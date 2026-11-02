@@ -456,7 +456,15 @@ async fn send_incident_notifications_inner(
             _ => ("P3".to_string(), String::new(), String::new(), 0),
         };
     let incident_template = incident_override(org_id).await;
-    let ledger_event = incident_ledger_event(event, chrono::Utc::now().timestamp_micros());
+    let now_us = chrono::Utc::now().timestamp_micros();
+    let ledger_event = repeat_opened_event(
+        org_id,
+        incident_id,
+        episode_opened_at,
+        incident_ledger_event(event, now_us),
+        now_us,
+    )
+    .await;
 
     let cfg = config::get_config();
     let incident_url = format!(
@@ -535,9 +543,42 @@ async fn incident_override(org_id: &str) -> Option<config::meta::destinations::T
 /// `opened` for a new incident, else `updated:{incident_event}:{event_time_us}`.
 fn incident_ledger_event(event: &str, event_time_us: i64) -> String {
     match event {
-        "new_incident_created" => "opened".to_string(),
+        "new_incident_created" | "reopened" => "opened".to_string(),
         "resolved" => "resolved".to_string(),
         other => format!("updated:{other}:{event_time_us}"),
+    }
+}
+
+/// An episode that already sent "opened" (an un-mute) opens again as `opened:{now}`, its own row.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn repeat_opened_event(
+    org_id: &str,
+    incident_id: &str,
+    episode_opened_at: i64,
+    ledger_event: String,
+    now_us: i64,
+) -> String {
+    if ledger_event != "opened" {
+        return ledger_event;
+    }
+    let key = infra::table::notification_deliveries::EpisodeKey {
+        org: org_id.to_string(),
+        kind: config::meta::alerts::notification_kind::NotificationKind::Incident
+            .as_str()
+            .to_string(),
+        episode_id: format!("{incident_id}:{episode_opened_at}"),
+    };
+    let sent_before = infra::table::notification_deliveries::event_exists(
+        infra::db::get_orm_client_rw().await,
+        &key,
+        "opened",
+    )
+    .await
+    .unwrap_or(false);
+    if sent_before {
+        format!("opened:{now_us}")
+    } else {
+        ledger_event
     }
 }
 
@@ -682,6 +723,43 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
         &merged_destinations,
     )
     .await;
+}
+
+/// Send "reopened" under the new episode key to the incident's merged alert destinations.
+#[cfg(feature = "enterprise")]
+async fn send_incident_reopened_notification(org_id: &str, incident_id: &str) {
+    let Some(first_alert) = first_incident_alert(org_id, incident_id).await else {
+        log::debug!("[incidents] no alert to notify for the reopen of {incident_id}");
+        return;
+    };
+    let merged_destinations =
+        collect_incident_destinations(org_id, incident_id, &first_alert.destinations).await;
+    if let Some(error) = send_incident_notifications(
+        &first_alert,
+        &[],
+        None,
+        None,
+        incident_id,
+        "reopened",
+        chrono::Utc::now().timestamp_micros(),
+        &merged_destinations,
+    )
+    .await
+    {
+        log::warn!("[incidents] reopen notification for {org_id}/{incident_id}: {error}");
+    }
+}
+
+/// The incident's first linked alert, from the cache.
+#[cfg(feature = "enterprise")]
+async fn first_incident_alert(org_id: &str, incident_id: &str) -> Option<Alert> {
+    let alerts = infra::table::alert_incidents::get_incident_alerts(incident_id)
+        .await
+        .ok()?;
+    let first = alerts.first()?;
+    crate::db::alerts::alert::get_alert_from_cache(org_id, &first.alert_id)
+        .await
+        .map(|(_, alert)| alert)
 }
 
 /// Correlate an alert to an incident, and send a notification if appropriate.
@@ -3247,6 +3325,11 @@ pub async fn update_status_as(
     ) && infra::table::alert_incidents::get(org_id, incident_id)
         .await?
         .is_some_and(|m| m.muted_by_downtime_id.is_some());
+    #[cfg(feature = "enterprise")]
+    let was_resolved = status == "open"
+        && infra::table::alert_incidents::get(org_id, incident_id)
+            .await?
+            .is_some_and(|m| m.status == "resolved");
     let updated = if status == "resolved" {
         resolve_status(org_id, incident_id, quiet || muted_before).await?
     } else {
@@ -3293,6 +3376,12 @@ pub async fn update_status_as(
         );
     }
 
+    // A reopen starts a new episode, so its destinations hear it open again.
+    #[cfg(feature = "enterprise")]
+    if was_resolved && !muted {
+        send_incident_reopened_notification(org_id, incident_id).await;
+    }
+
     // A reopened incident gets a fresh automatic run.
     #[cfg(feature = "enterprise")]
     if status == "open" && !muted {
@@ -3310,7 +3399,7 @@ pub async fn update_status_as(
 
 /// Write the resolve and close the episode in one transaction; a muted resolve sends nothing.
 #[cfg(feature = "enterprise")]
-async fn resolve_status(
+pub(crate) async fn resolve_status(
     org_id: &str,
     incident_id: &str,
     muted: bool,
@@ -3324,8 +3413,8 @@ async fn resolve_status(
         anyhow::bail!("Incident not found");
     };
     let episode_id = format!("{incident_id}:{}", before.episode_opened_at);
-    let (current, recorded) = if muted {
-        (Vec::new(), Vec::new())
+    let rows = if muted {
+        IncidentResolveRows::default()
     } else {
         incident_resolve_rows(org_id, incident_id, &before, &episode_id).await
     };
@@ -3346,8 +3435,8 @@ async fn resolve_status(
         NotificationKind::Incident,
         &episode_id,
         incident_id,
-        current,
-        recorded,
+        rows.current,
+        rows.recorded,
         if muted {
             CLOSED_BY_PRODUCER
         } else {
@@ -3360,6 +3449,14 @@ async fn resolve_status(
     for failed in results.iter().filter_map(|r| r.as_ref().err()) {
         log::warn!("[incidents] resolved notification for {org_id}/{incident_id}: {failed}");
     }
+    delivery::send_outside_after_close(
+        org_id,
+        &rows.outside,
+        &rows.candidates,
+        Some(&rows.subject),
+        &rows.ctx,
+    )
+    .await;
     written
         .lock()
         .await
@@ -3368,7 +3465,7 @@ async fn resolve_status(
 }
 
 #[cfg(not(feature = "enterprise"))]
-async fn resolve_status(
+pub(crate) async fn resolve_status(
     org_id: &str,
     incident_id: &str,
     _muted: bool,
@@ -3383,10 +3480,7 @@ async fn incident_resolve_rows(
     incident_id: &str,
     incident: &infra::table::entity::alert_incidents::Model,
     episode_id: &str,
-) -> (
-    Vec<infra::table::notification_deliveries::FanoutDestination>,
-    Vec<infra::table::notification_deliveries::FanoutDestination>,
-) {
+) -> IncidentResolveRows {
     use config::meta::alerts::notification_kind::NotificationKind;
 
     use crate::alerts::notifications::delivery;
@@ -3466,26 +3560,42 @@ async fn incident_resolve_rows(
         .chain(alert_template)
         .collect();
     let subject = format!("[resolved] {title}");
-    let mut current = Vec::new();
+    let mut rows = Vec::new();
     for dest in &destinations {
-        match delivery::fanout_destination(org_id, dest, &candidates, Some(&subject), &ctx).await {
-            Ok(d) => current.push(d),
-            Err(e) => log::warn!("[incidents] no resolve row for {dest} on {incident_id}: {e}"),
-        }
+        rows.push(delivery::fanout_row(org_id, dest, &candidates, Some(&subject), &ctx).await);
     }
-    let mut recorded = Vec::new();
+    let mut recorded_rows = Vec::new();
     for dest in delivery::recorded_destinations(org_id, NotificationKind::Incident, episode_id)
         .await
         .into_iter()
         .filter(|d| !destinations.contains(d))
     {
-        if let Ok(d) =
-            delivery::fanout_destination(org_id, &dest, &candidates, Some(&subject), &ctx).await
-        {
-            recorded.push(d);
-        }
+        recorded_rows
+            .push(delivery::fanout_row(org_id, &dest, &candidates, Some(&subject), &ctx).await);
     }
-    (current, recorded)
+    let (current, mut outside) = delivery::split_fanout(rows);
+    let (recorded, recorded_outside) = delivery::split_fanout(recorded_rows);
+    outside.extend(recorded_outside);
+    IncidentResolveRows {
+        current,
+        recorded,
+        outside,
+        ctx,
+        candidates,
+        subject,
+    }
+}
+
+/// The resolve rows of an incident and what the destinations outside the ledger are sent.
+#[cfg(feature = "enterprise")]
+#[derive(Default)]
+struct IncidentResolveRows {
+    current: Vec<infra::table::notification_deliveries::FanoutDestination>,
+    recorded: Vec<infra::table::notification_deliveries::FanoutDestination>,
+    outside: Vec<String>,
+    ctx: crate::alerts::notifications::NotificationContext,
+    candidates: Vec<config::meta::destinations::Template>,
+    subject: String,
 }
 
 /// Runs the one rule when the status change is the one ack's (AK-2, D20). [strong] (reads)
@@ -3583,12 +3693,19 @@ pub async fn record_auto_resolved(
     incident_id: &str,
     muted_by_downtime_id: Option<&str>,
 ) -> Result<(), anyhow::Error> {
-    let Some(downtime_id) = muted_by_downtime_id else {
-        return crate::incidents::append_event(org_id, incident_id, IncidentEvent::resolved(None))
-            .await;
-    };
-    let conn = infra::db::get_orm_client_rw().await;
-    record_muted_auto_resolve(conn, org_id, incident_id, downtime_id).await
+    match muted_by_downtime_id {
+        None => {
+            crate::incidents::append_event(org_id, incident_id, IncidentEvent::resolved(None))
+                .await?
+        }
+        Some(downtime_id) => {
+            let conn = infra::db::get_orm_client_rw().await;
+            record_muted_auto_resolve(conn, org_id, incident_id, downtime_id).await?
+        }
+    }
+    // The bulk sweep wrote the status; this closes the episode with it, as every resolve does.
+    resolve_status(org_id, incident_id, muted_by_downtime_id.is_some()).await?;
+    Ok(())
 }
 
 /// Update incident title
@@ -3672,6 +3789,31 @@ pub async fn update_severity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn incident_events_map_to_ledger_events() {
+        assert_eq!(incident_ledger_event("new_incident_created", 5), "opened");
+        assert_eq!(incident_ledger_event("reopened", 5), "opened");
+        assert_eq!(incident_ledger_event("resolved", 5), "resolved");
+        assert_eq!(
+            incident_ledger_event("severity_changed", 5),
+            "updated:severity_changed:5"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_incident_send_carries_its_kind_key_and_event() {
+        let mut ctx = crate::alerts::notifications::NotificationContext::default();
+        mark_incident_send(&mut ctx, "inc_1", 42, "opened");
+        assert_eq!(
+            ctx.kind,
+            config::meta::alerts::notification_kind::NotificationKind::Incident
+        );
+        assert_eq!(ctx.episode_id.as_deref(), Some("inc_1:42"));
+        assert_eq!(ctx.object_id, "inc_1");
+        assert_eq!(ctx.event, "opened");
+    }
 
     /// The incident path and the alert path page the same person about the same
     /// alert, so an unset priority has to mean the same thing on both. They used

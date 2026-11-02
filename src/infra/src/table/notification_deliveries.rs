@@ -51,6 +51,7 @@ pub const DEFAULT_MAX_ATTEMPTS: i32 = 5;
 /// Five minutes: longer than the shared transport timeout, so a live send never loses its claim.
 pub const LEASE_US: i64 = 5 * 60 * 1_000_000;
 pub const LEASE_EXPIRED: &str = "lease expired";
+pub const NO_RESOLVE_RENDERED: &str = "no resolve message could be rendered for this destination";
 
 /// The (org, kind, episode) an episode row and its delivery rows share.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -136,6 +137,8 @@ pub struct FanoutDestination {
     pub template_name: String,
     pub subject: Option<String>,
     pub payload: String,
+    /// Set when no resolve could be rendered; the row is written failed, never queued.
+    pub failure: Option<String>,
 }
 
 /// A destination the episode attempted, read under the episode lock.
@@ -470,38 +473,27 @@ async fn wake_resolve<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Write a row that ends where it starts: a platform skip or a render failure, never sent.
+/// Write a row that is finished when it is inserted, in one statement, never retried.
 pub async fn insert_terminal(
     db: &DatabaseConnection,
     new: &NewDelivery,
     result: &Finish,
     now: i64,
-) -> Result<(), errors::Error> {
-    if !insert_row(db, new, now, RowStart::Queued).await? {
-        return Ok(());
-    }
-    let status = if result.skip_reason.is_some() {
+) -> Result<bool, errors::Error> {
+    let status = if result.sent {
+        STATUS_SENT
+    } else if result.skip_reason.is_some() {
         STATUS_SKIPPED
     } else {
         STATUS_FAILED
     };
-    let closed = new.closed_at_insert.then_some(now);
-    Entity::update_many()
-        .col_expr(Column::Status, Expr::value(status))
-        .col_expr(Column::SkipReason, Expr::value(result.skip_reason.clone()))
-        .col_expr(Column::Error, Expr::value(result.error.clone()))
-        .col_expr(Column::Retryable, Expr::value(false))
-        .col_expr(Column::FinishedAt, Expr::value(now))
-        .col_expr(Column::NextRetryAt, Expr::value(Option::<i64>::None))
-        .col_expr(Column::EpisodeClosedAt, Expr::value(closed))
-        .filter(Column::Org.eq(&new.org))
-        .filter(Column::Kind.eq(&new.kind))
-        .filter(Column::EpisodeId.eq(&new.episode_id))
-        .filter(Column::Event.eq(&new.event))
-        .filter(Column::Destination.eq(&new.destination))
-        .exec(db)
-        .await?;
-    Ok(())
+    let start = RowStart::Terminal {
+        status,
+        skip: result.skip_reason.as_deref(),
+        error: result.error.as_deref(),
+        closed: new.closed_at_insert,
+    };
+    insert_row(db, new, now, start).await
 }
 
 /// Close the episode and queue a resolve per destination inside the producer's own transaction.
@@ -548,9 +540,13 @@ pub async fn resolve_episode_in(
             if set.iter().any(|d| d.destination == r.destination) {
                 continue;
             }
-            if let Some(d) = recorded_only(r) {
-                set.push(d);
-            }
+            set.push(recorded_only(r).unwrap_or_else(|| FanoutDestination {
+                destination: r.destination.clone(),
+                channel: r.channel.clone(),
+                platform: r.platform.clone(),
+                failure: Some(NO_RESOLVE_RENDERED.to_string()),
+                ..Default::default()
+            }));
         }
         for d in &set {
             let new = NewDelivery {
@@ -571,8 +567,18 @@ pub async fn resolve_episode_in(
                 subject: d.subject.clone(),
                 payload: d.payload.clone(),
             };
-            insert_row(txn, &new, now, RowStart::Queued).await?;
-            written.push(d.destination.clone());
+            let start = match &d.failure {
+                Some(error) => RowStart::Terminal {
+                    status: STATUS_FAILED,
+                    skip: None,
+                    error: Some(error),
+                    closed: false,
+                },
+                None => RowStart::Queued,
+            };
+            if insert_row(txn, &new, now, start).await? {
+                written.push(d.destination.clone());
+            }
         }
     }
 
@@ -583,6 +589,20 @@ pub async fn resolve_episode_in(
         .exec(txn)
         .await?;
     Ok(written)
+}
+
+/// Whether the episode already has a row for `event`, under any destination.
+pub async fn event_exists<C: ConnectionTrait>(
+    conn: &C,
+    key: &EpisodeKey,
+    event: &str,
+) -> Result<bool, errors::Error> {
+    Ok(Entity::find()
+        .filter(episode_filter(key))
+        .filter(Column::Event.eq(event))
+        .count(conn)
+        .await?
+        > 0)
 }
 
 /// The queued resolve rows of an episode, for the producer to claim right after its commit.
@@ -996,6 +1016,83 @@ enum RowStart<'a> {
     PendingClosed(&'a str),
     Queued,
     Superseded,
+    /// Born finished: a platform skip, a render failure, or a send outside the ledger.
+    Terminal {
+        status: &'a str,
+        skip: Option<&'a str>,
+        error: Option<&'a str>,
+        closed: bool,
+    },
+}
+
+/// The fields a new row starts with, by how it starts.
+struct RowInit<'a> {
+    status: &'a str,
+    attempt: i32,
+    token: Option<&'a str>,
+    claimed_at: Option<i64>,
+    next_retry_at: Option<i64>,
+    skip: Option<&'a str>,
+    error: Option<&'a str>,
+    finished_at: Option<i64>,
+    closed_at: Option<i64>,
+}
+
+impl<'a> RowInit<'a> {
+    fn of(start: RowStart<'a>, now: i64) -> Self {
+        let blank = RowInit {
+            status: STATUS_QUEUED,
+            attempt: 0,
+            token: None,
+            claimed_at: None,
+            next_retry_at: None,
+            skip: None,
+            error: None,
+            finished_at: None,
+            closed_at: None,
+        };
+        match start {
+            RowStart::Pending(t) => RowInit {
+                status: STATUS_PENDING,
+                attempt: 1,
+                token: Some(t),
+                claimed_at: Some(now),
+                ..blank
+            },
+            RowStart::PendingClosed(t) => RowInit {
+                status: STATUS_PENDING,
+                attempt: 1,
+                token: Some(t),
+                claimed_at: Some(now),
+                closed_at: Some(now),
+                ..blank
+            },
+            RowStart::Queued => RowInit {
+                next_retry_at: Some(now),
+                ..blank
+            },
+            RowStart::Superseded => RowInit {
+                status: STATUS_SKIPPED,
+                skip: Some(SKIP_SUPERSEDED),
+                finished_at: Some(now),
+                closed_at: Some(now),
+                ..blank
+            },
+            RowStart::Terminal {
+                status,
+                skip,
+                error,
+                closed,
+            } => RowInit {
+                status,
+                skip,
+                error,
+                finished_at: Some(now),
+                closed_at: closed.then_some(now),
+                ..blank
+            },
+        }
+    }
 }
 
 /// INSERT … ON CONFLICT DO NOTHING; true when this call created the row.
@@ -1005,39 +1102,7 @@ async fn insert_row<C: ConnectionTrait>(
     now: i64,
     start: RowStart<'_>,
 ) -> Result<bool, errors::Error> {
-    let (status, attempt, token, claimed_at, next_retry_at, skip, finished, closed) = match start {
-        RowStart::Pending(t) => (
-            STATUS_PENDING,
-            1,
-            Some(t),
-            Some(now),
-            None,
-            None,
-            None,
-            None,
-        ),
-        RowStart::PendingClosed(t) => (
-            STATUS_PENDING,
-            1,
-            Some(t),
-            Some(now),
-            None,
-            None,
-            None,
-            Some(now),
-        ),
-        RowStart::Queued => (STATUS_QUEUED, 0, None, None, Some(now), None, None, None),
-        RowStart::Superseded => (
-            STATUS_SKIPPED,
-            0,
-            None,
-            None,
-            None,
-            Some(SKIP_SUPERSEDED),
-            Some(now),
-            Some(now),
-        ),
-    };
+    let init = RowInit::of(start, now);
     let model = ActiveModel {
         id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
         org: Set(new.org.clone()),
@@ -1051,21 +1116,21 @@ async fn insert_row<C: ConnectionTrait>(
         template_name: Set(new.template_name.clone()),
         template_skipped: Set(new.template_skipped.clone()),
         opens_episode: Set(new.opens_episode),
-        status: Set(status.to_string()),
-        attempt: Set(attempt),
+        status: Set(init.status.to_string()),
+        attempt: Set(init.attempt),
         max_attempts: Set(new.max_attempts.max(1)),
         retryable: Set(false),
         status_code: Set(None),
-        error: Set(None),
-        skip_reason: Set(skip.map(str::to_string)),
+        error: Set(init.error.map(str::to_string)),
+        skip_reason: Set(init.skip.map(str::to_string)),
         subject: Set(new.subject.clone()),
         payload: Set(new.payload.clone()),
-        claim_token: Set(token.map(str::to_string)),
-        claimed_at: Set(claimed_at),
-        finished_at: Set(finished),
-        next_retry_at: Set(next_retry_at),
+        claim_token: Set(init.token.map(str::to_string)),
+        claimed_at: Set(init.claimed_at),
+        finished_at: Set(init.finished_at),
+        next_retry_at: Set(init.next_retry_at),
         created_at: Set(now),
-        episode_closed_at: Set(closed),
+        episode_closed_at: Set(init.closed_at),
     };
     let inserted = Entity::insert(model)
         .on_conflict(
@@ -1096,6 +1161,12 @@ async fn find_key<C: ConnectionTrait>(
         .filter(Column::Destination.eq(&new.destination))
         .one(conn)
         .await?)
+}
+
+/// Creates the three ledger tables; for tests outside this crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn create_tables_for_test(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
+    super::migration::create_notification_deliveries_for_test(db).await
 }
 
 #[cfg(test)]

@@ -406,7 +406,7 @@ pub(crate) async fn create_slo_tables_for_test(
         .await
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_notification_deliveries_for_test(
     db: &sea_orm::DatabaseConnection,
 ) -> Result<(), DbErr> {

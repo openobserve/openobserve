@@ -84,6 +84,7 @@ fn fanout(dest: &str, platform: bool) -> FanoutDestination {
         template_name: String::new(),
         subject: None,
         payload: "{\"v\":1}".into(),
+        failure: None,
     }
 }
 
@@ -366,8 +367,21 @@ async fn recovery_while_a_trigger_timed_out_still_resolves() {
     finish(&db, &row.id, "t1", &no_answer(), T0).await.unwrap();
     assert_eq!(record_of(&db, "pd").await.as_deref(), Some(OUTCOME_UNKNOWN));
     resolve(&db, &[fanout("pd", true)], T0 + 1).await;
+    let trigger_row = get(&db, &row.id).await.unwrap().unwrap();
+    assert_eq!(trigger_row.status, STATUS_SKIPPED);
+    assert_eq!(trigger_row.skip_reason.as_deref(), Some(SKIP_SUPERSEDED));
     let r = resolve_row(&db, "pd").await;
-    owned(reclaim(&db, &r.id, "r1", T0 + 2).await.unwrap());
+    let claimed = owned(reclaim(&db, &r.id, "r1", T0 + 2).await.unwrap());
+    finish(&db, &claimed.id, "r1", &sent(), T0 + 3)
+        .await
+        .unwrap();
+    assert_eq!(resolve_row(&db, "pd").await.status, STATUS_SENT);
+    assert!(
+        retry_candidates(&db, T0 + DAY, 100)
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -434,7 +448,10 @@ async fn the_fan_out_is_idempotent_and_stamps_every_row() {
         fanout("teams", false),
     ];
     assert_eq!(resolve(&db, &current, T0 + 1).await.len(), 3);
-    assert_eq!(resolve(&db, &current, T0 + 2).await.len(), 3);
+    assert!(
+        resolve(&db, &current, T0 + 2).await.is_empty(),
+        "a repeated fan out writes no new row"
+    );
     let (total, rows) = list(
         &db,
         &ListFilter {
@@ -597,6 +614,131 @@ async fn list_pages_newest_first_and_filters_by_object() {
         ..filter
     };
     assert_eq!(list(&db, &other).await.unwrap().0, 0);
+}
+
+#[tokio::test]
+async fn a_recorded_card_with_no_rendered_resolve_gets_a_failed_row_not_none() {
+    let db = db().await;
+    owned(
+        claim(&db, &trigger("slack", false), "t1", T0)
+            .await
+            .unwrap(),
+    );
+    let txn = db.begin().await.unwrap();
+    let written = resolve_episode_in(
+        &txn,
+        &key(),
+        "a1",
+        &[],
+        |_| None,
+        CLOSED_BY_RESOLVE,
+        true,
+        T0 + 1,
+    )
+    .await
+    .unwrap();
+    txn.commit().await.unwrap();
+    assert_eq!(written, ["slack"]);
+    let row = resolve_row(&db, "slack").await;
+    assert_eq!(row.status, STATUS_FAILED);
+    assert!(!row.retryable);
+    assert_eq!(row.error.as_deref(), Some(NO_RESOLVE_RENDERED));
+}
+
+#[tokio::test]
+async fn a_new_episode_while_the_old_recovery_retries_keeps_both_keys_apart() {
+    let db = db().await;
+    let old = owned(
+        claim(&db, &trigger("slack", false), "t1", T0)
+            .await
+            .unwrap(),
+    );
+    finish(&db, &old.id, "t1", &sent(), T0).await.unwrap();
+    resolve(&db, &[fanout("slack", false)], T0 + 1).await;
+    let old_resolve = resolve_row(&db, "slack").await;
+    let claimed = owned(reclaim(&db, &old_resolve.id, "r1", T0 + 2).await.unwrap());
+    finish(&db, &claimed.id, "r1", &rejected(503), T0 + 2)
+        .await
+        .unwrap();
+
+    let mut next = trigger("slack", false);
+    next.episode_id = "a1:200".into();
+    next.event = "firing:200".into();
+    let fresh = owned(claim(&db, &next, "t2", T0 + 3).await.unwrap());
+    assert_eq!(fresh.episode_id, "a1:200");
+    let due = retry_candidates(&db, T0 + 2 * MIN, 100).await.unwrap();
+    assert_eq!(due.len(), 1);
+    assert_eq!(
+        due[0].episode_id, "a1:100",
+        "the old resolve finishes under the old key"
+    );
+}
+
+#[tokio::test]
+async fn two_resolves_of_one_episode_write_one_row_per_destination() {
+    let db = db().await;
+    owned(claim(&db, &trigger("pd", true), "t1", T0).await.unwrap());
+    let current = [fanout("pd", true), fanout("slack", false)];
+    let (a, b) = tokio::join!(
+        resolve(&db, &current, T0 + 1),
+        resolve(&db, &current, T0 + 1)
+    );
+    assert_eq!(a.len() + b.len(), 2);
+    let (total, _) = list(
+        &db,
+        &ListFilter {
+            org: "acme".into(),
+            kind: "anomaly".into(),
+            episode_id: Some("a1:100".into()),
+            event: Some(EVENT_RESOLVED.into()),
+            size: 50,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(total, 2);
+}
+
+#[tokio::test]
+async fn a_terminal_row_is_never_a_retry_candidate() {
+    let db = db().await;
+    let new = informational("cancelled");
+    assert!(
+        insert_terminal(&db, &new, &rejected(500), T0)
+            .await
+            .unwrap()
+    );
+    assert!(
+        !insert_terminal(&db, &new, &rejected(500), T0)
+            .await
+            .unwrap()
+    );
+    assert!(
+        retry_candidates(&db, T0 + DAY, 100)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    let row = queued_or_any(&db, "cancelled", "slack").await.unwrap();
+    assert_eq!(row.status, STATUS_FAILED);
+    assert!(!row.retryable);
+}
+
+#[tokio::test]
+async fn a_trigger_that_never_finished_reads_as_unknown_at_the_resolve() {
+    let db = db().await;
+    owned(claim(&db, &trigger("pd", true), "t1", T0).await.unwrap());
+    assert_eq!(
+        record_of(&db, "pd").await.as_deref(),
+        Some(OUTCOME_ATTEMPTED)
+    );
+    let later = T0 + LEASE_US + 1;
+    expire_leases(&db, later).await.unwrap();
+    assert_eq!(record_of(&db, "pd").await.as_deref(), Some(OUTCOME_UNKNOWN));
+    resolve(&db, &[fanout("pd", true)], later + 1).await;
+    let r = resolve_row(&db, "pd").await;
+    owned(reclaim(&db, &r.id, "r1", later + 2).await.unwrap());
 }
 
 #[test]

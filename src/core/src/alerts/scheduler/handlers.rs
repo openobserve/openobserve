@@ -9831,7 +9831,30 @@ mod tests {
 
     #[test]
     fn a_partial_delivery_stores_the_minted_episode_key() {
-        assert!(partial_delivery_stores_key(&["slack".to_string()]));
+        use config::meta::alerts::{
+            recovery::{EpisodeInput, apply_episode},
+            state::AlertState,
+        };
+        let minted = "minted-k1".to_string();
+        let input = EpisodeInput {
+            delivered: partial_delivery_stores_key(&["slack".to_string()]),
+            incident_id: None,
+            keep_firing_for_secs: 0,
+            episode_id: Some(minted.clone()),
+        };
+        let mut state = AlertState::empty("a1", "");
+        // The same closure `persist_alert_run_state` passes.
+        apply_episode(&mut state, true, &input, 10, || {
+            input.episode_id.clone().unwrap_or_else(config::ider::uuid)
+        });
+        assert_eq!(state.episode_id.as_deref(), Some(minted.as_str()));
+        // The retry reads the stored key back, so it cannot mint a second one.
+        let retry = EpisodeInput {
+            episode_id: state.episode_id.clone(),
+            ..input
+        };
+        apply_episode(&mut state, true, &retry, 20, config::ider::uuid);
+        assert_eq!(state.episode_id.as_deref(), Some(minted.as_str()));
         assert!(!partial_delivery_stores_key(&[]));
     }
 }

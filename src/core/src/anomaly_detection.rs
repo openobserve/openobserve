@@ -3492,30 +3492,52 @@ pub async fn send_anomaly_alert(
     destination_id: String,
     actx: o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
 ) -> anyhow::Result<bool> {
-    use crate::alerts::notifications::notify::{NotifyError, SkipOutcome, notify};
     let org_id = actx.org_id.clone();
     let explicit = load_override(&org_id, actx.template.as_deref()).await;
     let mut ctx = anomaly_notification_context(&actx);
-    match notify(&org_id, &destination_id, &explicit, None, &mut ctx).await {
-        Ok(_) => Ok(true),
-        Err(NotifyError::Skipped(reason)) => Ok(match reason.outcome() {
-            SkipOutcome::Delivered | SkipOutcome::Handled | SkipOutcome::Pending => true,
-            SkipOutcome::Unsuccessful => false,
-        }),
-        Err(NotifyError::DestinationNotFound(_)) => {
-            log::warn!(
-                "[anomaly_detection {}] destination '{destination_id}' not found",
-                actx.anomaly_id
-            );
-            Ok(false)
+    let sent = crate::alerts::notifications::notify::notify(
+        &org_id,
+        &destination_id,
+        &explicit,
+        None,
+        &mut ctx,
+    )
+    .await;
+    if matches!(
+        sent,
+        Err(crate::alerts::notifications::notify::NotifyError::DestinationNotFound(_))
+    ) {
+        log::warn!(
+            "[anomaly_detection {}] destination '{destination_id}' not found",
+            actx.anomaly_id
+        );
+    }
+    anomaly_send_result(sent.map(|_| ()))
+}
+
+/// Delivered and handled are done; a pending ledger row is neither done nor failed.
+#[cfg(feature = "enterprise")]
+fn anomaly_send_result(
+    sent: Result<(), crate::alerts::notifications::notify::NotifyError>,
+) -> anyhow::Result<bool> {
+    use o2_enterprise::enterprise::anomaly_detection::query_executor::{
+        DeliveryPending, DestinationRejected,
+    };
+
+    use crate::alerts::notifications::notify::{NotifyError, SkipOutcome};
+    match sent {
+        Ok(()) => Ok(true),
+        Err(NotifyError::Skipped(reason)) => match reason.outcome() {
+            SkipOutcome::Delivered | SkipOutcome::Handled => Ok(true),
+            SkipOutcome::Pending => Err(DeliveryPending(reason.as_str().to_string()).into()),
+            SkipOutcome::Unsuccessful => Ok(false),
+        },
+        Err(NotifyError::DestinationNotFound(_)) => Ok(false),
+        Err(NotifyError::Rejected { status, body }) => Err(DestinationRejected {
+            status,
+            body: body.chars().take(REJECTION_BODY_MAX_CHARS).collect(),
         }
-        Err(NotifyError::Rejected { status, body }) => Err(
-            o2_enterprise::enterprise::anomaly_detection::query_executor::DestinationRejected {
-                status,
-                body: body.chars().take(REJECTION_BODY_MAX_CHARS).collect(),
-            }
-            .into(),
-        ),
+        .into()),
         Err(e) => Err(e.into()),
     }
 }
@@ -3538,30 +3560,28 @@ pub async fn resolve_anomaly_episode(
     let org_id = actx.org_id.clone();
     let ctx = anomaly_notification_context(&actx);
     let episode_id = ctx.episode_id.clone().unwrap_or_default();
-    let mut current = Vec::new();
-    let mut recorded = Vec::new();
+    let explicit = if recovery.send_resolves {
+        load_override(&org_id, actx.template.as_deref()).await
+    } else {
+        Vec::new()
+    };
+    let mut rows = Vec::new();
+    let mut recorded_rows = Vec::new();
     if recovery.send_resolves {
-        let explicit = load_override(&org_id, actx.template.as_deref()).await;
         for dest in &recovery.destinations {
-            match delivery::fanout_destination(&org_id, dest, &explicit, None, &ctx).await {
-                Ok(d) => current.push(d),
-                Err(e) => log::warn!(
-                    "[anomaly_detection {}] no recovery row for '{dest}': {e}",
-                    actx.anomaly_id
-                ),
-            }
+            rows.push(delivery::fanout_row(&org_id, dest, &explicit, None, &ctx).await);
         }
         for dest in delivery::recorded_destinations(&org_id, NotificationKind::Anomaly, &episode_id)
             .await
             .into_iter()
             .filter(|d| !recovery.destinations.contains(d))
         {
-            if let Ok(d) = delivery::fanout_destination(&org_id, &dest, &explicit, None, &ctx).await
-            {
-                recorded.push(d);
-            }
+            recorded_rows.push(delivery::fanout_row(&org_id, &dest, &explicit, None, &ctx).await);
         }
     }
+    let (current, mut outside) = delivery::split_fanout(rows);
+    let (recorded, recorded_outside) = delivery::split_fanout(recorded_rows);
+    outside.extend(recorded_outside);
     let anomaly_id = actx.anomaly_id.clone();
     let state_change: delivery::StateChange = Box::new(move |txn| {
         Box::pin(async move {
@@ -3587,6 +3607,7 @@ pub async fn resolve_anomaly_episode(
         state_change,
     )
     .await?;
+    delivery::send_outside_after_close(&org_id, &outside, &explicit, None, &ctx).await;
     let delivered = results
         .iter()
         .filter(|r| match r {
@@ -6793,6 +6814,56 @@ mod tests {
                 validated_denominator(&filter_alone, &counting).is_err(),
                 "a lone filter change must be judged against the stored function"
             );
+        }
+    }
+
+    // ── The shared send path's answers, as the scheduler reads them ──────
+    #[cfg(feature = "enterprise")]
+    mod send_result {
+        use o2_enterprise::enterprise::anomaly_detection::query_executor::{
+            DeliveryPending, DestinationRejected,
+        };
+
+        use super::super::anomaly_send_result;
+        use crate::alerts::notifications::notify::{NotifyError, SkipReason};
+
+        #[test]
+        fn a_refusing_answer_is_a_destination_rejection_with_its_status() {
+            let err = anomaly_send_result(Err(NotifyError::Rejected {
+                status: 500,
+                body: "boom".into(),
+            }))
+            .unwrap_err();
+            let rejected = err.downcast_ref::<DestinationRejected>().unwrap();
+            assert_eq!(rejected.status, 500);
+            assert!(rejected.is_retryable());
+        }
+
+        #[test]
+        fn a_missing_destination_or_no_member_recipient_is_a_skip() {
+            assert!(
+                !anomaly_send_result(Err(NotifyError::DestinationNotFound("d".into()))).unwrap()
+            );
+            assert!(
+                !anomaly_send_result(Err(NotifyError::Skipped(SkipReason::NoOrgMemberRecipient)))
+                    .unwrap()
+            );
+        }
+
+        #[test]
+        fn a_pending_ledger_row_is_neither_delivered_nor_failed() {
+            for reason in [SkipReason::InFlight, SkipReason::RetryScheduled] {
+                let err = anomaly_send_result(Err(NotifyError::Skipped(reason))).unwrap_err();
+                assert!(
+                    err.downcast_ref::<DeliveryPending>().is_some(),
+                    "{reason:?}"
+                );
+            }
+            assert!(
+                anomaly_send_result(Err(NotifyError::Skipped(SkipReason::AlreadyDelivered)))
+                    .unwrap()
+            );
+            assert!(anomaly_send_result(Ok(())).unwrap());
         }
     }
 

@@ -506,6 +506,10 @@ mod tests {
         DestinationType::Email(Default::default())
     }
 
+    fn sns_dest() -> DestinationType {
+        DestinationType::Sns(Default::default())
+    }
+
     fn slack_dest() -> DestinationType {
         DestinationType::Http(config::meta::destinations::Endpoint {
             destination_type: Some("slack".into()),
@@ -650,6 +654,25 @@ mod tests {
                 Some(hook.clone()),
                 email_dest(),
                 TemplateSource::Compiled,
+                1,
+            ),
+            // The SNS leg of a mixed set: a Custom http override falls through there too.
+            (
+                Anomaly,
+                vec![hook.clone()],
+                None,
+                None,
+                sns_dest(),
+                TemplateSource::Compiled,
+                1,
+            ),
+            (
+                Anomaly,
+                vec![hook.clone()],
+                Some(user.clone()),
+                None,
+                sns_dest(),
+                TemplateSource::Destination,
                 1,
             ),
             // Incident 1a: the org incident override first, then 1b the alert's template.

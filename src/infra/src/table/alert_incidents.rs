@@ -1525,6 +1525,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_reopen_after_a_resolve_starts_a_new_notification_episode() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-1").await;
+        let opened = incident.episode_opened_at;
+        let acked = update_status_with(&db, "acme", &incident.id, "acknowledged")
+            .await
+            .unwrap();
+        assert_eq!(
+            acked.episode_opened_at, opened,
+            "an acknowledge keeps the episode"
+        );
+        update_status_with(&db, "acme", &incident.id, "resolved")
+            .await
+            .unwrap();
+        let reopened = update_status_with(&db, "acme", &incident.id, "open")
+            .await
+            .unwrap();
+        assert!(
+            reopened.episode_opened_at > opened,
+            "a reopen keys a new episode"
+        );
+    }
+
+    #[tokio::test]
     async fn two_concurrent_unmutes_clear_the_incident_once() {
         let db = incidents_db().await;
         let incident = muted_incident(&db, "dt-1").await;

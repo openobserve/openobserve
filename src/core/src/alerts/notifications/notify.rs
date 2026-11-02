@@ -229,18 +229,19 @@ pub async fn send(
     ctx: &mut NotificationContext,
 ) -> Result<DeliveryRow, NotifyError> {
     apply_destination_metadata(&resolved.destination_type, ctx);
-    if let Some(sent) = send_outside_ledger(org_id, resolved, ctx).await {
-        return sent;
+    if sends_outside_ledger(resolved, ctx) {
+        return send_outside_ledger(org_id, resolved, subject, ctx).await;
     }
     super::delivery::send_on_ledger(org_id, resolved, subject, ctx).await
 }
 
-/// The Slack app outbox and Jira issues have no replayable body, so both bypass the ledger.
+/// Send through the Slack app outbox or Jira and record a finished row that is never replayed.
 async fn send_outside_ledger(
     org_id: &str,
     resolved: &Resolved,
+    subject: Option<&str>,
     ctx: &mut NotificationContext,
-) -> Option<Result<DeliveryRow, NotifyError>> {
+) -> Result<DeliveryRow, NotifyError> {
     let sent = match &resolved.destination_type {
         DestinationType::SlackApp(target) => {
             crate::alerts::slack_publish::send_templated_post(
@@ -252,21 +253,28 @@ async fn send_outside_ledger(
             )
             .await
         }
-        DestinationType::Http(endpoint)
-            if super::jira::is_jira(endpoint) && ctx.kind == NotificationKind::Incident =>
-        {
-            super::jira::send(endpoint, ctx).await
+        DestinationType::Http(endpoint) => super::jira::send(endpoint, ctx).await,
+        _ => Err(anyhow::anyhow!("not an outside-ledger destination")),
+    }
+    .map_err(|e| NotifyError::Transport(e.to_string()));
+    let new = super::delivery::new_delivery(org_id, resolved, ctx, subject);
+    super::delivery::record_outside(&new, &sent).await;
+    sent.map(|_| DeliveryRow {
+        status: "sent".into(),
+        attempt: 1,
+        ..Default::default()
+    })
+}
+
+/// The Slack app outbox and Jira issues keep no body the ledger could resend.
+pub fn sends_outside_ledger(resolved: &Resolved, ctx: &NotificationContext) -> bool {
+    match &resolved.destination_type {
+        DestinationType::SlackApp(_) => true,
+        DestinationType::Http(endpoint) => {
+            super::jira::is_jira(endpoint) && ctx.kind == NotificationKind::Incident
         }
-        _ => return None,
-    };
-    Some(
-        sent.map(|_| DeliveryRow {
-            status: "sent".into(),
-            attempt: 1,
-            ..Default::default()
-        })
-        .map_err(|e| NotifyError::Transport(e.to_string())),
-    )
+        _ => false,
+    }
 }
 
 /// Resolve, then send.
@@ -448,25 +456,38 @@ pub async fn transport(
                 return Err(NotifyError::Skipped(SkipReason::NoOrgMemberRecipient));
             }
             let to = config::meta::destinations::Email { recipients: kept };
-            crate::alerts::alert::send_email_notification_with_inline_png(
-                &rec.subject,
-                &to,
-                rec.text.clone(),
-                rec.html.clone(),
-                record.png().map(std::sync::Arc::new),
+            bounded(
+                crate::alerts::alert::send_email_notification_with_inline_png(
+                    &rec.subject,
+                    &to,
+                    rec.text.clone(),
+                    rec.html.clone(),
+                    record.png().map(std::sync::Arc::new),
+                ),
             )
-            .await
+            .await?
             .map(|resp| note_skipped(resp, &skipped))
             .map_err(|e| NotifyError::Transport(e.to_string()))
         }
         ("sns", DestinationType::Sns(aws_sns)) => {
             let rec = record.sns.as_ref().ok_or_else(missing)?;
-            send_sns_notification(&rec.subject, aws_sns, rec.message.clone())
-                .await
-                .map_err(|e| NotifyError::Transport(e.to_string()))
+            bounded(send_sns_notification(
+                &rec.subject,
+                aws_sns,
+                rec.message.clone(),
+            ))
+            .await?
+            .map_err(|e| NotifyError::Transport(e.to_string()))
         }
         _ => Err(NotifyError::Skipped(SkipReason::DestinationChanged)),
     }
+}
+
+/// Caps a transport without its own overall deadline, so no send outlives the ledger lease.
+async fn bounded<T>(send: impl std::future::Future<Output = T>) -> Result<T, NotifyError> {
+    tokio::time::timeout(TRANSPORT_TIMEOUT, send)
+        .await
+        .map_err(|_| NotifyError::Transport(format!("timed out after {TRANSPORT_TIMEOUT:?}")))
 }
 
 fn missing() -> NotifyError {

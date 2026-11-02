@@ -172,6 +172,13 @@ fn validate(query: &DeliveriesQuery) -> Result<(NotificationKind, String), Strin
             query.kind
         )
     })?;
+    // Only the kinds whose producers write rows today; the others land with their stages.
+    if !matches!(kind, NotificationKind::Anomaly | NotificationKind::Incident) {
+        return Err(format!(
+            "kind: '{}' has no delivery rows yet; allowed: anomaly, incident",
+            query.kind
+        ));
+    }
     let owner = match (&query.object_id, &query.episode_id) {
         (Some(object_id), _) if !object_id.is_empty() => object_id.clone(),
         (_, Some(episode_id)) if !episode_id.is_empty() => owner_of_episode(episode_id),
@@ -239,6 +246,14 @@ mod tests {
             validate(&q("incident", None, Some("inc_7f3a:1762077900000000"))).unwrap(),
             (NotificationKind::Incident, "inc_7f3a".to_string())
         );
+    }
+
+    #[test]
+    fn kinds_without_rows_yet_are_refused() {
+        for kind in ["alert", "synthetics", "downtime", "on_call"] {
+            let err = validate(&q(kind, Some("x1"), None)).unwrap_err();
+            assert!(err.contains("allowed: anomaly, incident"), "{kind}: {err}");
+        }
     }
 
     #[test]

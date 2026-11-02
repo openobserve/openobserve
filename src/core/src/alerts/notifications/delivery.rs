@@ -42,6 +42,9 @@ use super::{
     record::{IMAGE_DROPPED, ReplayRecord, platform_name, transport_of},
 };
 
+/// The note on a row the Slack app outbox or Jira sent: neither keeps a body that can be resent.
+pub const SENT_OUTSIDE_LEDGER: &str = "sent outside the ledger, not replayable";
+
 /// The producer state change that commits in the same transaction as a resolve fan out.
 pub type StateChange =
     Box<dyn for<'a> FnOnce(&'a DatabaseTransaction) -> BoxFuture<'a, anyhow::Result<()>> + Send>;
@@ -91,6 +94,7 @@ pub async fn send_on_ledger(
     };
     fill_prepared(&mut new, &prepared);
     let (payload, image_dropped) = prepared.record.to_stored();
+    let replayable = ReplayRecord::parse(&payload).is_some_and(|r| !r.truncated);
     new.payload = payload;
     let token = svix_ksuid::Ksuid::new(None, None).to_string();
     let db = get_orm_client_rw().await;
@@ -102,7 +106,8 @@ pub async fn send_on_ledger(
         Claim::Refused(refusal) => return Err(NotifyError::Skipped(skip_of(&refusal))),
     };
     let result = transport(org_id, &resolved.destination_type, &prepared.record).await;
-    finish_row(&row, &token, ctx.kind, &result, image_dropped).await;
+    let finish = finish_of(&result, image_dropped, replayable);
+    finish_row(&row, &token, ctx.kind, &finish, now_micros()).await;
     result.map(|_| DeliveryRow {
         id: row.id,
         status: ledger::STATUS_SENT.into(),
@@ -113,9 +118,18 @@ pub async fn send_on_ledger(
 
 /// Send a stored row again from its record with the destination as it is now.
 pub async fn replay(row_id: &str) -> Result<DeliveryRow, NotifyError> {
+    replay_at(row_id, None, now_micros()).await
+}
+
+/// `replay` at `now`; `destination` stands in for the stored destination in tests.
+pub async fn replay_at(
+    row_id: &str,
+    destination: Option<&DestinationType>,
+    now: i64,
+) -> Result<DeliveryRow, NotifyError> {
     let token = svix_ksuid::Ksuid::new(None, None).to_string();
     let db = get_orm_client_rw().await;
-    let row = match ledger::reclaim(db, row_id, &token, now_micros())
+    let row = match ledger::reclaim(db, row_id, &token, now)
         .await
         .map_err(|e| NotifyError::Transport(e.to_string()))?
     {
@@ -123,8 +137,8 @@ pub async fn replay(row_id: &str) -> Result<DeliveryRow, NotifyError> {
         Claim::Refused(refusal) => return Err(NotifyError::Skipped(skip_of(&refusal))),
     };
     let kind = NotificationKind::parse(&row.kind).unwrap_or_default();
-    let result = replay_owned(&row).await;
-    finish_row(&row, &token, kind, &result, false).await;
+    let result = replay_owned(&row, destination).await;
+    finish_row(&row, &token, kind, &finish_of(&result, false, true), now).await;
     result.map(|_| DeliveryRow {
         id: row.id,
         status: ledger::STATUS_SENT.into(),
@@ -135,19 +149,27 @@ pub async fn replay(row_id: &str) -> Result<DeliveryRow, NotifyError> {
 
 async fn replay_owned(
     row: &infra::table::entity::notification_deliveries::Model,
+    destination: Option<&DestinationType>,
 ) -> Result<String, NotifyError> {
     let Some(record) = ReplayRecord::parse(&row.payload) else {
         return Err(NotifyError::Render("replay record does not parse".into()));
     };
-    let dest = match super::super::destinations::get(&row.org, &row.destination).await {
-        Ok(dest) => dest,
-        Err(_) => return Err(NotifyError::DestinationNotFound(row.destination.clone())),
-    };
-    let Module::Alert {
-        destination_type, ..
-    } = &dest.module
-    else {
-        return Err(NotifyError::NotAlertDestination(row.destination.clone()));
+    let stored;
+    let destination_type = match destination {
+        Some(d) => d,
+        None => {
+            stored = match super::super::destinations::get(&row.org, &row.destination).await {
+                Ok(dest) => dest,
+                Err(_) => return Err(NotifyError::DestinationNotFound(row.destination.clone())),
+            };
+            let Module::Alert {
+                destination_type, ..
+            } = &stored.module
+            else {
+                return Err(NotifyError::NotAlertDestination(row.destination.clone()));
+            };
+            destination_type
+        }
     };
     if destination_changed(&record, destination_type, &row.channel) {
         return Err(NotifyError::Skipped(SkipReason::DestinationChanged));
@@ -196,27 +218,88 @@ pub async fn retention_tick() -> Result<u64, anyhow::Error> {
     .await?)
 }
 
-/// Render one destination's resolve row for a fan out; a platform gets a protocol record.
-pub async fn fanout_destination(
+/// One destination of a resolve fan out: a ledger row, or a destination that sends outside it.
+#[derive(Clone, Debug)]
+pub enum FanoutRow {
+    Ledger(FanoutDestination),
+    Outside(String),
+}
+
+/// Render one destination's resolve row; a render failure is a failed row, never a missing one.
+pub async fn fanout_row(
     org_id: &str,
     dest_name: &str,
     explicit: &[config::meta::destinations::Template],
     subject: Option<&str>,
     ctx: &NotificationContext,
-) -> Result<FanoutDestination, NotifyError> {
-    let resolved = super::notify::resolve(org_id, dest_name, explicit, ctx.kind).await?;
+) -> FanoutRow {
+    let resolved = match super::notify::resolve(org_id, dest_name, explicit, ctx.kind).await {
+        Ok(resolved) => resolved,
+        Err(e) => return FanoutRow::Ledger(failed_fanout(dest_name, &e)),
+    };
+    if super::notify::sends_outside_ledger(&resolved, ctx) {
+        return FanoutRow::Outside(dest_name.to_string());
+    }
     let mut ctx = ctx.clone();
     super::notify::apply_destination_metadata(&resolved.destination_type, &mut ctx);
-    let prepared = prepare(&resolved, subject, &ctx)?;
-    Ok(FanoutDestination {
+    match prepare(&resolved, subject, &ctx) {
+        Ok(prepared) => FanoutRow::Ledger(FanoutDestination {
+            destination: dest_name.to_string(),
+            channel: resolved.channel.wire_name().to_string(),
+            platform: prepared.platform.map(|p| platform_name(p).to_string()),
+            template_source: prepared.template_source,
+            template_name: prepared.template_name,
+            subject: subject.map(str::to_string),
+            payload: prepared.record.to_stored().0,
+            failure: None,
+        }),
+        Err(e) => FanoutRow::Ledger(FanoutDestination {
+            channel: resolved.channel.wire_name().to_string(),
+            ..failed_fanout(dest_name, &e)
+        }),
+    }
+}
+
+fn failed_fanout(dest_name: &str, error: &NotifyError) -> FanoutDestination {
+    let failure = match error {
+        NotifyError::DestinationNotFound(_) => "destination deleted".to_string(),
+        other => cap(&other.to_string()),
+    };
+    FanoutDestination {
         destination: dest_name.to_string(),
-        channel: resolved.channel.wire_name().to_string(),
-        platform: prepared.platform.map(|p| platform_name(p).to_string()),
-        template_source: prepared.template_source,
-        template_name: prepared.template_name,
-        subject: subject.map(str::to_string),
-        payload: prepared.record.to_stored().0,
-    })
+        payload: serde_json::to_string(&ReplayRecord::truncated()).unwrap_or_default(),
+        failure: Some(failure),
+        ..Default::default()
+    }
+}
+
+/// Split rendered rows into ledger rows and destinations that send outside the ledger.
+pub fn split_fanout(rows: Vec<FanoutRow>) -> (Vec<FanoutDestination>, Vec<String>) {
+    let mut ledger_rows = Vec::new();
+    let mut outside = Vec::new();
+    for row in rows {
+        match row {
+            FanoutRow::Ledger(d) => ledger_rows.push(d),
+            FanoutRow::Outside(name) => outside.push(name),
+        }
+    }
+    (ledger_rows, outside)
+}
+
+/// After the fan out commits, send the resolve to destinations outside the ledger.
+pub async fn send_outside_after_close(
+    org_id: &str,
+    destinations: &[String],
+    explicit: &[config::meta::destinations::Template],
+    subject: Option<&str>,
+    ctx: &NotificationContext,
+) {
+    for dest in destinations {
+        let mut ctx = ctx.clone();
+        if let Err(e) = super::notify::notify(org_id, dest, explicit, subject, &mut ctx).await {
+            log::warn!("[NOTIFY] resolve to {dest} outside the ledger failed: {e}");
+        }
+    }
 }
 
 /// Close an episode with the producer's state change in one transaction, then send the resolves.
@@ -281,6 +364,7 @@ fn platform_resolve_for(
         payload: ReplayRecord::platform_resolve(platform, episode_id)
             .to_stored()
             .0,
+        failure: None,
     })
 }
 
@@ -416,7 +500,11 @@ fn skip_of(refusal: &Refusal) -> SkipReason {
 }
 
 /// The finish a transport result maps to; a known answer is never an unknown outcome.
-pub fn finish_of(result: &Result<String, NotifyError>, image_dropped: bool) -> Finish {
+pub fn finish_of(
+    result: &Result<String, NotifyError>,
+    image_dropped: bool,
+    replayable: bool,
+) -> Finish {
     let note = |e: String| {
         if image_dropped {
             format!("{e}; {IMAGE_DROPPED}")
@@ -454,7 +542,7 @@ pub fn finish_of(result: &Result<String, NotifyError>, image_dropped: bool) -> F
         Err(e) => Finish {
             sent: false,
             answered: !matches!(e, NotifyError::Transport(_)),
-            retryable: e.is_retryable(),
+            retryable: replayable && e.is_retryable(),
             status_code: e.status_code().map(i32::from),
             error: Some(note(cap(&e.to_string()))),
             skip_reason: None,
@@ -466,10 +554,9 @@ async fn finish_row(
     row: &infra::table::entity::notification_deliveries::Model,
     token: &str,
     kind: NotificationKind,
-    result: &Result<String, NotifyError>,
-    image_dropped: bool,
+    finish: &Finish,
+    now: i64,
 ) {
-    let finish = finish_of(result, image_dropped);
     let status = if finish.sent {
         ledger::STATUS_SENT
     } else if finish.skip_reason.is_some() {
@@ -477,15 +564,7 @@ async fn finish_row(
     } else {
         ledger::STATUS_FAILED
     };
-    match ledger::finish(
-        get_orm_client_rw().await,
-        &row.id,
-        token,
-        &finish,
-        now_micros(),
-    )
-    .await
-    {
+    match ledger::finish(get_orm_client_rw().await, &row.id, token, finish, now).await {
         Ok(true) => {}
         Ok(false) => log::warn!(
             "[NOTIFY] delivery {} lost its claim before it finished; the result is not recorded",
@@ -506,6 +585,22 @@ async fn finish_row(
     );
 }
 
+/// Record a send that went outside the ledger as a finished row that is never replayed.
+pub async fn record_outside(new: &NewDelivery, result: &Result<String, NotifyError>) {
+    let mut new = new.clone();
+    new.payload = serde_json::to_string(&ReplayRecord::truncated()).unwrap_or_default();
+    let mut finish = finish_of(result, false, false);
+    finish.error = Some(match &finish.error {
+        Some(e) => format!("{SENT_OUTSIDE_LEDGER}: {e}"),
+        None => SENT_OUTSIDE_LEDGER.to_string(),
+    });
+    if let Err(e) =
+        ledger::insert_terminal(get_orm_client_rw().await, &new, &finish, now_micros()).await
+    {
+        log::error!("[NOTIFY] could not record the {} row: {e}", new.event);
+    }
+}
+
 /// A send that never reaches a transport still leaves its row: a platform skip or a render failure.
 async fn record_terminal(new: &NewDelivery, error: &NotifyError) {
     let keep = matches!(
@@ -524,7 +619,7 @@ async fn record_terminal(new: &NewDelivery, error: &NotifyError) {
     if let Err(e) = ledger::insert_terminal(
         get_orm_client_rw().await,
         &new,
-        &finish_of(&Err(clone_error(error)), false),
+        &finish_of(&Err(clone_error(error)), false, false),
         now_micros(),
     )
     .await
@@ -542,6 +637,8 @@ fn clone_error(e: &NotifyError) -> NotifyError {
 
 #[cfg(test)]
 mod tests {
+    mod flow;
+
     use config::meta::destinations::{Email, Endpoint};
 
     use super::*;
@@ -554,13 +651,15 @@ mod tests {
                 body: "x".into(),
             }),
             false,
+            true,
         );
         assert!(f.answered && f.retryable && f.status_code == Some(503));
-        let f = finish_of(&Err(NotifyError::Transport("timeout".into())), false);
+        let f = finish_of(&Err(NotifyError::Transport("timeout".into())), false, true);
         assert!(!f.answered && f.retryable);
         let f = finish_of(
             &Err(NotifyError::Skipped(SkipReason::NoOrgMemberRecipient)),
             false,
+            true,
         );
         assert_eq!(f.skip_reason.as_deref(), Some("NoOrgMemberRecipient"));
         let f = finish_of(
@@ -569,12 +668,26 @@ mod tests {
                 body: String::new(),
             }),
             true,
+            true,
         );
         assert!(f.error.unwrap().ends_with(IMAGE_DROPPED));
-        let f = finish_of(&Ok("nothing to close: x".into()), false);
+        let f = finish_of(
+            &Err(NotifyError::Rejected {
+                status: 503,
+                body: String::new(),
+            }),
+            false,
+            false,
+        );
+        assert!(!f.retryable, "a truncated record is never retried");
+        let f = finish_of(&Ok("nothing to close: x".into()), false, true);
         assert!(f.sent);
         assert!(f.error.unwrap().starts_with("nothing to close"));
-        let f = finish_of(&Err(NotifyError::DestinationNotFound("d".into())), false);
+        let f = finish_of(
+            &Err(NotifyError::DestinationNotFound("d".into())),
+            false,
+            true,
+        );
         assert!(!f.retryable);
         assert_eq!(f.error.as_deref(), Some("destination deleted"));
     }
