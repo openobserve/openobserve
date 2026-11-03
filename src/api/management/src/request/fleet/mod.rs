@@ -1761,6 +1761,16 @@ async fn fleet_read(org_id: &str, user_id: &str, fleet: &str) -> Option<Response
     fleet_write(org_id, user_id, fleet, "GET").await
 }
 
+/// Lifted RBAC passes every item read in `check_permissions`, so no list is bounded either.
+#[cfg(feature = "enterprise")]
+async fn rbac_enforced() -> bool {
+    #[cfg(test)]
+    if let Some(enforced) = tests::rbac_enforced() {
+        return enforced;
+    }
+    openobserve_core::authz::rbac_enforced().await
+}
+
 #[cfg(feature = "enterprise")]
 async fn fleet_allowed(org_id: &str, user_id: &str, fleet: &str, verb: &str) -> bool {
     #[cfg(test)]
@@ -1837,6 +1847,9 @@ async fn permitted_fleets(
 ) -> Result<Option<HashSet<String>>, Response> {
     use o2_openfga::meta::mapping::OFGA_MODELS;
 
+    if !rbac_enforced().await {
+        return Ok(None);
+    }
     let key = OFGA_MODELS.get(FLEETS).map_or(FLEETS, |model| model.key);
     #[cfg(test)]
     if let Some(objects) = tests::listed_objects(org_id, user_id) {
@@ -2059,6 +2072,7 @@ mod tests {
         grants: HashSet<(String, String)>,
         listed: Option<Option<Vec<String>>>,
         asked: Vec<(String, String)>,
+        lifted: bool,
     }
 
     thread_local! {
@@ -2096,6 +2110,11 @@ mod tests {
         FGA.with(|fga| fga.borrow().as_ref().and_then(|fga| fga.listed.clone()))
     }
 
+    /// `None` lets the real enforcement answer, as with OpenFGA off.
+    pub(super) fn rbac_enforced() -> Option<bool> {
+        FGA.with(|fga| fga.borrow().as_ref().map(|fga| !fga.lifted))
+    }
+
     fn openfga_on(grants: &[(&str, &str)], listed: Option<Option<Vec<&str>>>) {
         let fga = Fga {
             grants: grants
@@ -2104,12 +2123,22 @@ mod tests {
                 .collect(),
             listed: listed.map(|l| l.map(|v| v.into_iter().map(str::to_string).collect())),
             asked: vec![],
+            lifted: false,
         };
         FGA.with(|cell| *cell.borrow_mut() = Some(fga));
     }
 
     fn openfga_off() {
         FGA.with(|cell| *cell.borrow_mut() = None);
+    }
+
+    /// OpenFGA stays on while a usage-report failure lifts RBAC.
+    fn rbac_lifted() {
+        FGA.with(|cell| {
+            if let Some(fga) = cell.borrow_mut().as_mut() {
+                fga.lifted = true;
+            }
+        });
     }
 
     fn asked() -> Vec<(String, String)> {
@@ -2378,6 +2407,19 @@ mod tests {
                 "{listed:?}"
             );
         }
+        forget(custom, ORG);
+    }
+
+    #[tokio::test]
+    async fn a_lifted_rbac_lists_every_fleet_as_the_item_reads_allow() {
+        let custom = "lifted@fleet-fleets-handlers.test";
+        seed_member(custom, config::meta::user::UserRole::User, ORG);
+        openfga_on(&[], Some(Some(vec!["fleets:f"])));
+        let bounded = Some(HashSet::from(["f".to_string()]));
+        assert_eq!(permitted_fleets(ORG, custom).await.ok(), Some(bounded));
+        rbac_lifted();
+        assert_eq!(permitted_fleets(ORG, custom).await.ok(), Some(None));
+        openfga_off();
         forget(custom, ORG);
     }
 
