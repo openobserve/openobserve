@@ -29,8 +29,9 @@ pub const MAX_REFRESH_SECS: i32 = 30 * 86_400;
 pub const MIN_REFRESH_SECS: i32 = 60;
 
 /// Draft configures the share without exposing it; Public serves it and is the default.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
+#[schema(as = PublicDashboardVisibility)]
 pub enum Visibility {
     Draft,
     #[default]
@@ -54,8 +55,9 @@ impl Visibility {
 }
 
 /// One window a link offers: rolling and refreshed on read, or fixed and built once.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[schema(as = PublicDashboardTimeRange)]
 pub enum TimeRange {
     Relative {
         secs: i64,
@@ -107,14 +109,14 @@ impl TimeRange {
 }
 
 /// The ranges a link offers; with more than one, viewers can switch between them.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TimeRangePolicy {
     pub ranges: Vec<TimeRange>,
     pub default: TimeRange,
 }
 
 /// Admin body to create or update a link; variables stay frozen at the author's values.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PublicDashboardConfig {
     /// Label that tells a dashboard's links apart; empty is allowed.
     #[serde(default)]
@@ -123,6 +125,7 @@ pub struct PublicDashboardConfig {
     pub visibility: Visibility,
     pub time_range: TimeRangePolicy,
     #[serde(default)]
+    #[schema(value_type = Object)]
     pub frozen_variables: BTreeMap<String, serde_json::Value>,
     #[serde(default = "default_refresh_secs")]
     pub refresh_secs: i32,
@@ -131,7 +134,7 @@ pub struct PublicDashboardConfig {
 }
 
 /// Admin body to take over a link; a publisher other than the one the caller saw is a 409.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TakeOverRequest {
     pub expected_publisher: String,
 }
@@ -273,7 +276,7 @@ pub struct LinkStatusReport {
 }
 
 /// The org's settings as the settings API has them; a null `max_links` is the env default.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OrgPublicDashboardSettings {
     pub enabled: bool,
     #[serde(default)]
@@ -413,9 +416,12 @@ pub struct KeyedRange {
     pub refresh_secs: i64,
 }
 
-/// A dashboard variable as the public viewer sees it: display label and frozen value only.
+/// A dashboard variable as the public viewer sees it: name, display label and frozen value only.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PublicVariable {
+    /// The name panel titles reference as `$name`; empty in a result stored before it was added.
+    #[serde(default)]
+    pub name: String,
     pub label: String,
     pub value: serde_json::Value,
     /// Set for a tab-scoped variable: the tab this value belongs to.
@@ -472,6 +478,7 @@ impl PublicVariable {
                     .into_iter()
                     .map(|(key, tab_id, panel_id)| {
                         let entry = Self {
+                            name: v.name.clone(),
                             label: label.clone(),
                             value: values.get(&key).cloned().unwrap_or(serde_json::Value::Null),
                             tab_id,
@@ -748,6 +755,34 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(cfg.refresh_secs, 300);
+    }
+
+    #[test]
+    fn public_variables_carry_the_name_panel_titles_reference() {
+        let dash = Dashboard {
+            v8: Some(
+                serde_json::from_value(serde_json::json!({
+                    "variables": { "list": [
+                        { "type": "custom", "name": "level", "label": "Level" },
+                        { "type": "custom", "name": "svc", "scope": "tabs", "tabs": ["t1"] }
+                    ] }
+                }))
+                .unwrap(),
+            ),
+            ..Default::default()
+        };
+        let values = BTreeMap::from([("level".to_string(), serde_json::json!("error"))]);
+        let list = PublicVariable::list(&dash, &values);
+        let names: Vec<(&str, &str)> = list
+            .iter()
+            .map(|v| (v.name.as_str(), v.label.as_str()))
+            .collect();
+        assert_eq!(names, [("level", "Level"), ("svc", "svc")]);
+        assert_eq!(serde_json::to_value(&list[0]).unwrap()["name"], "level");
+        let stored: PublicVariable =
+            serde_json::from_value(serde_json::json!({ "label": "Level", "value": "error" }))
+                .unwrap();
+        assert_eq!(stored.name, "");
     }
 
     #[test]

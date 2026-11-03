@@ -272,42 +272,6 @@ describe("MoveAcrossFolders.vue", () => {
     expect(wrapper.vm.getModuleName()).toBe("alert_ids");
   });
 
-  it("sends fleet collectors as collector_ids", () => {
-    wrapper = createWrapper({ type: "fleets" });
-    expect(wrapper.vm.getModuleName()).toBe("collector_ids");
-  });
-
-  it("names no source fleet for a mixed fleet selection, so the server reads each collector's own", async () => {
-    wrapper = createWrapper({ activeFolderId: "", moduleId: ["c1", "c2"], type: "fleets" });
-    wrapper.vm.selectedFolder = { label: "Edge", value: "edge" };
-    mockMoveModuleToAnotherFolder.mockResolvedValue(true);
-
-    await wrapper.vm.onSubmit.execute();
-
-    expect(mockMoveModuleToAnotherFolder).toHaveBeenCalledWith(
-      mockStore,
-      { collector_ids: ["c1", "c2"], dst_folder_id: "edge" },
-      "fleets",
-      "",
-    );
-  });
-
-  it("words the dialog and its toast for fleets", async () => {
-    wrapper = createWrapper({ activeFolderId: "default", moduleId: ["c1"], type: "fleets" });
-    expect(wrapper.findComponent(ODialogStub).props("title")).toBe(
-      "Move collectors to another fleet",
-    );
-    expect(wrapper.text()).toContain("Current fleet");
-    wrapper.vm.selectedFolder = { label: "Edge", value: "edge" };
-    mockMoveModuleToAnotherFolder.mockResolvedValue(true);
-
-    await wrapper.vm.onSubmit.execute();
-
-    expect(mockShowPositiveNotification).toHaveBeenCalledWith("Collectors moved", {
-      timeout: 5000,
-    });
-  });
-
   it("keeps the folder wording for alerts", async () => {
     wrapper = createWrapper({ activeFolderId: "folder1", moduleId: ["a1"], type: "alerts" });
     expect(wrapper.findComponent(ODialogStub).props("title")).toBe("Move Alerts To Another Folder");

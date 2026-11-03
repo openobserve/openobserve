@@ -17,17 +17,23 @@ import store from "../stores";
 import type { AxiosInstance } from "axios";
 import axios from "axios";
 import config from "../aws-exports";
-import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
-import { addUnauthorizedError } from "@/composables/useUnauthorizedErrorGrouper";
+import { expireSession } from "@/utils/sessionServices";
+import {
+  currentAccessRouteKey,
+  noteAccessSuccess,
+  recordForbidden,
+} from "@/composables/useAccessStore";
 import { usePasswordReset } from "@/composables/usePasswordReset";
 import { isPasswordResetError } from "@/utils/passwordResetErrors";
 
 declare module "axios" {
   interface AxiosRequestConfig {
-    /** The caller renders a 403 itself, so it is left out of the grouped "Access Required" toast. */
+    /** The caller renders a 403 itself, so the access boundary does not record it. */
     skipAccessToast?: boolean;
-    /** Skip the global Unauthorized toast on a 403; the caller handles the refusal itself. */
+    /** The caller handles the refusal itself, so the access boundary does not record the 403. */
     silentForbidden?: boolean;
+    /** Route the request started on, so a late 403 is not pinned on the page the user moved to. */
+    accessRouteKey?: string;
   }
 }
 
@@ -49,11 +55,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
   }
 
   if (config.isCloud == "true") {
-    store.dispatch("logout");
-    useLocalCurrentUser("", true);
-    useLocalUserInfo("", true);
-    sessionStorage.clear();
-    window.location.reload();
+    expireSession(store);
     return Promise.reject(new Error("Cloud environment: direct logout"));
   }
 
@@ -74,13 +76,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
         .catch(() => {
           return refreshInstance
             .get("/config/logout")
-            .finally(() => {
-              store.dispatch("logout");
-              useLocalCurrentUser("", true);
-              useLocalUserInfo("", true);
-              sessionStorage.clear();
-              window.location.reload();
-            })
+            .finally(() => expireSession(store))
             .then(() => Promise.reject(new Error("Refresh failed")));
         })
         .finally(() => {
@@ -91,11 +87,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
   }
 
   // Not enterprise SSO — standard logout
-  store.dispatch("logout");
-  useLocalCurrentUser("", true);
-  useLocalUserInfo("", true);
-  sessionStorage.clear();
-  window.location.reload();
+  expireSession(store);
   return Promise.reject(new Error("Not SSO: cannot refresh"));
 };
 
@@ -113,8 +105,19 @@ const http = ({ headers } = {} as any) => {
     headers,
   });
 
+  instance.interceptors.request.use((requestConfig) => {
+    // A retry after a token refresh reuses its config, so it keeps the page that first asked.
+    requestConfig.accessRouteKey ??= currentAccessRouteKey();
+    return requestConfig;
+  });
+
   instance.interceptors.response.use(
     function (response) {
+      noteAccessSuccess({
+        url: response.request?.responseURL || response.config?.url,
+        method: response.config?.method,
+        routeKey: response.config?.accessRouteKey,
+      });
       return response;
     },
     function (error) {
@@ -130,11 +133,7 @@ const http = ({ headers } = {} as any) => {
             break;
           case 401:
             if (config.isCloud == "true" && !error.request.responseURL.includes("/auth/login")) {
-              store.dispatch("logout");
-              useLocalCurrentUser("", true);
-              useLocalUserInfo("", true);
-              sessionStorage.clear();
-              window.location.reload();
+              expireSession(store);
             }
             // Delegate to the shared refresh helper — it owns the URL exclusion
             // checks and the logout-on-failure path. Retry the original request
@@ -144,13 +143,7 @@ const http = ({ headers } = {} as any) => {
                 .then(() => instance.request(error.config))
                 .catch(() => Promise.reject(error));
             } else {
-              if (!error.request.responseURL.includes("/login")) {
-                store.dispatch("logout");
-                useLocalCurrentUser("", true);
-                useLocalUserInfo("", true);
-                sessionStorage.clear();
-                window.location.reload();
-              }
+              if (!error.request.responseURL.includes("/login")) expireSession(store);
             }
             break;
           case 403:
@@ -160,7 +153,11 @@ const http = ({ headers } = {} as any) => {
               !error.config?.silentForbidden
             ) {
               const responseUrl = error.request?.responseURL || error.config?.url || "";
-              addUnauthorizedError(responseUrl);
+              recordForbidden({
+                url: responseUrl,
+                method: error.config?.method,
+                routeKey: error.config?.accessRouteKey,
+              });
             }
             break;
           case 404:

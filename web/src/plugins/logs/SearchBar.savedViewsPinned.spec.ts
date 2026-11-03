@@ -149,11 +149,11 @@ describe("SearchBar — pinned saved views", () => {
     await group().get('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').trigger("click");
     await flushPromises();
     const button = document.querySelector(
-      '[data-test="logs-search-bar-saved-views-menu-update-Named view"]',
+      '[data-test="logs-search-bar-saved-views-menu-update-named"]',
     )!;
     expect(button).not.toBeNull();
     expect(button.getAttribute("aria-label")).toBe(
-      i18n.global.t("search.updateSavedViewWithCurrent"),
+      i18n.global.t("search.overwriteSavedViewNamed", { name: "Named view" }),
     );
     expect(button.getAttribute("aria-disabled")).toBe("true");
     expect(button.getAttribute("title")).toBeNull();
@@ -172,11 +172,11 @@ describe("SearchBar — pinned saved views", () => {
     await group().get('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').trigger("click");
     await flushPromises();
     const button = document.querySelector(
-      '[data-test="logs-search-bar-saved-views-menu-update-Named view"]',
+      '[data-test="logs-search-bar-saved-views-menu-update-named"]',
     )!;
     expect(button).not.toBeNull();
     expect(button.getAttribute("aria-label")).toBe(
-      i18n.global.t("search.updateSavedViewWithCurrent"),
+      i18n.global.t("search.overwriteSavedViewNamed", { name: "Named view" }),
     );
     expect(button.getAttribute("aria-disabled")).toBeNull();
     expect(button.getAttribute("disabled")).toBeNull();
@@ -192,11 +192,11 @@ describe("SearchBar — pinned saved views", () => {
     useLogsAutoRun().invalidateExecuted("search-around");
     await flushPromises();
     const apply = vi.spyOn(wrapper.vm, "applySavedView").mockImplementation(() => {});
-    const update = vi.spyOn(wrapper.vm, "quickUpdateSavedView").mockImplementation(() => {});
+    const update = vi.spyOn(wrapper.vm, "requestUpdateSavedView").mockImplementation(() => {});
     await group().get('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').trigger("click");
     await flushPromises();
     const button = document.querySelector(
-      '[data-test="logs-search-bar-saved-views-menu-update-Named view"]',
+      '[data-test="logs-search-bar-saved-views-menu-update-named"]',
     )!;
     const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
     button.dispatchEvent(event);
@@ -214,11 +214,11 @@ describe("SearchBar — pinned saved views", () => {
     wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
     await flushPromises();
     const apply = vi.spyOn(wrapper.vm, "applySavedView").mockImplementation(() => {});
-    const update = vi.spyOn(wrapper.vm, "quickUpdateSavedView").mockImplementation(() => {});
+    const update = vi.spyOn(wrapper.vm, "requestUpdateSavedView").mockImplementation(() => {});
     await group().get('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').trigger("click");
     await flushPromises();
     const button = document.querySelector(
-      '[data-test="logs-search-bar-saved-views-menu-update-Named view"]',
+      '[data-test="logs-search-bar-saved-views-menu-update-named"]',
     )!;
     expect(button.getAttribute("aria-disabled")).toBeNull();
     button.dispatchEvent(
@@ -228,7 +228,7 @@ describe("SearchBar — pinned saved views", () => {
     expect(update).toHaveBeenCalledExactlyOnceWith(view);
     expect(apply).not.toHaveBeenCalled();
     const row = document.querySelector(
-      '[data-test="logs-search-bar-saved-views-menu-apply-Named view"]',
+      '[data-test="logs-search-bar-saved-views-menu-apply-named"]',
     )!;
     row.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
@@ -254,4 +254,25 @@ describe("SearchBar — pinned saved views", () => {
 
     expect(group().exists()).toBe(false);
   });
+
+  // 89px = 1px border + 54px list trigger + 1px separator + 32px create button + 1px border.
+  it.each([
+    [698, false],
+    [699, true],
+  ])(
+    "budgets the group at its rendered 89px width (toolbar %ipx → shown: %s)",
+    async (width, shown) => {
+      const otherPins = (["histogram", "sqlMode", "quickMode", "syntaxGuide"] as const).filter(
+        (key) => isPinned(key),
+      );
+      otherPins.forEach((key) => togglePin(key));
+      try {
+        wrapper = mountSearchBar(width);
+        await flushPromises();
+        expect(group().exists()).toBe(shown);
+      } finally {
+        otherPins.forEach((key) => togglePin(key));
+      }
+    },
+  );
 });

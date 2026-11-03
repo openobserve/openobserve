@@ -1580,7 +1580,7 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     isAction: true,
     size: 92,
     sortable: false,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
 ]);
 

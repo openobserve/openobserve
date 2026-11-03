@@ -25,10 +25,17 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ReportRunHistory from "./ReportRunHistory.vue";
 
 const replace = vi.fn();
+const push = vi.fn();
 const routeQuery: Record<string, string> = {};
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useRouter: () => ({ push: vi.fn(), replace, resolve: () => ({ fullPath: "/" }) }),
+  useRouter: () => ({
+    push,
+    replace,
+    resolve: (to: { query?: Record<string, string> }) => ({
+      fullPath: `/detail?${new URLSearchParams(to.query ?? {})}`,
+    }),
+  }),
   useRoute: () => ({ query: routeQuery }),
 }));
 
@@ -219,6 +226,26 @@ describe("ReportRunHistory", () => {
           ([, q]) => q.run_report_id === "r2" && q.report_id === undefined && q.start_time === 10,
         ),
     ).toBe(true);
+  });
+
+  it.each([
+    [
+      "the org-wide view's report folders",
+      { reportId: undefined, reportFolders: { r1: "folder-b" } },
+    ],
+    ["the detail page's route folder", { routeFolder: "folder-b" }],
+  ])("Edit recipients keeps the report's folder from %s", async (_source, setup) => {
+    push.mockClear();
+    routeQuery.run = "10";
+    routeQuery.run_report_id = "r1";
+    if ("routeFolder" in setup) routeQuery.folder = setup.routeFolder;
+    const w = mountHistory("reportFolders" in setup ? setup : {});
+    await flushPromises();
+    (w.vm as unknown as { editRecipients: () => void }).editRecipients();
+
+    const target = push.mock.calls[0][0];
+    expect(target.query.folder).toBe("folder-b");
+    expect(target.query.returnTo).toContain("folder=folder-b");
   });
 
   it("asks for a new link when a legacy org link is ambiguous", async () => {

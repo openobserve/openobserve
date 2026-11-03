@@ -23,6 +23,7 @@ vi.mock("@/composables/useConfirmDialog", () => ({
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 import SaveAsPromptDialog from "./SaveAsPromptDialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import enUS from "@/locales/languages/en-US.json";
 
 const config = { model: null, params: null, tools: null, responseFormat: null };
 const prompt = {
@@ -52,6 +53,12 @@ beforeEach(() => {
 });
 
 describe("save as prompt", () => {
+  it("asks to discard with copy that exists in the locale file", () => {
+    const copy = enUS.aiObservability.promptManagement;
+    expect(copy.discardChangesTitle).toBe("Discard unsaved changes?");
+    expect(copy.discardChangesMessage).toBe("Your changes have not been saved.");
+  });
+
   it("requires a second submission after showing duplicate content and resets confirmation for a new destination", async () => {
     mocks.match.mockResolvedValue([{ id: "version-1", name: "existing", version: 1 }]);
     const wrapper = mountSave();

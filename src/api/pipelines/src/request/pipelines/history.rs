@@ -154,8 +154,10 @@ pub async fn get_pipeline_history(
             Some(&user_email.user_id),
         )
         .await;
-        if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
-            start_time = end_time - max_query_range * 3600 * 1_000_000;
+        if let Some(clamped) =
+            config::utils::query_range::clamp_start_time(start_time, end_time, max_query_range)
+        {
+            start_time = clamped;
             log::warn!(
                 "Start time for pipeline History api for org {org_id} updated as per max query range set for triggers stream"
             )

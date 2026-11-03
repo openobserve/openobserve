@@ -272,6 +272,16 @@ describe("MetricChartTile", () => {
     expect(runQuery).toHaveBeenCalledTimes(2);
   });
 
+  it("re-queries when only the step changes, keeping the drawn chart until it lands", async () => {
+    wrapper = mountTile({ stepSeconds: 72 });
+    await flushPromises();
+    runQuery.mockImplementationOnce(() => new Promise(() => {}));
+    await wrapper.setProps({ stepSeconds: 120 });
+    await flushPromises();
+    expect(runQuery).toHaveBeenCalledTimes(2);
+    expect(wrapper.findComponent({ name: "MetricCardChart" }).props("results")).toEqual([SERIES]);
+  });
+
   it("cancels its query when it unmounts", async () => {
     runQuery.mockImplementation(() => new Promise(() => {}));
     wrapper = mountTile();

@@ -11,6 +11,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AiChatShareDialog from "@/components/ai-assistant/share/AiChatShareDialog.vue";
@@ -36,10 +37,15 @@ const { loadHistory, loadChat, deleteChatById, clearAllHistory } = useChatHistor
 const { confirm } = useConfirmDialog();
 
 const history = ref<ChatHistoryEntry[]>([]);
+const historyLoaded = ref(false);
 const searchTerm = ref("");
 
 async function refresh() {
-  history.value = await loadHistory();
+  try {
+    history.value = await loadHistory();
+  } finally {
+    historyLoaded.value = true;
+  }
 }
 
 onMounted(refresh);
@@ -208,7 +214,7 @@ function formatTime(ts: string): string {
         </svg>
         <input
           v-model="searchTerm"
-          class="hch-search-input text-text-body placeholder:text-text-muted min-w-0 flex-1 border-0 bg-transparent py-[0.375em] text-[0.8125em] outline-none placeholder:opacity-70"
+          class="hch-search-input text-text-body placeholder:text-input-placeholder min-w-0 flex-1 border-0 bg-transparent py-[0.375em] text-[0.8125em] outline-none"
           :placeholder="t('chatHistory.search')"
           :aria-label="t('chatHistory.search')"
           type="text"
@@ -307,7 +313,15 @@ function formatTime(ts: string): string {
       </div>
 
       <div
-        v-if="filtered.length === 0"
+        v-if="!historyLoaded"
+        class="flex flex-col gap-3 px-2 py-[0.4375em]"
+        aria-busy="true"
+        data-test="home-chat-history-loading"
+      >
+        <OSkeleton v-for="i in 3" :key="i" type="text" />
+      </div>
+      <div
+        v-else-if="filtered.length === 0"
         class="py-[1.5em] text-center text-[0.8125em] opacity-[0.45]"
       >
         {{ searchTerm ? t("chatHistory.noMatches") : t("chatHistory.noHistory") }}

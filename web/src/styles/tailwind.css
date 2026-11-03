@@ -152,6 +152,14 @@ html.theme-switching *::after {
     animation-duration: 0.01ms !important;
     animation-timing-function: linear !important;
   }
+
+  /* 0.01ms, not none: transitionend still fires for code that waits on it. */
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+  }
 }
 
 /*

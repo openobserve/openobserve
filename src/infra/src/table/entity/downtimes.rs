@@ -14,6 +14,12 @@ pub struct Model {
     pub reason: Option<String>,
     pub condition: Option<Json>,
     pub targets: Json,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub alert_groups: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub end_on_clear: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub mute_source: Option<String>,
     pub show_banner: bool,
     pub repeat: i16,
     pub starts_at: i64,

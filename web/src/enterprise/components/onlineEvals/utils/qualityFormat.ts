@@ -29,6 +29,7 @@ import type {
   ScoreDataType,
 } from "@/services/online-evals.service";
 import { ALL_AGENTS_VALUE } from "@/plugins/traces/llmAgentFilter";
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 
 /** A list row joined with the Score Config fields the API does not return. */
@@ -409,7 +410,7 @@ export const DEFAULT_QUALITY_RANGE: AiDateState = {
 /** The range in the URL: `period` when relative, `from` and `to` (µs) when absolute; null when absent or malformed. */
 export function qualityRangeFromQuery(query: LocationQuery): AiDateState | null {
   const { period, from, to } = query;
-  if (typeof period === "string" && /^\d+[smhdwM]$/.test(period)) {
+  if (typeof period === "string" && (/^\d+[smhdwM]$/.test(period) || parseCalendarToken(period))) {
     return { valueType: "relative", startTime: null, endTime: null, relativeTimePeriod: period };
   }
   const start = Number(from);

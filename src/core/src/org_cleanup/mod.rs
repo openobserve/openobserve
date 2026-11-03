@@ -32,6 +32,9 @@ use infra::{
 };
 use sea_orm::TransactionTrait;
 
+#[cfg(feature = "cloud")]
+use crate::{org_domain_ownership, org_domain_requests};
+
 const LOCK_KEY: &str = "/org_cleanup/worker_lock";
 const MAX_ATTEMPTS: i32 = 10;
 
@@ -1034,17 +1037,11 @@ async fn delete_org_offsets_and_caches(org_id: &str) -> Result<(), anyhow::Error
     Ok(())
 }
 
-// The mappings live in the `_meta` org's settings, so the org's own settings delete misses them.
 #[cfg(feature = "cloud")]
 async fn delete_org_domain_mappings(org_id: &str) -> Result<(), anyhow::Error> {
-    // The shared writer serializes this with the settings API and other orgs' cleanups.
     let org_id = org_id.to_string();
-    crate::db::organization::update_org_setting(config::META_ORG_ID, move |settings| {
-        let before = settings.domain_org_mappings.len();
-        settings.domain_org_mappings.retain(|m| m.org_id != org_id);
-        settings.domain_org_mappings.len() != before
-    })
-    .await?;
+    org_domain_requests::delete_by_org(&org_id).await?;
+    org_domain_ownership::delete_by_org(&org_id).await?;
     Ok(())
 }
 
@@ -1097,12 +1094,13 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
     // collide on the OSS build.
     use infra::table::{
-        ai_chat_sessions, ai_chat_shares, ai_chat_turns, alert_calibration, alert_incidents,
-        anomaly_detection, compactor_manual_jobs, distinct_values, external_alerts, gen_ai_agents,
-        incident_events, incident_integrations, llm_eval, llm_prompts, llm_secrets, oncall_teams,
-        online_eval_jobs, org_ai_toolsets, org_telephony, providers, query_history, ratelimit,
-        rca_runs, rca_steering, re_pattern, re_pattern_stream_map, rum_pa, score_configs, scorers,
-        search_queue, slo, slo_backfill_jobs, slo_budget, slos, status_pages, synthetics_agents,
+        ai_chat_sessions, ai_chat_shares, ai_chat_turns, alert_acks, alert_calibration,
+        alert_incidents, anomaly_detection, compactor_manual_jobs, distinct_values,
+        external_alerts, gen_ai_agents, incident_events, incident_integrations, llm_eval,
+        llm_prompts, llm_secrets, oncall_teams, online_eval_jobs, org_ai_toolsets, org_telephony,
+        providers, query_history, ratelimit, rca_runs, rca_steering, re_pattern,
+        re_pattern_stream_map, rum_pa, score_configs, scorers, search_queue, slack_alert_messages,
+        slo, slo_backfill_jobs, slo_budget, slos, status_pages, synthetics_agents,
         synthetics_checks, synthetics_environments, synthetics_locations, synthetics_probe_tokens,
         synthetics_variables, timed_annotations, workflows,
     };
@@ -1155,6 +1153,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     delete_org_alerts(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alerts: {e}"))?;
+    alert_acks::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_acks: {e}"))?;
     // downtimes.folder_id has a FK (downtimes_folder_fk) → folders.id.
     delete_org_downtimes(org_id)
         .await
@@ -1166,6 +1167,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::slack::store::delete_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slack: {e}"))?;
+    slack_alert_messages::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slack_alert_messages: {e}"))?;
     timed_annotations::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/timed_annotations: {e}"))?;
@@ -4488,6 +4492,12 @@ mod tests {
             position_of("delete_org_downtimes(org_id)")
                 < position_of("folders::delete_by_org(org_id)")
         );
+    }
+
+    #[test]
+    fn test_db_resources_deletes_the_orgs_acks_and_slack_alert_messages() {
+        position_of("alert_acks::delete_by_org(org_id)");
+        position_of("slack_alert_messages::delete_by_org(org_id)");
     }
 
     #[test]

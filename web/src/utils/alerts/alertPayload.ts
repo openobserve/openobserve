@@ -63,6 +63,7 @@ export interface PayloadFormData {
   notify_on_recovery?: boolean;
   recovery_destinations?: string[];
   keep_firing_for?: number;
+  suppress_repeats?: boolean;
   /** Feature 2: integer storage id 1..5, or null/undefined when unset. */
   priority?: number | string | null;
   tags?: string[];
@@ -186,6 +187,8 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     ? 0
     : parseInt(formData.keep_firing_for as any, 10) || 0;
   payload.notify_on_recovery = payload.is_real_time ? false : !!formData.notify_on_recovery;
+  // The API refuses the switch on a realtime alert, which keeps no state to compare against.
+  payload.suppress_repeats = payload.is_real_time ? false : !!formData.suppress_repeats;
   // Dropped with the switch off, or the API refuses a list nothing would use.
   payload.recovery_destinations = payload.notify_on_recovery
     ? (formData.recovery_destinations ?? [])

@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="searchObj.data.resultGrid.columns"
                 :data="hits"
                 :loading="loading"
-                :row-class="traceRowClass"
+                :get-row-status-color="traceRowStatusColor"
                 :active-row-index="activeRowIndex"
                 sorting="server"
                 :sort-by="props.sortBy"
@@ -67,7 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :default-columns="false"
                 :show-global-filter="false"
                 pagination="none"
-                @row-click="(row: any) => emit('row-click', row)"
+                @row-click="onRowClick"
+                @row-auxclick="onRowAuxclick"
                 @sort-change="onSortChange"
                 @column-order-change="onColumnReorder"
                 @close-column="onCloseColumn"
@@ -108,14 +109,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- The cell clips on its own, so the table-level `wrap`
                        is not enough: without dropping `truncate` here the name
                        stays cut off no matter what the table does. -->
-                  <span
-                    class="text-text-body text-xs"
-                    :class="wrap ? '' : 'truncate'"
-                    data-test="trace-row-operation-name"
+                  <component
+                    :is="rowHref ? 'a' : 'span'"
+                    :href="rowHref?.(row)"
+                    :tabindex="rowHref ? -1 : undefined"
+                    class="group block min-w-0"
+                    data-test="trace-row-link"
+                    @click="onRowLinkClick($event, row)"
                   >
-                    {{ row.operation_name }}
-                    <OTooltip :content="row.operation_name" side="bottom" align="center" />
-                  </span>
+                    <span
+                      class="text-text-body block text-xs group-hover:underline"
+                      :class="wrap ? '' : 'truncate'"
+                      data-test="trace-row-operation-name"
+                    >
+                      {{ row.operation_name }}
+                      <OTooltip :content="row.operation_name" side="bottom" align="center" />
+                    </span>
+                  </component>
                 </template>
 
                 <template #cell-duration="{ row }">
@@ -140,6 +150,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <template #cell-status="{ row }">
                   <TraceStatusCell :item="row" />
+                </template>
+
+                <template #[`cell-${SPAN_ERROR_COLUMN_ID}`]="{ row }">
+                  <SpanErrorCell :row="row" :timestamp-field="timestampCol" />
+                </template>
+
+                <template #[`cell-${SPAN_EVENTS_COLUMN_ID}`]="{ row }">
+                  <SpanEventsCell :row="row" :timestamp-field="timestampCol" />
                 </template>
                 <template #cell-input_tokens="{ row }">
                   <span class="text-text-body font-mono text-xs" data-test="trace-row-input-tokens">
@@ -188,6 +206,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ contextCell.columnId }}
             </OContextMenuLabel>
             <OContextMenuSeparator />
+
+            <OContextMenuItem
+              v-if="rowHref"
+              icon-left="open-in-new"
+              data-test="trace-context-menu-open-new-tab"
+              @select="emit('open-in-new-tab', contextCell.row)"
+            >
+              {{ t("common.openInNewTab") }}
+            </OContextMenuItem>
 
             <OContextMenuItem
               icon-left="content-copy"
@@ -256,16 +283,24 @@ import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
 import OTable from "@/lib/core/Table/OTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
-import { useTracesTableColumns } from "@/plugins/traces/composables/useTracesTableColumns";
+import {
+  SPAN_DERIVED_COLUMN_IDS,
+  useTracesTableColumns,
+  fillLastColumn,
+} from "@/plugins/traces/composables/useTracesTableColumns";
 import TraceTimestampCell from "./TraceTimestampCell.vue";
 import TraceServiceCell from "./TraceServiceCell.vue";
 import TraceLatencyCell from "./TraceLatencyCell.vue";
 import TraceStatusCell from "./TraceStatusCell.vue";
 import SpanStatusPill from "./SpanStatusPill.vue";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
+import SpanErrorCell from "./SpanErrorCell.vue";
+import SpanEventsCell from "./SpanEventsCell.vue";
+import { SPAN_ERROR_COLUMN_ID, SPAN_EVENTS_COLUMN_ID } from "./spanResultCells";
 import { isLLMTrace, extractLLMData, formatCost, formatTokens } from "../../../utils/llmUtils";
 import { formatTimeWithSuffix } from "../../../utils/zincutils";
 import { escapeSingleQuotes } from "../../../utils/queryUtils";
+import { severityIndicatorColor } from "@/utils/logs/statusParser";
 import { useStore } from "vuex";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
@@ -316,6 +351,8 @@ interface Props {
    *  metrics charts above). Delegated to the table's virtualizer so the table
    *  doesn't create a second, nested scrollbar. */
   scrollEl?: HTMLElement | null;
+  /** Resolves a row to its trace-details URL so the name cell is a real link. */
+  rowHref?: (row: any) => string | undefined;
 }
 
 const store = useStore();
@@ -337,10 +374,12 @@ const props = withDefaults(defineProps<Props>(), {
   streamDocTimeRange: undefined,
   queryWindowUs: undefined,
   scrollEl: null,
+  rowHref: undefined,
 });
 
 const emit = defineEmits<{
   "row-click": [row: any];
+  "open-in-new-tab": [row: any];
   "page-change": [page: number];
   "cross-page": [page: number];
   "rows-per-page-change": [rowsPerPage: number];
@@ -385,6 +424,24 @@ const addSearchTerm = (
           : String(fieldValue);
     searchObj.data.stream.addToFilter = `${field} ${operator} '${escapeSingleQuotes(displayValue)}'`;
   }
+};
+
+const onRowClick = (row: any, event?: MouseEvent) => {
+  if (props.rowHref && (event?.ctrlKey || event?.metaKey)) emit("open-in-new-tab", row);
+  else emit("row-click", row);
+};
+
+const onRowAuxclick = (row: any) => {
+  if (props.rowHref) emit("open-in-new-tab", row);
+};
+
+// Modified/non-primary clicks fall through so the browser opens its own tab.
+const onRowLinkClick = (event: MouseEvent, row: any) => {
+  if (!props.rowHref) return;
+  if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)
+    return;
+  event.preventDefault();
+  emit("row-click", row);
 };
 
 const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
@@ -513,8 +570,15 @@ onMounted(() => {
 const onColumnReorder = (newOrder: string[]) => {
   const mode = props.searchMode ?? "traces";
   searchObj.data.stream.selectedFields = newOrder.filter(
-    (id) => id !== store.state.zoConfig.timestamp_column,
+    (id) => id !== store.state.zoConfig.timestamp_column && !SPAN_DERIVED_COLUMN_IDS.has(id),
   );
+  const rank = new Map(newOrder.map((id, index) => [id, index]));
+  const ordered = [...searchObj.data.resultGrid.columns].sort(
+    (a: { id: string }, b: { id: string }) =>
+      (rank.get(a.id) ?? newOrder.length) - (rank.get(b.id) ?? newOrder.length),
+  );
+  fillLastColumn(ordered, timestampCol.value);
+  searchObj.data.resultGrid.columns = ordered;
   // useTraces only persists per traces/spans; other modes have no column state.
   updatedLocalLogFilterField(mode as "traces" | "spans");
 };
@@ -526,9 +590,11 @@ const onCloseColumn = (columnDef: any) => {
     searchObj.data.stream.selectedFields.splice(fieldIdx, 1);
     updatedLocalLogFilterField(mode as "traces" | "spans");
   }
-  searchObj.data.resultGrid.columns = searchObj.data.resultGrid.columns.filter(
+  const remaining = searchObj.data.resultGrid.columns.filter(
     (c: { id: string }) => c.id !== columnDef.id,
   );
+  fillLastColumn(remaining, timestampCol.value);
+  searchObj.data.resultGrid.columns = remaining;
 
   // If the closed column was the active sort column, reset to default
   if (columnDef.id === props.sortBy) {
@@ -536,11 +602,17 @@ const onCloseColumn = (columnDef: any) => {
   }
 };
 
-const traceRowClass = (row: any) => {
-  if (props.searchMode === "spans") {
-    return row.span_status === "ERROR" ? "oz-table__row--error" : "";
-  }
-  return (row.errors ?? 0) > 0 ? "oz-table__row--error" : "";
+const ERROR_ROW_STATUS_COLOR = severityIndicatorColor({
+  level: "error",
+  source: "field",
+  field: null,
+  notFetched: false,
+});
+
+const traceRowStatusColor = (row: any): string | undefined => {
+  const isError =
+    props.searchMode === "spans" ? row.span_status === "ERROR" : (row.errors ?? 0) > 0;
+  return isError ? ERROR_ROW_STATUS_COLOR : undefined;
 };
 
 const noResults = computed(
@@ -682,12 +754,5 @@ defineExpose({ stepTraceRow });
 /* keep(complex-state): :deep override to square off the child table's corners */
 .traces-table-container :deep(.table-container) {
   border-radius: 0 !important;
-}
-
-/* keep(generated-content): the error-row left border. `traceRowClass` puts
-   `oz-table__row--error` on table-rendered <tr>s and the rule reaches their
-   <td>, hence :deep. Mirrors PlayerTracesTab's `trace-row--error`. */
-.traces-table-container :deep(.oz-table__row--error td:first-child) {
-  box-shadow: var(--shadow-rail-thin-geom) var(--color-status-error-text);
 }
 </style>

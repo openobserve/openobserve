@@ -55,6 +55,7 @@ import AlertDetail from "@/views/alerts/AlertDetail.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import alertsService from "@/services/alerts";
+import { queryClient } from "@/composables/query/queryClient";
 import type { AlertGroupTransition } from "@/ts/interfaces/alert";
 
 // ---------------------------------------------------------------------------
@@ -233,6 +234,7 @@ async function mountView({
         AlertGroupsTable: true,
         AlertConfigSummary: true,
         AnomalyDetectionChart: true,
+        AlertHeaderActions: true,
       },
     },
   });
@@ -594,5 +596,247 @@ describe("AlertDetail — anomaly alerts", () => {
   it("leaves every other alert family without a charts tab", async () => {
     wrapper = await mountView({ alert: makeSimpleAlert() });
     expect(wrapper.find('[data-test="alerts-alertdetail-tab-charts"]').exists()).toBe(false);
+  });
+});
+
+describe("AlertDetail — Acknowledge and Mute in the header (MK-1, MK-2)", () => {
+  let wrapper: VueWrapper;
+  const ack = {
+    group_key: "",
+    firing_started_at: 1,
+    acked_by: "bob@acme.io",
+    acked_at: 1_786_500_000_000_000,
+    ack_source: "slack",
+  };
+  const quickMute = {
+    id: "d1",
+    name: "Quick mute",
+    ends_at: 4_102_444_800_000_000,
+    end_on_clear: { alert_id: "alert-1", group_key: null },
+  };
+
+  const withListRow = (row: Record<string, unknown>, acks: unknown[] = []) => {
+    vi.mocked(alertsService.listByFolderId).mockResolvedValue({
+      data: { list: [{ alert_id: "alert-1", folder_id: "default", enabled: true, ...row }] },
+    } as any);
+    vi.mocked(alertsService.listAlertAcks).mockResolvedValue({ data: { acks } } as any);
+  };
+  const header = () => wrapper.findComponent({ name: "AlertHeaderActions" });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryClient.clear();
+  });
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("hands a firing single-row alert to the header actions", async () => {
+    withListRow({ last_outcome: "firing" });
+    wrapper = await mountView();
+    expect(header().exists()).toBe(true);
+    expect(header().props()).toMatchObject({
+      alertId: "alert-1",
+      name: "cpu-high",
+      folderId: "default",
+      firing: true,
+      unackedGroups: null,
+      ack: null,
+      downtime: null,
+    });
+  });
+
+  it("lists only the alerts named like this one, not the whole folder", async () => {
+    withListRow({ last_outcome: "firing" });
+    wrapper = await mountView();
+    expect(vi.mocked(alertsService.listByFolderId).mock.calls[0][7]).toBe("cpu-high");
+    expect(header().props("firing")).toBe(true);
+  });
+
+  it("reads the alert's own folder from the cross-folder list when the URL names none", async () => {
+    for (const key of Object.keys(mockRouteQuery)) delete mockRouteQuery[key];
+    withListRow({ folder_id: "prod", last_outcome: "firing" });
+    wrapper = await mountView();
+    expect(vi.mocked(alertsService.listByFolderId).mock.calls[0][6]).toBe("");
+    expect(header().props()).toMatchObject({ folderId: "prod", firing: true });
+    expect(alertsService.listAlertAcks).toHaveBeenCalledWith(expect.anything(), "alert-1", "prod");
+  });
+
+  it("shows the ack and the mute after the title", async () => {
+    withListRow({ last_outcome: "firing", active_downtime: quickMute }, [ack]);
+    wrapper = await mountView();
+    expect(wrapper.find('[data-test="alerts-alertdetail-ack-chip"]').text()).toContain("bob");
+    expect(wrapper.find('[data-test="alerts-alertdetail-muted-chip"]').text()).toContain(
+      "Muted until it clears",
+    );
+    expect(header().props("ack")).toMatchObject({ acked_by: "bob@acme.io" });
+    expect(header().props("downtime")).toMatchObject({ id: "d1" });
+  });
+
+  it("counts the firing groups left to acknowledge on a multi-alert", async () => {
+    withListRow({ last_outcome: "firing" });
+    wrapper = await mountView({
+      alert: makeMultiAlert(),
+      groupsResponse: {
+        list: [
+          { group_key: "a", last_outcome: "firing" },
+          { group_key: "b", last_outcome: "firing", ack: { ...ack, group_key: "b" } },
+          { group_key: "c", last_outcome: "firing" },
+          { group_key: "d", last_outcome: "ok" },
+        ],
+        groups_firing: 3,
+        groups_observed: 12,
+        capped: false,
+        group_cap: 100,
+      },
+    });
+    expect(header().props("unackedGroups")).toBe(2);
+    expect(wrapper.find('[data-test="alerts-alertdetail-firing-summary"]').text()).toContain(
+      "1 acknowledged",
+    );
+    const table = wrapper.findComponent({ name: "AlertGroupsTable" });
+    expect(table.props()).toMatchObject({ alertId: "alert-1", folderId: "default" });
+  });
+
+  it("keeps Mute in the header while only one group is muted, and hands the mute to the groups", async () => {
+    const groupMute = {
+      id: "d2",
+      name: "Quick mute",
+      ends_at: 4_102_444_800_000_000,
+      alert_groups: [{ alert_id: "alert-1", group_key: "a" }],
+    };
+    withListRow({ last_outcome: "firing", active_downtime: groupMute });
+    wrapper = await mountView({
+      alert: makeMultiAlert(),
+      groupsResponse: {
+        list: [{ group_key: "a", last_outcome: "firing" }],
+        capped: false,
+        group_cap: 100,
+      },
+    });
+    expect(header().props("downtime")).toBeNull();
+    const table = wrapper.findComponent({ name: "AlertGroupsTable" });
+    expect(table.props("downtime")).toMatchObject({ id: "d2" });
+  });
+
+  it("gives a composite alert the same header Acknowledge", async () => {
+    withListRow({ last_outcome: "firing" });
+    wrapper = await mountView({ alert: makeCompositeAlert() });
+    expect(header().exists()).toBe(true);
+    expect(header().props("firing")).toBe(true);
+  });
+
+  it("shows the Level and Firing since tiles and how long a single-row alert has fired", async () => {
+    // Half a minute of slack: the shared clock ticks once a minute.
+    const since = (Date.now() - 150_000) * 1000;
+    withListRow({ last_outcome: "firing", last_outcome_since: since, level: "critical" });
+    wrapper = await mountView();
+    const tiles = wrapper.find('[data-test="alerts-alertdetail-tiles"]');
+    expect(tiles.exists()).toBe(true);
+    expect(wrapper.find('[data-test="alerts-alertdetail-tile-level"]').text()).toContain("Level");
+    expect(wrapper.find('[data-test="alerts-alertdetail-tile-level"]').text()).toContain(
+      "Critical",
+    );
+    expect(wrapper.find('[data-test="alerts-alertdetail-tile-firing-since"]').text()).toContain(
+      "Firing since",
+    );
+    expect(wrapper.find('[data-test="alerts-alertdetail-firing-for"]').text()).toBe(
+      "firing for 2 min",
+    );
+  });
+
+  it("keeps counting from the firing's start when a send fails mid-firing", async () => {
+    const started = (Date.now() - 150_000) * 1000;
+    withListRow({
+      last_outcome: "notify_failed",
+      last_outcome_since: Date.now() * 1000,
+      firing_started_at: started,
+      level: "critical",
+    });
+    wrapper = await mountView();
+    expect(wrapper.find('[data-test="alerts-alertdetail-firing-for"]').text()).toBe(
+      "firing for 2 min",
+    );
+  });
+
+  it("adds the Incident tile when the firing has one, and the tile opens the incident (MK-1)", async () => {
+    withListRow({
+      last_outcome: "firing",
+      last_outcome_since: Date.now() * 1000,
+      level: "critical",
+      incident: { id: "inc-1", title: "Checkout errors", status: "open" },
+    });
+    wrapper = await mountView();
+    const tile = wrapper.find('[data-test="alerts-alertdetail-tile-incident"]');
+    expect(tile.text()).toContain("Incident");
+    expect(tile.text()).toContain("Checkout errors");
+    mockRouterPush.mockClear();
+    await tile.trigger("click");
+    expect(mockRouterPush).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "incidentDetail", params: { id: "inc-1" } }),
+    );
+  });
+
+  it("falls back to the incident id when it has no title", async () => {
+    withListRow({
+      last_outcome: "firing",
+      last_outcome_since: Date.now() * 1000,
+      incident: { id: "inc-2", status: "open" },
+    });
+    wrapper = await mountView();
+    expect(wrapper.find('[data-test="alerts-alertdetail-tile-incident"]').text()).toContain(
+      "inc-2",
+    );
+  });
+
+  it("leaves out the Level tile when the alert never classified a level", async () => {
+    withListRow({ last_outcome: "firing", last_outcome_since: Date.now() * 1000 });
+    wrapper = await mountView();
+    expect(wrapper.find('[data-test="alerts-alertdetail-tile-level"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alerts-alertdetail-tile-firing-since"]').exists()).toBe(true);
+  });
+
+  it("shows no tiles and no firing time while the alert is not firing", async () => {
+    withListRow({ last_outcome: "ok", last_outcome_since: Date.now() * 1000, level: "ok" });
+    wrapper = await mountView();
+    expect(wrapper.find('[data-test="alerts-alertdetail-tiles"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alerts-alertdetail-firing-for"]').exists()).toBe(false);
+  });
+
+  it("keeps the group strip, not the tiles, on a multi-alert", async () => {
+    withListRow({
+      last_outcome: "firing",
+      last_outcome_since: Date.now() * 1000,
+      level: "critical",
+    });
+    wrapper = await mountView({
+      alert: makeMultiAlert(),
+      groupsResponse: { list: [], capped: false, group_cap: 100 },
+    });
+    expect(wrapper.find('[data-test="alerts-alertdetail-tiles"]').exists()).toBe(false);
+  });
+
+  it("hands the firing groups to the header so its Until… can scope the mute", async () => {
+    withListRow({ last_outcome: "firing" });
+    wrapper = await mountView({
+      alert: makeMultiAlert(),
+      groupsResponse: {
+        list: [
+          { group_key: "a", group_labels: "cluster=eu", last_outcome: "firing" },
+          { group_key: "d", last_outcome: "ok" },
+        ],
+        capped: false,
+        group_cap: 100,
+      },
+    });
+    expect(header().props("groups")).toEqual([
+      { group_key: "a", group_labels: "cluster=eu", last_outcome: "firing" },
+    ]);
+  });
+
+  it("offers no Acknowledge or Mute on an anomaly config, which has no alert route", async () => {
+    withListRow({ last_outcome: "firing" });
+    wrapper = await mountView({ alert: makeAnomalyAlert() });
+    expect(header().exists()).toBe(false);
   });
 });

@@ -110,6 +110,7 @@ vi.mock("moment", () => ({
 import dashboardService from "../services/dashboards";
 import commonService from "../services/common";
 import { readPanelDraft, writePanelDraft } from "@/composables/dashboard/usePanelDraft";
+import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 
 const draftInput = {
   tabId: "tab-1",
@@ -123,6 +124,13 @@ const draftScope = (dashboardId: string, panelId?: string) => ({
   org: "test-org",
   dashboardId,
   panelId,
+});
+
+const settingsDraftScope = (entityId: string) => ({
+  kind: "dashboard_settings" as const,
+  org: "test-org",
+  entityId,
+  userEmail: "me@x.io",
 });
 
 describe("Commons Utility Functions", () => {
@@ -565,6 +573,19 @@ describe("Commons Utility Functions", () => {
 
       expect(readPanelDraft(draftScope("d1", "p1"))).toBeNull();
       expect(readPanelDraft(draftScope("d2"))).not.toBeNull();
+      localStorage.clear();
+    });
+
+    it("removes the settings drafts of bulk-deleted dashboards", () => {
+      localStorage.clear();
+      mockStore.state.organizationData.allDashboardList = {};
+      writeEditorDraft(settingsDraftScope("d1"), { data: { tab: "generalSettings" } });
+      writeEditorDraft(settingsDraftScope("d2"), { data: { tab: "generalSettings" } });
+
+      evictDashboardsFromCache(mockStore, new Map([["folder-a", ["d1"]]]));
+
+      expect(readEditorDraft(settingsDraftScope("d1"))).toBeNull();
+      expect(readEditorDraft(settingsDraftScope("d2"))).not.toBeNull();
       localStorage.clear();
     });
 
@@ -1703,6 +1724,21 @@ describe("Commons Utility Functions", () => {
       expect(readPanelDraft(draftScope("dashboard-kept", "panel-1"))).not.toBeNull();
       localStorage.clear();
     });
+
+    it("removes the deleted dashboard's settings draft only", async () => {
+      localStorage.clear();
+      mockStore.state.organizationData.allDashboardList = {};
+      mockStore.state.organizationData.allDashboardData = {};
+      vi.mocked(dashboardService.delete).mockResolvedValue({ success: true } as never);
+      writeEditorDraft(settingsDraftScope("dashboard-gone"), { data: { tab: "generalSettings" } });
+      writeEditorDraft(settingsDraftScope("dashboard-kept"), { data: { tab: "generalSettings" } });
+
+      await deleteDashboardById(mockStore, "dashboard-gone", "f");
+
+      expect(readEditorDraft(settingsDraftScope("dashboard-gone"))).toBeNull();
+      expect(readEditorDraft(settingsDraftScope("dashboard-kept"))).not.toBeNull();
+      localStorage.clear();
+    });
   });
 
   describe("createFolder and updateFolder", () => {
@@ -1972,5 +2008,29 @@ describe("Commons Utility Functions", () => {
         folder_id,
       );
     });
+  });
+
+  describe("getDashboard — prototype keys", () => {
+    it.each(["__proto__", "constructor", "prototype"])(
+      "never hands back the object behind %s",
+      async (id) => {
+        const result = await getDashboard(mockStore, id, "default");
+
+        expect(result).toEqual({});
+        expect(result).not.toBe(Object.prototype);
+        expect(({} as any).variables).toBeUndefined();
+      },
+    );
+
+    it.each(["toString", "hasOwnProperty"])(
+      "fetches %s instead of reading it off the prototype",
+      async (id) => {
+        vi.mocked(dashboardService.get_Dashboard).mockRejectedValueOnce(new Error("404"));
+
+        await expect(getDashboard(mockStore, id, "default")).rejects.toThrow("404");
+        expect(dashboardService.get_Dashboard).toHaveBeenCalledTimes(1);
+        expect((Object.prototype.toString as any).variables).toBeUndefined();
+      },
+    );
   });
 });

@@ -931,6 +931,9 @@ mod tests {
 
         fn downtime(start_hour: i64, end_hour: i64) -> Downtime {
             Downtime {
+                alert_groups: None,
+                end_on_clear: None,
+                source: None,
                 id: "dt".to_string(),
                 org: "acme".to_string(),
                 folder_id: "default".to_string(),

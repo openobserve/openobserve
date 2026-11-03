@@ -158,16 +158,17 @@ export const toolCallsDurationMs = (calls: RcaToolCall[]): number =>
 export const isInterruptedStep = (step: RcaStep): boolean =>
   step.tool_calls.some((call) => call.interrupted === true);
 
+/** A finished, uninterrupted step; an ended run finishes only the steps a Resume keeps. */
+export function isFinishedStep(thread: RcaThread, step: RcaStep, idx: number): boolean {
+  if (step.ended_at === null || isInterruptedStep(step)) return false;
+  if (thread.active) return true;
+  if (thread.reusable_steps !== undefined) return idx < thread.reusable_steps;
+  return thread.report_submitted || idx < thread.steps.length - 1;
+}
+
 /** Finished, uninterrupted steps; an ended run counts the steps a Resume keeps. */
 export function finishedStepCount(thread: RcaThread): number {
-  if (!thread.active && thread.reusable_steps !== undefined) return thread.reusable_steps;
-  const last = thread.steps.length - 1;
-  return thread.steps.filter(
-    (step, idx) =>
-      step.ended_at !== null &&
-      !isInterruptedStep(step) &&
-      !(idx === last && !thread.active && !thread.report_submitted),
-  ).length;
+  return thread.steps.filter((step, idx) => isFinishedStep(thread, step, idx)).length;
 }
 
 /** Status text of a tool row: "OK", "Error" or "Running". */

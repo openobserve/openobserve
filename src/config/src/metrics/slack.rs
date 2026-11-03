@@ -94,6 +94,45 @@ pub static SLACK_TURNS_INFLIGHT: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static SLACK_OUTBOUND_DEPTH: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "slack_outbound_depth",
+            "Alert messages queued for Slack per installation.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["installation"],
+    )
+    .expect("Metric created")
+});
+
+pub static SLACK_OUTBOUND_OLDEST_AGE_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "slack_outbound_oldest_age_seconds",
+            "Age of the oldest alert message queued for Slack per installation.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["installation"],
+    )
+    .expect("Metric created")
+});
+
+pub static SLACK_OUTBOUND_DIGEST_CHANNELS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "slack_outbound_digest_channels",
+            "Channels currently folding alert messages into a digest per installation.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["installation"],
+    )
+    .expect("Metric created")
+});
+
 pub(super) fn register(registry: &prometheus::Registry) {
     registry
         .register(Box::new(SLACK_SOCKETS_UP.clone()))
@@ -112,6 +151,15 @@ pub(super) fn register(registry: &prometheus::Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SLACK_TURNS_INFLIGHT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SLACK_OUTBOUND_DEPTH.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SLACK_OUTBOUND_OLDEST_AGE_SECONDS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SLACK_OUTBOUND_DIGEST_CHANNELS.clone()))
         .expect("Metric registered");
 }
 
@@ -139,6 +187,13 @@ mod tests {
             .with_label_values(&["event", "accepted"])
             .inc();
         SLACK_TURNS_INFLIGHT.with_label_values(&["acme"]).set(1);
+        SLACK_OUTBOUND_DEPTH.with_label_values(&["i1"]).set(3);
+        SLACK_OUTBOUND_OLDEST_AGE_SECONDS
+            .with_label_values(&["i1"])
+            .set(40);
+        SLACK_OUTBOUND_DIGEST_CHANNELS
+            .with_label_values(&["i1"])
+            .set(1);
 
         let mut buffer = vec![];
         TextEncoder::new()
@@ -152,6 +207,9 @@ mod tests {
             "zo_slack_send_failures_total{",
             "zo_slack_inbound_events_total{",
             "zo_slack_turns_inflight{",
+            "zo_slack_outbound_depth{",
+            "zo_slack_outbound_oldest_age_seconds{",
+            "zo_slack_outbound_digest_channels{",
         ] {
             assert!(text.contains(name), "{name} missing from:\n{text}");
         }

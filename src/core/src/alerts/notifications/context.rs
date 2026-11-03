@@ -38,6 +38,10 @@ pub struct NotificationContext {
     pub stream_type: String,
     pub stream_name: String,
     pub alert_name: String,
+    /// The alert's id (a composite's own id) that labels its Jira ticket; empty with no alert.
+    pub alert_id: String,
+    /// Set only by the incident sender, so alert attributes cannot claim an incident's ticket.
+    pub incident_id: String,
     /// "realtime" | "scheduled"
     pub alert_type: String,
     pub alert_period: String,
@@ -55,10 +59,14 @@ pub struct NotificationContext {
     /// resolve to pair with, a dedup key would silently change how repeated
     /// firings collapse.
     pub episode_id: Option<String>,
+    /// `cleared` or `disappeared` on a recovery; empty on a firing.
+    pub recovery_reason: String,
     pub alert_priority: String,
     pub alert_tags: String,
     pub alert_threshold_crit: String,
     pub alert_threshold_warn: String,
+    /// Operator the crit/warn thresholds were compared with (family-aware).
+    pub alert_threshold_operator: String,
     /// Formatted local time; "N/A" when unknown.
     pub alert_start_time: String,
     pub alert_end_time: String,

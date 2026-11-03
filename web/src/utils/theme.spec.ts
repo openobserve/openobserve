@@ -20,6 +20,20 @@ describe("cssToken", () => {
   it("returns the fallback when the token is unset", () => {
     expect(cssToken("--color-does-not-exist", "#deadbe")).toBe("#deadbe");
   });
+
+  it("returns a token set on body, where dark-mode presets are written", () => {
+    document.documentElement.style.setProperty("--color-preset-more", "#abcdef");
+    document.body.style.setProperty("--color-preset-more", "#123456");
+    expect(cssToken("--color-preset-more", "#000000")).toBe("#123456");
+    document.body.style.removeProperty("--color-preset-more");
+    document.documentElement.style.removeProperty("--color-preset-more");
+  });
+
+  it("still returns a token set only on documentElement", () => {
+    document.body.removeAttribute("style");
+    document.documentElement.style.setProperty("--color-root-only", "#654321");
+    expect(cssToken("--color-root-only", "#000000")).toBe("#654321");
+  });
 });
 
 const SEMANTIC: SemanticColors = {

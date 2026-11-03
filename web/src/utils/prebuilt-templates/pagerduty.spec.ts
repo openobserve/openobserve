@@ -96,6 +96,12 @@ describe("pagerduty template", () => {
       expect(severityField?.options).toBeDefined();
     });
 
+    it("has an optional EU region toggle", () => {
+      const euRegionField = pagerdutyConfig.credentialFields.find((f) => f.key === "euRegion");
+      expect(euRegionField?.type).toBe("toggle");
+      expect(euRegionField?.required).toBe(false);
+    });
+
     it("keeps PagerDuty substitution metadata out of generic credential metadata", () => {
       const persistentFields = pagerdutyConfig.credentialFields
         .filter((field) => field.persistInMetadata)

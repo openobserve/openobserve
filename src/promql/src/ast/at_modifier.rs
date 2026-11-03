@@ -62,7 +62,7 @@ impl Pin {
 /// Pins `@ start()` / `@ end()` to the whole query's bounds, which a worker never sees.
 pub fn resolve_at_modifiers(expr: &mut Expr, start: i64, end: i64) -> bool {
     let mut changed = false;
-    for_each_at(expr, &mut |at, _| {
+    for_each_at(expr, true, &mut |at, _| {
         let micros = match at {
             Some(AtModifier::Start) => start,
             Some(AtModifier::End) => end,
@@ -127,11 +127,7 @@ pub(crate) fn pin(expr: &Expr) -> Result<Pin> {
     Ok(match expr {
         Expr::VectorSelector(vs) => selector_pin(&vs.at)?,
         Expr::MatrixSelector(ms) => selector_pin(&ms.vs.at)?,
-        Expr::Subquery(sq) if sq.at.is_some() => {
-            return Err(DataFusionError::NotImplemented(
-                "Subquery: @ modifier is not supported".to_string(),
-            ));
-        }
+        Expr::Subquery(sq) if sq.at.is_some() => selector_pin(&sq.at)?,
         // a subquery evaluates its inner expression on its own steps
         Expr::Subquery(_) | Expr::Extension(_) => Pin::Varies,
         Expr::NumberLiteral(_) | Expr::StringLiteral(_) => Pin::Neutral,
@@ -160,7 +156,8 @@ pub(crate) fn pin(expr: &Expr) -> Result<Pin> {
 
 /// Turns every resolved `@` into the offset that reads the same samples from `reference`.
 pub(crate) fn rebase_at(expr: &mut Expr, reference: i64) {
-    for_each_at(expr, &mut |at, offset| {
+    // a subquery's body runs on the subquery's own steps, where its `@` stay absolute
+    for_each_at(expr, false, &mut |at, offset| {
         let Some(pinned) = at.take().as_ref().and_then(at_micros) else {
             return;
         };
@@ -246,29 +243,35 @@ fn selector_pin(at: &Option<AtModifier>) -> Result<Pin> {
     }
 }
 
-fn for_each_at(expr: &mut Expr, f: &mut impl FnMut(&mut Option<AtModifier>, &mut Option<Offset>)) {
+fn for_each_at(
+    expr: &mut Expr,
+    into_subqueries: bool,
+    f: &mut impl FnMut(&mut Option<AtModifier>, &mut Option<Offset>),
+) {
     match expr {
         Expr::VectorSelector(vs) => f(&mut vs.at, &mut vs.offset),
         Expr::MatrixSelector(ms) => f(&mut ms.vs.at, &mut ms.vs.offset),
         Expr::Subquery(sq) => {
             f(&mut sq.at, &mut sq.offset);
-            for_each_at(&mut sq.expr, f);
+            if into_subqueries {
+                for_each_at(&mut sq.expr, into_subqueries, f);
+            }
         }
-        Expr::Unary(unary) => for_each_at(&mut unary.expr, f),
-        Expr::Paren(paren) => for_each_at(&mut paren.expr, f),
+        Expr::Unary(unary) => for_each_at(&mut unary.expr, into_subqueries, f),
+        Expr::Paren(paren) => for_each_at(&mut paren.expr, into_subqueries, f),
         Expr::Binary(binary) => {
-            for_each_at(&mut binary.lhs, f);
-            for_each_at(&mut binary.rhs, f);
+            for_each_at(&mut binary.lhs, into_subqueries, f);
+            for_each_at(&mut binary.rhs, into_subqueries, f);
         }
         Expr::Aggregate(agg) => {
-            for_each_at(&mut agg.expr, f);
+            for_each_at(&mut agg.expr, into_subqueries, f);
             if let Some(param) = agg.param.as_deref_mut() {
-                for_each_at(param, f);
+                for_each_at(param, into_subqueries, f);
             }
         }
         Expr::Call(call) => {
             for arg in &mut call.args.args {
-                for_each_at(arg, f);
+                for_each_at(arg, into_subqueries, f);
             }
         }
         Expr::NumberLiteral(_) | Expr::StringLiteral(_) | Expr::Extension(_) => {}
@@ -339,7 +342,7 @@ mod tests {
         let reparsed = parser::parse(&expr.to_string()).unwrap();
         let mut pinned = Vec::new();
         let mut reparsed_mut = reparsed.clone();
-        for_each_at(&mut reparsed_mut, &mut |at, _| {
+        for_each_at(&mut reparsed_mut, true, &mut |at, _| {
             pinned.push(at.as_ref().and_then(at_micros))
         });
         assert_eq!(
@@ -439,13 +442,42 @@ mod tests {
 
     #[test]
     fn test_pin_rejects_what_it_cannot_evaluate() {
-        let err = pin_of("a[1h:1m] @ 1600000000").unwrap_err().to_string();
-        assert!(
-            err.contains("Subquery: @ modifier is not supported"),
-            "{err}"
+        for query in ["a @ end()", "max_over_time(a[1h:1m] @ end())"] {
+            let err = pin_of(query).unwrap_err().to_string();
+            assert!(err.contains("must be resolved"), "{query}: {err}");
+        }
+    }
+
+    #[test]
+    fn test_pin_of_a_subquery_follows_its_own_at() {
+        assert_eq!(pin_of("a[1h:1m] @ 1600000000").unwrap(), Pin::At(T));
+        assert_eq!(
+            pin_of("max_over_time(rate(a[5m])[1h:1m] @ 1600000000)").unwrap(),
+            Pin::At(T)
         );
-        let err = pin_of("a @ end()").unwrap_err().to_string();
-        assert!(err.contains("must be resolved"), "{err}");
+        // the body's own steps do not make a pinned subquery vary
+        assert_eq!(
+            pin_of("max_over_time(vector(time())[1h:1m] @ 1600000000)").unwrap(),
+            Pin::At(T)
+        );
+        assert_eq!(pin_of("max_over_time(a[1h:1m])").unwrap(), Pin::Varies);
+    }
+
+    #[test]
+    fn test_resolve_query_pins_a_subquery_to_the_query_range() {
+        let second = 1_000_000;
+        let resolved = resolve_query(
+            "max_over_time(rate(m[5m])[1h:1m] @ end()) + min_over_time((sum(m))[30m:] @ start())",
+            1000 * second,
+            2000 * second,
+            0,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            resolved,
+            "max_over_time(rate(m[5m])[1h:1m] @ 2000.000) + min_over_time((sum(m))[30m:] @ 1000.000)"
+        );
     }
 
     #[test]
@@ -471,6 +503,10 @@ mod tests {
         assert_eq!(rebased("a @ 1599999900 offset -1m40s"), "a");
         assert_eq!(rebased("a @ 1599999900 offset -5m"), "a offset -3m20s");
         assert_eq!(rebased("a offset 1m"), "a offset 1m");
+        assert_eq!(
+            rebased("max_over_time((a @ 1500000000)[1h:1m] @ 1599999900 offset 1m)"),
+            "max_over_time((a @ 1500000000.000)[1h:1m] offset 2m40s)"
+        );
     }
 
     #[test]

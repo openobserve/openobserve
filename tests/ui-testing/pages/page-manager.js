@@ -39,6 +39,7 @@ import CreateAlertFromSourceDialogPage from "./alertsPages/createAlertFromSource
 import { AlertLibraryPage } from "./alertsPages/alertLibraryPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
+import { AlertAckPage } from "./alertsPages/alertAckPage.js";
 import { AlertSaveQueryModePage } from "./alertsPages/alertSaveQueryModePage.js";
 import { AlertNoDestinationPage } from "./alertsPages/alertNoDestinationPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
@@ -86,6 +87,7 @@ import { MetricsExplorerPage } from "./metricsPages/metricsExplorerPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
+import { ProfilesPage } from "./profilesPages/profilesPage.js";
 import { DatabaseMonitoringPage } from "./dbmPages/databaseMonitoringPage.js";
 import { RumPage } from "./rumPages/rumPage.js";
 import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
@@ -143,6 +145,12 @@ const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
 const WorkflowsPage = require("./workflowsPages/workflowsPage.js");
 const WorkflowFoldersPage = require("./workflowsPages/workflowFoldersPage.js");
+const FleetManagerPage = require("./fleetPages/fleetManagerPage.js");
+const FleetFleetsPage = require("./fleetPages/fleetFleetsPage.js");
+const FleetInstallPage = require("./fleetPages/fleetInstallPage.js");
+const FleetConfigPage = require("./fleetPages/fleetConfigPage.js");
+const FleetRolloutPage = require("./fleetPages/fleetRolloutPage.js");
+const FleetSeed = require("./fleetPages/fleetSeed.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
@@ -223,6 +231,7 @@ class PageManager {
     this.alertLibraryPage = new AlertLibraryPage(page);
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
+    this.alertAckPage = new AlertAckPage(page);
     this.alertSaveQueryModePage = new AlertSaveQueryModePage(page);
     this.alertNoDestinationPage = new AlertNoDestinationPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
@@ -258,6 +267,14 @@ class PageManager {
     this.workflowsPage = new WorkflowsPage(page);
     this.workflowFoldersPage = new WorkflowFoldersPage(page);
 
+    // ===== FLEET MANAGEMENT PAGE OBJECTS =====
+    this.fleetManagerPage = new FleetManagerPage(page);
+    this.fleetFleetsPage = new FleetFleetsPage(page);
+    this.fleetInstallPage = new FleetInstallPage(page);
+    this.fleetConfigPage = new FleetConfigPage(page);
+    this.fleetRolloutPage = new FleetRolloutPage(page);
+    this.fleetSeed = new FleetSeed(page);
+
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
     this.logsToolbarPinsPage = new LogsToolbarPinsPage(page);
@@ -283,6 +300,7 @@ class PageManager {
     this.tracesPage = new TracesPage(page);
     this.serviceGraphPage = new ServiceGraphPage(page);
     this.servicesCatalogPage = new ServicesCatalogPage(page);
+    this.profilesPage = new ProfilesPage(page);
     this.databaseMonitoringPage = new DatabaseMonitoringPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);

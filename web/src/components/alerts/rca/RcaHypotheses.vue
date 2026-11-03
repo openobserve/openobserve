@@ -82,13 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 hypothesis.status === 'ruled_out' ? 'text-text-secondary' : 'text-text-heading'
               "
             >
-              {{ hypothesis.statement }}
+              <RcaInlineText :text="hypothesis.statement" />
             </div>
             <div
               v-if="hypothesis.reason"
               class="text-text-secondary text-compact [text-wrap:pretty]"
             >
-              {{ hypothesis.reason }}
+              <RcaInlineText :text="hypothesis.reason" />
             </div>
 
             <template v-if="hypothesis.history.length > 0">
@@ -222,6 +222,7 @@ import {
 } from "@/utils/incidents/rcaSummary";
 import { rcaHypothesisActions } from "@/utils/incidents/rcaSteering";
 import RcaEvidenceCard from "./RcaEvidenceCard.vue";
+import RcaInlineText from "./RcaInlineText.vue";
 import RcaPill from "./RcaPill.vue";
 
 const props = withDefaults(

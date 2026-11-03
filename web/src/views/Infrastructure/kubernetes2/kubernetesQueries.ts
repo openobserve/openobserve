@@ -18,6 +18,7 @@ import type { I18nKey } from "@/types/i18n";
 export type View =
   | "cluster"
   | "map"
+  | "dependencies"
   | "nodes"
   | "workloads"
   | "pods"
@@ -323,6 +324,7 @@ export const DETAIL_KINDS = Object.keys(KIND_INFO) as DetailKind[];
 export const VIEWS: readonly View[] = [
   "cluster",
   "map",
+  "dependencies",
   "nodes",
   "workloads",
   "pods",
@@ -362,6 +364,8 @@ const MAP_POD_SET: QueryId[] = POD_SET.filter((id) => !["P13", "P14"].includes(i
 
 export const VIEW_QUERIES: Record<Exclude<View, "map">, readonly QueryId[]> = {
   cluster: ["O1", "O2", "O3", "O4", "O5", "N1", "P1", "P2", "P11", "P12"],
+  // The view runs its own flow query.
+  dependencies: [],
   nodes: ["N1", "N2", "N3", "N4", "N5", "K3", "K4", "K5", "K6"],
   workloads: [
     "P1",
@@ -422,6 +426,7 @@ export const DETAIL_WITH_PODS: ReadonlySet<DetailKind> = new Set([
 export const VIEW_ANCHORS: Record<View, readonly string[] | null> = {
   cluster: null,
   map: null,
+  dependencies: null,
   nodes: ["kube_node_status_condition"],
   workloads: null,
   pods: ["kube_pod_status_phase"],

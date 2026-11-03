@@ -8,15 +8,18 @@ name: Playwright e2e Stuck-Run-Reaper
 #      It never held a runner; swept after a separate, much longer threshold.
 # Every cancellation is explained (on the PR when there is one) with wording
 # specific to the case, so a cancellation is never misread as a blocked runner.
+# A separate job re-runs merge-queue checks GitHub ignores for a completed_at older than their run.
 
 on:
   schedule:
     # Every 15 minutes. Worst-case a stuck job lives ~threshold + 15m.
     - cron: "*/15 * * * *"
+    # Every 10 minutes for the merge-queue unstick job.
+    - cron: "*/10 * * * *"
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Report stuck runs but do NOT cancel or comment"
+        description: "Report stuck runs and stuck merge-queue entries but do NOT cancel, re-run or comment"
         type: boolean
         default: false
       threshold_minutes:
@@ -28,12 +31,8 @@ on:
         type: string
         default: "24"
 
-concurrency:
-  group: stuck-run-reaper
-  cancel-in-progress: false
-
 permissions:
-  actions: write # force-cancel workflow runs
+  actions: write # force-cancel workflow runs, re-run merge-queue jobs
   pull-requests: write # comment on the PR explaining the cancellation
   contents: read
 
@@ -42,8 +41,12 @@ jobs:
     name: Reap runs stuck waiting for an EKS runner
     # MUST run on a GitHub-hosted runner — it must not depend on the same
     # self-hosted EKS pool it is policing.
+    if: github.event_name != 'schedule' || github.event.schedule == '*/15 * * * *'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    concurrency:
+      group: stuck-run-reaper
+      cancel-in-progress: false
     steps:
       - name: Cancel runs stuck waiting for an EKS runner
         uses: actions/github-script@v9
@@ -315,3 +318,31 @@ jobs:
                 ...summaryRows,
               ])
               .write();
+
+  unstick-merge-queue:
+    name: Unstick merge-queue entries with mis-timestamped checks
+    if: github.event_name != 'schedule' || github.event.schedule == '*/10 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: stuck-run-reaper-merge-queue
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - name: Self-test detection logic
+        run: node --test .github/scripts/mq-timestamp-unstick.test.js
+
+      - name: Re-run mis-timestamped jobs blocking the merge queue
+        uses: actions/github-script@v9
+        with:
+          # Same human PAT as the reaper: reads the merge queue and authors the PR comment as a person.
+          github-token: ${{ secrets.ORG_ADMIN_TOKEN }}
+          script: |
+            const inputs = context.payload.inputs || {};
+            const dryRun = inputs.dry_run === true || inputs.dry_run === "true";
+            const { run } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/mq-timestamp-unstick.js`);
+            await run({ github, context, core, dryRun });

@@ -298,6 +298,9 @@ pub async fn handle_otlp_request(
         }
         return Err(ingestion_gate_error(e));
     }
+    // the write path creates a new stream's schema itself, before check_for_schema runs
+    schema::check_stream_key_len(org_id, StreamType::Profiles, &stream_name)
+        .map_err(|e| ProfilesExportError::InvalidArgument(e.to_string()))?;
 
     dictionary_compat::normalize(&mut request).map_err(ProfilesExportError::InvalidArgument)?;
     validation::validate(&request).map_err(ProfilesExportError::InvalidArgument)?;
@@ -412,11 +415,7 @@ async fn buffer_records(
     if !stream_schema_map.contains_key(stream_name) {
         let mut schema = infra::schema::get(org_id, stream_name, StreamType::Profiles).await?;
         if schema.fields().is_empty() {
-            let first_str = json::to_string(&records[0]).unwrap();
-            let mut schema_reader = BufReader::new(first_str.as_bytes());
-            let inferred_schema =
-                infer_json_schema(&mut schema_reader, None, StreamType::Profiles)?;
-            schema = inferred_schema;
+            schema = new_stream_schema(org_id, stream_name, &records[0])?;
             db::schema::merge(
                 org_id,
                 stream_name,
@@ -431,6 +430,7 @@ async fn buffer_records(
                 Authz::new(stream_name),
             )
             .await;
+            crate::onboarding::on_user_stream_created(org_id, StreamType::Profiles, stream_name);
         }
         stream_schema_map.insert(stream_name.to_string(), SchemaCache::new(schema));
     }
@@ -480,6 +480,25 @@ async fn buffer_records(
         hour_buf.records_size += record_str_len;
     }
     Ok(())
+}
+
+/// check_for_schema takes its fast path once this schema is saved, so the columns limit is checked
+/// here.
+fn new_stream_schema(
+    org_id: &str,
+    stream_name: &str,
+    first_record: &json::Map<String, json::Value>,
+) -> Result<arrow_schema::Schema, anyhow::Error> {
+    let first_str = json::to_string(first_record).unwrap();
+    let mut schema_reader = BufReader::new(first_str.as_bytes());
+    let schema = infer_json_schema(&mut schema_reader, None, StreamType::Profiles)?;
+    schema::check_request_columns_limit(
+        org_id,
+        StreamType::Profiles,
+        stream_name,
+        schema.fields().len(),
+    )?;
+    Ok(schema)
 }
 
 /// Redacts flattened profile records before they are buffered for the WAL.
@@ -2003,6 +2022,44 @@ mod tests {
         );
         assert!(row.get("sample_tags").is_none());
         assert!(row.get("profile_blob").is_none());
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn too_long_stream_key_is_an_invalid_argument() {
+        let name = "p".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let bounded =
+            infra::file_list::stream_key_violation("test_org_id", StreamType::Profiles, &name)
+                .is_some();
+        let result = handle_otlp_request(
+            "test_org_id",
+            ExportProfilesServiceRequest::default(),
+            OtlpRequestType::HttpProtobuf,
+            Some(&name),
+            IngestUser::from_user_email("a@a.com"),
+        )
+        .await;
+        let rejected = matches!(
+            &result,
+            Err(ProfilesExportError::InvalidArgument(msg)) if msg.starts_with("Stream name too long")
+        );
+        assert_eq!(rejected, bounded);
+    }
+
+    #[test]
+    fn new_stream_over_columns_limit_is_rejected() {
+        let limit = get_config().limit.req_cols_per_record_limit;
+        let mut record = json::Map::new();
+        record.insert(TIMESTAMP_COL_NAME.to_string(), json::json!(now_micros()));
+        for i in 0..=limit {
+            record.insert(format!("attr_{i}"), json::json!("v"));
+        }
+        let err = new_stream_schema("test_org_id", "profiles_columns_limit", &record).unwrap_err();
+        assert!(
+            err.to_string().contains("ZO_COLS_PER_RECORD_LIMIT"),
+            "{err}"
+        );
     }
 
     #[test]

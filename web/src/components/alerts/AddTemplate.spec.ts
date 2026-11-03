@@ -22,6 +22,8 @@ import store from "@/test/unit/helpers/store";
 vi.mock("vue-router", () => ({
   useRouter: () => ({ currentRoute: { value: { query: {} } }, push: vi.fn() }),
   useRoute: () => ({ params: {}, query: {} }),
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 vi.mock("@/services/alert_templates", async (importOriginal) => {
@@ -457,6 +459,29 @@ describe("AddTemplate - http JSON-validity toast (Rule ④ side-effect)", () => 
 
     expect(validateTemplateBody).not.toHaveBeenCalled();
     expect(templateService.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AddTemplate - refused save", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("closes its loading toast when the save is refused with a 403", async () => {
+    const dismissLoading = vi.fn();
+    vi.mocked(toast).mockReturnValueOnce(dismissLoading);
+    vi.mocked(templateService.create).mockRejectedValueOnce({ response: { status: 403 } });
+    const w = await mountComp();
+    await selectCustomMode(w);
+    const form = getForm(w);
+    form.setFieldValue("name", "email-template");
+    form.setFieldValue("type", "email");
+    form.setFieldValue("title", "Subject");
+    form.setFieldValue("body", "plain text");
+
+    await submit(w);
+
+    expect(templateService.create).toHaveBeenCalledTimes(1);
+    expect(dismissLoading).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledTimes(1);
   });
 });
 

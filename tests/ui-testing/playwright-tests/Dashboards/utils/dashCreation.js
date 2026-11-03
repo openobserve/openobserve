@@ -140,6 +140,7 @@ export async function deleteDashboard(page, dashboardName) {
 
       return isStable;
     },
+    undefined,
     { timeout: 15000, polling: 100 }
   );
 

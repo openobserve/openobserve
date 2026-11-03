@@ -30,6 +30,8 @@ const { mockGet, mockRouterPush } = vi.hoisted(() => ({
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: { id: "page-1" }, query: {} }),
   useRouter: () => ({ push: mockRouterPush }),
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 vi.mock("@/services/status_pages", () => ({
@@ -141,6 +143,7 @@ function makeWrapper() {
         OIcon: true,
         OSpinner: true,
         StatusPagePreview: true,
+        EditorDraftDialogs: true,
       },
     },
   });

@@ -264,7 +264,7 @@ describe("useRolePermissionRows - updateEntityEntities", () => {
   it("mirrors the heavy stream types into heavyResourceEntities and nothing else", () => {
     const { updateEntityEntities, heavyResourceEntities } = setup();
     const node = (name: string) => ({ name, childName: name, entities: [] as any[] });
-    const nodes = ["logs", "metrics", "traces", "index", "dfolder"].map(node);
+    const nodes = ["logs", "metrics", "traces", "profiles", "index", "dfolder"].map(node);
 
     nodes.forEach((n) => updateEntityEntities(n as any, ["name"], [{ name: n.name + "-1" }]));
 
@@ -272,6 +272,7 @@ describe("useRolePermissionRows - updateEntityEntities", () => {
       "index",
       "logs",
       "metrics",
+      "profiles",
       "traces",
     ]);
     expect(heavyResourceEntities.value.logs.map((e: any) => e.name)).toEqual(["logs-1"]);

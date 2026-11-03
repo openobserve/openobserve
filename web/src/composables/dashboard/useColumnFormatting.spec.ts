@@ -113,7 +113,7 @@ describe("getUnitOptions groups", () => {
       "dashboard.unitGroupData",
       ["bytes", "kilobytes", "megabytes", "bytes-si", "kilobytes-si", "megabytes-si", "bits"],
     ],
-    ["dashboard.unitGroupDataRate", ["bps", "bps-si", "bits-per-sec"]],
+    ["dashboard.unitGroupDataRate", ["bps", "bps-si", "bits-per-sec", "bytes-per-sec"]],
     [
       "dashboard.unitGroupThroughput",
       [
@@ -129,13 +129,34 @@ describe("getUnitOptions groups", () => {
     ],
     [
       "dashboard.unitGroupTime",
-      ["seconds", "milliseconds", "microseconds", "nanoseconds", "minutes", "hours", "days"],
+      [
+        "seconds",
+        "milliseconds",
+        "microseconds",
+        "nanoseconds",
+        "minutes",
+        "hours",
+        "days",
+        "datetime",
+        "from-now",
+      ],
     ],
+    ["dashboard.unitGroupTemperature", ["celsius", "fahrenheit"]],
+    ["dashboard.unitGroupFrequency", ["hertz"]],
     ["dashboard.unitGroupPercent", ["percent-1", "percent"]],
     [
       "dashboard.unitGroupCurrency",
-      ["currency-dollar", "currency-euro", "currency-pound", "currency-yen", "currency-rupee"],
+      [
+        "currency-dollar",
+        "currency-euro",
+        "currency-pound",
+        "currency-yen",
+        "currency-rupee",
+        "currency-yuan",
+        "currency-won",
+      ],
     ],
+    ["dashboard.unitGroupOther", ["boolean"]],
     ["dashboard.unitGroupCustom", ["custom"]],
   ];
 
@@ -157,9 +178,18 @@ describe("getUnitOptions groups", () => {
     "minutes",
     "hours",
     "days",
+    "bytes-per-sec",
+    "datetime",
+    "from-now",
+    "celsius",
+    "fahrenheit",
+    "hertz",
+    "currency-yuan",
+    "currency-won",
+    "boolean",
   ];
 
-  it("lists the eight group headers in order, each a label with no unit value", () => {
+  it("lists the group headers in order, each a label with no unit value", () => {
     const headers = options.filter((o) => o.header);
     expect(headers.map((o) => o.label)).toEqual(GROUPS.map(([header]) => header));
     for (const header of headers) expect(header).toEqual({ label: header.label, header: true });

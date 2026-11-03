@@ -102,6 +102,18 @@ class SlackMock:
         body = {"method": method, "error": error, "times": times}
         requests.post(f"{self.base_url}/_mock/fail", json=body, timeout=5).raise_for_status()
 
+    def mode(self, method: str, http_status: int, error: str | None = None, retry_after: int | None = None) -> None:
+        """Every call of ``method`` fails this way until ``clear_mode``: a Slack outage or a 429 storm."""
+        body: dict[str, Any] = {"method": method, "http_status": http_status}
+        if error:
+            body["error"] = error
+        if retry_after is not None:
+            body["retry_after"] = retry_after
+        requests.post(f"{self.base_url}/_mock/mode", json=body, timeout=5).raise_for_status()
+
+    def clear_mode(self, method: str) -> None:
+        requests.post(f"{self.base_url}/_mock/mode", json={"method": method, "clear": True}, timeout=5).raise_for_status()
+
     def add_team(self, team_id: str, team_name: str, **extra: Any) -> None:
         body = {"team_id": team_id, "team_name": team_name, **extra}
         requests.post(f"{self.base_url}/_mock/teams", json=body, timeout=5).raise_for_status()

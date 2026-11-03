@@ -10,7 +10,9 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ push }),
 }));
 vi.mock("vuex", () => ({
-  useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),
+  useStore: () => ({
+    state: { selectedOrganization: { identifier: "acme" }, userInfo: { email: "me@x.io" } },
+  }),
 }));
 
 const list = vi.fn();
@@ -34,6 +36,18 @@ const confirm = vi.fn();
 vi.mock("@/composables/useConfirmDialog", () => ({ useConfirmDialog: () => ({ confirm }) }));
 
 import RemoteTasksPage from "./RemoteTasksPage.vue";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
+
+const draftScope = (entityId: string | null): EditorDraftScope => ({
+  kind: "remote_task",
+  org: "acme",
+  entityId,
+  userEmail: "me@x.io",
+});
 
 function task(overrides: Partial<RemoteTask> = {}): RemoteTask {
   return {
@@ -89,6 +103,7 @@ function mountPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   listExperiments.mockResolvedValue([]);
 });
 
@@ -212,6 +227,44 @@ describe("RemoteTasksPage", () => {
     expect(remove).toHaveBeenCalledWith("acme", "head-1");
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     expect(list.mock.calls.length).toBe(before + 1);
+  });
+
+  it("marks New and a task's name when this user keeps a draft for them", async () => {
+    list.mockResolvedValue([task(), task({ id: "row-2", entityId: "head-2", name: "ranker" })]);
+    const wrapper = mountPage();
+    await flushPromises();
+    const newButton = wrapper.get('[data-test="ai-remote-tasks-new-btn"]');
+    expect(wrapper.find('[data-test="ai-remote-tasks-new-draft-dot"]').exists()).toBe(false);
+    expect(newButton.attributes("aria-label")).toBeUndefined();
+
+    writeEditorDraft(draftScope(null), { data: { name: "new one" } });
+    writeEditorDraft(draftScope("head-2"), { data: { name: "ranker" } });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="ai-remote-tasks-new-draft-dot"]').exists()).toBe(true);
+    expect(newButton.attributes("aria-label")).toBe("New Task · unsaved draft");
+    expect(wrapper.find('[data-test="ai-remote-tasks-head-2-draft-dot"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="ai-remote-tasks-head-1-draft-dot"]').exists()).toBe(false);
+  });
+
+  it("deleting a task drops its drafts; a failed delete keeps them", async () => {
+    list.mockResolvedValue([task()]);
+    writeEditorDraft(draftScope("head-1"), { data: { name: "summarizer" } });
+    writeEditorDraft({ ...draftScope("head-1"), userEmail: "other@x.io" }, { data: {} });
+    confirm.mockResolvedValue(true);
+    remove.mockRejectedValueOnce({ response: { data: { message: "nope" } } });
+    const wrapper = mountPage();
+    await flushPromises();
+
+    await wrapper.get('[data-test="ai-remote-tasks-delete-head-1"]').trigger("click");
+    await flushPromises();
+    expect(readEditorDraft(draftScope("head-1"))).not.toBeNull();
+
+    remove.mockResolvedValue(undefined);
+    await wrapper.get('[data-test="ai-remote-tasks-delete-head-1"]').trigger("click");
+    await flushPromises();
+    expect(readEditorDraft(draftScope("head-1"))).toBeNull();
+    expect(readEditorDraft({ ...draftScope("head-1"), userEmail: "other@x.io" })).toBeNull();
   });
 
   it("reports a failed load rather than rendering an empty table silently", async () => {

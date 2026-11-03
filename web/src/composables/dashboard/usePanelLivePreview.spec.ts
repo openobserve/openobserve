@@ -25,6 +25,11 @@ import {
   usePanelLivePreview,
   variablesSignature,
 } from "./usePanelLivePreview";
+import {
+  defaultLogsPanelQuery,
+  markPanelStarterQuery,
+  orderLogsStarter,
+} from "./usePanelAggregation";
 
 const makeQuery = (overrides: Record<string, any> = {}) => ({
   query: 'SELECT histogram(_timestamp) AS "x_axis_1" FROM "default"',
@@ -159,6 +164,17 @@ describe("usePanelLivePreview", () => {
       expect(hasTypedChanges(builder, applied)).toBe(false);
     });
 
+    it("does not hold a type switch's starter SQL back as typed text", () => {
+      const applied = makePanel();
+      const flame = clone(applied);
+      flame.queries[0].customQuery = true;
+      flame.queries[0].query = 'SELECT stack, sum(samples) AS value FROM "default" GROUP BY stack';
+      markPanelStarterQuery(flame.queries[0]);
+      expect(hasTypedChanges(flame, applied)).toBe(false);
+      flame.queries[0].query += " LIMIT 10";
+      expect(hasTypedChanges(flame, applied)).toBe(true);
+    });
+
     it("holds only for an open select list, not tooltips, menus or popovers", () => {
       document.body.innerHTML =
         '<div data-reka-popper-content-wrapper><span role="tooltip">tip</span></div>' +
@@ -172,6 +188,23 @@ describe("usePanelLivePreview", () => {
   });
 
   describe("live runs", () => {
+    it("runs a logs starter flipped to oldest first without waiting for Apply", async () => {
+      const { panel, applied, run, live, scope } = setup();
+      panel.type = "logs";
+      panel.queries[0].customQuery = true;
+      panel.queries[0].query = defaultLogsPanelQuery("default", "_timestamp");
+      markPanelStarterQuery(panel.queries[0]);
+      applied.value = clone(panel);
+      live.arm();
+      orderLogsStarter(panel.queries[0], "oldest");
+      await nextTick();
+      expect(live.applyState.value).not.toBe("typed");
+      vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS);
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(applied.value.queries[0].query).toMatch(/ASC LIMIT 100$/);
+      scope.stop();
+    });
+
     it("runs an aggregation change made inside the still-open axis menu", async () => {
       const { panel, run, live, scope } = setup({ domOverlay: true });
       document.body.innerHTML =

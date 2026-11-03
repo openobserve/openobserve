@@ -13,15 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::destinations::{
-    Destination, DestinationType, Endpoint, HTTPOutputFormat, HTTPType, Module,
+use config::meta::{
+    alerts::auto_investigate::GateSettings,
+    destinations::{Destination, DestinationType, Endpoint, HTTPOutputFormat, HTTPType, Module},
 };
 use hashbrown::HashMap;
 use o2_enterprise::enterprise::{
     common::auditor::AuditMessage,
     slack::{
         self,
-        hooks::{BoxFut, ChartSeries, CreatedDestination, SlackHooks, WebhookDestination},
+        hooks::{
+            AlertRcaRefusal, AlertRcaRequest, AlertRcaStart, AlertRcaVerdict, AlertViewKey, BoxFut,
+            ChartSeries, CreatedDestination, DestinationRefusal, GateFacts, SlackAppDestination,
+            SlackHooks, WebhookDestination,
+        },
     },
 };
 use openobserve_core::alerts::notifications::chart::{
@@ -38,9 +43,16 @@ pub fn hooks() -> SlackHooks {
         domain_mappings_for_org,
         is_org_blocked: db::org_status::is_blocked,
         create_webhook_destination,
+        create_slack_app_destination,
+        alert_message_view,
         render_chart_png,
         shorten_url,
         audit,
+        auto_investigate_facts,
+        auto_investigate_settings,
+        start_alert_rca,
+        running_rca_verdict,
+        publish_auto_investigate_decision: usage_reporting::publish_auto_investigate_decision,
     }
 }
 
@@ -53,38 +65,43 @@ fn domain_mappings_for_org(org_id: String) -> BoxFut<anyhow::Result<Vec<String>>
     Box::pin(async move { mapped_domains(&org_id).await })
 }
 
+/// The domains whose login rules send users to `org_id`: rules set by `org_id` or its billing
+/// payer, on a domain that owner proved, as login reads them (`process_domain_org_mapping`).
 #[cfg(feature = "cloud")]
 async fn mapped_domains(org_id: &str) -> anyhow::Result<Vec<String>> {
-    // A blocked org's domain is not passed on to the next mapping (`process_domain_org_mapping`).
-    if db::org_status::is_blocked(org_id) {
+    use o2_enterprise::enterprise::cloud::billing_group;
+    use openobserve_core::org_domain_ownership::get_cached_org_for_domain;
+
+    // Login skips a target org that is inactive or blocked.
+    if !db::org_status::read_active(org_id).await? {
         return Ok(vec![]);
     }
-    let settings = db::organization::get_org_setting(config::META_ORG_ID).await?;
-    let mappings = settings
-        .domain_org_mappings
-        .iter()
-        .map(|m| (m.domain.as_str(), m.org_id.as_str()));
-    Ok(first_match_domains(mappings, org_id))
+    let mut owners = vec![org_id.to_string()];
+    if let Some(membership) = billing_group::list_billing_membership_of(org_id).await? {
+        owners.push(membership.payer_org_id);
+    }
+    let mut domains: Vec<String> = Vec::new();
+    for owner in owners {
+        let settings = db::organization::get_org_setting(&owner).await?;
+        for rule in settings
+            .domain_org_mappings
+            .iter()
+            .filter(|m| m.org_id == org_id)
+        {
+            let domain = rule.domain.to_lowercase();
+            let proved =
+                get_cached_org_for_domain(&domain).await.as_deref() == Some(owner.as_str());
+            if proved && !domains.contains(&domain) {
+                domains.push(domain);
+            }
+        }
+    }
+    Ok(domains)
 }
 
 #[cfg(not(feature = "cloud"))]
 async fn mapped_domains(_org_id: &str) -> anyhow::Result<Vec<String>> {
     Ok(vec![])
-}
-
-/// Login uses the first mapping per domain, so later ones for that domain never apply.
-#[cfg(any(feature = "cloud", test))]
-fn first_match_domains<'a>(
-    mappings: impl Iterator<Item = (&'a str, &'a str)>,
-    org_id: &str,
-) -> Vec<String> {
-    let mut seen = std::collections::HashSet::new();
-    mappings
-        .filter_map(|(domain, mapped_org)| {
-            let domain = domain.to_lowercase();
-            (seen.insert(domain.clone()) && mapped_org == org_id).then_some(domain)
-        })
-        .collect()
 }
 
 fn create_webhook_destination(d: WebhookDestination) -> BoxFut<anyhow::Result<CreatedDestination>> {
@@ -95,6 +112,104 @@ fn create_webhook_destination(d: WebhookDestination) -> BoxFut<anyhow::Result<Cr
             id: saved.id.map(|id| id.to_string()).unwrap_or_default(),
             name: saved.name,
         })
+    })
+}
+
+fn create_slack_app_destination(
+    d: SlackAppDestination,
+) -> BoxFut<anyhow::Result<CreatedDestination>> {
+    Box::pin(async move {
+        let by = d.created_by.clone();
+        let destination = Destination {
+            id: None,
+            org_id: d.org_id,
+            name: d.name,
+            module: Module::Alert {
+                template: None,
+                destination_type: DestinationType::SlackApp(d.target),
+            },
+        };
+        let saved = openobserve_core::alerts::destinations::save_by("", destination, true, &by)
+            .await
+            .map_err(refusal_or_error)?;
+        Ok(CreatedDestination {
+            id: saved.id.map(|id| id.to_string()).unwrap_or_default(),
+            name: saved.name,
+        })
+    })
+}
+
+/// A coded refusal crosses the hook typed, so the setup path can hand the confirm to the form.
+fn refusal_or_error(e: db::alerts::destinations::DestinationError) -> anyhow::Error {
+    match e {
+        db::alerts::destinations::DestinationError::SlackApp(r) => {
+            anyhow::Error::new(DestinationRefusal {
+                status: r.status,
+                code: r.code.to_string(),
+                message: r.message,
+                team: r.team,
+                destination: r.destination,
+            })
+        }
+        e => anyhow::Error::new(e),
+    }
+}
+
+fn alert_message_view(
+    key: AlertViewKey,
+) -> BoxFut<anyhow::Result<Option<config::meta::slack::AlertMessageView>>> {
+    Box::pin(async move {
+        openobserve_core::alerts::slack_view::alert_message_view(
+            &key.org_id,
+            &key.alert_id,
+            &key.group_key,
+            key.firing_started_at,
+        )
+        .await
+    })
+}
+
+fn auto_investigate_facts(key: AlertViewKey, now: i64) -> BoxFut<anyhow::Result<GateFacts>> {
+    Box::pin(async move {
+        let f = openobserve_core::alerts::slack_investigate::gate_facts(
+            &key.org_id,
+            &key.alert_id,
+            &key.group_key,
+            key.firing_started_at,
+            now,
+        )
+        .await?;
+        Ok(GateFacts {
+            onsets_7d: f.stats.onsets,
+            evaluations_7d: f.stats.evaluations,
+            fire_share_7d: f.stats.fire_share,
+            rca_running: f.rca_running,
+            settings: f.settings,
+            settings_version: f.settings_version,
+        })
+    })
+}
+
+fn auto_investigate_settings(org_id: String) -> BoxFut<GateSettings> {
+    Box::pin(async move {
+        openobserve_core::alerts::slack_investigate::gate_settings(&org_id)
+            .await
+            .0
+    })
+}
+
+fn start_alert_rca(req: AlertRcaRequest) -> BoxFut<Result<AlertRcaStart, AlertRcaRefusal>> {
+    Box::pin(openobserve_core::alerts::slack_investigate::start_alert_rca(req))
+}
+
+fn running_rca_verdict(key: AlertViewKey) -> BoxFut<Option<AlertRcaVerdict>> {
+    Box::pin(async move {
+        openobserve_core::alerts::slack_investigate::running_rca_verdict(
+            &key.org_id,
+            &key.alert_id,
+            key.firing_started_at,
+        )
+        .await
     })
 }
 
@@ -193,27 +308,6 @@ mod tests {
             x_unit: x_unit.to_string(),
             series,
         }
-    }
-
-    #[test]
-    fn first_match_domains_keeps_the_first_mapping_per_domain() {
-        let mappings = [
-            ("acme.com", "acme"),
-            ("ACME.io", "acme"),
-            ("shared.com", "first"),
-            ("shared.com", "acme"),
-            ("Acme.com", "other"),
-            ("beta.com", "beta"),
-        ];
-        assert_eq!(
-            first_match_domains(mappings.into_iter(), "acme"),
-            vec!["acme.com", "acme.io"]
-        );
-        assert_eq!(
-            first_match_domains(mappings.into_iter(), "first"),
-            vec!["shared.com"]
-        );
-        assert!(first_match_domains(mappings.into_iter(), "other").is_empty());
     }
 
     #[test]

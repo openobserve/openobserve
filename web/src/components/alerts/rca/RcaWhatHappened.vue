@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'text-text-heading'
               "
             >
-              {{ entry.text }}
+              <RcaInlineText :text="entry.text" />
             </span>
             <span
               v-if="entry.status !== 'confirmed'"
@@ -133,6 +133,7 @@ import type {
 import { sortedRcaTimeline } from "@/utils/incidents/rcaSummary";
 import { formatTimestampInTimezone } from "@/utils/date";
 import RcaEvidenceCard from "./RcaEvidenceCard.vue";
+import RcaInlineText from "./RcaInlineText.vue";
 
 const props = defineProps<{
   timeline: RcaSummaryTimelineEntry[];

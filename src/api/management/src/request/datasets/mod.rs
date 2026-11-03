@@ -31,6 +31,15 @@ use crate::{
 
 const MAX_DATASET_IMPORT_BYTES: usize = 10 * 1024 * 1024;
 
+// Only documents the multipart body: the handler reads the form fields by hand.
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+struct DatasetImportForm {
+    /// CSV file; only one is accepted per request.
+    #[schema(value_type = String, format = Binary)]
+    file: Vec<u8>,
+}
+
 fn dataset_error_response(value: DatasetError) -> Response {
     match value {
         DatasetError::Database(err) => {
@@ -105,7 +114,7 @@ fn dataset_error_response(value: DatasetError) -> Response {
         (status = 400, description = "Invalid page size", body = ()),
         (status = 404, description = "Dataset not found", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "list"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "list"}))),
 )]
 pub async fn list_dataset_items(
     Path((org_id, dataset_id)): Path<(String, String)>,
@@ -137,7 +146,7 @@ pub async fn list_dataset_items(
         (status = 400, description = "Invalid page size or snapshot version", body = ()),
         (status = 404, description = "Dataset not found", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "list"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "list"}))),
 )]
 pub async fn get_dataset_snapshot_rows(
     Path((org_id, dataset_id)): Path<(String, String)>,
@@ -160,7 +169,7 @@ pub async fn get_dataset_snapshot_rows(
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses((status = 200, body = inline(ListDatasetsResponseBody))),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "list"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "list"}))),
 )]
 pub async fn list_datasets(
     Path(org_id): Path<String>,
@@ -212,7 +221,7 @@ pub async fn list_datasets(
         (status = 400, description = "Bad Request", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "create"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "create"}))),
 )]
 pub async fn create_dataset(
     Path(org_id): Path<String>,
@@ -245,7 +254,7 @@ pub async fn create_dataset(
         (status = 200, body = inline(DatasetResponseBody)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "get"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "get"}))),
 )]
 pub async fn get_dataset(Path((org_id, dataset_id)): Path<(String, String)>) -> Response {
     match datasets::get(&org_id, &dataset_id).await {
@@ -274,7 +283,7 @@ pub async fn get_dataset(Path((org_id, dataset_id)): Path<(String, String)>) -> 
         (status = 404, description = "Not Found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
 )]
 pub async fn update_dataset(
     Path((org_id, dataset_id)): Path<(String, String)>,
@@ -301,11 +310,11 @@ pub async fn update_dataset(
         ("dataset_id" = String, Path, description = "Dataset ID"),
     ),
     responses(
-        (status = 200, description = "Deleted", body = String),
+        (status = 200, description = "Deleted", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 404, description = "Not Found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "delete"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "delete"}))),
 )]
 pub async fn delete_dataset(Path((org_id, dataset_id)): Path<(String, String)>) -> Response {
     match datasets::delete(&org_id, &dataset_id).await {
@@ -336,7 +345,7 @@ pub async fn delete_dataset(Path((org_id, dataset_id)): Path<(String, String)>) 
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
 )]
 pub async fn push_dataset_item(
     Path((org_id, dataset_id)): Path<(String, String)>,
@@ -374,7 +383,7 @@ pub async fn push_dataset_item(
         (status = 404, description = "Dataset not found", body = ()),
         (status = 409, description = "Stale revision, deleted Case, or idempotency conflict", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
 )]
 pub async fn upsert_dataset_items(
     Path((org_id, dataset_id)): Path<(String, String)>,
@@ -427,7 +436,7 @@ pub async fn upsert_dataset_items(
         (status = 200, body = inline(DatasetItemVersionsResponseBody)),
         (status = 404, description = "Dataset or Dataset Item not found", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "get"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "get"}))),
 )]
 pub async fn get_dataset_item_versions(
     Path((org_id, dataset_id, item_id)): Path<(String, String, String)>,
@@ -459,7 +468,7 @@ pub async fn get_dataset_item_versions(
         (status = 400, description = "Invalid Dataset Item", body = ()),
         (status = 404, description = "Dataset or Dataset Item not found", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
 )]
 pub async fn update_dataset_item(
     Path((org_id, dataset_id, item_id)): Path<(String, String, String)>,
@@ -491,7 +500,7 @@ pub async fn update_dataset_item(
         (status = 200, body = inline(DatasetItemResponseBody)),
         (status = 404, description = "Dataset or Dataset Item not found", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "delete"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "delete"}))),
 )]
 pub async fn delete_dataset_item(
     Path((org_id, dataset_id, item_id)): Path<(String, String, String)>,
@@ -516,12 +525,13 @@ pub async fn delete_dataset_item(
         ("org_id" = String, Path, description = "Organization name"),
         ("dataset_id" = String, Path, description = "Dataset ID"),
     ),
+    request_body(content = inline(DatasetImportForm), description = "CSV file, at most 10 MiB", content_type = "multipart/form-data"),
     responses(
         (status = 200, body = inline(ImportDatasetItemsResponseBody)),
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
 )]
 pub async fn import_dataset_items(
     Path((org_id, dataset_id)): Path<(String, String)>,
@@ -594,7 +604,7 @@ pub async fn import_dataset_items(
         (status = 404, description = "Not Found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
 )]
 pub async fn push_annotation_queue_item_to_dataset(
     Path((org_id, queue_id, queue_item_id)): Path<(String, String, String)>,

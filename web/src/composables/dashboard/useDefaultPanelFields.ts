@@ -15,7 +15,7 @@
 
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import type { TranslateFn } from "@/types/i18n";
-import { buildDefaultSqlFields, SKIP_SEED_TYPES } from "@/utils/dashboard/defaultFields";
+import { buildDefaultBuilderFields, SKIP_SEED_TYPES } from "@/utils/dashboard/defaultFields";
 import { applyPromqlSeed, isAutoSeededSlot } from "@/utils/dashboard/promqlSeed";
 
 /**
@@ -71,7 +71,8 @@ const useDefaultPanelFields = (pageKey: string = "dashboard", t: TranslateFn) =>
 
     // hasValueColumn is scoped to `stream`, so a missing/stale schema (incl. join
     // streams) falls back to count(_timestamp).
-    const { x, y } = buildDefaultSqlFields(
+    const { x, y } = buildDefaultBuilderFields(
+      dashboardPanelData.data.type,
       streamType,
       dashboardPanelData.meta?.streamFields?.groupedFields ?? [],
       stream,

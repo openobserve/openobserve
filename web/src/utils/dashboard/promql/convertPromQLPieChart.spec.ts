@@ -51,6 +51,7 @@ vi.mock("./shared/gridBuilder", () => ({
 }));
 
 vi.mock("../colorPalette", () => ({
+  createDistinctSeriesColor: vi.fn(() => () => undefined),
   getSeriesColor: vi.fn((colorConfig, name) => {
     // Simple mock that returns colors based on name
     const colors: Record<string, string> = {
@@ -1002,6 +1003,33 @@ describe("PieConverter", () => {
 
       expect(result).toBeDefined();
       expect(result.series[0].data).toHaveLength(1);
+    });
+
+    it("colours each slice from the chart-wide distinct map before the name hash", async () => {
+      const { createDistinctSeriesColor } = await import("../colorPalette");
+      vi.mocked(createDistinctSeriesColor).mockImplementationOnce((names, colorCfg, theme) => {
+        expect(names).toEqual(["Pending", "Succeeded"]);
+        expect(colorCfg).toBeUndefined();
+        expect(theme).toBe("light");
+        return (name: string) => (name === "Succeeded" ? "#5b8ef0" : undefined);
+      });
+      const processedData: ProcessedPromQLData[] = [
+        {
+          series: [
+            { name: "Pending", values: [[1, "3"]] },
+            { name: "Succeeded", values: [[1, "3"]] },
+          ],
+          timestamps: [1],
+          queryIndex: 0,
+        },
+      ];
+
+      const result = converter.convert(processedData, { type: "pie" }, mockStore, mockExtras);
+
+      const colorOf = (name: string) =>
+        result.series[0].data.find((d: any) => d.name === name).itemStyle?.color;
+      expect(colorOf("Succeeded")).toBe("#5b8ef0");
+      expect(colorOf("Pending")).toBe("#CCCCCC");
     });
 
     it("should handle when getSeriesColor returns null", async () => {

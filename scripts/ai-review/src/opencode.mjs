@@ -227,6 +227,7 @@ export class OpencodeClient {
     })).data;
     const waiter = new SessionWaiter(this, session.id);
     this.waiters.set(session.id, waiter);
+    let totals = null;
     try {
       // 2.x has no per-prompt system field; an instruction entry lands in the system prompt as <context key="...">.
       if (system) {
@@ -241,8 +242,13 @@ export class OpencodeClient {
         throw new OpencodeError(`opencode agent ${agent} timed out after ${timeoutMs}ms`, { name: "TimeoutError" });
       }
       const messages = await this.json("GET", `/api/session/${session.id}/message?type=assistant&order=desc&limit=1`);
-      const totals = await this.json("GET", `/api/session/${session.id}`).catch(() => null);
+      totals = await this.json("GET", `/api/session/${session.id}`).catch(() => null);
       return finalAssistantResult(messages?.data, totals?.data, outcome.error, waiter.rejectedPermissions);
+    } catch (err) {
+      // A failed or timed-out session was still billed; its totals are gone once the session is deleted.
+      totals ??= await this.json("GET", `/api/session/${session.id}`).catch(() => null);
+      if (totals?.data && err && typeof err === "object") err.usage = { cost: totals.data.cost, tokens: totals.data.tokens };
+      throw err;
     } finally {
       waiter.cancel();
       this.waiters.delete(session.id);

@@ -55,7 +55,7 @@ mod tests {
         };
         let mut value = serde_json::to_value(DestinationMessage::Put { dest }).unwrap();
         value["Put"]["dest"]["module"]["alert"]["destination_type"]["type"] =
-            serde_json::json!("slack_app");
+            serde_json::json!("from_a_newer_release");
         Message {
             key: "/destinations/org1/dest1".to_string(),
             value: Some(serde_json::to_vec(&value).unwrap().into()),

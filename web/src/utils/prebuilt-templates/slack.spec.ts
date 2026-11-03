@@ -144,7 +144,7 @@ describe("slack template", () => {
     });
 
     it("has display name", () => {
-      expect(slackDestinationType.name).toBe("Slack");
+      expect(slackDestinationType.name).toBe("Slack webhook");
     });
 
     it("has description", () => {

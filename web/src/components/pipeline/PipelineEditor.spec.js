@@ -25,7 +25,7 @@ import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: vi.fn(),
+  toast: vi.fn(() => vi.fn()),
 }));
 
 const mockAddNode = vi.fn();
@@ -229,7 +229,6 @@ describe("PipelineEditor", () => {
     }
     if (wrapper) {
       try {
-        wrapper.vm.confirmDialogMeta.show = false;
         wrapper.vm.showJsonEditorDialog = false;
         wrapper.vm.confirmDialogBasicPipeline = false;
       } catch (_) {
@@ -272,10 +271,6 @@ describe("PipelineEditor", () => {
       // metaForm is seeded here — otherwise a change-only watch never fires and
       // save wrongly reports "Pipeline name is required".
       expect(wrapper.vm.metaForm.state.values.name).toBe("test-pipeline");
-    });
-
-    it("initializes confirmDialogMeta as hidden", () => {
-      expect(wrapper.vm.confirmDialogMeta.show).toBe(false);
     });
 
     it("exposes correct data attributes", () => {
@@ -360,36 +355,16 @@ describe("PipelineEditor", () => {
       expect(wrapper.vm.editingStreamRouteName).toBe("");
     });
 
-    it("resetConfirmDialog clears all confirmDialogMeta fields", () => {
-      wrapper.vm.confirmDialogMeta.show = true;
-      wrapper.vm.confirmDialogMeta.title = "Title";
-      wrapper.vm.confirmDialogMeta.message = "Message";
-      wrapper.vm.confirmDialogMeta.data = { x: 1 };
-
-      wrapper.vm.resetConfirmDialog();
-
-      expect(wrapper.vm.confirmDialogMeta.show).toBe(false);
-      expect(wrapper.vm.confirmDialogMeta.title).toBe("");
-      expect(wrapper.vm.confirmDialogMeta.message).toBe("");
-      expect(wrapper.vm.confirmDialogMeta.data).toBeNull();
-    });
-
-    it("openCancelDialog opens confirm dialog when pipeline is dirty", () => {
-      mockPipelineObj.dirtyFlag = true;
-      wrapper.vm.openCancelDialog();
-      expect(wrapper.vm.confirmDialogMeta.show).toBe(true);
-      expect(wrapper.vm.confirmDialogMeta.title).toBeTruthy();
-    });
-
     it("openCancelDialog navigates directly when pipeline is not dirty", async () => {
       const routerPushSpy = vi.spyOn(router, "push").mockImplementation(() => Promise.resolve());
       mockPipelineObj.dirtyFlag = false;
       mockPipelineObj.currentSelectedPipeline.nodes = [];
       mockPipelineObj.isEditPipeline = true;
 
-      wrapper.vm.openCancelDialog();
+      await wrapper.vm.openCancelDialog();
 
-      expect(wrapper.vm.confirmDialogMeta.show).toBe(false);
+      expect(document.querySelector('[data-test="editor-draft-leave-dialog"]')).toBeNull();
+      expect(routerPushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "pipelines" }));
       routerPushSpy.mockRestore();
     });
 
@@ -542,6 +517,14 @@ describe("PipelineEditor", () => {
       const e = { returnValue: null };
       const result = wrapper.vm.beforeUnloadHandler(e);
       expect(result).toBeTruthy();
+    });
+
+    it("counts a new pipeline with a single node as unsaved, like the route guard", () => {
+      mockPipelineObj.dirtyFlag = false;
+      mockPipelineObj.isEditPipeline = false;
+      mockPipelineObj.currentSelectedPipeline.nodes = [{ id: "1" }];
+      const e = { returnValue: null };
+      expect(wrapper.vm.beforeUnloadHandler(e)).toBeTruthy();
     });
   });
 
@@ -702,7 +685,7 @@ describe("PipelineEditor", () => {
       expect(wrapper.vm.confirmDialogBasicPipeline).toBe(true);
     });
 
-    it("sets isPipelineSaving to true when all validations pass and calls onSubmitPipeline", async () => {
+    it("saves when all validations pass and resolves once the save has finished", async () => {
       mockPipelineObj.currentSelectedPipeline.name = "my-pipeline";
       mockPipelineObj.currentSelectedPipeline.nodes = [
         {
@@ -720,9 +703,11 @@ describe("PipelineEditor", () => {
       ];
       mockPipelineObj.currentSelectedPipeline.edges = [{ source: "n1", target: "n2" }];
 
-      await wrapper.vm.savePipeline();
+      const saved = await wrapper.vm.savePipeline();
 
-      expect(wrapper.vm.isPipelineSaving).toBe(true);
+      expect(saved).toBe(true);
+      expect(pipelineService.createPipeline).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.isPipelineSaving).toBe(false);
     });
   });
 
@@ -808,7 +793,6 @@ describe("PipelineEditor", () => {
         "savePipeline",
         "savePipelineJson",
         "openCancelDialog",
-        "resetConfirmDialog",
         "resetDialog",
         "openJsonEditor",
         "findMissingEdges",

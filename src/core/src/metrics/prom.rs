@@ -143,10 +143,15 @@ pub async fn remote_write(
     // check if stream is deleting from cache
     let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
     let mut skipped_records: u32 = 0;
+    // remote write has no partial success: a 4xx drops the whole batch, a 5xx retries it forever
+    let mut stream_key_checks = ingest::StreamKeyChecks::default();
 
     // parse metadata
     for item in request.metadata {
         let metric_name = format_stream_name(item.metric_family_name.to_string());
+        if stream_key_checks.violation(org_id, &metric_name).is_some() {
+            continue;
+        }
         let schema = infra::schema::get(org_id, &metric_name, StreamType::Metrics)
             .await
             .unwrap_or_else(|_| Schema::empty());
@@ -217,6 +222,8 @@ pub async fn remote_write(
             }
         }
     }
+
+    unique_metrics.retain(|name| stream_key_checks.violation(org_id, name).is_none());
 
     let mut preload_pipeline_time = 0u128;
     let mut preload_uds_time = 0u128;
@@ -376,6 +383,10 @@ pub async fn remote_write(
 
         if is_deleting {
             skipped_records += 1;
+            continue;
+        }
+
+        if stream_key_checks.violation(org_id, &metric_name).is_some() {
             continue;
         }
 
@@ -552,6 +563,8 @@ pub async fn remote_write(
                 .map(|(record, timestamp)| (record, timestamp, None)),
         );
     }
+    // histogram bucket, exemplar and pipeline output streams can be too long when the metric fits
+    stream_key_checks.drop_unstorable(org_id, &mut json_data_by_stream);
 
     let step_start = std::time::Instant::now();
     for (stream_name, mut json_data) in json_data_by_stream {
@@ -731,7 +744,7 @@ fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
     super::get_prom_metadata_from_schema(schema).map(Into::into)
 }
 
-/// Default lookback window for `/api/v1/series` when `start` is omitted.
+/// Default lookback when `start` is omitted, for series and non-`__name__` label values.
 ///
 /// The Prometheus spec makes `start`/`end` optional (defaulting to the full
 /// TSDB range), but an unbounded range is rejected by the file_list layer and
@@ -754,13 +767,36 @@ fn normalize_series_time_range(start: i64, end: i64) -> (i64, i64) {
     (start, end)
 }
 
+fn metadata_search_request(sql: String, start: i64, end: i64) -> config::meta::search::Request {
+    let (start, end) = normalize_series_time_range(start, end);
+    config::meta::search::Request {
+        query: config::meta::search::Query {
+            sql,
+            from: 0,
+            size: 1000,
+            start_time: start,
+            end_time: end,
+            ..Default::default()
+        },
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
+        clusters: vec![],
+        timeout: 0,
+        search_type: None,
+        search_event_context: None,
+        use_cache: default_use_cache(),
+        clear_cache: false,
+        local_mode: None,
+        agent_options: None,
+    }
+}
+
 pub async fn get_series(
     org_id: &str,
     selector: Option<parser::VectorSelector>,
     start: i64,
     end: i64,
 ) -> Result<Vec<serde_json::Value>> {
-    let (start, end) = normalize_series_time_range(start, end);
     let metric_name = match selector.as_ref().and_then(try_into_metric_name) {
         Some(name) => name,
         None => {
@@ -781,26 +817,7 @@ pub async fn get_series(
         return Ok(vec![]);
     };
 
-    let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql,
-            from: 0,
-            size: 1000,
-            start_time: start,
-            end_time: end,
-            ..Default::default()
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
-        use_cache: default_use_cache(),
-        clear_cache: false,
-        local_mode: None,
-        agent_options: None,
-    };
+    let req = metadata_search_request(sql, start, end);
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
             log::error!("search series error: org_id: {org_id}, error: {err}");
@@ -961,26 +978,7 @@ pub async fn get_label_values(
 
     let sql = metadata_sql(&metric_name, &[&label_name], &schema, selector.as_ref());
 
-    let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql,
-            from: 0,
-            size: 1000,
-            start_time: start,
-            end_time: end,
-            ..Default::default()
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
-        use_cache: default_use_cache(),
-        clear_cache: false,
-        local_mode: None,
-        agent_options: None,
-    };
+    let req = metadata_search_request(sql, start, end);
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
         Ok(resp) => resp
             .hits
@@ -1093,7 +1091,11 @@ fn metadata_sql(
         })
         .map(|mat| {
             let name = quote_identifier(&mat.name);
-            let value = quote_sql_string(&mat.value);
+            // the parser's regex is anchored as `^(?:...)$`; `re_match` searches anywhere
+            let value = match &mat.op {
+                MatchOp::Re(regex) | MatchOp::NotRe(regex) => quote_sql_string(regex.as_str()),
+                MatchOp::Equal | MatchOp::NotEqual => quote_sql_string(&mat.value),
+            };
             let predicate = match &mat.op {
                 MatchOp::Equal => format!("{name} = {value}"),
                 MatchOp::NotEqual => format!("{name} != {value}"),
@@ -1478,7 +1480,12 @@ mod tests {
                 let parser::Expr::VectorSelector(selector) = parser::parse(&promql).unwrap() else {
                     panic!("expected a vector selector");
                 };
-                assert_eq!(selector.matchers.matchers[0].value, value);
+                let matcher = &selector.matchers.matchers[0];
+                assert_eq!(matcher.value, value);
+                let literal_value = match &matcher.op {
+                    MatchOp::Re(regex) | MatchOp::NotRe(regex) => regex.as_str(),
+                    _ => value,
+                };
                 for (sql, projection) in [
                     (
                         metadata_sql("up", &["job"], &schema, Some(&selector)),
@@ -1495,7 +1502,10 @@ mod tests {
                         let mut literals = 0;
                         let _ = visit_expressions_mut(&mut statements, |expr| {
                             if let Expr::Value(literal) = expr {
-                                assert_eq!(literal.value, Value::SingleQuotedString(value.into()));
+                                assert_eq!(
+                                    literal.value,
+                                    Value::SingleQuotedString(literal_value.into())
+                                );
                                 literal.value = Value::SingleQuotedString(String::new());
                                 literals += 1;
                             }
@@ -1645,6 +1655,84 @@ mod tests {
                 .collect::<Vec<_>>();
             hashes.sort();
             assert_eq!(hashes, expected, "{query}");
+        }
+    }
+
+    #[tokio::test]
+    async fn metadata_sql_anchors_regex_matchers_to_the_whole_value() {
+        use std::sync::Arc;
+
+        use datafusion::{
+            arrow::{array::StringArray, record_batch::RecordBatch},
+            prelude::SessionContext,
+        };
+        use search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
+
+        let values = [
+            "api", "work", "apix", "xwork", "xapix", "apiwork", "apix-x", "workx",
+        ];
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEX_MATCH_UDF.clone());
+        ctx.register_udf(REGEX_NOT_MATCH_UDF.clone());
+        let batch = RecordBatch::try_from_iter(vec![
+            (
+                HASH_LABEL,
+                Arc::new(StringArray::from(values.to_vec())) as _,
+            ),
+            ("job", Arc::new(StringArray::from(values.to_vec())) as _),
+        ])
+        .unwrap();
+        let schema = batch.schema();
+        ctx.register_batch("up", batch).unwrap();
+        for (query, expected) in [
+            (r#"up{job=~"api|work"}"#, vec!["api", "work"]),
+            (
+                r#"up{job!~"api|work"}"#,
+                vec!["apiwork", "apix", "apix-x", "workx", "xapix", "xwork"],
+            ),
+            (r#"up{job=~"^api$|work"}"#, vec!["api", "work"]),
+            (r#"up{job=~"(?:api|work)x"}"#, vec!["apix", "workx"]),
+            (
+                r#"up{job!~"(api|work)x"}"#,
+                vec!["api", "apiwork", "apix-x", "work", "xapix", "xwork"],
+            ),
+            (
+                r#"up{job=~"api.*"}"#,
+                vec!["api", "apiwork", "apix", "apix-x"],
+            ),
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected a vector selector");
+            };
+            let matcher = &selector.matchers.matchers[0];
+            let mut matching = values
+                .into_iter()
+                .filter(|value| matcher.is_match(value))
+                .collect::<Vec<_>>();
+            matching.sort_unstable();
+            assert_eq!(matching, expected, "{query}: the parser's own matching");
+            for sql in [
+                metadata_sql("up", &["job"], &schema, Some(&selector)),
+                series_sql("up", &schema, Some(&selector)).unwrap(),
+            ] {
+                let batches = ctx.sql(&sql).await.unwrap().collect().await.unwrap();
+                let mut actual = batches
+                    .iter()
+                    .flat_map(|batch| {
+                        batch
+                            .column_by_name("job")
+                            .unwrap()
+                            .as_any()
+                            .downcast_ref::<StringArray>()
+                            .unwrap()
+                            .iter()
+                            .map(|value| value.unwrap().to_string())
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                actual.sort_unstable();
+                assert_eq!(actual, expected, "{query}: {sql}");
+            }
         }
     }
 
@@ -1998,6 +2086,22 @@ mod tests {
     }
 
     #[test]
+    fn metadata_search_request_bounds_a_missing_start() {
+        let end = now_micros();
+        let req = metadata_search_request("SELECT 1".to_string(), 0, end);
+        assert_eq!(req.query.start_time, end - DEFAULT_SERIES_LOOKBACK_MICROS);
+        assert_eq!(req.query.end_time, end);
+        let req = metadata_search_request("SELECT 1".to_string(), 0, 0);
+        assert!(req.query.start_time > 0);
+        assert_eq!(
+            req.query.end_time - req.query.start_time,
+            DEFAULT_SERIES_LOOKBACK_MICROS
+        );
+        let req = metadata_search_request("SELECT 1".to_string(), 1_000, 2_000);
+        assert_eq!((req.query.start_time, req.query.end_time), (1_000, 2_000));
+    }
+
+    #[test]
     fn test_normalize_series_time_range_explicit_values_untouched() {
         let (start, end) = normalize_series_time_range(1_000, 2_000);
         assert_eq!((start, end), (1_000, 2_000));
@@ -2307,6 +2411,87 @@ mod tests {
         let matchers = sel.matchers.find_matchers(NAME_LABEL);
         assert!(!matchers.iter().all(|m| m.is_match("node_cpu")));
         assert!(matchers.iter().all(|m| m.is_match("http_requests")));
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn remote_write_drops_only_the_streams_whose_key_is_too_long() {
+        use infra::file_list::STREAM_KEY_MAX_LEN;
+        use prost::Message;
+        use proto::prometheus_rpc;
+
+        let org_id = "test_org_id";
+        let now = Utc::now().timestamp_millis();
+        let series = |name: &str| prometheus_rpc::TimeSeries {
+            labels: vec![prometheus_rpc::Label {
+                name: NAME_LABEL.to_string(),
+                value: name.to_string(),
+            }],
+            samples: vec![prometheus_rpc::Sample {
+                value: 1.0,
+                timestamp: now,
+            }],
+            ..Default::default()
+        };
+        let long_name = "m".repeat(STREAM_KEY_MAX_LEN);
+        // `_sum` fills the key exactly; `_count`, `_bucket` and `_exemplars` overflow it
+        let histogram_name =
+            "h".repeat(STREAM_KEY_MAX_LEN - format!("{org_id}/metrics/_sum").len());
+        let histogram = prometheus_rpc::TimeSeries {
+            samples: vec![],
+            exemplars: vec![prometheus_rpc::Exemplar {
+                labels: vec![],
+                value: 1.0,
+                timestamp: now,
+            }],
+            histograms: vec![prometheus_rpc::Histogram {
+                sum: 1.0,
+                count: Some(prometheus_rpc::histogram::Count::CountInt(1)),
+                zero_count: Some(prometheus_rpc::histogram::ZeroCount::ZeroCountInt(1)),
+                timestamp: now,
+                ..Default::default()
+            }],
+            ..series(&histogram_name)
+        };
+        let request = prometheus_rpc::WriteRequest {
+            timeseries: vec![
+                series("test_prom_key_len_ok"),
+                series(&long_name),
+                histogram,
+            ],
+            metadata: vec![prometheus_rpc::MetricMetadata {
+                r#type: prometheus_rpc::metric_metadata::MetricType::Gauge as i32,
+                metric_family_name: long_name.clone(),
+                ..Default::default()
+            }],
+        };
+        let body = snap::raw::Encoder::new()
+            .compress_vec(&request.encode_to_vec())
+            .unwrap();
+        remote_write(
+            org_id,
+            Bytes::from(body),
+            IngestUser::User("root@example.com".to_string()),
+        )
+        .await
+        .unwrap();
+
+        let bounded =
+            infra::file_list::stream_key_violation(org_id, StreamType::Metrics, &long_name)
+                .is_some();
+        let expected = [
+            ("test_prom_key_len_ok".to_string(), true),
+            (format!("{histogram_name}_sum"), true),
+            (long_name, !bounded),
+            (format!("{histogram_name}_count"), !bounded),
+            (format!("{histogram_name}_bucket"), !bounded),
+            (exemplars_stream_name(&histogram_name), !bounded),
+        ];
+        for (name, created) in expected {
+            let exists = infra::schema::exists(org_id, StreamType::Metrics, &name).await;
+            assert_eq!(exists, created, "{name}");
+        }
     }
 
     #[tokio::test]

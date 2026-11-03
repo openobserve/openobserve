@@ -3651,93 +3651,6 @@ class APICleanup {
     }
 
     /**
-     * ==========================================
-     * CORRELATION SETTINGS CLEANUP METHODS
-     * ==========================================
-     */
-
-    /**
-     * Clean up test semantic groups created by correlation settings tests
-     * Uses the alerts deduplication config API (same as frontend)
-     * Test groups created by ensureSemanticGroupsExist(): k8s-cluster, k8s-namespace, k8s-deployment, service
-     * @param {Array<string>} groupIds - Array of semantic group IDs to delete (default: test group IDs)
-     */
-    async cleanupCorrelationSettings(groupIds = ['k8s-cluster', 'k8s-namespace', 'k8s-deployment', 'service']) {
-        testLogger.info('Starting correlation settings cleanup', { groupIds });
-
-        try {
-            // First, fetch the current deduplication config
-            const getResponse = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': this.authHeader,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!getResponse.ok) {
-                if (getResponse.status === 404) {
-                    testLogger.info('Deduplication config not found (nothing to clean up)');
-                    return;
-                }
-                testLogger.warn('Failed to fetch deduplication config', { status: getResponse.status });
-                return;
-            }
-
-            const config = await getResponse.json();
-            const currentGroups = config.semantic_field_groups || [];
-            testLogger.info('Current semantic groups in dedup config', { count: currentGroups.length });
-
-            if (currentGroups.length === 0) {
-                testLogger.info('No semantic groups to clean up');
-                return;
-            }
-
-            // Filter out the test groups
-            const remainingGroups = currentGroups.filter(g => !groupIds.includes(g.id));
-            const removedCount = currentGroups.length - remainingGroups.length;
-
-            if (removedCount === 0) {
-                testLogger.info('No test semantic groups found to clean up');
-                return;
-            }
-
-            testLogger.info('Removing test semantic groups', {
-                total: currentGroups.length,
-                removing: removedCount,
-                remaining: remainingGroups.length
-            });
-
-            // Update the config with remaining groups
-            const updatePayload = {
-                ...config,
-                semantic_field_groups: remainingGroups,
-                // Also clean up fingerprint groups that reference removed semantic groups
-                alert_fingerprint_groups: (config.alert_fingerprint_groups || [])
-                    .filter(id => !groupIds.includes(id))
-            };
-
-            const updateResponse = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': this.authHeader,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(updatePayload)
-            });
-
-            if (updateResponse.ok) {
-                testLogger.info('Correlation settings cleanup completed', { removedGroups: removedCount });
-            } else {
-                testLogger.warn('Failed to update deduplication config', { status: updateResponse.status });
-            }
-
-        } catch (error) {
-            testLogger.error('Correlation settings cleanup failed', { error: error.message });
-        }
-    }
-
-    /**
      * IAM leftovers a CRASHED run orphaned: roles, groups, users and service accounts
      * under `prefix`.
      *
@@ -3795,6 +3708,50 @@ class APICleanup {
         } catch (e) {
             // Never fail the cleanup run: every other suite is waiting on it.
             testLogger.warn('IAM artifact cleanup hit an error — continuing', { error: e?.message });
+        }
+        return removed;
+    }
+
+    /** Crashed-run fleet leftovers; quiet on OSS, where the fleet routes are not registered and answer 404. */
+    async cleanupFleetArtifacts(fleetPrefixes = ['fl_auto_'], configPrefixes = ['fl-auto-']) {
+        testLogger.info('Starting fleet artifact cleanup', { fleetPrefixes, configPrefixes });
+        const headers = { 'Authorization': this.authHeader, 'Content-Type': 'application/json' };
+        const api = (path) => `${this.baseUrl}/api/${this.org}${path}`;
+        const json = async (res) => { try { return await res.json(); } catch { return null; } };
+        const starts = (value, prefixes) => typeof value === 'string' && prefixes.some((p) => value.startsWith(p));
+        const removed = { tokens: 0, fleets: 0, configs: 0 };
+        // The fl_auto_ roles and users do not depend on the fleet API, so sweep them even when it is unavailable.
+        for (const prefix of fleetPrefixes) await this.cleanupIamArtifacts(prefix);
+        try {
+            const fleetsRes = await this._fetch(api('/fleet/fleets?offset=0&limit=1000'), { method: 'GET', headers });
+            if (!fleetsRes.ok) {
+                testLogger.info('Fleet cleanup skipped — fleet API unavailable (OSS build or fleet off)', { status: fleetsRes.status });
+                return removed;
+            }
+            const fleets = ((await json(fleetsRes))?.items ?? []).filter((f) => starts(f?.name, fleetPrefixes));
+            const ids = new Set(fleets.map((f) => f.id));
+            const tokensRes = await this._fetch(api('/fleet/tokens?offset=0&limit=1000'), { method: 'GET', headers });
+            for (const tok of (tokensRes.ok ? (await json(tokensRes))?.items : null) ?? []) {
+                if (ids.has(tok?.fleet?.id) && !tok.revoked) {
+                    await this._fetch(api(`/fleet/tokens/${tok.id}/revoke`), { method: 'POST', headers });
+                    removed.tokens += 1;
+                }
+            }
+            // Deleting a fleet also removes its revoked tokens and rollout history, which unpins its configurations.
+            for (const f of fleets) {
+                await this._fetch(api(`/fleet/fleets/${f.id}`), { method: 'DELETE', headers });
+                removed.fleets += 1;
+            }
+            const configsRes = await this._fetch(api('/fleet/configs?offset=0&limit=1000'), { method: 'GET', headers });
+            for (const c of (configsRes.ok ? (await json(configsRes))?.items : null) ?? []) {
+                if (starts(c?.id, configPrefixes)) {
+                    await this._fetch(api(`/fleet/configs/${c.id}`), { method: 'DELETE', headers });
+                    removed.configs += 1;
+                }
+            }
+            testLogger.info('Fleet artifact cleanup complete', removed);
+        } catch (e) {
+            testLogger.warn('Fleet artifact cleanup hit an error — continuing', { error: e?.message });
         }
         return removed;
     }

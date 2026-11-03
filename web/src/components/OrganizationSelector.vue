@@ -37,6 +37,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 
 interface OrgOption {
@@ -213,7 +214,15 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           <template #icon-left>
             <OIcon name="domain" size="sm" class="shrink-0 opacity-60" />
           </template>
-          <OTruncatedText class="flex-1 text-left">{{ current?.label || "" }}</OTruncatedText>
+          <OTruncatedText v-if="current?.label" class="flex-1 text-left">{{
+            current.label
+          }}</OTruncatedText>
+          <OSkeleton
+            v-else
+            type="text"
+            class="h-3 flex-1"
+            data-test="navbar-organizations-select-placeholder"
+          />
           <template #icon-right>
             <OIcon
               name="arrow-drop-down"

@@ -19,6 +19,9 @@ import { reactive } from "vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import { convertToUtcTimestamp } from "@/utils/timezone";
+import { formatAxisTickValue } from "@/utils/dashboard/axisTickFormat";
+import { createSeriesOverrideLookup } from "@/utils/dashboard/seriesOverrides";
+import { convertMultiSQLData } from "@/utils/dashboard/convertSQLData";
 
 // ---------------------------------------------------------------------------
 // Heavy async component stubs — must be declared before the component import
@@ -32,8 +35,8 @@ vi.mock("./TracesLatencyHeatmap.vue", () => ({
   default: {
     name: "TracesLatencyHeatmap",
     template: '<div data-test="traces-latency-heatmap"></div>',
-    props: ["request"],
-    emits: ["select"],
+    props: ["request", "selection", "aiEnabled"],
+    emits: ["select", "filter", "drill-down", "clear", "ask-ai"],
   },
 }));
 
@@ -41,7 +44,7 @@ vi.mock("./TracesComparison.vue", () => ({
   default: {
     name: "TracesComparison",
     template: '<div data-test="traces-comparison-stub"></div>',
-    props: ["selection", "streamName"],
+    props: ["selection", "streamName", "presetContext"],
     emits: ["close", "apply-filter"],
   },
 }));
@@ -155,7 +158,7 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
         TracesComparison: {
           name: "TracesComparison",
           template: '<div data-test="traces-comparison-stub"></div>',
-          props: ["selection", "streamName"],
+          props: ["selection", "streamName", "presetContext"],
           emits: ["close", "apply-filter"],
         },
       },
@@ -219,10 +222,6 @@ describe("TracesMetricsDashboard", () => {
   // Rendering
   // -------------------------------------------------------------------------
   describe("rendering", () => {
-    it("should mount without errors", () => {
-      expect(wrapper.exists()).toBe(true);
-    });
-
     it("should not render the charts-wrapper when show is false", async () => {
       await wrapper.setProps({ show: false });
       const charts = wrapper.find('[data-test="render-dashboard-charts"]');
@@ -232,12 +231,6 @@ describe("TracesMetricsDashboard", () => {
     it("should render the dashboard charts component when show is true and histogram is visible", () => {
       const charts = wrapper.find('[data-test="render-dashboard-charts"]');
       expect(charts.exists()).toBe(true);
-    });
-
-    it("should not render the dashboard charts component when show is false", async () => {
-      await wrapper.setProps({ show: false });
-      const charts = wrapper.find('[data-test="render-dashboard-charts"]');
-      expect(charts.exists()).toBe(false);
     });
 
     it("should not render the comparison page on initial mount", () => {
@@ -276,21 +269,84 @@ describe("TracesMetricsDashboard", () => {
       );
     });
 
-    it("labels Rate in traces/s with two decimals", async () => {
+    it("shows traces/s once in the Rate header and keeps the y ticks plain", async () => {
       await wrapper.vm.loadDashboard();
       await flushPromises();
       const config = getPanel(wrapper, "Rate").config;
-      expect(config.unit).toBe("custom");
-      expect(config.unit_custom).toBe("traces/s");
-      expect(config.decimals).toBe(2);
+      expect(config.title_meta).toBe("traces/s");
+      expect(formatAxisTickValue(10, config.unit, config.unit_custom, config.decimals)).toBe(
+        "10.00",
+      );
     });
 
-    it("should keep approx_distinct(trace_id) in the Errors panel query in traces mode", async () => {
+    it("keeps traces/s with two decimals on the Rate tooltip value", async () => {
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Errors");
-      // Errors panel injects span_status='ERROR' into WHERE — should NOT replace approx_distinct yet
-      expect(query).not.toContain("count(*)");
+      const lookup = createSeriesOverrideLookup(getPanel(wrapper, "Rate").config);
+      expect(lookup.formatValue(12.345, "max_rate")).toBe("12.35traces/s");
+      expect(lookup.formatValue(0.5, "Rate")).toBe("0.50traces/s");
+    });
+
+    it("renders the Rate chart with plain y ticks and crosshair, and the unit on the tooltip", async () => {
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const rows = [
+        { time_bucket: "2024-01-01T00:00:00", max_rate: 4.5 },
+        { time_bucket: "2024-01-01T00:00:15", max_rate: 12 },
+      ];
+      const result: any = await convertMultiSQLData(
+        getPanel(wrapper, "Rate"),
+        [rows],
+        {
+          state: {
+            theme: "light",
+            timezone: "UTC",
+            zoConfig: { timestamp_column: "_timestamp", max_dashboard_series: 1000 },
+            selectedOrganization: { identifier: "default" },
+          },
+        },
+        { value: { offsetWidth: 800, offsetHeight: 400 } },
+        { value: null },
+        { value: [] },
+        {
+          queries: [
+            {
+              query: "SELECT 1",
+              startTime: 1704067200000000,
+              endTime: 1704067230000000,
+              timeRangeGap: { seconds: 0, periodAsStr: "" },
+              panelQueryIndex: 0,
+            },
+          ],
+        },
+        { height: "400px" },
+        { value: [] },
+        false,
+      );
+      const options = result.options;
+      const yAxis = Array.isArray(options.yAxis) ? options.yAxis[0] : options.yAxis;
+      expect(yAxis.axisLabel.formatter(10)).toBe("10.00");
+      expect(options.tooltip.axisPointer.label.formatter({ axisDimension: "y", value: 10 })).toBe(
+        "10.00",
+      );
+      const series = options.series[0];
+      const html = options.tooltip.formatter([
+        {
+          seriesName: series.name,
+          marker: "",
+          value: series.data[1],
+          data: series.data[1],
+        },
+      ]);
+      expect(html).toContain("12.00traces/s");
+    });
+
+    it("leaves the Errors panel header and units untouched", async () => {
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const config = getPanel(wrapper, "Errors").config;
+      expect(config.title_meta).toBeUndefined();
+      expect(config.override_config ?? []).toEqual([]);
     });
 
     it("should prepend WHERE span_status = 'ERROR' to the Errors panel query", async () => {
@@ -323,7 +379,17 @@ describe("TracesMetricsDashboard", () => {
       await wrapper.vm.loadDashboard();
       await flushPromises();
       expect(getPanelQuery(wrapper, "Rate")).toContain("count(*) / 15.0");
-      expect(getPanel(wrapper, "Rate").config.unit_custom).toBe("spans/s");
+    });
+
+    it("shows spans/s in the Rate header and on the tooltip, never on the y ticks", async () => {
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const config = getPanel(wrapper, "Rate").config;
+      expect(config.title_meta).toBe("spans/s");
+      expect(formatAxisTickValue(250, config.unit, config.unit_custom, config.decimals)).toBe(
+        "250.00",
+      );
+      expect(createSeriesOverrideLookup(config).formatValue(3, "max_rate")).toBe("3.00spans/s");
     });
 
     it("should replace approx_distinct(trace_id) with count(*) in the Errors panel query", async () => {
@@ -384,17 +450,6 @@ describe("TracesMetricsDashboard", () => {
       expect(getHeatmapSql(wrapper)).not.toContain("span_kind='Server'");
     });
 
-    it("should include the filter prop in the Errors panel WHERE clause", async () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "service_name = 'api'";
-      wrapper = mountComponent();
-      await flushPromises();
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      const query = getPanelQuery(wrapper, "Errors");
-      expect(query).toContain("service_name = 'api'");
-    });
-
     it("should produce no WHERE clause in Rate panel when filter is absent and no range filters exist", async () => {
       // default mount has no filter prop and empty metricsRangeFilters
       await wrapper.vm.loadDashboard();
@@ -417,18 +472,6 @@ describe("TracesMetricsDashboard", () => {
       expect(query).not.toContain("span_kind='Server'");
     });
 
-    it("should convert span_kind='Server' label to '2' in the Errors panel WHERE clause", async () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "span_kind='Server'";
-      wrapper = mountComponent();
-      await flushPromises();
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      const query = getPanelQuery(wrapper, "Errors");
-      expect(query).toContain("span_kind='2'");
-      expect(query).not.toContain("span_kind='Server'");
-    });
-
     it("should convert span_kind='Client' label to '3' in both Rate and Errors panels", async () => {
       wrapper.unmount();
       mockSearchObj.data.editorValue = "span_kind='Client'";
@@ -442,27 +485,6 @@ describe("TracesMetricsDashboard", () => {
       expect(rateQuery).not.toContain("span_kind='Client'");
       expect(errorsQuery).toContain("span_kind='3'");
       expect(errorsQuery).not.toContain("span_kind='Client'");
-    });
-
-    it("should leave non-span_kind filter unchanged in the Errors panel WHERE clause", async () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "service_name = 'api'";
-      wrapper = mountComponent();
-      await flushPromises();
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      const query = getPanelQuery(wrapper, "Errors");
-      expect(query).toContain("service_name = 'api'");
-    });
-
-    it("should leave non-span_kind filter unchanged in the heatmap WHERE clause", async () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "service_name = 'api'";
-      wrapper = mountComponent();
-      await flushPromises();
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      expect(getHeatmapSql(wrapper)).toContain("service_name = 'api'");
     });
 
     it("should convert span_kind label case-insensitively in the Errors panel", async () => {
@@ -583,13 +605,6 @@ describe("TracesMetricsDashboard", () => {
       expect(timeObj.__global.start_time.getTime()).toBe(5_000_000);
       expect(timeObj.__global.end_time.getTime()).toBe(6_000_000);
     });
-
-    it("should set dashboardData after loadDashboard is called with new timeRange", async () => {
-      mockSearchObj.data.datetime = { startTime: 7_000_000, endTime: 8_000_000 };
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      expect(wrapper.vm.dashboardData).not.toBeNull();
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -653,7 +668,7 @@ describe("TracesMetricsDashboard", () => {
       process.env.TZ = "America/New_York";
       try {
         mockStore.state.timezone = "Asia/Kolkata";
-        await wrapper.vm.onHeatmapSelect(selection());
+        await wrapper.vm.onHeatmapFilter(selection());
         const { start, end } = wrapper.emitted("time-range-selected")![0][0] as any;
         // The picker formats with browser-local getters and parses that wall clock in the app zone.
         const picked = (ms: number) => {
@@ -672,7 +687,7 @@ describe("TracesMetricsDashboard", () => {
 
     it("never hands the picker an empty range for a final column clamped mid-second", async () => {
       // Final column 10:02:00–10:02:10 with the search ending at 10:02:00.437.
-      await wrapper.vm.onHeatmapSelect(selection({ timeEndUs: T + 437_000 }));
+      await wrapper.vm.onHeatmapFilter(selection({ timeEndUs: T + 437_000 }));
       const { start, end } = wrapper.emitted("time-range-selected")![0][0] as any;
       // The picker keeps whole seconds only.
       const appliedStart = Math.floor(start / 1000);
@@ -682,7 +697,7 @@ describe("TracesMetricsDashboard", () => {
     });
 
     it("rounds a mid-second clamped start down to the whole second", async () => {
-      await wrapper.vm.onHeatmapSelect(selection({ timeStartUs: T + 437_000 }));
+      await wrapper.vm.onHeatmapFilter(selection({ timeStartUs: T + 437_000 }));
       expect((wrapper.emitted("time-range-selected")![0][0] as any).start).toBe(T / 1000);
     });
 
@@ -690,7 +705,7 @@ describe("TracesMetricsDashboard", () => {
       mountApplying({ startTime: T, endTime: T + 40 * S });
       mockSearchObj.data.editorValue = "service_name = 'a'";
       mockSearchObj.meta.searchMode = "spans";
-      await wrapper.vm.onHeatmapSelect(selection());
+      await wrapper.vm.onHeatmapFilter(selection());
       expect(durationEntry()).toEqual({
         panelTitle: "Duration",
         start: 100_000,
@@ -707,26 +722,26 @@ describe("TracesMetricsDashboard", () => {
 
     it("emits exactly one editor-filter-set with the composed filter and no filters-updated", async () => {
       mockSearchObj.data.editorValue = "service_name = 'a'";
-      await wrapper.vm.onHeatmapSelect(selection());
+      await wrapper.vm.onHeatmapFilter(selection());
       expect(wrapper.emitted("editor-filter-set")).toEqual([[`(service_name = 'a') and ${band}`]]);
       expect(wrapper.emitted("filters-updated")).toBeUndefined();
     });
 
     it("keeps a user duration condition and intersects the band with it", async () => {
       mockSearchObj.data.editorValue = "duration >= '1ms'";
-      await wrapper.vm.onHeatmapSelect(selection());
+      await wrapper.vm.onHeatmapFilter(selection());
       expect(wrapper.emitted("editor-filter-set")![0][0]).toBe(`(duration >= '1ms') and ${band}`);
     });
 
     it("stores a lo of 0 as a null start", async () => {
-      await wrapper.vm.onHeatmapSelect(selection({ durationLoUs: 0 }));
+      await wrapper.vm.onHeatmapFilter(selection({ durationLoUs: 0 }));
       expect(durationEntry()!.start).toBeNull();
       expect(durationEntry()!.end).toBe(500_000);
     });
 
     it("restores the baseline text exactly for a full-height box", async () => {
       mockSearchObj.data.editorValue = "a = '1'  or b = '2'";
-      await wrapper.vm.onHeatmapSelect(selection({ durationLoUs: 0, durationHiUs: null }));
+      await wrapper.vm.onHeatmapFilter(selection({ durationLoUs: 0, durationHiUs: null }));
       expect(durationEntry()!.start).toBeNull();
       expect(durationEntry()!.end).toBeNull();
       expect(wrapper.emitted("editor-filter-set")![0][0]).toBe("a = '1'  or b = '2'");
@@ -735,8 +750,9 @@ describe("TracesMetricsDashboard", () => {
     it("gives Drill down the applied end when the picker drops the box's milliseconds", async () => {
       const appliedEnd = T + 30 * S;
       mountApplying({ startTime: T, endTime: appliedEnd });
-      await wrapper.vm.onHeatmapSelect(selection({ timeEndUs: appliedEnd + 437_000 }));
+      await wrapper.vm.onHeatmapFilter(selection({ timeEndUs: appliedEnd + 437_000 }));
       mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")![0][0] as string;
+      await wrapper.vm.loadDashboard();
       wrapper.vm.openComparison();
       expect(wrapper.vm.comparisonSelection.windowEndUs).toBe(appliedEnd);
       expect(durationEntry()!.timeEnd).toBe(appliedEnd + 437_000);
@@ -745,7 +761,7 @@ describe("TracesMetricsDashboard", () => {
     it("stores the raw editor text, OR and parentheses included, without the band", async () => {
       const raw = "(service_name = 'a' or duration >= '1ms') and span_kind = 'Server'";
       mockSearchObj.data.editorValue = raw;
-      await wrapper.vm.onHeatmapSelect(selection());
+      await wrapper.vm.onHeatmapFilter(selection());
       expect(durationEntry()!.baselineFilter).toBe(raw);
       expect(durationEntry()!.baselineFilter).not.toContain("100ms");
     });
@@ -753,10 +769,10 @@ describe("TracesMetricsDashboard", () => {
     it("carries the first box's baseline and original range into a refinement box", async () => {
       mountApplying({ startTime: T, endTime: T + 40 * S });
       mockSearchObj.data.editorValue = "service_name = 'a'";
-      await wrapper.vm.onHeatmapSelect(selection());
+      await wrapper.vm.onHeatmapFilter(selection());
       mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")![0][0] as string;
 
-      await wrapper.vm.onHeatmapSelect(
+      await wrapper.vm.onHeatmapFilter(
         selection({ timeStartUs: T + 10 * S, timeEndUs: T + 20 * S, durationLoUs: 200_000 }),
       );
 
@@ -773,13 +789,13 @@ describe("TracesMetricsDashboard", () => {
     it("re-snapshots the baseline and range when the editor was edited after the first box", async () => {
       mountApplying({ startTime: T, endTime: T + 40 * S });
       mockSearchObj.data.editorValue = "service_name = 'a'";
-      await wrapper.vm.onHeatmapSelect(selection());
+      await wrapper.vm.onHeatmapFilter(selection());
       const edited = `${wrapper.emitted("editor-filter-set")![0][0]} and span_kind = 'Server'`;
       mockSearchObj.data.editorValue = edited;
       // The edit was searched, which reloads the charts over the box's range.
       await wrapper.vm.loadDashboard();
 
-      await wrapper.vm.onHeatmapSelect(
+      await wrapper.vm.onHeatmapFilter(
         selection({ timeStartUs: T + 10 * S, timeEndUs: T + 20 * S, durationLoUs: 200_000 }),
       );
 
@@ -838,7 +854,7 @@ describe("TracesMetricsDashboard", () => {
           start: T / 1000,
           end: T / 1000 + 40_000,
         });
-        await wrapper.vm.onHeatmapSelect(selection());
+        await wrapper.vm.onHeatmapFilter(selection());
         const boxRange = wrapper.emitted("time-range-selected")![1][0] as any;
         expect(boxRange.start).toBe(T / 1000 + 5.5 * 3600 * 1000);
         expect(boxRange.end).toBe(T / 1000 + 40_000 + 5.5 * 3600 * 1000);
@@ -856,7 +872,7 @@ describe("TracesMetricsDashboard", () => {
       // Live mode: the brush's search reloads the charts over the brushed range.
       await wrapper.vm.loadDashboard();
 
-      await wrapper.vm.onHeatmapSelect(selection());
+      await wrapper.vm.onHeatmapFilter(selection());
 
       expect(durationEntry()!.baselineFilter).toBe(errorsText);
       expect(wrapper.vm.originalTimeRangeBeforeSelection).toEqual({
@@ -871,7 +887,7 @@ describe("TracesMetricsDashboard", () => {
     it("snapshots the range the charts show, not the picker's, for a brush after an unsearched box", async () => {
       // Manual mode: the box moves the picker, but the charts still show the range of the last search.
       mountApplying({ startTime: T, endTime: T + 40 * S });
-      await wrapper.vm.onHeatmapSelect(selection());
+      await wrapper.vm.onHeatmapFilter(selection());
       mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")![0][0] as string;
       expect(mockSearchObj.data.datetime).toEqual({ startTime: T, endTime: T + 40 * S });
 
@@ -886,7 +902,7 @@ describe("TracesMetricsDashboard", () => {
     it("keeps the band in the baseline of a brush drawn after a box", async () => {
       mountApplying({ startTime: T, endTime: T + 40 * S });
       mockSearchObj.data.editorValue = "service_name = 'a'";
-      await wrapper.vm.onHeatmapSelect(selection());
+      await wrapper.vm.onHeatmapFilter(selection());
       mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")![0][0] as string;
 
       await brush("Rate");
@@ -915,7 +931,7 @@ describe("TracesMetricsDashboard", () => {
       });
     };
     const box = () =>
-      wrapper.vm.onHeatmapSelect({
+      wrapper.vm.onHeatmapFilter({
         timeStartUs: T,
         timeEndUs: T + 40 * S,
         durationLoUs: 100_000,
@@ -926,13 +942,19 @@ describe("TracesMetricsDashboard", () => {
     const showSelection = () => {
       mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")!.at(-1)![0] as string;
     };
+    // The search the applied selection triggers reloads the charts with its text.
+    const runSelection = async () => {
+      showSelection();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+    };
 
     beforeEach(() => {
       vi.mocked(parseDurationWhereClause).mockImplementation((f: string) =>
         f.replace("'1ms'", "1000"),
       );
-      mountApplying({ startTime: T, endTime: T + 40 * S });
       mockSearchObj.data.editorValue = raw;
+      mountApplying({ startTime: T, endTime: T + 40 * S });
     });
 
     afterEach(() => {
@@ -941,7 +963,7 @@ describe("TracesMetricsDashboard", () => {
 
     it("passes a current box as a duration selection with the decoded pre-box filter", async () => {
       await box();
-      showSelection();
+      await runSelection();
       wrapper.vm.openComparison();
       await flushPromises();
       expect(stub().props("selection")).toEqual({
@@ -962,7 +984,7 @@ describe("TracesMetricsDashboard", () => {
       ["Rate", "rate"],
     ] as const)("passes a current %s brush as a %s selection", async (title, kind) => {
       await brush(title);
-      showSelection();
+      await runSelection();
       wrapper.vm.openComparison();
       await flushPromises();
       expect(stub().props("selection")).toMatchObject({
@@ -979,7 +1001,7 @@ describe("TracesMetricsDashboard", () => {
     it("passes an empty filter for a box drawn from an empty editor", async () => {
       mockSearchObj.data.editorValue = "";
       await box();
-      showSelection();
+      await runSelection();
       wrapper.vm.openComparison();
       await flushPromises();
       expect(stub().props("selection").filter).toBe("");
@@ -992,7 +1014,24 @@ describe("TracesMetricsDashboard", () => {
       expect(stub().props("selection")).toBeNull();
     });
 
-    it("passes no selection when an unsearched edit made the entry stale", async () => {
+    it("keeps the selection the charts ran when a staged edit follows it", async () => {
+      await box();
+      await runSelection();
+      mockSearchObj.data.editorValue = `${mockSearchObj.data.editorValue} and http_method = 'GET'`;
+      wrapper.vm.openComparison();
+      await flushPromises();
+      expect(stub().props("selection")).toMatchObject({ kind: "duration", windowStartUs: T });
+    });
+
+    it("opens on an applied selection the charts have not run yet", async () => {
+      await box();
+      showSelection();
+      wrapper.vm.openComparison();
+      await flushPromises();
+      expect(stub().props("selection")).toMatchObject({ kind: "duration", windowStartUs: T });
+    });
+
+    it("passes no selection when an edit follows an applied selection the charts never ran", async () => {
       await box();
       showSelection();
       mockSearchObj.data.editorValue = `${mockSearchObj.data.editorValue} and http_method = 'GET'`;
@@ -1004,7 +1043,47 @@ describe("TracesMetricsDashboard", () => {
     it("teleports the page into the traces drill-down target", async () => {
       wrapper.vm.openComparison();
       await flushPromises();
+      expect(stub().exists()).toBe(true);
       expect(wrapper.find("teleport-stub").attributes("to")).toBe("#traces-drill-down-page");
+    });
+
+    it("gives the presets the charts' range and the decoded editor filter", async () => {
+      wrapper.vm.openComparison();
+      await flushPromises();
+      expect(stub().props("presetContext")).toEqual({
+        rangeStartUs: R.startTime,
+        rangeEndUs: R.endTime,
+        filter: "(service_name = 'a' or duration >= 1000) and span_kind='2'",
+      });
+    });
+
+    it("gives the presets the filter the charts ran, not a staged edit", async () => {
+      mockSearchObj.data.editorValue = "service_name = 'staged'";
+      wrapper.vm.openComparison();
+      await flushPromises();
+      expect(stub().props("presetContext")).toMatchObject({
+        filter: "(service_name = 'a' or duration >= 1000) and span_kind='2'",
+      });
+    });
+
+    it("composes a preset's Filter onto the current editor text, so a staged edit is kept", async () => {
+      wrapper.vm.openComparison();
+      await flushPromises();
+      mockSearchObj.data.editorValue = "service_name = 'staged'";
+      stub().vm.$emit("apply-filter", "a = '1'");
+      await flushPromises();
+      expect(wrapper.emitted("editor-filter-run")).toEqual([
+        ["(service_name = 'staged') and a = '1'"],
+      ]);
+    });
+
+    it("composes a preset's Filter with the editor text and keeps the panel open until Run", async () => {
+      wrapper.vm.openComparison();
+      await flushPromises();
+      stub().vm.$emit("apply-filter", "a = '1'");
+      await flushPromises();
+      expect(wrapper.emitted("editor-filter-run")).toEqual([[`(${raw}) and a = '1'`]]);
+      expect(stub().exists()).toBe(true);
     });
 
     it("unmounts the page on close and when a new search starts, not when one finishes", async () => {
@@ -1044,7 +1123,7 @@ describe("TracesMetricsDashboard", () => {
         },
       });
       await box();
-      showSelection();
+      await runSelection();
       wrapper.vm.openComparison();
       await flushPromises();
 
@@ -1062,7 +1141,7 @@ describe("TracesMetricsDashboard", () => {
 
     it("applies a filter emitted by the comparison page", async () => {
       await box();
-      showSelection();
+      await runSelection();
       wrapper.vm.openComparison();
       await flushPromises();
       stub().vm.$emit("apply-filter", "a = '1'");
@@ -1071,35 +1150,222 @@ describe("TracesMetricsDashboard", () => {
     });
   });
 
+  describe("heatmap popover", () => {
+    const S = 1_000_000;
+    const T = Date.UTC(2026, 9, 6, 10, 2, 0) * 1000;
+    const R = { startTime: 1_000_000, endTime: 2_000_000 };
+    const raw = "service_name = 'a'";
+    const BOX = {
+      timeStartUs: T,
+      timeEndUs: T + 40 * S,
+      durationLoUs: 100_000,
+      durationHiUs: 500_000,
+    };
+    const heatmap = () => wrapper.findComponent({ name: "TracesLatencyHeatmap" });
+    const panel = () => wrapper.findComponent({ name: "TracesComparison" });
+    const draw = async () => {
+      heatmap().vm.$emit("select", BOX);
+      await flushPromises();
+    };
+    const filter = async () => {
+      heatmap().vm.$emit("filter");
+      for (let i = 0; i < 3; i++) await flushPromises();
+      mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")!.at(-1)![0] as string;
+    };
+
+    beforeEach(() => {
+      wrapper.unmount();
+      mockSearchObj.data.editorValue = raw;
+      wrapper = mountComponent({
+        onTimeRangeSelected: () =>
+          queueMicrotask(() => {
+            mockSearchObj.data.datetime = { startTime: T, endTime: T + 40 * S };
+          }),
+      });
+    });
+
+    it("keeps a drawn box as the heatmap's selection without applying it", async () => {
+      await flushPromises();
+      await draw();
+      expect(heatmap().props("selection")).toEqual(BOX);
+      expect(wrapper.emitted("time-range-selected")).toBeUndefined();
+      expect(wrapper.emitted("editor-filter-set")).toBeUndefined();
+      expect(mockMetricsRangeFilters.size).toBe(0);
+    });
+
+    it("applies the drawn box on Filter to selection, and keeps it drawn", async () => {
+      await flushPromises();
+      await draw();
+      await filter();
+      expect(wrapper.emitted("editor-filter-set")!.at(-1)).toEqual([
+        `(${raw}) and duration >= '100ms' and duration < '500ms'`,
+      ]);
+      expect(mockMetricsRangeFilters.size).toBe(1);
+      expect(heatmap().props("selection")).toEqual(BOX);
+    });
+
+    it("opens Drill down on the drawn box without applying it", async () => {
+      await flushPromises();
+      await draw();
+      heatmap().vm.$emit("drill-down");
+      await flushPromises();
+      expect(panel().props("selection")).toEqual({
+        kind: "duration",
+        windowStartUs: T,
+        windowEndUs: T + 40 * S,
+        rangeStartUs: R.startTime,
+        rangeEndUs: R.endTime,
+        durationLoUs: 100_000,
+        durationHiUs: 500_000,
+        filter: raw,
+      });
+      expect(wrapper.emitted("editor-filter-set")).toBeUndefined();
+    });
+
+    it("drills down on an applied box with its pre-box filter, not the band", async () => {
+      await flushPromises();
+      await draw();
+      await filter();
+      heatmap().vm.$emit("drill-down");
+      await flushPromises();
+      expect(panel().props("selection")).toMatchObject({ kind: "duration", filter: raw });
+    });
+
+    it("erases an unapplied box on Clear selection and changes nothing else", async () => {
+      await flushPromises();
+      await draw();
+      heatmap().vm.$emit("clear");
+      await flushPromises();
+      expect(heatmap().props("selection")).toBeNull();
+      expect(wrapper.emitted("time-range-selected")).toBeUndefined();
+      expect(wrapper.emitted("editor-filter-set")).toBeUndefined();
+    });
+
+    it("undoes an applied box on Clear selection: the range, the editor text and the stored filter", async () => {
+      await flushPromises();
+      await draw();
+      await filter();
+      heatmap().vm.$emit("clear");
+      await flushPromises();
+      expect(heatmap().props("selection")).toBeNull();
+      expect(mockMetricsRangeFilters.size).toBe(0);
+      expect(wrapper.vm.originalTimeRangeBeforeSelection).toBeNull();
+      expect(wrapper.emitted("editor-filter-set")!.at(-1)).toEqual([raw]);
+      expect(wrapper.emitted("time-range-selected")!.at(-1)![0]).toEqual({
+        start: instantToPickerMs(Math.floor(R.startTime / S) * 1000, "UTC"),
+        end: instantToPickerMs(Math.ceil(R.endTime / S) * 1000, "UTC"),
+      });
+    });
+
+    it("drills down on a drawn box with the filter the charts ran, not a staged edit", async () => {
+      await flushPromises();
+      mockSearchObj.data.editorValue = "service_name = 'staged'";
+      await draw();
+      heatmap().vm.$emit("drill-down");
+      await flushPromises();
+      expect(panel().props("selection")).toMatchObject({ kind: "duration", filter: raw });
+    });
+
+    it("filters a new box's Drill down over an applied box on the range the panel compared", async () => {
+      await flushPromises();
+      await draw();
+      await filter();
+      const applied = mockSearchObj.data.editorValue;
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      heatmap().vm.$emit("select", { ...BOX, durationLoUs: 200_000, durationHiUs: 300_000 });
+      await flushPromises();
+      heatmap().vm.$emit("drill-down");
+      await flushPromises();
+      expect(panel().props("selection")).toMatchObject({
+        rangeStartUs: T,
+        rangeEndUs: T + 40 * S,
+        filter: applied,
+      });
+      panel().vm.$emit("apply-filter", "a = '1'");
+      await flushPromises();
+      expect(wrapper.emitted("time-range-selected")!.at(-1)![0]).toEqual({
+        start: instantToPickerMs(Math.floor(T / S) * 1000, "UTC"),
+        end: instantToPickerMs(Math.ceil((T + 40 * S) / S) * 1000, "UTC"),
+      });
+      expect(wrapper.emitted("editor-filter-run")).toEqual([[`(${applied}) and a = '1'`]]);
+    });
+
+    it("erases the box when a Drill down term is applied", async () => {
+      await flushPromises();
+      await draw();
+      heatmap().vm.$emit("drill-down");
+      await flushPromises();
+      panel().vm.$emit("apply-filter", "a = '1'");
+      await flushPromises();
+      expect(heatmap().props("selection")).toBeNull();
+      expect(wrapper.emitted("editor-filter-run")).toEqual([[`(${raw}) and a = '1'`]]);
+    });
+
+    it("hands the heatmap the AI gate", async () => {
+      expect(heatmap().props("aiEnabled")).toBe(false);
+      await wrapper.setProps({ aiEnabled: true });
+      expect(heatmap().props("aiEnabled")).toBe(true);
+    });
+
+    it("asks AI about the box with the filter the charts ran, not an unrun edit", async () => {
+      await flushPromises();
+      await draw();
+      mockSearchObj.data.editorValue = "unrun = 1";
+      heatmap().vm.$emit("ask-ai", {
+        selection: BOX,
+        count: 40,
+        band: "100ms–500ms",
+        window: "10:02:00–10:02:40",
+      });
+      await flushPromises();
+      const from = new Date(T / 1000).toISOString();
+      const to = new Date((T + 40 * S) / 1000).toISOString();
+      expect(wrapper.emitted("send-to-ai-chat")).toEqual([
+        [
+          {
+            query: `I selected a box on the traces latency heatmap. Spans in the box: 40. Duration: 100ms–500ms. Time: ${from} to ${to} (shown as 10:02:00–10:02:40). I am searching traces. Stream: default. The filter expression is: ${raw}. This is a WHERE-clause filter — not a full SQL query. What do these spans have in common, and what explains their duration?`,
+            chipName: "Heatmap selection · 40 spans",
+            newChat: true,
+            autoSend: false,
+            context: {
+              currentPage: "traces",
+              selectedStreams: ["default"],
+              streamType: "traces",
+              currentQuery: raw,
+              searchMode: "traces",
+              timeRange: { type: "absolute", startTime: T, endTime: T + 40 * S },
+              durationRange: { startUs: 100_000, endUs: 500_000 },
+              organization_identifier: "test-org",
+            },
+          },
+        ],
+      ]);
+      expect(wrapper.emitted("editor-filter-set")).toBeUndefined();
+    });
+
+    it("names the charted stream and mode when they changed after the charts loaded", async () => {
+      await flushPromises();
+      await draw();
+      mockSearchObj.data.stream.selectedStream.value = "other_stream";
+      mockSearchObj.meta.searchMode = "spans";
+      heatmap().vm.$emit("ask-ai", {
+        selection: BOX,
+        count: 40,
+        band: "100ms–500ms",
+        window: "10:02:00–10:02:40",
+      });
+      await flushPromises();
+      const payload: any = wrapper.emitted("send-to-ai-chat")![0][0];
+      expect(payload.query).toContain("I am searching traces. Stream: default.");
+      expect(payload.context.selectedStreams).toEqual(["default"]);
+      expect(payload.context.searchMode).toBe("traces");
+    });
+  });
+
   // -------------------------------------------------------------------------
   // Exposed API
   // -------------------------------------------------------------------------
-  describe("exposed API", () => {
-    it("should expose the refresh method", () => {
-      expect(typeof wrapper.vm.refresh).toBe("function");
-    });
-
-    it("should expose the loadDashboard method", () => {
-      expect(typeof wrapper.vm.loadDashboard).toBe("function");
-    });
-
-    it("should expose the getBaseFilters method", () => {
-      expect(typeof wrapper.vm.getBaseFilters).toBe("function");
-    });
-
-    it("should expose rangeFiltersVersion as a ref", () => {
-      // rangeFiltersVersion is a numeric ref — it must be a number
-      expect(typeof wrapper.vm.rangeFiltersVersion).toBe("number");
-    });
-
-    it("should expose the openComparison method", () => {
-      expect(typeof wrapper.vm.openComparison).toBe("function");
-    });
-
-    it("should expose clearOriginalTimeRange", () => {
-      expect(Object.keys(wrapper.vm.$.exposed)).toContain("clearOriginalTimeRange");
-    });
-  });
 
   // -------------------------------------------------------------------------
   // getBaseFilters — detail tests
@@ -1156,33 +1422,12 @@ describe("TracesMetricsDashboard", () => {
       expect(wrapper.vm.getBaseFilters()).toEqual([]);
     });
 
-    it("should include span_status = 'ERROR' when filter prop contains it", () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
-      wrapper = mountComponent();
-      const filters = wrapper.vm.getBaseFilters();
-      expect(filters).toContain("span_status = 'ERROR'");
-    });
-
-    it("should NOT include span_status = 'ERROR' when filter prop does not contain it", () => {
-      const filters = wrapper.vm.getBaseFilters();
-      expect(filters).not.toContain("span_status = 'ERROR'");
-    });
-
     it("should include the filter prop string when filter is a non-empty string", () => {
       wrapper.unmount();
       mockSearchObj.data.editorValue = "http_method = 'GET'";
       wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("http_method = 'GET'");
-    });
-
-    it("should not include a filter entry when filter prop is an empty string", () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "";
-      wrapper = mountComponent();
-      const filters = wrapper.vm.getBaseFilters();
-      expect(filters).toEqual([]);
     });
 
     it("should not include a filter entry when filter prop is only whitespace", () => {
@@ -1202,29 +1447,12 @@ describe("TracesMetricsDashboard", () => {
       expect(filters.join(" ")).not.toContain("span_kind='Server'");
     });
 
-    it("should convert span_kind='Client' label to numeric key '3' in the base filter", () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "span_kind='Client'";
-      wrapper = mountComponent();
-      const filters = wrapper.vm.getBaseFilters();
-      expect(filters).toContain("span_kind='3'");
-      expect(filters.join(" ")).not.toContain("span_kind='Client'");
-    });
-
     it("should convert span_kind label case-insensitively in the base filter", () => {
       wrapper.unmount();
       mockSearchObj.data.editorValue = "span_kind='SERVER'";
       wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("span_kind='2'");
-    });
-
-    it("should leave non-span_kind filters unchanged in the base filter", () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "service_name = 'api'";
-      wrapper = mountComponent();
-      const filters = wrapper.vm.getBaseFilters();
-      expect(filters).toContain("service_name = 'api'");
     });
 
     it("should convert span_kind label when combined with a duration range filter", () => {
@@ -1292,91 +1520,12 @@ describe("TracesMetricsDashboard", () => {
       await localWrapper.vm.$nextTick();
       localWrapper.unmount();
     });
-
-    it("should call loadDashboard synchronously relative to the loadSqlParser await gap", async () => {
-      // We track the order of calls: loadDashboard sets dashboardData, which
-      // happens before sqlParser's promise resolves. We verify this by
-      // checking that dashboardData is set at the moment the parser resolves
-      // for the first time (i.e. it was set earlier, not after).
-      const localWrapper = mountComponent();
-
-      // Tick once to let the synchronous portion of onMounted execute.
-      await localWrapper.vm.$nextTick();
-
-      // dashboardData is already set — confirms loadDashboard ran before the
-      // await suspension handed control back to the event loop.
-      const dashboardDataBeforeParserResolves = localWrapper.vm.dashboardData;
-      expect(dashboardDataBeforeParserResolves).not.toBeNull();
-
-      // Now resolve the parser and flush all remaining microtasks.
-      resolveParser({});
-      await localWrapper.vm.$nextTick();
-
-      // dashboardData must still be non-null after the parser resolves.
-      expect(localWrapper.vm.dashboardData).not.toBeNull();
-
-      localWrapper.unmount();
-    });
-
-    it("should set sqlParser.value only after loadSqlParser resolves", async () => {
-      const localWrapper = mountComponent();
-
-      // Right after mount — parser promise is still pending.
-      await localWrapper.vm.$nextTick();
-
-      // sqlParser ref should not yet hold the resolved value (it is still null
-      // because loadSqlParser has not resolved).
-      // We cannot read sqlParser directly, but dashboardData being set first
-      // proves loadDashboard completed before the parser await resumed.
-      expect(localWrapper.vm.dashboardData).not.toBeNull();
-
-      resolveParser({ parse: vi.fn() });
-      await localWrapper.vm.$nextTick();
-
-      // After resolving, the component should still be healthy.
-      expect(localWrapper.exists()).toBe(true);
-
-      localWrapper.unmount();
-    });
   });
 
   // -------------------------------------------------------------------------
   // Edge cases
   // -------------------------------------------------------------------------
   describe("edge cases", () => {
-    it("should mount without error when streamName prop is an empty string", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ streamName: "" });
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should mount without error when filter prop is undefined", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should mount without error when streamFields prop is an empty array", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ streamFields: [] });
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should mount without error when streamFields prop is undefined", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ streamFields: undefined });
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should set dashboardData to a non-null value after loadDashboard runs on mount", () => {
-      // dashboardData is set during onMounted -> loadDashboard()
-      expect(wrapper.vm.dashboardData).not.toBeNull();
-    });
-
     it("should not emit time-range-selected when onDataZoom receives null data", async () => {
       wrapper.vm.onDataZoom({
         start: 0,

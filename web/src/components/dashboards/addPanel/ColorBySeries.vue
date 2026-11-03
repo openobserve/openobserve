@@ -60,6 +60,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColorBySeriesPopUp from "./ColorBySeriesPopUp.vue";
+import { getLegendSeriesNames } from "@/composables/dashboard/useSeriesFormatting";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -116,6 +117,12 @@ export default defineComponent({
             name: series.data[0].name,
           }));
         return { series: gaugeSeriesNames };
+      }
+
+      if (panelType === "bar-gauge") {
+        return {
+          series: getLegendSeriesNames(chartOptions, panelType).map((name) => ({ name })),
+        };
       }
 
       // For other chart types, use the existing logic

@@ -126,6 +126,7 @@ export const useRolePermissionRows = (deps: RowDeps) => {
       entity.name === "logs" ||
       entity.name === "metrics" ||
       entity.name === "traces" ||
+      entity.name === "profiles" ||
       entity.name === "index"
     ) {
       heavyResourceEntities.value[entity.name] = [...entities];

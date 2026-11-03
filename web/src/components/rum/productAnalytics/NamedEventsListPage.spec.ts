@@ -43,6 +43,11 @@ import { resetSavedFunnels } from "@/composables/rum/useSavedFunnels";
 import { MAX_EVENTS_PER_APP } from "@/utils/rum/productAnalyticsModel";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import { rumPaApiMock as api } from "@/utils/rum/__fixtures__/namedEventsApiMock";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 import NamedEventsListPage from "./NamedEventsListPage.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 
@@ -109,7 +114,16 @@ describe("NamedEventsListPage (AC-44)", () => {
     await flushPromises();
   };
 
+  const draftScope = (entityId: string | null, variant?: string): EditorDraftScope => ({
+    kind: "rum_named_event",
+    org: "org1",
+    entityId,
+    userEmail: "me@x.com",
+    variant,
+  });
+
   beforeEach(() => {
+    localStorage.clear();
     api.reset();
     confirmMock.mockReset().mockResolvedValue(true);
     toastMock.mockReset();
@@ -183,7 +197,7 @@ describe("NamedEventsListPage (AC-44)", () => {
   });
 
   it("Duplicate opens a new event pre-filled as a copy, and the row stays put", async () => {
-    seed(1);
+    const [ev] = seed(1);
     await mountList();
     q("rum-analytics-named-events-row-0-duplicate-btn")!.click();
     await settle();
@@ -193,8 +207,70 @@ describe("NamedEventsListPage (AC-44)", () => {
       draft: { name: "Copy of Event 0", rules: [{ t: "view", op: "eq", value: "/web/logs" }] },
       pageHints: [],
       from: null,
+      source: ev.id,
     });
     expect(api.service.createEvent).not.toHaveBeenCalled();
+  });
+
+  it("marks rows with a draft and the Duplicate of an event whose copy has one", async () => {
+    const [a, b] = seed(2);
+    writeEditorDraft(draftScope(a.id), { data: {} });
+    writeEditorDraft(draftScope(null, `web~clone:${b.id}`), { data: {} });
+    await mountList();
+
+    expect(q("rum-analytics-named-events-row-0-draft-dot")).not.toBeNull();
+    expect(q("rum-analytics-named-events-row-1-draft-dot")).toBeNull();
+    expect(q("rum-analytics-named-events-row-0-duplicate-draft-dot")).toBeNull();
+    expect(q("rum-analytics-named-events-row-1-duplicate-draft-dot")).not.toBeNull();
+    expect(q("rum-analytics-named-events-row-1-duplicate-btn")?.getAttribute("aria-label")).toMatch(
+      /^Duplicate · unsaved draft · .*\d/,
+    );
+    // The phone row menu is the only way to Duplicate below md, so it carries the dot too.
+    const more = q("rum-analytics-named-events-row-1-more-btn");
+    expect(
+      more?.querySelector('[data-test="rum-analytics-named-events-row-1-more-draft-dot"]'),
+    ).not.toBeNull();
+    expect(more?.getAttribute("aria-label")).toMatch(/^More actions · unsaved draft · .*\d/);
+    expect(q("rum-analytics-named-events-row-0-more-draft-dot")).toBeNull();
+    expect(q("rum-analytics-named-events-row-0-more-btn")?.getAttribute("aria-label")).toBe(
+      "More actions",
+    );
+    // What the user sees on hover: the button's own tooltip names the kept copy and its date.
+    vi.useFakeTimers();
+    try {
+      q("rum-analytics-named-events-row-1-duplicate-btn")!.dispatchEvent(
+        new MouseEvent("mouseenter"),
+      );
+      vi.advanceTimersByTime(800);
+      await flushPromises();
+      const tip = document.body.querySelector('[data-test="o-tooltip-content"]')?.textContent;
+      expect(tip).toMatch(/Duplicate · unsaved draft · .*\d/);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(document.body.querySelectorAll('[data-test="o-tooltip-content"]')).toHaveLength(1);
+  });
+
+  it("drops the drafts of events deleted singly or in bulk, and keeps a failed one's", async () => {
+    const [a, b, c] = seed(3);
+    for (const ev of [a, b, c]) writeEditorDraft(draftScope(ev.id), { data: {} });
+    writeEditorDraft(draftScope(null, `web~clone:${a.id}`), { data: {} });
+    writeEditorDraft(draftScope(null, `web~clone:${b.id}`), { data: {} });
+    await mountList();
+    q("rum-analytics-named-events-row-0-delete-btn")!.click();
+    await settle();
+    await answerDelete(true);
+    expect(readEditorDraft(draftScope(a.id))).toBeNull();
+    expect(readEditorDraft(draftScope(null, `web~clone:${a.id}`))).toBeNull();
+    expect(readEditorDraft(draftScope(null, `web~clone:${b.id}`))).not.toBeNull();
+
+    await selectRow(0);
+    await selectRow(1);
+    api.failNext("deleteEvent", 503);
+    q("rum-analytics-named-events-bulk-delete-btn")!.click();
+    await settle();
+    expect(readEditorDraft(draftScope(b.id))).not.toBeNull();
+    expect(readEditorDraft(draftScope(c.id))).toBeNull();
   });
 
   it("deletes an unused event after the plain confirmation, without force", async () => {

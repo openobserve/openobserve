@@ -356,8 +356,15 @@ describe("Quality range in the URL", () => {
       endTime: 200,
       relativeTimePeriod: null,
     });
+    expect(qualityRangeFromQuery({ period: "calendar:month:-1" })).toEqual({
+      valueType: "relative",
+      startTime: null,
+      endTime: null,
+      relativeTimePeriod: "calendar:month:-1",
+    });
     expect(qualityRangeFromQuery({})).toBeNull();
     expect(qualityRangeFromQuery({ period: "soon" })).toBeNull();
+    expect(qualityRangeFromQuery({ period: "calendar:month:1" })).toBeNull();
     expect(qualityRangeFromQuery({ from: "200", to: "100" })).toBeNull();
     expect(qualityRangeFromQuery({ from: "x", to: "y" })).toBeNull();
   });

@@ -32,6 +32,7 @@ export class AlertNoDestinationPage {
       importSubmit: '[data-test="alert-import-json-btn"]',
       importEditor: '[data-test="query-editor"]:visible',
       importCreated: '[data-test="alert-import-creation-0-message"]',
+      successToastMessage: '[data-test-variant="success"] [data-test="o-toast-message"]',
       importErrors: '[data-test="alert-import-error-0"]',
     };
   }
@@ -132,11 +133,14 @@ export class AlertNoDestinationPage {
     testLogger.info('Submitted alert import', { count: alerts.length });
   }
 
-  async expectImportCreated(name) {
-    await expect(this.page.locator(this.locators.importCreated)).toContainText(
-      `"${name}" created successfully`,
-      { timeout: 20000 },
-    );
+  async expectImportSucceeded() {
+    // The per-alert result list lives only 400ms before the redirect; the toast outlives it.
+    await expect(
+      this.page.locator(this.locators.successToastMessage)
+        .filter({ hasText: '1 alert imported successfully' })
+        .first(),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(this.page.locator(this.locators.importSubmit)).toHaveCount(0, { timeout: 15000 });
   }
 
   async expectImportRejected(text) {

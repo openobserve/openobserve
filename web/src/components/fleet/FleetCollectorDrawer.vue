@@ -52,15 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('fleet.collectors.outdated')"
         />
         <div class="ms-auto flex flex-wrap items-center gap-2">
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="drive-file-move"
-            data-test="fleet-collector-drawer-move"
-            @click="moveOpen = true"
-          >
-            {{ t("fleet.collectors.moveToFleet") }}
-          </OButton>
           <span class="inline-flex">
             <OButton
               variant="outline"
@@ -162,7 +153,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span v-else class="text-text-muted">{{ DASH }}</span>
             </ODescriptionItem>
             <ODescriptionItem :label="t('fleet.collectors.fleet')">
-              <span data-test="fleet-collector-drawer-fleet">{{ collector.fleetName }}</span>
+              <div class="flex flex-col gap-0.5">
+                <span data-test="fleet-collector-drawer-fleet">{{ collector.fleetName }}</span>
+                <OText variant="meta" data-test="fleet-collector-drawer-fleet-hint">{{
+                  t("fleet.collectors.fleetFromToken")
+                }}</OText>
+              </div>
             </ODescriptionItem>
             <ODescriptionItem :label="t('fleet.collectors.enrolled')">
               <OTimeCell :value="collector.enrolledAt" unit="ms" mode="date" />
@@ -376,12 +372,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <FleetMoveDialog
-      v-if="collector"
-      v-model:open="moveOpen"
-      :collector-ids="[collector.id]"
-      :source-fleet-id="collector.fleetId"
-    />
   </ODrawer>
 </template>
 
@@ -408,7 +398,6 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import FleetCodeEditor from "./FleetCodeEditor.vue";
-import FleetMoveDialog from "./FleetMoveDialog.vue";
 import FleetCollectorMetrics from "./FleetCollectorMetrics.vue";
 import { splitSystemSections } from "./effectiveConfig";
 import { useCollectorActions } from "./useCollectorActions";
@@ -430,10 +419,6 @@ const HISTORY_VARIANT: Record<string, TimelineItemVariant> = {
   accepted: "info",
   running: "success",
   rejected: "destructive",
-  moved: "primary",
-  moved_by_token: "primary",
-  restarted: "info",
-  redelivered: "primary",
 };
 
 const { t } = useI18nTyped();
@@ -441,7 +426,6 @@ const orgId = useOrgId();
 const actions = useCollectorActions();
 
 const tab = ref(props.initialTab ?? "overview");
-const moveOpen = ref(false);
 watch(
   () => [props.collectorId, props.open, props.initialTab],
   () => {
@@ -450,7 +434,6 @@ watch(
 );
 // The open collector belongs to the previous org, and any write would hit the new one.
 watch(orgId, () => {
-  moveOpen.value = false;
   if (props.open) emit("update:open", false);
 });
 
@@ -499,10 +482,6 @@ function historyTitle(event: string): I18nText {
     accepted: t("fleet.delivery.accepted"),
     running: t("fleet.collectors.eventRunning"),
     rejected: t("fleet.delivery.rejected"),
-    moved: t("fleet.collectors.eventMoved"),
-    moved_by_token: t("fleet.collectors.eventMovedByToken"),
-    restarted: t("fleet.collectors.eventRestarted"),
-    redelivered: t("fleet.collectors.eventRedelivered"),
   };
   return known[event] ?? raw(event);
 }

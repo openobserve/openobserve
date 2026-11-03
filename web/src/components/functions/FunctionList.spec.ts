@@ -24,6 +24,11 @@ import analytics from "@/services/product_analytics";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
 
 const {
   mockJsTransformList,
@@ -1284,6 +1289,110 @@ describe("FunctionList", () => {
       expect(saved.filterQuery).toBe("js");
       expect(saved.sortOrder).toBe("desc");
       wrapper.unmount();
+    });
+  });
+
+  describe("Editor drafts", () => {
+    interface DraftListVm {
+      selectedDelete: { name: string; ingest: boolean };
+      selectedFunctions: { name: string }[];
+      deleteFn: () => void;
+      bulkDeleteFunctions: () => Promise<void>;
+    }
+    const draftScope = (
+      entityId: string | null,
+      userEmail = "test@example.com",
+    ): EditorDraftScope => ({
+      kind: "function",
+      org: "test-org",
+      entityId,
+      userEmail,
+    });
+    const seed = (scope: EditorDraftScope) => writeEditorDraft(scope, { data: {} });
+
+    const mountRows = async () => {
+      const wrapper = mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+      // OTable holds its skeleton for MIN_SKELETON_MS before rows render.
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="function-list-name-cell-func1"]').exists()).toBe(true),
+      );
+      return wrapper;
+    };
+
+    beforeEach(() => localStorage.clear());
+
+    it("dots the rows and the New function button that have drafts", async () => {
+      seed(draftScope("func1"));
+      seed(draftScope(null));
+      seed(draftScope("func2", "other@example.com"));
+      const wrapper = await mountRows();
+
+      const dot = wrapper.get('[data-test="function-list-func1-draft-dot"]');
+      expect(dot.attributes("aria-label")).toMatch(/^Unsaved draft · /);
+      expect(wrapper.find('[data-test="function-list-func2-draft-dot"]').exists()).toBe(false);
+
+      const addButton = wrapper.get('[data-test="function-list-add-function-btn"]');
+      expect(addButton.attributes("aria-label")).toBe("New function · unsaved draft");
+      expect(addButton.find('[data-test="function-list-add-function-draft-dot"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("updates the dots when a draft is written or removed", async () => {
+      const wrapper = await mountRows();
+      expect(wrapper.find('[data-test="function-list-func2-draft-dot"]').exists()).toBe(false);
+      expect(
+        wrapper.get('[data-test="function-list-add-function-btn"]').attributes("aria-label"),
+      ).toBeUndefined();
+
+      seed(draftScope("func2"));
+      await nextTick();
+      expect(wrapper.find('[data-test="function-list-func2-draft-dot"]').exists()).toBe(true);
+    });
+
+    it("drops every user's draft of a deleted function", async () => {
+      seed(draftScope("func1"));
+      seed(draftScope("func1", "other@example.com"));
+      seed(draftScope("func2"));
+      const wrapper = await mountRows();
+      const vm = wrapper.vm as unknown as DraftListVm;
+      vm.selectedDelete = { name: "func1", ingest: false };
+      vm.deleteFn();
+      await flushPromises();
+
+      expect(readEditorDraft(draftScope("func1"))).toBeNull();
+      expect(readEditorDraft(draftScope("func1", "other@example.com"))).toBeNull();
+      expect(readEditorDraft(draftScope("func2"))).not.toBeNull();
+    });
+
+    it("keeps the draft when the delete fails", async () => {
+      mockJsTransformDelete.mockResolvedValue({ data: { code: 500, message: "nope" } });
+      seed(draftScope("func1"));
+      const wrapper = await mountRows();
+      const vm = wrapper.vm as unknown as DraftListVm;
+      vm.selectedDelete = { name: "func1", ingest: false };
+      vm.deleteFn();
+      await flushPromises();
+
+      expect(readEditorDraft(draftScope("func1"))).not.toBeNull();
+    });
+
+    it("drops drafts only of the functions a bulk delete removed", async () => {
+      mockBulkDelete.mockResolvedValue({
+        data: { successful: ["func1"], unsuccessful: ["func2"] },
+      });
+      seed(draftScope("func1"));
+      seed(draftScope("func2"));
+      const wrapper = await mountRows();
+      const vm = wrapper.vm as unknown as DraftListVm;
+      vm.selectedFunctions = [{ name: "func1" }, { name: "func2" }];
+      await vm.bulkDeleteFunctions();
+      await flushPromises();
+
+      expect(readEditorDraft(draftScope("func1"))).toBeNull();
+      expect(readEditorDraft(draftScope("func2"))).not.toBeNull();
     });
   });
 });

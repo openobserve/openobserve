@@ -23,9 +23,32 @@ import {
   generatePrebuiltMetadata,
   getPopularPrebuiltTypes,
   getPrebuiltTypesByCategory,
+  destinationTypeTiles,
 } from "@/utils/prebuilt-templates";
 
 describe("Prebuilt Templates Index", () => {
+  describe("destinationTypeTiles (MK-7)", () => {
+    it("puts the Slack app tile first, then the relabelled webhook tile, each with a short line", () => {
+      const tiles = destinationTypeTiles(true);
+      expect(tiles.map((tile) => tile.id).slice(0, 3)).toEqual(["slack_app", "slack", "discord"]);
+      expect(tiles[0].name).toBe("Slack app");
+      expect(tiles[0].shortKey).toBe("alert_destinations.prebuilt.slackAppShort");
+      expect(tiles[1].name).toBe("Slack webhook");
+      expect(tiles[1].shortKey).toBe("slackApp.destination.postOnly");
+      expect(tiles.every((tile) => !("tag" in tile) || tile.tag === undefined)).toBe(true);
+    });
+
+    it("keeps the unavailable Slack app disabled and the webhook selectable", () => {
+      const tiles = destinationTypeTiles(false);
+      expect(tiles.map((tile) => tile.id)).toEqual([
+        "slack_app",
+        ...PREBUILT_DESTINATION_TYPES.map((p) => p.id),
+      ]);
+      expect(tiles[0].disabled).toBe(true);
+      expect(tiles[1].disabled).not.toBe(true);
+    });
+  });
+
   describe("PREBUILT_DESTINATION_TYPES", () => {
     it("should contain all expected destination types", () => {
       const expectedTypes = [
@@ -36,9 +59,10 @@ describe("Prebuilt Templates Index", () => {
         "servicenow",
         "email",
         "opsgenie",
+        "jira",
       ];
 
-      expect(PREBUILT_DESTINATION_TYPES).toHaveLength(7);
+      expect(PREBUILT_DESTINATION_TYPES).toHaveLength(8);
 
       const actualTypes = PREBUILT_DESTINATION_TYPES.map((type) => type.id);
       expectedTypes.forEach((expectedType) => {
@@ -132,6 +156,13 @@ describe("Prebuilt Templates Index", () => {
 
       const pagerdutyCredentials = {};
       expect(generateDestinationUrl("pagerduty", pagerdutyCredentials)).toBe(
+        "https://events.pagerduty.com/v2/enqueue",
+      );
+
+      expect(generateDestinationUrl("pagerduty", { euRegion: true })).toBe(
+        "https://events.eu.pagerduty.com/v2/enqueue",
+      );
+      expect(generateDestinationUrl("pagerduty", { euRegion: false })).toBe(
         "https://events.pagerduty.com/v2/enqueue",
       );
 

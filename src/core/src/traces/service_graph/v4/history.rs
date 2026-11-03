@@ -90,7 +90,7 @@ pub async fn fetch_edge_history(
 
 /// Coarser than a minute only when the range would exceed `MAX_POINTS`; always whole minutes.
 fn step_micros(start: i64, end: i64) -> i64 {
-    let span_secs = ((end - start) / 1_000_000).max(1) as u64;
+    let span_secs = (end.saturating_sub(start) / 1_000_000).max(1) as u64;
     let minutes = span_secs
         .div_ceil(MAX_POINTS as u64)
         .div_ceil(MIN_STEP_SECS as u64);
@@ -99,7 +99,7 @@ fn step_micros(start: i64, end: i64) -> i64 {
 
 /// Evaluation times sit on step boundaries, where the rollup's samples are, inside the range.
 fn eval_bounds(start: i64, end: i64, step: i64) -> Option<(i64, i64)> {
-    let first = align_down(start + step - 1, step) + step;
+    let first = align_down(start.checked_add(step - 1)?, step).checked_add(step)?;
     let last = align_down(end, step);
     (first <= last).then_some((first, last))
 }
@@ -215,6 +215,14 @@ mod tests {
             Some((2 * MIN, 10 * MIN))
         );
         assert_eq!(eval_bounds(0, MIN - 1, MIN), None);
+    }
+
+    #[test]
+    fn test_step_and_bounds_survive_windows_near_i64_max() {
+        let step = step_micros(i64::MAX - 1, i64::MAX);
+        assert_eq!(step, MIN);
+        assert_eq!(eval_bounds(i64::MAX - 1, i64::MAX, step), None);
+        assert!(step_micros(i64::MIN, i64::MAX) > 0);
     }
 
     #[test]

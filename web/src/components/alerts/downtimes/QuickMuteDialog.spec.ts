@@ -14,7 +14,12 @@ import {
   groupSelection,
   presetSeconds,
 } from "@/utils/downtimes/quickMute";
-import { makeQuickMuteSchema, quickMuteEndsAt, type QuickMuteForm } from "./QuickMuteDialog.schema";
+import {
+  makeQuickMuteSchema,
+  quickMuteDefaults,
+  quickMuteEndsAt,
+  type QuickMuteForm,
+} from "./QuickMuteDialog.schema";
 
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
 vi.mock("@/services/common", () => ({ default: { list_Folders: vi.fn() } }));
@@ -28,7 +33,7 @@ describe("quick mute request body", () => {
     const body = buildQuickMuteRequest(
       [{ module: "alerts", ids: ["a1", "a2"] }],
       NOW,
-      NOW + presetSeconds("2h") * 1_000_000,
+      NOW + presetSeconds("1h") * 1_000_000,
       "UTC",
       " Working INC-231 ",
     );
@@ -39,9 +44,9 @@ describe("quick mute request body", () => {
       schedule: {
         repeat: "none",
         starts_at: NOW,
-        ends_at: NOW + 7200 * 1_000_000,
+        ends_at: NOW + 3600 * 1_000_000,
         timezone: "UTC",
-        duration_secs: 7200,
+        duration_secs: 3600,
         weekdays: [],
       },
       show_banner: false,
@@ -93,6 +98,30 @@ describe("quick mute form", () => {
     reason: "",
     folder_id: "payments",
     ...over,
+  });
+
+  it("defaults to 1 h, with the custom end one hour out", () => {
+    const defaults = quickMuteDefaults(NOW / 1000, "UTC", "payments");
+    expect(defaults.preset).toBe("1h");
+    expect([defaults.end_date, defaults.end_time]).toEqual(["2026-09-17", "15:10"]);
+  });
+
+  it("defaults to Until it clears for one alert, ending at the 24 h safety end", () => {
+    const defaults = quickMuteDefaults(NOW / 1000, "UTC", "payments", "untilClear");
+    expect(defaults.preset).toBe("untilClear");
+    expect(quickMuteEndsAt(defaults, NOW, "UTC")).toBe(NOW + 86400 * 1_000_000);
+    expect(schema.safeParse(values({ preset: "untilClear" })).success).toBe(true);
+  });
+
+  it("files an alert mute without a folder when none is open to the user", () => {
+    const alertSchema = makeQuickMuteSchema(
+      gt,
+      () => "UTC",
+      () => NOW,
+      { folderOptional: () => true },
+    );
+    expect(alertSchema.safeParse(values({ preset: "1h", folder_id: "" })).success).toBe(true);
+    expect(schema.safeParse(values({ preset: "1h", folder_id: "" })).success).toBe(false);
   });
 
   it("ends a preset at now plus its length", () => {

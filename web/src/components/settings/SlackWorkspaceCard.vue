@@ -48,6 +48,7 @@ import type {
   SlackTestResponse,
 } from "@/types/slack";
 import { formatTimestamp } from "@/utils/date";
+import { formatDuration } from "@/utils/downtimes/schedule";
 import { isSlackUrl } from "@/utils/slackLink";
 import SlackCheckList, { type SlackCheckItem } from "./SlackCheckList.vue";
 import SlackCredentialsDialog from "./SlackCredentialsDialog.vue";
@@ -120,6 +121,25 @@ const connectedDate = computed(() =>
   formatTimestamp(props.installation.this_org.created_at, "MMM d, yyyy"),
 );
 const showSockets = computed(() => props.installation.mode === "socket" && selfHosted.value);
+// Ten minutes is the age the default `_meta` self-alert pages on.
+const OUTBOUND_SLOW_SECS = 600;
+const outbound = computed(() => {
+  const { outbound_depth: depth, outbound_oldest_age_secs: age } = props.installation.health;
+  if (depth === undefined) return null;
+  if (depth === 0) return { text: t("slackApp.card.outboundEmpty"), slow: false };
+  const secs = Math.max(0, Math.round(age ?? 0));
+  return {
+    text: t(
+      "slackApp.card.outboundQueue",
+      {
+        count: depth,
+        age: secs < 60 ? t("slackApp.card.ageSeconds", { count: secs }) : formatDuration(secs, t),
+      },
+      depth,
+    ),
+    slow: secs > OUTBOUND_SLOW_SECS,
+  };
+});
 const socketsAsOf = computed(() =>
   props.installation.health.as_of
     ? formatTimestamp(props.installation.health.as_of, "MMM d, HH:mm")
@@ -348,6 +368,19 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
               time: socketsAsOf,
             })
           }}
+        </span>
+        <span
+          v-if="outbound"
+          class="flex items-center gap-2 text-sm"
+          :data-state="outbound.slow ? 'warning' : 'ok'"
+          data-test="slack-workspace-outbound"
+        >
+          <OIcon
+            :name="outbound.slow ? 'warning-amber' : 'check-circle'"
+            size="sm"
+            :class="outbound.slow ? 'text-status-warning-text' : 'text-status-positive'"
+          />
+          {{ outbound.text }}
         </span>
         <span
           v-if="appTokenWarning"

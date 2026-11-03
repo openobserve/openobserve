@@ -428,6 +428,7 @@ pub(crate) fn scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str, &str)
         ("alert_level", ctx.alert_level.as_str()),
         ("alert_status", ctx.alert_status.as_str()),
         ("episode_id", ctx.episode_id.as_deref().unwrap_or_default()),
+        ("recovery_reason", ctx.recovery_reason.as_str()),
         ("alert_priority", ctx.alert_priority.as_str()),
         ("alert_tags", ctx.alert_tags.as_str()),
         ("alert_threshold_crit", ctx.alert_threshold_crit.as_str()),
@@ -472,10 +473,12 @@ mod tests {
             alert_level: "critical".into(),
             alert_status: "firing".to_string(),
             episode_id: None,
+            recovery_reason: String::new(),
             alert_priority: "P1".into(),
             alert_tags: "infra, prod".into(),
             alert_threshold_crit: "90".into(),
             alert_threshold_warn: "80".into(),
+            alert_threshold_operator: ">".into(),
             alert_start_time: "2026-08-01T10:00:00".into(),
             alert_end_time: "2026-08-01T10:10:00".into(),
             alert_start_time_millis: "1785578400000".into(),
@@ -504,6 +507,8 @@ mod tests {
             level: Some(AlertLevel::Critical),
             chart_url: None,
             chart_png: None,
+            alert_id: String::new(),
+            incident_id: String::new(),
         }
     }
 

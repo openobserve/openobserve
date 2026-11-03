@@ -14,15 +14,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
-import type { NamedEvent } from "@/utils/rum/productAnalyticsModel";
+import type { NamedEvent, Period } from "@/utils/rum/productAnalyticsModel";
 import {
   funnelPanelSql,
+  funnelTrendPanelSql,
   trendSql,
   type AnalyticsScope,
   type FunnelDef,
+  type FunnelPair,
   type IdentitySql,
   type StepRef,
 } from "@/utils/rum/productAnalyticsQueries";
+
+const PANEL_INTERVAL: Readonly<Record<Period, string>> = {
+  day: "1 day",
+  week: "1 week",
+  month: "1 month",
+};
 
 interface AxisField {
   alias: string;
@@ -55,6 +63,7 @@ const sqlPanel = (
   sql: string,
   x: AxisField,
   y: AxisField[],
+  config: Record<string, unknown> = {},
 ): Record<string, unknown> => ({
   version: 2,
   id,
@@ -72,6 +81,7 @@ const sqlPanel = (
     base_map: { type: "osm" },
     map_view: { zoom: 1, lat: 0, lng: 0 },
     mark_line: [],
+    ...config,
   },
   queryType: "sql",
   queries: [
@@ -153,5 +163,36 @@ export function buildFunnelPanel(
     sql,
     axis("x_axis_1", t("rum.analytics.dashboard.step")),
     [axis("y_axis_1", t("rum.analytics.trends.sessions"))],
+  );
+}
+
+/** The Trend view's line: conversion between the pair's steps per interval of each session's entry. */
+export function buildFunnelTrendPanel(
+  scope: AnalyticsScope,
+  def: FunnelDef,
+  pair: FunnelPair,
+  interval: Period,
+  events: NamedEvent[],
+  t: TranslateFn,
+  deletedNames: Readonly<Record<string, string>> = {},
+): Record<string, unknown> {
+  const sql = funnelTrendPanelSql(scope, def, pair, PANEL_INTERVAL[interval], {
+    events,
+    sample: 1,
+  });
+  const label = (i: number) =>
+    def.steps[i - 1] ? stepLabel(def.steps[i - 1], events, deletedNames) : "";
+  return sqlPanel(
+    "rum-analytics-funnel-trend",
+    "line",
+    t("rum.analytics.dashboard.funnelTrendTitle", {
+      first: raw(label(pair.a)),
+      last: raw(label(pair.b)),
+    }),
+    sql,
+    axis("x_axis_1", t("rum.analytics.trends.time")),
+    [axis("y_axis_1", t("rum.analytics.funnel.trendAxis"))],
+    // The SQL rounds to one decimal, and an interval with no entrants is a gap, not a slope.
+    { decimals: 1, connect_nulls: false },
   );
 }

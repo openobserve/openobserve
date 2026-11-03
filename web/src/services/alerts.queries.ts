@@ -18,8 +18,18 @@ import { quantizeRange } from "@/composables/query/queryClient";
 import alerts from "./alerts";
 import search from "./search";
 import type { AlertHistoryQuery } from "./alerts";
-import { alertKeys } from "./alerts.querykeys";
+import { alertKeys, oneAckScopes } from "./alerts.querykeys";
+import { oncallKeys } from "./oncall.querykeys";
 import { anomalyKeys } from "./anomaly_detection.querykeys";
+import { downtimeKeys } from "./downtimes.querykeys";
+import { announcementKeys } from "./announcements.querykeys";
+import type {
+  AckAlertRequest,
+  AckView,
+  ExtendAlertMuteRequest,
+  MuteAlertRequest,
+  UnackAlertRequest,
+} from "@/ts/interfaces/alert";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const alertsListQuery = (
@@ -78,6 +88,14 @@ export const alertDetailQuery = (org: string, id: string) =>
   queryOptions({
     queryKey: alertKeys.detail(org, id),
     queryFn: async () => (await alerts.get_by_alert_id(org, id)).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+
+export const alertAcksQuery = (org: string, id: string, folderId?: string) =>
+  queryOptions({
+    queryKey: alertKeys.acks(org, id),
+    queryFn: async (): Promise<AckView[]> =>
+      (await alerts.listAlertAcks(org, id, folderId)).data?.acks ?? [],
     staleTime: LIVE_STALE_TIME,
   });
 
@@ -169,4 +187,63 @@ export const toggleAnomalyAlertStateMutation = (org: string) =>
     mutationFn: (vars: { alertId: string; enabled: boolean; folderId?: string }) =>
       alerts.toggle_state_by_alert_id(org, vars.alertId, vars.enabled, vars.folderId),
     meta: { invalidates: [anomalyKeys.all(org)] },
+  });
+
+/** An ack changes the list tile, the detail header and the groups tab, all under the alert scope. */
+export const ackAlertMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (vars: { alertId: string; body: AckAlertRequest; folderId?: string }) =>
+      (await alerts.ackAlert(org, vars.alertId, vars.body, vars.folderId)).data,
+    // Callers render refusals and stale-firing answers themselves.
+    meta: { invalidates: oneAckScopes(org), silentError: true },
+  });
+
+export const unackAlertMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (vars: { alertId: string; body: UnackAlertRequest; folderId?: string }) =>
+      (await alerts.unackAlert(org, vars.alertId, vars.body, vars.folderId)).data,
+    meta: { invalidates: oneAckScopes(org), silentError: true },
+  });
+
+/** A quick mute is a downtime, so the Downtimes list refreshes with the alert's chip. */
+export const muteAlertMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (vars: { alertId: string; body: MuteAlertRequest; folderId?: string }) =>
+      (await alerts.muteAlert(org, vars.alertId, vars.body, vars.folderId)).data,
+    // A mute also snoozes the alert's open pages.
+    meta: {
+      invalidates: [
+        alertKeys.all(org),
+        downtimeKeys.all(org),
+        oncallKeys.responsesAll(org),
+        oncallKeys.myAll(org),
+      ],
+      silentError: true,
+    },
+  });
+
+export const extendAlertMuteMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (vars: {
+      alertId: string;
+      downtimeId: string;
+      body: ExtendAlertMuteRequest;
+      folderId?: string;
+    }) =>
+      (await alerts.extendAlertMute(org, vars.alertId, vars.downtimeId, vars.body, vars.folderId))
+        .data,
+    meta: {
+      invalidates: [alertKeys.all(org), downtimeKeys.all(org), announcementKeys.all(org)],
+      silentError: true,
+    },
+  });
+
+export const cancelAlertMuteMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { alertId: string; downtimeId: string; folderId?: string }) =>
+      alerts.cancelAlertMute(org, vars.alertId, vars.downtimeId, vars.folderId),
+    meta: {
+      invalidates: [alertKeys.all(org), downtimeKeys.all(org), announcementKeys.all(org)],
+      silentError: true,
+    },
   });

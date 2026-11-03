@@ -39,6 +39,9 @@ use crate::traces::{
 
 // The lookup only widens summaries, so a slow index must not hold back the page.
 const RANGE_LOOKUP_TIMEOUT: Duration = Duration::from_secs(2);
+// `duration` is in microseconds while `start_time` and `end_time` are in nanoseconds.
+pub const DURATION_CANDIDATE_SELECT: &str =
+    "GREATEST(max(duration), (max(end_time) - min(start_time)) / 1000) AS zo_sql_candidate";
 
 pub struct TraceSearchContext {
     pub org_id: String,

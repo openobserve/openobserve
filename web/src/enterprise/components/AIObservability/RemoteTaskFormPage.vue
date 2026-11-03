@@ -17,7 +17,7 @@
     <OPageLayout
       :back="{
         label: t('aiObservability.remoteTasks.form.backTo'),
-        onClick: goBack,
+        onClick: cancel,
         dataTest: 'ai-remote-task-form-back-btn',
       }"
       title-overflow="visible"
@@ -405,6 +405,15 @@
                     {{ t("aiObservability.remoteTasks.form.signingKeyOnce") }}
                     <code class="text-text-body font-mono">{{ headerShape }}</code>
                   </span>
+                  <OBanner
+                    v-if="signingKeyRegenerated"
+                    variant="warning"
+                    dense
+                    icon="key"
+                    data-test="ai-remote-task-form-signing-key-regenerated"
+                  >
+                    {{ t("aiObservability.remoteTasks.form.signingKeyRegenerated") }}
+                  </OBanner>
                 </div>
               </template>
             </div>
@@ -439,7 +448,7 @@
           size="sm-action"
           :disabled="isSubmitting"
           data-test="ai-remote-task-form-cancel-btn"
-          @click="goBack"
+          @click="cancel"
         >
           {{ t("common.cancel") }}
         </OButton>
@@ -472,6 +481,7 @@
         </OButton>
       </footer>
     </OPageLayout>
+    <EditorDraftDialogs :draft="taskDraft" />
   </OForm>
 </template>
 
@@ -484,6 +494,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -505,6 +516,8 @@ import remoteTasksService, {
   type RemoteTaskVerificationReport,
 } from "@/services/remote-tasks.service";
 import RemoteTaskTestPanel from "./RemoteTaskTestPanel.vue";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft, useEditorDraftIds } from "@/composables/useEditorDraft";
 import {
   ATTEMPTS_MAX,
   ATTEMPTS_MIN,
@@ -591,6 +604,10 @@ const form = useOForm<RemoteTaskFormValues>({
 const submitIntent = ref<"publish" | "draft">("publish");
 
 function onSubmit(values: RemoteTaskFormValues) {
+  if (taskDraft.pendingReentries().some((path) => secretInUse(path, values))) {
+    toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
+    return;
+  }
   return submitIntent.value === "draft" ? saveDraftOnly(values) : publish(values);
 }
 
@@ -629,6 +646,8 @@ const storedTarget = reactive({ version: 0, endpoint: "" });
 
 const signingKey = form.useStore((state: any) => String(state.values.signingKey ?? ""));
 const signingKeyCopied = ref(false);
+/** Set when a continued draft got a new key, since drafts never keep the one the operator may have copied. */
+const signingKeyRegenerated = ref(false);
 const headerShape = raw(SIGNATURE_HEADER_SHAPE);
 
 // A key exists from the instant signing is switched on, so the operator can put
@@ -639,18 +658,21 @@ watch(signingEnabled, (enabled) => {
   if (!enabled) {
     form.setFieldValue("signingKey", "");
     signingKeyCopied.value = false;
+    signingKeyRegenerated.value = false;
   }
 });
 
 function regenerateSigningKey() {
   form.setFieldValue("signingKey", generateSigningKey());
   signingKeyCopied.value = false;
+  signingKeyRegenerated.value = false;
 }
 
 async function copySigningKey() {
   try {
     await navigator.clipboard.writeText(signingKey.value);
     signingKeyCopied.value = true;
+    signingKeyRegenerated.value = false;
   } catch {
     signingKeyCopied.value = false;
   }
@@ -728,6 +750,10 @@ function templateInput(): HTMLTextAreaElement | null {
 
 function goBack() {
   void router.push(aiRemoteTasksRoute(orgId.value));
+}
+
+async function cancel() {
+  if (await taskDraft.confirmLeave()) goBack();
 }
 
 /**
@@ -842,6 +868,8 @@ async function publish(values: RemoteTaskFormValues) {
   testReport.value = null;
 
   let entityId = draftEntityId.value || routeEntityId.value;
+  // Only a head that took this attempt's values may stand in for the local draft.
+  let headHoldsValues = false;
 
   try {
     if (!entityId) {
@@ -849,11 +877,13 @@ async function publish(values: RemoteTaskFormValues) {
       entityId = created.entityId;
       draftEntityId.value = entityId;
       draftHasSecret.value = valuesHaveSecret(values);
+      headHoldsValues = true;
     } else if (!draftHasSecret.value) {
       await saveRemoteTaskDraft.mutateAsync({
         entityId,
         payload: toDraftPayload(values, draftFromVersion.value),
       });
+      headHoldsValues = true;
     }
 
     const result = await testRemoteTaskConnection.mutateAsync({
@@ -870,6 +900,7 @@ async function publish(values: RemoteTaskFormValues) {
         message: t("aiObservability.remoteTasks.form.publishFailed"),
       });
       if (mode.value === "create" && draftHasSecret.value) await rollbackDraft(entityId);
+      if (headHoldsValues) keepDraftOnRegisteredHead();
       return;
     }
 
@@ -883,6 +914,11 @@ async function publish(values: RemoteTaskFormValues) {
           }),
     });
 
+    if (leaveSave) {
+      leaveSave.saved = true;
+      return;
+    }
+    taskDraft.markSaved();
     void router.push(aiRemoteTaskDetailRoute(orgId.value, entityId));
   } catch (error: any) {
     testState.value = "failed";
@@ -893,7 +929,13 @@ async function publish(values: RemoteTaskFormValues) {
       message:
         raw(error?.response?.data?.message) || t("aiObservability.remoteTasks.form.createError"),
     });
+    if (headHoldsValues) keepDraftOnRegisteredHead();
   }
+}
+
+/** A failed publish whose head kept these values moves the local draft to that task, or a later Continue would register the name twice. */
+function keepDraftOnRegisteredHead() {
+  if (mode.value === "create" && draftEntityId.value) taskDraft.markSaved();
 }
 
 /** Best effort: leaving debris is worse than a silent failure here, but a failed
@@ -926,6 +968,11 @@ async function saveDraftOnly(values: RemoteTaskFormValues) {
       draftHasSecret.value = valuesHaveSecret(values);
     }
     toast({ variant: "success", message: t("aiObservability.remoteTasks.form.draftSuccess") });
+    if (leaveSave) {
+      leaveSave.saved = true;
+      return;
+    }
+    taskDraft.markSaved();
     void router.push(aiRemoteTaskDetailRoute(orgId.value, draftEntityId.value));
   } catch (error: any) {
     toast({
@@ -936,14 +983,14 @@ async function saveDraftOnly(values: RemoteTaskFormValues) {
   }
 }
 
-async function loadForEdit() {
-  if (mode.value !== "edit" || !orgId.value) return;
+async function loadForEdit(): Promise<boolean> {
+  if (!orgId.value) return false;
   try {
     const task: RemoteTask = await remoteTasksService.get(orgId.value, routeEntityId.value);
     if (!canEditRemoteTask(task)) {
       toast({ variant: "error", message: t("aiObservability.remoteTasks.statusHint.retired") });
       goBack();
-      return;
+      return false;
     }
     draftFromVersion.value = task.isDraft ? undefined : task.version;
     const holdsSecret =
@@ -954,16 +1001,99 @@ async function loadForEdit() {
     testsStoredVersion.value = holdsSecret && !task.isDraft;
     Object.assign(storedTarget, { version: task.version, endpoint: task.endpoint });
     unpublishedSecret.value = holdsSecret && task.isDraft;
+    serverTask.value = remoteTaskToFormValues(task);
     form.reset(remoteTaskToFormValues(task));
+    return true;
   } catch (error: any) {
-    toast({
-      variant: "error",
-      message:
-        raw(error?.response?.data?.message) || t("aiObservability.remoteTasks.detail.loadError"),
-    });
+    // Opening the draft of a task that is gone drops it and says so, in place of the load error.
+    if (error?.response?.status === 404 && taskDrafts.ids.has(routeEntityId.value)) {
+      await taskDraft.start();
+    } else {
+      toast({
+        variant: "error",
+        message:
+          raw(error?.response?.data?.message) || t("aiObservability.remoteTasks.detail.loadError"),
+      });
+    }
     goBack();
+    return false;
   }
 }
 
-onMounted(loadForEdit);
+// Set while the leave dialog's Save runs, so a successful save stays on the page for the pending navigation.
+let leaveSave: { saved: boolean } | null = null;
+/** The loaded task in form shape: hashed for "changed on server", and null once it is gone. */
+const serverTask = ref<RemoteTaskFormValues | null>(null);
+const taskDrafts = useEditorDraftIds("remote_task");
+const formValues = form.useStore((state) => state.values);
+
+function secretFieldLabel(path: string, data: RemoteTaskFormValues): I18nText | null {
+  const header = /^\/headers\/(\d+)\/value$/.exec(path);
+  if (header) {
+    return t("common.editorDraft.headerField", {
+      name: data.headers[Number(header[1])]?.key ?? "",
+    });
+  }
+  if (path === "/token") return t("common.editorDraft.tokenField");
+  if (path === "/password") return t("common.editorDraft.passwordField");
+  if (path === "/endpoint") return t("common.editorDraft.endpointUrlField");
+  return null;
+}
+
+/** Whether a blanked secret is still sent with the current auth choice. */
+function secretInUse(path: string, values: RemoteTaskFormValues): boolean {
+  if (path === "/token")
+    return values.authType === "bearer" || values.authType === "api_key_header";
+  if (path === "/password") return values.authType === "basic";
+  return true;
+}
+
+function describeRedacted(paths: string[], data: RemoteTaskFormValues): I18nText[] {
+  return paths.flatMap((path) => secretFieldLabel(path, data) ?? []);
+}
+
+const taskDraft = useEditorDraft<RemoteTaskFormValues>({
+  kind: "remote_task",
+  entityLabel: () => t("common.editorDraft.entities.remote_task"),
+  // "Draft" already names the registry's unpublished server version.
+  serverDraftItem: true,
+  restoreNote: (data) =>
+    data.signingEnabled && mode.value === "create"
+      ? t("aiObservability.remoteTasks.form.signingKeyNotKept")
+      : null,
+  // The leave dialog's Save runs the publish flow, not "Save as Draft".
+  saveLabel: () => t("aiObservability.remoteTasks.form.submit"),
+  entityId: () => routeEntityId.value || draftEntityId.value || null,
+  // The HMAC signing key is never drafted; the signing watcher generates a new one on Continue.
+  snapshot: () => ({
+    ...formValues.value,
+    headers: formValues.value.headers.map((header) => ({ ...header })),
+    signingKey: "",
+  }),
+  apply: (data) => {
+    form.reset({ ...remoteTaskFormDefaults(), ...data, signingKey: "" });
+    signingKeyRegenerated.value = mode.value === "create" && data.signingEnabled;
+  },
+  base: () => (mode.value === "edit" ? serverTask.value : undefined),
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    submitIntent.value = "publish";
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  describeRedacted,
+  // Any header can carry a credential (Cookie, X-Auth, …), so no header value is drafted.
+  secretLists: ["/headers"],
+  secretUrls: ["/endpoint"],
+});
+
+onMounted(async () => {
+  if (mode.value === "edit" && !(await loadForEdit())) return;
+  await taskDraft.start();
+});
 </script>

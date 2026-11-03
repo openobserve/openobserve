@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{ConnectionTrait, DbErr};
+use sea_orm::{DatabaseConnection, DbErr};
 
-/// Creates the six Slack tables; for tests, since the migrator replays the whole history.
-pub async fn create_tables_for_test<C: ConnectionTrait>(conn: &C) -> Result<(), DbErr> {
+/// Creates the Slack tables, `slack_alert_messages` included, without replaying the migrator.
+pub async fn create_tables_for_test(conn: &DatabaseConnection) -> Result<(), DbErr> {
     super::migration::create_slack_tables(conn).await
 }

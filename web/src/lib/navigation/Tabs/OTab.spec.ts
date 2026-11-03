@@ -195,51 +195,48 @@ describe("OTab", () => {
     expect(wrapper.find('[role="tab"]').attributes("disabled")).toBeUndefined();
   });
 
-  // --- Transition & focus ring (post-migration tweaks) ---
+  // --- Transition & focus outline ---
 
-  it("applies the multi-property transition utility for smooth state changes", () => {
-    const wrapper = mountTab();
-    const classes = wrapper.find('[role="tab"]').classes();
-    // The migration replaced `transition-colors` with an explicit
-    // multi-property transition that also animates border-color and box-shadow.
+  it("puts the hover-in and hover-out motion tokens on the colour transition", () => {
+    const classes = mountTab().find('[role="tab"]').classes();
     expect(classes).toContain(
-      "transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow]",
+      "transition-[color,background-color,border-color,text-decoration-color,fill,stroke]",
     );
-    expect(classes).toContain("duration-150");
-    // Sanity: the old narrow utility should NOT be present anymore.
+    expect(classes).toContain("duration-(--duration-hover-out)");
+    expect(classes).toContain("hover:duration-(--duration-hover-in)");
     expect(classes).not.toContain("transition-colors");
   });
 
-  it("renders ring offset utilities so the focus ring is visually separated from the tab edge", () => {
-    const wrapper = mountTab();
-    const classes = wrapper.find('[role="tab"]').classes();
-    expect(classes).toContain("ring-offset-1");
-    expect(classes).toContain("ring-offset-surface-base");
+  it("uses an accent outline, not a box-shadow ring, for focus", () => {
+    const classes = mountTab().find('[role="tab"]').classes();
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        "focus-visible:outline-solid",
+        "focus-visible:outline-2",
+        "focus-visible:outline-focus-ring-accent",
+      ]),
+    );
+    expect(classes.some((c) => /(^|:)ring-/.test(c))).toBe(false);
   });
 
-  it("applies a focus-visible ring using the tabs indicator color", () => {
-    const wrapper = mountTab();
-    const classes = wrapper.find('[role="tab"]').classes();
-    expect(classes).toContain("focus-visible:outline-none");
-    expect(classes).toContain("focus-visible:ring-2");
-    expect(classes).toContain("focus-visible:ring-tabs-indicator");
+  it("uses a negative focus outline offset on a horizontal tab", () => {
+    const classes = mountTab().find('[role="tab"]').classes();
+    expect(classes).toContain("focus-visible:-outline-offset-2");
+    expect(classes).not.toContain("focus-visible:outline-offset-2");
   });
 
-  it("keeps the focus ring utilities on disabled tabs (keyboard navigation still highlights them)", () => {
-    const wrapper = mountTab({ disable: true });
-    const classes = wrapper.find('[role="tab"]').classes();
-    // Focus ring classes belong to baseClasses and must remain regardless of state.
-    expect(classes).toContain("focus-visible:ring-2");
-    expect(classes).toContain("focus-visible:ring-tabs-indicator");
-    expect(classes).toContain("ring-offset-1");
+  it("uses a positive focus outline offset on a vertical tab", () => {
+    const classes = mountTab({ isVertical: true }).find('[role="tab"]').classes();
+    expect(classes).toContain("focus-visible:outline-offset-2");
+    expect(classes).not.toContain("focus-visible:-outline-offset-2");
   });
 
-  it("keeps the focus ring utilities on the active tab", () => {
-    const wrapper = mountTab({ name: "tab1", activeTab: "tab1" });
-    const classes = wrapper.find('[role="tab"]').classes();
-    expect(classes).toContain("focus-visible:ring-2");
-    expect(classes).toContain("focus-visible:ring-tabs-indicator");
-    expect(classes).toContain("ring-offset-surface-base");
+  it("keeps the focus outline classes on disabled and active tabs", () => {
+    for (const opts of [{ disable: true }, { name: "tab1", activeTab: "tab1" }]) {
+      const classes = mountTab(opts).find('[role="tab"]').classes();
+      expect(classes).toContain("focus-visible:outline-2");
+      expect(classes).toContain("focus-visible:outline-focus-ring-accent");
+    }
   });
 
   // --- Grip-gated drag (reorderable) ---

@@ -141,6 +141,7 @@ export const useRoleJsonView = (deps: JsonViewDeps) => {
           resource === "logs" ||
           resource === "metrics" ||
           resource === "traces" ||
+          resource === "profiles" ||
           resource === "index"
         ) {
           resourceDetails = resourceMapper.value["stream"].entities.find(
@@ -211,6 +212,7 @@ export const useRoleJsonView = (deps: JsonViewDeps) => {
           resource === "logs" ||
           resource === "metrics" ||
           resource === "traces" ||
+          resource === "profiles" ||
           resource === "index"
         ) {
           resourceDetails = resourceMapper.value["stream"].entities.find(

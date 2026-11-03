@@ -1,6 +1,8 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import { DEFAULT_CAST_TARGET_TYPE, isCastTargetType } from "@/utils/dashboard/castSuggestion";
+import { DISTRIBUTION_ROW_LIMIT, isRawValueChart } from "@/utils/dashboard/chartTypeGroups";
+import { BOXPLOT_STATS, boxplotStatAlias } from "@/utils/dashboard/boxplotStats";
 import {
   heatmapYBucketError,
   heatmapYBucketing,
@@ -362,6 +364,8 @@ export function buildSQLChartQuery(config: {
     return "";
   }
 
+  if (chartType === "boxplot") return buildBoxplotStatsQuery(queryData, dashboardPanelData);
+
   const stream = queryData.fields.stream;
   const streamAlias = queryData?.joins?.length ? stream : "";
 
@@ -446,8 +450,8 @@ export function buildSQLChartQuery(config: {
   // HAVING clause - support multiple fields from y-axis and z-axis
   const havingClauses: string[] = [];
 
-  // Process y-axis having conditions (skip for heatmap)
-  if (chartType !== "heatmap") {
+  // Process y-axis having conditions (skip for heatmap and raw-value charts, which are not grouped)
+  if (chartType !== "heatmap" && !isRawValueChart(chartType)) {
     queryData.fields.y.forEach((field: any) => {
       if (
         field?.havingConditions?.[0]?.operator &&
@@ -494,11 +498,46 @@ export function buildSQLChartQuery(config: {
   }
 
   // LIMIT clause
-  const queryLimit = queryData.config.limit ?? 0;
+  const queryLimit =
+    queryData.config.limit || (isRawValueChart(chartType) ? DISTRIBUTION_ROW_LIMIT : 0);
   if (queryLimit > 0) {
     query += ` LIMIT ${queryLimit}`;
   }
 
+  return query;
+}
+
+/** Double-quotes a stored identifier; an imported dashboard's alias or stream must not reach the SQL as syntax. */
+const quoteIdentifier = (name: unknown): string => `"${String(name).replace(/"/g, '""')}"`;
+
+/** A box plot's builder query: the y field's five-number summary per x category, over every matching row. */
+function buildBoxplotStatsQuery(queryData: any, dashboardPanelData: any): string {
+  const stream = queryData.fields.stream;
+  const streamAlias = queryData?.joins?.length ? stream : "";
+  const valueField = queryData.fields.y.find((field: any) => !field?.isDerived);
+  const value = valueField ? buildSQLQueryFromInput(valueField, streamAlias) : "";
+  if (!value) return "";
+  const category = queryData.fields.x.find((field: any) => !field?.isDerived);
+  const categorySql = category ? buildSQLQueryFromInput(category, streamAlias) : "";
+  const categoryAlias = categorySql ? quoteIdentifier(category.alias) : "";
+  const categoryExpr = categorySql ? `${categorySql} as ${categoryAlias}` : "";
+  const stats = BOXPLOT_STATS.map(
+    (stat) =>
+      `${stat.sql(value)} as ${quoteIdentifier(boxplotStatAlias(valueField.alias, stat.column))}`,
+  );
+
+  let query = `SELECT ${[categoryExpr, ...stats].filter(Boolean).join(", ")}`;
+  query += ` FROM ${quoteIdentifier(stream)} ${buildSQLJoinsFromInput(queryData.joins, streamAlias)}`;
+  query += buildWhereClause(queryData.fields.filter.conditions, dashboardPanelData);
+  if (categoryExpr) {
+    query += ` GROUP BY ${categoryAlias}`;
+    const direction = String(category.sortBy ?? "").toUpperCase();
+    if (["ASC", "DESC"].includes(direction)) query += ` ORDER BY ${categoryAlias} ${direction}`;
+  }
+  // A high-cardinality category must not return more boxes than a panel can draw.
+  const limit =
+    queryData.config.limit > 0 ? queryData.config.limit : categoryExpr ? DISTRIBUTION_ROW_LIMIT : 0;
+  if (limit) query += ` LIMIT ${limit}`;
   return query;
 }
 
@@ -656,22 +695,8 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
     : "";
 
   if (condition.filterType === "group") {
-    const groupConditions = condition.conditions
-      .map((condition: any) => buildCondition(condition, dashboardPanelData))
-      .filter(Boolean);
-    const logicalOperators = condition.conditions
-      .map((c: any) => c.logicalOperator)
-      .filter(Boolean);
-
-    let groupQuery = "";
-    groupConditions.forEach((c: any, index: any) => {
-      if (index > 0) {
-        groupQuery += ` ${logicalOperators[index]} `;
-      }
-      groupQuery += c;
-    });
-
-    return groupConditions.length ? `(${groupQuery})` : "";
+    const groupQuery = joinConditions(condition.conditions, dashboardPanelData);
+    return groupQuery ? `(${groupQuery})` : "";
   } else if (condition.type === "list" && condition.values?.length > 0) {
     const fieldRef = streamAlias
       ? `${streamAlias}.${condition.column.field}`
@@ -738,7 +763,11 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
         condition.column,
         dashboardPanelData,
       )})`;
-    } else if (condition.value != null && condition.value !== "") {
+    } else if (
+      (condition.value != null && condition.value !== "") ||
+      // `x <> ''` parsed from SQL is a real filter, unlike a value not entered yet
+      (condition.emptyLiteral && condition.value === "" && ["=", "<>"].includes(condition.operator))
+    ) {
       const fieldRef = streamAlias
         ? `${streamAlias}.${condition.column.field}`
         : condition.column.field;
@@ -750,11 +779,12 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
         case ">":
         case "<=":
         case ">=":
-          selectFilter += `${condition.operator} ${formatValue(
-            condition.value,
-            condition.column,
-            dashboardPanelData,
-          )}`;
+          // formatValue leaves "" unquoted on a non-string column
+          selectFilter += `${condition.operator} ${
+            condition.value === ""
+              ? "''"
+              : formatValue(condition.value, condition.column, dashboardPanelData)
+          }`;
           break;
         case "Not Contains":
           selectFilter += `NOT LIKE '%${escapeSingleQuotes(condition.value)}%'`;
@@ -786,26 +816,27 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
  * @returns {string} - the WHERE clause as a string.
  */
 const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
-  const whereConditions = filterData
-    ?.map((condition: any) => buildCondition(condition, dashboardPanelData))
-    ?.filter(Boolean);
-
-  const logicalOperators = filterData.map((it: any) => it.logicalOperator);
-  if (whereConditions.length > 0) {
-    return ` WHERE ${whereConditions
-      .map((cond: any, index: any) => {
-        const logicalOperator =
-          index < logicalOperators.length && logicalOperators[index + 1]
-            ? logicalOperators[index + 1]
-            : "";
-
-        return index < logicalOperators.length ? `${cond} ${logicalOperator}` : cond;
-      })
-      .join(" ")}`;
-  }
-
-  return "";
+  const whereQuery = joinConditions(filterData, dashboardPanelData);
+  return whereQuery ? ` WHERE ${whereQuery}` : "";
 };
+
+/**
+ * Join conditions with their logical operators. A condition's logicalOperator
+ * joins it to the condition before it, so each condition is paired with its own
+ * operator before empty ones are dropped; dropping first shifts the operators
+ * and can leave a trailing AND.
+ */
+const joinConditions = (conditions: any[], dashboardPanelData: any): string =>
+  (conditions ?? [])
+    .map((condition: any) => ({
+      sql: buildCondition(condition, dashboardPanelData),
+      logicalOperator: condition?.logicalOperator || "AND",
+    }))
+    .filter((part: any) => part.sql)
+    .map((part: any, index: number) =>
+      index === 0 ? part.sql : `${part.logicalOperator} ${part.sql}`,
+    )
+    .join(" ");
 
 export const mapChart = (dashboardPanelData: any) => {
   const queryData = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];

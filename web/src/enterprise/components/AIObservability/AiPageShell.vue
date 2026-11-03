@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimeRef"
           auto-apply
           menu-align="end"
+          calendar-presets
           :default-type="dateState.valueType"
           :default-absolute-time="{
             startTime: dateState.startTime ?? 0,

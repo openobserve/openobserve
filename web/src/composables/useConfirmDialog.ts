@@ -17,6 +17,8 @@ export interface ConfirmDialogOptions {
   confirmVariant?: ButtonVariant;
   // A destructive confirm starts on Cancel so Enter cannot confirm by accident.
   focusCancel?: boolean;
+  /** Offers only the confirm button and cannot be dismissed, for a choice the user cannot refuse. */
+  confirmOnly?: boolean;
 }
 
 interface DialogState extends ConfirmDialogOptions {

@@ -43,9 +43,31 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: unknown[]) => toastMock(...args),
 }));
 
+vi.mock("@/utils/sessionServices", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/sessionServices")>()),
+  stopSessionServices: vi.fn(),
+}));
+
 const pushMock = vi.fn();
+// Runs the global guards like vue-router does, so the shared sign-out flow can finish.
+const routerGuards: ((to: { path: string }) => unknown)[] = [];
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: pushMock }),
+  useRouter: () => ({
+    push: async (path: string) => {
+      pushMock(path);
+      for (const guard of [...routerGuards]) {
+        // A guard returning false aborts the navigation, which push reports as a failure.
+        if ((await guard({ path })) === false) return { type: "aborted" };
+      }
+      return undefined;
+    },
+    beforeEach: (guard: (to: { path: string }) => unknown) => {
+      routerGuards.push(guard);
+      return () => {
+        if (routerGuards.includes(guard)) routerGuards.splice(routerGuards.indexOf(guard), 1);
+      };
+    },
+  }),
 }));
 
 const invalidateLoginDataMock = vi.fn();
@@ -60,6 +82,16 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 });
 
 import passwordPolicyService from "@/services/passwordPolicy";
+import {
+  cancelDraftSignOut,
+  draftSignOutDiscardOnly,
+  draftSignOutForced,
+  resumeDraftSession,
+} from "@/utils/drafts/draftSession";
+import { stopSessionServices } from "@/utils/sessionServices";
+import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
+
+const realLocation = window.location;
 import userService from "@/services/users";
 
 const STRICT_COMPLEXITY = {
@@ -97,8 +129,11 @@ const mountDialog = () => {
 const { open, close, isOpen } = usePasswordReset();
 
 describe("UpdatePasswordDialog", () => {
+  const assign = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal("location", { ...window.location, assign });
     resetPasswordComplexityCache();
     close();
     (passwordPolicyService.getComplexity as any).mockResolvedValue({ data: STRICT_COMPLEXITY });
@@ -109,6 +144,11 @@ describe("UpdatePasswordDialog", () => {
     wrappers.forEach((wrapper) => wrapper.unmount());
     wrappers = [];
     close();
+    vi.stubGlobal("location", realLocation);
+    // A sign-out that reached the reload leaves its flags and the signed-out user behind, as the reload would clear them.
+    cancelDraftSignOut();
+    resumeDraftSession();
+    localStorage.clear();
   });
 
   it("renders nothing until the user is flagged", async () => {
@@ -270,6 +310,68 @@ describe("UpdatePasswordDialog", () => {
     );
   });
 
+  it("signs out with editors offering only Discard, and stays open when an editor keeps the user", async () => {
+    open("policy_tightened");
+    const wrapper = mountDialog();
+    await flushPromises();
+    let sawDiscardOnly = false;
+    const editorGuard = (to: { path: string }) => {
+      if (to.path !== "/logout") return true;
+      sawDiscardOnly = draftSignOutDiscardOnly.value;
+      return false;
+    };
+    routerGuards.unshift(editorGuard);
+    try {
+      await (wrapper.vm as unknown as { signOut: () => Promise<void> }).signOut();
+      await flushPromises();
+    } finally {
+      routerGuards.splice(routerGuards.indexOf(editorGuard), 1);
+    }
+
+    expect(sawDiscardOnly).toBe(true);
+    expect(draftSignOutDiscardOnly.value).toBe(false);
+    expect(invalidateLoginDataMock).not.toHaveBeenCalled();
+    expect(stopSessionServices).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
+    expect(isOpen.value).toBe(true);
+  });
+
+  it("confirms discarding the user's drafts before its Sign out, as the menu's Sign out does", async () => {
+    const scope = { kind: "slo" as const, org: "acme", entityId: null, userEmail: "maya@acme.io" };
+    writeEditorDraft(scope, { data: { name: "unsaved" } });
+    open("policy_tightened");
+    const wrapper = mountDialog();
+    await flushPromises();
+
+    await wrapper.find('[data-test="o-dialog-neutral-btn"]').trigger("click");
+    await flushPromises();
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="editor-draft-signout-message"]').text()).toBe(
+      "You have 1 unsaved draft in this browser. Signing out discards it.",
+    );
+    expect(readEditorDraft(scope)).not.toBeNull();
+
+    await wrapper.find('[data-test="editor-draft-signout-confirm"]').trigger("click");
+    await flushPromises();
+    expect(pushMock).toHaveBeenCalledWith("/logout");
+    expect(assign).toHaveBeenCalledTimes(1);
+    resumeDraftSession();
+    expect(readEditorDraft(scope)).toBeNull();
+    localStorage.clear();
+  });
+
+  it("signs out at once from its Sign out when the user has no drafts", async () => {
+    open("policy_tightened");
+    const wrapper = mountDialog();
+    await flushPromises();
+
+    await wrapper.find('[data-test="o-dialog-neutral-btn"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="editor-draft-signout-dialog"]').exists()).toBe(false);
+    expect(pushMock).toHaveBeenCalledWith("/logout");
+    expect(assign).toHaveBeenCalledTimes(1);
+  });
+
   it("signs the user out on success, because the cookie is the old password", async () => {
     open("policy_tightened");
     const wrapper = mountDialog();
@@ -283,7 +385,63 @@ describe("UpdatePasswordDialog", () => {
     await flushPromises();
 
     expect(invalidateLoginDataMock).toHaveBeenCalled();
+    expect(stopSessionServices).toHaveBeenCalledTimes(1);
     expect(pushMock).toHaveBeenCalledWith("/logout");
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(isOpen.value).toBe(false);
+  });
+
+  it("keeps the user's drafts once the password has changed, as an expired session does", async () => {
+    const scope = { kind: "slo" as const, org: "acme", entityId: null, userEmail: "maya@acme.io" };
+    writeEditorDraft(scope, { data: { name: "unsaved" } });
+    open("policy_tightened");
+    const wrapper = mountDialog();
+    await flushPromises();
+
+    await (wrapper.vm as unknown as { submit: (v: UpdatePasswordForm) => Promise<void> }).submit({
+      old_password: "old-secret",
+      new_password: "New-Secret-1!",
+      confirm_password: "New-Secret-1!",
+    });
+    await flushPromises();
+
+    expect(assign).toHaveBeenCalledTimes(1);
+    resumeDraftSession();
+    expect(readEditorDraft(scope)?.data).toEqual({ name: "unsaved" });
+    localStorage.clear();
+  });
+
+  it("cannot be kept in the old session once the password has changed", async () => {
+    open("policy_tightened");
+    const wrapper = mountDialog();
+    await flushPromises();
+    let sawForced = false;
+    const editorGuard = (to: { path: string }) => {
+      if (to.path !== "/logout") return true;
+      sawForced = draftSignOutForced.value;
+      return false;
+    };
+    routerGuards.unshift(editorGuard);
+    const vm = wrapper.vm as unknown as {
+      submit: (
+        values: Record<"old_password" | "new_password" | "confirm_password", string>,
+      ) => Promise<void>;
+    };
+    try {
+      await vm.submit({
+        old_password: "old-secret",
+        new_password: "New-Secret-1!",
+        confirm_password: "New-Secret-1!",
+      });
+      await flushPromises();
+    } finally {
+      routerGuards.splice(routerGuards.indexOf(editorGuard), 1);
+    }
+
+    expect(sawForced).toBe(true);
+    expect(invalidateLoginDataMock).toHaveBeenCalled();
+    expect(stopSessionServices).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledTimes(1);
     expect(isOpen.value).toBe(false);
   });
 

@@ -34,6 +34,7 @@ import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { buildContextualSqlMessage, isParserLimitation } from "@/utils/query/sqlDiagnostics";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
+import { isExplainQuery } from "@/utils/query/sqlUtils";
 import { stripSqlComments } from "@/utils/query/sqlComments";
 import { raw, type TranslateFn } from "@/types/i18n";
 import {
@@ -557,6 +558,7 @@ export const useSearchQuery = (t: TranslateFn) => {
         !readOnly &&
         searchObj.meta.sqlMode &&
         query &&
+        !isExplainQuery(query) &&
         maxParenDepth(query) <= SQL_PARSE_MAX_DEPTH
       ) {
         try {

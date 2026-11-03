@@ -97,6 +97,9 @@ export const alertSettingsCreatesIncidentSchema = z.boolean().optional();
 
 export const alertSettingsNotifyOnRecoverySchema = z.boolean().optional();
 
+/** suppress_repeats: optional. Enterprise only; on = notify once per state change. */
+export const alertSettingsSuppressRepeatsSchema = z.boolean().optional();
+
 /** recovery_destinations: optional. Empty = the recovery follows the firing's destinations. */
 export const alertSettingsRecoveryDestinationsSchema = z.array(z.string()).optional();
 
@@ -127,6 +130,7 @@ export const makeAlertSettingsShape = (t: Translator) =>
     notify_on_recovery: alertSettingsNotifyOnRecoverySchema,
     recovery_destinations: alertSettingsRecoveryDestinationsSchema,
     keep_firing_for: makeKeepFiringForSchema(t),
+    suppress_repeats: alertSettingsSuppressRepeatsSchema,
   }) as const;
 
 // ── Mode-conditional composite ──────────────────────────────────────────────
@@ -151,6 +155,7 @@ export const createAlertSettingsSchema = (t: Translator, isRealTime: boolean) =>
     notify_on_recovery: alertSettingsNotifyOnRecoverySchema,
     recovery_destinations: alertSettingsRecoveryDestinationsSchema,
     keep_firing_for: makeKeepFiringForSchema(t),
+    suppress_repeats: alertSettingsSuppressRepeatsSchema,
   });
 
 export type AlertSettingsForm = z.infer<ReturnType<typeof createAlertSettingsSchema>>;

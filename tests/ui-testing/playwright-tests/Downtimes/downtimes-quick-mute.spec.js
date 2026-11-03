@@ -9,7 +9,7 @@ const { seedMinimalStream, createSloViaApi, countDefinition, deleteSlosByPrefix 
 
 const PREFIX = 'e2e_dt_qmute';
 const ENT_2848 = 'https://github.com/openobserve/o2-enterprise/issues/2848';
-const PRESET_SECS = { '30m': 1800, '1h': 3600, '2h': 7200, '4h': 14400 };
+const PRESET_SECS = { '30m': 1800, '1h': 3600, '4h': 14400, '24h': 86400 };
 
 const gate = { ready: false, config: {} };
 const shared = { stream: null, dest: null, service: null };
@@ -71,7 +71,8 @@ test.describe('Downtimes quick mute', { tag: ['@downtimes', '@enterprise', '@all
     await pm.alertsPage.gotoAlertListFolder(folder);
     await pm.alertsPage.muteAlertPreset(target.name, '1h');
     await pm.downtimesPage.expectQuickMuteDialog(false);
-    await pm.downtimesPage.expectToast(/^Muted 1 item until \d{2}:\d{2}/);
+    // A row mute goes through the alert's own mute route, whose toast names the alert and has no action.
+    await pm.downtimesPage.expectToast(new RegExp(`^Muted ${target.name} until \\d{1,2}:\\d{2}`));
 
     const rows = await dt.waitForActiveMutes(page, target.id);
     expect(rows, 'exactly one active mute must exist for the target').toHaveLength(1);
@@ -82,9 +83,6 @@ test.describe('Downtimes quick mute', { tag: ['@downtimes', '@enterprise', '@all
     expect(mute.folder_id).toBe('default');
     expect(Math.abs(dt.secsLeft(mute) - 3600)).toBeLessThanOrEqual(90);
     expect(await dt.activeDowntimesForAlert(page, control.id), 'the control must not be muted').toHaveLength(0);
-
-    await pm.downtimesPage.clickToastAction('Muted 1 item');
-    await pm.downtimesPage.expectOnDetail(mute.id);
 
     await pm.alertsPage.gotoAlertListFolder(folder);
     await pm.alertsPage.expectMutedChip(target.name, true);
@@ -148,13 +146,13 @@ test.describe('Downtimes quick mute', { tag: ['@downtimes', '@enterprise', '@all
     await pm.alertsPage.expectMutedChip(rt.name, true);
   });
 
-  test('DT-Q-05 the 30m, 2h and 4h presets set the matching end', { tag: ['@P1'] }, async ({ page }) => {
-    const { folder, alerts } = await fx.alertsInFolder(page, reg, shared, ['p30m', 'p2h', 'p4h']);
+  test('DT-Q-05 the 30m, 4h and 24h presets set the matching end', { tag: ['@P1'] }, async ({ page }) => {
+    const { folder, alerts } = await fx.alertsInFolder(page, reg, shared, ['p30m', 'p4h', 'p24h']);
     await pm.alertsPage.gotoAlertListFolder(folder);
-    for (const preset of ['30m', '2h', '4h']) {
+    for (const preset of ['30m', '4h', '24h']) {
       await pm.alertsPage.muteAlertPreset(alerts[`p${preset}`].name, preset);
     }
-    for (const preset of ['30m', '2h', '4h']) {
+    for (const preset of ['30m', '4h', '24h']) {
       const [mute] = await dt.waitForActiveMutes(page, alerts[`p${preset}`].id);
       expect(mute, `the ${preset} mute must exist`).toBeTruthy();
       expect(Math.abs(dt.secsLeft(mute) - PRESET_SECS[preset]), `${preset} end`).toBeLessThanOrEqual(90);

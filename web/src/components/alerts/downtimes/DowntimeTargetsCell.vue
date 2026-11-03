@@ -15,20 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    :class="[
-      'flex min-w-0 items-center gap-1',
-      maxChips == null ? 'flex-wrap' : 'flex-nowrap overflow-hidden',
-    ]"
-    :data-test="dataTest"
-  >
+  <div class="flex min-w-0 flex-wrap items-center gap-1" :data-test="dataTest">
     <OTag
       v-for="chip in visibleChips"
       :key="chip.key"
       type="downtimeTarget"
       :value="chip.value"
       :label="chip.label"
-      :class="maxChips == null ? '' : 'min-w-0 shrink'"
+      class="max-w-full min-w-0"
       :data-test="`${dataTest}-${chip.key}`"
     />
     <OTag
@@ -55,8 +49,9 @@ import { computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import type { DimensionCondition, DowntimeTarget } from "@/services/downtimes";
+import type { AlertGroupRef, DimensionCondition, DowntimeTarget } from "@/services/downtimes";
 import {
+  alertGroupChips,
   conditionSummary,
   sortedTargets,
   targetSummary,
@@ -73,12 +68,20 @@ const props = withDefaults(
   defineProps<{
     condition?: DimensionCondition | null;
     targets: DowntimeTarget[];
+    /** The alert groups a group mute covers; each leads the row as its own chip. */
+    alertGroups?: AlertGroupRef[] | null;
     folderName?: FolderNameFn;
-    /** One row of at most this many chips, the rest behind "+N"; unset wraps every chip. */
+    /** At most this many chips, the rest behind "+N"; unset shows every chip. */
     maxChips?: number;
     dataTest?: string;
   }>(),
-  { condition: null, folderName: undefined, maxChips: undefined, dataTest: "downtime-targets" },
+  {
+    condition: null,
+    alertGroups: null,
+    folderName: undefined,
+    maxChips: undefined,
+    dataTest: "downtime-targets",
+  },
 );
 
 const { t } = useI18nTyped();
@@ -95,9 +98,14 @@ const chips = computed<Chip[]>(() => {
       label: t("alerts.downtimes.summary.chip", { module: chip.label, text: chip.text }),
     };
   });
+  const groups = alertGroupChips(props.alertGroups, t).map((g) => ({
+    key: `group-${g.key}`,
+    value: "group",
+    label: g.label,
+  }));
   return condition
-    ? [{ key: "condition", value: "condition", label: condition }, ...targets]
-    : targets;
+    ? [...groups, { key: "condition", value: "condition", label: condition }, ...targets]
+    : [...groups, ...targets];
 });
 
 // "+1" saves no room over the chip it hides, so a row that overflows by one shows it.

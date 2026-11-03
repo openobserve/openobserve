@@ -175,14 +175,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <template #cell-status="{ value }">
-            <OTag type="alertState" :value="value" data-test="alert-history-status-badge" />
+          <template #cell-status="{ row }">
+            <OTag
+              type="alertState"
+              :value="historyStatusOf(row)"
+              data-test="alert-history-status-badge"
+            />
           </template>
 
           <!-- T-10: what was observed, against what, and the level it
                classified to. Pre-change rows (no actual_value) render "—". -->
           <template #cell-condition="{ row }">
-            <div class="flex min-w-0 items-center gap-1.5">
+            <OTruncatedText
+              v-if="isAckEventRow(row)"
+              class="text-compact"
+              data-test="alert-history-ack-event-text"
+            >
+              {{ ackEventText(row, t) }}
+            </OTruncatedText>
+            <div v-else class="flex min-w-0 items-center gap-1.5">
               <span class="text-compact whitespace-nowrap tabular-nums">
                 {{ conditionSummary(row) }}
               </span>
@@ -200,8 +211,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <template #cell-is_realtime="{ value }">
+          <template #cell-is_realtime="{ row, value }">
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
             <OIcon
+              v-else
               :name="value ? 'check-circle' : 'schedule'"
               :class="value ? 'text-status-positive' : 'text-text-body'"
               size="xs"
@@ -210,8 +223,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OIcon>
           </template>
 
-          <template #cell-is_silenced="{ value }">
+          <template #cell-is_silenced="{ row, value }">
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
             <OIcon
+              v-else
               :name="value ? 'volume-off' : 'volume-up'"
               :class="value ? 'text-text-body' : 'text-status-positive'"
               size="md"
@@ -223,23 +238,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-duration="{ row }">
-            {{ formatDuration(row.end_time - row.start_time) }}
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
+            <template v-else>{{ formatDuration(row.end_time - row.start_time) }}</template>
           </template>
 
-          <template #cell-dedup="{ row }">
-            <span v-if="!row.dedup_enabled" class="text-text-secondary">-</span>
-            <div v-else-if="row.dedup_suppressed" class="text-status-error-text">
-              <OIcon name="block" size="sm">
-                <OTooltip>
-                  <template #content>
-                    {{ t("alerts.suppressedByDeduplication") }}
-                    <div v-if="row.dedup_count">
-                      {{ t("alerts.occurrence", { count: row.dedup_count }, row.dedup_count) }}
-                    </div>
-                  </template>
-                </OTooltip>
-              </OIcon>
-            </div>
+          <template #cell-retries="{ row }">
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
+            <template v-else>{{ row.retries }}</template>
+          </template>
+
+          <template #cell-suppression="{ row }">
+            <span v-if="isAckEventRow(row)" class="text-text-secondary">—</span>
+            <OTruncatedText
+              v-else-if="ackSuppressedBy(row)"
+              class="text-text-secondary text-xs"
+              data-test="alert-history-ack-dedup"
+            >
+              {{ t("alerts.ack.history.dedupSuppressed", { who: raw(ackSuppressedBy(row)) }) }}
+            </OTruncatedText>
+            <OTruncatedText
+              v-else-if="row.repeat_suppressed === true"
+              class="text-text-secondary text-xs"
+              data-test="alert-history-repeat-suppressed"
+            >
+              {{ t("alerts.suppressedAsRepeat") }}
+            </OTruncatedText>
             <div v-else-if="row.grouped" class="text-primary flex items-center justify-center">
               <OIcon name="group-work" size="md">
                 <OTooltip>
@@ -251,21 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
               <span class="ms-1 text-xs">×{{ row.group_size || 1 }}</span>
             </div>
-            <div v-else class="text-status-positive flex items-center justify-center">
-              <OIcon name="check-circle" size="md">
-                <OTooltip>
-                  <template #content>
-                    {{ t("alerts.notificationSent") }}
-                    <div v-if="row.dedup_count && row.dedup_count > 1">
-                      {{ row.dedup_count }} {{ t("alerts.occurrencesDeduplicated") }}
-                    </div>
-                  </template>
-                </OTooltip>
-              </OIcon>
-              <span v-if="row.dedup_count && row.dedup_count > 1" class="ms-1 text-xs">
-                ×{{ row.dedup_count }}
-              </span>
-            </div>
+            <span v-else class="text-text-secondary">—</span>
           </template>
 
           <template #cell-actions="{ row }">
@@ -353,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="w-1/2">
               <div class="text-text-secondary mb-1 text-xs">{{ t("common.status") }}</div>
-              <OTag type="alertState" :value="selectedRow.status" />
+              <OTag type="alertState" :value="historyStatusOf(selectedRow)" />
             </div>
           </div>
         </div>
@@ -556,6 +565,12 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { conditionSummary } from "@/utils/alerts/runOutcome";
+import {
+  ackEventText,
+  ackSuppressedBy,
+  historyStatusOf,
+  isAckEventRow,
+} from "@/utils/alerts/ackState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -716,8 +731,8 @@ const columns = ref<OTableColumnDef[]>([
     header: t("alerts.status"),
     accessorKey: "status",
     sortable: true,
-    size: COL.status,
-    maxSize: COL.status,
+    size: 128,
+    maxSize: 128,
     cell: " ",
     meta: { align: "left" },
   },
@@ -738,14 +753,15 @@ const columns = ref<OTableColumnDef[]>([
     sortable: true,
     size: 64,
     maxSize: 64,
+    cell: " ",
     meta: { align: "right" },
   },
   {
-    id: "dedup",
-    header: t("alerts.dedup"),
+    id: "suppression",
+    header: t("alerts.suppression"),
     sortable: false,
-    size: 80,
-    maxSize: 80,
+    size: 112,
+    maxSize: 112,
     cell: " ",
     meta: { align: "left" },
   },

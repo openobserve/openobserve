@@ -21,7 +21,7 @@ describe("auditKind", () => {
     expect(auditKind("fleet.audit.setDesired")).toBe("rollout");
     expect(auditKind("fleet.audit.autoRollback")).toBe("rollout");
     expect(auditKind("fleet.audit.publishedVersion")).toBe("configuration");
-    expect(auditKind("fleet.audit.movedCollectors")).toBe("collector");
+    expect(auditKind("fleet.audit.movedByToken")).toBe("collector");
     expect(auditKind("fleet.audit.updatedFleetSettings")).toBe("fleet");
     expect(auditKind("fleet.audit.updatedSettings")).toBe("settings");
     expect(auditKind("fleet.audit.revokedToken")).toBe("token");

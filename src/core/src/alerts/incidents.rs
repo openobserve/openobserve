@@ -525,6 +525,7 @@ fn apply_incident_to_context(
 ) {
     // The alert's own link points at its search; an incident notification must open the incident.
     ctx.alert_url = incident_url.to_string();
+    ctx.incident_id = incident_id.to_string();
     ctx.context_attributes.extend(
         [
             ("incident_id", incident_id),
@@ -630,7 +631,7 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
 /// Correlate an alert to an incident, and send a notification if appropriate.
 ///
 /// This is the main entry point for incident correlation in the alert execution flow.
-/// Called after deduplication, instead of direct notification for `creates_incident=true` alerts.
+/// Called instead of direct notification for `creates_incident=true` alerts.
 ///
 /// Notification behaviour:
 /// - `NewIncidentCreated` → sends incident notification to merged destinations of all correlated
@@ -769,6 +770,15 @@ pub async fn correlate_alert_to_incident(
     )
     .await?;
     let outcome = correlation.outcome;
+    // D23: a firing joining an acknowledged incident is acknowledged too, so nobody is re-paged.
+    if !matches!(
+        outcome,
+        IncidentCorrelationOutcome::NewIncidentCreated { .. }
+    ) && let Some(alert_id) = alert.id.map(|id| id.to_string())
+    {
+        crate::alerts::ack::join_acked_incident(&alert.org_id, outcome.incident_id(), &alert_id)
+            .await;
+    }
 
     // The on-call record routing opened; its team decides L0 for the incident.
     #[cfg(feature = "enterprise")]
@@ -861,6 +871,15 @@ pub async fn correlate_alert_to_incident(
                 alert.org_id
             ),
         }
+    }
+
+    // A new alert is new evidence, so a page whose ladder ran out may page again.
+    #[cfg(feature = "enterprise")]
+    if let Some(incident_id) = outcome.joined_by_new_alert()
+        && downtime.is_none()
+        && o2_enterprise::enterprise::oncall::is_enabled()
+    {
+        page_again_after_new_alert(&alert.org_id, incident_id).await;
     }
 
     // Starts after routing decides L0; an un-mute keeps an already stored off decision.
@@ -1010,6 +1029,14 @@ pub async fn correlate_external_event(
         None,
     )
     .await?;
+
+    // A new external alert is new evidence too, so an unanswered page may page again.
+    #[cfg(feature = "enterprise")]
+    if let Some(incident_id) = outcome.joined_by_new_alert()
+        && o2_enterprise::enterprise::oncall::is_enabled()
+    {
+        page_again_after_new_alert(org_id, incident_id).await;
+    }
 
     // No on-call routing on this path, so nothing decides L0 and the run starts.
     #[cfg(feature = "enterprise")]
@@ -2591,6 +2618,71 @@ async fn start_unmuted_incident_rca(
     }
 }
 
+/// Tells each of the incident's pages that a new alert joined, re-running a ladder that ran out.
+#[cfg(feature = "enterprise")]
+async fn page_again_after_new_alert(org_id: &str, incident_id: &str) {
+    use config::meta::oncall::NewAlertEffect;
+    use o2_enterprise::enterprise::oncall::{escalation::ENGINE_ACTOR, replicate};
+
+    let now = config::utils::time::now_micros();
+    let pages = match infra::table::oncall_responses::list_for_incident(org_id, incident_id).await {
+        Ok(pages) => pages,
+        Err(e) => {
+            log::error!("[incidents] on-call pages of {org_id}/{incident_id}: {e}");
+            return;
+        }
+    };
+    for page in pages {
+        let repaged = match page.on_new_alert(now) {
+            NewAlertEffect::Nothing => continue,
+            NewAlertEffect::NoteOnly => false,
+            // Ok(false): acked, snoozed or re-run since the read, so this alert only gets the note.
+            NewAlertEffect::PageAgain => match restart_exhausted_ladder(org_id, &page, now).await {
+                Ok(repaged) => repaged,
+                Err(e) => {
+                    log::error!("[incidents] could not page {org_id}/{} again: {e}", page.id);
+                    continue;
+                }
+            },
+        };
+        let event = page.new_alert_note(repaged, ENGINE_ACTOR, now);
+        if let Err(e) = replicate::add_event(org_id, &page.id, &event).await {
+            log::error!("[incidents] timeline of {org_id}/{}: {e}", page.id);
+        }
+    }
+}
+
+/// Re-runs an exhausted page's ladder if nobody touched it since `seen`, then re-arms its timer.
+#[cfg(feature = "enterprise")]
+async fn restart_exhausted_ladder(
+    org_id: &str,
+    seen: &config::meta::oncall::Response,
+    now: i64,
+) -> Result<bool, anyhow::Error> {
+    use config::meta::triggers::{Trigger, TriggerModule};
+    use o2_enterprise::enterprise::oncall::replicate;
+
+    let Some(updated) =
+        infra::table::oncall_responses::restart_exhausted(org_id, seen, now).await?
+    else {
+        return Ok(false);
+    };
+    // Upsert keeps the row's data; a racing tick may delete it, and the reconcile sweep re-arms it.
+    infra::scheduler::arm_with(
+        infra::db::get_orm_client_rw().await,
+        &Trigger {
+            org: org_id.to_string(),
+            module: TriggerModule::OncallEscalation,
+            module_key: updated.id.clone(),
+            next_run_at: now,
+            ..Default::default()
+        },
+    )
+    .await?;
+    replicate::response(&updated).await;
+    Ok(true)
+}
+
 /// A manual run does not decide L0, so only a stored off reason skips the un-mute decision.
 #[cfg(feature = "enterprise")]
 fn l0_undecided(incident: &infra::table::entity::alert_incidents::Model) -> bool {
@@ -3048,6 +3140,27 @@ async fn record_muted_auto_resolve<C: sea_orm::ConnectionTrait + sea_orm::Transa
     Ok(())
 }
 
+/// The event and the super-cluster status of an ack change the one ack wrote.
+/// [weak: a lost event or publish is logged; the row change stands]
+pub async fn record_ack_change(
+    org_id: &str,
+    incident_id: &str,
+    status: config::meta::alerts::incidents::IncidentStatus,
+    event: IncidentEvent,
+) {
+    let muted = match infra::table::alert_incidents::get(org_id, incident_id).await {
+        Ok(m) => m.is_some_and(|m| m.muted_by_downtime_id.is_some()),
+        Err(e) => {
+            log::error!("[incidents] could not read {org_id}/{incident_id} after an ack: {e}");
+            false
+        }
+    };
+    if let Err(e) = append_event_unless_muted(org_id, incident_id, event, muted).await {
+        log::error!("[incidents] could not record the ack of {org_id}/{incident_id}: {e}");
+    }
+    publish_status(org_id, incident_id, &status.to_string()).await;
+}
+
 /// Update incident status
 pub async fn update_status(
     org_id: &str,
@@ -3066,10 +3179,9 @@ pub async fn update_status_as(
     user_id: &str,
     quiet: bool,
 ) -> Result<Incident, anyhow::Error> {
-    // Acknowledging goes through a dedicated atomic path so the actor and
-    // timestamp land on the row itself (not just the event log) and a
-    // second/concurrent acknowledge can't silently overwrite the first
-    // acknowledger — see `infra::table::alert_incidents::acknowledge`.
+    if is_the_one_ack(org_id, incident_id, status).await? {
+        return through_the_one_ack(org_id, incident_id, status, user_id).await;
+    }
     // Read before the resolve clears it, so resolving a muted incident still notifies nobody.
     let muted_before = reads_mute_before(
         status,
@@ -3079,13 +3191,7 @@ pub async fn update_status_as(
     ) && infra::table::alert_incidents::get(org_id, incident_id)
         .await?
         .is_some_and(|m| m.muted_by_downtime_id.is_some());
-    let updated = if status == "acknowledged" {
-        infra::table::alert_incidents::acknowledge(org_id, incident_id, user_id)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Incident not found"))?
-    } else {
-        infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
-    };
+    let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
 
     let muted = status_change_is_muted(
         quiet || muted_before,
@@ -3106,7 +3212,6 @@ pub async fn update_status_as(
     // Emit status change event
     use config::meta::alerts::incidents::IncidentEvent;
     let event = match status {
-        "acknowledged" => Some(IncidentEvent::acknowledged(user_id)),
         "resolved" => Some(IncidentEvent::resolved(Some(user_id.to_string()))),
         "open" => Some(IncidentEvent::reopened(user_id, "Manually reopened")),
         _ => None,
@@ -3139,7 +3244,82 @@ pub async fn update_status_as(
         .await;
     }
 
-    #[cfg(feature = "enterprise")]
+    publish_status(org_id, incident_id, status).await;
+    model_to_incident(updated).await
+}
+
+/// Runs the one rule when the status change is the one ack's (AK-2, D20). [strong] (reads)
+pub async fn authorize_status(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+    user_id: &str,
+) -> Result<(), crate::alerts::ack::AckError> {
+    use crate::alerts::ack::{self, AckError, Act, Problem};
+
+    if !is_the_one_ack(org_id, incident_id, status)
+        .await
+        .map_err(|e| AckError::Internal(e.to_string()))?
+    {
+        return Ok(());
+    }
+    let problem = Problem::Incident {
+        org_id: org_id.to_string(),
+        incident_id: incident_id.to_string(),
+    };
+    ack::authorize_problem(&problem, user_id, Act::Ack)
+        .await
+        .map(|_| ())
+}
+
+/// Acknowledging, and reopening an acknowledged incident, are the one ack's (AK-2).
+async fn is_the_one_ack(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+) -> Result<bool, anyhow::Error> {
+    Ok(match status {
+        "acknowledged" => true,
+        "open" => infra::table::alert_incidents::get(org_id, incident_id)
+            .await?
+            .is_some_and(|m| m.status == "acknowledged"),
+        _ => false,
+    })
+}
+
+async fn through_the_one_ack(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+    user_id: &str,
+) -> Result<Incident, anyhow::Error> {
+    use crate::alerts::ack::{self, AckError, Problem};
+
+    let problem = Problem::Incident {
+        org_id: org_id.to_string(),
+        incident_id: incident_id.to_string(),
+    };
+    let source = config::meta::alerts::ack::AckSource::Incident;
+    let done = if status == "acknowledged" {
+        ack::acknowledge(&problem, user_id, source)
+            .await
+            .map(|_| ())
+    } else {
+        ack::unack(&problem, user_id, source).await.map(|_| ())
+    };
+    match done {
+        // A resolved incident has nothing to acknowledge; the answer is the incident as it stands.
+        Ok(()) | Err(AckError::Conflict(_)) => {}
+        Err(AckError::NotFound) => anyhow::bail!("Incident not found"),
+        Err(e) => anyhow::bail!("could not change the ack of {incident_id}: {e:?}"),
+    }
+    let model = infra::table::alert_incidents::get(org_id, incident_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
+    model_to_incident(model).await
+}
+
+async fn publish_status(org_id: &str, incident_id: &str, status: &str) {
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
@@ -3155,8 +3335,6 @@ pub async fn update_status_as(
             "[SUPER_CLUSTER] Failed to publish incident update_status: org_id: {org_id}, error: {e}"
         );
     }
-
-    model_to_incident(updated).await
 }
 
 /// Records the resolved event of the auto-resolve job; a muted incident notifies nobody (D3).
@@ -4356,6 +4534,7 @@ mod tests {
             incident_url,
         );
         assert_eq!(ctx.alert_url, incident_url);
+        assert_eq!(ctx.incident_id, "inc-1");
 
         let content = resolve_content(
             &compiled_default_content(),

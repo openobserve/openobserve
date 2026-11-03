@@ -65,17 +65,14 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 const selectLabel = computed(() => {
-  let named: unknown;
-  for (const cell of props.row.getVisibleCells()) {
-    const value = cell.getValue();
-    if ((typeof value === "string" && value.trim()) || typeof value === "number") {
-      named = value;
-      break;
-    }
-  }
-  return t("components.table.selectRow", {
-    name: raw(String(named ?? props.row.index + 1).slice(0, 80)),
-  });
+  const index = props.row.index + 1;
+  const named = props.row
+    .getVisibleCells()
+    .map((cell) => cell.getValue())
+    .find((value: unknown): value is string => typeof value === "string" && !!value.trim());
+  // The position keeps the label unique, since many rows can share the same title.
+  if (!named) return t("components.table.selectRowAt", { index });
+  return t("components.table.selectRowAtNamed", { index, name: raw(named.slice(0, 80)) });
 });
 
 const emit = defineEmits<{
@@ -83,6 +80,7 @@ const emit = defineEmits<{
   "toggle-expansion": [row: any];
   "row-click": [row: any, event: MouseEvent];
   "row-dblclick": [row: any, event: MouseEvent];
+  "row-auxclick": [row: any, event: MouseEvent];
   "row-mouseenter": [row: any, event: MouseEvent];
   "row-mouseleave": [row: any];
   "cell-click": [params: { columnId: string; row: any; value: any }];
@@ -145,6 +143,11 @@ const isStriped = computed(() => {
   return props.striped && props.row.index % 2 === 1;
 });
 
+// A row with no detected level gets "transparent", which paints no spine.
+const hasVisibleSpine = computed(
+  () => !!props.statusBarColor && props.statusBarColor !== "transparent",
+);
+
 const hasExpansionSlot = computed(() => !!slots.expansion);
 
 // ── Tree mode ────────────────────────────────────────────────────
@@ -194,6 +197,13 @@ function onSelectCellClick() {
   emit("toggle-selection", props.row.original);
 }
 
+function onAuxclick(event: MouseEvent) {
+  if (event.button !== 1) return;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest("button, a, input, select, textarea, label, [role='button']")) return;
+  emit("row-auxclick", props.row.original, event);
+}
+
 function onDblclick(event: MouseEvent) {
   emit("row-dblclick", props.row.original, event);
 }
@@ -221,12 +231,20 @@ function onRowMouseleave() {
     :tabindex="clickable ? 0 : undefined"
     :class="[
       'group/row',
-      'transition-colors duration-150',
+      'transition-[background-color] duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
       clickable ? 'cursor-pointer' : '',
-      'hover:bg-table-row-hover-bg',
-      clickable ? 'focus-visible:bg-table-row-hover-bg focus:outline-none' : '',
-      isRowSelected || isActive ? 'bg-table-row-selected-bg' : '',
+      isRowSelected || isActive
+        ? 'bg-table-row-selected-bg [--color-text-secondary:var(--color-table-row-text-secondary-tinted)]'
+        : 'hover:bg-table-row-hover-bg hover:[--color-text-secondary:var(--color-table-row-text-secondary-tinted)]',
+      clickable
+        ? 'focus-visible:outline-focus-ring-accent outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-solid'
+        : '',
+      clickable && !isRowSelected && !isActive
+        ? 'focus-visible:bg-table-row-hover-bg focus-visible:[--color-text-secondary:var(--color-table-row-text-secondary-tinted)]'
+        : '',
       isActive ? 'ring-focus-ring-accent ring-2 ring-inset' : '',
+      isRowSelected && !isActive && hasVisibleSpine ? 'ring-accent ring-1 ring-inset' : '',
+      (isRowSelected || isActive) && !hasVisibleSpine ? 'o2-table-row-selected-bar' : '',
       !isRowSelected && !isActive && isStriped ? 'bg-table-row-striped-bg' : '',
       statusBarColor ? 'o2-table-row-with-status' : '',
       rowClass,
@@ -239,6 +257,7 @@ function onRowMouseleave() {
     :data-status-bar="statusBarColor ? 'true' : undefined"
     @click="onClick"
     @dblclick="onDblclick"
+    @auxclick="onAuxclick"
     @mouseenter="onRowMouseenter"
     @mouseleave="onRowMouseleave"
   >
@@ -412,6 +431,22 @@ function onRowMouseleave() {
   bottom: 0;
   width: 0.25rem;
   background: var(--row-status-color, transparent);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* keep(complex-state): selection bar on a row without a status spine, drawn like the spine so a pinned or expand cell cannot cover it */
+.o2-table-row-selected-bar > td:first-child {
+  position: relative;
+}
+.o2-table-row-selected-bar > td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0.125rem;
+  background: var(--color-accent);
   z-index: 2;
   pointer-events: none;
 }

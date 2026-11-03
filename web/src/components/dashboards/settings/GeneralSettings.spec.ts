@@ -42,6 +42,12 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { getDashboard, updateDashboard } from "@/utils/commons";
 import { createRouter, createWebHistory } from "vue-router";
+import { defineComponent, h } from "vue";
+import {
+  createDashboardSettingsDraftContext,
+  provideDashboardSettingsDraft,
+  type DashboardSettingsDraftContext,
+} from "@/components/dashboards/settings/dashboardSettingsDraft";
 
 const mockDashboardData = {
   dashboardId: "dashboard-1",
@@ -811,6 +817,93 @@ describe("GeneralSettings", () => {
       // Should reflect the final value (the form owns `name`)
       const form = wrapper.findComponent({ name: "OForm" });
       expect(form.vm.form.state.values.name).toBe("ABC");
+    });
+  });
+
+  describe("Draft section", () => {
+    const absoluteRange = { startTime: 1672531200000, endTime: 1672617599000, type: "absolute" };
+    // The real picker re-emits an absolute range in microseconds.
+    const echoedRange = {
+      startTime: 1672531200000000,
+      endTime: 1672617599000000,
+      relativeTimePeriod: "15m",
+      valueType: "absolute",
+    };
+    let context: DashboardSettingsDraftContext;
+
+    const mountWithDraftContext = async () => {
+      context = createDashboardSettingsDraftContext(() => undefined);
+      const Host = defineComponent({
+        setup() {
+          provideDashboardSettingsDraft(context);
+          return () => h(GeneralSettings);
+        },
+      });
+      const host = mount(Host, {
+        attachTo: document.body,
+        global: {
+          plugins: [i18n, store, router],
+          stubs: {
+            DashboardHeader: { template: "<div><slot></slot></div>", props: ["title"] },
+            DateTimePickerDashboard: {
+              template: '<div data-test="datetime-picker"></div>',
+              props: { modelValue: Object },
+              emits: ["update:modelValue"],
+            },
+          },
+        },
+      });
+      await flushPromises();
+      return host;
+    };
+    const picker = () => wrapper.findComponent('[data-test="datetime-picker"]');
+
+    beforeEach(() => {
+      vi.mocked(getDashboard).mockResolvedValue({
+        ...mockDashboardData,
+        defaultDatetimeDuration: absoluteRange,
+      });
+    });
+
+    it("an untouched form never counts as edited, however late the picker re-emits its range", async () => {
+      wrapper = await mountWithDraftContext();
+      await picker().vm.$emit("update:modelValue", { ...echoedRange });
+      await flushPromises();
+      await picker().vm.$emit("update:modelValue", { ...echoedRange });
+      await flushPromises();
+
+      expect(context.pending.general).toBeNull();
+    });
+
+    it("a range the user picks after the picker settled is an edit", async () => {
+      wrapper = await mountWithDraftContext();
+      await picker().vm.$emit("update:modelValue", { ...echoedRange });
+      await flushPromises();
+
+      window.dispatchEvent(new Event("pointerdown"));
+      await picker().vm.$emit("update:modelValue", {
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod: "1h",
+        valueType: "relative",
+      });
+      await flushPromises();
+
+      expect(context.pending.general?.dateTime).toMatchObject({
+        relativeTimePeriod: "1h",
+        valueType: "relative",
+      });
+    });
+
+    it("a title filled with no key or pointer event stays an edit while the picker re-emits", async () => {
+      wrapper = await mountWithDraftContext();
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("name", "Filled title");
+      await flushPromises();
+      await picker().vm.$emit("update:modelValue", { ...echoedRange });
+      await flushPromises();
+
+      expect(context.pending.general?.values.name).toBe("Filled title");
     });
   });
 });

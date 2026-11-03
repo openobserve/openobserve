@@ -120,6 +120,7 @@ describe("alert_library locale parity", () => {
     "pl-PL": [/instal/i],
     "pt-PT": [/instal/i],
     "ru-RU": [/установ/i],
+    "th-TH": [/ติดตั้ง/],
     "tr-TR": [/\bkur(?!uluş)\w*/i, /\byükle\w*/i],
     "vi-VN": [/cài đặt/i],
     "zh-CN": [/安装/],

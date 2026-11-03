@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
       :title="t('statusPages.editTitle')"
       :subtitle="pageName ? raw(pageName) : undefined"
-      :back="{ label: t('statusPages.back'), onClick: goBack, dataTest: 'status-page-editor-back' }"
+      :back="{ label: t('statusPages.back'), onClick: cancel, dataTest: 'status-page-editor-back' }"
       title-overflow="truncate"
     >
       <template #actions>
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline-destructive"
           size="sm-action"
           data-test="status-page-editor-cancel"
-          @click="goBack"
+          @click="cancel"
           >{{ t("common.cancel") }}</OButton
         >
         <OButton
@@ -332,6 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </OPageLayout>
+    <EditorDraftDialogs :draft="statusPageDraft" />
   </OForm>
 </template>
 
@@ -340,10 +341,10 @@ import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import { useOForm } from "@/lib/forms/Form/useOForm";
+import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormColor from "@/lib/forms/Color/OFormColor.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
@@ -375,6 +376,9 @@ import {
 } from "./EditStatusPage.schema";
 import { publicStatusPageUrl } from "./statusPageBadges";
 import { syntheticsListRoute, syntheticsNavContextFromRoute } from "@/utils/synthetics/routes";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { hashDraftValue } from "@/utils/drafts/editorDraftStore";
 
 // A component row carries a client-only stable id so the v-for key never keys on
 // the array index — index keys made "add a second component" reuse the first
@@ -385,6 +389,18 @@ interface ComponentRow {
   name: string;
   description: string;
   check_ids: string[];
+}
+
+type StoredComponent = Omit<ComponentRow, "_uid">;
+
+interface StatusPageDraftData {
+  // An image the user did not change is stored as null: it can be large, and the page still holds it.
+  values: Omit<EditStatusPageForm, "logo_img" | "favicon_img"> & {
+    logo_img: string | null;
+    favicon_img: string | null;
+  };
+  usingOrgLogoDefault: boolean;
+  components: StoredComponent[];
 }
 
 const FORM_ID = "status-page-edit-form";
@@ -480,6 +496,7 @@ const form = useOForm<EditStatusPageForm>({
 });
 
 const visibilityMode = form.useStore((s: any) => s.values.visibility);
+const formValues = form.useStore((s: { values: EditStatusPageForm }) => s.values);
 
 // Live form values that drive the preview pane.
 const previewValues = form.useStore((s: any) => ({
@@ -606,17 +623,24 @@ async function load() {
       description: c.description ?? "",
       check_ids: c.check_ids ?? [],
     }));
+    loadedImages = { logo_img: form.state.values.logo_img, favicon_img: p.favicon_img ?? "" };
+    loadedOrgLogoDefault = usingOrgLogoDefault.value;
+    serverPage = serverSnapshot();
     loadChecks();
   } catch (err) {
     console.error("[status-pages] failed to load page", err);
     page.value = null;
+    serverPage = null;
+    pageGone = (err as { response?: { status?: number } } | null)?.response?.status === 404;
   } finally {
     loading.value = false;
   }
+  // A deleted page still starts the draft, so a draft left for it is dropped with a notice.
+  if (page.value || pageGone) await statusPageDraft.start();
 }
 
 async function saveSettings(values: EditStatusPageForm) {
-  if (!page.value) return;
+  if (!page.value || blockOnPendingReentries()) return;
   const payload: Record<string, unknown> = {
     name: values.name,
     description: values.description,
@@ -653,6 +677,11 @@ async function saveSettings(values: EditStatusPageForm) {
     );
     dismiss();
     toast({ variant: "success", message: t("statusPages.toast.saved") });
+    if (leaveSave) {
+      leaveSave.saved = true;
+      return;
+    }
+    statusPageDraft.markSaved();
     goBack();
   } catch (err: any) {
     dismiss();
@@ -698,6 +727,134 @@ function goBack() {
   if (!ctx.orgIdentifier && orgIdentifier.value) ctx.orgIdentifier = orgIdentifier.value;
   router.push(syntheticsListRoute(ctx, { section: "status-pages" }));
 }
+
+async function cancel() {
+  if (await statusPageDraft.confirmLeave()) goBack();
+}
+
+// The images the page loaded with, so an unchanged one is left out of the draft.
+let loadedImages = { logo_img: "", favicon_img: "" };
+let loadedOrgLogoDefault = false;
+// The page as the form shows it after loading; the raw item carries health and timestamps that move on their own.
+let serverPage: StatusPageDraftData | null = null;
+let pageGone = false;
+// Set while the leave dialog's Save runs, so a successful save does not go back to the list itself.
+let leaveSave: { saved: boolean } | null = null;
+
+const PASSWORD_PATH = "/values/password";
+// A base64 image above this would take most of the browser's storage quota, so it is not drafted.
+const MAX_DRAFT_IMAGE_CHARS = 256 * 1024;
+const IMAGE_PATHS: Record<string, "logo_img" | "favicon_img"> = {
+  "/values/logo_img": "logo_img",
+  "/values/favicon_img": "favicon_img",
+};
+
+function statusPageSnapshot(): StatusPageDraftData {
+  const values = { ...(formValues.value as EditStatusPageForm) };
+  const image = (field: "logo_img" | "favicon_img") =>
+    values[field] === loadedImages[field] ? null : values[field];
+  return {
+    values: { ...values, logo_img: image("logo_img"), favicon_img: image("favicon_img") },
+    usingOrgLogoDefault: usingOrgLogoDefault.value,
+    components: components.value.map(({ id, name, description, check_ids }) => ({
+      id,
+      name,
+      description,
+      check_ids: [...check_ids],
+    })),
+  };
+}
+
+// Images are hashed, so the base stays small to hash on every autosave.
+function serverSnapshot(): StatusPageDraftData {
+  const snapshot = statusPageSnapshot();
+  const values = formValues.value as EditStatusPageForm;
+  return {
+    ...snapshot,
+    values: {
+      ...snapshot.values,
+      logo_img: hashDraftValue(values.logo_img),
+      favicon_img: hashDraftValue(values.favicon_img),
+    },
+  };
+}
+
+function redactLargeImages(data: StatusPageDraftData) {
+  const paths = Object.entries(IMAGE_PATHS).flatMap(([path, field]) => {
+    const value = data.values[field];
+    if (typeof value !== "string" || value.length <= MAX_DRAFT_IMAGE_CHARS) return [];
+    data.values[field] = null;
+    return [path];
+  });
+  return { data, paths, changedPaths: paths };
+}
+
+function flagReentries(paths: string[]) {
+  if (!paths.includes(PASSWORD_PATH)) return;
+  const name = "password" as FormFieldPath<EditStatusPageForm>;
+  const meta = form.getFieldMeta(name);
+  if (!meta) return;
+  form.setFieldMeta(name, {
+    ...meta,
+    errorMap: { ...meta.errorMap, onSubmit: t("common.editorDraft.reenterField") },
+  });
+}
+
+/** A changed password the draft could not keep must be typed again before saving, while the page still uses one. */
+function blockOnPendingReentries(): boolean {
+  const usesPassword = (formValues.value as EditStatusPageForm).visibility === "password";
+  const pending = statusPageDraft
+    .pendingReentries()
+    .filter((path) => usesPassword && path === PASSWORD_PATH);
+  if (!pending.length) return false;
+  flagReentries(pending);
+  toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
+  return true;
+}
+
+const statusPageDraft = useEditorDraft<StatusPageDraftData>({
+  kind: "status_page",
+  entityLabel: () => t("common.editorDraft.entities.status_page"),
+  entityId: () => String(route.params.id ?? "") || null,
+  snapshot: () => statusPageSnapshot(),
+  apply: async (data, { notKeptPaths }) => {
+    form.reset({
+      ...data.values,
+      logo_img: data.values.logo_img ?? loadedImages.logo_img,
+      favicon_img: data.values.favicon_img ?? loadedImages.favicon_img,
+      _passwordSet: !!page.value?.password_set,
+    });
+    // A logo that was too large to draft falls back to the loaded one, and so does its org-default state.
+    usingOrgLogoDefault.value = notKeptPaths.includes("/values/logo_img")
+      ? loadedOrgLogoDefault
+      : data.usingOrgLogoDefault;
+    components.value = data.components.map((c) => ({
+      ...c,
+      _uid: uidSeq++,
+      check_ids: [...c.check_ids],
+    }));
+    // After the form's own error sweep, which runs on the reset values.
+    await nextTick();
+    flagReentries(notKeptPaths);
+  },
+  base: () => serverPage,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  redact: redactLargeImages,
+  describeRedacted: (paths): I18nText[] => [
+    ...(paths.includes(PASSWORD_PATH) ? [t("statusPages.fields.password")] : []),
+    ...(paths.includes("/values/logo_img") ? [t("statusPages.fields.logo")] : []),
+    ...(paths.includes("/values/favicon_img") ? [t("statusPages.fields.favicon")] : []),
+  ],
+});
 
 watch(orgIdentifier, (org) => {
   if (org && loading.value) load();

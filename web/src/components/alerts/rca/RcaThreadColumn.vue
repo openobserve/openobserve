@@ -194,6 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :step="entry.step"
             :run-live="runLive"
             :run-waiting="runWaiting"
+            :finished="!unfinishedSteps.has(entry.step)"
             :evidence-numbers="evidenceNumbers"
             @open-evidence="$emit('open-evidence', $event)"
           />
@@ -382,14 +383,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :sending="sending"
       :send="sendFromComposer"
     />
-    <!-- The finished note under every run that no longer takes messages. -->
+    <!-- The note under every run that no longer takes messages; a run Resume can continue is not final. -->
     <footer
       v-else-if="runState && !runLive"
       data-test="rca-thread-final-note"
       class="border-border-default bg-surface-base text-text-secondary flex flex-none items-start gap-2 border-t px-4 py-3 text-xs"
     >
-      <OIcon name="lock" size="sm" class="mt-px shrink-0" />
-      <span>{{ t("alerts.incidents.rcaThread.finalNote") }}</span>
+      <OIcon :name="canResume ? 'info' : 'lock'" size="sm" class="mt-px shrink-0" />
+      <span>{{
+        canResume
+          ? t("alerts.incidents.rcaThread.resumableNote")
+          : t("alerts.incidents.rcaThread.finalNote")
+      }}</span>
     </footer>
   </aside>
 </template>
@@ -407,6 +412,7 @@ import type {
   RcaRunStats,
   RcaSteerRecord,
   RcaSteering,
+  RcaStep,
   RcaThread,
   RcaThreadQuestion,
 } from "@/services/incidents";
@@ -415,6 +421,7 @@ import type { RcaSteerSendResult } from "@/composables/useRcaSteering";
 import {
   formatRcaClock,
   formatRcaDuration,
+  isFinishedStep,
   rcaThreadEntries,
   type RcaThreadEntry,
 } from "@/utils/incidents/rcaThread";
@@ -435,8 +442,10 @@ const props = withDefaults(
     status: RcaReadStatus;
     /** The thread's run is running or waiting for input. */
     runLive: boolean;
-    /** State of the thread's run; a run that is not live gets the final note. */
+    /** State of the thread's run; a run that is not live gets the closing note. */
     runState: RcaRunState | null;
+    /** Resume can continue the thread's run, so its note is not final. */
+    canResume?: boolean;
     /** "Auto on incident open", "Re-analyze by j.okafor", … */
     triggerLabel?: I18nText | null;
     /** `rca_runs.context_used` of the thread's run, when known. */
@@ -460,6 +469,7 @@ const props = withDefaults(
     send?: ((text: string) => Promise<RcaSteerSendResult>) | null;
   }>(),
   {
+    canResume: false,
     triggerLabel: null,
     contextUsed: null,
     runStats: null,
@@ -562,6 +572,15 @@ const questionStatus = (question: RcaThreadQuestion): string => {
 const entries = computed<RcaThreadEntry[]>(() =>
   props.thread ? rcaThreadEntries(props.thread, props.steering?.items ?? []) : [],
 );
+
+/** A cancelled or failed run's steps that a Resume repeats; a completed run repeats none. */
+const unfinishedSteps = computed(() => {
+  const thread = props.thread;
+  if (!thread || (props.runState !== "cancelled" && props.runState !== "failed")) {
+    return new Set<RcaStep>();
+  }
+  return new Set(thread.steps.filter((step, idx) => !isFinishedStep(thread, step, idx)));
+});
 
 const STEER_PILL_VARIANT: Record<RcaSteerRecord["status"], BadgeVariant> = {
   queued: "default-outline",

@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="otableColumns"
             row-key="id"
             :loading="loading"
+            :loading-reset-key="activeFolderId"
             :forbidden="forbidden"
             :page-size="pageSize"
             :page-size-options="[20, 50, 100, 250, 500]"

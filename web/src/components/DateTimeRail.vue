@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span :id="recentKeysHintId" class="sr-only">{{ t("common.timeRangeRecentKeysHint") }}</span>
       <div
         v-if="recent.length === 0"
-        class="text-text-muted px-2 pb-1 text-xs"
+        class="text-text-secondary px-2 pb-1 text-xs"
         data-test="date-time-rail-recent-empty"
       >
         {{ t("common.timeRangeRecentEmpty") }}

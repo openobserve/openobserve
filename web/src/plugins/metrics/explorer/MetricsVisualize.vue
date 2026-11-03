@@ -17,9 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   Visualize mode for the Metrics explorer — a query-driven workspace.
 
-  This is the SAME dashboard PanelEditor the metrics editor route (plugins/metrics
-  /Index.vue) mounts in production, run in-page with editMode and the metrics
-  defaults (line + promql + query bar on). Chart types are NOT restricted — the
+  This is the SAME dashboard PanelEditor Add Panel mounts, run in-page with
+  editMode and the metrics defaults (line + promql + query bar on). Chart types are NOT restricted — the
   same full set AddPanel offers, gated only by ChartSelection's own PromQL rules.
   So the chart the user builds here is exactly the one they get on a dashboard,
   and it inherits right-click → Create Alert for free.
@@ -39,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :selected-date-time="dashboardPanelData.meta.dateTime"
       @add-to-dashboard="onAddToDashboard"
       @chart-api-error="onChartApiError"
+      @renderer-error="onRendererError"
     />
 
     <AddToDashboard
@@ -69,6 +69,7 @@ import useNotifications from "@/composables/useNotifications";
 import { restoreMetricsStream } from "@/utils/streamPersist";
 import { applyMetricsBlob, normaliseMetricsBlobData } from "@/composables/metrics/metricsUrlState";
 import { useQueryHistoryRecorder } from "@/composables/metrics/useQueryHistoryRecorder";
+import type { PanelErrorDetail } from "@/utils/queryHistory/metrics";
 import type { SelectedDate } from "@/utils/dashboard/urlTimeParams";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
@@ -127,8 +128,6 @@ export default defineComponent({
       values: [],
     };
 
-    // Same defaults the metrics editor route applies: a line chart driven by a
-    // promql query, with the query bar shown so the user can type PromQL.
     const applyMetricsDefaults = () => {
       resetDashboardPanelData();
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
@@ -145,8 +144,7 @@ export default defineComponent({
     };
 
     // Open on a card's type-based query: reset to a clean metrics panel, then lay
-    // the seed's panel-schema `data` on top (the same shape the metrics editor
-    // receives from the card drill-in). Every query is forced to the metrics
+    // the seed's panel-schema `data` on top. Every query is forced to the metrics
     // stream type. Mirrors `applyMetricsBlob`, but from a raw data object.
     const applySeed = (seed: Record<string, any>) => {
       resetDashboardPanelData();
@@ -166,7 +164,7 @@ export default defineComponent({
      */
     let seededOnMount = false;
 
-    // BEFORE the PanelEditor child mounts (matches the metrics editor route): if
+    // BEFORE the PanelEditor child mounts: if
     // it mounts first, it initialises an empty query area and a later assign does
     // not reflect into the already-built query bar.
     onBeforeMount(() => {
@@ -179,8 +177,7 @@ export default defineComponent({
       }
     });
 
-    // Validate before opening the add-to-dashboard dialog — the same handshake
-    // the metrics editor uses, so an incomplete panel can't be saved.
+    // Validate before opening the add-to-dashboard dialog, so an incomplete panel can't be saved.
     const onAddToDashboard = () => {
       const errors: string[] = [];
       validatePanel(errors, true);
@@ -193,6 +190,11 @@ export default defineComponent({
 
     const onChartApiError = (_error: unknown) => {
       // PanelEditor surfaces its own error UI; nothing extra to do here.
+    };
+
+    // History reads the renderer's error to classify the run; PanelEditor shows it itself.
+    const onRendererError = (error: PanelErrorDetail | string | null) => {
+      historyRecorder.onPanelError(error);
     };
 
     const timeKey = () => `${props.selectedDateTime?.startTime}:${props.selectedDateTime?.endTime}`;
@@ -270,27 +272,27 @@ export default defineComponent({
       if (on && isTimeChangePending.value) runQuery();
     });
 
-    const { record } = useQueryHistoryRecorder();
+    const historyRecorder = useQueryHistoryRecorder(() => !!panelEditorRef.value?.isLoading);
 
     /** An explicit Run (button, shortcut or Refresh Cache & Run): the only run that writes history. */
     const onUserRun = (selectedDate: SelectedDate, withoutCache = false) => {
       runQuery(withoutCache);
       const errors: string[] = [];
       validatePanel(errors, false);
-      if (!errors.length) record(dashboardPanelData, selectedDate);
+      if (!errors.length) historyRecorder.record(dashboardPanelData, selectedDate);
     };
 
     // Set while applying an entry, so its range change does not also run the old query.
     let applyingEntry = false;
 
-    /** Loads a history entry live: its panel in place, its range on the parent's picker, one run. */
-    const applyPanelData = async (metricsData: string, timeRange: SelectedDate) => {
+    /** Loads a history entry live: its panel in place, its range on the parent's picker; a re-run is a user Run. */
+    const applyPanelData = async (metricsData: string, timeRange: SelectedDate, run = true) => {
       if (!applyMetricsBlob(metricsData, dashboardPanelData)) return;
       applyingEntry = true;
       emit("update:time-range", timeRange);
       await nextTick();
       applyingEntry = false;
-      runQuery();
+      if (run) onUserRun(timeRange);
     };
 
     // Declared AFTER applyDateTime/runQuery: the hooks call them, and a const
@@ -332,6 +334,7 @@ export default defineComponent({
       showAddToDashboardDialog,
       onAddToDashboard,
       onChartApiError,
+      onRendererError,
       runQuery,
       onUserRun,
       applyPanelData,

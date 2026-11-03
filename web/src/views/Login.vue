@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { configQuery } from "@/services/config.queries";
+import { configQuery, isFullConfigLoaded } from "@/services/config.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, onBeforeMount, ref } from "vue";
 import { useRouter } from "vue-router";
@@ -67,7 +67,6 @@ import {
   useLocalCurrentUser,
   useLocalOrganization,
   invalidateLoginData,
-  useLocalUserInfo,
   getImageURL,
 } from "@/utils/zincutils";
 import usersService from "@/services/users";
@@ -75,6 +74,7 @@ import organizationsService from "@/services/organizations";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
+import { expireSession } from "@/utils/sessionServices";
 import { isSameOriginRedirect } from "@/utils/safeUrl";
 import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 import { capturePrefill } from "@/components/login/firstSourceOptions";
@@ -121,7 +121,7 @@ export default defineComponent({
           .then(async (data: any) => {
             // Never replace an already-loaded full config with the bootstrap
             // subset (e.g. a logged-in user navigating to /login).
-            if (!store.state.zoConfig?.version) {
+            if (!isFullConfigLoaded(store.state.zoConfig)) {
               store.commit("setConfig", data);
             }
           })
@@ -240,19 +240,13 @@ export default defineComponent({
         });
     };
 
+    // The server refused this user's organizations, so the session ends as an expired one does: the drafts stay for the next login.
     const signout = () => {
       if (config?.isEnterprise == "true" || config?.isCloud == "true") {
         invalidateLoginData();
       }
-
-      store.dispatch("logout");
-      useLocalCurrentUser("", true);
-      useLocalUserInfo("", true);
-
-      router.push("/login");
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      // A reload here could re-run the login callback, so this goes to the login page instead.
+      expireSession(store, { toLogin: true });
     };
 
     /**
@@ -359,7 +353,7 @@ export default defineComponent({
           // "setZoConfig" never existed as a mutation, so this fetch stored
           // nothing; commit through the real mutation, with the same
           // don't-clobber-the-full-config guard as everywhere else.
-          if (!this.store.state.zoConfig?.version) {
+          if (!isFullConfigLoaded(this.store.state.zoConfig)) {
             this.store.commit("setConfig", data);
           }
           const token = getUserInfo(this.$route.hash);

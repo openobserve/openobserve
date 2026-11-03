@@ -90,6 +90,9 @@ const state = (over: Partial<K8sUrlState> = {}): K8sUrlState => ({
   fill: "cpuReq",
   group: "node",
   filter: [],
+  system: false,
+  nodeTraffic: false,
+  lowTraffic: false,
   details: null,
   ...over,
 });

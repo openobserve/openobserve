@@ -250,6 +250,63 @@ describe("RcaThreadColumn", () => {
         expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
       },
     );
+
+    // The projection closes every step of an ended run; a Resume keeps only `reusable_steps`.
+    const ENDED_THREAD = rcaThread({
+      active: false,
+      report_submitted: false,
+      reusable_steps: 1,
+      steps: [
+        rcaStep(),
+        rcaStep({ index: 2, title: "Map the services", stage: "topology" }),
+        rcaStep({ index: 3, title: "Check recent deploys", stage: "changes" }),
+      ],
+    });
+    const CANCELLED = { thread: ENDED_THREAD, runLive: false, runState: "cancelled" };
+    const stepStatuses = (wrapper: VueWrapper) =>
+      wrapper
+        .findAll('[data-test="rca-thread-step-status"] [aria-label]')
+        .map((icon) => icon.attributes("aria-label"));
+
+    it.each(["cancelled", "failed"] as const)(
+      "a %s run's steps past the Resume count did not finish, as the banner counts them",
+      (runState) => {
+        const wrapper = mountColumn({ ...CANCELLED, runState });
+
+        expect(stepStatuses(wrapper)).toEqual([
+          "A tool call failed",
+          "Step did not finish",
+          "Step did not finish",
+        ]);
+      },
+    );
+
+    it("a completed run finished every closed step, also one the answer deadline ended without a report", () => {
+      expect(stepStatuses(mountColumn(SAVED))).toEqual([
+        "A tool call failed",
+        "A tool call failed",
+      ]);
+      expect(stepStatuses(mountColumn({ ...CANCELLED, runState: "completed" }))).toEqual([
+        "A tool call failed",
+        "A tool call failed",
+        "A tool call failed",
+      ]);
+    });
+
+    it("a run Resume can continue says so instead of calling itself final", () => {
+      const wrapper = mountColumn({ ...CANCELLED, canResume: true });
+
+      expect(byTest(wrapper, "rca-thread-final-note").text()).toBe(
+        "This run stopped before it finished. Resume run continues from the last finished step.",
+      );
+      expect(wrapper.text()).not.toContain("final");
+    });
+
+    it("a cancelled run Resume cannot continue keeps the final note", () => {
+      const wrapper = mountColumn(CANCELLED);
+
+      expect(byTest(wrapper, "rca-thread-final-note").text()).toContain("This report is final");
+    });
   });
 
   describe("transcript and load states", () => {

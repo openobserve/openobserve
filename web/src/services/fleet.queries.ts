@@ -365,14 +365,6 @@ export const renameCollectorMutation = (org: string) =>
     meta: { invalidates: [fleetKeys.collectors(org), fleetKeys.audit(org)], silentError: true },
   });
 
-// A move assigns the destination's stable version at once, so every fleet read changes.
-export const moveCollectorsMutation = (org: string) =>
-  mutationOptions({
-    mutationFn: async (vars: { ids: string[]; to: string }) =>
-      (await fleet.moveCollectors(org, vars.ids, vars.to)).data,
-    meta: { invalidates: [fleetKeys.all(org)], silentError: true },
-  });
-
 export const createFleetMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (name: string): Promise<Fleet> => (await fleet.createFleet(org, name)).data,

@@ -205,9 +205,7 @@ const pillSide = (offset: number) => (offset > 0.85 ? "-translate-x-full -ms-1.5
             </slot>
           </template>
 
-          <!-- Now marker, drawn over the bands so it is never hidden by one.
-             Gutter mode only — lane mode draws one full-height line over every
-             track instead, from the overlay below. -->
+          <!-- Gutter mode's now marker, over the bands; lane mode uses the overlay below and, on phones, the next line. -->
           <span
             v-if="
               now !== null && !laneHeaders && (nowTrackKey == null || nowTrackKey === track.key)
@@ -218,6 +216,14 @@ const pillSide = (offset: number) => (offset > 0.85 ? "-translate-x-full -ms-1.5
             :aria-label="nowLabel"
             :aria-hidden="nowLabel ? undefined : 'true'"
             data-test="o2-schedule-timeline-now"
+          />
+          <!-- Lane mode on a phone: the lane headers span the plot, so the line stays inside each strip. -->
+          <span
+            v-if="now !== null && laneHeaders"
+            class="bg-status-error-text absolute inset-y-0 z-1 w-px md:hidden"
+            :style="inlineStart(now)"
+            aria-hidden="true"
+            data-test="o2-schedule-timeline-now-lane"
           />
         </div>
       </div>
@@ -259,8 +265,9 @@ const pillSide = (offset: number) => (offset > 0.85 ? "-translate-x-full -ms-1.5
         <!-- Now. Drawn last so it stays legible where the two cross, and always
            present: every instant on this chart is read relative to it. -->
         <template v-if="now !== null">
+          <!-- Unpainted below md, where the per-lane lines take over; it keeps the accessible name. -->
           <span
-            class="bg-status-error-text absolute inset-y-0 z-1 w-px"
+            class="bg-status-error-text absolute inset-y-0 z-1 w-px max-md:bg-transparent"
             :style="inlineStart(now)"
             :role="nowLabel ? 'img' : undefined"
             :aria-label="nowLabel"

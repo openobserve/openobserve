@@ -164,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <FunnelLayoutRail
         v-else
+        ref="rail"
         :def="def"
         :result="result"
         :removed="removed"
@@ -180,22 +181,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :app="pa.state.app"
         :app-filters="appFilters.counts.value"
         :include-hidden="pa.state.includeExcluded"
-        :settings="layoutSettings"
         :filter-fields="filterFields"
         :filter-field-types="pa.schemaTypes.value"
         :filter-values="filterValues"
         :failed="funnelFailed"
+        :compare="compareView"
+        :trend="trend.shown.value"
+        :field-sample="fieldSample.sample.value"
+        :field-sample-state="fieldSample.state.value"
+        :filter-notice="filterNotice"
         @update:def="applyDef"
         @filter-values="loadFilterValues"
+        @load-fields="fieldSample.load()"
+        @break-down="breakDownBy"
+        @break-down-step="breakDownAtStep"
+        @trend-from-step="trendFromStep"
         @dropoff="openDropoff"
         @suggestions-retry="retrySuggestions"
         @include-hidden="appFilters.setIncludeHidden(router, true)"
         @hide-hidden="appFilters.setIncludeHidden(router, false)"
         @edit-app-filters="emit('open-exclusions')"
       >
+        <template #breakdown>
+          <FunnelBreakdownControl
+            ref="breakdownControl"
+            :def="def"
+            :dims="breakdownDims"
+            :fields="filterFields"
+            :sample="fieldSample.sample.value"
+            :sample-state="fieldSample.state.value"
+            :start="breakdown?.start ?? null"
+            :step-names="stepNames"
+            @update:def="applyDef"
+            @load-fields="fieldSample.load()"
+          />
+        </template>
         <template #header>
           <span
-            class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 max-md:basis-full"
+            class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 max-md:basis-full"
             data-test="rum-analytics-funnel-overall"
           >
             <span class="text-text-heading text-sm font-semibold">{{
@@ -205,39 +228,134 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-heading text-xl font-semibold tabular-nums">{{
                 pct(overallRate)
               }}</span>
-              <span class="text-text-secondary text-xs">{{
-                t("rum.analytics.funnel.overallOf", {
-                  last: formatCount(lastUnits, 1),
-                  first: formatCount(firstUnits, 1),
-                  unit: unitNoun,
-                })
-              }}</span>
-              <span
-                v-if="!def.breakdown && def.steps.length > 1 && lastUnits > 0"
-                class="text-text-secondary text-xs"
-                data-test="rum-analytics-funnel-overall-time"
+              <OBadge
+                variant="default-soft"
+                size="sm"
+                data-test="rum-analytics-funnel-overall-count"
                 >{{
-                  t("rum.analytics.funnel.overallTime", {
-                    median: raw(formatDuration(result.steps[result.steps.length - 1].medianMs)),
-                    p90: raw(formatDuration(result.steps[result.steps.length - 1].p90Ms)),
+                  t("rum.analytics.funnel.overallOf", {
+                    last: formatCount(lastUnits, 1),
+                    first: formatCount(firstUnits, 1),
+                    unit: unitNoun,
                   })
-                }}</span
+                }}</OBadge
               >
-              <WhyEnteredPopover
-                v-if="!usersMode && def.steps.length > 1"
-                :count="firstUnits"
-                :app="pa.state.app"
-                :step1="firstLabel"
-                :state="whyState"
-                :lines="why"
-                :estimated="funnelPanel.sampled > 1"
-                @open="onWhyOpen"
-                @retry="loadWhy(true)"
-              />
+              <OBadge
+                v-if="windowBadge"
+                variant="default-soft"
+                size="sm"
+                data-test="rum-analytics-funnel-overall-window"
+                >{{ windowBadge }}</OBadge
+              >
+              <OBadge
+                v-if="def.breakdown"
+                variant="primary-soft"
+                size="sm"
+                clickable
+                :aria-expanded="!railCollapsed"
+                data-test="rum-analytics-funnel-overall-breakdown"
+                @click="showBreakdownSection"
+                >{{ t("rum.analytics.funnel.headlineBreakdown", { field: dimLabel }) }}</OBadge
+              >
+              <template v-if="!def.breakdown && def.steps.length > 1 && lastUnits > 0">
+                <OBadge
+                  variant="default-soft"
+                  size="sm"
+                  data-test="rum-analytics-funnel-overall-median"
+                  >{{
+                    t("rum.analytics.funnel.headlineMedian", {
+                      value: raw(formatDuration(result.steps[result.steps.length - 1].medianMs)),
+                    })
+                  }}</OBadge
+                >
+                <OBadge
+                  variant="default-soft"
+                  size="sm"
+                  data-test="rum-analytics-funnel-overall-p90"
+                  >{{
+                    t("rum.analytics.funnel.p90", {
+                      value: raw(formatDuration(result.steps[result.steps.length - 1].p90Ms)),
+                    })
+                  }}</OBadge
+                >
+              </template>
+              <span
+                v-if="compareView || (!usersMode && def.steps.length > 1)"
+                class="flex flex-wrap items-center gap-x-2 gap-y-1"
+              >
+                <template v-if="compareView">
+                  <span
+                    v-if="compareView.data?.empty"
+                    class="text-text-secondary text-xs"
+                    data-test="rum-analytics-funnel-compare-empty"
+                    >{{
+                      t("rum.analytics.funnel.compareEmpty", {
+                        unit: unitNoun,
+                        range: raw(compareView.prevRange),
+                      })
+                    }}</span
+                  >
+                  <OBadge
+                    v-else-if="compareView.data?.overall && compareView.data.prevOverall !== null"
+                    :variant="changeTone(compareView.data.overall)"
+                    size="sm"
+                    data-test="rum-analytics-funnel-overall-change"
+                  >
+                    <FunnelChangeCell :change="compareView.data.overall" :unit-noun="unitNoun" />
+                    <span>{{
+                      effectiveCompare === "prev"
+                        ? t("rum.analytics.funnel.overallVs", {
+                            pct: pct(compareView.data.prevOverall),
+                            range: raw(compareView.prevRange),
+                          })
+                        : t("rum.analytics.funnel.overallVsAgo", {
+                            pct: pct(compareView.data.prevOverall),
+                            label: compareView.label,
+                            range: raw(compareView.prevRange),
+                          })
+                    }}</span>
+                    <span v-if="funnelPanel.sampled > 1">{{
+                      t("rum.analytics.funnel.headlineEstimated")
+                    }}</span>
+                  </OBadge>
+                </template>
+                <WhyEnteredPopover
+                  v-if="!usersMode && def.steps.length > 1"
+                  :count="firstUnits"
+                  :app="pa.state.app"
+                  :step1="firstLabel"
+                  :state="whyState"
+                  :lines="why"
+                  :estimated="funnelPanel.sampled > 1"
+                  @open="onWhyOpen"
+                  @retry="loadWhy(true)"
+                />
+              </span>
             </template>
           </span>
         </template>
         <template #actions>
+          <OToggleGroup
+            :model-value="trend.shown.value ? 'trend' : 'steps'"
+            type="single"
+            :label="t('rum.analytics.funnel.viewAs')"
+            label-position="left"
+            mobile-dropdown
+            data-test="rum-analytics-funnel-view"
+            @update:model-value="setView"
+          >
+            <OToggleGroupItem value="steps" size="xs" data-test="rum-analytics-funnel-view-steps">{{
+              t("rum.analytics.funnel.viewSteps")
+            }}</OToggleGroupItem>
+            <OToggleGroupItem
+              value="trend"
+              size="xs"
+              :disabled="def.steps.length < 2"
+              data-test="rum-analytics-funnel-view-trend"
+              >{{ t("rum.analytics.funnel.viewTrend") }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+          <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
           <OToggleGroup
             :model-value="def.unit"
             type="single"
@@ -261,42 +379,151 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ pa.usersUnit.value.label }}</OToggleGroupItem
             >
           </OToggleGroup>
-          <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
-          <OSelect
-            v-if="usersMode"
-            :model-value="def.window"
-            :options="windowOptions"
-            size="xs"
-            width="sm"
-            data-test="rum-analytics-funnel-window-select"
-            @update:model-value="(v) => update({ window: v as FunnelWindow })"
-          />
-          <OTag
-            v-else
-            :label="t('rum.analytics.funnel.windowSession')"
-            variant="default-outline"
-            size="sm"
-            data-test="rum-analytics-funnel-window-fixed"
-          />
-          <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
-          <label
-            for="rum-analytics-funnel-breakdown"
-            class="text-text-secondary text-xs font-semibold"
-            >{{ t("rum.analytics.funnel.breakdownLabel") }}</label
-          >
-          <OSelect
-            id="rum-analytics-funnel-breakdown"
-            :model-value="def.breakdown ?? 'none'"
-            :options="breakdownOptions"
-            size="xs"
-            width="xs"
-            data-test="rum-analytics-funnel-breakdown-select"
-            @update:model-value="
-              (v) => update({ breakdown: v === 'none' ? null : (v as BreakdownDim) })
-            "
-          />
+          <span v-if="usersMode" class="flex items-center gap-2">
+            <label
+              for="rum-analytics-funnel-window-select"
+              class="text-text-secondary text-xs font-semibold"
+              >{{ t("rum.analytics.funnel.whoFinishIn") }}</label
+            >
+            <OSelect
+              id="rum-analytics-funnel-window-select"
+              :model-value="def.window"
+              :options="windowOptions"
+              :searchable="false"
+              size="xs"
+              width="sm"
+              data-test="rum-analytics-funnel-window-select"
+              @update:model-value="(v) => update({ window: v as FunnelWindow })"
+            >
+              <template #trigger>{{
+                def.window === "session"
+                  ? t("rum.analytics.funnel.windowSessionShort")
+                  : windowLengths[def.window]
+              }}</template>
+            </OSelect>
+          </span>
+          <span class="ms-auto flex items-center gap-2" data-test="rum-analytics-funnel-compare">
+            <label
+              for="rum-analytics-funnel-compare-select"
+              class="text-text-secondary text-xs font-semibold"
+              >{{ t("rum.analytics.funnel.compareTo") }}</label
+            >
+            <span>
+              <OSelect
+                id="rum-analytics-funnel-compare-select"
+                :model-value="compareSelectValue"
+                :options="compareOptions"
+                :disabled="compareTooLong"
+                :searchable="false"
+                size="xs"
+                width="sm"
+                data-test="rum-analytics-funnel-compare-select"
+                @update:model-value="setCompare"
+              >
+                <template #trigger>{{ compareTriggerLabel }}</template>
+              </OSelect>
+              <OTooltip v-if="compareTooLong" :content="t('rum.analytics.funnel.compareTooLong')" />
+            </span>
+          </span>
         </template>
         <template #notices>
+          <div
+            v-if="trend.shown.value"
+            class="flex flex-wrap items-center gap-3 px-4 pt-2.5"
+            data-test="rum-analytics-funnel-trend-steps"
+          >
+            <span ref="trendFromField" class="flex items-center gap-2">
+              <label
+                for="rum-analytics-funnel-trend-from"
+                class="text-text-secondary text-xs font-semibold"
+                >{{ t("rum.analytics.funnel.trendFrom") }}</label
+              >
+              <OSelect
+                id="rum-analytics-funnel-trend-from"
+                :model-value="trend.pair.value.a"
+                :options="trend.fromOptions.value"
+                :disabled="def.steps.length < 3"
+                :searchable="false"
+                size="xs"
+                width="md"
+                data-test="rum-analytics-funnel-trend-from-select"
+                @update:model-value="trend.setFrom"
+              />
+            </span>
+            <span class="flex items-center gap-2">
+              <label
+                for="rum-analytics-funnel-trend-to"
+                class="text-text-secondary text-xs font-semibold"
+                >{{ t("rum.analytics.funnel.trendTo") }}</label
+              >
+              <OSelect
+                id="rum-analytics-funnel-trend-to"
+                :model-value="trend.pair.value.b"
+                :options="trend.toOptions.value"
+                :disabled="def.steps.length < 3"
+                :searchable="false"
+                size="xs"
+                width="md"
+                data-test="rum-analytics-funnel-trend-to-select"
+                @update:model-value="trend.setTo"
+              />
+            </span>
+            <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
+            <span class="flex items-center gap-2" data-test="rum-analytics-funnel-trend-interval">
+              <label
+                for="rum-analytics-funnel-trend-interval"
+                class="text-text-secondary text-xs font-semibold"
+                >{{ t("rum.analytics.funnel.trendInterval") }}</label
+              >
+              <OSelect
+                id="rum-analytics-funnel-trend-interval"
+                :model-value="trend.selectedInterval.value"
+                :options="trend.intervalOptions.value"
+                :searchable="false"
+                size="xs"
+                width="xs"
+                data-test="rum-analytics-funnel-trend-interval-select"
+                @update:model-value="trend.setInterval"
+              />
+            </span>
+            <span v-if="compareView && trend.breakdown.value" class="ms-auto">
+              <OPopover
+                v-model:open="compareNoLineOpen"
+                side="bottom"
+                align="end"
+                :aria-label="t('rum.analytics.funnel.compareNoLineAbout')"
+              >
+                <template #trigger>
+                  <OButton
+                    variant="ghost-warning"
+                    size="xs"
+                    icon-left="warning-amber"
+                    :aria-label="t('rum.analytics.funnel.compareNoLineAbout')"
+                    data-test="rum-analytics-funnel-trend-compare-warning"
+                  />
+                </template>
+                <div class="flex w-96 max-w-[calc(100vw-1.5rem)] flex-col gap-3 p-3">
+                  <p class="leading-5" data-test="rum-analytics-funnel-trend-compare-warning-text">
+                    <OText variant="meta">{{
+                      t("rum.analytics.funnel.compareNoLineBreakdown", {
+                        field: dimLabel,
+                        range: raw(compareView.prevRange),
+                      })
+                    }}</OText>
+                  </p>
+                  <span class="flex justify-end">
+                    <OButton
+                      variant="outline"
+                      size="sm-action"
+                      data-test="rum-analytics-funnel-trend-compare-remove-breakdown"
+                      @click="removeBreakdownForCompare"
+                      >{{ t("rum.analytics.funnel.breakdownRemove") }}</OButton
+                    >
+                  </span>
+                </div>
+              </OPopover>
+            </span>
+          </div>
           <span
             v-if="usersMode && result && result.step1Sessions !== null"
             class="text-text-secondary flex items-center gap-1 px-4 text-xs"
@@ -385,6 +612,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OEmptyState>
           </template>
         </template>
+        <template #trend>
+          <FunnelTrend
+            :state="trend.state.value"
+            :series="trend.series.value"
+            :periods="trend.periods.value"
+            :issue="trend.issue.value"
+            :breakdown="trend.breakdown.value"
+            :pair="trend.pair.value"
+            :pair-label="trend.pairLabel.value"
+            :dim-label="dimLabel"
+            :previous="trend.previous.value"
+            :timezone="timezone"
+            :range="trend.rangeText.value"
+            :unit-noun="unitNoun"
+            :data-start-us="pa.dataStartUs.value"
+            :today="!usersMode || def.window === 'session'"
+            @retry="runTrend(true)"
+          />
+        </template>
         <template #footer>
           <span
             v-if="!funnelFailed && def.x?.length"
@@ -392,10 +638,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-analytics-funnel-exclusions-caption"
             >{{ exclusionsCaption }}</span
           >
-          <template v-if="def.breakdown && breakdown && funnelPanel.status === 'ok'">
-            <span class="text-text-secondary px-4 text-xs">{{
-              t("rum.analytics.funnel.breakdownTimeHidden")
-            }}</span>
+          <span
+            v-if="breakdownMissingNote"
+            class="text-text-secondary px-4 text-xs"
+            data-test="rum-analytics-funnel-breakdown-start"
+            >{{ breakdownMissingNote }}</span
+          >
+          <template
+            v-if="!trend.shown.value && def.breakdown && breakdown && funnelPanel.status === 'ok'"
+          >
             <span
               v-if="def.breakdown === 'app'"
               class="text-text-secondary px-4 text-xs"
@@ -403,13 +654,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("rum.analytics.funnel.byAppRules", { app: raw(pa.state.app) }) }}</span
             >
             <FunnelBreakdown
-              :rows="breakdown.rows"
+              :rows="breakdownCompare?.rows ?? breakdown.rows"
               :total="breakdown.total"
+              :start="breakdown.start"
               :steps="def.steps"
               :dim-label="dimLabel"
               :events="events"
               :deleted-names="namedEvents.deletedNames.value"
               :builtin-only="builtinOnlyApps"
+              :compare="breakdownCompareState"
+              :unit-noun="unitNoun"
             />
           </template>
         </template>
@@ -440,6 +694,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   computed,
   defineAsyncComponent,
+  nextTick,
   onActivated,
   onBeforeUnmount,
   onDeactivated,
@@ -448,13 +703,17 @@ import {
   watch,
 } from "vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -462,13 +721,20 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import FunnelBreakdown from "@/components/rum/productAnalytics/FunnelBreakdown.vue";
+import FunnelTrend from "@/components/rum/productAnalytics/FunnelTrend.vue";
 import KeySequence from "@/components/rum/productAnalytics/KeySequence.vue";
 import DropoffDrawer from "@/components/rum/productAnalytics/DropoffDrawer.vue";
 import NamedEventsNotice from "@/components/rum/productAnalytics/NamedEventsNotice.vue";
 import SavedFunnelBar from "@/components/rum/productAnalytics/SavedFunnelBar.vue";
 import WhyEnteredPopover from "@/components/rum/productAnalytics/funnelParts/WhyEnteredPopover.vue";
+import FunnelChangeCell from "@/components/rum/productAnalytics/funnelParts/FunnelChangeCell.vue";
+import FunnelBreakdownControl from "@/components/rum/productAnalytics/funnelParts/FunnelBreakdownControl.vue";
 import { fitsLink } from "@/components/rum/productAnalytics/funnelParts/funnelEdits";
-import type { FilterValuesState } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
+import {
+  filterNoticeOf,
+  removeFilter,
+  type FilterValuesState,
+} from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
 import { whyLines, type WhyLines } from "@/components/rum/productAnalytics/funnelParts/whyEntered";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import FunnelQuickStarts from "@/components/rum/productAnalytics/FunnelQuickStarts.vue";
@@ -481,20 +747,23 @@ import useFunnelDraft, {
 } from "@/composables/rum/useFunnelDraft";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import useAppFilterCounts from "@/composables/rum/useAppFilterCounts";
+import useFunnelTrend from "@/composables/rum/useFunnelTrend";
+import useFunnelFieldSample from "@/composables/rum/useFunnelFieldSample";
 import FunnelLayoutRail from "@/components/rum/productAnalytics/funnelLayouts/rail/FunnelLayoutRail.vue";
-import type { FunnelLayoutSetting } from "@/components/rum/productAnalytics/funnelLayouts/types";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import useAnalyticsSearch, { type PanelState } from "@/composables/rum/useAnalyticsSearch";
 import useNamedEvents from "@/composables/rum/useNamedEvents";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
+  BREAKDOWN_TOP,
   FILTER_FIELDS,
   exclusionRemoved,
   foldBreakdown,
   formatCount,
   formatDuration,
   funnelParam,
+  funnelResultOf,
   isFilterColumn,
   toFunnelResult,
   type FunnelResult,
@@ -504,6 +773,8 @@ import {
 import {
   DIMENSIONS,
   filterValuesSql,
+  isAttributeBreakdown,
+  isSessionFilter,
   funnelSql,
   nextStepsSql,
   storedFunnelScope,
@@ -515,7 +786,29 @@ import {
   type FunnelWindow,
   type StepRef,
 } from "@/utils/rum/productAnalyticsQueries";
-import { buildFunnelPanel, stepLabel } from "@/utils/rum/productAnalyticsPanels";
+import {
+  buildFunnelPanel,
+  buildFunnelTrendPanel,
+  stepLabel,
+} from "@/utils/rum/productAnalyticsPanels";
+import {
+  COMPARE_MODE_LABEL_KEYS,
+  FUNNEL_COMPARE_MODES,
+  changeDirection,
+  compareAllowed,
+  compareBreakdown,
+  compareFunnel,
+  compareModeState,
+  compareWindow,
+  effectiveCompareMode,
+  formatWindow,
+  formatWindowExact,
+  type BreakdownCompareState,
+  type FunnelCompareMode,
+  type FunnelCompareView,
+  type RateChange,
+  type UsWindow,
+} from "@/utils/rum/funnelCompare";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { buildPrefillFromRumFunnel } from "@/utils/alerts/prefill/fromRumFunnel";
 
@@ -524,10 +817,12 @@ defineOptions({ name: "AnalyticsFunnels" });
 const AddToDashboard = defineAsyncComponent(() => import("@/plugins/metrics/AddToDashboard.vue"));
 
 const DEBOUNCE_MS = 300;
+const MENU_CLOSE_MS = 150;
 
 const emit = defineEmits<{ "open-exclusions": [] }>();
 const { t } = useI18nTyped();
 const router = useRouter();
+const store = useStore();
 const pa = useProductAnalytics();
 const appFilters = useAppFilterCounts();
 const funnelDraft = useFunnelDraft();
@@ -536,6 +831,7 @@ const runner = useAnalyticsSearch();
 const { identitySql } = pa;
 
 const funnelPanel = runner.panel<Record<string, unknown>>("funnel");
+const prevPanel = runner.panel<Record<string, unknown>>("funnel-prev");
 const valuesPanel = runner.panel<{ v: string; sessions: number }>("filter-values");
 const whyPanel = runner.panel<Record<string, unknown>>("why");
 const nextPanel = runner.panel<{ is_next: number; kind: string; k: string; units: number }>("next");
@@ -589,12 +885,34 @@ const usersTooltip = computed<I18nText | undefined>(() => {
     : undefined;
 });
 
+const windowLengths = computed<Record<Exclude<FunnelWindow, "session">, I18nText>>(() => ({
+  "1h": t("rum.analytics.funnel.window1h"),
+  "1d": t("rum.analytics.funnel.window1d"),
+  "7d": t("rum.analytics.funnel.window7d"),
+}));
+
 const windowOptions = computed(() => [
   { label: t("rum.analytics.funnel.windowSession"), value: "session" },
-  { label: t("rum.analytics.funnel.window1h"), value: "1h" },
-  { label: t("rum.analytics.funnel.window1d"), value: "1d" },
-  { label: t("rum.analytics.funnel.window7d"), value: "7d" },
+  ...(Object.entries(windowLengths.value) as [FunnelWindow, I18nText][]).map(([value, w]) => ({
+    label: t("rum.analytics.funnel.windowOfStep1", { window: w }),
+    value,
+  })),
 ]);
+
+const windowBadge = computed<I18nText | null>(() => {
+  const w = effectiveDef.value.window;
+  return w === "session"
+    ? null
+    : t("rum.analytics.funnel.headlineWithin", { window: windowLengths.value[w] });
+});
+
+// Same rules as FunnelChangeCell: low volume outranks the direction.
+const changeTone = (c: RateChange): BadgeVariant => {
+  if (c.lowVolume) return "default-soft";
+  const d = changeDirection(c);
+  if (d === "up") return "success-soft";
+  return d === "down" ? "error-soft" : "default-soft";
+};
 
 const dimLabels = computed<Record<BreakdownDim, I18nText>>(() => ({
   browser: t("rum.analytics.funnel.dims.browser"),
@@ -606,16 +924,17 @@ const dimLabels = computed<Record<BreakdownDim, I18nText>>(() => ({
   app: t("rum.analytics.funnel.dims.app"),
 }));
 
-const breakdownOptions = computed(() => [
-  { label: t("rum.analytics.funnel.breakdownNone"), value: "none" },
-  ...(Object.keys(DIMENSIONS) as BreakdownDim[])
+const breakdownDims = computed(() =>
+  (Object.keys(DIMENSIONS) as BreakdownDim[])
     .filter((d) => (d === "app" ? !!pa.scope.value.apps?.length : pa.schema.value[DIMENSIONS[d]]))
-    .map((d) => ({ label: dimLabels.value[d], value: d })),
-]);
-
-const dimLabel = computed(() =>
-  def.value.breakdown ? dimLabels.value[def.value.breakdown] : raw(""),
+    .map((d) => ({ dim: d, label: dimLabels.value[d] })),
 );
+
+const dimLabel = computed(() => {
+  const b = def.value.breakdown;
+  if (isAttributeBreakdown(b)) return raw(b.f);
+  return b ? dimLabels.value[b] : raw("");
+});
 
 // Exclusions are applied to whatever the funnel's unit links together, so the caption names that span.
 const exclusionsCaption = computed<I18nText>(() => {
@@ -643,25 +962,32 @@ const needsNewer = computed(
   () => linkProblem.value === "unreadable" || pa.invalidParams.value.includes("funnel"),
 );
 
-const breakdown = computed(() =>
-  def.value.breakdown && funnelPanel.value.status === "ok"
-    ? foldBreakdown(funnelPanel.value.rows, def.value.steps.length)
-    : null,
+const breakdown = computed(() => {
+  const b = def.value.breakdown;
+  if (!b || funnelPanel.value.status !== "ok") return null;
+  const attribute = isAttributeBreakdown(b) ? b : null;
+  return foldBreakdown(funnelPanel.value.rows, def.value.steps.length, BREAKDOWN_TOP, attribute);
+});
+
+const breakdownMissingNote = computed<I18nText | null>(() => {
+  const b = def.value.breakdown;
+  if (!breakdown.value?.start || !isAttributeBreakdown(b) || pa.schema.value[b.f]) return null;
+  return t("rum.analytics.funnel.breakdownFieldMissing", {
+    field: dimLabel.value,
+    unit: unitNoun.value,
+  });
+});
+
+const stepNames = computed(() =>
+  def.value.steps.map((s) => stepLabel(s, events.value, namedEvents.deletedNames.value)),
 );
 
-const result = computed<FunnelResult | null>(() => {
-  if (funnelPanel.value.status !== "ok") return null;
-  if (breakdown.value) {
-    const hit: Record<string, number> = {};
-    breakdown.value.total.forEach((c, i) => {
-      hit[`c${i + 1}`] = c;
-      hit[`seen${i + 1}`] = 1;
-    });
-    return toFunnelResult(hit, effectiveDef.value);
-  }
-  const row = funnelPanel.value.rows[0] as Record<string, number> | undefined;
-  return row ? toFunnelResult(row, effectiveDef.value) : null;
-});
+// The previous period goes through the same fold, so turning compare on never touches these numbers.
+const result = computed<FunnelResult | null>(() =>
+  funnelPanel.value.status === "ok"
+    ? funnelResultOf(funnelPanel.value.rows, effectiveDef.value)
+    : null,
+);
 
 // Rows from an earlier run index another exclusion list, so they count only for the funnel on screen.
 const removed = computed<(number | null)[]>(() =>
@@ -669,6 +995,140 @@ const removed = computed<(number | null)[]>(() =>
     ? exclusionRemoved(funnelPanel.value.rows, def.value.x?.length ?? 0)
     : [],
 );
+
+const timezone = computed<string>(() => store.state.timezone || "UTC");
+const compareTooLong = computed(() => !!pa.range.value && !compareAllowed(pa.range.value));
+// An offset the range cannot use compares with the previous period; the link keeps the offset.
+const effectiveCompare = computed(() =>
+  effectiveCompareMode(pa.range.value, pa.funnelCompare.value),
+);
+const prevKey = computed(() => `${funnelKey.value}|prev:${effectiveCompare.value}`);
+// While compare is greyed out the select keeps showing what the link asked for.
+const compareSelectValue = computed<FunnelCompareMode | "off">(() => {
+  const mode = pa.funnelCompare.value;
+  if (!mode) return "off";
+  return compareTooLong.value || !pa.range.value ? mode : (effectiveCompare.value ?? mode);
+});
+const compareTriggerLabel = computed(() => {
+  const mode = compareSelectValue.value;
+  return mode === "off" ? t("rum.analytics.funnel.compareOff") : t(COMPARE_MODE_LABEL_KEYS[mode]);
+});
+const compareOptions = computed(() => {
+  const cur = pa.range.value;
+  const tz = timezone.value;
+  return [
+    { label: t("rum.analytics.funnel.compareOff"), value: "off", disabled: false },
+    ...FUNNEL_COMPARE_MODES.map((mode) => {
+      const label = t(COMPARE_MODE_LABEL_KEYS[mode]);
+      if (!cur) return { label, value: mode, disabled: false };
+      const state = compareModeState(cur, mode);
+      if (state !== "ok")
+        return {
+          label: t("rum.analytics.funnel.compareOptionDisabled", {
+            label,
+            reason:
+              state === "same"
+                ? t("rum.analytics.funnel.compareSameAsPrev")
+                : t("rum.analytics.funnel.compareOverlaps"),
+          }),
+          value: mode,
+          disabled: true,
+        };
+      return {
+        label: t("rum.analytics.funnel.compareOption", {
+          label,
+          range: raw(formatWindow(compareWindow(cur, mode), tz)),
+        }),
+        value: mode,
+        disabled: false,
+      };
+    }),
+  ];
+});
+const compareNoLineOpen = ref(false);
+const prevRows = computed(() =>
+  effectiveCompare.value && prevPanel.value.key === prevKey.value && prevPanel.value.status === "ok"
+    ? prevPanel.value.rows
+    : null,
+);
+
+const compareData = computed(() => {
+  if (!result.value || !prevRows.value) return null;
+  const d = effectiveDef.value;
+  // An empty window still answers with one row of zeros, but a missing row means the same.
+  const prev = funnelResultOf(prevRows.value, d) ?? toFunnelResult({}, d);
+  return compareFunnel(result.value, prev);
+});
+
+const compareView = computed<FunnelCompareView | null>(() => {
+  const cur = pa.range.value;
+  // A held or stepless funnel starts no run, so it keeps the compare-off layout.
+  const mode = effectiveCompare.value;
+  if (!mode || !cur || funnelPanel.value.status === "idle") return null;
+  const prev = compareWindow(cur, mode);
+  const p = prevPanel.value;
+  const failed = p.key === prevKey.value && (p.status === "error" || p.status === "forbidden");
+  const tz = timezone.value;
+  return {
+    status: compareData.value ? "ok" : failed ? "failed" : "loading",
+    data: compareData.value,
+    label: t(COMPARE_MODE_LABEL_KEYS[mode]),
+    range: formatWindow(cur, tz),
+    prevRange: formatWindow(prev, tz),
+    rangeExact: formatWindowExact(cur, tz),
+    prevRangeExact: formatWindowExact(prev, tz),
+  };
+});
+
+const breakdownCompare = computed(() =>
+  breakdown.value && prevRows.value
+    ? compareBreakdown(
+        breakdown.value,
+        funnelPanel.value.rows,
+        prevRows.value,
+        def.value.steps.length,
+      )
+    : null,
+);
+
+const breakdownCompareState = computed<BreakdownCompareState | null>(() => {
+  const v = compareView.value;
+  if (!v) return null;
+  return {
+    status: breakdownCompare.value ? "ok" : v.status === "failed" ? "failed" : "loading",
+    total: breakdownCompare.value?.total ?? null,
+    label: v.label,
+    prevRange: v.prevRange,
+  };
+});
+
+// Trend lines rank attribute values from the table's start step, which an automatic pick learns from the funnel run.
+const trendRank = computed<number | null>(() => {
+  const b = def.value.breakdown;
+  if (!isAttributeBreakdown(b)) return 1;
+  if (b.s !== undefined && b.s <= def.value.steps.length) return b.s;
+  if (funnelFailed.value) return 1;
+  const start = breakdown.value?.start;
+  if (!start || funnelPanel.value.key !== funnelKey.value) return null;
+  return start.anyStep ? 1 : start.step;
+});
+
+const trend = useFunnelTrend({
+  pa,
+  runner,
+  t,
+  def,
+  usersMode,
+  identitySql,
+  events,
+  timezone,
+  funnelKey: computed(() => funnelKey.value),
+  compareMode: effectiveCompare,
+  rankStep: trendRank,
+  stepNames,
+});
+
+const fieldSample = useFunnelFieldSample({ pa, runner, def, events });
 
 const filterFields = computed(() => [
   ...FILTER_FIELDS.filter((f) => pa.schema.value[f]),
@@ -720,22 +1180,6 @@ const why = computed<WhyLines | null>(() => {
     hasFilters: !!def.value.f?.length,
   });
 });
-
-const layoutSettings = computed<FunnelLayoutSetting[]>(() => [
-  { id: "unit", label: t("rum.analytics.funnel.countBy"), value: unitLabel.value },
-  {
-    id: "window",
-    label: t("rum.analytics.funnel.railWindow"),
-    value:
-      windowOptions.value.find((o) => o.value === effectiveDef.value.window)?.label ??
-      t("rum.analytics.funnel.windowSession"),
-  },
-  {
-    id: "breakdown",
-    label: t("rum.analytics.funnel.railBreakdown"),
-    value: def.value.breakdown ? dimLabel.value : t("rum.analytics.funnel.noBreakdown"),
-  },
-]);
 
 const firstUnits = computed(() => result.value?.steps[0]?.units ?? 0);
 const lastUnits = computed(() => result.value?.steps[result.value.steps.length - 1]?.units ?? 0);
@@ -790,9 +1234,12 @@ const funnelFailed = computed(
   () => funnelPanel.value.status === "error" || funnelPanel.value.status === "forbidden",
 );
 const partial = computed(() => funnelPanel.value.status === "ok" && !!funnelPanel.value.partial);
-const alertReady = computed(() => def.value.steps.length > 1 && !!result.value && !partial.value);
+const alertReady = computed(
+  () => def.value.steps.length > 1 && !!result.value && !partial.value && !trend.shown.value,
+);
 const alertTip = computed<I18nText>(() => {
   if (def.value.steps.length < 2) return t("rum.analytics.funnel.alertNeedsRun");
+  if (trend.shown.value) return t("rum.analytics.funnel.alertTrend");
   if (partial.value) return t("rum.analytics.funnel.alertPartial");
   if (!result.value) {
     return funnelPanel.value.status === "error" || funnelPanel.value.status === "forbidden"
@@ -846,13 +1293,19 @@ watch(
 
 // A saved funnel's name is the panel's default title; the panel stays a snapshot.
 const dashboardPanel = () => {
-  const panel = buildFunnelPanel(
-    storedFunnelScope(pa.scope.value),
-    def.value,
-    events.value,
-    t,
-    namedEvents.deletedNames.value,
-  );
+  const scope = storedFunnelScope(pa.scope.value);
+  const deleted = namedEvents.deletedNames.value;
+  const panel = trend.shown.value
+    ? buildFunnelTrendPanel(
+        scope,
+        def.value,
+        trend.pair.value,
+        trend.interval.value ?? "day",
+        events.value,
+        t,
+        deleted,
+      )
+    : buildFunnelPanel(scope, def.value, events.value, t, deleted);
   return pa.openedFunnel.value ? { ...panel, title: pa.openedFunnel.value.name } : panel;
 };
 
@@ -927,7 +1380,9 @@ const onUnit = (v: unknown) => {
 const hold = (status: "idle" | "loading") => {
   lastKey = "";
   runner.hold("funnel", status);
+  runner.hold("funnel-prev", "idle");
   runner.hold("next", "idle");
+  trend.hold();
 };
 
 const compute = async (force = false) => {
@@ -960,7 +1415,7 @@ const compute = async (force = false) => {
   if (d.steps.length > 1) pushRecent(def.value);
   const cur = pa.resolveRange();
   const opts = { events: events.value, sample: pa.sampleRatio.value };
-  const res = await runner.run(
+  const current = runner.run(
     "funnel",
     {
       sql: funnelSql(pa.scope.value, identitySql.value, d, { ...opts, sample: 1 }),
@@ -970,8 +1425,74 @@ const compute = async (force = false) => {
     },
     key,
   );
+  // Enqueued after the current run, so the table on screen never waits behind a compare-only scan.
+  runPrevious(d, key, cur);
+  trend.tick();
+  void trend.run(d, force);
+  const res = await current;
   if (res.status !== "ok" || key !== lastKey) return;
   runSuggestions(d, key, cur, opts);
+  loadWhy(force);
+};
+
+// The same query over the window before, so a slow or failed run only blanks the compare cells.
+const runPrevious = (d: FunnelDef, key: string, cur: UsWindow) => {
+  const mode = effectiveCompareMode(cur, pa.funnelCompare.value);
+  if (!mode) {
+    runner.hold("funnel-prev", "idle");
+    return;
+  }
+  const prev = compareWindow(cur, mode);
+  const s = pa.scope.value;
+  // New users of the previous period are those first seen in that period, not in this one.
+  const scope = s.newSince === undefined ? s : { ...s, newSince: Math.trunc(prev.startUs / 1000) };
+  void runner.run(
+    "funnel-prev",
+    {
+      sql: funnelSql(scope, identitySql.value, d, { events: events.value, sample: 1 }),
+      ...pa.newUsersRange(prev, d.unit === "users" && !!identitySql.value),
+      limit: d.breakdown ? 1000 : 1,
+      sampled: 1,
+    },
+    `${key}|prev:${mode}`,
+  );
+};
+
+// Only a funnel already run for the one on screen gets a previous run of its own.
+const rerunPrevious = () => {
+  const key = funnelKey.value;
+  if (key !== lastKey || funnelPanel.value.key !== key) return;
+  const cur = pa.resolveRange();
+  const p = prevPanel.value;
+  const mode = effectiveCompareMode(cur, pa.funnelCompare.value);
+  // A new pick that keeps the same window must not abort the run already answering it.
+  if (mode && p.key === `${key}|prev:${mode}` && (p.status === "ok" || p.status === "loading"))
+    return;
+  runPrevious(effectiveDef.value, key, cur);
+};
+
+const setCompare = (v: unknown) => {
+  pa.funnelCompare.value = FUNNEL_COMPARE_MODES.find((m) => m === v) ?? null;
+};
+
+const removeBreakdownForCompare = () => {
+  compareNoLineOpen.value = false;
+  update({ breakdown: null });
+  // The popover's trigger unmounts with the warning, so focus would otherwise fall to the page.
+  void nextTick(() =>
+    trendFromField.value?.querySelector<HTMLElement>('[role="combobox"]')?.focus(),
+  );
+};
+
+const setView = (v: unknown) => {
+  if (v === "steps" || v === "trend") pa.funnelView.value = v;
+};
+
+// Only a funnel already run for the one on screen gets a trend run of its own.
+const runTrend = (force = false) => {
+  const key = funnelKey.value;
+  if (key !== lastKey || funnelPanel.value.key !== key) return;
+  void trend.run(effectiveDef.value, force);
 };
 
 const runSuggestions = (
@@ -1020,10 +1541,16 @@ const loadFilterValues = (field: string) => {
   );
 };
 
-// Runs only while the popover is open, and never inside the funnel query, so the funnel keeps its row pruning.
+// An attribute filter that few sessions carry needs the counts for its notice, so it runs the query too.
+const noticeWanted = computed(() =>
+  (def.value.f ?? []).some((r) => isSessionFilter(r) && !r.not && isFilterColumn(r.field)),
+);
+
+// Runs only while the popover or a notice needs it, and never inside the funnel query, so the funnel keeps its row pruning.
 const loadWhy = (force = false) => {
   const d = effectiveDef.value;
-  if (!whyOpen.value || usersMode.value || d.steps.length < 2) return;
+  if (usersMode.value || !d.steps.length) return;
+  if (!(whyOpen.value && d.steps.length > 1) && !noticeWanted.value) return;
   const key = funnelKey.value;
   const p = whyPanel.value;
   if (!force && p.key === key && (p.status === "ok" || p.status === "loading")) return;
@@ -1036,6 +1563,51 @@ const loadWhy = (force = false) => {
       sampled: 1,
     },
     key,
+  );
+};
+
+const filterNotice = computed(() =>
+  whyState.value === "ok" && !usersMode.value
+    ? filterNoticeOf(def.value, whyPanel.value.rows[0] ?? null)
+    : null,
+);
+
+// The notice's way out: the filter goes and the field becomes the breakdown, so no session is dropped.
+const breakDownBy = (field: string) =>
+  applyDef({ ...removeFilter(def.value, field), breakdown: { f: field } });
+
+const breakdownControl = ref<InstanceType<typeof FunnelBreakdownControl> | null>(null);
+const rail = ref<InstanceType<typeof FunnelLayoutRail> | null>(null);
+const railCollapsed = computed(() => !!rail.value?.collapsed);
+
+// Below lg the rail never collapses; it stacks above the card, so the section may be off screen.
+const revealBreakdownSection = () => {
+  rail.value?.expand();
+  (breakdownControl.value?.$el as HTMLElement | undefined)?.scrollIntoView?.({ block: "nearest" });
+};
+
+const showBreakdownSection = async () => {
+  revealBreakdownSection();
+  await nextTick();
+  breakdownControl.value?.focus();
+};
+
+// The step menu closes and hands focus back to its button first, which would dismiss a picker opened in the same tick.
+const breakDownAtStep = (step: number) => {
+  revealBreakdownSection();
+  setTimeout(() => breakdownControl.value?.openForStep(step), MENU_CLOSE_MS);
+};
+
+const trendFromField = ref<HTMLElement | null>(null);
+
+const trendFromStep = (step: number) => {
+  trend.setFrom(step);
+  trend.setTo(def.value.steps.length);
+  setView("trend");
+  // The step menu's trigger unmounts with the table, so focus would otherwise fall to the page.
+  setTimeout(
+    () => trendFromField.value?.querySelector<HTMLElement>('[role="combobox"]')?.focus(),
+    MENU_CLOSE_MS,
   );
 };
 
@@ -1110,6 +1682,32 @@ watch(
   },
 );
 
+watch(
+  () => pa.funnelCompare.value,
+  () => {
+    if (!active) return;
+    void pa.syncUrl(router);
+    rerunPrevious();
+    runTrend();
+  },
+);
+
+watch(
+  () => [pa.funnelView.value, pa.funnelPair.value, pa.funnelInterval.value],
+  () => {
+    if (active) void pa.syncUrl(router);
+  },
+  { deep: true },
+);
+
+// Any change to what the trend buckets (view, pair, interval, zone, first-data day) reruns only the trend.
+watch(
+  () => [trend.shown.value, trend.key.value],
+  () => {
+    if (active) runTrend();
+  },
+);
+
 // Typing an "Only when" value changes the key per keystroke, so the open popover reruns once typing settles.
 watch(funnelKey, () => {
   if (whyTimer) clearTimeout(whyTimer);
@@ -1149,7 +1747,12 @@ onActivated(() => {
   if (linkProblem.value === "failed") void resolveSavedLink(true, true);
   // A run cut short by leaving never loaded its suggestions, and its key still matches, so it reruns whole.
   const cutShort = funnelPanel.value.status === "aborted" || nextPanel.value.status === "aborted";
-  void compute(cutShort || refreshMissed);
+  const prevCut = !cutShort && !refreshMissed && prevPanel.value.status === "aborted";
+  void compute(cutShort || refreshMissed).then(() => {
+    // A full compute already restarted the previous run, which then no longer reads aborted.
+    if (prevCut && prevPanel.value.status === "aborted") rerunPrevious();
+    runTrend();
+  });
   refreshMissed = false;
 });
 

@@ -39,13 +39,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODescriptionItem v-if="showRoutingReason" :label="t('oncall.routedBy')">
           <span class="flex flex-col items-start gap-1">
             <span data-test="oncall-about-routing-reason">
-              <!-- A sentence parseRoutingReason doesn't recognise ("...as an
-                   impacted caller of the failing service") still opens
-                   "routed to <id>" — the id is the one fact worth trusting;
-                   the prose around it is not, so it is dropped rather than
-                   shown verbatim. -->
+              <!-- Unrecognised wording: show the record's team, not the server's prose. -->
+              <OTag
+                v-if="fallbackRouted && teamDeleted"
+                variant="default-soft"
+                size="sm"
+                data-test="oncall-about-routing-team-deleted"
+              >
+                {{ t("oncall.deletedTeam") }}
+              </OTag>
               <router-link
-                v-if="fallbackRoutedId"
+                v-else-if="fallbackRouted && teamId"
                 class="text-accent font-medium"
                 :to="{
                   name: 'onCallTeamDetail',
@@ -54,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
                 data-test="oncall-about-routing-id-link"
               >
-                {{ raw(fallbackRoutedId) }}
+                {{ raw(teamName) }}
               </router-link>
               <span
                 v-else-if="routingDimensions.length"
@@ -87,7 +91,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODescriptionItem>
 
         <ODescriptionItem :label="t('oncall.team')">
+          <span v-if="!teamId" class="text-status-error-text" data-test="oncall-about-team-none">{{
+            t("oncall.statUnrouted")
+          }}</span>
+          <OTag
+            v-else-if="teamDeleted"
+            variant="default-soft"
+            size="sm"
+            data-test="oncall-about-team-deleted"
+          >
+            {{ t("oncall.deletedTeam") }}
+          </OTag>
           <router-link
+            v-else
             class="text-accent"
             :to="{
               name: 'onCallTeamDetail',
@@ -185,6 +201,7 @@ import { computed } from "vue";
 import type { RouteLocationRaw } from "vue-router";
 
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -201,8 +218,11 @@ import { copyToClipboard } from "@/utils/clipboard";
 const props = withDefaults(
   defineProps<{
     orgId: string;
-    teamId: string;
+    /** `null` for an unrouted page, which has no team to link to. */
+    teamId: string | null;
     teamName: string;
+    /** The team is gone from the team list, so there is nothing to link to. */
+    teamDeleted?: boolean;
     subjectType: SubjectType;
     sourceId: string;
     /** The engine's sentence for why this team was picked. */
@@ -213,6 +233,7 @@ const props = withDefaults(
     causeNote?: string | null;
   }>(),
   {
+    teamDeleted: false,
     routingReason: null,
     subjectStream: null,
     incidentId: null,
@@ -254,15 +275,11 @@ const routedByPrimary = computed<I18nText>(() => {
   return mechanismLine.value;
 });
 
-/// The id out of a routing sentence `parseRoutingReason` doesn't recognise —
-/// every branch it DOES recognise opens "routed to <id>" too, so an
-/// unrecognised one almost always still yields an id worth linking, without
-/// the guesswork of interpreting prose the server might change at any time.
-const fallbackRoutedId = computed(() => {
-  if (!props.routingReason || routing.value) return null;
+/// An unrecognised "routed to …" sentence links the record's own team, by the record's id.
+const fallbackRouted = computed(() => {
+  if (!props.routingReason || routing.value) return false;
   const decision = props.routingReason.split("; ").pop()?.trim() ?? "";
-  const match = /^routed to (\S+)/.exec(decision);
-  return match ? match[1] : null;
+  return decision.startsWith("routed to ");
 });
 
 /// A page routed `explicit` was not routed at all — the alert names its team,

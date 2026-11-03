@@ -14,15 +14,33 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
+import { mount, flushPromises, DOMWrapper, type VueWrapper } from "@vue/test-utils";
+import type { RouteLocationNormalizedLoaded } from "vue-router";
 import TemplateList from "./TemplateList.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { http, HttpResponse } from "msw";
 import templateService from "@/services/alert_templates";
 import alertsFixture from "@/test/unit/mockData/alerts";
 import router from "@/test/unit/helpers/router";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
+import type { Template } from "@/ts/interfaces";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
+import {
+  readEditorDraft,
+  writeEditorDraft,
+  type EditorDraftScope,
+} from "@/utils/drafts/editorDraftStore";
+
+interface TemplateListVm {
+  showTemplateEditor: boolean;
+  editingTemplate: Template | null;
+  cloningTemplate: boolean;
+  cloningSource: string | null;
+  templates: Template[];
+  lastUpdatedAt: number;
+  cloneTemplate: (template: Template) => void;
+}
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -297,6 +315,7 @@ describe("TemplateList pagination persistence", () => {
     const pushedQuery = pushSpy.mock.calls[0][0].query;
     expect(pushedQuery.page).toBe("3");
     expect(pushedQuery.action).toBe("add");
+    expect(pushedQuery.clone).toBe("Template2");
   });
 
   it("importTemplate preserves the page query param", async () => {
@@ -375,5 +394,256 @@ describe("alertTemplates view state restore", () => {
     expect(saved.filterQuery).toBe("abc");
     expect(saved.tab).toBe("prebuilt");
     expect(saved.pageSize).toBe(100);
+  });
+});
+
+describe("TemplateList drafts", () => {
+  let wrapper: VueWrapper;
+  const scope = (entityId: string | null): EditorDraftScope => ({
+    kind: "alert_template",
+    org: "default",
+    entityId,
+    userEmail: "example@gmail.com",
+  });
+
+  beforeEach(async () => {
+    localStorage.clear();
+    writeEditorDraft(scope(null), { data: {} });
+    writeEditorDraft(scope("Template2"), { data: {} });
+    router.currentRoute.value.query = {};
+    resetListViewState();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    wrapper = mount(TemplateList, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    await flushPromises();
+    vi.advanceTimersByTime(SKELETON_HOLD_MS);
+    await flushPromises();
+  });
+
+  afterEach(() => {
+    wrapper.unmount();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it("marks the Add button and the drafted row only", () => {
+    const add = wrapper.get('[data-test="template-list-add-btn"]');
+    expect(add.find('[data-test="template-list-add-draft-dot"]').exists()).toBe(true);
+    expect(add.attributes("aria-label")).toContain("unsaved draft");
+    expect(wrapper.find('[data-test="alert-template-list-Template2-draft-dot"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.find('[data-test="alert-template-list-Template3-draft-dot"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("marks the clone action of a template whose clone has a kept draft", async () => {
+    writeEditorDraft({ ...scope(null), variant: "clone:Template2" }, { data: {} });
+    await flushPromises();
+
+    const clone = wrapper.get('[data-test="alert-template-list-Template2-clone-template"]');
+    expect(clone.find('[data-test="alert-template-list-Template2-clone-draft-dot"]').exists()).toBe(
+      true,
+    );
+    expect(clone.attributes("aria-label")).toMatch(/^Clone · unsaved draft · .*\d/);
+    // Sighted users read the same dated name in the button's own tooltip, not a bare native title.
+    expect(clone.attributes("title")).toBeUndefined();
+    const tip = clone.findComponent(OTooltip);
+    expect(tip.props("content")).toBe(clone.attributes("aria-label"));
+    expect(
+      wrapper.find('[data-test="alert-template-list-Template3-clone-draft-dot"]').exists(),
+    ).toBe(false);
+    const plain = wrapper.get('[data-test="alert-template-list-Template3-clone-template"]');
+    expect(plain.findComponent(OTooltip).props("content")).toBe("Clone");
+  });
+
+  it("marks the phone row menu and its Clone item for a kept clone draft", async () => {
+    writeEditorDraft({ ...scope(null), variant: "clone:Template2" }, { data: {} });
+    await flushPromises();
+
+    const triggers = wrapper.findAll('[data-test="alert-template-list-row-more-actions"]');
+    const trigger = triggers.find((t: DOMWrapper<Element>) =>
+      t.find('[data-test="alert-template-list-Template2-more-actions-draft-dot"]').exists(),
+    );
+    expect(trigger?.attributes("aria-label")).toMatch(/^More actions · unsaved draft · .*\d/);
+    expect(trigger?.attributes("title")).toBeUndefined();
+    expect(wrapper.findAll('[data-test$="-more-actions-draft-dot"]').length).toBe(1);
+
+    await trigger!.trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    const item = document.body.querySelector(
+      '[data-test="alert-template-list-Template2-clone-template-menu"]',
+    );
+    const menuDot = item?.querySelector(
+      '[data-test="alert-template-list-Template2-clone-template-menu-draft-dot"]',
+    );
+    expect(menuDot?.getAttribute("aria-label")).toMatch(/^Unsaved draft · .*\d/);
+  });
+
+  it("drops a deleted template's draft", async () => {
+    const templatesUrl = `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`;
+    global.server.use(
+      http.delete(`${templatesUrl}/Template2`, () => HttpResponse.json({ code: 200 })),
+      http.get(templatesUrl, () =>
+        HttpResponse.json(
+          alertsFixture.templates.get.filter((tpl: { name: string }) => tpl.name !== "Template2"),
+        ),
+      ),
+    );
+    await wrapper
+      .find('[data-test="alert-template-list-Template2-delete-template"]')
+      .trigger("click");
+    await flushPromises();
+    await new DOMWrapper(document.body).find('[data-test="o-dialog-primary-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(readEditorDraft(scope("Template2"))).toBeNull();
+    expect(readEditorDraft(scope(null))).not.toBeNull();
+  });
+});
+
+describe("TemplateList refetch while the editor is open", () => {
+  let wrapper: VueWrapper | null = null;
+  let routeName: RouteLocationNormalizedLoaded["name"];
+  const route = () => router.currentRoute.value;
+  const vm = () => wrapper!.vm as unknown as TemplateListVm;
+
+  const mountAt = async (query: Record<string, string>) => {
+    route().query = query;
+    wrapper = mount(TemplateList, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    await vi.waitFor(() => expect(vm().showTemplateEditor).toBe(true), { timeout: 3000 });
+    // AddTemplate is an async component, so it can land after the list says the editor is open.
+    await vi.waitFor(
+      () => expect(wrapper!.findComponent({ name: "AddTemplate" }).exists()).toBe(true),
+      { timeout: 3000 },
+    );
+    await flushPromises();
+  };
+
+  const refetch = async () => {
+    const { queryClient } = await import("@/composables/query/queryClient");
+    const before = vm().lastUpdatedAt;
+    await queryClient.refetchQueries();
+    await vi.waitFor(() => expect(vm().lastUpdatedAt).not.toBe(before), { timeout: 3000 });
+    await flushPromises();
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    resetListViewState();
+    // Pinned: a real navigation through the app router lands at an unpredictable moment and rewrites the query.
+    vi.spyOn(router, "push").mockImplementation((() => Promise.resolve()) as never);
+    vi.spyOn(router, "replace").mockImplementation((() => Promise.resolve()) as never);
+    // AddTemplate runs drafts only on its own route.
+    routeName = route().name;
+    route().name = "alertTemplates";
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+    route().name = routeName;
+  });
+
+  it("keeps the edit open on the same template", async () => {
+    await mountAt({ action: "update", name: "Template2" });
+    expect(vm().editingTemplate?.name).toBe("Template2");
+
+    await refetch();
+
+    expect(vm().showTemplateEditor).toBe(true);
+    expect(vm().editingTemplate?.name).toBe("Template2");
+    expect(wrapper!.findComponent({ name: "AddTemplate" }).exists()).toBe(true);
+  });
+
+  it("keeps a new template open", async () => {
+    await mountAt({ action: "add" });
+
+    await refetch();
+
+    expect(vm().showTemplateEditor).toBe(true);
+    expect(vm().editingTemplate).toBeNull();
+  });
+
+  it("opens a clone on its own draft slot, never offering the new-template draft", async () => {
+    writeEditorDraft(
+      { kind: "alert_template", org: "default", entityId: null, userEmail: "example@gmail.com" },
+      { data: {} },
+    );
+    route().query = {};
+    wrapper = mount(TemplateList, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    await vi.waitFor(() => expect(vm().templates.length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+    const source = vm().templates[0].name;
+    vm().cloneTemplate(vm().templates[0]);
+    await vi.waitFor(
+      () => expect(wrapper!.findComponent({ name: "AddTemplate" }).exists()).toBe(true),
+      { timeout: 3000 },
+    );
+    await flushPromises();
+
+    expect(wrapper!.findComponent({ name: "AddTemplate" }).props("cloneSource")).toBe(source);
+    expect(document.body.querySelector('[data-test="editor-draft-restore-dialog"]')).toBeNull();
+  });
+
+  it("reopens a clone from its URL on reload and offers the clone's own draft", async () => {
+    writeEditorDraft(
+      {
+        kind: "alert_template",
+        org: "default",
+        entityId: null,
+        userEmail: "example@gmail.com",
+        variant: "clone:Template2",
+      },
+      { data: {} },
+    );
+    await mountAt({ action: "add", clone: "Template2" });
+
+    expect(vm().cloningTemplate).toBe(true);
+    expect(vm().editingTemplate?.name).toBe("Copy_of_Template2");
+    expect(wrapper!.findComponent({ name: "AddTemplate" }).props("cloneSource")).toBe("Template2");
+    await vi.waitFor(() =>
+      expect(
+        document.body.querySelector('[data-test="editor-draft-restore-dialog"]'),
+      ).not.toBeNull(),
+    );
+
+    await refetch();
+    expect(vm().showTemplateEditor).toBe(true);
+    expect(vm().cloningSource).toBe("Template2");
+  });
+
+  it("keeps a clone open with its copied content", async () => {
+    route().query = {};
+    wrapper = mount(TemplateList, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    await vi.waitFor(() => expect(vm().templates.length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+    vm().cloneTemplate(vm().templates[0]);
+    route().query = {
+      action: "add",
+      clone: vm().templates[0].name,
+    };
+    await flushPromises();
+
+    await refetch();
+
+    expect(vm().showTemplateEditor).toBe(true);
+    expect(vm().cloningTemplate).toBe(true);
+    expect(vm().editingTemplate?.name).toMatch(/^Copy_of_/);
   });
 });

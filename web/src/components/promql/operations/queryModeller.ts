@@ -24,6 +24,7 @@ import {
   normalizeStepId,
 } from "../types";
 import { buildPromqlStepCatalog } from "./index";
+import { compileLabelFilters } from "../labelBoolean";
 
 const SCALAR_PRECEDENCE: Partial<Record<string, number>> = {
   [PromqlStepId.Addition]: 1,
@@ -33,6 +34,9 @@ const SCALAR_PRECEDENCE: Partial<Record<string, number>> = {
   [PromqlStepId.Modulo]: 2,
   [PromqlStepId.Exponent]: 3,
 };
+
+/** `or` binds looser than every arithmetic operator. */
+const UNION_PRECEDENCE = 0;
 
 class PromqlRendererImpl implements PromqlRenderer {
   private operations: Map<string, PromqlStepSpec>;
@@ -71,7 +75,7 @@ class PromqlRendererImpl implements PromqlRenderer {
   /**
    * Render a single operation
    */
-  private renderOperation(operation: PromqlStep, innerExpr: string): string {
+  private renderOperation(operation: PromqlStep, innerExpr: string, rangeSuffix = ""): string {
     // A panel may persist an old scalar-math step id, so resolve it before
     // anything looks it up or switches on it.
     const id = normalizeStepId(operation.id);
@@ -84,56 +88,18 @@ class PromqlRendererImpl implements PromqlRenderer {
     if (id === PromqlStepId.QuantileOverTime) {
       const quantile = params[0] ?? 0.95;
       const range = params[1] || "$__interval";
-      return `${id}(${quantile}, ${innerExpr}[${range}])`;
+      return `${id}(${quantile}, ${innerExpr}[${range}]${rangeSuffix})`;
     }
 
     // Handle range functions (rate, increase, etc.)
     if (def.group === PromqlStepGroup.RateAndRange) {
       const range = params[0] || "$__interval";
-      return `${id}(${innerExpr}[${range}])`;
+      return `${id}(${innerExpr}[${range}]${rangeSuffix})`;
     }
 
     // Handle aggregations (sum, avg, etc.)
     if (def.group === PromqlStepGroup.Aggregation) {
-      const byLabelsParam = params[params.length - 1];
-      const otherParams = params.slice(0, -1);
-
-      // Build parameter string for functions like topk(k, ...) or quantile(q, ...)
-      let funcParams = "";
-      if (otherParams.length > 0) {
-        funcParams = otherParams.join(", ");
-      }
-
-      // Handle byLabels as either array or string
-      let labels: string[] = [];
-      if (Array.isArray(byLabelsParam)) {
-        labels = byLabelsParam.filter((l) => l && l.trim());
-      } else if (typeof byLabelsParam === "string" && byLabelsParam.trim()) {
-        labels = byLabelsParam
-          .split(",")
-          .map((l) => l.trim())
-          .filter((l) => l);
-      }
-
-      // Use INFIX form: sum by (label) (...)
-      if (labels.length > 0) {
-        const byClause = ` by (${labels.join(", ")})`;
-
-        if (funcParams) {
-          // e.g., topk by (label) (k, expr)
-          return `${id}${byClause} (${funcParams}, ${innerExpr})`;
-        } else {
-          // e.g., sum by (label) (expr)
-          return `${id}${byClause} (${innerExpr})`;
-        }
-      }
-
-      // No by clause
-      if (funcParams) {
-        // e.g., topk(k, expr)
-        return `${id}(${funcParams}, ${innerExpr})`;
-      }
-      return `${id}(${innerExpr})`;
+      return this.renderAggregation(id, def, params, innerExpr);
     }
 
     // Handle histogram_quantile
@@ -193,29 +159,68 @@ class PromqlRendererImpl implements PromqlRenderer {
     return `${id}(${innerExpr})`;
   }
 
-  /**
-   * Render the complete PromQL query
-   */
-  renderQuery(query: PromqlBuilderQuery): string {
-    // Start with metric and labels
-    let queryStr = query.metric || "";
-    const labelsStr = this.renderLabels(query.labels);
-    if (labelsStr) {
-      queryStr += labelsStr;
-    } else if (queryStr) {
-      // Add empty braces if we have a metric but no labels
-      queryStr += "{}";
+  /** `params` is `[...leading numbers, labels, without?]`; panels saved before `without` lack the flag. */
+  private renderAggregation(
+    id: string,
+    def: PromqlStepSpec,
+    params: PromqlStep["params"],
+    innerExpr: string,
+  ): string {
+    const labelsAt = def.params.findIndex((p) => p.type === "select");
+    const byLabelsParam = params[labelsAt];
+    const without = params[labelsAt + 1] === true;
+    const funcParams = params.slice(0, labelsAt).join(", ");
+
+    let labels: string[] = [];
+    if (Array.isArray(byLabelsParam)) {
+      labels = byLabelsParam.filter((l) => l && l.trim());
+    } else if (typeof byLabelsParam === "string" && byLabelsParam.trim()) {
+      labels = byLabelsParam
+        .split(",")
+        .map((l) => l.trim())
+        .filter((l) => l);
     }
+
+    const args = funcParams ? `${funcParams}, ${innerExpr}` : innerExpr;
+    // `without ()` keeps every label, so it is emitted even with no labels picked.
+    if (without) return `${id} without (${labels.join(", ")}) (${args})`;
+    if (labels.length > 0) return `${id} by (${labels.join(", ")}) (${args})`;
+    return `${id}(${args})`;
+  }
+
+  /** The PromQL text; throws past the branch cap, so a caller keeps its last query instead of writing a blank one. */
+  renderQuery(query: PromqlBuilderQuery): string {
+    const compiled = compileLabelFilters(query.labels);
+    if (!compiled.ok) {
+      throw new Error(`label filters expand to ${compiled.branchCount} selectors`);
+    }
+
+    const steps = query.operations.filter((op) => this.operations.has(normalizeStepId(op.id)));
+    const offsetStep = steps.filter((op) => normalizeStepId(op.id) === PromqlStepId.Offset).pop();
+    const offset = String(offsetStep?.params?.[0] ?? "").trim();
+    const chain = steps.filter((op) => normalizeStepId(op.id) !== PromqlStepId.Offset);
+
+    // A range step reads the selector itself, so it is applied inside each branch of a union.
+    const first = chain[0];
+    const firstIsRange =
+      !!first &&
+      this.operations.get(normalizeStepId(first.id))?.group === PromqlStepGroup.RateAndRange;
+    const suffix = offset ? ` offset ${offset}` : "";
+
+    const leaves = compiled.branches.map((branch) => {
+      const labelsStr = this.renderLabels(branch as PromqlLabelMatcher[]);
+      const selector = (query.metric || "") + (labelsStr || (query.metric ? "{}" : ""));
+      if (firstIsRange) return this.renderOperation(first, selector, suffix);
+      return selector ? selector + suffix : selector;
+    });
 
     // Each step wraps the expression built so far, so the FIRST step ends up
     // innermost and the last one outermost.
     // Example: [max, rate, sum] renders as: sum(rate(max(...)))
-    let currentExpr = queryStr;
-    let inner: number | undefined;
-    for (const operation of query.operations) {
+    let currentExpr = leaves.join(" or ");
+    let inner: number | undefined = leaves.length > 1 ? UNION_PRECEDENCE : undefined;
+    for (const operation of firstIsRange ? chain.slice(1) : chain) {
       const id = normalizeStepId(operation.id);
-      // An unknown step renders nothing, so the expression it was given stays the inner one.
-      if (!this.operations.has(id)) continue;
       const outer = SCALAR_PRECEDENCE[id];
       // A binary input binds looser than (or as loose as) the operator now wrapping it.
       if (inner !== undefined && outer !== undefined && inner <= outer) {

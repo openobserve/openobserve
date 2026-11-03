@@ -55,6 +55,10 @@ class FunctionsPage {
     this.confirmDialog = this.page.locator('[data-test="confirm-dialog"]');
     this.confirmDialogPrimaryBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
     this.confirmDialogSecondaryBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]');
+
+    // Editor drafts: Cancel/Back with unsaved changes opens the shared leave dialog
+    this.draftLeaveDialog = this.page.locator('[data-test="editor-draft-leave-dialog"]');
+    this.draftLeaveDiscardBtn = this.draftLeaveDialog.locator('[data-test="o-dialog-neutral-btn"]');
   }
 
   // ==================== Locator factories (runtime-dynamic) ====================
@@ -186,8 +190,17 @@ class FunctionsPage {
     await this.page.waitForTimeout(2000);
   }
 
+  /** Cancel the editor; unsaved changes are discarded through the leave dialog so no draft is left behind. */
   async clickCancelButton() {
     await this.cancelButton.click();
+    const asked = await this.draftLeaveDialog
+      .waitFor({ state: 'visible', timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+    if (asked) {
+      await this.draftLeaveDiscardBtn.click();
+      await this.draftLeaveDialog.waitFor({ state: 'hidden', timeout: 10000 });
+    }
     await this.page.waitForTimeout(1500); // Wait for dialog to fully close
   }
 

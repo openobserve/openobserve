@@ -17,8 +17,12 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";
 import type { NamedEvent } from "@/utils/rum/productAnalyticsModel";
-import type { StepKind, StepRef } from "@/utils/rum/productAnalyticsQueries";
+import type { FunnelFilter, StepKind, StepRef } from "@/utils/rum/productAnalyticsQueries";
 import { stepLabel } from "@/utils/rum/productAnalyticsPanels";
+import {
+  conditionOf,
+  filterFieldLabel,
+} from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
 
 const KIND_LABEL = {
   p: "rum.analytics.kind.page",
@@ -51,6 +55,14 @@ export default function useStepLabels(
 
   const kindVariant = (s: StepRef): BadgeVariant => KIND_VARIANT[s.kind];
 
+  // A Property row names its condition as the row's own select does.
+  const propCondition = (r: FunnelFilter): I18nText => {
+    const id = conditionOf(r).id;
+    return id === "in" || id === "notIn" || id === "contains" || id === "regex"
+      ? t(`rum.analytics.funnel.propConditions.${id}`)
+      : t(`rum.analytics.funnel.conditions.${id}`);
+  };
+
   const filterChips = (s: StepRef): I18nText[] => [
     ...(s.f?.minMs !== undefined
       ? [t("rum.analytics.funnel.filterOnPage", { seconds: s.f.minMs / 1000 })]
@@ -64,6 +76,13 @@ export default function useStepLabels(
             values: raw(c.values.join(" | ")),
           })
         : t("rum.analytics.funnel.condRefTag", { values: raw(c.values.join(" | ")) }),
+    ),
+    ...(s.f?.pc ?? []).map((r) =>
+      t("rum.analytics.funnel.filterChipCondition", {
+        field: filterFieldLabel(t, r.field),
+        condition: propCondition(r),
+        values: raw(r.values.join(", ")),
+      }),
     ),
   ];
 

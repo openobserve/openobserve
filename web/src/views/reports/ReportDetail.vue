@@ -140,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :report-name="report.name"
       :last-run-status="report.last_run_status"
       :last-run-error="report.last_run_error"
+      :folder-id="(route.query.folder as string) || undefined"
       @update:running="running = $event"
       @ran="historyRef?.afterManualRun()"
     />
@@ -254,20 +255,22 @@ const backTarget = computed(() => ({
   },
 }));
 
-const editReport = (step?: string) =>
-  router.push({
+const editReport = (step?: string) => {
+  const folder = (route.query.folder as string) || "default";
+  return router.push({
     name: "createReport",
     query: {
       report_id: reportId.value,
       name: report.value?.name,
       org_identifier: orgId.value,
-      folder: (route.query.folder as string) || "default",
+      folder,
       ...(step ? { step } : {}),
       returnTo: router.resolve({
         name: "reportDetail",
         params: { report_id: reportId.value },
-        query: { org_identifier: orgId.value, tab: "history" },
+        query: { org_identifier: orgId.value, tab: "history", folder },
       }).fullPath,
     },
   });
+};
 </script>

@@ -20,7 +20,7 @@ const classes = computed(() => {
     base.push(
       "flex flex-row items-center gap-2",
       "flex-none",
-      props.dense ? "px-4 pt-2 pb-1" : "px-4 py-3",
+      props.dense ? "px-4 pt-2 pb-1" : "px-4 py-2.5",
     );
   } else if (props.role === "body") {
     base.push("flex-1 min-h-0", props.dense ? "px-4 pt-0 pb-3" : "p-4");

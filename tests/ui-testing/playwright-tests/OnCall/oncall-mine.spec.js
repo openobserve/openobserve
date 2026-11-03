@@ -141,11 +141,11 @@ test.describe('On-call — my duty, my inbox, my history', {
 
     // One team that resolves and puts the caller on call.
     const staffed = await createTeam(page, { name: `${name}_ok`, timezone: 'UTC' });
+    await addTeamMembers(page, staffed.id, [me]);
     await setTeamSchedule(page, staffed.id, {
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: [me] })],
     });
-    await addTeamMembers(page, staffed.id, [me]);
 
     // And one the caller is on that staffs nobody — genuinely off duty, which
     // must be reported as such and NOT as unknown.
@@ -237,11 +237,11 @@ test.describe('On-call — my duty, my inbox, my history', {
     const prefix = uniqueName(`${workerPrefix(testInfo)}_inbox`);
     const me = process.env.ZO_ROOT_USER_EMAIL;
     const team = await createTeam(page, { name: `${prefix}_team`, timezone: 'UTC' });
+    await addTeamMembers(page, team.id, [me]);
     await setTeamSchedule(page, team.id, {
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: [me] })],
     });
-    await addTeamMembers(page, team.id, [me]);
 
     const service = `${prefix}_svc`;
     const stream = prefix.toLowerCase();
@@ -446,11 +446,11 @@ test.describe('On-call — my duty, my inbox, my history', {
     const prefix = uniqueName(`${workerPrefix(testInfo)}_hist`);
     const emails = await createOrgUsers(page, prefix, 2);
     const team = await createTeam(page, { name: `${prefix}_team` });
+    await addTeamMembers(page, team.id, emails);
     await setTeamSchedule(page, team.id, {
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: emails })],
     });
-    await addTeamMembers(page, team.id, emails);
 
     const service = `${prefix}_svc`;
     const stream = prefix.toLowerCase();

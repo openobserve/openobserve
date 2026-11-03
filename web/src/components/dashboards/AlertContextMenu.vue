@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="visible"
       ref="menuRef"
-      class="bg-dropdown-bg border-dropdown-border rounded-default fixed z-9999 max-w-[calc(100vw-1rem)] min-w-70 border px-0 py-1 shadow-sm dark:shadow-sm"
+      class="bg-dropdown-bg rounded-default shadow-overlay fixed z-9999 max-w-[calc(100vw-1rem)] min-w-70 border border-transparent px-0 py-1"
       :style="menuStyle"
       @click.stop
       data-test="alert-context-menu"

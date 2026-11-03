@@ -299,13 +299,7 @@
     </OPageLayout>
   </OForm>
 
-  <ConfirmDialog
-    v-model="leaveDialog.show"
-    :title="t('aiObservability.promptManagement.discardChangesTitle')"
-    :message="t('aiObservability.promptManagement.discardChangesMessage')"
-    @update:ok="leaveDialog.onConfirm"
-    @update:cancel="leaveDialog.show = false"
-  />
+  <EditorDraftDialogs :draft="promptDraft" />
 </template>
 
 <script setup lang="ts">
@@ -329,8 +323,9 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { useStore } from "vuex";
-import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { useRoute, useRouter } from "vue-router";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import {
   makePromptEditorSchema,
@@ -370,8 +365,8 @@ const baseVersionParam = computed(() => Number(route.query.base_version) || null
 // Null on the create route; loaded from the route on the new-version route.
 const prompt = ref<Prompt | null>(null);
 const baseVersion = ref<PromptVersion | null>(null);
-const leaveDialog = reactive({ show: false, onConfirm: () => {} });
-let allowLeave = false;
+// Set while the leave dialog's Save runs, so a successful save stays on the page.
+let leaveSave: { saved: boolean } | null = null;
 
 const createPrompt = useMutation(() => createPromptMutation(orgId.value));
 const createVersion = useMutation(() => createPromptVersionMutation(orgId.value));
@@ -397,6 +392,7 @@ const commitMessage = form.useStore((state) => state.values.commitMessage);
 const saving = form.useStore((state) => state.isSubmitting);
 const submitted = form.useStore((state) => state.submissionAttempts > 0);
 const dirty = form.useStore((state) => state.isDirty);
+const formValues = form.useStore((state) => state.values);
 const matches = ref<PromptMatch[]>([]);
 const confirmedMatchFingerprint = ref("");
 const providerQuery = useQuery(() => ({
@@ -562,7 +558,7 @@ function goBack() {
   );
 }
 
-function openPlayground() {
+async function openPlayground() {
   if (!router.hasRoute("aiPlayground")) {
     toast({
       variant: "info",
@@ -581,9 +577,17 @@ function openPlayground() {
     config: version.config,
     provenance: { type: "prompt", label: `${promptName}@v${version.version}` },
   });
-  // The draft travels with the handoff, so leaving is not a discard.
-  allowLeave = true;
+  // The work travels with the handoff, so leaving keeps it as a draft instead of asking.
+  if (!keepDraftAndLeave()) return;
   router.push({ name: "aiPlayground", query: { org_identifier: orgId.value, from: "prompt" } });
+}
+
+function keepDraftAndLeave(): boolean {
+  if (!promptDraft.storageAvailable) {
+    promptDraft.discard();
+    return true;
+  }
+  return promptDraft.keepAndRelease();
 }
 
 // Loads the prompt and the version being edited on the new-version route.
@@ -594,7 +598,11 @@ async function load() {
   const entityId = entityIdParam.value;
   prompt.value = null;
   baseVersion.value = null;
-  if (!entityId || !requestedOrg) return reset();
+  if (!entityId || !requestedOrg) {
+    reset();
+    if (requestedOrg) await promptDraft.start();
+    return;
+  }
   try {
     const loaded = await llmPromptsService.get(requestedOrg, entityId);
     const version = await llmPromptsService.getVersion(
@@ -606,13 +614,13 @@ async function load() {
     prompt.value = loaded;
     baseVersion.value = version;
     reset();
+    await promptDraft.start();
   } catch (error: unknown) {
     if (generation !== loadGeneration) return;
     toast({
       variant: "error",
       message: promptErrorText(error, t("aiObservability.promptManagement.versionLoadError")),
     });
-    allowLeave = true;
     goBack();
   }
 }
@@ -685,7 +693,11 @@ async function save(value: PromptEditorForm) {
           })
         : t("aiObservability.promptManagement.createSuccess"),
     });
-    allowLeave = true;
+    if (leaveSave) {
+      leaveSave.saved = true;
+      return;
+    }
+    promptDraft.markSaved();
     router.push(
       aiPromptsRoute(orgId.value, {
         entityId: result.prompt.entityId,
@@ -728,26 +740,56 @@ function moveMessage(from: number, to: number) {
   if (message) variant.messages.splice(to, 0, message);
 }
 
+type PromptDraftFields = Omit<PromptEditorForm, "chatContent">;
+interface PromptDraftData {
+  values: PromptDraftFields;
+  messages: PlaygroundMessage[];
+}
+
+const promptDraft = useEditorDraft<PromptDraftData>({
+  kind: "prompt",
+  entityLabel: () => t("common.editorDraft.entities.prompt"),
+  entityId: () => prompt.value?.entityId ?? null,
+  snapshot: () => {
+    const { chatContent: _chatContent, ...values } = formValues.value;
+    return { values, messages: variant.messages.map((message) => ({ ...message })) };
+  },
+  apply: (data) => {
+    variant.messages = data.messages.map((message) => ({ ...message }));
+    for (const [field, value] of Object.entries(data.values)) {
+      form.setFieldValue(field as keyof PromptDraftFields, value as never);
+    }
+  },
+  base: () =>
+    prompt.value && baseVersion.value
+      ? {
+          entityId: prompt.value.entityId,
+          latestVersion: prompt.value.latestVersion,
+          version: baseVersion.value.version,
+          payload: baseVersion.value.payload,
+          config: baseVersion.value.config,
+        }
+      : null,
+  hasChanges: () => dirty.value,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  // A new base version reloads the form, so it leaves the edits like a path change does.
+  leaveOnRouteUpdate: (to, from) =>
+    to.path !== from.path || to.query.base_version !== from.query.base_version,
+});
+
 watch(
   () => variant.messages.map((message) => message.content),
   (content) => form.setFieldValue("chatContent", content),
   { flush: "sync" },
 );
 watch([orgId, entityIdParam, baseVersionParam], load, { immediate: true });
-
-onBeforeRouteLeave((to, _from, next) => {
-  if (allowLeave || !dirty.value) {
-    next();
-    return;
-  }
-  // Cancel and ask in a dialog: browsers suppress confirm() during navigation.
-  next(false);
-  const destination = to.fullPath;
-  leaveDialog.onConfirm = () => {
-    leaveDialog.show = false;
-    allowLeave = true;
-    router.push(destination);
-  };
-  leaveDialog.show = true;
-});
 </script>

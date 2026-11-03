@@ -98,7 +98,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import type { DropdownAlign } from "@/lib/overlay/Dropdown/ODropdown.types";
 import { reactive, watch, computed } from "vue";
 import type { PropType } from "vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 
@@ -168,6 +168,25 @@ const relativeDates: Record<PeriodKey, number[]> = {
   M: [1, 2, 3, 4, 5, 6],
 };
 
+// Same plural keys the comparison legend uses (dateTimeUtils), so both read the same.
+const agoKeys: Record<PeriodKey, I18nKey> = {
+  s: "dashboard.utils.secondsAgo",
+  m: "dashboard.utils.minutesAgo",
+  h: "dashboard.utils.hoursAgo",
+  d: "dashboard.utils.daysAgo",
+  w: "dashboard.utils.weeksAgo",
+  M: "dashboard.utils.monthsAgo",
+};
+
+const pastKeys: Record<PeriodKey, I18nKey> = {
+  s: "common.pastSecond",
+  m: "common.pastMinute",
+  h: "common.pastHour",
+  d: "common.pastDay",
+  w: "common.pastWeek",
+  M: "common.pastMonth",
+};
+
 const relativePeriods = computed(() =>
   props.excludeMonths ? allRelativePeriods.filter((p) => p.value !== "M") : allRelativePeriods,
 );
@@ -218,19 +237,16 @@ const updateCustomPeriod = (newPeriod: SelectModelValue | string) => {
 };
 
 // Display the current selected offset
-// Parameterised rather than concatenated — word order around the value varies by language.
 const getDisplayValue = () => {
-  return t("common.relativeTimeAgo", {
-    value: picker.data.selectedDate.relative.value,
-    unit: picker.data.selectedDate.relative.label,
-  });
+  const count = picker.data.selectedDate.relative.value;
+  const key = agoKeys[picker.data.selectedDate.relative.period as PeriodKey] ?? agoKeys.m;
+  return t(key, { count }, count);
 };
 
 const getTrimmedDisplayValue = () => {
-  return t("common.relativeTimePast", {
-    value: picker.data.selectedDate.relative.value,
-    unit: picker.data.selectedDate.relative.label,
-  });
+  const count = picker.data.selectedDate.relative.value;
+  const key = pastKeys[picker.data.selectedDate.relative.period as PeriodKey] ?? pastKeys.m;
+  return t(key, { count }, count);
 };
 
 // Check if the current selection matches the modelValue

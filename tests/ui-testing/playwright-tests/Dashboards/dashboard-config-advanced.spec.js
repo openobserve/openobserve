@@ -21,9 +21,7 @@ const testLogger = require('../utils/test-logger.js');
 const { TIME_SHIFT_METRIC, seedTimeShiftMetric } = require('../utils/metrics-explore-seed.js');
 
 test.describe.configure({ mode: "parallel" });
-// No file-level `retries` override: it used to pin this file to 1 retry, which both
-// added a retry locally (project default 0, hiding flakes during development) and
-// *cut* CI's 3 retries down to 1. The project-level policy is the right one.
+// No file-level `retries` override: it would add retries locally (project default 0) and hide flakes during development.
 
 test.describe("ConfigPanel — Advanced Settings", () => {
   test.beforeEach(async ({ page }) => {

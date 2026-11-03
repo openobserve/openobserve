@@ -16,6 +16,9 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
+import config from "@/aws-exports";
+import enUS from "@/locales/languages/en-US.json";
+import { PREBUILT_DESTINATION_TYPES } from "@/utils/prebuilt-templates";
 import { createI18n } from "vue-i18n";
 
 // ==================== TEST DATA FACTORIES ====================
@@ -29,6 +32,7 @@ function createMockI18n() {
     locale: "en",
     messages: {
       en: {
+        ...enUS,
         alerts: {
           customDestination: "Custom Destination",
           customDestinationDescription: "Configure a custom webhook destination",
@@ -570,7 +574,7 @@ describe("PrebuiltDestinationSelector", () => {
 
       // All cards should be within the grid
       cards.forEach((card) => {
-        expect(card.element.parentElement?.classList.contains("selector-grid")).toBe(true);
+        expect(card.element.closest(".selector-grid")).not.toBeNull();
       });
     });
 
@@ -591,5 +595,217 @@ describe("PrebuiltDestinationSelector", () => {
       expect(customCard.classes()).not.toContain("selected");
       expect(customCard.find(".check-icon").exists()).toBe(false);
     });
+  });
+});
+
+describe("Approved Slack choices", () => {
+  const descriptionOf = (wrapper: VueWrapper, type: string) => {
+    const card = findCardByType(wrapper, type);
+    return wrapper.find(`[id="${card.attributes("aria-describedby")}"]`);
+  };
+
+  it("keeps the descriptions in the tooltip text, not in the visible tile", () => {
+    const wrapper = mountComponent({ slackApp: true });
+    const app = descriptionOf(wrapper, "slack_app");
+    expect(app.attributes("data-test")).toBe("destination-type-description");
+    expect(app.classes()).toContain("sr-only");
+    expect(app.text()).toContain(
+      "Recommended for alert response. Updates scheduled alerts in place. Acknowledge, mute and investigate from Slack. Needs a connected workspace.",
+    );
+    expect(descriptionOf(wrapper, "slack").text()).toContain(
+      "Posts a new message with your webhook and template. Use it for on-call pages or custom Slack layouts.",
+    );
+    const shown = findCardByType(wrapper, "slack").find(".card-content").text();
+    expect(shown).not.toContain("Posts a new message");
+    wrapper.unmount();
+  });
+
+  it("has no tag inside the Slack tiles", () => {
+    const wrapper = mountComponent({ slackApp: true });
+    expect(wrapper.findAll('[data-test="destination-type-tag"]')).toHaveLength(0);
+    expect(findCardByType(wrapper, "slack_app").find(".card-content").text()).not.toContain(
+      "Recommended",
+    );
+    expect(wrapper.find('[data-test="destination-type-off"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("renders a short line on every tile", () => {
+    const wrapper = mountComponent({ slackApp: true });
+    const expected: Record<string, string> = {
+      slack_app: "Act on alerts",
+      slack: "Post only",
+      discord: "Chat posts",
+      msteams: "Chat posts",
+      email: "HTML email",
+      pagerduty: "Page on-call",
+      opsgenie: "Page on-call",
+      servicenow: "IT incidents",
+      jira: "Issue tickets",
+      custom: "URL or email",
+    };
+    for (const [type, text] of Object.entries(expected)) {
+      const short = findCardByType(wrapper, type).find('[data-test="destination-type-short"]');
+      expect(short.text()).toBe(text);
+      expect(short.classes()).toContain("mt-auto");
+    }
+    wrapper.unmount();
+  });
+
+  it("marks the unavailable app Off and explains it in the tile tooltip, not under the row", () => {
+    const wrapper = mountComponent({
+      slackApp: false,
+      unavailableReason: "flag",
+      canManageSlack: true,
+    });
+    const card = findCardByType(wrapper, "slack_app");
+    expect(card.find('[data-test="destination-type-off"]').text()).toBe("Off");
+    expect(descriptionOf(wrapper, "slack_app").text()).toContain("O2_SLACK_ENABLED");
+    wrapper.unmount();
+  });
+
+  it("renders nothing after the tile row", () => {
+    for (const props of [{ slackApp: true }, { slackApp: false, unavailableReason: "flag" }]) {
+      const wrapper = mountComponent(props);
+      const root = wrapper.element as HTMLElement;
+      expect(root.children).toHaveLength(1);
+      expect(root.querySelector(".selector-grid")!.parentElement!.parentElement).toBe(root);
+      expect(wrapper.find('[data-test="slack-app-unavailable"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="slack-choice-hint"]').exists()).toBe(false);
+      wrapper.unmount();
+    }
+  });
+
+  const HINT =
+    "On-call pages and super clusters use the webhook. Manual and realtime sends from a Slack app destination are separate posts.";
+
+  it("gives the unavailable Slack app tile the reason, its description and the choice hint as separate lines", () => {
+    const wrapper = mountComponent({
+      slackApp: false,
+      unavailableReason: "master_key",
+      canManageSlack: true,
+    });
+    const lines = descriptionOf(wrapper, "slack_app")
+      .findAll("span")
+      .map((line) => line.text());
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain("O2_MASTER_ENCRYPTION_KEY");
+    expect(lines[2]).toBe(HINT);
+    wrapper.unmount();
+  });
+
+  it("gives the available Slack app and the webhook tile their description and the choice hint", () => {
+    const wrapper = mountComponent({ slackApp: true });
+    for (const id of ["slack_app", "slack"]) {
+      const lines = descriptionOf(wrapper, id)
+        .findAll("span")
+        .map((line) => line.text());
+      expect(lines).toHaveLength(2);
+      expect(lines[1]).toBe(HINT);
+    }
+    wrapper.unmount();
+  });
+
+  it("keeps the choice hint off non-Slack tiles", () => {
+    const wrapper = mountComponent({ slackApp: true });
+    expect(descriptionOf(wrapper, "jira").text()).not.toContain(HINT);
+    wrapper.unmount();
+  });
+
+  it.each([
+    ["flag", "O2_SLACK_ENABLED"],
+    ["master_key", "O2_MASTER_ENCRYPTION_KEY"],
+  ])("names the operator setting in the tooltip for reason %s", (unavailableReason, name) => {
+    const wrapper = mountComponent({ slackApp: false, unavailableReason, canManageSlack: true });
+    expect(descriptionOf(wrapper, "slack_app").text()).toContain(name);
+    expect(wrapper.findAll("button")).toHaveLength(0);
+    wrapper.unmount();
+  });
+
+  it("applies the selected class on click", async () => {
+    const wrapper = mountComponent({ slackApp: true });
+    await findCardByType(wrapper, "discord").trigger("click");
+    expect(wrapper.emitted("update:modelValue")![0]).toEqual(["discord"]);
+    await wrapper.setProps({ modelValue: "discord" });
+    expect(findCardByType(wrapper, "discord").classes()).toContain("selected");
+    wrapper.unmount();
+  });
+
+  const inCloud = (run: () => void | Promise<void>) => async () => {
+    const was = config.isCloud;
+    config.isCloud = "true";
+    try {
+      await run();
+    } finally {
+      config.isCloud = was;
+    }
+  };
+
+  it(
+    "tells every Cloud user the app is not on for the region, with no server variable",
+    inCloud(() => {
+      for (const canManageSlack of [true, false]) {
+        const wrapper = mountComponent({
+          slackApp: false,
+          unavailableReason: "flag",
+          canManageSlack,
+        });
+        const text = descriptionOf(wrapper, "slack_app").text();
+        expect(text).toContain("Not turned on for your Cloud region yet");
+        expect(text).not.toContain("O2_SLACK_ENABLED");
+        wrapper.unmount();
+      }
+    }),
+  );
+
+  it("tells a member who can't turn Slack on to ask an org admin", () => {
+    const wrapper = mountComponent({
+      slackApp: false,
+      unavailableReason: "flag",
+      canManageSlack: false,
+    });
+    expect(descriptionOf(wrapper, "slack_app").text()).toContain(
+      "Ask an org admin to turn on the Slack app",
+    );
+    wrapper.unmount();
+  });
+
+  it("keeps every other destination tile whole in the wider grid", () => {
+    const wrapper = mountComponent({ slackApp: true });
+    expect(wrapper.find(".selector-grid").classes()).toEqual(
+      expect.arrayContaining(["grid-flow-col", "@max-[54rem]/dest-picker:grid-cols-5"]),
+    );
+    const others = PREBUILT_DESTINATION_TYPES.filter((type) => type.id !== "slack");
+    expect(others.length).toBeGreaterThan(0);
+    for (const type of others) {
+      const card = findCardByType(wrapper, type.id);
+      expect(card.classes()).toEqual(expect.arrayContaining(["min-w-0", "cursor-pointer"]));
+      expect(card.attributes("aria-disabled")).toBeUndefined();
+      expect(card.find('[data-test="destination-type-icon"]').exists()).toBe(true);
+      expect(card.find('[data-test="destination-type-name"]').text()).toBe(type.name);
+      expect(card.find(".card-content").classes()).toContain("min-w-0");
+      expect(card.find('[data-test="destination-type-short"]').exists()).toBe(true);
+    }
+    expect(findCardByType(wrapper, "custom").exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("disables the unavailable app with a linked reason while keeping the webhook selectable", async () => {
+    const wrapper = mountComponent({ slackApp: false });
+    const app = findCardByType(wrapper, "slack_app");
+    expect(app.exists()).toBe(true);
+    expect(app.attributes("aria-disabled")).toBe("true");
+    expect(app.attributes("tabindex")).toBe("0");
+    const reason = wrapper.find(`[id="${app.attributes("aria-describedby")}"]`);
+    expect(reason.text()).toContain("Needs the Enterprise Slack app on a single cluster");
+    expect(app.find(".card-content").classes()).toContain("opacity-40");
+    await app.trigger("click");
+    await app.trigger("keydown", { key: "Enter" });
+    await app.trigger("keydown", { key: " " });
+    expect(wrapper.emitted("select")).toBeUndefined();
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+    await clickCard(wrapper, "slack");
+    expect(wrapper.emitted("select")).toEqual([["slack"]]);
+    wrapper.unmount();
   });
 });

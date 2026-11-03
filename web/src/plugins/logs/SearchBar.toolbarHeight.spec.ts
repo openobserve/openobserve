@@ -102,4 +102,48 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
     expectToolbarHeight("logs-view-mode-dropdown-btn");
     expectToolbarHeight("logs-search-bar-utilities-menu-btn");
   });
+
+  it("raises every right-hand control to the same 34px row height", async () => {
+    const innerWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { value: 1600, configurable: true });
+    if (!isPinned("functionEditor")) {
+      togglePin("functionEditor");
+      pinnedByTest.push("functionEditor");
+    }
+    try {
+      wrapper = mountSearchBar(1600);
+      await flushPromises();
+      wrapper.vm.searchObj.meta.showTransformEditor = true;
+      await flushPromises();
+
+      const classesOf = (dataTest: string) => wrapper!.get(`[data-test="${dataTest}"]`).classes();
+      for (const dataTest of [
+        "logs-search-bar-more-options-btn",
+        "logs-search-bar-share-link-btn",
+      ]) {
+        expect(classesOf(dataTest)).toContain("size-[2.125rem]!");
+      }
+      for (const dataTest of [
+        "logs-search-bar-function-editor-pinned-btn",
+        "logs-search-bar-date-time-dropdown",
+        "logs-search-bar-refresh-btn",
+        "logs-search-bar-refresh-cache-dropdown-trigger",
+      ]) {
+        expect(classesOf(dataTest)).toContain(TOGGLE_GROUP_HEIGHT_CLASS);
+      }
+      const runButton = wrapper.get('[data-test="logs-search-bar-refresh-btn"]').element;
+      expect(runButton.nextElementSibling!.classList).toContain(TOGGLE_GROUP_HEIGHT_CLASS);
+      const interval = wrapper.get('[data-test="logs-search-bar-refresh-interval-btn"]').element;
+      expect(interval.parentElement!.classList).toContain("*:size-[2.125rem]!");
+      // A 1px group border around 2rem buttons makes the function selector 34px.
+      for (const dataTest of [
+        "logs-search-bar-function-dropdown",
+        "logs-search-bar-save-function-btn",
+      ]) {
+        expect(classesOf(dataTest)).toContain("size-8!");
+      }
+    } finally {
+      Object.defineProperty(window, "innerWidth", { value: innerWidth, configurable: true });
+    }
+  });
 });

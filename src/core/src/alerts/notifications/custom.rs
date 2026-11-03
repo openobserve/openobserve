@@ -87,6 +87,7 @@ pub(crate) fn apply_custom_template_plain(
             "{episode_id}",
             ctx.episode_id.as_deref().unwrap_or_default(),
         )
+        .replace("{recovery_reason}", &ctx.recovery_reason)
         // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
         // incident notifications build custom JSON and workflows carry
         // hard-coded metadata; neither is wired here in v1. Unset priority and
@@ -518,10 +519,12 @@ mod golden {
             alert_level: "critical".into(),
             alert_status: "firing".to_string(),
             episode_id: None,
+            recovery_reason: String::new(),
             alert_priority: "P1".into(),
             alert_tags: "infra, prod".into(),
             alert_threshold_crit: "90".into(),
             alert_threshold_warn: "80".into(),
+            alert_threshold_operator: ">".into(),
             alert_start_time: "2026-08-01T10:00:00".into(),
             alert_end_time: "2026-08-01T10:10:00".into(),
             alert_start_time_millis: "1785578400000".into(),
@@ -559,6 +562,8 @@ mod golden {
             level: Some(AlertLevel::Critical),
             chart_url: None,
             chart_png: None,
+            alert_id: String::new(),
+            incident_id: String::new(),
         }
     }
 
@@ -594,6 +599,23 @@ mod golden {
     const GOLDEN_ESCAPE: &str = r#"{"hosts":"web\"1"}"#;
     // Truncation is pre-escape: raw web"1 → 4 chars web" → escaped web\".
     const GOLDEN_TRUNC_ROW: &str = r#"{"h":"web\""}"#;
+
+    #[test]
+    fn recovery_reason_renders_on_a_recovery_and_is_empty_on_a_firing() {
+        let tpl = "{alert_status}:{recovery_reason}:{group.host}";
+        let mut ctx = fixture_ctx();
+        ctx.group_labels = Some(std::collections::BTreeMap::from([(
+            "host".to_string(),
+            "a".to_string(),
+        )]));
+        assert_eq!(apply_custom_template(tpl, &ctx, false), "firing::a");
+        ctx.alert_status = "resolved".into();
+        ctx.recovery_reason = "disappeared".into();
+        assert_eq!(
+            apply_custom_template(tpl, &ctx, false),
+            "resolved:disappeared:a"
+        );
+    }
 
     #[test]
     fn golden_scalars() {

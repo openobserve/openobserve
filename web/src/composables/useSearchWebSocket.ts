@@ -416,4 +416,9 @@ const useSearchWebSocket = () => {
   };
 };
 
+/** Closes the shared search socket, if one is open; safe outside a component (sign-out). */
+export const closeSearchSocket = () => {
+  if (_webSocket && socketId.value) _webSocket.cleanupSocket(socketId.value);
+};
+
 export default useSearchWebSocket;

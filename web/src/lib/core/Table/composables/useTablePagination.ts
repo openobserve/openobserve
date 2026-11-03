@@ -13,6 +13,7 @@ export function useTablePagination<TData>(
     currentPage?: number;
     totalCount?: number;
     data: TData[];
+    rowModelWindowed?: boolean;
   },
   emit: any,
 ) {
@@ -62,7 +63,10 @@ export function useTablePagination<TData>(
 
   const totalCount = computed(() => {
     if (isServerMode.value) return props.totalCount ?? 0;
-    return props.data.length;
+    // A windowed row model holds only the visible slice; windowing is off while filters are active.
+    if (props.rowModelWindowed) return props.data.length;
+    // Pages are cut from the filtered rows, so the footer must count those, not the raw data.
+    return table.getFilteredRowModel().rows.length;
   });
 
   const isFirstPage = computed(() => currentPage.value <= 1);

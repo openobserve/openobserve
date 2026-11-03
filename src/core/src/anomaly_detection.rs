@@ -3514,6 +3514,11 @@ pub async fn send_anomaly_alert(
             return Ok(false);
         }
     };
+    if crate::alerts::notifications::jira::is_jira(&endpoint) {
+        return Err(anyhow::anyhow!(
+            crate::alerts::notifications::jira::UNSUPPORTED_SENDER
+        ));
+    }
 
     let link = anomaly_detail_link(&ctx.org_id, &ctx.anomaly_id);
     let message = anomaly_alert_message(&ctx, &link);

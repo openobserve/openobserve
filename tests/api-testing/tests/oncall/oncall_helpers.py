@@ -484,10 +484,13 @@ class OnCallClient:
         return self.oc("GET", f"teams/{team_id}/policy")
 
     def set_policy(self, team_id: str, rungs: list[dict[str, Any]], *,
-                   destinations: list[str] | None = None) -> requests.Response:
+                   destinations: list[str] | None = None,
+                   l0: dict[str, Any] | None = None) -> requests.Response:
         body: dict[str, Any] = {"rungs": rungs}
         if destinations is not None:
             body["destinations"] = destinations
+        if l0 is not None:
+            body["l0"] = l0
         return self.oc("PUT", f"teams/{team_id}/policy", json=body)
 
     def reachability(self, team_id: str) -> requests.Response:

@@ -592,6 +592,28 @@ describe("RcaVerdictCard", () => {
       expect(byTest(single, "rca-verdict-causes").exists()).toBe(false);
     });
 
+    it("agent inline code shows as code, never as backticks, in the headline, causes and impact", () => {
+      const base = rcaRunSummary().card;
+      const card = {
+        ...base,
+        outcome: "multiple_root_causes" as const,
+        headline: "The `adFailure` flag was toggled on",
+        causes: [
+          { id: "h1", statement: "frontend `GET /api/data` failed", band: "medium" as const },
+        ],
+        impact: { ...base.impact!, summary: "`frontend` 5xx" },
+      };
+      const wrapper = mountCard({ cardState: "analyzed", summary: rcaRunSummary({ card }) });
+
+      const headline = byTest(wrapper, "rca-verdict-headline");
+      expect(headline.text()).toBe("The adFailure flag was toggled on");
+      expect(headline.find("code").text()).toBe("adFailure");
+      const cause = byTest(wrapper, "rca-verdict-cause");
+      expect(cause.text()).not.toContain("`");
+      expect(cause.find("code").text()).toBe("GET /api/data");
+      expect(byTest(wrapper, "rca-verdict-impact").find("code").text()).toBe("frontend");
+    });
+
     it("C: Inconclusive, 'Suspected, not confirmed' with the subject statement, band Low, '(diff not read)' (VE17, VE35)", () => {
       const wrapper = mountCard({ cardState: "analyzed", summary: rcaRunSummaryInconclusive() });
 

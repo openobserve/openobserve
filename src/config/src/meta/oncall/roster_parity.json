@@ -1,0 +1,226 @@
+[
+  {
+    "case": "fall back, second 01:15, remove a non-holder (review repro)",
+    "timezone": "America/New_York",
+    "anchor_micros": 1792906200000000,
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "now_micros": 1793513700000000,
+    "new_members": [
+      "b",
+      "c"
+    ],
+    "expected": [
+      "c",
+      "b"
+    ],
+    "shift_micros": 604800000000
+  },
+  {
+    "case": "fall back, first 01:20, before the handover, add",
+    "timezone": "America/New_York",
+    "anchor_micros": 1792906200000000,
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "now_micros": 1793510400000000,
+    "new_members": [
+      "a",
+      "b",
+      "c",
+      "d"
+    ],
+    "expected": [
+      "a",
+      "b",
+      "c",
+      "d"
+    ],
+    "shift_micros": 604800000000
+  },
+  {
+    "case": "fall back, second 01:20, after the handover, add",
+    "timezone": "America/New_York",
+    "anchor_micros": 1792906200000000,
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "now_micros": 1793514000000000,
+    "new_members": [
+      "a",
+      "b",
+      "c",
+      "d"
+    ],
+    "expected": [
+      "d",
+      "b",
+      "c",
+      "a"
+    ],
+    "shift_micros": 604800000000
+  },
+  {
+    "case": "fall back, first 01:45, after the handover, add",
+    "timezone": "America/New_York",
+    "anchor_micros": 1792906200000000,
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "now_micros": 1793511900000000,
+    "new_members": [
+      "a",
+      "b",
+      "c",
+      "d"
+    ],
+    "expected": [
+      "d",
+      "b",
+      "c",
+      "a"
+    ],
+    "shift_micros": 604800000000
+  },
+  {
+    "case": "spring forward, just before the gap, add",
+    "timezone": "America/New_York",
+    "anchor_micros": 1772350200000000,
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "now_micros": 1772952900000000,
+    "new_members": [
+      "a",
+      "b",
+      "c",
+      "d"
+    ],
+    "expected": [
+      "a",
+      "b",
+      "c",
+      "d"
+    ],
+    "shift_micros": 604800000000
+  },
+  {
+    "case": "spring forward, just after the gap, add",
+    "timezone": "America/New_York",
+    "anchor_micros": 1772350200000000,
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "now_micros": 1772953500000000,
+    "new_members": [
+      "a",
+      "b",
+      "c",
+      "d"
+    ],
+    "expected": [
+      "d",
+      "b",
+      "c",
+      "a"
+    ],
+    "shift_micros": 604800000000
+  },
+  {
+    "case": "spring forward, after the gap, remove a non-holder",
+    "timezone": "America/New_York",
+    "anchor_micros": 1772350200000000,
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "now_micros": 1772953500000000,
+    "new_members": [
+      "b",
+      "c"
+    ],
+    "expected": [
+      "c",
+      "b"
+    ],
+    "shift_micros": 604800000000
+  },
+  {
+    "case": "daily shift across the fall back, second 01:15, remove a non-holder",
+    "timezone": "America/New_York",
+    "anchor_micros": 1793338200000000,
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "now_micros": 1793513700000000,
+    "new_members": [
+      "b",
+      "c"
+    ],
+    "expected": [
+      "c",
+      "b"
+    ],
+    "shift_micros": 86400000000
+  },
+  {
+    "case": "edit ten days before the anchor, add",
+    "timezone": "America/New_York",
+    "anchor_micros": 1780318800000000,
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "now_micros": 1779454800000000,
+    "new_members": [
+      "a",
+      "b",
+      "c",
+      "d"
+    ],
+    "expected": [
+      "a",
+      "d",
+      "b",
+      "c"
+    ],
+    "shift_micros": 604800000000
+  },
+  {
+    "case": "Lord Howe 30-minute fall back, second 01:30, remove a non-holder",
+    "timezone": "Australia/Lord_Howe",
+    "anchor_micros": 1806158700000000,
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "now_micros": 1806764400000000,
+    "new_members": [
+      "b",
+      "c"
+    ],
+    "expected": [
+      "c",
+      "b"
+    ],
+    "shift_micros": 604800000000
+  }
+]

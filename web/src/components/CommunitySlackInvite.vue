@@ -255,6 +255,7 @@ const joinSlack = () => {
         <OButton
           data-test="community-slack-invite-join-btn"
           variant="primary"
+          size="cta"
           class="flex-1"
           @click="joinSlack"
         >
@@ -266,6 +267,7 @@ const joinSlack = () => {
         <OButton
           data-test="community-slack-invite-maybe-later-btn"
           variant="outline"
+          size="cta"
           @click="dismiss"
         >
           {{ t("communitySlackInvite.maybeLater") }}

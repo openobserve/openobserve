@@ -34,10 +34,10 @@ use config::{
         downtimes::{
             AffectedItems, DimensionCondition, Downtime, DowntimeDetail, DowntimeListItem,
             DowntimeNotifications, DowntimeRequest, DowntimeSchedule, DowntimeStatus,
-            DowntimeTarget, DowntimeWindow, ExtendDowntimeRequest, ExtendDowntimeResponse,
-            MoveDowntimesRequest, NotificationEvent, PreviewMatch, PreviewRequest, PreviewResponse,
-            Repeat, ResourcesRequest, ResourcesResponse, TargetModule, ValuesRequest,
-            ValuesResponse,
+            DowntimeTarget, DowntimeWindow, EndOnClear, ExtendDowntimeRequest,
+            ExtendDowntimeResponse, MoveDowntimesRequest, MuteSource, NotificationEvent,
+            PreviewMatch, PreviewRequest, PreviewResponse, Repeat, ResourcesRequest,
+            ResourcesResponse, TargetModule, ValuesRequest, ValuesResponse,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
     },
@@ -71,6 +71,8 @@ const MAX_MOVE_IDS: usize = 100;
 const MICROS_PER_SEC: i64 = 1_000_000;
 /// Appended to the name of the one-time row that extends a recurring one.
 const EXTENDED_SUFFIX: &str = " (extended)";
+/// Who cancels an Until-it-clears row when its alert clears, the incidents' system actor (V-36).
+pub const SYSTEM_ACTOR: &str = "system@openobserve.ai";
 /// The order modules are listed in on a combined banner.
 const MODULE_ORDER: [TargetModule; 4] = [
     TargetModule::Alerts,
@@ -215,21 +217,34 @@ pub async fn create(
     req: DowntimeRequest,
 ) -> Result<Downtime, DowntimeError> {
     ensure_enabled()?;
-    let folder_id = resolve_folder(org, &req.folder_id).await?;
-    let req = checked_request(org, user_id, req, None, true).await?;
-    check_room(org)?;
-    let now = now_micros();
-    let mut downtime = created(org, folder_id, &req, user_id, now);
-    downtime.notifications = with_continues(req.notifications.clone(), None);
-    downtime.origin_region = origin_region();
-    let plan = remeasure_plan(None, &downtime).await?;
-    db::downtimes::set(&downtime, plan.jobs()).await?;
-    db::authz::set_ownership(org, "downtimes", db::downtimes::ownership(&downtime)).await;
-    if let Some(due) = started_on_save(&downtime, now) {
-        notify::deliver_in_background(downtime.clone(), due);
-    }
-    plan.trigger(&downtime.id).await;
-    Ok(downtime)
+    insert_new(org, user_id, req, None).await
+}
+
+/// A quick mute from an alert route, whose rule stands in for the folder-write check.
+pub async fn create_for_alert(
+    org: &str,
+    user_id: &str,
+    req: DowntimeRequest,
+    source: MuteSource,
+) -> Result<Downtime, DowntimeError> {
+    ensure_enabled()?;
+    insert_new(org, user_id, req, Some(source)).await
+}
+
+/// The org cap's message when one more row would pass it (V-40).
+pub fn cap_reached(org: &str) -> Option<String> {
+    let limit = get_o2_config().downtimes.max_per_org;
+    (db::downtimes::list_cached(org).len() >= limit).then(|| {
+        format!(
+            "This organization already has {limit} downtimes, the most allowed. Delete ended ones first."
+        )
+    })
+}
+
+/// The stored row, read from the primary like every write.
+pub async fn get_row(org: &str, id: &str) -> Result<Downtime, DowntimeError> {
+    ensure_enabled()?;
+    load(org, id).await
 }
 
 /// Edits everything but the folder, which only `move` changes.
@@ -269,29 +284,73 @@ pub async fn cancel(org: &str, user_id: &str, id: &str) -> Result<Downtime, Down
     ensure_enabled()?;
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
-    let now = now_micros();
-    if before.cancelled_at.is_some() {
-        // A retry still reaches the follow-ups a failed cancel left live.
-        if before.schedule.repeat != Repeat::None {
-            cancel_follow_ups(org, user_id, &before.id, now).await;
+    cancel_row(org, user_id, before).await
+}
+
+/// [cancel] of a quick mute, whose alert rule stands in for the row check.
+pub async fn cancel_quick_mute(
+    org: &str,
+    user_id: &str,
+    before: Downtime,
+) -> Result<Downtime, DowntimeError> {
+    ensure_enabled()?;
+    cancel_row(org, user_id, before).await
+}
+
+/// Ends an Until-it-clears row at the moment its alert first cleared (R-117); idempotent.
+pub async fn cancel_on_clear(org: &str, id: &str, cleared_at: i64) -> Result<bool, DowntimeError> {
+    ensure_enabled()?;
+    for _ in 0..3 {
+        let before = load(org, id).await?;
+        if !ends_on_clear(&before, cleared_at) {
+            return Ok(false);
         }
-        return Ok(before);
-    }
-    check_cancellable(&before, now)?;
-    let after = cancelled(&before, user_id, now);
-    let plan = remeasure_plan(Some(&before), &after).await?;
-    set_if_unchanged(&after, before.updated_at, &plan).await?;
-    forget_recorded_mutes(&after.org, &after.id).await;
-    if let Some(window) = cancelled_window(&before, now) {
-        notify::deliver_in_background(
-            after.clone(),
-            DueEvent::of_window(NotificationEvent::Cancelled, window),
+        let mut after = cancelled(&before, SYSTEM_ACTOR, now_micros());
+        // The first-clear moment, so the row is not live at the recovery it would swallow.
+        after.cancelled_at = Some(cleared_at);
+        let plan = remeasure_plan(Some(&before), &after).await?;
+        if !db::downtimes::set_if_unchanged(&after, before.updated_at, plan.jobs()).await? {
+            continue;
+        }
+        forget_recorded_mutes(org, id).await;
+        log::info!(
+            "[downtimes] audit: {SYSTEM_ACTOR} cancelled {org}/{id} at {cleared_at}, reason end_on_clear"
         );
+        if let Some(window) = cancelled_window(&before, cleared_at) {
+            notify::deliver_in_background(
+                after.clone(),
+                DueEvent::of_window(NotificationEvent::Cancelled, window),
+            );
+        }
+        plan.trigger(&after.id).await;
+        return Ok(true);
     }
+    Err(changed_meanwhile())
+}
+
+/// Moves the end of a quick mute; `end_on_clear` is what the row ends on from now.
+pub async fn extend_quick_mute(
+    org: &str,
+    user_id: &str,
+    before: &Downtime,
+    new_end: i64,
+    end_on_clear: Option<EndOnClear>,
+) -> Result<Downtime, DowntimeError> {
+    ensure_enabled()?;
+    let now = now_micros();
+    let window = extendable_window(before, now)?;
+    if new_end <= now {
+        return Err(DowntimeError::BadRequest(
+            "The new end must be in the future.".to_string(),
+        ));
+    }
+    let mut after = extended_once(before, new_end, user_id, now);
+    after.end_on_clear = end_on_clear;
+    checked_request(org, user_id, request_of(&after), Some(before), false).await?;
+    let plan = remeasure_plan(Some(before), &after).await?;
+    set_if_unchanged(&after, before.updated_at, &plan).await?;
     plan.trigger(&after.id).await;
-    if before.schedule.repeat != Repeat::None {
-        cancel_follow_ups(org, user_id, &before.id, now).await;
-    }
+    notify::deliver_in_background(after.clone(), extended_event(window.start, new_end));
     Ok(after)
 }
 
@@ -366,6 +425,16 @@ pub async fn extend(
         created_id: Some(follow_up.id.clone()),
         downtime: follow_up,
     })
+}
+
+/// Whether `row` is a live Until-it-clears row that a clear at `cleared_at` still ends.
+pub fn ends_on_clear(row: &Downtime, cleared_at: i64) -> bool {
+    row.end_on_clear.is_some()
+        && row.cancelled_at.is_none()
+        && !matches!(
+            schedule::status(&row.schedule, None, cleared_at),
+            DowntimeStatus::Ended
+        )
 }
 
 pub async fn delete(org: &str, user_id: &str, id: &str) -> Result<(), DowntimeError> {
@@ -566,6 +635,34 @@ pub fn corrections_may_change(before: Option<&Downtime>, after: &Downtime) -> bo
     })
 }
 
+async fn cancel_row(org: &str, user_id: &str, before: Downtime) -> Result<Downtime, DowntimeError> {
+    let id = before.id.clone();
+    let now = now_micros();
+    if before.cancelled_at.is_some() {
+        // A retry still reaches the follow-ups a failed cancel left live.
+        if before.schedule.repeat != Repeat::None {
+            cancel_follow_ups(org, user_id, &before.id, now).await;
+        }
+        return Ok(before);
+    }
+    check_cancellable(&before, now)?;
+    let after = cancelled(&before, user_id, now);
+    let plan = remeasure_plan(Some(&before), &after).await?;
+    set_if_unchanged(&after, before.updated_at, &plan).await?;
+    forget_recorded_mutes(&after.org, &after.id).await;
+    if let Some(window) = cancelled_window(&before, now) {
+        notify::deliver_in_background(
+            after.clone(),
+            DueEvent::of_window(NotificationEvent::Cancelled, window),
+        );
+    }
+    plan.trigger(&after.id).await;
+    if before.schedule.repeat != Repeat::None {
+        cancel_follow_ups(org, user_id, &id, now).await;
+    }
+    Ok(after)
+}
+
 /// A lost delete compare-and-set is a 409 that leaves the row's ownership and mutes alone.
 async fn finish_delete(
     deleted: impl Future<Output = Result<bool, anyhow::Error>>,
@@ -722,6 +819,8 @@ fn check_preview(
     groups: &[config::meta::correlation::FieldAlias],
 ) -> Result<(), DowntimeError> {
     let placeholder = DowntimeRequest {
+        alert_groups: None,
+        end_on_clear: None,
         folder_id: DEFAULT_FOLDER.to_string(),
         name: None,
         reason: None,
@@ -773,13 +872,32 @@ async fn resolve_folder(org: &str, folder_id: &str) -> Result<String, DowntimeEr
 }
 
 fn check_room(org: &str) -> Result<(), DowntimeError> {
-    let limit = get_o2_config().downtimes.max_per_org;
-    if db::downtimes::list_cached(org).len() >= limit {
-        return Err(DowntimeError::BadRequest(format!(
-            "This organization already has {limit} downtimes, the most allowed. Delete ended ones first."
-        )));
+    cap_reached(org).map_or(Ok(()), |m| Err(DowntimeError::BadRequest(m)))
+}
+
+/// A new row; `source` is set only for a quick mute from an alert route.
+async fn insert_new(
+    org: &str,
+    user_id: &str,
+    req: DowntimeRequest,
+    source: Option<MuteSource>,
+) -> Result<Downtime, DowntimeError> {
+    let folder_id = resolve_folder(org, &req.folder_id).await?;
+    let req = checked_request(org, user_id, req, None, true).await?;
+    check_room(org)?;
+    let now = now_micros();
+    let mut downtime = created(org, folder_id, &req, user_id, now);
+    downtime.notifications = with_continues(req.notifications.clone(), None);
+    downtime.origin_region = origin_region();
+    downtime.source = source;
+    let plan = remeasure_plan(None, &downtime).await?;
+    db::downtimes::set(&downtime, plan.jobs()).await?;
+    db::authz::set_ownership(org, "downtimes", db::downtimes::ownership(&downtime)).await;
+    if let Some(due) = started_on_save(&downtime, now) {
+        notify::deliver_in_background(downtime.clone(), due);
     }
-    Ok(())
+    plan.trigger(&downtime.id).await;
+    Ok(downtime)
 }
 
 /// Validates, normalizes as stored, then checks what the user may silence if it changed.
@@ -792,6 +910,8 @@ async fn checked_request(
 ) -> Result<DowntimeRequest, DowntimeError> {
     let groups = db::system_settings::get_semantic_field_groups(org).await;
     validate(&req, &groups).map_err(DowntimeError::BadRequest)?;
+    req.check_alert_targets()
+        .map_err(DowntimeError::BadRequest)?;
     span_as_duration(&mut req.schedule);
     if let Some(notifications) = &req.notifications {
         check_notifications(org, notifications, &req.schedule, check_destinations).await?;
@@ -916,6 +1036,9 @@ fn created(
         reason: req.reason.clone(),
         condition: req.condition.clone(),
         targets: req.targets.clone(),
+        alert_groups: req.alert_groups.clone(),
+        end_on_clear: req.end_on_clear.clone(),
+        source: None,
         schedule: req.schedule.clone(),
         cancelled_at: None,
         cancelled_by: None,
@@ -936,6 +1059,8 @@ fn edited(before: &Downtime, req: DowntimeRequest, user_id: &str, now: i64) -> D
         reason: req.reason,
         condition: req.condition,
         targets: req.targets,
+        alert_groups: req.alert_groups,
+        end_on_clear: req.end_on_clear,
         schedule: req.schedule,
         show_banner: req.show_banner,
         version: before.version + 1,
@@ -987,6 +1112,8 @@ fn request_of(row: &Downtime) -> DowntimeRequest {
         show_banner: row.show_banner,
         notifications: row.notifications.clone(),
         version: None,
+        alert_groups: row.alert_groups.clone(),
+        end_on_clear: row.end_on_clear.clone(),
     }
 }
 
@@ -1533,6 +1660,9 @@ mod tests {
 
     fn row(targets: Vec<TargetModule>, start: i64, end: i64) -> Downtime {
         Downtime {
+            alert_groups: None,
+            end_on_clear: None,
+            source: None,
             id: "d1".to_string(),
             org: "acme".to_string(),
             folder_id: "default".to_string(),
@@ -1635,6 +1765,8 @@ mod tests {
     fn an_empty_name_is_generated() {
         let d = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
         let req = DowntimeRequest {
+            alert_groups: None,
+            end_on_clear: None,
             folder_id: "default".to_string(),
             name: Some("  ".to_string()),
             reason: None,
@@ -2412,6 +2544,8 @@ mod tests {
     #[test]
     fn every_writer_bumps_the_version() {
         let req = DowntimeRequest {
+            alert_groups: None,
+            end_on_clear: None,
             folder_id: "default".to_string(),
             name: None,
             reason: None,

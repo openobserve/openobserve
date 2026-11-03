@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :holder="holder"
         :name-of="nameOf"
         :team-members="teamMembers"
+        :timezone="timezone"
         :set-members="setMembers"
       />
       <p

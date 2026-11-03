@@ -25,6 +25,7 @@ const organizationObj = {
   rumToken: {
     rum_token: "",
   },
+  rumTokenForbidden: false,
   // Mirror of the production organizationObj — see src/stores/index.ts.
   correlatedTracesStreams: {
     byTraceId: {} as Record<string, { stream: string; range?: TraceTimeRange }>,
@@ -94,6 +95,7 @@ const store = createStore({
     savedViewDialog: false,
     regionInfo: [],
     zoConfig: {
+      query_history_enabled: true,
       service_account_enabled: true,
       // Enterprise-shaped by default, which is what the synthetics specs were
       // written against. The specs that cover the OSS shape set it to false
@@ -173,6 +175,7 @@ const store = createStore({
       rumToken: {
         rum_token: "",
       },
+      rumTokenForbidden: false,
       quotaThresholdMsg: "",
       functions: [],
       streams: {} as Record<string, unknown>,
@@ -252,6 +255,9 @@ const store = createStore({
     },
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
+    },
+    setRUMTokenForbidden(state, payload) {
+      state.organizationData.rumTokenForbidden = payload;
     },
     setCorrelatedTracesStream(
       state,
@@ -517,6 +523,9 @@ const store = createStore({
     },
     setRUMToken(context, payload) {
       context.commit("setRUMToken", payload);
+    },
+    setRUMTokenForbidden(context, payload) {
+      context.commit("setRUMTokenForbidden", payload);
     },
     // setAllCurrentDashboards(context, payload) {
     //   context.commit('setAllCurrentDashboards', payload);

@@ -23,6 +23,7 @@ the Free Software Foundation, either version 3 of the License, or
       :score-config-versions="scoreConfigVersions"
       :is-refreshing-providers="isRefreshingProviders"
       @saved="handleSaved"
+      @persisted="reloadLists()"
       @cancel="closeFormPage"
       @request-versions="(id) => ensureScoreConfigVersions(orgId, id)"
       @refresh-providers="refreshProviders"
@@ -34,6 +35,7 @@ the Free Software Foundation, either version 3 of the License, or
       :row="jobFormRow"
       :scorers="scorers"
       @saved="handleSaved"
+      @persisted="reloadLists()"
       @cancel="closeFormPage"
     />
     <ImportScoreConfig
@@ -116,9 +118,20 @@ the Free Software Foundation, either version 3 of the License, or
             :data-test="`${activeTab}-list-add-btn`"
             variant="primary"
             size="sm"
+            :aria-label="
+              activeTab === 'scorers' && hasNewScorerDraft
+                ? t('common.editorDraft.newDot', { label: addButtonLabel })
+                : undefined
+            "
             @click="openCreateDialog"
           >
             {{ addButtonLabel }}
+            <EditorDraftDot
+              v-if="activeTab === 'scorers' && hasNewScorerDraft"
+              :saved-at="newScorerDraftSavedAt"
+              corner
+              data-test="scorers-list-add-draft-dot"
+            />
           </OButton>
         </template>
         <template v-else-if="activeTab === 'jobs'" #actions>
@@ -127,9 +140,20 @@ the Free Software Foundation, either version 3 of the License, or
             data-test="eval-job-list-add-btn"
             variant="primary"
             size="sm"
+            :aria-label="
+              jobDrafts.hasNew
+                ? t('common.editorDraft.newDot', { label: addButtonLabel })
+                : undefined
+            "
             @click="openCreateDialog"
           >
             {{ addButtonLabel }}
+            <EditorDraftDot
+              v-if="jobDrafts.hasNew"
+              :saved-at="jobDrafts.savedAt(null)"
+              corner
+              data-test="eval-job-list-add-draft-dot"
+            />
           </OButton>
         </template>
       </OPageHeader>
@@ -156,6 +180,7 @@ the Free Software Foundation, either version 3 of the License, or
             ref="qualityDatePickerRef"
             v-model="qualitySelectedDate"
             :auto-apply-dashboard="true"
+            calendar-presets
             class="max-lg:[&_.date-time-label]:hidden"
             data-test="quality-time-range-picker"
           />
@@ -409,6 +434,7 @@ import { showError } from "./onlineEvals/utils/evalFormat";
 import {
   buildCrossNavigationQuery,
   computeViewState,
+  findRowById,
   parseTabFromRoute,
   rowIdOf as rowIdOfPure,
   type ActiveTab,
@@ -429,6 +455,9 @@ import EvalJobDetail from "./onlineEvals/forms/EvalJobDetail.vue";
 import ScorerFormPage from "./onlineEvals/forms/ScorerFormPage.vue";
 import JobFormPage from "./onlineEvals/forms/JobFormPage.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor, type EditorDraftKind } from "@/utils/drafts/editorDraftStore";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ScoreConfigLibrary from "./onlineEvals/ScoreConfigLibrary.vue";
 import ScorerLibrary from "./onlineEvals/ScorerLibrary.vue";
@@ -525,6 +554,22 @@ const scorerLibrarySelectedCount = ref(0);
 const scorerLibraryImporting = ref(false);
 const scorerLibraryRef = ref<InstanceType<typeof ScorerLibrary> | null>(null);
 const importingEntity = ref<"scoreConfigs" | "scorers" | null>(null);
+
+const jobDrafts = useEditorDraftIds("eval_job");
+const scorerDrafts = useEditorDraftIds("eval_scorer");
+const SCORER_TYPES: ScorerType[] = ["llm_judge", "remote"];
+// A new scorer's draft is kept per type, so the button shows either type's draft.
+const hasNewScorerDraft = computed(() =>
+  SCORER_TYPES.some((type) => scorerDrafts.hasNewVariant(type)),
+);
+const newScorerDraftSavedAt = computed(() => {
+  const times = SCORER_TYPES.flatMap((type) => scorerDrafts.savedAtVariant(type) ?? []);
+  return times.length ? Math.max(...times) : null;
+});
+const DRAFT_KIND_BY_TAB: Partial<Record<ActiveTab, EditorDraftKind>> = {
+  jobs: "eval_job",
+  scorers: "eval_scorer",
+};
 
 const {
   jobs,
@@ -1169,6 +1214,7 @@ function syncFromRoute() {
 
   switch (state.kind) {
     case "none":
+      void dropDeletedItemDraft();
       return;
     case "viewScoreConfig":
       viewRow.value = state.row;
@@ -1211,6 +1257,39 @@ watch(
   () => syncFromRoute(),
 );
 
+function dropDrafts(tab: ActiveTab, ids: string[]) {
+  const kind = DRAFT_KIND_BY_TAB[tab];
+  if (!kind) return;
+  for (const id of ids) deleteEditorDraftsFor({ kind, org: orgId.value, entityId: id });
+}
+
+/** Opening the edit form of an item that is gone drops its draft and says so, once a fresh read of its list confirms it. */
+async function dropDeletedItemDraft() {
+  const { action, id, tab: tabQuery } = route.query;
+  const tab = parseTabFromRoute(tabQuery);
+  const kind = DRAFT_KIND_BY_TAB[tab];
+  if (action !== "update" || typeof id !== "string" || !kind) return;
+  const drafts = tab === "jobs" ? jobDrafts : scorerDrafts;
+  if (!drafts.ids.has(id)) return;
+  // The cached list may predate the item (made in another tab within its stale time).
+  await reloadLists(true);
+  if (route.query.action !== "update" || route.query.id !== id) return;
+  if (findRowById(tab, id, rowsByTab.value)) {
+    syncFromRoute();
+    return;
+  }
+  const listKey =
+    tab === "jobs" ? onlineEvalKeys.jobs(orgId.value) : onlineEvalKeys.scorers(orgId.value);
+  if (queryClient.getQueryState(listKey)?.status !== "success") return;
+  deleteEditorDraftsFor({ kind, org: orgId.value, entityId: id });
+  toast({
+    variant: "info",
+    message: t("common.editorDraft.itemDeleted", {
+      entity: t(`common.editorDraft.entities.${kind}`),
+    }),
+  });
+}
+
 function deleteRow(row: AnyRow) {
   pendingDeleteRow.value = row;
   pendingDeleteTab.value = activeTab.value;
@@ -1248,6 +1327,7 @@ async function performDelete() {
           ? entityId(row as Scorer)
           : (row as EvalJob).id;
     await deleteEvalEntity.mutateAsync({ tab, id });
+    dropDrafts(tab, [id]);
 
     toast({
       variant: "success",
@@ -1271,6 +1351,10 @@ async function performBulkJobsDelete() {
   try {
     const results = await Promise.allSettled(
       ids.map((id) => deleteEvalEntity.mutateAsync({ tab: "jobs", id })),
+    );
+    dropDrafts(
+      "jobs",
+      ids.filter((_, index) => results[index].status === "fulfilled"),
     );
     const failed = results.filter((r) => r.status === "rejected").length;
     if (failed > 0) {

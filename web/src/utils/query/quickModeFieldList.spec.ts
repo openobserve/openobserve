@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { hasSubquery, replaceSelectFieldList } from "./quickModeFieldList";
+import {
+  quickModeHiddenFieldCount,
+  hasSubquery,
+  replaceSelectFieldList,
+} from "./quickModeFieldList";
 
 describe("replaceSelectFieldList", () => {
   describe("queries containing a subquery are left alone", () => {
@@ -131,5 +135,43 @@ limit 10`;
     it("returns an empty query unchanged", () => {
       expect(replaceSelectFieldList("", "x,y")).toBe("");
     });
+  });
+});
+
+describe("quickModeHiddenFieldCount", () => {
+  const streamFields = [
+    { name: "app", label: true },
+    { name: "_timestamp", isSchemaField: true },
+    { name: "level", isSchemaField: true },
+    { name: "message", isSchemaField: true },
+    { name: "_all", isSchemaField: true },
+    { name: "extracted", isSchemaField: false },
+  ];
+  const state = {
+    quickMode: true,
+    sqlMode: false,
+    streamCount: 1,
+    interestingFields: ["level"],
+    streamFields,
+    allFieldsName: "_all",
+  };
+  const row = { _timestamp: 1, level: "info" };
+
+  it("counts the fields a quick-mode row shows", () => {
+    expect(quickModeHiddenFieldCount(row, state)).toEqual({ shown: 2, total: 3 });
+  });
+
+  it("returns null when the row has every field", () => {
+    expect(quickModeHiddenFieldCount({ ...row, message: "m" }, state)).toBeNull();
+  });
+
+  it.each([
+    ["quick mode off", { quickMode: false }],
+    ["SQL mode", { sqlMode: true }],
+    ["several streams", { streamCount: 2 }],
+    ["no interesting fields", { interestingFields: [] }],
+    ["no schema loaded", { streamFields: [] }],
+  ])("returns null with %s", (_name, patch) => {
+    expect(quickModeHiddenFieldCount(row, { ...state, ...patch })).toBeNull();
   });
 });

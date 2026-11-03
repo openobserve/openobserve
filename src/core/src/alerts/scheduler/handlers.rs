@@ -20,7 +20,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        alerts::{TriggerCondition, fixed_offset, level::DeliveryDecision},
+        alerts::{TriggerCondition, cron_fires_between, level::DeliveryDecision, next_cron_after},
         dashboards::reports::{ReportFrequency, ReportFrequencyType},
         pipeline::components::{DerivedStream, NodeData, PipelineSource},
         self_reporting::{
@@ -128,9 +128,31 @@ async fn persist_alert_run_state(
     rule_value: Option<&str>,
     episode: &config::meta::alerts::recovery::EpisodeInput,
 ) -> bool {
+    let Some(recoveries) = persist_alert_run_state_deferred(
+        alert, alert_id, outcome, level, grouped, rule_value, episode,
+    )
+    .await
+    else {
+        return false;
+    };
+    crate::alerts::recovery::dispatch_group_recoveries(alert, recoveries).await;
+    true
+}
+
+/// [`persist_alert_run_state`] that hands back the group recoveries its write committed, unsent.
+#[must_use]
+async fn persist_alert_run_state_deferred(
+    alert: &config::meta::alerts::alert::Alert,
+    alert_id: &str,
+    outcome: &RunOutcome,
+    level: Option<config::meta::alerts::level::AlertLevel>,
+    grouped: Option<&config::meta::alerts::grouping::GroupClassification>,
+    rule_value: Option<&str>,
+    episode: &config::meta::alerts::recovery::EpisodeInput,
+) -> Option<Vec<config::meta::alerts::recovery::RecoveryEvent>> {
     use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
 
-    // Every delivery path persists here, the grouped and deduplicated ones included.
+    // Every delivery path persists here.
     #[cfg(feature = "enterprise")]
     if clears_recorded_mute(outcome) {
         clear_recorded_mute(&alert.org_id, alert_id).await;
@@ -147,69 +169,7 @@ async fn persist_alert_run_state(
     if let Some(classification) = grouped
         && !matches!(outcome, RunOutcome::Skipped)
     {
-        let prev = match load_tracked_group_states(alert_id).await {
-            Ok(p) => p,
-            Err(e) => {
-                log::warn!("[SCHEDULER] could not read group states for {alert_id}: {e}");
-                return false;
-            }
-        };
-        let at = now_micros();
-        let plan = if alert.query_condition.promql_rule_mode {
-            config::meta::alerts::prom_rule::plan_rule_updates(
-                alert_id,
-                classification,
-                &prev,
-                at,
-                alert.pending_period_sec,
-            )
-        } else {
-            config::meta::alerts::grouping::plan_group_updates(
-                alert_id,
-                classification,
-                &prev,
-                at,
-                alert.pending_period_sec,
-            )
-        };
-        if let Err(e) = db::alerts::alert_states::persist_group_plan(&plan, alert_id).await {
-            log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
-            return false;
-        }
-
-        // A composite reads only this multi-alert's rollup row. Nudge its
-        // parents on a rollup transition or a stale-to-fresh return, exactly
-        // as the single-row path does — otherwise a grouped child is sweep-only.
-        let rollup = plan.updates.iter().find(|update| {
-            update
-                .state
-                .as_ref()
-                .is_some_and(|state| state.group_key.as_str() == ROLLUP_GROUP_KEY)
-        });
-        let transition_changed = rollup.is_some_and(|update| update.transition.is_some());
-        let stale_to_fresh = prev
-            .get(ROLLUP_GROUP_KEY)
-            .and_then(|state| state.level_at)
-            .is_some_and(|level_at| {
-                config::meta::alerts::composite::alert_stale_deadline_micros(
-                    level_at,
-                    &alert.trigger_condition,
-                    alert.tz_offset,
-                    composite_stale_k(),
-                )
-                .map(|deadline| at > deadline)
-                .unwrap_or(false)
-            });
-        if transition_changed || stale_to_fresh {
-            nudge_composite_parents(
-                &alert.org_id,
-                alert_id,
-                infra::table::alert_composites::ChildKind::Alert,
-                at,
-            )
-            .await;
-        }
-        return true;
+        return persist_group_run_state(alert, alert_id, classification).await;
     }
 
     // `Skipped` runs are dropped by `apply_outcome` so a silenced evaluation
@@ -221,7 +181,7 @@ async fn persist_alert_run_state(
                 "[SCHEDULER] could not read alert state for {}/{alert_id}: {e}",
                 alert.org_id
             );
-            return false;
+            return None;
         }
     };
 
@@ -257,15 +217,27 @@ async fn persist_alert_run_state(
         )
     };
 
+    // A Slack app send of this run already published the start it predicted for the new firing.
+    let pending_start = crate::alerts::slack_publish::take_pending_start(alert_id, now);
+    if let (Some(started), Some(state)) = (pending_start, update.state.as_mut())
+        && prev.as_ref().and_then(|p| p.firing_started_at).is_none()
+        && state.firing_started_at == Some(now)
+    {
+        state.firing_started_at = Some(started);
+    }
+
     // Emitted only once `persist` committed, or consumers hear of an unrecorded recovery.
     let recovered = update.state.as_mut().and_then(|state| {
         let firing = state.level.is_some_and(|l| l.is_firing());
-        config::meta::alerts::recovery::apply_episode(state, firing, episode, now, || {
-            episode
-                .episode_id
-                .clone()
-                .unwrap_or_else(config::ider::uuid)
-        })
+        let closed =
+            config::meta::alerts::recovery::apply_episode(state, firing, episode, now, || {
+                episode
+                    .episode_id
+                    .clone()
+                    .unwrap_or_else(config::ider::uuid)
+            });
+        config::meta::alerts::recovery::hold_firing_cycle(prev.as_ref(), state);
+        closed
     });
 
     // ── Availability ledger (S-16) ──────────────────────────────────────────
@@ -294,21 +266,33 @@ async fn persist_alert_run_state(
     );
 
     if update.is_noop() && ledger.is_none() {
-        return true;
+        return Some(vec![]);
     }
     if let Err(e) = db::alerts::alert_states::persist(&update, ledger.as_ref()).await {
         log::error!(
             "[SCHEDULER] could not persist alert state for {}/{alert_id}: {e}",
             alert.org_id
         );
-        return false;
+        return None;
+    }
+
+    // The clear hook ran before this commit; marking again keeps a render that raced it honest.
+    if let Some(close) = config::meta::alerts::recovery::closes_firing_cycle(
+        prev.as_ref(),
+        update.state.as_ref(),
+        now,
+    ) {
+        crate::alerts::lifecycle::mark_committed_clear(alert_id, close.firing_started_at).await;
     }
 
     if let Some(closed) = recovered
         && let Some(state) = update.state.as_ref()
     {
-        let event =
+        let mut event =
             config::meta::alerts::recovery::recovery_event(&alert.org_id, state, closed, now);
+        event.firing_started_at = event
+            .firing_started_at
+            .or(prev.as_ref().and_then(|p| p.firing_started_at));
         crate::alerts::recovery::dispatch_recovery(alert, &event).await;
     }
 
@@ -339,7 +323,150 @@ async fn persist_alert_run_state(
         )
         .await;
     }
-    true
+    Some(vec![])
+}
+
+/// The grouped branch of [`persist_alert_run_state_deferred`]: one plan, its closes as events.
+async fn persist_group_run_state(
+    alert: &config::meta::alerts::alert::Alert,
+    alert_id: &str,
+    classification: &config::meta::alerts::grouping::GroupClassification,
+) -> Option<Vec<config::meta::alerts::recovery::RecoveryEvent>> {
+    use config::meta::alerts::state::ROLLUP_GROUP_KEY;
+
+    let prev = match load_tracked_group_states(alert_id).await {
+        Ok(p) => p,
+        Err(e) => {
+            log::warn!("[SCHEDULER] could not read group states for {alert_id}: {e}");
+            return None;
+        }
+    };
+    let at = now_micros();
+    let plan = if alert.query_condition.promql_rule_mode {
+        config::meta::alerts::prom_rule::plan_rule_updates(
+            alert_id,
+            classification,
+            &prev,
+            at,
+            alert.pending_period_sec,
+            alert.keep_firing_for,
+        )
+    } else {
+        config::meta::alerts::grouping::plan_group_updates(
+            alert_id,
+            classification,
+            &prev,
+            at,
+            alert.pending_period_sec,
+            alert.keep_firing_for,
+        )
+    };
+    crate::alerts::recovery::log_orphaned_episodes(
+        alert_id,
+        plan.evicted.iter().filter_map(|key| prev.get(key)),
+        "evicted",
+    );
+    let write = match db::alerts::alert_states::persist_group_plan(
+        &plan,
+        alert_id,
+        infra::table::alert_states::PlanApply::Evaluation,
+    )
+    .await
+    {
+        Ok(write) => write,
+        Err(e) => {
+            log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
+            return None;
+        }
+    };
+    let cleared = crate::alerts::lifecycle::group_plan_clears(&prev, &plan, &write, at);
+    crate::alerts::lifecycle::on_all_cleared(&alert.org_id, alert_id, &cleared).await;
+
+    // A composite reads only this multi-alert's rollup row. Nudge its
+    // parents on a rollup transition or a stale-to-fresh return, exactly
+    // as the single-row path does — otherwise a grouped child is sweep-only.
+    let rollup = plan.updates.iter().find(|update| {
+        update
+            .state
+            .as_ref()
+            .is_some_and(|state| state.group_key.as_str() == ROLLUP_GROUP_KEY)
+    });
+    let transition_changed = rollup.is_some_and(|update| update.transition.is_some());
+    let stale_to_fresh = prev
+        .get(ROLLUP_GROUP_KEY)
+        .and_then(|state| state.level_at)
+        .is_some_and(|level_at| {
+            config::meta::alerts::composite::alert_stale_deadline_micros(
+                level_at,
+                &alert.trigger_condition,
+                alert.tz_offset,
+                composite_stale_k(),
+            )
+            .map(|deadline| at > deadline)
+            .unwrap_or(false)
+        });
+    if transition_changed || stale_to_fresh {
+        nudge_composite_parents(
+            &alert.org_id,
+            alert_id,
+            infra::table::alert_composites::ChildKind::Alert,
+            at,
+        )
+        .await;
+    }
+    Some(
+        write
+            .closed
+            .iter()
+            .map(|close| close.recovery_event(&alert.org_id, alert_id, at))
+            .collect(),
+    )
+}
+
+/// Whether the alert's firing cycle lives on its rollup row: every alert but a multi-alert,
+/// which clears per group. [pure]
+fn closes_single_row_cycle(query: &config::meta::alerts::QueryCondition) -> bool {
+    !query.multi_alert_enabled()
+}
+
+/// Ends the single-row firing cycle a clear run closes, ahead of the on-call clear-run and persist.
+async fn close_single_row_cycle(
+    alert: &config::meta::alerts::alert::Alert,
+    level: Option<config::meta::alerts::level::AlertLevel>,
+    now: i64,
+) {
+    use config::meta::alerts::state::ROLLUP_GROUP_KEY;
+
+    if !closes_single_row_cycle(&alert.query_condition) {
+        return;
+    }
+    let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string()) else {
+        return;
+    };
+    let prev = match infra::table::alert_states::get(&alert_id, ROLLUP_GROUP_KEY).await {
+        Ok(prev) => prev,
+        Err(e) => {
+            log::warn!("[SCHEDULER] could not read alert state for {alert_id}: {e}");
+            return;
+        }
+    };
+    let Some(close) = config::meta::alerts::recovery::single_row_clear(
+        prev.as_ref(),
+        level,
+        alert.keep_firing_for,
+        now,
+    ) else {
+        return;
+    };
+    crate::alerts::lifecycle::on_cleared(
+        &alert.org_id,
+        &alert_id,
+        ROLLUP_GROUP_KEY,
+        close.firing_started_at,
+        close.cleared_at,
+        crate::alerts::lifecycle::ClearKind::Recovered,
+    )
+    .await;
 }
 
 /// Every state row this alert currently tracks, keyed by `group_key` — the
@@ -371,16 +498,12 @@ async fn load_tracked_group_states(
 
 /// What [`dispatch_per_group`] actually did, per group.
 struct GroupDispatchOutcome {
-    delivered: usize,
     failed: usize,
     /// Groups that fired this evaluation, whether or not anything was sent for them.
     fired: usize,
     // how many have transitioned to pending state
     pending: usize,
     errors: Vec<String>,
-    /// Group keys whose send succeeded. A dedup reservation is confirmed by
-    /// its OWN group's delivery, never a sibling's (§5.5 MN-6).
-    delivered_groups: std::collections::HashSet<String>,
     /// Whether any group's send dispatched a destination or workflow.
     attempted: bool,
     /// The state layer failed, so nothing was even attempted. Distinct from
@@ -390,18 +513,27 @@ struct GroupDispatchOutcome {
     state_failed: bool,
     /// The first downtime that kept one of the groups silent.
     downtime_id: Option<String>,
+    /// Who acked the first group an ack kept silent.
+    acked_by: Option<String>,
+    /// Some group was withheld because it repeated its last delivery.
+    repeated: bool,
 }
 
 impl GroupDispatchOutcome {
-    /// Any muted group names its downtime; only a run with every group muted is Suppressed.
+    /// Any muted group names its downtime or ack; only a run with every group muted is Suppressed.
     fn record_downtime(&self, row: &mut TriggerData) {
-        let Some(downtime_id) = self.downtime_id.clone() else {
+        if self.downtime_id.is_none() && self.acked_by.is_none() {
             return;
-        };
+        }
         if self.fired == 0 && self.pending == 0 {
             row.status = RunOutcome::Suppressed;
         }
-        row.downtime_id = Some(downtime_id);
+        if let Some(downtime_id) = self.downtime_id.clone() {
+            row.downtime_id = Some(downtime_id);
+        }
+        if let Some(acked_by) = self.acked_by.clone() {
+            row.acked_by = Some(acked_by);
+        }
     }
 
     /// The evaluation's record: any undelivered destination is a delivery failure.
@@ -471,7 +603,7 @@ async fn dispatch_per_group(
     // The rollup outcome follows the classification, not an assumption: an
     // evaluation can reach dispatch with every group healthy.
     let rollup_outcome = config::meta::alerts::grouping::group_outcome(classification.rollup);
-    if !persist_alert_run_state(
+    let Some(recoveries) = persist_alert_run_state_deferred(
         alert,
         &alert_id,
         &rollup_outcome,
@@ -481,7 +613,7 @@ async fn dispatch_per_group(
         &config::meta::alerts::recovery::EpisodeInput::undelivered(alert.keep_firing_for),
     )
     .await
-    {
+    else {
         // MN-1: dispatch only AFTER the plan commits. Sending against stale
         // state would page a group under the previous episode and its delivery
         // callback would be rejected as stale — a page with nothing recording
@@ -491,32 +623,34 @@ async fn dispatch_per_group(
              skipping per-group dispatch this evaluation"
         );
         return Some(GroupDispatchOutcome {
-            delivered: 0,
             failed: 0,
             fired: 0,
             pending: 0,
             errors: vec!["group state did not commit".to_string()],
-            delivered_groups: Default::default(),
             attempted: false,
             state_failed: true,
             downtime_id: None,
+            acked_by: None,
+            repeated: false,
         });
-    }
+    };
 
     let states = match load_tracked_group_states(&alert_id).await {
         Ok(s) => s,
         Err(e) => {
             log::error!("[SCHEDULER trace_id {trace_id}] group dispatch: state read failed: {e}");
+            // The plan's closes already committed, so their recoveries are owed regardless.
+            crate::alerts::recovery::dispatch_group_recoveries(alert, recoveries).await;
             return Some(GroupDispatchOutcome {
-                delivered: 0,
                 failed: 0,
                 fired: 0,
                 pending: 0,
                 errors: vec![format!("group state read failed: {e}")],
-                delivered_groups: Default::default(),
                 attempted: false,
                 state_failed: true,
                 downtime_id: None,
+                acked_by: None,
+                repeated: false,
             });
         }
     };
@@ -543,7 +677,10 @@ async fn dispatch_per_group(
     };
     let cfg = get_config();
     let muted_groups = group_downtime_map(alert, folder_id, records).await;
+    let acked_groups =
+        crate::alerts::ack::in_force_by_group(&alert.org_id, &alert_id, &states).await;
 
+    // Downtime first, then ack; an ack never holds back a real level increase (R-119).
     let plan = plan_dispatch(
         classification,
         &states,
@@ -551,7 +688,11 @@ async fn dispatch_per_group(
         &alert.trigger_condition,
         now_micros(),
         cfg.limit.alert_max_group_notifications_per_eval,
-        |key| muted_groups.contains_key(key),
+        alert.suppresses_repeats(),
+        |key, decision, last_notified| {
+            muted_groups.contains_key(key)
+                || (acked_groups.contains_key(key) && decision.ack_withholds(last_notified))
+        },
     );
 
     // Never silent: both the volume cap and any consistency failure are
@@ -577,12 +718,20 @@ async fn dispatch_per_group(
 
     let (mut delivered, mut failed) = (0usize, 0usize);
     let mut errors: Vec<String> = Vec::new();
-    let mut delivered_groups: std::collections::HashSet<String> = Default::default();
     let (mut downtime_suppressed, mut downtime_id) = (0usize, None);
+    let mut acked_by: Option<String> = None;
     let mut attempted = false;
     // One group muted, the others notify: no send and no silence window for this group.
     for key in &plan.muted {
         let Some(downtime) = muted_groups.get(key) else {
+            if let Some(by) = acked_groups.get(key) {
+                log::info!(
+                    "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {key}: suppressed by \
+                     the ack of {by}"
+                );
+                crate::alerts::alert::count_suppressed_run(&alert.org_id, "alerts");
+                acked_by.get_or_insert(by.clone());
+            }
             continue;
         };
         log::info!(
@@ -604,6 +753,13 @@ async fn dispatch_per_group(
         if muted_groups.contains_key(&item.group_key) {
             continue;
         }
+        // Chosen before the send: a resolve only closes a ticket opened under the key it quotes.
+        let episode_key = (alert.notify_on_recovery || alert.suppresses_repeats()).then(|| {
+            states
+                .get(&item.group_key)
+                .and_then(|state| state.episode_id.clone())
+                .unwrap_or_else(config::ider::uuid)
+        });
         // The group's OWN row, level and value — never the worst group's
         // (MN-3). One send per group is what makes host-a and host-b page
         // independently.
@@ -620,7 +776,7 @@ async fn dispatch_per_group(
                 // last so a label value containing `{...}` cannot expand.
                 Some(&item.labels),
                 &[],
-                None,
+                episode_key.clone().filter(|_| alert.notify_on_recovery),
             )
             .await;
 
@@ -668,7 +824,6 @@ async fn dispatch_per_group(
         // how the pure and SQL layers drifted apart before.
         let record = if ok {
             delivered += 1;
-            delivered_groups.insert(item.group_key.clone());
             infra::table::alert_states::DeliveryOutcome::Delivered {
                 silence_minutes: alert.trigger_condition.silence,
                 at: resolved_at,
@@ -678,40 +833,71 @@ async fn dispatch_per_group(
             infra::table::alert_states::DeliveryOutcome::Failed { at: resolved_at }
         };
 
-        if let Err(e) = db::alerts::alert_states::advance_delivery_state(
-            &alert_id,
-            &item.group_key,
-            item.episode,
-            record,
-        )
-        .await
-        {
-            log::error!(
-                "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: could not record \
-                 delivery outcome: {e}",
-                item.group_key
-            );
-        }
+        let mint = episode_key.as_deref().filter(|_| ok);
+        record_group_delivery(alert, &alert_id, trace_id, item, record, mint).await;
     }
+    crate::alerts::recovery::dispatch_group_recoveries(alert, recoveries).await;
 
     log::info!(
         "[SCHEDULER trace_id {trace_id}] alert {alert_id}: per-group dispatch delivered={delivered} \
-         pending={} failed={failed} suppressed={} downtime={downtime_suppressed} candidates={}",
+         pending={} failed={failed} suppressed={} repeats={} downtime={downtime_suppressed} \
+         candidates={}",
         plan.pending,
         plan.suppressed,
+        plan.repeats,
         plan.items.len()
     );
     Some(GroupDispatchOutcome {
-        delivered,
         failed,
         fired: plan.items.len(),
         pending: plan.pending,
         errors,
-        delivered_groups,
         attempted,
         state_failed: false,
         downtime_id,
+        acked_by,
+        repeated: plan.repeats > 0,
     })
+}
+
+/// Records one group's delivery and the key it carried; a key the row cannot keep is logged (D1).
+async fn record_group_delivery(
+    alert: &config::meta::alerts::alert::Alert,
+    alert_id: &str,
+    trace_id: &str,
+    item: &config::meta::alerts::dispatch::DispatchItem,
+    record: infra::table::alert_states::DeliveryOutcome,
+    mint: Option<&str>,
+) {
+    let group_key = &item.group_key;
+    match db::alerts::alert_states::advance_delivery_state(
+        alert_id,
+        group_key,
+        item.episode,
+        record,
+        mint,
+    )
+    .await
+    {
+        Ok(advance) if advance.mint == infra::table::alert_states::MintOutcome::Orphaned => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {group_key}: episode key {} \
+                 reached {:?} but the group row is gone or holds another episode; that ticket \
+                 will not be resolved",
+                mint.unwrap_or_default(),
+                alert.destinations
+            );
+        }
+        Ok(_) => {}
+        Err(e) => {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {group_key}: could not \
+                 record delivery outcome (episode key {:?}, destinations {:?}): {e}",
+                mint,
+                alert.destinations
+            );
+        }
+    }
 }
 
 /// The downtime of each muted group of a multi-alert, from one identity call over every row.
@@ -731,30 +917,6 @@ async fn group_downtime_map(
     _rows: &[config::utils::json::Map<String, config::utils::json::Value>],
 ) -> HashMap<String, config::meta::downtimes::ActiveDowntime> {
     HashMap::new()
-}
-
-/// Confirm this evaluation's dedup reservations once a notification landed
-/// (§5.5 MN-6).
-///
-/// Unconfirmed reservations do not suppress, so skipping this on failure is
-/// exactly what allows the next evaluation through. Best-effort: failing to
-/// confirm costs at most one duplicate notification, while failing the
-/// evaluation over it would cost the alert.
-async fn confirm_dedup_reservations(org_id: &str, fingerprints: &[String]) {
-    if fingerprints.is_empty() {
-        return;
-    }
-    #[cfg(feature = "enterprise")]
-    {
-        let db = infra::db::get_orm_client_rw().await;
-        if let Err(e) =
-            crate::alerts::deduplication::confirm_notification_sent(db, org_id, fingerprints).await
-        {
-            log::warn!("[SCHEDULER] could not confirm dedup reservations: {e}");
-        }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let _ = (org_id, fingerprints);
 }
 
 pub async fn handle_triggers(
@@ -799,7 +961,38 @@ pub async fn handle_triggers(
             super::calibration::handle_triggers(trace_id, trigger).await
         }
         db::scheduler::TriggerModule::FleetRollout => handle_fleet_rollout_triggers(trigger).await,
+        db::scheduler::TriggerModule::OncallSlackSync => {
+            handle_oncall_slack_sync_triggers(trigger).await
+        }
     }
+}
+
+/// Runs one Slack sync pass of the page; the pass ends its own row (C11).
+#[cfg(feature = "enterprise")]
+async fn handle_oncall_slack_sync_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    o2_enterprise::enterprise::oncall::chat::pass::run(&trigger).await
+}
+
+/// Completes the page's sync row with no Slack call, fenced by this claim: this build has no
+/// sync pass. Region-local: `infra::scheduler` never replicates.
+#[cfg(not(feature = "enterprise"))]
+async fn handle_oncall_slack_sync_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    let finish = config::meta::triggers::SlackSyncFinish {
+        status: db::scheduler::TriggerStatus::Completed,
+        next_run_at: trigger.next_run_at,
+        data: Default::default(),
+    };
+    if !infra::scheduler::finish_slack_sync(&trigger, &finish).await? {
+        log::warn!(
+            "[ONCALL] Slack sync of {} lost its claim before it finished",
+            trigger.module_key
+        );
+    }
+    Ok(())
 }
 
 /// Region-local (D21): only `infra::scheduler`, which never replicates to other regions.
@@ -1265,6 +1458,15 @@ async fn handle_composite_alert_trigger(
     }
     infra::table::alert_states::persist_update_in_transaction(&transaction, &update).await?;
     transaction.commit().await?;
+    if let Some(c) = crate::alerts::lifecycle::update_clear(
+        previous.as_ref(),
+        &update,
+        now,
+        crate::alerts::lifecycle::ClearKind::Recovered,
+    ) {
+        crate::alerts::lifecycle::on_all_cleared(&trigger.org, &definition.definition.id, &[c])
+            .await;
+    }
 
     let mut delivery_retry_at = None;
     let mut delivery_error = None;
@@ -1274,6 +1476,7 @@ async fn handle_composite_alert_trigger(
         None
     };
     let suppressed_by = composite_suppressed_by(&outcome, downtime.as_ref());
+    let mut ack_suppressed_by: Option<String> = None;
     if evaluated.result {
         scheduled_data.last_satisfied_at = Some(now);
         // Hoisted: correlation runs in the deliverable branch, but paging needs the answer.
@@ -1285,15 +1488,31 @@ async fn handle_composite_alert_trigger(
         } else if let Some(downtime) = suppressed_by {
             DeliveryDecision::SuppressedByDowntime(downtime.id.clone())
         } else {
-            config::meta::alerts::level::delivery_decision(
+            let last_notified = scheduled_data
+                .last_notified_level
+                .and_then(config::meta::alerts::level::AlertLevel::from_i32);
+            let decision = config::meta::alerts::level::delivery_decision(
                 evaluated.level,
-                scheduled_data
-                    .last_notified_level
-                    .and_then(config::meta::alerts::level::AlertLevel::from_i32),
+                last_notified,
                 scheduled_data.delivery_silenced_until,
                 now,
                 Some(true),
+            );
+            let ack = crate::alerts::ack::in_force(
+                &trigger.org,
+                &definition.definition.id,
+                ROLLUP_GROUP_KEY,
+                update.state.as_ref().and_then(|s| s.firing_started_at),
             )
+            .await;
+            match ack {
+                Some(ack) if decision.ack_withholds(last_notified) => {
+                    crate::alerts::alert::count_suppressed_run(&trigger.org, "alerts");
+                    ack_suppressed_by = Some(ack.acked_by.clone());
+                    DeliveryDecision::SuppressedByAck(ack.acked_by)
+                }
+                _ => decision,
+            }
         };
         let has_targets = !definition
             .definition
@@ -1465,7 +1684,7 @@ async fn handle_composite_alert_trigger(
             "{}/{}",
             definition.definition.name, definition.definition.id
         ),
-        status: if suppressed_by.is_some() {
+        status: if suppressed_by.is_some() || ack_suppressed_by.is_some() {
             RunOutcome::Suppressed
         } else if delivery_error.is_some() {
             RunOutcome::NotifyFailed
@@ -1474,7 +1693,9 @@ async fn handle_composite_alert_trigger(
         },
         error: delivery_error,
         downtime_id: suppressed_by.map(|d| d.id.clone()),
-        delivery_attempted: suppressed_by.map(|_| false),
+        delivery_attempted: (suppressed_by.is_some() || ack_suppressed_by.is_some())
+            .then_some(false),
+        acked_by: ack_suppressed_by,
         actual_value: Some(i32::from(evaluated.result) as f64),
         level: Some(evaluated.level.to_i32()),
         scheduler_trace_id: Some(trace_id.to_string()),
@@ -2006,7 +2227,7 @@ fn get_skipped_timestamps(
     let mut next_run_at;
     if !cron.is_empty() {
         let Some((skipped, next)) =
-            skipped_cron_timestamps(supposed_to_run_at, cron, tz_offset, delay)
+            skipped_cron_timestamps(supposed_to_run_at, cron, timezone_str, tz_offset, delay)
         else {
             log::warn!(
                 "[ALERT] cron '{cron}' with tz_offset {tz_offset} cannot be evaluated, skipping none"
@@ -2053,22 +2274,16 @@ fn get_skipped_timestamps(
 fn skipped_cron_timestamps(
     supposed_to_run_at: i64,
     cron: &str,
+    timezone: Option<&str>,
     tz_offset: i32,
     delay: i64,
 ) -> Option<(Vec<i64>, i64)> {
     let cron = Schedule::from_str(cron).ok()?;
-    let tz = fixed_offset(tz_offset)?;
-    let next_after = |ts: i64| {
-        let dt = DateTime::from_timestamp_micros(ts)?.with_timezone(&tz);
-        cron.after(&dt).next().map(|next| next.timestamp_micros())
-    };
-    let mut skipped = Vec::new();
-    let mut next_run_at = next_after(supposed_to_run_at)?;
-    while next_run_at <= supposed_to_run_at + delay {
-        skipped.push(next_run_at);
-        next_run_at = next_after(next_run_at)?;
-    }
-    Some((skipped, next_run_at))
+    let after = DateTime::from_timestamp_micros(supposed_to_run_at)?;
+    let until = DateTime::from_timestamp_micros(supposed_to_run_at.saturating_add(delay))?;
+    let (fires, next) = cron_fires_between(&cron, timezone, tz_offset, after, until)?;
+    let skipped = fires.iter().map(|t| t.timestamp_micros()).collect();
+    Some((skipped, next.timestamp_micros()))
 }
 
 /// Returns maximum considerable delay in microseconds - minimum of 1 hour or 20% of the frequency.
@@ -2564,9 +2779,9 @@ pub(crate) async fn downtime_decision_except(
     })
 }
 
-/// The identity a downtime is matched on, shared by evaluation and the grouped flush.
+/// The identity a downtime is matched on.
 #[cfg(feature = "enterprise")]
-pub(crate) async fn downtime_identity(
+async fn downtime_identity(
     alert: &config::meta::alerts::alert::Alert,
     rows: &[config::utils::json::Map<String, config::utils::json::Value>],
 ) -> Vec<HashMap<String, String>> {
@@ -2704,7 +2919,7 @@ fn alert_group_by(alert: &config::meta::alerts::alert::Alert) -> Vec<String> {
 
 /// The downtime of each muted group of a multi-alert, by group key.
 #[cfg(feature = "enterprise")]
-async fn group_downtimes(
+pub(crate) async fn group_downtimes(
     alert: &config::meta::alerts::alert::Alert,
     folder_id: &str,
     rows: &[config::utils::json::Map<String, config::utils::json::Value>],
@@ -2716,15 +2931,17 @@ async fn group_downtimes(
     if !alert_downtimes_in(&alert.org_id) {
         return HashMap::new();
     }
+    let multi = alert.query_condition.multi_alert_enabled();
     downtime_identities_by_key(alert, rows)
         .await
         .into_iter()
         .filter_map(|(key, dims)| {
-            crate::alerts::downtimes::active_for_alert(
+            crate::alerts::downtimes::active_for_alert_key(
                 &alert.org_id,
                 &alert_id,
                 folder_id,
                 &dims,
+                multi.then_some(key.as_str()),
                 now,
             )
             .map(|downtime| (key, downtime))
@@ -2747,10 +2964,24 @@ async fn unmuted_identity(
     if !alert_downtimes_in(&alert.org_id) {
         return on_call;
     }
-    let identities = downtime_identities(alert, rows).await;
+    let multi = alert.query_condition.multi_alert_enabled();
+    let (keys, identities): (Vec<String>, Vec<_>) = downtime_identities_by_key(alert, rows)
+        .await
+        .into_iter()
+        .unzip();
+    // `unmuted_maps` asks once per identity, in order, so the keys line up with the maps.
+    let mut keys = keys.into_iter();
     unmuted_maps(on_call, identities, |dims| {
-        crate::alerts::downtimes::active_for_alert(&alert.org_id, &alert_id, folder_id, dims, now)
-            .is_some()
+        let key = keys.next().unwrap_or_default();
+        crate::alerts::downtimes::active_for_alert_key(
+            &alert.org_id,
+            &alert_id,
+            folder_id,
+            dims,
+            multi.then_some(key.as_str()),
+            now,
+        )
+        .is_some()
     })
 }
 
@@ -2855,6 +3086,45 @@ pub(crate) async fn correlate_muted_incident(
     }
 }
 
+/// A repeat still correlates, or a continuous firing lets its incident go stale and auto-resolve.
+#[cfg(feature = "enterprise")]
+async fn correlate_repeated_incident(
+    trace_id: &str,
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+    triggered_at: i64,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    actual_value: Option<f64>,
+) {
+    let Some(first_row) = rows.first() else {
+        return;
+    };
+    let incidents_enabled = o2_enterprise::enterprise::common::config::get_config()
+        .incidents
+        .enabled;
+    if !correlates_repeated_firing(alert.creates_incident, incidents_enabled) {
+        return;
+    }
+    // Correlation itself stays silent on a repeat and only notifies a new or escalated incident.
+    if let Err(e) = crate::alerts::incidents::correlate_alert_to_incident(
+        alert,
+        first_row,
+        rows,
+        triggered_at,
+        eval_level,
+        actual_value,
+        None,
+    )
+    .await
+    {
+        log::error!(
+            "[SCHEDULER trace_id {trace_id}] repeat incident correlation failed for {}/{}: {e}",
+            alert.org_id,
+            alert.name
+        );
+    }
+}
+
 /// Whether a matched single-series run is still inside its pending period.
 fn holds_pending(
     alert: &config::meta::alerts::alert::Alert,
@@ -2936,6 +3206,41 @@ fn correlates_muted_firing(
     creates_incident && incidents_enabled && downtime.incident_mode.is_muted()
 }
 
+/// Whether a firing withheld as a repeat still feeds its incident.
+#[cfg(feature = "enterprise")]
+fn correlates_repeated_firing(creates_incident: bool, incidents_enabled: bool) -> bool {
+    creates_incident && incidents_enabled
+}
+
+/// Who acked a single-row alert's current firing, when that ack withholds this run's send.
+async fn single_row_ack(
+    alert: &config::meta::alerts::alert::Alert,
+    level_delivery: &DeliveryDecision,
+    last_notified_level: Option<i32>,
+) -> Option<String> {
+    // A multi-alert's acks are per group, decided in `dispatch_per_group`.
+    if alert.query_condition.multi_alert_enabled() {
+        return None;
+    }
+    let last = last_notified_level.and_then(config::meta::alerts::level::AlertLevel::from_i32);
+    if !level_delivery.ack_withholds(last) {
+        return None;
+    }
+    let alert_id = alert.id.as_ref()?.to_string();
+    let rollup = config::meta::alerts::state::ROLLUP_GROUP_KEY;
+    // Read before this run persists, so a firing that starts now has no start yet and no ack.
+    let started = match infra::table::alert_states::get(&alert_id, rollup).await {
+        Ok(state) => state.and_then(|s| s.firing_started_at),
+        Err(e) => {
+            log::warn!("[SCHEDULER] could not read the state of {alert_id} for its ack: {e}");
+            None
+        }
+    };
+    crate::alerts::ack::in_force(&alert.org_id, &alert_id, rollup, started)
+        .await
+        .map(|ack| ack.acked_by)
+}
+
 /// D6: only a delivered firing opens the silence, so the run after a downtime delivers.
 fn starts_silence_window(
     condition_matched: bool,
@@ -2962,6 +3267,32 @@ fn pending_stores_end_time(
 /// Whether this run moves `last_notified_level` and the delivery silence window.
 fn records_delivery_state(alert_level_delivery: bool, delivery: &DeliveryDecision) -> bool {
     alert_level_delivery && delivery.resets_silence()
+}
+
+/// Whether a single-row firing at `level` repeats what its open recovery episode already sent.
+fn single_row_repeats(
+    alert: &config::meta::alerts::alert::Alert,
+    level: Option<config::meta::alerts::level::AlertLevel>,
+    rollup: Option<&config::meta::alerts::state::AlertState>,
+    recorded_level: Option<i32>,
+    alert_level_delivery: bool,
+) -> bool {
+    let (Some(level), Some(rollup)) = (level.filter(|l| l.is_firing()), rollup) else {
+        return false;
+    };
+    // Only the multi-level path records the delivered level; a single-level alert fires at one.
+    let last_notified = if alert_level_delivery {
+        recorded_level.and_then(config::meta::alerts::level::AlertLevel::from_i32)
+    } else {
+        Some(level)
+    };
+    alert.suppresses_repeats()
+        && !alert.query_condition.multi_alert_enabled()
+        && config::meta::alerts::dispatch::repeats_last_notification(
+            level,
+            rollup.episode_id.is_some(),
+            last_notified,
+        )
 }
 
 /// A delivered firing ends the Muted chip; a pending run persists before the downtime decision.
@@ -3367,7 +3698,7 @@ async fn handle_alert_triggers(
                 .unwrap();
 
     let last_states = if !alert.query_condition.multi_alert_enabled()
-        && alert.pending_period_sec > 0
+        && (alert.pending_period_sec > 0 || alert.suppresses_repeats())
     {
         load_tracked_group_states(&alert.get_unique_key()).await.inspect_err(|e|{
             log::error!("[SCHEDULER trace_id {scheduler_trace_id}] alert {}/{} error in getting alert state: {e}",trigger.org,trigger.module_key);
@@ -3382,12 +3713,6 @@ async fn handle_alert_triggers(
     // group plan itself, before sending, so the alert-level state write at the
     // end of this function must not run and clobber the delivery callbacks.
     let mut multi_alert_dispatched = false;
-    // Dedup `(group_key, fingerprint)` pairs, confirmed only after a
-    // successful send (§5.5 MN-6) — per group, so group A's success does not
-    // confirm group B's. Tuples rather than the dedup module's type, which is
-    // enterprise-gated.
-    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
-    let mut dedup_reservations: Vec<(Option<String>, String)> = Vec::new();
     let mut trigger_data_stream: TriggerData = TriggerData {
         _timestamp: now,
         org: trigger.org.clone(),
@@ -3450,6 +3775,14 @@ async fn handle_alert_triggers(
                         trigger.org,
                         trigger.module_key
                     );
+                } else {
+                    crate::alerts::lifecycle::on_alert_enabled_changed(
+                        &trigger.org,
+                        &alert.id.unwrap().to_string(),
+                        "system@openobserve.ai",
+                        false,
+                    )
+                    .await;
                 }
             }
             // This didn't work, update the next_run_at to the next expected trigger time
@@ -3522,6 +3855,11 @@ async fn handle_alert_triggers(
         trigger_results.frozen,
         matched_level,
     );
+
+    // The clear hook runs before anything reads downtimes for this clear (§6.3).
+    if matched_level.is_none() {
+        close_single_row_cycle(&alert, eval_level, now).await;
+    }
 
     // Every clear run: on-call pages BEFORE the send, so an undelivered page leaves it open.
     #[cfg(feature = "enterprise")]
@@ -3688,10 +4026,32 @@ async fn handle_alert_triggers(
     // Decided after the query, from the fired rows, and never from the definition alone.
     let downtime =
         downtime_decision(&alert, &folder_id, trigger_results.data.as_deref(), now).await;
+    let acked_by = if downtime.is_none() && trigger_results.data.is_some() {
+        single_row_ack(&alert, &level_delivery, trigger_data.last_notified_level).await
+    } else {
+        None
+    };
+    let delivery = match (downtime.as_ref(), acked_by) {
+        (Some(downtime), _) => DeliveryDecision::SuppressedByDowntime(downtime.id.clone()),
+        (None, Some(by)) => DeliveryDecision::SuppressedByAck(by),
+        (None, None)
+            if level_delivery.should_deliver()
+                && single_row_repeats(
+                    &alert,
+                    eval_level,
+                    last_states.get(config::meta::alerts::state::ROLLUP_GROUP_KEY),
+                    trigger_data.last_notified_level,
+                    alert_level_delivery,
+                ) =>
+        {
+            DeliveryDecision::SuppressedAsRepeat
+        }
+        (None, None) => level_delivery,
+    };
     // D6: a suppressed run starts no silence window, so the first run after the window delivers.
     if starts_silence_window(
         trigger_results.data.is_some(),
-        downtime.is_some(),
+        delivery.withheld(),
         alert.trigger_condition.silence,
         evaluates_through_silence,
     ) {
@@ -3711,13 +4071,9 @@ async fn handle_alert_triggers(
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
     // send notification
-    // Nowhere to send means no delivery to record: no dedup, silence window or episode.
+    // Nowhere to send means no delivery to record: no silence window or episode.
     let has_target = has_delivery_target(&alert);
-    let delivery = match downtime.as_ref() {
-        Some(downtime) => DeliveryDecision::SuppressedByDowntime(downtime.id.clone()),
-        None => level_delivery,
-    };
-    if !delivery.should_deliver() && (alert_level_delivery || downtime.is_some()) {
+    if !delivery.should_deliver() && (alert_level_delivery || delivery.withheld()) {
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] delivery suppressed ({delivery:?}) for {}/{}",
             new_trigger.org,
@@ -3730,10 +4086,9 @@ async fn handle_alert_triggers(
     // delivery. Writing only one would either re-page forever or never again.
     //
     // Called ONLY on paths where the notification was actually delivered (or
-    // handed to a delivery mechanism that owns it: grouping batch, incident
-    // correlation). `last_notified_level`'s contract is the last DELIVERED
-    // level — stamping it before a send that then FAILS would make the retry
-    // look like a repeat inside an active silence window and suppress it.
+    // handed to a delivery mechanism that owns it: incident correlation). `last_notified_level`'s
+    // contract is the last DELIVERED level — stamping it before a send that then FAILS would make
+    // the retry look like a repeat inside an active silence window and suppress it.
     // MN-2: multi-alerts keep their delivery state on the per-group rows, so
     // they never write these alert-level fields. Leaving them stale would be
     // harmless now that nothing reads them for this path, but writing them
@@ -3775,6 +4130,20 @@ async fn handle_alert_triggers(
         )
         .await;
     }
+    #[cfg(feature = "enterprise")]
+    if delivery == DeliveryDecision::SuppressedAsRepeat
+        && let Some(rows) = trigger_results.data.as_deref()
+    {
+        correlate_repeated_incident(
+            &scheduler_trace_id,
+            &alert,
+            rows,
+            triggered_at,
+            eval_level,
+            trigger_results.actual_value,
+        )
+        .await;
+    }
 
     // What this evaluation DELIVERED, not what it decided to: the episode opens on a landed send.
     let mut episode_delivered = false;
@@ -3808,246 +4177,6 @@ async fn handle_alert_triggers(
         // notification is skipped.
         && delivery.should_deliver()
     {
-        // Per-group dispatch IS this alert's batching unit (§5.5 MN-1), so a
-        // multi-alert never takes the alert-level grouping path. Letting it
-        // through would batch every group under one alert-scoped fingerprint
-        // and record delivery at ENQUEUE time — no per-group fingerprint
-        // (M-5), no per-group delivery state (MN-6), and no per-group failure
-        // accounting (MN-7). The groups would be silently collapsed back into
-        // the single notification multi-alerts exist to split apart.
-        let is_multi_alert = alert.query_condition.multi_alert_enabled();
-
-        // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
-        // A batch notifies its first alert's destinations, so one with none must not open it.
-        #[cfg(feature = "enterprise")]
-        let grouping_enabled = !is_multi_alert
-            && has_target
-            && alert
-                .deduplication
-                .as_ref()
-                .and_then(|d| d.grouping.as_ref())
-                .map(|g| g.enabled)
-                .unwrap_or(false);
-
-        #[cfg(not(feature = "enterprise"))]
-        let grouping_enabled = {
-            let _ = is_multi_alert;
-            false
-        };
-
-        if grouping_enabled {
-            #[cfg(feature = "enterprise")]
-            {
-                let grouping_config = alert
-                    .deduplication
-                    .as_ref()
-                    .and_then(|d| d.grouping.as_ref())
-                    .unwrap();
-
-                // Calculate fingerprint for grouping
-                let fingerprint = if let Some(dedup_config) = alert.deduplication.as_ref() {
-                    let org_config =
-                        match crate::alerts::org_config::get_deduplication_config(&new_trigger.org)
-                            .await
-                        {
-                            Ok(Some(config)) => Some(config),
-                            _ => None,
-                        };
-
-                    let semantic_groups =
-                        crate::db::system_settings::get_semantic_field_groups(&new_trigger.org)
-                            .await;
-
-                    if let Some(first_row) = data.first() {
-                        // Level is an implicit fingerprint component: a
-                        // Warning batch must never absorb a Critical
-                        // escalation (§7.1).
-                        crate::alerts::deduplication::calculate_fingerprint(
-                            &alert,
-                            first_row,
-                            dedup_config,
-                            org_config.as_ref(),
-                            &semantic_groups,
-                            eval_level,
-                        )
-                    } else {
-                        alert.get_unique_key()
-                    }
-                } else {
-                    alert.get_unique_key()
-                };
-
-                log::debug!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] Adding alert to batch, org: {}, alert: {}, fingerprint: {fingerprint}, rows: {}",
-                    new_trigger.org,
-                    alert.name,
-                    data.len()
-                );
-
-                // Add to batch
-                let admission = crate::alerts::grouping::add_to_batch(
-                    fingerprint.clone(),
-                    new_trigger.org.clone(),
-                    alert.clone(),
-                    data.clone(),
-                    trigger_data_stream.clone(),
-                    grouping_config.group_wait_seconds,
-                    grouping_config.max_group_size,
-                    eval_level,
-                    // Alert-level batch: multi-alerts never reach here (they
-                    // dispatch per group instead), so there is no group
-                    // identity to carry. Per-group batching is the post-v1
-                    // enhancement specified in §5.5.
-                    None,
-                );
-
-                // Whether the batch handoff counts as a DELIVERY for the
-                // silence/escalation baseline. Queued = yes (the flush worker
-                // owns it from here). Immediately flushed = only if the send
-                // actually succeeded — stamping a failed send would start a
-                // silence window with zero destinations reached and suppress
-                // the retry.
-                let grouped_delivery_ok = match admission {
-                    crate::alerts::grouping::BatchAdmission::Ready => {
-                        log::info!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] Batch {fingerprint} reached max size, sending immediately",
-                        );
-                        // Absent means the expiry worker took the batch and publishes its rows.
-                        match crate::alerts::grouping::get_ready_batch(
-                            &new_trigger.org,
-                            &fingerprint,
-                        ) {
-                            Some(batch) => {
-                                crate::alerts::grouping::flush_batch(&scheduler_trace_id, batch)
-                                    .await
-                            }
-                            None => true,
-                        }
-                    }
-                    crate::alerts::grouping::BatchAdmission::Queued => {
-                        log::debug!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] Alert added to batch, waiting for more alerts or timeout, fingerprint: {}",
-                            fingerprint
-                        );
-                        true
-                    }
-                    crate::alerts::grouping::BatchAdmission::Refused => {
-                        publish_triggers_usage(crate::alerts::grouping::refused_row(
-                            &trigger_data_stream,
-                        ));
-                        // No batch owns this evaluation, so no silence window may open for it.
-                        false
-                    }
-                };
-
-                // Alert added to batch, don't send individual notification.
-                if grouped_delivery_ok {
-                    record_delivery(&mut trigger_data);
-                }
-                trigger_data.period_end_time = if should_store_last_end_time {
-                    Some(trigger_results.end_time)
-                } else {
-                    None
-                };
-                new_trigger.data = json::to_string(&trigger_data).unwrap();
-                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                // No episode: a batch holds several alerts, so no per-alert key can ride it.
-                if let Some(alert_id) = alert.id.as_ref() {
-                    let _ = persist_alert_run_state(
-                        &alert,
-                        &alert_id.to_string(),
-                        &trigger_data_stream.status,
-                        eval_level,
-                        trigger_results.group_classification.as_ref(),
-                        trigger_results.rule_value.as_deref(),
-                        &config::meta::alerts::recovery::EpisodeInput::undelivered(
-                            alert.keep_firing_for,
-                        ),
-                    )
-                    .await;
-                }
-                return Ok(());
-            }
-        }
-
-        // Apply deduplication if enabled (enterprise-only feature)
-        #[cfg(feature = "enterprise")]
-        let data = {
-            let db = get_orm_client_rw().await;
-            match crate::alerts::deduplication::apply_deduplication(
-                db,
-                &alert,
-                data.clone(),
-                eval_level,
-            )
-            .await
-            {
-                Ok(outcome) => {
-                    let (deduplicated_data, deduplicated) = (outcome.rows, outcome.applied);
-                    // Reserved, NOT yet suppressing. Confirmed only once the
-                    // notification actually goes out (§5.5 MN-6), so a send
-                    // that fails is retried rather than swallowed as a
-                    // duplicate for the rest of the window.
-                    dedup_reservations = outcome
-                        .reserved
-                        .into_iter()
-                        .map(|r| (r.group_key, r.fingerprint))
-                        .collect();
-                    // A zero-row match has nothing to dedup; empty output is no suppression.
-                    if deduplicated_data.is_empty() && deduplicated && !data.is_empty() {
-                        log::debug!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
-                            new_trigger.org,
-                            new_trigger.module_key
-                        );
-
-                        // Mark as suppressed for history tracking
-                        trigger_data_stream.dedup_enabled = Some(true);
-                        trigger_data_stream.dedup_suppressed = Some(true);
-                        trigger_data_stream.delivery_attempted = Some(false);
-
-                        // All results were deduplicated, skip notification
-                        // Still update the trigger timing
-                        trigger_data.period_end_time = if should_store_last_end_time {
-                            Some(trigger_results.end_time)
-                        } else {
-                            None
-                        };
-                        new_trigger.data = json::to_string(&trigger_data).unwrap();
-                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                        // Condition matched; only the notification was
-                        // deduplicated away. State must reflect the firing.
-                        if let Some(alert_id) = alert.id.as_ref() {
-                            let _ = persist_alert_run_state(
-                                &alert,
-                                &alert_id.to_string(),
-                                &trigger_data_stream.status,
-                                eval_level,
-                                trigger_results.group_classification.as_ref(),
-                                trigger_results.rule_value.as_deref(),
-                                &config::meta::alerts::recovery::EpisodeInput::undelivered(
-                                    alert.keep_firing_for,
-                                ),
-                            )
-                            .await;
-                        }
-                        publish_triggers_usage(trigger_data_stream);
-                        return Ok(());
-                    }
-                    deduplicated_data
-                }
-                Err(e) => {
-                    log::error!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Error applying deduplication for org: {}, module_key: {}: {e}",
-                        new_trigger.org,
-                        new_trigger.module_key,
-                    );
-                    // On error, continue with original data to avoid missing alerts
-                    data
-                }
-            }
-        };
-
         #[cfg(feature = "enterprise")]
         let unmuted_rows = unmuted_group_rows(&alert, &folder_id, &data, now).await;
         #[cfg(feature = "enterprise")]
@@ -4138,12 +4267,6 @@ async fn handle_alert_triggers(
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
 
-        // Mark dedup status for history (if dedup was enabled, alert passed through)
-        if alert.deduplication.as_ref().is_some_and(|d| d.enabled) {
-            trigger_data_stream.dedup_enabled = Some(true);
-            trigger_data_stream.dedup_suppressed = Some(false);
-        }
-
         if !should_dispatch_after_incident(
             incident_handled_notification,
             !alert.workflows.is_empty(),
@@ -4218,6 +4341,9 @@ async fn handle_alert_triggers(
             }
 
             dispatch.record_downtime(&mut trigger_data_stream);
+            if dispatch.repeated {
+                trigger_data_stream.repeat_suppressed = Some(true);
+            }
             // The rollup row was committed before anything was sent.
             if let Some(outcome) = dispatch.rollup_rewrite()
                 && let Some(alert_id) = alert.id.as_ref()
@@ -4235,17 +4361,6 @@ async fn handle_alert_triggers(
                 )
                 .await;
             }
-            // MN-6: a reservation is confirmed by its own group's delivery.
-            // An unkeyed one falls back to "any delivery confirms".
-            let confirmable: Vec<String> = dedup_reservations
-                .iter()
-                .filter(|(group_key, _)| match group_key.as_deref() {
-                    Some(k) => dispatch.delivered_groups.contains(k),
-                    None => dispatch.delivered > 0,
-                })
-                .map(|(_, fingerprint)| fingerprint.clone())
-                .collect();
-            confirm_dedup_reservations(&alert.org_id, &confirmable).await;
             record_delivery(&mut trigger_data);
             episode_delivered = true;
             trigger_data.period_end_time = if should_store_last_end_time {
@@ -4292,16 +4407,6 @@ async fn handle_alert_triggers(
                         error_message: err_msg,
                     } = outcome;
                     let partial_failure = !failed.is_empty();
-                    // At least one destination delivered, so the reservations
-                    // this evaluation made are now real suppressions — one
-                    // send covered every reserved row.
-                    if has_target {
-                        let fingerprints: Vec<String> = dedup_reservations
-                            .iter()
-                            .map(|(_, fingerprint)| fingerprint.clone())
-                            .collect();
-                        confirm_dedup_reservations(&alert.org_id, &fingerprints).await;
-                    }
                     let success_msg = success_msg.trim().to_owned();
                     let err_msg = err_msg.trim().to_owned();
                     if !err_msg.is_empty() {
@@ -4506,6 +4611,14 @@ async fn handle_alert_triggers(
                     "alerts",
                     downtime.id.clone(),
                 );
+            } else if let Some(by) = delivery.acked_by() {
+                crate::alerts::alert::record_ack_suppressed_run(
+                    &mut trigger_data_stream,
+                    "alerts",
+                    by.to_string(),
+                );
+            } else if delivery == DeliveryDecision::SuppressedAsRepeat {
+                trigger_data_stream.repeat_suppressed = Some(true);
             }
         } else if trigger_results.frozen {
             // Frozen is not Normal: nothing was measured (§7.6). `Skipped` is
@@ -4857,8 +4970,13 @@ async fn handle_report_triggers(
         return Ok(());
     }
     let run_once = report.frequency.frequency_type == ReportFrequencyType::Once;
-    let (next_run_at, frequency_seconds) =
-        report_next_run(&report.frequency, report.tz_offset, new_trigger.next_run_at);
+    let timezone = (!report.timezone.is_empty()).then_some(report.timezone.as_str());
+    let (next_run_at, frequency_seconds) = report_next_run(
+        &report.frequency,
+        timezone,
+        report.tz_offset,
+        new_trigger.next_run_at,
+    );
     new_trigger.next_run_at = next_run_at;
 
     if report.frequency.align_time && report.frequency.frequency_type != ReportFrequencyType::Cron {
@@ -5024,7 +5142,12 @@ fn report_retry_outcome(run_once: bool, retries: i32, max_retries: i32) -> Retry
 }
 
 /// Next run and frequency in seconds of a report schedule; a week out if it cannot be evaluated.
-fn report_next_run(frequency: &ReportFrequency, tz_offset: i32, now: i64) -> (i64, i64) {
+fn report_next_run(
+    frequency: &ReportFrequency,
+    timezone: Option<&str>,
+    tz_offset: i32,
+    now: i64,
+) -> (i64, i64) {
     let step = |unit_secs: i64| {
         let secs = frequency.interval.checked_mul(unit_secs)?;
         let next = now.checked_add(secs.checked_mul(1_000_000)?)?;
@@ -5038,7 +5161,12 @@ fn report_next_run(frequency: &ReportFrequency, tz_offset: i32, now: i64) -> (i6
         ReportFrequencyType::Months => step(2592000),
         ReportFrequencyType::Once => None,
         ReportFrequencyType::Cron => Schedule::from_str(&frequency.cron).ok().and_then(|cron| {
-            let next = cron.upcoming(fixed_offset(tz_offset)?).next()?;
+            let next = next_cron_after(
+                &cron,
+                timezone,
+                tz_offset,
+                DateTime::from_timestamp_micros(now)?,
+            )?;
             Some((next.timestamp_micros(), 60))
         }),
     };
@@ -7351,6 +7479,7 @@ mod tests {
             name: "dt-1".to_string(),
             ends_at: 0,
             incident_mode: Default::default(),
+            ..Default::default()
         };
         // The muted-incident correlation and the Suppressed status both read this answer.
         assert_eq!(
@@ -7395,15 +7524,15 @@ mod tests {
         errors: &[&str],
     ) -> GroupDispatchOutcome {
         GroupDispatchOutcome {
-            delivered,
             failed,
             fired: delivered + failed,
             pending,
             errors: errors.iter().map(|e| (*e).to_string()).collect(),
-            delivered_groups: std::collections::HashSet::new(),
             attempted: false,
             state_failed: false,
             downtime_id: None,
+            acked_by: None,
+            repeated: false,
         }
     }
 
@@ -8022,11 +8151,101 @@ mod tests {
             (every(ReportFrequencyType::Months, i64::MAX), 0),
         ] {
             assert_eq!(
-                report_next_run(&frequency, tz_offset, now),
+                report_next_run(&frequency, None, tz_offset, now),
                 (now + week, 60),
                 "{frequency:?} @ {tz_offset}"
             );
         }
+    }
+
+    fn utc_micros(y: i32, m: u32, d: u32, h: u32) -> i64 {
+        use chrono::TimeZone;
+        Utc.with_ymd_and_hms(y, m, d, h, 0, 0)
+            .unwrap()
+            .timestamp_micros()
+    }
+
+    #[test]
+    fn report_next_run_follows_the_zone_name_across_dst() {
+        let nine_am = ReportFrequency {
+            cron: "0 0 9 * * *".to_string(),
+            frequency_type: ReportFrequencyType::Cron,
+            ..Default::default()
+        };
+        let ny = Some("America/New_York");
+        // The stored offset is the one in force when the report was saved, stale after the change.
+        assert_eq!(
+            report_next_run(&nine_am, ny, -240, utc_micros(2026, 11, 1, 12)),
+            (utc_micros(2026, 11, 1, 14), 60)
+        );
+        assert_eq!(
+            report_next_run(&nine_am, ny, -300, utc_micros(2026, 3, 8, 12)),
+            (utc_micros(2026, 3, 8, 13), 60)
+        );
+        let half_past_three_utc = utc_micros(2026, 6, 15, 3) + 30 * 60_000_000;
+        assert_eq!(
+            report_next_run(&nine_am, None, 330, utc_micros(2026, 6, 15, 0)),
+            (half_past_three_utc, 60)
+        );
+    }
+
+    #[test]
+    fn skipped_cron_timestamps_follow_the_zone_name_across_dst() {
+        let ny = Some("America/New_York");
+        let hour = 3_600_000_000;
+        assert_eq!(
+            skipped_cron_timestamps(
+                utc_micros(2026, 10, 31, 13),
+                "0 0 9 * * *",
+                ny,
+                -240,
+                48 * hour
+            ),
+            Some((
+                vec![utc_micros(2026, 11, 1, 14)],
+                utc_micros(2026, 11, 2, 14)
+            ))
+        );
+        assert_eq!(
+            skipped_cron_timestamps(
+                utc_micros(2026, 3, 7, 14),
+                "0 0 9 * * *",
+                ny,
+                -300,
+                48 * hour
+            ),
+            Some((
+                vec![utc_micros(2026, 3, 8, 13), utc_micros(2026, 3, 9, 13)],
+                utc_micros(2026, 3, 10, 13)
+            ))
+        );
+        let ist_nine_am = |d| utc_micros(2026, 6, d, 3) + 30 * 60_000_000;
+        assert_eq!(
+            skipped_cron_timestamps(ist_nine_am(15), "0 0 9 * * *", None, 330, 24 * hour),
+            Some((vec![ist_nine_am(16)], ist_nine_am(17)))
+        );
+    }
+
+    #[test]
+    fn get_skipped_timestamps_passes_the_zone_name_to_cron_catch_up() {
+        let supposed_to_run_at = utc_micros(2026, 10, 31, 13);
+        let delay = 72 * 3_600_000_000;
+        assert_eq!(
+            get_skipped_timestamps(
+                supposed_to_run_at,
+                "0 0 9 * * *",
+                -240,
+                0,
+                delay,
+                true,
+                supposed_to_run_at + delay,
+                Some("America/New_York"),
+            ),
+            (
+                vec![utc_micros(2026, 11, 1, 14)],
+                utc_micros(2026, 11, 2, 14)
+            )
+        );
     }
 
     #[test]
@@ -8085,14 +8304,17 @@ mod tests {
             frequency_type: ReportFrequencyType::Hours,
             ..Default::default()
         };
-        assert_eq!(report_next_run(&hours, 0, now), (now + 2 * hour, 7200));
+        assert_eq!(
+            report_next_run(&hours, None, 0, now),
+            (now + 2 * hour, 7200)
+        );
         let months = ReportFrequency {
             interval: 1,
             frequency_type: ReportFrequencyType::Months,
             ..Default::default()
         };
         assert_eq!(
-            report_next_run(&months, 0, now),
+            report_next_run(&months, None, 0, now),
             (now + 30 * 24 * hour, 2592000)
         );
         let cron = ReportFrequency {
@@ -8100,9 +8322,10 @@ mod tests {
             frequency_type: ReportFrequencyType::Cron,
             ..Default::default()
         };
-        let (next, frequency_seconds) = report_next_run(&cron, 1439, now);
-        assert!(next > now_micros() && next <= now_micros() + hour, "{next}");
-        assert_eq!(frequency_seconds, 60);
+        assert_eq!(
+            report_next_run(&cron, None, 1439, now),
+            (now + 60_000_000, 60)
+        );
     }
 
     #[test]
@@ -8881,6 +9104,7 @@ mod tests {
             name: id.to_string(),
             ends_at: 1,
             incident_mode: Default::default(),
+            ..Default::default()
         };
         let identity = [group("a"), group("b")];
         let only_a = muted_in_every_group(&identity, |dims| {
@@ -8906,6 +9130,7 @@ mod tests {
                     name: "a".to_string(),
                     ends_at: 10,
                     incident_mode: IncidentMode::None,
+                    ..Default::default()
                 }
             } else {
                 ActiveDowntime {
@@ -8913,6 +9138,7 @@ mod tests {
                     name: "b".to_string(),
                     ends_at: 12,
                     incident_mode: IncidentMode::Muted,
+                    ..Default::default()
                 }
             })
         };
@@ -8932,6 +9158,7 @@ mod tests {
             name: "Deploy".to_string(),
             ends_at: 1,
             incident_mode,
+            ..Default::default()
         };
         assert!(correlates_muted_firing(
             true,
@@ -8958,6 +9185,14 @@ mod tests {
             IncidentMode::Muted,
             "an Alerts target without the field keeps today's muted incident"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_repeat_still_feeds_its_incident_only_when_incidents_apply() {
+        assert!(correlates_repeated_firing(true, true));
+        assert!(!correlates_repeated_firing(false, true));
+        assert!(!correlates_repeated_firing(true, false));
     }
 
     #[cfg(feature = "enterprise")]
@@ -9182,6 +9417,7 @@ mod tests {
                     name: service.clone(),
                     ends_at: 1,
                     incident_mode: Default::default(),
+                    ..Default::default()
                 })
         })
         .map(|d| d.id)
@@ -9264,7 +9500,6 @@ mod tests {
         assert_eq!(run_downtime(&alert, &rows, &["payments"]), None);
     }
 
-    #[cfg(feature = "enterprise")]
     fn sql_multi_alert() -> config::meta::alerts::alert::Alert {
         let mut sql = config::meta::alerts::alert::Alert::default();
         sql.query_condition.aggregation = Some(config::meta::alerts::Aggregation {
@@ -9280,6 +9515,35 @@ mod tests {
             multi_alert: true,
         });
         sql
+    }
+
+    #[test]
+    fn only_a_multi_alert_leaves_its_clear_to_the_groups() {
+        let plain = config::meta::alerts::alert::Alert::default();
+        let multi = sql_multi_alert();
+        let mut group_by = sql_multi_alert();
+        group_by
+            .query_condition
+            .aggregation
+            .as_mut()
+            .unwrap()
+            .multi_alert = false;
+        let mut promql = config::meta::alerts::alert::Alert::default();
+        promql.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
+        promql.query_condition.promql_multi_alert = true;
+        for (alert, single_row) in [
+            (&plain, true),
+            (&group_by, true),
+            (&multi, false),
+            (&promql, false),
+        ] {
+            assert_eq!(
+                closes_single_row_cycle(&alert.query_condition),
+                single_row,
+                "{:?}",
+                alert.query_condition.aggregation
+            );
+        }
     }
 
     /// `dispatch_per_group` and `unmuted_group_rows` look a row's group up under this key.
@@ -9307,7 +9571,6 @@ mod tests {
         }
     }
 
-    /// The grouped flush calls [downtime_identity] too, so both points judge an SLO alert alike.
     #[cfg(feature = "enterprise")]
     #[test]
     fn an_slo_alert_is_matched_on_its_slo_dimensions_not_its_rows() {
@@ -9361,6 +9624,7 @@ mod tests {
             name: service.to_string(),
             ends_at: 1,
             incident_mode,
+            ..Default::default()
         };
         let modes = |first_mode, other_mode| {
             let first = first.clone();

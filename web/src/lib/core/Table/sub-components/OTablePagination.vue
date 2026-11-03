@@ -78,7 +78,7 @@ const selectionLabel = computed(() => {
   <div
     :data-test="`o2-table-pagination-${position}`"
     :class="[
-      'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1',
+      'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1 max-md:gap-y-2',
       bordered ? 'border-border-default border-t' : '',
     ]"
   >

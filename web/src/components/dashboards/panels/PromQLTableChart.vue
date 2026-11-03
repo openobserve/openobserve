@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="innerTableRef"
         :data="{ rows: filteredTableRows, columns: tableColumns }"
         :wrap-cells="panelConfig.wrap_table_cells"
+        :density="panelConfig.table_density"
         :value-mapping="panelConfig.mappings ?? []"
         :show-pagination="panelConfig.table_pagination && !store.state.printMode"
         :rows-per-page="panelConfig.table_pagination_rows_per_page"

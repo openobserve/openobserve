@@ -448,7 +448,6 @@ async function refresh(force = true) {
     // refresh control. A plain mount passes false and keeps the cached rows.
     if (force) await datasetsList.refetch();
   } catch {
-    // The grouped access toast already reports a 403; a second red toast adds nothing.
     if (!forbidden.value) {
       toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
     }

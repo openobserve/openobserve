@@ -25,8 +25,14 @@ export const GATEWAY_RELEASE = "otel-fleet-collector-gateway";
 
 /** Environment every install command gives the collector. */
 export const INSTALL_ENV = ["O2_ENDPOINT", "O2_TOKEN"];
-/** Environment only the Helm chart adds, from the pod's downward API. */
-export const HELM_ENV = ["K8S_NODE_NAME", "K8S_POD_NAME", "K8S_NAMESPACE"];
+/** Environment only the Helm chart adds: the pod's downward API plus its clusterName value. */
+export const HELM_ENV = [
+  "K8S_NODE_NAME",
+  "K8S_NODE_IP",
+  "K8S_POD_NAME",
+  "K8S_NAMESPACE",
+  "K8S_CLUSTER_NAME",
+];
 
 export const INSTALL_PLATFORMS: InstallPlatform[] = [
   "linux",
@@ -54,6 +60,8 @@ export interface InstallTarget {
   http: boolean;
   /** Kubernetes only; agents when unset. */
   role?: KubernetesRole;
+  /** Kubernetes only; becomes k8s.cluster.name through the chart's K8S_CLUSTER_NAME. */
+  clusterName?: string;
 }
 
 const SCRIPT_BASE = "https://raw.githubusercontent.com/openobserve/agents/main";
@@ -105,11 +113,18 @@ function windowsCommand(t: InstallTarget): string {
   ].join("\n");
 }
 
+// --set-string keeps a numeric name a string; Helm reads a backslash as an escape and splits on commas.
+function clusterNameSet(name?: string): string[] {
+  const value = name?.trim().replace(/\\/g, "\\\\").replace(/,/g, "\\,");
+  return value ? [`--set-string clusterName=${q(value)}`] : [];
+}
+
 // One release runs one role: its token enrols every pod into one fleet, and a fleet shares one configuration.
 function helmCommand(t: InstallTarget): string {
   const gateway = t.role === "gateway";
   const sets = [
     ...(gateway ? ["--set agent.enabled=false", "--set gateway.enabled=true"] : []),
+    ...clusterNameSet(t.clusterName),
     `--set image.repository=${IMAGE}`,
     ...(t.version ? [`--set image.tag=${q(t.version)}`] : []),
     `--set opamp.endpoint=${q(opampEndpoint(t))}`,

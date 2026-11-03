@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-compact text-text-heading me-5 shrink-[1000] font-medium tracking-[0.02em] @max-[22rem]/panelbar:me-1"
           :class="[
             curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined,
+            titleMeta ? 'me-2!' : undefined,
             hasNoticeChips
               ? 'min-w-[min(10rem,40%)]! @max-[12rem]/panelbar:min-w-[35%]!'
               : undefined,
@@ -69,6 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ panelTitle }}
         </OTruncatedText>
+        <span
+          v-if="titleMeta"
+          class="text-2xs text-text-secondary me-5 shrink-0 font-normal whitespace-nowrap"
+          data-test="dashboard-panel-header-meta"
+          >{{ titleMeta }}</span
+        >
         <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
@@ -130,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="hoverRevealClass"
           v-if="
             props.showLegendsButton &&
+            !isDataView &&
             !PanleSchemaRendererRef?.noData &&
             ![
               'table',
@@ -141,6 +149,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'heatmap',
               'metric',
               'gauge',
+              'bar-gauge',
+              'treemap',
+              'sunburst',
+              'funnel',
+              'node-graph',
+              'alert-list',
+              'flame-graph',
+              'boxplot',
+              'logs',
             ].includes(props.data.type)
           "
           variant="ghost"
@@ -160,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           :class="hoverRevealClass"
           v-if="
+            !isDataView &&
             !viewOnly &&
             !simplifiedPanelView &&
             [
@@ -194,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <ExemplarToggle
-          v-if="exemplarsEligible && !viewOnly"
+          v-if="exemplarsEligible && !viewOnly && !isDataView"
           :class="exemplarToggleAtRest && !isLayoutEditing ? '' : hoverRevealClass"
           :on="exemplarsOn"
           :loading="PanleSchemaRendererRef?.exemplarsStatus === 'loading'"
@@ -372,6 +390,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </ODropdownItem>
           <ODropdownItem
+            v-if="showDataViewToggle && !isLayoutEditing"
+            data-test="dashboard-panel-data-view-toggle"
+            @select="previewView = isDataView ? 'chart' : 'data'"
+          >
+            <template #icon-left
+              ><OIcon :name="isDataView ? 'show-chart' : 'table-chart'" size="sm"
+            /></template>
+            {{ isDataView ? t("panel.showChart") : t("panel.showRawData") }}
+          </ODropdownItem>
+          <ODropdownItem
             v-if="!simplifiedPanelView && layoutMode !== 'view'"
             data-test="dashboard-edit-layout"
             @select="onPanelModifyClick('EditLayout')"
@@ -454,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  panel's state through a pure adapter and the action owns the rest
                  (label, confirm dialog, transport). See CreateAlertAction.vue. -->
             <CreateAlertAction
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              v-if="!simplifiedPanelView && canCreateAlert"
               variant="menu-item"
               source="panel"
               :build="buildPanelAlertPrefill"
@@ -531,6 +559,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @series-data-update="onCuratedSeriesData"
         @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
       ></PanelSchemaRenderer>
+      <PanelDataView
+        v-if="showDataOverlay"
+        class="absolute inset-0 z-10"
+        :data="previewRawData"
+        :query-type="props.data.queryType"
+        :loading="isPanelLoading"
+        data-test-prefix="dashboard-panel"
+      />
 
       <!-- Until the first result or error lands, an empty body would read as "No Data" on a TV. -->
       <div
@@ -635,6 +671,8 @@ import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh"
 import { summarizePanelError } from "@/utils/dashboard/kiosk";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
+import PanelDataView from "./addPanel/PanelDataView.vue";
+import { usePanelDataView } from "@/composables/dashboard/usePanelDataView";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
@@ -743,6 +781,7 @@ export default defineComponent({
     OBadge,
     OSkeleton,
     PanelSchemaRenderer,
+    PanelDataView,
     PanelBar,
     QueryInspector,
     ConfirmDialog,
@@ -771,6 +810,8 @@ export default defineComponent({
       context: () => ({ tabId: props.tabId, panelId: props.data?.id }),
     });
     const panelFileName = computed(() => toPanelFileName(panelTitle.value));
+    // A runtime stamp from embedding pages (the traces Rate unit); stored dashboards never carry it.
+    const titleMeta = computed(() => props.data?.config?.title_meta as string | undefined);
     // Curated pages stamp this; stored dashboards never carry it, so the badge
     // and the body dimming are both invisible outside them (§6.3).
     const curatedBadge = computed(
@@ -809,6 +850,17 @@ export default defineComponent({
     );
     // need PanleSchemaRendererRef for table download as a csv
     const PanleSchemaRendererRef: any = ref(null);
+    const {
+      previewView,
+      showDataViewToggle,
+      isDataView,
+      showDataOverlay,
+      rawData: previewRawData,
+    } = usePanelDataView({
+      panelType: () => props.data?.type,
+      renderer: PanleSchemaRendererRef,
+      enabled: () => !props.kiosk && !props.viewOnly && !props.simplifiedPanelView,
+    });
 
     const exemplarsEligible = computed(() => isExemplarEligible(props.data));
     const exemplarKey = computed(() =>
@@ -968,6 +1020,10 @@ export default defineComponent({
     // for full screen button
     const isCurrentlyHoveredPanel: any = ref(false);
     const isLayoutEditing = computed(() => props.layoutMode === "edit");
+    // Layout editing hides the panel bar controls, which would leave the Data view with no way back.
+    watch(isLayoutEditing, (editing) => {
+      if (editing) previewView.value = "chart";
+    });
 
     // Editor actions follow the "Edit panel" menu item; Refresh is a viewer action, so layout edit and viewOnly keep it.
     const canEditFromNotice = computed(
@@ -1440,6 +1496,11 @@ export default defineComponent({
     onMounted(() => window.addEventListener("keydown", handlePanelKeydown));
     onBeforeUnmount(() => window.removeEventListener("keydown", handlePanelKeydown));
 
+    // An alert list reads the alerts API, so it has no query to build an alert from.
+    const canCreateAlert = computed(
+      () => props.data?.type !== "alert-list" && (metaData.value?.queries?.length ?? 0) > 0,
+    );
+
     // Guards that used to fire as toasts AFTER the user clicked "Create alert".
     // Stated up front as a disabled reason instead — a dead-end click is worse
     // than a control that explains itself.
@@ -1476,8 +1537,10 @@ export default defineComponent({
       curatedTableOwnsEmpty,
       onCuratedSeriesData,
       panelTitle,
+      titleMeta,
       panelFileName,
       alertDisabledReason,
+      canCreateAlert,
       onEditPanel,
       onNoticeEditPanel,
       showDraftDot,
@@ -1487,6 +1550,11 @@ export default defineComponent({
       isCurrentlyHoveredPanel,
       isLayoutEditing,
       hoverRevealClass,
+      previewView,
+      showDataViewToggle,
+      isDataView,
+      showDataOverlay,
+      previewRawData,
       hasNoticeChips,
       showViewPanel,
       dependentAdHocVariable,

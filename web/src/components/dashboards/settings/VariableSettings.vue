@@ -253,6 +253,7 @@ import {
   onBeforeUnmount,
   reactive,
   nextTick,
+  watch,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
@@ -278,6 +279,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL, TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { useDashboardSettingsDraft } from "./dashboardSettingsDraft";
 
 export default defineComponent({
   name: "VariableSettings",
@@ -383,7 +385,7 @@ export default defineComponent({
     const getDependencies = (row: any): string[] =>
       dependencyGraph.value?.[row?.name]?.parentVariables ?? [];
 
-    const selectedVariable = ref(null);
+    const selectedVariable = ref<string | null>(null);
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete: any = ref(null);
     const variableTypes = [
@@ -516,8 +518,31 @@ export default defineComponent({
       });
     };
 
+    const draftContext = useDashboardSettingsDraft();
+
+    // Reopens the variable form a draft or another tab left unsaved; a variable deleted since then drops it.
+    const openPendingVariable = () => {
+      const pending = draftContext?.pending.variable;
+      if (!draftContext || !pending || isAddVariable.value) return;
+      const exists =
+        pending.variableName === null ||
+        dashboardVariablesList.value.some((v: { name: string }) => v.name === pending.variableName);
+      if (!exists) {
+        draftContext.pending.variable = null;
+        return;
+      }
+      selectedVariable.value = pending.variableName;
+      isAddVariable.value = true;
+    };
+
+    watch(
+      () => draftContext?.restoreRevision,
+      () => openPendingVariable(),
+    );
+
     onMounted(async () => {
       await getDashboardData();
+      openPendingVariable();
       await initSortable();
     });
 

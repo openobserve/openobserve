@@ -174,4 +174,28 @@ describe("HomeChatHistory", () => {
     await flushPromises();
     expect(history.loadHistory).toHaveBeenCalledTimes(2);
   });
+
+  it("shows no empty message while the history request is pending", async () => {
+    history.loadHistory.mockReturnValue(new Promise(() => {}));
+    const { wrapper } = mountList();
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("No chat history");
+    expect(wrapper.find('[data-test="home-chat-history-loading"]').exists()).toBe(true);
+  });
+
+  it("shows the empty message once the history settles with no chats", async () => {
+    history.loadHistory.mockResolvedValue([]);
+    const { wrapper } = mountList();
+    await flushPromises();
+    expect(wrapper.find('[data-test="home-chat-history-loading"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("No chat history");
+  });
+
+  it("settles to the empty message when reading the history fails", async () => {
+    history.loadHistory.mockRejectedValue(new Error("idb unavailable"));
+    const { wrapper } = mountList();
+    await flushPromises();
+    expect(wrapper.find('[data-test="home-chat-history-loading"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("No chat history");
+  });
 });

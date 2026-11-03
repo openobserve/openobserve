@@ -135,7 +135,6 @@ const stubs = {
   QueryConfig: true,
   AlertSettings: true,
   CompareWithPast: true,
-  Deduplication: true,
   Advanced: true,
   PreviewAlert: true,
   AlertSummary: true,
@@ -192,17 +191,6 @@ describe("AddAlert (OForm owner)", () => {
     wrapper?.unmount();
     wrapper = null;
     vi.clearAllMocks();
-  });
-
-  describe("owner pattern wiring", () => {
-    it("owns the ONE form and exposes formData as a read-view + _meta seeded", async () => {
-      wrapper = mountAlert();
-      await flushPromises();
-      expect(wrapper.vm.form).toBeTruthy();
-      expect(wrapper.vm.formData.name).toBe("");
-      expect(wrapper.vm.formData._meta).toBeTruthy();
-      expect(wrapper.vm.formData.is_real_time).toBe("false");
-    });
   });
 
   describe("schema-gated save (block-on-invalid)", () => {
@@ -680,6 +668,7 @@ describe("AddAlert (OForm owner)", () => {
           "notify_on_recovery",
           "recovery_destinations",
           "keep_firing_for",
+          "suppress_repeats",
         ].sort(),
       );
 

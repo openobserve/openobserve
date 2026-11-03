@@ -13,9 +13,20 @@
         size="sm"
         variant="primary"
         data-test="ai-experiments-new-btn"
+        :aria-label="
+          experimentDrafts.hasNew
+            ? t('common.editorDraft.newDot', { label: t('aiObservability.experiments.newButton') })
+            : undefined
+        "
         @click="openCreate('')"
       >
         {{ t("aiObservability.experiments.newButton") }}
+        <EditorDraftDot
+          v-if="experimentDrafts.hasNew"
+          :saved-at="experimentDrafts.savedAt(null)"
+          corner
+          data-test="ai-experiments-new-draft-dot"
+        />
       </OButton>
     </template>
 
@@ -55,6 +66,8 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ExperimentBrowser from "@/enterprise/components/AIObservability/ExperimentBrowser.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
 import type { LlmExperiment } from "@/services/llm-experiments.service";
@@ -74,6 +87,7 @@ const experiments = ref<LlmExperiment[]>([]);
 const datasets = ref<LlmDataset[]>([]);
 const loading = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
+const experimentDrafts = useEditorDraftIds("experiment");
 
 function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string | null) {
   experiments.value = experiments.value.map((row) => {

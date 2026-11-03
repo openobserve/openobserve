@@ -402,7 +402,7 @@ const useEnterpriseRoutes = () => {
         path: "fleet/configurations/:id",
         name: "fleetConfigEditor",
         component: () => import("@/views/FleetConfigEditor.vue"),
-        meta: { titleKey: "fleet.editor.pageTitle" },
+        meta: { titleKey: "fleet.editor.pageTitle", allowOnEmptyData: true },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
         },
@@ -411,7 +411,7 @@ const useEnterpriseRoutes = () => {
         path: "fleet",
         name: "fleet",
         component: () => import("@/views/FleetManager.vue"),
-        meta: { titleKey: "menu.fleet" },
+        meta: { titleKey: "menu.fleet", allowOnEmptyData: true },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
         },
@@ -441,7 +441,7 @@ const useEnterpriseRoutes = () => {
         path: "edit",
         name: "workflowEditor",
         component: WorkflowEditor,
-        meta: { titleKey: "workflow.editMode" },
+        meta: { titleKey: "workflow.editMode", accessScopeQuery: ["id"] },
         beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
       },
       {
@@ -451,7 +451,7 @@ const useEnterpriseRoutes = () => {
         path: "runs",
         name: "workflowRuns",
         component: WorkflowRuns,
-        meta: { titleKey: "workflow.runs.title" },
+        meta: { titleKey: "workflow.runs.title", accessScopeQuery: ["id"] },
         beforeEnter: withFeatureGate("workflows", workflowsRouteGuard),
       },
     ],

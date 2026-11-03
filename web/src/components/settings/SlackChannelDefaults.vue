@@ -32,6 +32,8 @@ import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { alertRoutesByChannel } from "@/utils/slackAppDestination";
 import {
   deleteChannelDefaultMutation,
   putChannelDefaultMutation,
@@ -73,6 +75,10 @@ const ownerName = (row: SlackChannelDefaultRow) =>
   instanceAdmin.value && row.org_id ? raw(row.org_name || row.org_id) : null;
 
 const defaults = useQuery(() => slackChannelDefaultsQuery(org.value, props.installationId));
+const destinations = useQuery(() => destinationsQuery(org.value, "alert"));
+const alertRoutes = computed(() =>
+  alertRoutesByChannel(destinations.data.value ?? [], props.installationId),
+);
 const put = useMutation(() => putChannelDefaultMutation(org.value, props.installationId));
 const remove = useMutation(() => deleteChannelDefaultMutation(org.value, props.installationId));
 
@@ -152,6 +158,7 @@ const columns = computed<OTableColumnDef<SlackChannelDefaultRow>[]>(() => [
   { id: "channel", header: t("slackApp.channels.columnChannel"), size: 200, meta: { flex: true } },
   { id: "default_org", header: t("slackApp.channels.columnDefaultOrg"), size: 140 },
   { id: "answers", header: t("slackApp.channels.columnAnswers"), size: 130 },
+  { id: "alert_routes", header: t("slackApp.channels.columnAlertRoutes"), size: 120 },
   { id: "set_by", header: t("slackApp.channels.columnSetBy"), size: 220 },
   { id: "actions", header: raw(""), size: ownOrgOnly.value ? 170 : 100, isAction: true },
 ]);
@@ -235,6 +242,18 @@ const save = async (value: DefaultForm): Promise<void> => {
               : t("slackApp.channels.private")
           }}
         </template>
+      </template>
+      <template #cell-alert_routes="{ row }">
+        <template v-if="alertRoutes[row.channel_id]">
+          {{
+            t(
+              "slackApp.channels.alertRoutes",
+              { count: alertRoutes[row.channel_id] },
+              alertRoutes[row.channel_id],
+            )
+          }}
+        </template>
+        <span v-else class="text-text-muted">{{ raw("—") }}</span>
       </template>
       <template #cell-set_by="{ row }">
         <span v-if="!canChange(row) && ownOrgOnly" class="text-text-muted">{{ raw("—") }}</span>

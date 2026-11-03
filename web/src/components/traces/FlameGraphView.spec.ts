@@ -70,6 +70,8 @@ vi.mock("@/utils/traces/serviceColorRegistry", () => ({
       "service-1": "#4caf50",
       "service-2": "#2196f3",
       "service-3": "#ff9800",
+      "lime-service": "#84cc16",
+      "violet-service": "#7c3aed",
     };
     return colorMap[name] || "#9CA3AF";
   }),
@@ -1481,6 +1483,21 @@ describe("FlameGraphView span event markers", () => {
     const result = renderBlock(mountView(), 100);
 
     expect(result.children.slice(1).every((c: any) => c.silent)).toBe(true);
+  });
+
+  it.each([
+    ["lime-service", "#000000"],
+    ["violet-service", "#ffffff"],
+  ])("picks a label colour that contrasts with the %s bar", (service, expected) => {
+    const wrapper = mount(FlameGraphView, {
+      props: {
+        spans: [{ ...spanWithEvents, resolvedIdentity: service, events: [] }],
+        traceDuration: 100,
+        selectedSpanId: null,
+      },
+    });
+
+    expect(renderBlock(wrapper, 100).textContent.style.fill).toBe(expected);
   });
 
   it("returns a bare rect for a span with no events", () => {

@@ -1713,6 +1713,93 @@ describe("VariablesValueSelector", () => {
     });
   });
 
+  // A cached query streams its empty newest-delta chunk first, so the rows arrive only after it.
+  describe("a value is selected when the first streamed chunk is empty", () => {
+    const chainedConfig = {
+      list: [
+        {
+          name: "namespace",
+          type: "query_values",
+          label: "Namespace",
+          multiSelect: false,
+          query_data: {
+            field: "k8s_namespace_name",
+            stream: "k8s_pod_memory_usage",
+            stream_type: "metrics",
+            max_record_size: 100,
+            filter: [],
+          },
+        },
+        {
+          name: "pod",
+          type: "query_values",
+          label: "Pod",
+          multiSelect: false,
+          query_data: {
+            field: "k8s_pod_name",
+            stream: "k8s_pod_memory_usage",
+            stream_type: "metrics",
+            max_record_size: 100,
+            filter: [{ name: "k8s_namespace_name", operator: "=", value: "$namespace" }],
+          },
+        },
+      ],
+    };
+
+    const hitsChunk = (values: string[]) => ({
+      type: "search_response_hits",
+      content: {
+        results: {
+          hits: [
+            {
+              field: "k8s_namespace_name",
+              values: values.map((v) => ({ zo_sql_key: v })),
+            },
+          ],
+        },
+      },
+    });
+
+    it("selects the first option and loads the child", async () => {
+      const { useVariablesManager } = await import("@/composables/dashboard/useVariablesManager");
+      const manager = useVariablesManager(((key: string) => key) as never);
+      await manager.initialize(chainedConfig.list as any, {});
+
+      const parent = manager.variablesData.global.find((v: any) => v.name === "namespace") as any;
+
+      wrapper = createWrapper({
+        variablesConfig: chainedConfig,
+        variablesManager: manager,
+        scope: "global",
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const parentVariable = vm.variablesData.values.find((v: any) => v.name === "namespace");
+
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          if (JSON.stringify(payload).includes("k8s_namespace_name")) {
+            handlers.data(payload, hitsChunk([]));
+            handlers.data(payload, hitsChunk(["argocd", "monitor"]));
+          }
+          handlers.data(payload, { type: "end", content: {} });
+        },
+      );
+
+      await vm.loadVariableOptions(parentVariable);
+      await nextTick();
+      await new Promise((r) => setTimeout(r, 0));
+      await nextTick();
+
+      expect(parent.value).toBe("argocd");
+      const podCall = mockStreamingComposable.fetchQueryDataWithHttpStream.mock.calls.find(
+        (call: any) => JSON.stringify(call[0]).includes("k8s_pod_name"),
+      );
+      expect(podCall, "child never issued its values query").toBeTruthy();
+    });
+  });
+
   // In manager mode the rendered set comes from the MANAGER's scope arrays, not
   // from variablesConfig, so a filter on the config prop alone is ignored and
   // every global variable renders on every tab. The narrowing must gate RENDERING

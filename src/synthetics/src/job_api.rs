@@ -490,6 +490,7 @@ use infra::{
     },
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{RESULTS_STREAM, STEP_RESULTS_STREAM};
 
@@ -895,20 +896,20 @@ pub async fn artifact_urls(
 /// How long presigned download URLs stay valid (seconds).
 const PRESIGN_DOWNLOAD_EXPIRES_SECS: u64 = 180;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct PresignArtifactsRequest {
     /// Full object-store keys as stored in the stream records
     /// (`screenshot_key`, `trace_key`).
     pub keys: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PresignedArtifact {
     pub key: String,
     pub url: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PresignArtifactsResponse {
     /// "presigned" — urls point directly at object storage (S3/MinIO/Azure).
     /// "proxy" — local disk mode; urls are relative API paths that stream bytes.

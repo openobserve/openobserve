@@ -99,8 +99,24 @@
     </template>
 
     <template #cell-last_outcome="{ row }">
-      <OTag v-if="row.last_outcome" type="alertState" :value="row.last_outcome" size="sm" />
-      <span v-else class="text-text-secondary">—</span>
+      <div
+        class="flex min-w-0 items-center gap-2"
+        :data-test="`alerts-alertgroupstable-outcome-${row.group_key}`"
+      >
+        <template v-if="row.ack">
+          <OTag type="alertState" value="acknowledged" size="sm" />
+          <span class="text-text-secondary text-xs whitespace-nowrap">
+            {{ t("alerts.ack.byAt", { who: ackWho(row), time: ackTime(row) }) }}
+          </span>
+        </template>
+        <OTag v-else-if="row.last_outcome" type="alertState" :value="row.last_outcome" size="sm" />
+        <span v-else class="text-text-secondary">—</span>
+        <MutedChip
+          v-if="groupMute(row)"
+          :downtime="groupMute(row)!"
+          :data-test="`alerts-alertgroupstable-muted-${row.group_key}`"
+        />
+      </div>
     </template>
 
     <!-- The level of this group's last SUCCESSFUL delivery. An em dash on a
@@ -134,15 +150,92 @@
     </template>
 
     <template #cell-actions="{ row }">
-      <OButton
-        variant="ghost"
-        size="icon-sm"
-        icon-left="history"
-        :data-test="`alerts-alertgroupstable-history-${row.group_key}`"
-        @click.stop="emit('show-history', row)"
-      >
-        <OTooltip side="left" :content="t('alerts.groups.viewHistory')" />
-      </OButton>
+      <div class="flex items-center">
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="history"
+          :data-test="`alerts-alertgroupstable-history-${row.group_key}`"
+          @click.stop="emit('show-history', row)"
+        >
+          <OTooltip side="left" :content="t('alerts.groups.viewHistory')" />
+        </OButton>
+        <ODropdown align="end">
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              icon-left="more-vert"
+              :aria-label="t('alerts.groupActions.menu')"
+              :data-test="`alerts-alertgroupstable-menu-${row.group_key}`"
+              @click.stop
+            />
+          </template>
+          <ODropdownItem
+            v-if="canAcknowledge(row)"
+            icon-left="check"
+            :data-test="`alerts-alertgroupstable-ack-${row.group_key}`"
+            @select="onAcknowledge(row)"
+          >
+            {{ t("alerts.ack.acknowledge") }}
+          </ODropdownItem>
+          <template v-if="row.ack">
+            <ODropdownItem
+              icon-left="person"
+              :data-test="`alerts-alertgroupstable-unack-${row.group_key}`"
+              @select="onUnack(row)"
+            >
+              {{ t("alerts.ack.unacknowledge") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="row.ack.acked_by !== actions.me.value"
+              icon-left="person"
+              :data-test="`alerts-alertgroupstable-take-over-${row.group_key}`"
+              @select="onTakeOver(row)"
+            >
+              {{ t("alerts.ack.takeOver") }}
+            </ODropdownItem>
+          </template>
+          <template v-if="muteEnabled">
+            <ODropdownSeparator v-if="canAcknowledge(row) || row.ack" />
+            <template v-if="groupMute(row)">
+              <MuteMenuItems
+                labels="extend"
+                until-clear
+                :data-test-prefix="`alerts-alertgroupstable-extend-${row.group_key}`"
+                @preset="(secs) => onExtend(row, { minutes: secs / 60 })"
+                @until-clear="onExtend(row, { untilClear: true })"
+                @until="openExtendUntil(row)"
+              />
+              <ODropdownItem
+                variant="destructive"
+                icon-left="notifications-active"
+                :data-test="`alerts-alertgroupstable-end-mute-${row.group_key}`"
+                @select="onEndMute(row)"
+              >
+                {{ t("alerts.downtimes.mute.endNow") }}
+              </ODropdownItem>
+            </template>
+            <MuteMenuItems
+              v-else
+              labels="group"
+              until-clear
+              :data-test-prefix="`alerts-alertgroupstable-mute-${row.group_key}`"
+              @preset="(secs) => onMute(row, { minutes: secs / 60 })"
+              @until-clear="onMute(row, { untilClear: true })"
+              @until="openMuteDialog(row)"
+            />
+          </template>
+          <ODropdownSeparator />
+          <ODropdownItem
+            icon-left="history"
+            :data-test="`alerts-alertgroupstable-menu-history-${row.group_key}`"
+            @select="emit('show-history', row)"
+          >
+            {{ t("alerts.groupActions.viewHistory") }}
+          </ODropdownItem>
+        </ODropdown>
+      </div>
     </template>
 
     <template #empty>
@@ -157,6 +250,20 @@
       />
     </template>
   </OTable>
+  <AlertMuteUntilDialog
+    v-if="muteEnabled"
+    v-model:open="extendUntilOpen"
+    :target="target"
+    :downtime="untilGroup ? muteRef(untilGroup) : null"
+    @done="emit('changed')"
+  />
+  <QuickMuteDialog
+    v-if="muteEnabled"
+    v-model:open="muteDialogOpen"
+    :selection="[{ module: 'alerts', ids: [alertId] }]"
+    :alert="muteAlertContext"
+    @muted="emit('changed')"
+  />
 </template>
 
 <script setup lang="ts">
@@ -164,7 +271,25 @@ import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
+import type { ActiveDowntime } from "@/services/downtimes";
+import { useAlertActions, type AlertMuteRef } from "@/composables/alerts/useAlertActions";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
+import { ackShortName, downtimeForGroup } from "@/utils/alerts/ackState";
+import { isFiringOutcome } from "@/utils/alerts/runOutcome";
+import {
+  groupOptionOf,
+  type AlertMuteEnd,
+  type QuickMuteAlertContext,
+} from "@/utils/downtimes/quickMute";
+import { formatInZone } from "@/utils/oncall";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import MuteMenuItems from "./downtimes/MuteMenuItems.vue";
+import MutedChip from "./downtimes/MutedChip.vue";
+import AlertMuteUntilDialog from "./AlertMuteUntilDialog.vue";
+import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -179,18 +304,127 @@ const props = withDefaults(
   defineProps<{
     groups: AlertGroup[];
     loading?: boolean;
+    alertId?: string;
+    alertName?: string;
+    folderId?: string;
+    /** The alert's live quick mute; a group mute lists the groups it covers. */
+    downtime?: (ActiveDowntime & { version?: number }) | null;
+    muteEnabled?: boolean;
   }>(),
-  { loading: false },
+  {
+    loading: false,
+    alertId: "",
+    alertName: "",
+    folderId: undefined,
+    downtime: null,
+    muteEnabled: false,
+  },
 );
 
 const emit = defineEmits<{
   refresh: [];
   "show-history": [group: AlertGroup];
+  changed: [];
 }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
 const search = ref("");
+const actions = useAlertActions();
+const viewerZone = useViewerTimezone();
+
+const target = computed(() => ({
+  alertId: props.alertId,
+  name: props.alertName,
+  folderId: props.folderId,
+}));
+
+const extendUntilOpen = ref(false);
+const muteDialogOpen = ref(false);
+const untilGroup = ref<AlertGroup | null>(null);
+
+const muteAlertContext = computed<QuickMuteAlertContext>(() => ({
+  ...target.value,
+  groupKey: untilGroup.value?.group_key,
+  groups: props.groups
+    .filter((g) => isFiringOutcome(g.last_outcome) || g.group_key === untilGroup.value?.group_key)
+    .map(groupOptionOf),
+}));
+
+const canAcknowledge = (row: AlertGroup) => isFiringOutcome(row.last_outcome) && !row.ack;
+
+// The table shows the mute per group, so a group mute reads as this group's own countdown.
+const groupMute = (row: AlertGroup): ActiveDowntime | null => {
+  const covering = downtimeForGroup(props.downtime, row.group_key);
+  return covering ? { ...covering, alert_groups: null } : null;
+};
+
+const muteRef = (row: AlertGroup): AlertMuteRef | null => {
+  const covering = downtimeForGroup(props.downtime, row.group_key);
+  return covering && props.downtime
+    ? { id: covering.id, ends_at: covering.ends_at, version: props.downtime.version }
+    : null;
+};
+
+const ackWho = (row: AlertGroup) => raw(row.ack ? ackShortName(row.ack.acked_by) : "");
+const ackTime = (row: AlertGroup) =>
+  raw(row.ack ? formatInZone(row.ack.acked_at, viewerZone.value, { timeStyle: "short" }) : "");
+
+const after = (ok: boolean) => {
+  if (ok) emit("changed");
+};
+
+const onAcknowledge = async (row: AlertGroup) =>
+  after(
+    await actions.acknowledge(target.value, {
+      groupKey: row.group_key,
+      firingStartedAt: row.firing_started_at,
+    }),
+  );
+
+const onUnack = async (row: AlertGroup) =>
+  after(
+    await actions.unacknowledge(target.value, {
+      groupKey: row.group_key,
+      firingStartedAt: row.ack?.firing_started_at,
+    }),
+  );
+
+const onTakeOver = async (row: AlertGroup) =>
+  after(
+    await actions.takeOver(target.value, {
+      groupKey: row.group_key,
+      firingStartedAt: row.ack?.firing_started_at ?? row.firing_started_at,
+    }),
+  );
+
+const onMute = async (row: AlertGroup, end: AlertMuteEnd) =>
+  after(
+    await actions.mute(target.value, end, {
+      groups: [row.group_key],
+      firingStartedAt: row.firing_started_at,
+    }),
+  );
+
+const onExtend = async (row: AlertGroup, end: AlertMuteEnd) => {
+  const downtime = muteRef(row);
+  if (downtime) after(await actions.extend(target.value, downtime, end));
+};
+
+const onEndMute = async (row: AlertGroup) => {
+  const downtime = muteRef(row);
+  if (downtime) after(await actions.endMute(target.value, downtime.id));
+};
+
+const openExtendUntil = (row: AlertGroup) => {
+  untilGroup.value = row;
+  extendUntilOpen.value = true;
+};
+
+const openMuteDialog = (row: AlertGroup) => {
+  untilGroup.value = row;
+  muteDialogOpen.value = true;
+};
 
 // Filtering is client-side because the whole group set is already bounded by
 // the M-6 cap — there is no page to fetch beyond it.
@@ -283,7 +517,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: raw(""),
     cell: " ",
     isAction: true,
-    size: 70,
+    size: 88,
     meta: { align: "center" },
   },
 ]);

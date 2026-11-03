@@ -257,8 +257,8 @@ const hasInsideLabel = computed(
             'z-10001 w-(--reka-combobox-trigger-width) max-w-(--reka-combobox-trigger-width) min-w-(--reka-combobox-trigger-width)',
             'max-h-60 overflow-hidden',
             'max-lg:max-h-[var(--reka-popper-available-height,15rem)]',
-            'rounded-default border shadow-lg',
-            'bg-select-content-bg border-select-content-border',
+            'rounded-default shadow-overlay border border-transparent',
+            'bg-select-content-bg',
             'p-1',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft

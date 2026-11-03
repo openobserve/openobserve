@@ -373,8 +373,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-setting-btn"
               @click="openSettingsDialog"
               icon-left="settings"
+              :aria-label="hasSettingsDraft ? settingsButtonLabel : undefined"
             >
-              <OTooltip :content="t('dashboard.setting')" />
+              <OTooltip :content="settingsButtonLabel" />
+              <EditorDraftDot
+                v-if="hasSettingsDraft"
+                corner
+                :tooltip="false"
+                data-test="dashboard-setting-btn-draft-dot"
+              />
             </OButton>
             <OButton
               variant="outline"
@@ -610,35 +617,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :open="discardDialog.open"
           size="sm"
           :title="t('dashboard.layoutEdit.discardTitle')"
+          :persistent="discardForced"
+          :show-close="!discardForced"
           :secondary-button-label="
-            discardDialog.reason === 'leave'
-              ? t('dashboard.layoutEdit.stay')
-              : t('dashboard.layoutEdit.keepEditing')
+            discardForced
+              ? undefined
+              : discardDialog.reason === 'leave'
+                ? t('dashboard.layoutEdit.stay')
+                : t('dashboard.layoutEdit.keepEditing')
           "
           :primary-button-label="
-            discardDialog.reason === 'leave'
-              ? t('dashboard.layoutEdit.discardAndLeave')
-              : t('dashboard.layoutEdit.discard')
+            discardForced
+              ? t('dashboard.layoutEdit.discardAndSignOut')
+              : discardDialog.reason === 'leave'
+                ? t('dashboard.layoutEdit.discardAndLeave')
+                : t('dashboard.layoutEdit.discard')
           "
           primary-button-variant="destructive"
-          initial-focus="secondary"
+          :initial-focus="discardForced ? 'primary' : 'secondary'"
           data-test="dashboard-edit-discard-dialog"
           @update:open="(open) => !open && settleDiscard(false)"
           @click:secondary="settleDiscard(false)"
           @click:primary="settleDiscard(true)"
         >
           {{
-            discardDialog.reason === "leave"
+            discardForced
               ? t(
-                  "dashboard.layoutEdit.leaveMessage",
+                  "dashboard.layoutEdit.leaveMessageForced",
                   { count: layoutChangeCount },
                   layoutChangeCount,
                 )
-              : t(
-                  "dashboard.layoutEdit.discardMessage",
-                  { count: layoutChangeCount },
-                  layoutChangeCount,
-                )
+              : discardDialog.reason === "leave"
+                ? t(
+                    "dashboard.layoutEdit.leaveMessage",
+                    { count: layoutChangeCount },
+                    layoutChangeCount,
+                  )
+                : t(
+                    "dashboard.layoutEdit.discardMessage",
+                    { count: layoutChangeCount },
+                    layoutChangeCount,
+                  )
           }}
         </ODialog>
       </OPageLayout>
@@ -667,7 +686,12 @@ import { ANNOTATION_PREVIEW_CONTEXT_KEY } from "@/composables/dashboard/useDashb
 import ShareButton from "@/components/common/ShareButton.vue";
 import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from "vue-router";
+import {
+  onBeforeRouteLeave,
+  onBeforeRouteUpdate,
+  useRouter,
+  type RouteLocationNormalized,
+} from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
 import { generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
@@ -715,6 +739,10 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useLayoutEditDraft } from "@/composables/dashboard/useLayoutEditDraft";
 import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { draftSignOutForced } from "@/utils/drafts/draftSession";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
@@ -816,6 +844,7 @@ export default defineComponent({
     KioskStrip,
     KioskSetupPopover,
     PlaylistHoldingCard,
+    EditorDraftDot,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -1355,6 +1384,20 @@ export default defineComponent({
       showDashboardSettingsDialog.value = true;
     };
 
+    const settingsDrafts = useEditorDraftIds("dashboard_settings");
+    const draftLabel = useDraftLabel();
+    const hasSettingsDraft = computed(() =>
+      settingsDrafts.ids.has(String(route.query.dashboard ?? "")),
+    );
+    const settingsButtonLabel = computed(() =>
+      hasSettingsDraft.value
+        ? draftLabel(
+            t("dashboard.setting"),
+            settingsDrafts.savedAt(String(route.query.dashboard ?? "")),
+          )
+        : t("dashboard.setting"),
+    );
+
     const openLayoutConfig = (id: string) => {
       selectedPanelConfig.value.show = true;
 
@@ -1434,6 +1477,10 @@ export default defineComponent({
     };
 
     const discardDialog = reactive({ open: false, reason: "exit" as "exit" | "leave" });
+    // The password changed and the sign-out goes on whatever is answered, so Stay would only pretend to keep the edits.
+    const discardForced = computed(
+      () => discardDialog.reason === "leave" && draftSignOutForced.value,
+    );
     let resolveDiscard: ((confirmed: boolean) => void) | null = null;
 
     const confirmDiscard = (reason: "exit" | "leave") =>
@@ -2672,17 +2719,43 @@ export default defineComponent({
       leaveKioskState();
     };
 
+    // A later leave guard (the settings drawer's) can still keep the user here, so leaving acts only once the navigation lands.
+    let onLanded: { to: RouteLocationNormalized; run: () => void } | null = null;
+    const removeLandedHook = router.afterEach((to, _from, failure) => {
+      if (onLanded?.to !== to) return;
+      const { run } = onLanded;
+      onLanded = null;
+      if (!failure) run();
+    });
+    onUnmounted(() => {
+      removeLandedHook();
+      // A redirect never reports the original navigation, but unmounting means the user did leave.
+      const pending = onLanded;
+      onLanded = null;
+      pending?.run();
+    });
+
     // Unsaved layout edits are the store's cached dashboard object, so a confirmed leave must roll them back.
-    onBeforeRouteLeave(() => {
+    onBeforeRouteLeave((to) => {
       if (!layoutDraft.isDirty.value) {
-        layoutDraft.finish();
-        clearPrintModeOnLeave();
+        onLanded = {
+          to,
+          run: () => {
+            layoutDraft.finish();
+            clearPrintModeOnLeave();
+          },
+        };
         return;
       }
       return confirmDiscard("leave").then((confirmed) => {
         if (!confirmed) return false;
-        layoutDraft.discard();
-        clearPrintModeOnLeave();
+        onLanded = {
+          to,
+          run: () => {
+            layoutDraft.discard();
+            clearPrintModeOnLeave();
+          },
+        };
         return true;
       });
     });
@@ -2692,7 +2765,7 @@ export default defineComponent({
       if (to.query.dashboard === from.query.dashboard || !layoutDraft.isDirty.value) return;
       return confirmDiscard("leave").then((confirmed) => {
         if (!confirmed) return false;
-        layoutDraft.discard();
+        onLanded = { to, run: () => layoutDraft.discard() };
         return true;
       });
     });
@@ -2860,6 +2933,8 @@ export default defineComponent({
       resolveSaveConflict,
       saveConflictState: dashboardSaveConflictState,
       openSettingsDialog,
+      hasSettingsDraft,
+      settingsButtonLabel,
       loadDashboard,
       refreshPanelRequest,
       updateRunId,
@@ -2906,6 +2981,7 @@ export default defineComponent({
       saveLayout,
       requestExitLayoutEdit,
       discardDialog,
+      discardForced,
       settleDiscard,
       folderNameFromFolderId,
       showJsonEditorDialog,

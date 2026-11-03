@@ -21,6 +21,7 @@ import { raw, type TranslateFn } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
+import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
 import {
   DBM_CONTRIB_VERSION,
   PG_DBM_AUTO_EXPLAIN_CONF,
@@ -34,6 +35,8 @@ import {
 // Step 1 — the monitoring role. The config reads the password from
 // $POSTGRESQL_PASSWORD, set at run time.
 const ROLE_SQL = `CREATE ROLE myuser WITH LOGIN PASSWORD 'mypassword';`;
+
+const PG_LOG_PATH = "/var/log/postgresql/postgresql*.log";
 
 const applyRole = (connect: string) => `${connect} -c "${ROLE_SQL}"`;
 
@@ -89,6 +92,7 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
       // blocking-chain events into the _o2_dbm_server logs stream.
       metaBadges: [t("common.metrics"), t("common.logs")],
     },
+    setupModes: DB_SETUP_MODES,
     steps: [
       {
         id: "prepare",
@@ -124,12 +128,26 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
           },
         ],
       },
+      dbQuickInstallStep(t, subs, {
+        db: "postgres",
+        hostLabelKey: "ingestion.setupCard.postgresqlHostLabel",
+        defaultPort: "5432",
+        defaultUser: "myuser",
+        defaultDatabase: "postgres",
+        dbm: true,
+        dbmLogPath: {
+          default: PG_LOG_PATH,
+          labelKey: "ingestion.setupCard.dbmPgLogPathLabel",
+          helpKey: "ingestion.setupCard.dbmPgLogPathHelp",
+        },
+      }),
       // Pinned, not the shared default: the DBM config below needs upstream
       // contrib >= 0.148.0 (the `events:` block is an unknown key on older
       // releases).
-      collectorInstallStep(t, DBM_CONTRIB_VERSION),
+      manualOnly(collectorInstallStep(t, DBM_CONTRIB_VERSION)),
       {
         id: "configure",
+        mode: "manual",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
         descriptionKey: "ingestion.setupCard.configureCollectorDesc",
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
@@ -158,6 +176,7 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
       },
       {
         id: "run",
+        mode: "manual",
         titleKey: "ingestion.setupCard.runCollectorTitle",
         descriptionKey: "ingestion.setupCard.runCollectorPostgresqlDesc",
         chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
@@ -260,6 +279,7 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
       },
       {
         id: "dbm-configure",
+        mode: "manual",
         titleKey: "ingestion.setupCard.dbmConfigureTitle",
         descriptionKey: "ingestion.setupCard.dbmConfigurePostgresDesc",
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
@@ -276,8 +296,8 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
           {
             id: "logpath",
             labelKey: "ingestion.setupCard.dbmPgLogPathLabel",
-            default: "/var/log/postgresql/postgresql*.log",
-            placeholder: raw("/var/log/postgresql/postgresql*.log"),
+            default: PG_LOG_PATH,
+            placeholder: raw(PG_LOG_PATH),
             helpKey: "ingestion.setupCard.dbmPgLogPathHelp",
           },
         ],
@@ -296,6 +316,7 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
       },
       {
         id: "dbm-run",
+        mode: "manual",
         titleKey: "ingestion.setupCard.dbmRunTitle",
         descriptionKey: "ingestion.setupCard.dbmRunPostgresDesc",
         chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
@@ -319,6 +340,7 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
       streamName: "postgresql",
       filter: "",
     },
+    extras: { uninstall: dbUninstallExtra() },
     docUrl: "https://openobserve.ai/blog/how-to-monitor-postgresql-performance",
   };
 }

@@ -23,6 +23,7 @@ import { raw, type TranslateFn } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants } from "./otelShared";
+import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
 
 const CONFIG_YAML = `receivers:
   redis:
@@ -60,10 +61,17 @@ export default function redisCard(subs: CardSubstitutions, t: TranslateFn): Rich
       tone: "#DC382D",
       metaBadges: [t("common.metrics")],
     },
+    setupModes: DB_SETUP_MODES,
     steps: [
-      collectorInstallStep(t),
+      dbQuickInstallStep(t, subs, {
+        db: "redis",
+        hostLabelKey: "ingestion.setupCard.redisHostLabel",
+        defaultPort: "6379",
+      }),
+      manualOnly(collectorInstallStep(t)),
       {
         id: "configure",
+        mode: "manual",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
         descriptionKey: "ingestion.setupCard.configureCollectorDesc",
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
@@ -90,6 +98,7 @@ export default function redisCard(subs: CardSubstitutions, t: TranslateFn): Rich
       },
       {
         id: "run",
+        mode: "manual",
         titleKey: "ingestion.setupCard.runCollectorTitle",
         descriptionKey: "ingestion.setupCard.runCollectorRedisDesc",
         chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
@@ -120,6 +129,7 @@ export default function redisCard(subs: CardSubstitutions, t: TranslateFn): Rich
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "redis", filter: "" },
+    extras: { uninstall: dbUninstallExtra() },
     docUrl: "https://openobserve.ai/blog/monitor-redis-metrics-otel",
   };
 }

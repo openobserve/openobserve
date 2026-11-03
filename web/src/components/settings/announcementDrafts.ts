@@ -112,6 +112,11 @@ export function newBannerId(prefix = "banner"): string {
   return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
+/** The banner's editor-draft key, its id; a legacy banner stored without one has none, as nothing else about it survives an edit. */
+export function bannerDraftKey(stored: Record<string, unknown> | null | undefined): string | null {
+  return typeof stored?.id === "string" && stored.id ? stored.id : null;
+}
+
 /** Largest first, as the API requires them in a compound span like `"1h30m"`. */
 const DURATION_UNITS: [string, number][] = [
   ["y", 31_536_000_000],

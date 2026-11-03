@@ -1,0 +1,730 @@
+[
+  {
+    "id": "evt_0000",
+    "aggregateID": "ses_rca",
+    "seq": 0,
+    "type": "message.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "info": {
+        "id": "msg_u1",
+        "sessionID": "ses_rca",
+        "role": "user",
+        "time": {
+          "created": 1784600000000
+        }
+      }
+    }
+  },
+  {
+    "id": "evt_0001",
+    "aggregateID": "ses_rca",
+    "seq": 1,
+    "type": "message.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "info": {
+        "id": "msg_a1",
+        "sessionID": "ses_rca",
+        "role": "assistant",
+        "time": {
+          "created": 1784600000100
+        }
+      }
+    }
+  },
+  {
+    "id": "evt_0002",
+    "aggregateID": "ses_rca",
+    "seq": 2,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_s0",
+        "type": "tool",
+        "callID": "call_prt_s0",
+        "tool": "record_step",
+        "state": {
+          "status": "completed",
+          "input": {
+            "stage": "context",
+            "title": "Step context"
+          },
+          "time": {
+            "start": 1784600000100,
+            "end": 1784600000101
+          },
+          "output": "{\"type\":\"rca_step\"}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0003",
+    "aggregateID": "ses_rca",
+    "seq": 3,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_s1",
+        "type": "tool",
+        "callID": "call_prt_s1",
+        "tool": "record_step",
+        "state": {
+          "status": "completed",
+          "input": {
+            "stage": "topology",
+            "title": "Step topology"
+          },
+          "time": {
+            "start": 1784600000110,
+            "end": 1784600000111
+          },
+          "output": "{\"type\":\"rca_step\"}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0004",
+    "aggregateID": "ses_rca",
+    "seq": 4,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_s2",
+        "type": "tool",
+        "callID": "call_prt_s2",
+        "tool": "record_step",
+        "state": {
+          "status": "completed",
+          "input": {
+            "stage": "changes",
+            "title": "Step changes"
+          },
+          "time": {
+            "start": 1784600000120,
+            "end": 1784600000121
+          },
+          "output": "{\"type\":\"rca_step\"}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0005",
+    "aggregateID": "ses_rca",
+    "seq": 5,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_s3",
+        "type": "tool",
+        "callID": "call_prt_s3",
+        "tool": "record_step",
+        "state": {
+          "status": "completed",
+          "input": {
+            "stage": "traces",
+            "title": "Step traces"
+          },
+          "time": {
+            "start": 1784600000130,
+            "end": 1784600000131
+          },
+          "output": "{\"type\":\"rca_step\"}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0006",
+    "aggregateID": "ses_rca",
+    "seq": 6,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_s4",
+        "type": "tool",
+        "callID": "call_prt_s4",
+        "tool": "record_step",
+        "state": {
+          "status": "completed",
+          "input": {
+            "stage": "log_patterns",
+            "title": "Step log_patterns"
+          },
+          "time": {
+            "start": 1784600000140,
+            "end": 1784600000141
+          },
+          "output": "{\"type\":\"rca_step\"}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0007",
+    "aggregateID": "ses_rca",
+    "seq": 7,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_s5",
+        "type": "tool",
+        "callID": "call_prt_s5",
+        "tool": "record_step",
+        "state": {
+          "status": "completed",
+          "input": {
+            "stage": "metrics",
+            "title": "Step metrics"
+          },
+          "time": {
+            "start": 1784600000150,
+            "end": 1784600000151
+          },
+          "output": "{\"type\":\"rca_step\"}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0008",
+    "aggregateID": "ses_rca",
+    "seq": 8,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_s6",
+        "type": "tool",
+        "callID": "call_prt_s6",
+        "tool": "record_step",
+        "state": {
+          "status": "completed",
+          "input": {
+            "stage": "converge",
+            "title": "Step converge"
+          },
+          "time": {
+            "start": 1784600000160,
+            "end": 1784600000161
+          },
+          "output": "{\"type\":\"rca_step\"}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0009",
+    "aggregateID": "ses_rca",
+    "seq": 9,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_g1",
+        "type": "tool",
+        "callID": "call_prt_g1",
+        "tool": "o2_GetIncident",
+        "state": {
+          "status": "completed",
+          "input": {
+            "incident_id": "inc_1",
+            "_o2_session": "secret"
+          },
+          "time": {
+            "start": 1784600000200,
+            "end": 1784600000260
+          },
+          "output": "{\"id\":\"inc_1\",\"title\":\"checkout errors\"}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0010",
+    "aggregateID": "ses_rca",
+    "seq": 10,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_b1",
+        "type": "tool",
+        "callID": "call_prt_b1",
+        "tool": "bash",
+        "state": {
+          "status": "completed",
+          "input": {
+            "command": "ls"
+          },
+          "time": {
+            "start": 1784600000300,
+            "end": 1784600000310
+          },
+          "output": "a\nb"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0011",
+    "aggregateID": "ses_rca",
+    "seq": 11,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_t1",
+        "type": "tool",
+        "callID": "call_prt_t1",
+        "tool": "o2_SearchSQL",
+        "state": {
+          "status": "completed",
+          "input": {
+            "org_id": "default",
+            "type": "logs",
+            "request_body": {
+              "query": {
+                "sql": "SELECT count(*) FROM app_logs WHERE level = 'error'"
+              }
+            }
+          },
+          "time": {
+            "start": 1784600001100,
+            "end": 1784600001142
+          },
+          "output": "{\"took\":3,\"hits\":[{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}],\"total\":42}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0012",
+    "aggregateID": "ses_rca",
+    "seq": 12,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_h1a",
+        "type": "tool",
+        "callID": "call_prt_h1a",
+        "tool": "record_hypothesis",
+        "state": {
+          "status": "completed",
+          "input": {
+            "id": "h1",
+            "statement": "The orders-db pool ran dry",
+            "status": "testing",
+            "reason": "h1 is testing",
+            "evidence": [
+              {
+                "id": "e1",
+                "tool": "SearchSQL",
+                "query": "SELECT count(*) FROM app_logs WHERE level = 'error'",
+                "polarity": "supports",
+                "strength": "supporting",
+                "observation": "e1 observed"
+              }
+            ],
+            "_o2_session": "secret"
+          },
+          "time": {
+            "start": 1784600001200,
+            "end": 1784600001201
+          },
+          "output": "{\"type\":\"rca_hypothesis\"}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0013",
+    "aggregateID": "ses_rca",
+    "seq": 13,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_t2",
+        "type": "tool",
+        "callID": "call_prt_t2",
+        "tool": "o2_tools_call",
+        "state": {
+          "status": "completed",
+          "input": {
+            "tool": "o2_PrometheusRangeQuery",
+            "args": {
+              "query": "sum(rate(db_pool_wait_seconds[5m]))"
+            }
+          },
+          "time": {
+            "start": 1784600002100,
+            "end": 1784600002350
+          },
+          "output": "{\"data\":{\"result\":[{\"values\":[[1,\"1\"],[2,\"2\"]]},{\"values\":[[1,\"3\"]]}]}}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0014",
+    "aggregateID": "ses_rca",
+    "seq": 14,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_t3",
+        "type": "tool",
+        "callID": "call_prt_t3",
+        "tool": "o2_SearchSQL",
+        "state": {
+          "status": "error",
+          "input": {
+            "org_id": "default",
+            "type": "logs",
+            "request_body": {
+              "query": {
+                "sql": "SELECT * FROM db_logs"
+              }
+            }
+          },
+          "time": {
+            "start": 1784600002400,
+            "end": 1784600002410
+          },
+          "error": "connection refused"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0015",
+    "aggregateID": "ses_rca",
+    "seq": 15,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_hx",
+        "type": "tool",
+        "callID": "call_prt_hx",
+        "tool": "record_hypothesis",
+        "state": {
+          "status": "error",
+          "input": {
+            "id": "h1",
+            "statement": "An errored call",
+            "status": "symptom",
+            "reason": "h1 is symptom",
+            "evidence": []
+          },
+          "time": {
+            "start": 1784600002500,
+            "end": 1784600002501
+          },
+          "error": "invalid input"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0016",
+    "aggregateID": "ses_rca",
+    "seq": 16,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_t4",
+        "type": "tool",
+        "callID": "call_prt_t4",
+        "tool": "o2_GetLatestTraces",
+        "state": {
+          "status": "running",
+          "input": {
+            "stream_name": "default"
+          },
+          "time": {
+            "start": 1784600002600,
+            "end": 1784600002600
+          }
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0017",
+    "aggregateID": "ses_rca",
+    "seq": 17,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_h2",
+        "type": "tool",
+        "callID": "call_prt_h2",
+        "tool": "record_hypothesis",
+        "state": {
+          "status": "completed",
+          "input": {
+            "id": "h2",
+            "statement": "A node ran out of CPU",
+            "status": "ruled_out",
+            "reason": "h2 is ruled_out",
+            "evidence": [
+              {
+                "id": "e3",
+                "tool": "GetIncident",
+                "query": "{\"incident_id\":\"inc_1\"}",
+                "polarity": "rules_out",
+                "strength": "decisive",
+                "observation": "e3 observed"
+              }
+            ]
+          },
+          "time": {
+            "start": 1784600002700,
+            "end": 1784600002701
+          },
+          "output": "{}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0018",
+    "aggregateID": "ses_rca",
+    "seq": 18,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_h1b",
+        "type": "tool",
+        "callID": "call_prt_h1b",
+        "tool": "record_hypothesis",
+        "state": {
+          "status": "pending",
+          "input": {
+            "id": "h1",
+            "statement": "The orders-db pool ran dry",
+            "status": "root_cause",
+            "reason": "h1 is root_cause",
+            "evidence": [
+              {
+                "id": "e1",
+                "tool": "SearchSQL",
+                "query": "SELECT count(*) FROM app_logs WHERE level = 'error'",
+                "polarity": "supports",
+                "strength": "decisive",
+                "observation": "e1 observed"
+              },
+              {
+                "id": "e2",
+                "tool": "PrometheusRangeQuery",
+                "query": "sum(rate(db_pool_wait_seconds[5m]))",
+                "polarity": "supports",
+                "strength": "decisive",
+                "observation": "e2 observed"
+              },
+              {
+                "id": "e4",
+                "tool": "SearchSQL",
+                "query": "SELECT * FROM db_logs",
+                "polarity": "supports",
+                "strength": "supporting",
+                "observation": "e4 observed"
+              }
+            ]
+          },
+          "time": {
+            "start": 1784600003000,
+            "end": 1784600003000
+          }
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0019",
+    "aggregateID": "ses_rca",
+    "seq": 19,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_h1b",
+        "type": "tool",
+        "callID": "call_prt_h1b",
+        "tool": "record_hypothesis",
+        "state": {
+          "status": "completed",
+          "input": {
+            "id": "h1",
+            "statement": "The orders-db pool ran dry",
+            "status": "root_cause",
+            "reason": "h1 is root_cause",
+            "evidence": [
+              {
+                "id": "e1",
+                "tool": "SearchSQL",
+                "query": "SELECT count(*) FROM app_logs WHERE level = 'error'",
+                "polarity": "supports",
+                "strength": "decisive",
+                "observation": "e1 observed"
+              },
+              {
+                "id": "e2",
+                "tool": "PrometheusRangeQuery",
+                "query": "sum(rate(db_pool_wait_seconds[5m]))",
+                "polarity": "supports",
+                "strength": "decisive",
+                "observation": "e2 observed"
+              },
+              {
+                "id": "e4",
+                "tool": "SearchSQL",
+                "query": "SELECT * FROM db_logs",
+                "polarity": "supports",
+                "strength": "supporting",
+                "observation": "e4 observed"
+              }
+            ]
+          },
+          "time": {
+            "start": 1784600003000,
+            "end": 1784600003001
+          },
+          "output": "{}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0020",
+    "aggregateID": "ses_rca",
+    "seq": 20,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_l1",
+        "type": "tool",
+        "callID": "call_prt_l1",
+        "tool": "record_blind_spot",
+        "state": {
+          "status": "completed",
+          "input": {
+            "id": "b1",
+            "axis": "traces",
+            "title": "Trace sampling at 1%",
+            "why": "Few traces kept",
+            "fix": "sampling_rules"
+          },
+          "time": {
+            "start": 1784600003100,
+            "end": 1784600003101
+          },
+          "output": "{}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  },
+  {
+    "id": "evt_0021",
+    "aggregateID": "ses_rca",
+    "seq": 21,
+    "type": "message.part.updated.1",
+    "data": {
+      "sessionID": "ses_rca",
+      "part": {
+        "id": "prt_p1",
+        "type": "tool",
+        "callID": "call_prt_p1",
+        "tool": "submit_report",
+        "state": {
+          "status": "completed",
+          "input": {
+            "markdown": "## Root cause\nThe DB pool ran dry.",
+            "verdict": {
+              "probable_cause": "The orders-db pool ran dry",
+              "claimed_confidence": "high",
+              "claimed_outcome": "root_cause_identified",
+              "page_recommendation": {
+                "action": "page",
+                "reason": "customers see errors"
+              },
+              "report_ref": "report"
+            },
+            "timeline": [
+              {
+                "at": 1,
+                "text": "Errors began",
+                "status": "confirmed",
+                "evidence_ids": [
+                  "e1"
+                ]
+              }
+            ]
+          },
+          "time": {
+            "start": 1784600004000,
+            "end": 1784600004001
+          },
+          "output": "{\"type\":\"rca_report\"}"
+        },
+        "sessionID": "ses_rca",
+        "messageID": "msg_a1"
+      }
+    }
+  }
+]

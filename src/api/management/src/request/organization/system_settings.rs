@@ -24,9 +24,13 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use config::meta::{
-    system_settings::{SettingScope, SystemSetting, SystemSettingPayload, SystemSettingQuery},
-    user::UserRole,
+use config::{
+    meta::{
+        alerts::auto_investigate::{AUTO_INVESTIGATE_GATE_SETTING_KEY, GateSettings},
+        system_settings::{SettingScope, SystemSetting, SystemSettingPayload, SystemSettingQuery},
+        user::UserRole,
+    },
+    utils::json::Value,
 };
 use db::system_settings;
 use openobserve_api_common::extractors::Headers;
@@ -43,6 +47,16 @@ fn is_reserved_key(key: &str) -> bool {
 
 fn reserved_key_response() -> Response {
     MetaHttpResponse::forbidden("This setting is managed by /prompts/settings")
+}
+
+/// Typed keys are refused here, since their readers silently fall back to defaults on a bad value.
+fn invalid_value_response(key: &str, value: &Value) -> Option<Response> {
+    if key != AUTO_INVESTIGATE_GATE_SETTING_KEY {
+        return None;
+    }
+    GateSettings::parse(value)
+        .err()
+        .map(|e| MetaHttpResponse::bad_request(format!("invalid {key}: {e}").as_str()))
 }
 
 /// Own settings are the caller's; another user's need root, Admin, or an OpenFGA users write.
@@ -205,6 +219,9 @@ pub async fn set_org_setting(
     if is_reserved_key(&payload.setting_key) {
         return reserved_key_response();
     }
+    if let Some(response) = invalid_value_response(&payload.setting_key, &payload.setting_value) {
+        return response;
+    }
     let mut setting = SystemSetting::new_org(&org_id, &payload.setting_key, payload.setting_value);
     if let Some(cat) = payload.setting_category.as_deref() {
         setting.setting_category = Some(cat.to_string());
@@ -253,6 +270,9 @@ pub async fn set_user_setting(
 ) -> Response {
     if is_reserved_key(&payload.setting_key) {
         return reserved_key_response();
+    }
+    if let Some(response) = invalid_value_response(&payload.setting_key, &payload.setting_value) {
+        return response;
     }
     if !may_access_user_settings(&org_id, &user_email.user_id, &user_id).await {
         return foreign_user_response();

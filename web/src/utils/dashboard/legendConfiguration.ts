@@ -41,6 +41,7 @@ const LEGEND_VALUES_TEXT_WIDTH = 180;
 const LEGEND_TEXT_FONT = "12px";
 // Legend padding (30) plus the default icon (25) and its gap (5) beside each entry's text.
 const LEGEND_ITEM_CHROME_WIDTH = 60;
+const LEGEND_MIN_TEXT_WIDTH = 60;
 // ECharts' largest-remainder percent loops forever once 100 * 10^precision passes 2^53.
 export const MAX_SEATS_PRECISION = 13;
 // Shared so the sizing pass and the first formatter call hit the same cached legend entries.
@@ -513,6 +514,13 @@ export const pieLegendPercentDecimals = (decimals: unknown): number => {
   return Number.isFinite(parsed) && parsed >= 0 ? Math.min(parsed, 100) : 2;
 };
 
+/** The percent digits a pie's legend and slice labels share; ECharts computes none past its seat precision. */
+export const piePercentPrecision = (config: Record<string, any> | null | undefined): number =>
+  Math.min(pieLegendPercentDecimals(config?.decimals), MAX_SEATS_PRECISION);
+
+const hasExplicitLegendWidth = (panelSchema: PieLegendPanelSchema): boolean =>
+  !!panelSchema.config?.legend_width && !isNaN(parseFloat(panelSchema.config.legend_width.value));
+
 // Returns "" when not even one letter and the ellipsis fit, since anything wider pushes the values out.
 const truncateLegendName = (text: string, maxWidth: number): string => {
   if (calculateWidthText(text, LEGEND_TEXT_FONT) <= maxWidth) return text;
@@ -561,10 +569,7 @@ const buildPieLegendEntries = (
 ): Map<string, PieLegendEntry> => {
   const lookup = createSeriesOverrideLookup(panelSchema?.config);
   // The slice labels cap their precision here too, so the legend never prints digits they do not.
-  const panelDecimals = Math.min(
-    pieLegendPercentDecimals(panelSchema?.config?.decimals),
-    MAX_SEATS_PRECISION,
-  );
+  const panelDecimals = piePercentPrecision(panelSchema?.config);
   const sums = new Map<string, number>();
   const measured = new Set<string>();
   const shares = new Map<string, number>();
@@ -597,6 +602,8 @@ const buildPieLegendEntries = (
   names.forEach((name, index) => {
     const overrideDecimals = lookup.get(name)?.decimals;
     const percentText = () => {
+      // A hidden slice has no share of what is drawn, and "0%" would read as an empty slice.
+      if (selected[name] === false) return "-";
       if (overrideDecimals !== undefined) {
         const decimals = pieLegendPercentDecimals(overrideDecimals);
         return overridePercentText(seatValues[index], positiveTotal, decimals);
@@ -679,8 +686,11 @@ const applyPieLegendValues = (
   if (!keys.length || !options.legend?.show) return;
   options.legend.formatter = (name: string) => {
     const data = options.series?.[0]?.data;
-    // A narrow right scroll legend shrinks textStyle.width after this point; fit the entries to it.
-    const width = Math.min(LEGEND_VALUES_TEXT_WIDTH, options.legend.textStyle?.width ?? Infinity);
+    // Right-legend sizing resets textStyle.width after this point; only an explicit Legend Width may exceed the cap.
+    const fittedWidth = options.legend.textStyle?.width ?? LEGEND_VALUES_TEXT_WIDTH;
+    const width = hasExplicitLegendWidth(panelSchema)
+      ? fittedWidth
+      : Math.min(LEGEND_VALUES_TEXT_WIDTH, fittedWidth);
     // ChartRenderer replaces legend.selected on every toggle, so the percents follow the visible slices.
     const entries = Array.isArray(data)
       ? getPieLegendEntries(panelSchema, data, keys, width, options.legend.selected)
@@ -1046,10 +1056,8 @@ export const applyPieDonutLegendPositioning = (
       // Calculate and apply legend width for right position
       // Prefer explicit legend width if provided in config
       let legendWidth;
-      if (
-        panelSchema.config.legend_width &&
-        !isNaN(parseFloat(panelSchema.config.legend_width.value))
-      ) {
+      const explicitLegendWidth = hasExplicitLegendWidth(panelSchema);
+      if (explicitLegendWidth) {
         legendWidth =
           panelSchema.config.legend_width.unit === "%"
             ? chartWidth * (panelSchema.config.legend_width.value / 100)
@@ -1070,8 +1078,13 @@ export const applyPieDonutLegendPositioning = (
       const legendLeftPx = Math.max(containerWidth - legendWidth, 0);
       options.legend.left = legendLeftPx;
       options.legend.right = 0;
-      // Values widen the text past the reserved width on small panels; fit it to the reservation.
-      if (pieLegendValueKeys(panelSchema).length) {
+      // The canvas bounds an explicit Legend Width, or values run past its edge; a zero width would blank the names.
+      if (explicitLegendWidth) {
+        options.legend.textStyle.width = Math.max(
+          Math.min(legendWidth, chartWidth) - LEGEND_ITEM_CHROME_WIDTH,
+          LEGEND_MIN_TEXT_WIDTH,
+        );
+      } else if (pieLegendValueKeys(panelSchema).length) {
         options.legend.textStyle.width = Math.min(
           LEGEND_VALUES_TEXT_WIDTH,
           Math.max(legendWidth - LEGEND_ITEM_CHROME_WIDTH, 0),
@@ -1131,9 +1144,7 @@ export const applyPieDonutLegendPositioning = (
 
     if (
       panelSchema?.config?.legends_position === "right" &&
-      !(
-        panelSchema.config.legend_width && !isNaN(parseFloat(panelSchema.config.legend_width.value))
-      ) // Don't apply if explicit width is set
+      !hasExplicitLegendWidth(panelSchema) // Don't apply if explicit width is set
     ) {
       // Calculate legend width using the helper function to ensure consistency
       const legendWidth = calculatePieDonutScrollLegendWidth(panelSchema, options, chartWidth);

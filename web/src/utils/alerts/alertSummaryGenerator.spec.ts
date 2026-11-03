@@ -139,3 +139,27 @@ describe("generateAlertSummary: where it sends", () => {
     expect(summary({ ...forecastForm(), ...targets })).not.toContain(noDestination);
   });
 });
+
+describe("generateAlertSummary: look-back period", () => {
+  const withPeriod = (period: number | string) =>
+    summary({
+      stream_name: "default",
+      stream_type: "logs",
+      is_real_time: "false",
+      query_condition: { type: "custom", conditions: [] },
+      trigger_condition: { period, operator: ">=", threshold: 3, frequency: 10, silence: 10 },
+      destinations: [],
+    });
+
+  it.each([
+    [1, "the last minute"],
+    [30, "the last 30 minutes"],
+    [60, "the last hour"],
+    [120, "the last 2 hours"],
+    [2880, "the last 2 days"],
+    ["30", "the last 30 minutes"],
+    ["1", "the last minute"],
+  ])("describes %s minutes as %s", (period, expected) => {
+    expect(withPeriod(period)).toContain(expected);
+  });
+});

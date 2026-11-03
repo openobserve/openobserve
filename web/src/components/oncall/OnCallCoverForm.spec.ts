@@ -76,7 +76,7 @@ const stubs = {
     // The REAL prop names. `primary-label` / `primary-disabled` are not props
     // of ODialog at all — passing those is what hid the footer entirely, so a
     // stub that accepted them would keep the bug invisible in tests.
-    props: ["open", "primaryButtonLabel", "secondaryButtonLabel", "primaryButtonDisabled"],
+    props: ["open", "title", "primaryButtonLabel", "secondaryButtonLabel", "primaryButtonDisabled"],
     emits: ["click:primary", "click:secondary", "update:open"],
     template: `<div v-if="open">
       <slot />
@@ -220,6 +220,14 @@ describe("OnCallCoverForm — which clock the times are on", () => {
 
   const summaryOf = (wrapper: ReturnType<typeof renderCover>) =>
     wrapper.find('[data-test="oncall-cover-summary"]').text();
+
+  // S14: the action has one name, and the window field asks "When".
+  it("is titled Cover a shift, with the window labelled When", () => {
+    const wrapper = renderCover();
+
+    expect(wrapper.findComponent({ name: "ODialog" }).props("title")).toBe("Cover a shift");
+    expect(wrapper.findComponent({ name: "OFormDateTimeRange" }).attributes("label")).toBe("When");
+  });
 
   it("names the clock the reader picked on", async () => {
     const wrapper = renderCover({ viewerTimezone: IST });

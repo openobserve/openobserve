@@ -73,10 +73,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="primary"
           size="sm"
+          :aria-label="
+            pricingDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('modelPricing.newModel') })
+              : undefined
+          "
           @click="openEditor(null)"
           data-test="model-pricing-add-btn"
         >
           {{ t("modelPricing.newModel") }}
+          <EditorDraftDot
+            v-if="pricingDrafts.hasNew"
+            :saved-at="pricingDrafts.savedAt(null)"
+            corner
+            data-test="model-pricing-add-draft-dot"
+          />
         </OButton>
       </template>
 
@@ -184,15 +195,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="person" size="sm" class="text-text-secondary" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
               </span>
-              <OTruncatedText as="div">{{ row.name }}</OTruncatedText>
-              <OTag
-                v-if="isDisabled(row)"
-                type="booleanState"
-                value="disabled"
-                size="sm"
-                class="ms-2 shrink-0"
-                data-test="model-pricing-disabled-tag"
-              />
+              <div class="flex min-w-0 items-center gap-2">
+                <OTruncatedText as="div">{{ row.name }}</OTruncatedText>
+                <EditorDraftDot
+                  v-if="pricingDrafts.ids.has(row.id)"
+                  :saved-at="pricingDrafts.savedAt(row.id)"
+                  :data-test="`model-pricing-${row.id}-draft-dot`"
+                />
+                <OTag
+                  v-if="isDisabled(row)"
+                  type="booleanState"
+                  value="disabled"
+                  size="sm"
+                  class="shrink-0"
+                  data-test="model-pricing-disabled-tag"
+                />
+              </div>
             </div>
           </template>
           <template #cell-match_pattern="{ row }">
@@ -390,10 +408,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       icon-left="more-vert"
                       variant="ghost"
                       size="icon-sm"
-                      :aria-label="t('modelPricing.moreActions')"
+                      :aria-label="duplicateActionLabel(row, t('modelPricing.moreActions'))"
                       data-test="model-pricing-row-more-actions"
                       @click.stop
-                    />
+                    >
+                      <EditorDraftDot
+                        v-if="hasDuplicateDraft(row)"
+                        corner
+                        :data-test="`model-pricing-${row.id}-more-actions-draft-dot`"
+                      />
+                    </OButton>
                   </template>
                   <ODropdownItem
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -420,6 +444,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @select="duplicateModel(row)"
                   >
                     <span>{{ t("modelPricing.actionDuplicate") }}</span>
+                    <EditorDraftDot
+                      v-if="hasDuplicateDraft(row)"
+                      :saved-at="duplicateDraftSavedAt(row)"
+                      :data-test="`model-pricing-${row.id}-duplicate-menu-draft-dot`"
+                    />
                   </ODropdownItem>
                   <ODropdownItem
                     icon-left="delete"
@@ -435,12 +464,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-sm"
-                  :title="t('modelPricing.actionClone')"
+                  :aria-label="duplicateActionLabel(row, t('modelPricing.actionClone'))"
                   @click.stop="duplicateModel(row)"
                   data-test="model-pricing-clone-btn"
                   data-row-action="duplicate"
                   icon-left="content-copy"
-                />
+                >
+                  <OTooltip
+                    side="bottom"
+                    :content="duplicateActionLabel(row, t('modelPricing.actionClone'))"
+                  />
+                  <EditorDraftDot
+                    v-if="hasDuplicateDraft(row)"
+                    corner
+                    :tooltip="false"
+                    :data-test="`model-pricing-${row.id}-clone-draft-dot`"
+                  />
+                </OButton>
               </template>
             </div>
           </template>
@@ -657,7 +697,7 @@ import { modelPricingQuery } from "@/services/model_pricing.queries";
 import { modelPricingKeys } from "@/services/model_pricing.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -686,6 +726,10 @@ import UtcHoursBar from "@/components/settings/UtcHoursBar.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import {
   operatorSymbol,
   formatTierRule,
@@ -704,6 +748,22 @@ const router = useRouter();
 
 const qTableRef = ref<any>(null);
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || "");
+const pricingDrafts = useEditorDraftIds("model_pricing");
+const hasDuplicateDraft = (row: { id: string }) =>
+  pricingDrafts.hasNewVariant(`duplicate:${row.id}`);
+const duplicateDraftSavedAt = (row: { id: string }) =>
+  pricingDrafts.savedAtVariant(`duplicate:${row.id}`);
+const draftLabel = useDraftLabel();
+// The corner dot is presentational, so an action that reopens a kept copy says so, dated, in its own name.
+const duplicateActionLabel = (row: { id: string }, label: I18nText): I18nText =>
+  hasDuplicateDraft(row) ? draftLabel(label, duplicateDraftSavedAt(row)) : label;
+// A copy of a deleted model has nothing left to come from, so its draft goes too.
+const dropPricingDrafts = (ids: string[]) => {
+  const org = orgIdentifier.value;
+  for (const id of ids) {
+    deleteEditorDraftsFor({ kind: "model_pricing", org, entityId: id, variant: `duplicate:${id}` });
+  }
+};
 
 const modelsQuery = useQuery(() =>
   Object.assign(modelPricingQuery(orgIdentifier.value), { enabled: !!orgIdentifier.value }),
@@ -1098,6 +1158,7 @@ function confirmDelete(model: any) {
     onConfirm: async () => {
       try {
         await modelPricingService.delete(orgIdentifier.value, model.id);
+        dropPricingDrafts([model.id]);
         toast({
           variant: "success",
           message: t("modelPricing.modelPricingDeleted"),
@@ -1188,6 +1249,7 @@ function confirmDeleteSelected() {
           const modelName = modelEntry?.name || id;
           try {
             await modelPricingService.delete(orgIdentifier.value, id);
+            dropPricingDrafts([id]);
             successCount++;
           } catch (e: any) {
             notifyError(t("modelPricing.errDeleteNamed", { name: modelName }), e);

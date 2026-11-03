@@ -138,6 +138,9 @@ mod tests {
     fn item(id: &str, status: DowntimeStatus, repeat: Repeat, updated_at: i64) -> DowntimeListItem {
         DowntimeListItem {
             downtime: Downtime {
+                alert_groups: None,
+                end_on_clear: None,
+                source: None,
                 id: id.to_string(),
                 org: "acme".to_string(),
                 folder_id: if id.starts_with('p') {

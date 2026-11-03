@@ -187,7 +187,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import type { ShiftRule } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { rotateMembersTo, turnLine } from "@/utils/oncall";
+import { rotateMembersTo, turnLine, withRoster } from "@/utils/oncall";
 
 const LINE_NAMES = 4;
 
@@ -198,6 +198,8 @@ const props = defineProps<{
   holder: { email: string; now: boolean } | null;
   nameOf: (email: string) => string;
   teamMembers: string[];
+  /** The team's zone; shifts are counted in its wall time, as the server counts them. */
+  timezone: string;
   setMembers: (rule: ShiftRule, members: string[]) => void;
 }>();
 
@@ -218,23 +220,22 @@ const addable = computed(() =>
     .map((email) => ({ label: raw(email), value: email })),
 );
 
+// Same rule as the server's save: whoever is on call now stays on call, newcomers go last.
+function setRoster(members: string[]) {
+  props.setMembers(props.rule, withRoster(props.rule, members, Date.now() * 1000, props.timezone));
+}
+
 function add(value: unknown) {
   if (typeof value !== "string" || !value) return;
-  props.setMembers(props.rule, [...props.rule.members, value]);
+  setRoster([...props.rule.members, value]);
 }
 
 function addEveryone() {
-  props.setMembers(props.rule, [
-    ...props.rule.members,
-    ...addable.value.map((option) => option.value),
-  ]);
+  setRoster([...props.rule.members, ...addable.value.map((option) => option.value)]);
 }
 
 function remove(member: string) {
-  props.setMembers(
-    props.rule,
-    props.rule.members.filter((m) => m !== member),
-  );
+  setRoster(props.rule.members.filter((m) => m !== member));
 }
 
 function move(from: number, to: number, event?: KeyboardEvent) {

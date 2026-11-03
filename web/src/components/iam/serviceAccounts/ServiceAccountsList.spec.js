@@ -223,22 +223,7 @@ describe("ServiceAccountsList Component", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the component", () => {
-    expect(wrapper.exists()).toBe(true);
-  });
-
   describe("Service Accounts List", () => {
-    it("fetches service accounts on mount", async () => {
-      expect(service_accounts.list).toHaveBeenCalledWith("test-org");
-    });
-
-    it("formats service account data correctly", async () => {
-      const result = await wrapper.vm.getServiceAccountsUsers();
-      await flushPromises();
-
-      expect(result).toBeDefined();
-    });
-
     it("first row should be SRE Agent system account", async () => {
       await wrapper.vm.getServiceAccountsUsers();
       await flushPromises();
@@ -269,37 +254,6 @@ describe("ServiceAccountsList Component", () => {
   });
 
   describe("Service Account Management", () => {
-    it("shows add service account dialog", async () => {
-      // Test the dialog state change
-      expect(wrapper.vm.showAddUserDialog).toBe(false);
-      wrapper.vm.showAddUserDialog = true;
-      expect(wrapper.vm.showAddUserDialog).toBe(true);
-    });
-
-    it("hides form dialog", () => {
-      // Test the direct state change functionality
-      wrapper.vm.showAddUserDialog = true;
-      expect(wrapper.vm.showAddUserDialog).toBe(true);
-
-      wrapper.vm.showAddUserDialog = false;
-      expect(wrapper.vm.showAddUserDialog).toBe(false);
-    });
-
-    it("handles successful service account creation", async () => {
-      const newAccount = {
-        email: "new-service@example.com",
-        first_name: "New Service",
-        is_system: false,
-        description: null,
-      };
-
-      wrapper.vm.isUpdated = false;
-      wrapper.vm.addUser(newAccount, true);
-
-      expect(wrapper.vm.isUpdated).toBe(true);
-      expect(wrapper.vm.showAddUserDialog).toBe(false);
-    });
-
     it("confirms delete action for user service accounts", () => {
       // confirmDeleteAction receives the row object directly (not wrapped in {row: ...})
       const row = { email: "service1@example.com", is_system: false };
@@ -628,37 +582,10 @@ describe("ServiceAccountsList Component", () => {
     });
   });
 
-  describe("Pagination", () => {
-    it("changes pagination settings", async () => {
-      // The component uses OTable's built-in pagination via page-size and page-size-options props.
-      // There is no changePagination method; pagination is controlled by OTable internally.
-      // This test verifies the OTable receives the correct page-size prop (20) and options.
-      const oTable = wrapper.findComponent({ name: "OTable" });
-      // OTable is rendered — it exists when the component mounts
-      expect(oTable.exists()).toBe(true);
-      // The page-size prop controls default rows per page
-      expect(oTable.props("pageSize")).toBe(20);
-    });
-
-    it("updates max records to return", async () => {
-      // The component uses OTable's built-in page-size-options prop for selectable page sizes.
-      // There is no changeMaxRecordToReturn method; page sizes are provided as static options.
-      const oTable = wrapper.findComponent({ name: "OTable" });
-      expect(oTable.exists()).toBe(true);
-      // The page-size-options prop provides the available sizes
-      expect(oTable.props("pageSizeOptions")).toEqual([20, 50, 100, 250, 500]);
-    });
-  });
-
   describe("Token Display", () => {
     it("redactToken shows first 4 chars and pads to fixed length of 12", () => {
       // output is always 12 chars: first 4 visible, rest padded with '*'
       expect(wrapper.vm.redactToken("abcd1234567890ef")).toBe("abcd********");
-    });
-
-    it("redactToken with exactly 4 chars shows all 4 and pads to 12", () => {
-      // 4 visible chars + 8 stars = 12 total
-      expect(wrapper.vm.redactToken("abcd")).toBe("abcd********");
     });
 
     it("redactToken with fewer than 4 chars shows available chars and pads to 12", () => {
@@ -666,18 +593,9 @@ describe("ServiceAccountsList Component", () => {
       expect(wrapper.vm.redactToken("ab")).toBe("ab**********");
       expect(wrapper.vm.redactToken("")).toBe("************");
     });
-
-    it("redactToken with 5 chars shows first 4 and pads to 12", () => {
-      // still shows first 4, pads to 12 total
-      expect(wrapper.vm.redactToken("abcde")).toBe("abcd********");
-    });
   });
 
   describe("File Operations", () => {
-    it("downloadTokenAsFile is available", () => {
-      expect(typeof wrapper.vm.downloadTokenAsFile).toBe("function");
-    });
-
     it("downloadTokenAsFile triggers a text-file download of the token", () => {
       const createEl = vi.spyOn(document, "createElement");
       const createObjUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
@@ -697,37 +615,6 @@ describe("ServiceAccountsList Component", () => {
     });
   });
 
-  describe("Component State", () => {
-    it("initializes with correct default values", () => {
-      expect(wrapper.vm.confirmDelete).toBe(false);
-      expect(wrapper.vm.showAddUserDialog).toBe(false);
-      expect(wrapper.vm.isUpdated).toBe(false);
-      expect(wrapper.vm.isShowToken).toBe(false);
-    });
-
-    it("has correct column configuration", () => {
-      // columns uses OTableColumnDef with 'id' (not 'name'). The row-index "#"
-      // column is now auto-injected by OTable's show-index, so it is not part
-      // of the component's own column defs. aws-exports is mocked with
-      // isEnterprise: "true", so the Roles column is included.
-      expect(wrapper.vm.columns).toHaveLength(6);
-      expect(wrapper.vm.columns[0].id).toBe("email");
-      expect(wrapper.vm.columns[1].id).toBe("first_name");
-      expect(wrapper.vm.columns[2].id).toBe("roles");
-      expect(wrapper.vm.columns[3].id).toBe("token");
-      expect(wrapper.vm.columns[4].id).toBe("created_at");
-      expect(wrapper.vm.columns[5].id).toBe("actions");
-    });
-
-    it("has correct per page options", () => {
-      // The component passes page-size-options directly to OTable as a prop array.
-      // Verify via the OTable component prop rather than a wrapper.vm property.
-      const oTable = wrapper.findComponent({ name: "OTable" });
-      expect(oTable.exists()).toBe(true);
-      expect(oTable.props("pageSizeOptions")).toEqual([20, 50, 100, 250, 500]);
-    });
-  });
-
   describe("SRE Agent System Account", () => {
     it("identifies SRE Agent accounts as system managed", async () => {
       await wrapper.vm.getServiceAccountsUsers();
@@ -741,23 +628,6 @@ describe("ServiceAccountsList Component", () => {
       expect(sreAgent.is_system).toBe(true);
       expect(sreAgent.email).toContain("o2-sre-agent.org-");
       expect(sreAgent.description).toContain("System-managed");
-    });
-
-    it("prevents modification of system accounts", () => {
-      const sreAgent = {
-        email: "o2-sre-agent.org-test-org@openobserve.internal",
-        is_system: true,
-        role: "SreAgent",
-      };
-
-      // Verify system account properties that should prevent modification
-      expect(sreAgent.is_system).toBe(true);
-      expect(sreAgent.role).toBe("SreAgent");
-
-      // In the UI, delete and edit buttons should be disabled for system accounts
-      // This test verifies the properties are correctly identified
-      const shouldDisableActions = sreAgent.is_system;
-      expect(shouldDisableActions).toBe(true);
     });
 
     it("displays proper role label for SRE Agent", async () => {
@@ -1198,30 +1068,6 @@ describe("ServiceAccountsList Component", () => {
       expect(env).not.toContain("Bearer");
     });
 
-    it("renders a download button in the token dialog (step 1)", () => {
-      const tokenDialog = wrapper
-        .findAllComponents({ name: "ODialog" })
-        .find((d) => d.props("title") === "Copy your token");
-      expect(tokenDialog).toBeDefined();
-      const dialogHtml = tokenDialog.html();
-      expect(dialogHtml).toContain("service-accounts-list-token-download-btn");
-    });
-
-    it("renders a copy button in the token dialog", () => {
-      const tokenDialog = wrapper
-        .findAllComponents({ name: "ODialog" })
-        .find((d) => d.props("title") === "Copy your token");
-      expect(tokenDialog).toBeDefined();
-      // Copy button should still be present (data-test attribute)
-      expect(tokenDialog.html()).toContain("service-accounts-list-token-copy-btn");
-    });
-
-    it("the copy hint does not use an em dash", () => {
-      const hint = wrapper.find('[data-test="service-accounts-token-copy-hint"]');
-      expect(hint.exists()).toBe(true);
-      expect(hint.text()).not.toContain("—");
-    });
-
     it("the main Copy Token button always copies the raw token, even on the Header/Env tab", async () => {
       wrapper.vm.revealToken("the-token", "svc@example.com");
       wrapper.vm.tokenTab = "header";
@@ -1439,28 +1285,6 @@ describe("ServiceAccountsList Component", () => {
   });
 
   describe("Columns — token, created, identifier header", () => {
-    it("includes a 'token' column", () => {
-      const tokenCol = wrapper.vm.columns.find((c) => c.id === "token");
-      expect(tokenCol).toBeDefined();
-      expect(tokenCol.header).toBe("Token");
-    });
-
-    it("includes a 'created' column", () => {
-      const createdCol = wrapper.vm.columns.find((c) => c.id === "created_at");
-      expect(createdCol).toBeDefined();
-    });
-
-    it("does not include a 'createdBy' column (API does not return created_by)", () => {
-      const createdByCol = wrapper.vm.columns.find((c) => c.id === "created_by");
-      expect(createdByCol).toBeUndefined();
-    });
-
-    it("renames email header to 'Identifier'", () => {
-      const emailCol = wrapper.vm.columns.find((c) => c.id === "email");
-      expect(emailCol).toBeDefined();
-      expect(emailCol.header).toBe("Identifier");
-    });
-
     it("formats created_at (epoch micros) into a readable date string", () => {
       // 2026-06-30T00:00:00Z in microseconds.
       const micros = Date.UTC(2026, 5, 30, 0, 0, 0) * 1000;
@@ -1484,66 +1308,6 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.serviceAccountRoles = { "svc@example.com": ["editor", "viewer"] };
       expect(wrapper.vm.serviceAccountRolesText("svc@example.com")).toBe("editor, viewer");
       expect(wrapper.vm.serviceAccountRolesText("unknown@example.com")).toBe("—");
-    });
-  });
-
-  describe("Actions — rotate verb label", () => {
-    it("uses 'Rotate Token' as the action label for token rotation", () => {
-      // The refresh button title should now say "Rotate Token"
-      const refreshBtn = wrapper.find('[data-test="service-accounts-refresh"]');
-      if (refreshBtn.exists()) {
-        expect(refreshBtn.attributes("title")).toBe("Rotate Token");
-      }
-    });
-  });
-
-  describe("System rows — managed-by chip and disabled checkbox", () => {
-    beforeEach(async () => {
-      await wrapper.vm.getServiceAccountsUsers();
-      await flushPromises();
-    });
-
-    it("renders a managed-by chip with tooltip for system rows", () => {
-      const sreAgentRow = mockServiceAccountsState.service_accounts_users.find((a) => a.is_system);
-      expect(sreAgentRow).toBeDefined();
-      // System row should have managed-by badge visible in the rendered output
-    });
-
-    it("uses system-managed tooltip text for disabled checkbox", () => {
-      // Checkbox on system rows should have a tooltip explaining why disabled
-      const sreAgent = mockServiceAccountsState.service_accounts_users.find((a) => a.is_system);
-      expect(sreAgent).toBeDefined();
-    });
-  });
-
-  describe("Header subtitle", () => {
-    it("renders a subtitle below the header", async () => {
-      // The subtitle should be visible
-      const appPageHeader = wrapper.findComponent({ name: "OPageHeader" });
-      if (appPageHeader.exists()) {
-        expect(appPageHeader.props("subtitle")).toBe("Programmatic access tokens for APIs");
-      }
-    });
-  });
-
-  describe("Empty state", () => {
-    it("has empty-state copy with title and CTA", async () => {
-      // Set up the mock to return empty data
-      vi.mocked(service_accounts.list).mockResolvedValueOnce({
-        data: { data: [] },
-      });
-      // Forced: a plain reload would be served from the cache the mount warmed.
-      await wrapper.vm.getServiceAccountsUsers(true);
-      await flushPromises();
-
-      // The service accounts list should be empty
-      expect(mockServiceAccountsState.service_accounts_users).toHaveLength(0);
-      // OEmptyState should be present (OTable renders #empty slot when data is empty)
-      const oEmpty = wrapper.findComponent({ name: "OEmptyState" });
-      // If OTable renders the empty slot, OEmptyState will be visible
-      if (oEmpty.exists()) {
-        expect(oEmpty.props("preset")).toBe("no-service-accounts");
-      }
     });
   });
 

@@ -519,22 +519,28 @@ describe("ThresholdsConfig", () => {
     });
 
     it.each(["line", "area", "bar", "h-bar", "scatter"])(
-      "offers four choices on %s",
+      "offers five choices on %s",
       async (chartType) => {
         mountConfig({ chartType, modelValue: twoSteps });
-        expect(await selectOptions()).toEqual(["color_line", "color", "line", "color_band"]);
+        expect(await selectOptions()).toEqual([
+          "color_line",
+          "color",
+          "line",
+          "dashed_line",
+          "color_band",
+        ]);
       },
     );
 
     it.each(["area-stacked", "stacked", "h-stacked"])(
-      "offers only Limit line and Shaded band on %s, with the hint",
+      "offers only the limit lines and Shaded band on %s, with the hint",
       async (chartType) => {
         mountConfig({ chartType, modelValue: twoSteps });
         expect(find("dashboard-config-thresholds-show-as-info").exists()).toBe(true);
         expect(wrapper!.findComponent(OTooltip).props("content")).toBe(
           "Stacked charts are not recolored; limits are drawn as lines or bands.",
         );
-        expect(await selectOptions()).toEqual(["line", "color_band"]);
+        expect(await selectOptions()).toEqual(["line", "dashed_line", "color_band"]);
       },
     );
 
@@ -557,6 +563,18 @@ describe("ThresholdsConfig", () => {
         .click();
       await flushPromises();
       expect(model.value.showAs).toBe("color_band");
+    });
+
+    it.each(["line", "area-stacked"])("writes the even dashed line on %s", async (chartType) => {
+      const { model } = mountBound({ chartType }, twoSteps);
+      await selectOptions();
+      document.body
+        .querySelector<HTMLElement>(
+          '[data-test="dashboard-config-thresholds-show-as-option"][data-test-value="dashed_line"]',
+        )!
+        .click();
+      await flushPromises();
+      expect(model.value.showAs).toBe("dashed_line");
     });
 
     it.each(["bar", "h-bar", "scatter"])(

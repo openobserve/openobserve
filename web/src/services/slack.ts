@@ -49,6 +49,8 @@ import type {
   SlackManifestParams,
   SlackMyLinksResponse,
   SlackOidcCallbackRequest,
+  SlackOncallRemindResponse,
+  SlackOncallUnlinkedResponse,
   SlackOrgAccessRequest,
   SlackOrgAccessView,
   SlackPrerequisitesResponse,
@@ -58,8 +60,6 @@ import type {
   SlackTestResponse,
   SlackUninstallResponse,
 } from "@/types/slack";
-
-/** Background callers pass `silentForbidden` so a 403 stays out of the grouped access toast. */
 export interface SlackRequestOptions {
   silentForbidden?: boolean;
 }
@@ -161,6 +161,14 @@ const slack = {
     http().delete<void>(
       `${installation(org, id)}/channel-defaults/${encodeURIComponent(channelId)}`,
     ),
+
+  listOncallUnlinked: (org: string, id: string) =>
+    http().get<SlackOncallUnlinkedResponse>(`${installation(org, id)}/oncall-unlinked`, {
+      silentForbidden: true,
+    }),
+
+  remindOncallUnlinked: (org: string, id: string) =>
+    http().post<SlackOncallRemindResponse>(`${installation(org, id)}/oncall-unlinked/remind`),
 
   getHelpContact: (org: string, id: string) =>
     http().get<SlackHelpContact>(`${installation(org, id)}/help-contact`),

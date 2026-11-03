@@ -22,6 +22,7 @@ import { raw, type TranslateFn } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
+import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
 import {
   DBM_CONTRIB_VERSION,
   MSSQL_DBM_CONFIG_YAML,
@@ -88,6 +89,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
       // samples into the _o2_dbm_server logs stream.
       metaBadges: [t("common.metrics"), t("common.logs")],
     },
+    setupModes: DB_SETUP_MODES,
     steps: [
       {
         id: "prepare",
@@ -130,10 +132,20 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
           raw("SQL Server 2016–2019 · VIEW SERVER STATE"),
         ],
       },
+      dbQuickInstallStep(t, subs, {
+        db: "sqlserver",
+        hostInputId: "server",
+        hostLabelKey: "ingestion.setupCard.sqlServerHostLabel",
+        defaultPort: "1433",
+        defaultUser: "otel",
+        defaultDatabase: "master",
+        dbm: true,
+      }),
       // Pinned so all four Tier-1 cards install the same collector.
-      collectorInstallStep(t, DBM_CONTRIB_VERSION),
+      manualOnly(collectorInstallStep(t, DBM_CONTRIB_VERSION)),
       {
         id: "configure",
+        mode: "manual",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
         descriptionKey: "ingestion.setupCard.configureCollectorDesc",
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
@@ -162,6 +174,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
       },
       {
         id: "run",
+        mode: "manual",
         titleKey: "ingestion.setupCard.runCollectorTitle",
         descriptionKey: "ingestion.setupCard.runCollectorDesc",
         chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
@@ -233,6 +246,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
       },
       {
         id: "dbm-configure",
+        mode: "manual",
         titleKey: "ingestion.setupCard.dbmConfigureTitle",
         descriptionKey: "ingestion.setupCard.dbmConfigureMssqlDesc",
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
@@ -261,6 +275,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
       },
       {
         id: "dbm-run",
+        mode: "manual",
         titleKey: "ingestion.setupCard.dbmRunTitle",
         descriptionKey: "ingestion.setupCard.dbmRunMssqlDesc",
         chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
@@ -281,6 +296,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
     // Metrics fan out into one stream per metric — match by keyword: any
     // metrics stream containing "sqlserver" means data is flowing.
     detect: { streamType: "metrics", match: "keyword", streamName: "sqlserver", filter: "" },
+    extras: { uninstall: dbUninstallExtra() },
     docUrl: "https://openobserve.ai/blog/monitor-sql-server-with-otel/",
   };
 }

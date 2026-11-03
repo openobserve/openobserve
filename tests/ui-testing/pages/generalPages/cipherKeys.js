@@ -1,5 +1,7 @@
 // cipher keys.js
 import { expect } from '@playwright/test';
+import { confirmDraftSignOut } from './draftSignOut.js';
+import { discardEditorDraftIfAsked, clearEditorDrafts } from '../alertsPages/editorDraftHelpers.js';
 
 
 export class CipherKeys {
@@ -28,7 +30,7 @@ export class CipherKeys {
          this.cancelButton = '[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]';
          this.updateButton = cipherName => `[data-test="cipherkey-list-${cipherName}-update"]`;
          this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
-         this.signOutButton = page.locator('[data-test="header-sign-out-btn"]');
+         this.signOutButton = page.locator('[data-test="menu-link-logout-item"]');
 
 
     }
@@ -61,8 +63,8 @@ export class CipherKeys {
 
       async addCipherKey() {
         await this.addCipherKeyButton.waitFor({ state: 'visible', timeout: 10000 });
+        await clearEditorDrafts(this.page);
         await this.addCipherKeyButton.click();
-
       }
 
       async addCipherKeyName(name) {
@@ -180,6 +182,7 @@ export class CipherKeys {
     async updateCipherKeysCancel() {
         await this.page.waitForSelector('[data-test="add-cipher-key-cancel-btn"]');
         await this.page.locator('[data-test="add-cipher-key-cancel-btn"]').click();
+        await discardEditorDraftIfAsked(this.page);
 
     }
 
@@ -244,6 +247,7 @@ export class CipherKeys {
       async signOut() {
         await this.profileButton.click();
         await this.signOutButton.click();
+        await confirmDraftSignOut(this.page);
       }
 
 

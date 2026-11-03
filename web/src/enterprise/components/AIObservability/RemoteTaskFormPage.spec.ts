@@ -9,6 +9,8 @@ const push = vi.fn();
 vi.mock("vue-router", () => ({
   useRoute: () => route,
   useRouter: () => ({ push }),
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),

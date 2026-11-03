@@ -1014,6 +1014,21 @@ pub async fn newest_completed_for_incident(
     .await
 }
 
+/// The newest completed run on the alert itself, whatever started it; read on the primary.
+pub async fn newest_completed_for_alert(
+    org_id: &str,
+    alert_id: &str,
+) -> Result<Option<Model>, DbErr> {
+    newest_completed_with(
+        get_orm_client_rw().await,
+        org_id,
+        Condition::all()
+            .add(rca_runs::Column::SubjectType.eq(RunSubjectType::Alert.as_str()))
+            .add(rca_runs::Column::SubjectId.eq(alert_id)),
+    )
+    .await
+}
+
 /// `started_at` of the incident's oldest run; pre-run reports are older than it.
 pub async fn first_started_at_for_incident(
     org_id: &str,
@@ -1070,6 +1085,27 @@ pub async fn list_running(limit: u64) -> Result<Vec<Model>, DbErr> {
         .filter(rca_runs::Column::State.eq(RunState::Running.as_str()))
         .order_by_asc(rca_runs::Column::UpdatedAt)
         .limit(limit)
+        .all(get_orm_client_rw().await)
+        .await
+}
+
+/// Live rows (`running`, `waiting_input`) on an alert or its incident; staleness is the caller's.
+pub async fn list_live_for_alert(
+    org_id: &str,
+    alert_id: &str,
+    incident_id: Option<&str>,
+) -> Result<Vec<Model>, DbErr> {
+    let mut subject = Condition::any().add(rca_runs::Column::SubjectId.eq(alert_id));
+    if let Some(incident_id) = incident_id {
+        subject = subject.add(rca_runs::Column::IncidentId.eq(incident_id));
+    }
+    rca_runs::Entity::find()
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .filter(subject)
+        .filter(
+            rca_runs::Column::State
+                .is_in([RunState::Running.as_str(), RunState::WaitingInput.as_str()]),
+        )
         .all(get_orm_client_rw().await)
         .await
 }

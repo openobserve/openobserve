@@ -31,4 +31,4 @@ export const makeTokenSchema = (t: TranslateFn) =>
 
 export type TokenForm = z.infer<ReturnType<typeof makeTokenSchema>>;
 
-export const tokenDefaults = (): TokenForm => ({ name: "", expiry: "90", maxUses: "100" });
+export const tokenDefaults = (): TokenForm => ({ name: "", expiry: "never", maxUses: "100" });

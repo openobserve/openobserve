@@ -198,6 +198,23 @@ const moveToRightAxis = (options: any, series: any[], config: any) => {
   }
 };
 
+// A hidden-axis series keeps its own scale, so its shape is visible next to series of a different magnitude.
+const moveToHiddenAxis = (options: any, series: any[]) => {
+  const axes = Array.isArray(options.yAxis) ? options.yAxis : [options.yAxis];
+  const left = axes[0];
+  if (!series.length || !isPlainObject(left) || left.type !== "value") return;
+  axes.push({
+    ...left,
+    show: false,
+    name: "",
+    min: undefined,
+    max: undefined,
+    splitLine: { ...left.splitLine, show: false },
+  });
+  options.yAxis = axes;
+  for (const s of series) s.yAxisIndex = axes.length - 1;
+};
+
 /** Applies line style, width, fill, points, draw style, stack group, y-axis side and hide flags from series overrides to the final options. */
 export const applySeriesStyleOverrides = (options: any, panelSchema: any): void => {
   const panelType = panelSchema?.type;
@@ -212,6 +229,7 @@ export const applySeriesStyleOverrides = (options: any, panelSchema: any): void 
     tooltip: new Set<string>(),
   };
   const rightSeries: any[] = [];
+  const hiddenAxisSeries: any[] = [];
   for (const series of options.series) {
     if (!isStyledSeries(series)) continue;
     const style = lookup.get(series.name)?.style;
@@ -222,6 +240,9 @@ export const applySeriesStyleOverrides = (options: any, panelSchema: any): void 
     applyFillOpacity(series, style.fillOpacity);
     if (style.stackGroup) series.stack = style.stackGroup;
     if (style.yAxis === "right" && !HORIZONTAL_CHART_TYPES.has(panelType)) rightSeries.push(series);
+    if (style.yAxis === "hidden" && !HORIZONTAL_CHART_TYPES.has(panelType)) {
+      hiddenAxisSeries.push(series);
+    }
     const name = String(series.name);
     if (style.hideFrom?.chart) {
       hidden.chart.add(name);
@@ -237,6 +258,7 @@ export const applySeriesStyleOverrides = (options: any, panelSchema: any): void 
     }
   }
   moveToRightAxis(options, rightSeries, panelSchema?.config);
+  moveToHiddenAxis(options, hiddenAxisSeries);
   hideFromChart(options, hidden.chart);
   hideFromLegend(options, hidden.legend);
   hideFromTooltip(options, hidden.tooltip);

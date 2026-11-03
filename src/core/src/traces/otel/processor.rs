@@ -340,6 +340,7 @@ impl OtelIngestionProcessor {
                     );
                     cost = result.cost;
                     add_cache_derived_costs(&mut cost, &tier_usage, &result.prices);
+                    cost.values_mut().for_each(|v| *v = round_cost(*v));
                 }
             }
         }
@@ -842,6 +843,14 @@ fn add_cache_derived_costs(
     }
 }
 
+/// Rounds to 10 significant digits to drop float noise from `tokens * price` products.
+fn round_cost(value: f64) -> f64 {
+    if value == 0.0 || !value.is_finite() {
+        return value;
+    }
+    format!("{value:.9e}").parse().unwrap_or(value)
+}
+
 fn actual_cost_total(cost: &HashMap<String, f64>) -> f64 {
     cost.iter()
         .filter(|(key, _)| {
@@ -869,6 +878,8 @@ mod tests {
                 r#"[
                 {"name": "GPT-4o", "match_pattern": "(?i)gpt-4o(?:-\\d{4}[-\\d]*)?$",
                  "tiers": [{"name": "Default", "prices": {"input": 2.5e-06, "output": 1e-05}}]},
+                {"name": "GPT-4o mini", "match_pattern": "(?i)gpt-4o-mini",
+                 "tiers": [{"name": "Default", "prices": {"input": 1.5e-07, "output": 6e-07}}]},
                 {"name": "Claude Sonnet 4.6", "match_pattern": "(?i)claude-sonnet-4-6",
                  "tiers": [
                     {"name": "Default", "prices": {"input": 3e-06, "output": 1.5e-05}},
@@ -1529,6 +1540,57 @@ mod tests {
                 .get(GenAiAttributes::USAGE_COST)
                 .and_then(|v| v.as_f64()),
             Some(0.0)
+        );
+    }
+
+    #[test]
+    fn test_process_span_rounds_computed_cost_float_noise() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("gpt-4o-mini"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(1));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(408));
+
+        processor.process_span(&mut span_attrs, &HashMap::new(), None, &[]);
+
+        assert_eq!(
+            span_attrs
+                .get(GenAiAttributes::USAGE_COST)
+                .and_then(|v| v.as_f64()),
+            Some(0.00024495)
+        );
+    }
+
+    #[test]
+    fn test_process_span_keeps_client_reported_cost_unrounded() {
+        let processor = OtelIngestionProcessor::new();
+        let noisy = 0.000_244_949_999_999_999_96_f64;
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("gpt-4o-mini"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(1));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(408));
+        span_attrs.insert(
+            LangfuseAttributes::COST_DETAILS.to_string(),
+            json::json!({ "input": noisy }),
+        );
+
+        processor.process_span(&mut span_attrs, &HashMap::new(), None, &[]);
+
+        assert_eq!(
+            span_attrs
+                .get(GenAiExtensions::USAGE_COST_INPUT)
+                .and_then(|v| v.as_f64()),
+            Some(noisy)
         );
     }
 
