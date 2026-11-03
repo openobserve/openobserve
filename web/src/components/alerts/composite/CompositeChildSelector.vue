@@ -123,6 +123,7 @@ const childLink = (child: CompositeChildOption): string =>
           :options="optionsFor(id)"
           :searchable="true"
           :placeholder="t('alerts.composite.searchChildren')"
+          :aria-label="`${t('alerts.composite.searchChildren')} ${letterFor(index)}`"
           class="min-w-0 flex-1"
           :data-test="`alerts-composite-child-select-${id}`"
           @update:model-value="replace(index, $event as string)"
