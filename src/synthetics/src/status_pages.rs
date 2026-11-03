@@ -161,12 +161,6 @@ pub async fn run(stop: crate::StopToken) {
         .status_page_rebuild_interval
         .max(10);
     let mut hashes = SnapshotHashes::new();
-    // Confirmation streaks observed by THIS loop from `last_check_status`.
-    // Deliberately not the checks table's `consecutive_failures`: the ack path
-    // clears that column for destination-less checks (it is alert bookkeeping,
-    // not neutral state), so a status page keyed on it would never confirm an
-    // outage on a check with no alert destinations.
-    let mut down_streaks: HashMap<String, i32> = HashMap::new();
     // Full mapped-check state, carried across ticks and refreshed by an
     // `updated_at`-watermark delta so per-tick DB cost tracks status *changes*,
     // not the mapped-check count. A full sweep every FULL_SWEEP_TICKS catches
@@ -177,7 +171,7 @@ pub async fn run(stop: crate::StopToken) {
             tracing::info!("[status_pages] rebuilder stopped");
             return;
         }
-        if let Err(e) = tick(&mut hashes, &mut down_streaks, &mut rt).await {
+        if let Err(e) = tick(&mut hashes, &mut rt).await {
             tracing::error!("[status_pages] rebuild tick failed: {e}");
         }
     }
@@ -195,44 +189,6 @@ struct RebuilderState {
     /// Highest `updated_at` consumed so far (the delta watermark).
     watermark: i64,
     tick_count: u64,
-    /// Per check, the `completed_at` of the last run this loop counted.
-    seen_runs: HashMap<String, i64>,
-}
-
-/// How far back (by `scheduled_ts`) the rebuilder looks for completed runs.
-/// Only completions that are new since the previous tick matter, and a probe
-/// run completes within its job timeout (minutes), so an hour covers every
-/// normal result with room for a delayed tick. A run that completes later than
-/// this — a long-expired dead letter — ends as Error, which never advances a
-/// streak anyway.
-const RUN_COMPLETION_LOOKBACK_MICROS: i64 = 3_600_000_000;
-
-/// Records one tick's view of a check and says whether it is a new result.
-///
-/// Streaks count completed RUNS, not rebuild ticks: the rebuilder ticks far
-/// more often than most checks run, so counting ticks confirmed a single DOWN
-/// as three failures. The marker is the check's latest
-/// `synthetics_runs.completed_at`, so one completed run counts exactly once.
-/// (`last_triggered_at` moves at dispatch, before the result exists, so it
-/// counted the previous result again when the next run was dispatched.) No
-/// completed run in the lookback window means nothing new to count.
-fn observe_run(
-    down_streaks: &mut HashMap<String, i32>,
-    seen_runs: &mut HashMap<String, i64>,
-    s: &table::CheckStateRow,
-) -> bool {
-    let fresh = match s.last_completed_at {
-        Some(at) => seen_runs.insert(s.id.clone(), at) != Some(at),
-        None => false,
-    };
-    if s.last_check_status == engine::CHECK_STATUS_DOWN {
-        if fresh {
-            *down_streaks.entry(s.id.clone()).or_insert(0) += 1;
-        }
-    } else {
-        down_streaks.remove(&s.id);
-    }
-    fresh
 }
 
 /// Per-check thresholds from the pages the check is mapped to. A check on
@@ -285,6 +241,7 @@ fn page_thresholds(p: &infra::table::entity::status_pages::Model) -> engine::Thr
     }
 }
 
+// One auto notice per check is shared by every page, so the strictest page's thresholds win.
 fn strictest(a: engine::Thresholds, b: engine::Thresholds) -> engine::Thresholds {
     engine::Thresholds {
         confirm_failures: a.confirm_failures.max(b.confirm_failures),
@@ -299,21 +256,12 @@ fn strictest(a: engine::Thresholds, b: engine::Thresholds) -> engine::Thresholds
 
 async fn tick(
     hashes: &mut SnapshotHashes,
-    down_streaks: &mut HashMap<String, i32>,
     rt: &mut RebuilderState,
 ) -> Result<(), infra::errors::Error> {
     let conn = get_orm_client_rw().await;
     let now = config::utils::time::now_micros();
     let data = load(conn, now, rt).await?;
-    let mut fresh: HashSet<String> = HashSet::new();
-    rt.seen_runs
-        .retain(|id, _| data.states.iter().any(|s| &s.id == id));
-    for s in &data.states {
-        if observe_run(down_streaks, &mut rt.seen_runs, s) {
-            fresh.insert(s.id.clone());
-        }
-    }
-    apply_engine_actions(conn, &data, down_streaks, &fresh, now).await?;
+    apply_engine_actions(conn, &data, now).await?;
     // Re-read notices only if actions changed them; a second bounded read per
     // tick is cheaper than tracking per-action deltas in the POC.
     let notices = table::list_notices_since(conn, now - RESOLVED_LOOKBACK_MICROS).await?;
@@ -352,12 +300,7 @@ async fn load(
     // Delta by default; full sweep on the Nth tick. The sweep replaces the
     // cache wholesale (so deleted/unmapped checks drop out); the delta merges
     // only changed rows over the carried cache.
-    // Always a full read of the mapped checks' state. The delta read keys on
-    // `updated_at`, which only moves on a status TRANSITION; a check that keeps
-    // failing (or keeps passing) advances only `last_triggered_at`, so the
-    // run-based streaks in `observe_run` would see a repeated result only on
-    // the periodic sweep and confirm many minutes late. The read is three
-    // scalar columns of the mapped checks only.
+    // Always a full read: a few scalar columns of the mapped checks only.
     let full_sweep = FULL_SWEEP_TICKS > 0;
     rt.tick_count = rt.tick_count.wrapping_add(1);
     let since = if full_sweep { None } else { Some(rt.watermark) };
@@ -379,16 +322,7 @@ async fn load(
         rt.check_state.retain(|id, _| mapped.contains(id.as_str()));
     }
     rt.watermark = rt.watermark.max(max_updated);
-    let mut states: Vec<table::CheckStateRow> = rt.check_state.values().cloned().collect();
-    let keys: Vec<(String, String)> = states
-        .iter()
-        .map(|s| (s.org_id.clone(), s.id.clone()))
-        .collect();
-    let completions =
-        table::latest_run_completions(conn, &keys, now - RUN_COMPLETION_LOOKBACK_MICROS).await?;
-    for s in &mut states {
-        s.last_completed_at = completions.get(&s.id).copied();
-    }
+    let states: Vec<table::CheckStateRow> = rt.check_state.values().cloned().collect();
 
     let mut snoozed: HashSet<String> = table::list_active_snoozes(conn, now)
         .await?
@@ -442,8 +376,6 @@ async fn muted_checks(
 async fn apply_engine_actions(
     conn: &sea_orm::DatabaseConnection,
     data: &TickData,
-    down_streaks: &HashMap<String, i32>,
-    fresh: &HashSet<String>,
     now: i64,
 ) -> Result<(), infra::errors::Error> {
     let checks: Vec<engine::EngineCheck> = data
@@ -451,12 +383,11 @@ async fn apply_engine_actions(
         .iter()
         .map(|s| engine::EngineCheck {
             id: s.id.clone(),
-            last_check_status: s.last_check_status,
-            // The loop's own observed streak, never the DB column — see run().
-            consecutive_failures: down_streaks.get(&s.id).copied().unwrap_or(0),
+            // Per-run verdict streaks written at run finalization; never the badge.
+            down_runs: s.down_runs,
+            up_runs: s.up_runs,
             first_fail_at: None,
             failing_since: None,
-            fresh_result: fresh.contains(&s.id),
         })
         .collect();
 
@@ -807,7 +738,9 @@ fn all_checks_in_error(mapped: &[&str], states: &[table::CheckStateRow]) -> bool
         states
             .iter()
             .find(|s| s.id == *id)
-            .is_some_and(|s| s.last_check_status == engine::CHECK_STATUS_ERROR)
+            // The badge is the worst job, so a quorum-Up run with one errored location is not No
+            // data.
+            .is_some_and(|s| s.last_check_status == engine::CHECK_STATUS_ERROR && s.up_runs == 0)
     })
 }
 
@@ -883,67 +816,15 @@ pub async fn run_domain_verifier() {}
 mod fast_pass_tests {
     use super::*;
 
-    fn row(id: &str, status: i32, completed: i64) -> table::CheckStateRow {
-        row_at(id, status, Some(completed))
-    }
-
-    fn row_at(id: &str, status: i32, completed: Option<i64>) -> table::CheckStateRow {
+    fn row(id: &str, status: i32) -> table::CheckStateRow {
         table::CheckStateRow {
             id: id.into(),
             org_id: "org".into(),
             last_check_status: status,
-            consecutive_failures: 0,
+            down_runs: 0,
+            up_runs: 0,
             last_triggered_at: 0,
-            last_completed_at: completed,
         }
-    }
-
-    /// The double count Codex found: dispatching the next run used to move the
-    /// marker while the status still showed the previous result, so one DOWN
-    /// counted twice and `confirm_failures = 2` opened on a single failure.
-    #[test]
-    fn dispatch_without_completion_does_not_count_again() {
-        let (mut d, mut seen) = (HashMap::new(), HashMap::new());
-        let down = engine::CHECK_STATUS_DOWN;
-        assert!(observe_run(&mut d, &mut seen, &row("c", down, 100)));
-        // Next run dispatched (last_triggered_at moves), not yet completed.
-        let mut dispatched = row("c", down, 100);
-        dispatched.last_triggered_at = 999;
-        assert!(!observe_run(&mut d, &mut seen, &dispatched));
-        assert_eq!(d["c"], 1);
-    }
-
-    /// The latest completion falling out of the lookback window is not a new
-    /// result, and its return is not one either.
-    #[test]
-    fn no_completion_in_window_is_not_fresh() {
-        let (mut d, mut seen) = (HashMap::new(), HashMap::new());
-        let down = engine::CHECK_STATUS_DOWN;
-        assert!(!observe_run(&mut d, &mut seen, &row_at("c", down, None)));
-        assert!(!d.contains_key("c"));
-        assert!(observe_run(&mut d, &mut seen, &row("c", down, 100)));
-        assert!(!observe_run(&mut d, &mut seen, &row_at("c", down, None)));
-        assert!(!observe_run(&mut d, &mut seen, &row("c", down, 100)));
-        assert_eq!(d["c"], 1);
-    }
-
-    #[test]
-    fn down_streak_counts_runs_not_ticks() {
-        let (mut d, mut seen) = (HashMap::new(), HashMap::new());
-        let down = engine::CHECK_STATUS_DOWN;
-        assert!(observe_run(&mut d, &mut seen, &row("c", down, 100)));
-        for _ in 0..10 {
-            assert!(!observe_run(&mut d, &mut seen, &row("c", down, 100)));
-        }
-        assert_eq!(d["c"], 1);
-        assert!(observe_run(&mut d, &mut seen, &row("c", down, 200)));
-        assert_eq!(d["c"], 2);
-        observe_run(
-            &mut d,
-            &mut seen,
-            &row("c", engine::CHECK_STATUS_ERROR, 300),
-        );
-        assert!(!d.contains_key("c"));
     }
 
     #[test]
@@ -982,10 +863,14 @@ mod fast_pass_tests {
     #[test]
     fn all_error_component_is_not_operational() {
         let e = engine::CHECK_STATUS_ERROR;
-        let states = vec![row("a", e, 1), row("b", e, 1), row("c", 1, 1)];
+        let states = vec![row("a", e), row("b", e), row("c", 1)];
         assert!(all_checks_in_error(&["a", "b"], &states));
         assert!(!all_checks_in_error(&["a", "c"], &states));
         assert!(!all_checks_in_error(&["a", "missing"], &states));
+        // 2 passed + 1 errored: the badge is Error, but the verdict is Up.
+        let mut up = row("a", e);
+        up.up_runs = 1;
+        assert!(!all_checks_in_error(&["a"], &[up]));
     }
 }
 
