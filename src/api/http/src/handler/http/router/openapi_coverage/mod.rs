@@ -57,6 +57,10 @@ const ROUTER_ROOT: &str = "local_routes";
 /// Only serves UI redirects, computed from `base_uri` at startup.
 const UNSCANNED_ROUTERS: &[&str] = &["create_app_router"];
 
+/// Runtime `if` conditions in the router that are fixed per edition, with the cfg each reduces to.
+const EDITION_GATES: &[(&str, &str)] =
+    &[("http_trigger::hooks_enabled()", r#"not(feature = "cloud")"#)];
+
 /// What a handler really answers on success: edition, method, path, status, content type, shape.
 const SUCCESS_CONTRACTS: &[ContractRow] = &[
     ("ent", "POST", "/api/license", "201", JSON, "string"),
@@ -796,6 +800,26 @@ fn cfg_spans(body: &str) -> Vec<(Range<usize>, String)> {
         let stop = block.map_or_else(|| statement_end(body, next), |open| close_of(body, open));
         spans.push((next..stop, predicate));
     }
+    spans.extend(edition_gate_spans(body));
+    spans
+}
+
+/// The block each `EDITION_GATES` condition guards, under the cfg it reduces to.
+fn edition_gate_spans(body: &str) -> Vec<(Range<usize>, String)> {
+    let mut spans = Vec::new();
+    for (gate, predicate) in EDITION_GATES {
+        for (at, _) in body.match_indices(gate) {
+            let condition_end = at + gate.len();
+            let Some(brace) = body[condition_end..].find('{') else {
+                continue;
+            };
+            let open = condition_end + brace;
+            if body[condition_end..open].contains(';') {
+                continue;
+            }
+            spans.push((open..close_of(body, open), (*predicate).to_string()));
+        }
+    }
     spans
 }
 
@@ -1434,6 +1458,25 @@ mod tests {}
     ];
     expected.sort();
     assert_eq!(parse_router(source), expected);
+}
+
+#[cfg(feature = "enterprise")]
+#[test]
+fn workflow_hook_routes_are_active_only_outside_cloud() {
+    let states: Vec<bool> = parsed_routes()
+        .into_iter()
+        .filter(|route| {
+            route.path.contains("/http_trigger") || route.path.contains("/workflows/hooks/")
+        })
+        .map(|route| route.active)
+        .collect();
+    assert_eq!(states.len(), 9, "{states:?}");
+    assert!(
+        states
+            .iter()
+            .all(|active| *active == cfg!(not(feature = "cloud"))),
+        "{states:?}"
+    );
 }
 
 #[test]

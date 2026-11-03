@@ -1202,13 +1202,6 @@ pub struct ApiDoc;
     openobserve_api_management::request::workflows::enable_workflow,
     openobserve_api_management::request::workflows::get_workflow_history,
     openobserve_api_management::request::workflows::promote_draft,
-    openobserve_api_management::request::workflows::http_trigger::get_http_trigger,
-    openobserve_api_management::request::workflows::http_trigger::put_http_trigger,
-    openobserve_api_management::request::workflows::http_trigger::delete_http_trigger,
-    openobserve_api_management::request::workflows::http_trigger::rotate_http_credential,
-    openobserve_api_management::request::workflows::http_trigger::revoke_http_credential,
-    openobserve_api_management::request::workflows::http_trigger::reveal_http_credential_secret,
-    openobserve_api_management::request::workflows::http_trigger::test_http_trigger,
     crate::handler::http::request::ratelimit::api_modules,
     openobserve_api_management::request::ai::chat::cancel,
     openobserve_api_management::request::ai::chat::chat,
@@ -1409,6 +1402,20 @@ pub struct ApiDoc;
 )))]
 struct EnterpriseExperimentApiDoc;
 
+/// Cloud builds never mount the workflow HTTP-trigger routes, so they stay out of its spec.
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+#[derive(OpenApi)]
+#[openapi(paths(
+    openobserve_api_management::request::workflows::http_trigger::get_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::put_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::delete_http_trigger,
+    openobserve_api_management::request::workflows::http_trigger::rotate_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::revoke_http_credential,
+    openobserve_api_management::request::workflows::http_trigger::reveal_http_credential_secret,
+    openobserve_api_management::request::workflows::http_trigger::test_http_trigger,
+))]
+struct WorkflowHttpTriggerApiDoc;
+
 #[cfg(feature = "cloud")]
 #[derive(OpenApi)]
 #[openapi(paths(
@@ -1463,27 +1470,11 @@ pub struct SecurityAddon;
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         #[cfg(feature = "enterprise")]
-        {
-            let enterprise = EnterpriseExperimentApiDoc::openapi();
-            overlay_paths(&mut openapi.paths, enterprise.paths);
-            if let (Some(components), Some(enterprise_components)) =
-                (openapi.components.as_mut(), enterprise.components)
-            {
-                components.schemas.extend(enterprise_components.schemas);
-                components.responses.extend(enterprise_components.responses);
-            }
-        }
+        overlay_doc(openapi, EnterpriseExperimentApiDoc::openapi());
+        #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+        overlay_doc(openapi, WorkflowHttpTriggerApiDoc::openapi());
         #[cfg(feature = "cloud")]
-        {
-            let cloud = CloudQuotaApiDoc::openapi();
-            overlay_paths(&mut openapi.paths, cloud.paths);
-            if let (Some(components), Some(cloud_components)) =
-                (openapi.components.as_mut(), cloud.components)
-            {
-                components.schemas.extend(cloud_components.schemas);
-                components.responses.extend(cloud_components.responses);
-            }
-        }
+        overlay_doc(openapi, CloudQuotaApiDoc::openapi());
         let cfg = get_config();
         if !cfg.common.base_uri.is_empty() {
             openapi.servers = Some(vec![utoipa::openapi::Server::new(&cfg.common.base_uri)]);
@@ -1587,6 +1578,17 @@ pub async fn openapi_info() -> OpenapiInfo {
     }
 
     tag_operations
+}
+
+#[cfg(any(feature = "enterprise", feature = "cloud"))]
+fn overlay_doc(openapi: &mut utoipa::openapi::OpenApi, extra: utoipa::openapi::OpenApi) {
+    overlay_paths(&mut openapi.paths, extra.paths);
+    if let (Some(components), Some(extra_components)) =
+        (openapi.components.as_mut(), extra.components)
+    {
+        components.schemas.extend(extra_components.schemas);
+        components.responses.extend(extra_components.responses);
+    }
 }
 
 /// Lays `extra` over `paths` per method: its operations win, the base keeps methods `extra` lacks.
@@ -2037,6 +2039,12 @@ mod tests {
         })
     }
 
+    /// Cloud never mounts the HTTP-trigger routes, so its spec leaves them out.
+    #[cfg(feature = "enterprise")]
+    fn published_in_this_edition(path: &str) -> bool {
+        !(cfg!(feature = "cloud") && path.contains("/http_trigger"))
+    }
+
     #[cfg(feature = "enterprise")]
     fn registered_gated_routes() -> BTreeSet<(String, String)> {
         // The licence-gated search routes are a separate group that service_routes() merges in.
@@ -2077,6 +2085,9 @@ mod tests {
         let paths = spec.get("paths").unwrap().as_object().unwrap();
         let mut wrong = Vec::new();
         for (path, method, statuses) in expected {
+            if !published_in_this_edition(path) {
+                continue;
+            }
             let Some(operation) = paths.get(*path).and_then(|item| item.get(*method)) else {
                 wrong.push(format!("{method} {path}: absent from the spec"));
                 continue;
@@ -2574,11 +2585,32 @@ mod tests {
         let paths = spec.get("paths").unwrap().as_object().unwrap();
         let missing: Vec<_> = GATED_MODULE_ROUTES
             .iter()
+            .filter(|(path, _)| published_in_this_edition(path))
             .filter(|(path, method)| paths.get(*path).and_then(|p| p.get(*method)).is_none())
             .collect();
         assert!(
             missing.is_empty(),
             "absent from the merged spec: {missing:#?}"
+        );
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn http_trigger_routes_are_absent_from_the_cloud_spec() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap().as_object().unwrap();
+        let hidden: Vec<_> = GATED_MODULE_ROUTES
+            .iter()
+            .filter(|(path, _)| !published_in_this_edition(path))
+            .collect();
+        assert_eq!(hidden.len(), 7, "{hidden:#?}");
+        let leaked: Vec<_> = hidden
+            .into_iter()
+            .filter(|(path, method)| paths.get(*path).and_then(|p| p.get(*method)).is_some())
+            .collect();
+        assert!(
+            leaked.is_empty(),
+            "cloud publishes unmounted routes: {leaked:#?}"
         );
     }
 
@@ -2611,6 +2643,9 @@ mod tests {
         let paths = spec.get("paths").unwrap().as_object().unwrap();
         let mut invalid = Vec::new();
         for (path, method) in GATED_MODULE_ROUTES {
+            if !published_in_this_edition(path) {
+                continue;
+            }
             let Some(operation) = paths.get(*path).and_then(|p| p.get(*method)) else {
                 invalid.push(format!("{method} {path}: absent from the spec"));
                 continue;
@@ -2806,6 +2841,9 @@ mod tests {
         let paths = spec.get("paths").unwrap().as_object().unwrap();
         let mut wrong = Vec::new();
         for (path, method, operation) in WORKFLOWS_RATELIMIT {
+            if !published_in_this_edition(path) {
+                continue;
+            }
             let Some(op) = paths.get(*path).and_then(|p| p.get(*method)) else {
                 wrong.push(format!("{method} {path}: absent from the spec"));
                 continue;
