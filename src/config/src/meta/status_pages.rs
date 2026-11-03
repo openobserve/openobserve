@@ -1123,7 +1123,7 @@ mod tests {
                 streak: 0
             }]
         );
-        // A NoVerdict run leaves both streaks where they were.
+        // A NoVerdict run after a Down leaves `down_runs` as it was and `up_runs` at 0.
         assert!(act(check("c1", 1, 0), &open_incident(0), &th).is_empty());
     }
 
