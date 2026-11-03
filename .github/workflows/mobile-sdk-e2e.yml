@@ -451,6 +451,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
+      # Some ubuntu-24.04 images leave too little disk for the emulator system image ("No space left on device").
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h /
+
       - uses: actions/checkout@v4
 
       # Test the LATEST SDK on a release event: the mobile-sdk-release dispatch carries {sdk, version};
