@@ -253,7 +253,8 @@ const useStreams = () => {
 
       // Wait for the streams to be fetched if they are being fetched
       if (getStreamsPromise.value) {
-        await getStreamsPromise.value;
+        // A rejection here would be lost inside this async executor and leave the promise pending.
+        await getStreamsPromise.value.catch(() => {});
       }
 
       // If the stream is not fetched, and trying to fetch the specific stream. First fetch all streams

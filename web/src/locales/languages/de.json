@@ -1131,6 +1131,7 @@
     "movePanelMessage": "Wählen Sie den Ziel-Tab",
     "noQueriesToCreateAlert": "Dieses Panel enthält keine Abfragen, von denen aus eine Warnung erstellt werden könnte",
     "panelQueryMustHaveStream": "Bei der Panel-Abfrage muss ein Stream konfiguriert sein",
+    "enrichmentTableAlertUnsupported": "Alarme können nicht für Anreicherungstabellen ausgeführt werden",
     "unsupportedPanelTypeAlert": "Das Erstellen von Benachrichtigungen aus {type} -Panels funktioniert möglicherweise nicht wie erwartet",
     "panelDuplicatedSuccessfully": "Panel wurde erfolgreich dupliziert",
     "panelDuplicationFailed": "Fehler beim Duplizieren des Panels",

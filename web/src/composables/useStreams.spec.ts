@@ -654,6 +654,22 @@ describe("useStreams Composable", () => {
         .rejects.toThrow("Service error");
     });
 
+    it("should settle getStream when the stream list it waits on fails", async () => {
+      vi.mocked(StreamService.nameList).mockRejectedValue(
+        new Error("List error"),
+      );
+
+      const listing = streamsInstance.getStreams("enrichment_tables", false);
+      const lookup = streamsInstance.getStream(
+        "geo",
+        "enrichment_tables",
+        false,
+      );
+
+      await expect(listing).rejects.toThrow("List error");
+      await expect(lookup).rejects.toThrow("List error");
+    });
+
     it("should handle StreamService.schema rejection in getStream", async () => {
       mockStore.state.streams.logs = { list: [{ name: "test", schema: [] }] };
       mockStore.state.streams.streamsIndexMapping.logs["test"] = 0;

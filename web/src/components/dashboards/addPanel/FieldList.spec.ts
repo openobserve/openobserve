@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 
@@ -201,6 +201,36 @@ describe("FieldList", () => {
         expect(streamTypeDropdown.exists()).toBe(true);
       }
     });
+
+    it("offers enrichment tables on the dashboard page", () => {
+      wrapper = createWrapper({}, { pageKey: "dashboard" });
+
+      const streamTypeDropdown = wrapper
+        .findAllComponents({ name: "QSelect" })
+        .find(
+          (select: VueWrapper) =>
+            select.vm.$attrs["data-test"] === "index-dropdown-stream_type",
+        );
+      expect(streamTypeDropdown?.props("options")).toEqual([
+        "logs",
+        "metrics",
+        "traces",
+        "enrichment_tables",
+      ]);
+    });
+
+    it.each(["logs", "metrics", "traces"])(
+      "does not offer enrichment tables on the %s page",
+      (pageKey) => {
+        wrapper = createWrapper({}, { pageKey });
+
+        expect(wrapper.vm.data.streamType).toEqual([
+          "logs",
+          "metrics",
+          "traces",
+        ]);
+      },
+    );
   });
 
   describe("Stream Selection", () => {

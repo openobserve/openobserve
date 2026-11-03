@@ -460,6 +460,7 @@ import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
+import { isEnrichmentTablePanel } from "@/utils/dashboard/streamLifetime";
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
 
@@ -1004,6 +1005,16 @@ export default defineComponent({
         this.$q.notify({
           type: "negative",
           message: this.t("panel.panelQueryMustHaveStream"),
+          timeout: 2000,
+        });
+        return;
+      }
+
+      // The alert form offers no enrichment-table stream type, so the prefill would be rejected.
+      if (isEnrichmentTablePanel(this.props.data)) {
+        this.$q.notify({
+          type: "negative",
+          message: this.t("panel.enrichmentTableAlertUnsupported"),
           timeout: 2000,
         });
         return;
