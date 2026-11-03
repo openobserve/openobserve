@@ -3083,6 +3083,56 @@ pub async fn snooze_response(
 
 #[utoipa::path(
     post,
+    path = "/{org_id}/oncall/responses/{response_id}/unsnooze",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "UnsnoozeOnCallResponse",
+    summary = "End a snooze now, so paging continues from the current step",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn unsnooze_response(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
+        }
+        match o2_enterprise::enterprise::oncall::escalation::unsnooze(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            config::utils::time::now_micros(),
+        )
+        .await
+        {
+            Ok(Some(r)) => MetaHttpResponse::json(r),
+            Ok(None) => MetaHttpResponse::not_found("Response record not found"),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
     path = "/{org_id}/oncall/responses/{response_id}/handoff",
     context_path = "/api",
     tag = "OnCall",
