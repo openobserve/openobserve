@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * The openobserve-instrument skill, published in the `@openobserve/skills` npm
- * package (source: o2-ai `skills/coding-agent/`). Served by the npm CDN so any coding
- * agent can fetch and follow it without installing a plugin.
- */
+/** Served from the npm CDN (source: o2-ai `skills/coding-agent/`) so any coding agent can fetch it without a plugin. */
 export const INSTRUMENT_SKILL_URL =
   "https://cdn.jsdelivr.net/npm/@openobserve/skills@1/skills/openobserve-instrument/SKILL.md";
 

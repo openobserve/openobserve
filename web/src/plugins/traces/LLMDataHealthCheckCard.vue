@@ -14,9 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- One AI data health check: its status, what it found, sample traces, and
-     the setting or guide that fixes it. Used by the LLM Insights health drawer
-     and the coding-agent setup tab. -->
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRouter } from "vue-router";

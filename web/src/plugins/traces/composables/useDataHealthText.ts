@@ -25,11 +25,7 @@ export function affectedPct(check: DataHealthCheck): string {
   return `${p < 1 && p > 0 ? p.toFixed(1) : Math.round(p)}%`;
 }
 
-/**
- * The words for an AI data health check: its name, what it found, its status
- * and the fix button. Shared by the LLM Insights health strip and the
- * coding-agent setup tab, so both describe a check the same way.
- */
+/** Shared by LLM Insights and the coding-agent tab so both describe a check the same way. */
 export function useDataHealthText() {
   const { t } = useI18nTyped();
 

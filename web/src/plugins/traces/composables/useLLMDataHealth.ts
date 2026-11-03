@@ -44,15 +44,7 @@ function samplesOf(res: DataHealthResponse): DataHealthSamples {
   return Object.fromEntries(res.checks.map((c) => [c.id, c.samples ?? []]));
 }
 
-/**
- * AI data health for one stream + window: one request per scope + window,
- * shared by the LLM Insights health strip and Total Cost tile (which reads the
- * unpriced check), and by the coding-agent setup tab. Sample trace ids cost an
- * extra query per failing check, so by default they are fetched only on demand
- * (the data health drawer) for the last scope + window; a load that asks for
- * `include_samples` gets them in the same request.
- * A response that lands after a newer request started is dropped.
- */
+/** Samples cost a query per failing check, so they load on demand unless a load sets `include_samples`. */
 export function useLLMDataHealth() {
   const health = ref<DataHealthResponse | null>(null);
   /** The window `health` was checked over, so links can open the same window. */

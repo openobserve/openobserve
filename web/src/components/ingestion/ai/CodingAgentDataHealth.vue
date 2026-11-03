@@ -14,12 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  AI data health for the spans a coding agent's first run sent, read with the
-  user's session: the agent's .env carries an ingestion token, which cannot read
-  data back, so this tab gives the feedback. Every check, passing or not, shows
-  with its fix; a failure to load never hides the first-span success above.
--->
+<!-- Reads with the user's session: the agent's .env token can only ingest. -->
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { useRouter } from "vue-router";

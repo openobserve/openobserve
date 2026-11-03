@@ -107,10 +107,7 @@ export function sortChecks(checks: DataHealthCheck[]): DataHealthCheck[] {
   return [...checks].sort((a, b) => rank[a.status] - rank[b.status]);
 }
 
-/**
- * The checks to show, worst first. With model pricing off (ZO_MODEL_PRICING_ENABLED=false)
- * nothing is priced and Model Pricing is hidden in Settings, so there is no unpriced check.
- */
+/** With model pricing off nothing is priced, so the unpriced check is hidden. */
 export function shownChecks(checks: DataHealthCheck[], pricingEnabled: boolean): DataHealthCheck[] {
   return sortChecks(checks.filter((c) => c.id !== "unpriced_models" || pricingEnabled));
 }

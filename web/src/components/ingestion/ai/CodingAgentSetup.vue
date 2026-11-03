@@ -81,8 +81,7 @@ const onPromptCopy = () => statusBar.value?.start("copy");
 const copyPrompt = () =>
   root.value?.querySelector<HTMLElement>('[data-test="ai-coding-agent-prompt-copy-btn"]')?.click();
 
-// A coding agent installs packages and edits code before its first request, so
-// the bar waits far longer than the stepped card before it names a cause.
+// An agent installs packages and edits code before its first request, so diagnosis waits far longer.
 const DIAGNOSIS_AFTER_MS = 15 * 60_000;
 // Clock skew and SDK batching can stamp a span a little before the watch started.
 const WINDOW_SLACK_MS = 60_000;
