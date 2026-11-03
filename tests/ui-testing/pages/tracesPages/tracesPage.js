@@ -3963,6 +3963,9 @@ export class TracesPage {
         editors.find((e) => e.getDomNode?.()?.closest('#traces-query-editor')) || editors[0];
       target.setValue(value);
     }, text);
+    await this.expectQueryEditorValue(text);
+    // The app reads the editor after a 100 ms debounce that only a text blur flushes, and its state has no DOM signal in production builds.
+    await this.page.waitForTimeout(400);
   }
 
   async expectQueryEditorValue(text) {

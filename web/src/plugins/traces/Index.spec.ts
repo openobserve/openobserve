@@ -5124,6 +5124,22 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(countSql).toContain(`FROM "default" WHERE trace_id IN (${big})`);
     });
 
+    it("cancels the run still streaming when the next SQL run is blocked", async () => {
+      await mountSql();
+      await useRealParser();
+      const { request } = await runSql(`SELECT * FROM "default"`);
+      expect(mockSearchObj.loading).toBe(true);
+      mockCancelStreamQueryBasedOnRequestId.mockClear();
+      mockSearchObj.meta.searchMode = "traces";
+      wrapper.vm.searchData();
+      await flushPromises();
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith(
+        expect.objectContaining({ trace_id: request.traceId }),
+      );
+      expect(mockSearchObj.loading).toBe(false);
+      mockSearchObj.meta.searchMode = "spans";
+    });
+
     it("shows why a query without trace_id cannot run, and Add trace_id and Run fixes it", async () => {
       const spans = `SELECT service_name, duration\nFROM "default"\nWHERE duration > 2000000`;
       await runTracesSql(spans);
@@ -5393,6 +5409,17 @@ describe("Index.vue (Main Traces Page)", () => {
       );
     });
 
+    it("opens the stream settings from a SQL-mode Configure resource card", async () => {
+      await mountSql();
+      await failRun(`SELECT * FROM "default"`, {
+        code: 20003,
+        message: "no full text search fields",
+      });
+      routerPushSpy.mockClear();
+      wrapper.findComponent({ name: "TracesSqlErrorState" }).vm.$emit("configure-resource");
+      expect(routerPushSpy).toHaveBeenCalledWith("/streams?dialog=default");
+    });
+
     it("narrows to the last hour and runs for Use last 1 hour", async () => {
       await mountSql();
       await failRun(`SELECT * FROM "default" c JOIN "default" p ON c.t = p.t`, {
@@ -5589,6 +5616,22 @@ describe("Index.vue (Main Traces Page)", () => {
         expect(mockSearchObj.loading).toBe(false);
       });
 
+      it("marks a text key so the table folds empty into (no value), and not a number key", async () => {
+        await mountSql();
+        const fields = mockSearchObj.data.stream.selectedStreamFields;
+        mockSearchObj.data.stream.selectedStreamFields = [
+          { name: "service_name", dataType: "Utf8" },
+          { name: "duration", dataType: "Int64" },
+        ];
+        mockSearchObj.meta.groupBy = "service_name";
+        await runGrouped();
+        expect(mockSearchObj.data.groupsRequest?.textKey).toBe(true);
+        mockSearchObj.meta.groupBy = "duration";
+        await runGrouped();
+        expect(mockSearchObj.data.groupsRequest?.textKey).toBe(false);
+        mockSearchObj.data.stream.selectedStreamFields = fields;
+      });
+
       it("gives every grouped run a new request, so the table reloads", async () => {
         await mountSql();
         mockSearchObj.meta.groupBy = "service_name";
@@ -5612,6 +5655,21 @@ describe("Index.vue (Main Traces Page)", () => {
         await flushPromises();
         expect(mockSearchObj.data.groupsRequest).toBeNull();
         expect(ownSqls()[0]).toMatch(/^SELECT \* FROM "default"/);
+      });
+
+      it("opening a group runs the filtered span list at once, even with auto-run off", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        await runGrouped("http_method = 'GET'");
+        mockFetchQueryDataWithHttpStream.mockClear();
+        wrapper.vm.onOpenGroup("service_name = 'cart'");
+        await flushPromises();
+        expect(mockSearchObj.meta.groupBy).toBe("");
+        expect(mockSearchObj.data.groupsRequest).toBeNull();
+        expect(mockSearchObj.data.editorValue).toBe(
+          "http_method = 'GET' and service_name = 'cart'",
+        );
+        expect(ownSqls()[0]).toMatch(/^SELECT \* FROM "default" WHERE .*service_name = 'cart'/);
       });
 
       it("records no recent search for a grouped run, as a recent entry holds no Group by", async () => {
@@ -5695,6 +5753,52 @@ describe("Index.vue (Main Traces Page)", () => {
         expect(mockSearchObj.data.groupsRequest).toBeNull();
         mockSearchObj.meta.searchMode = "spans";
       });
+    });
+
+    it("drops a Group by the picked stream has no field for, and keeps one it has", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.meta.groupBy = "service_name";
+      mockSearchObj.data.stream.selectedStream = { label: "test-stream", value: "test-stream" };
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockSearchObj.meta.groupBy).toBe("service_name");
+
+      mockSearchObj.meta.groupBy = "http_method";
+      mockSearchObj.data.stream.selectedStream = { label: "test-stream", value: "test-stream" };
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockSearchObj.meta.groupBy).toBe("");
+    });
+
+    it("clears the Groups table when the picked stream has no Group by field, without a search on auto-run off", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = false;
+      localStorage.setItem("oo_toggle_auto_run", "false");
+      store.state.zoConfig.auto_query_enabled = true;
+      await flushPromises();
+      mockSearchObj.meta.groupBy = "http_method";
+      mockSearchObj.data.groupsRequest = { key: "http_method" } as any;
+      mockFetchQueryDataWithHttpStream.mockClear();
+      mockSearchObj.data.stream.selectedStream = { label: "test-stream", value: "test-stream" };
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockSearchObj.meta.groupBy).toBe("");
+      expect(mockSearchObj.data.groupsRequest).toBeNull();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      delete store.state.zoConfig.auto_query_enabled;
+      localStorage.removeItem("oo_toggle_auto_run");
+    });
+
+    it("runs nothing when a stream is picked from the list in SQL mode, even with auto-run on", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.meta.liveMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "test-stream"`;
+      mockSearchObj.data.stream.selectedStream = { label: "test-stream", value: "test-stream" };
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
     });
 
     it("waits for Run when the stream changes in SQL mode, even with auto-run on", async () => {

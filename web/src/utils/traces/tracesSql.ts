@@ -315,7 +315,7 @@ export function sqlToFilter(
 
 /** "Add trace_id" only makes sense where trace_id can sit next to the other columns. */
 export function canAddTraceId(info: TracesSqlInfo): boolean {
-  return info.isStatement && !info.groupBy && !info.aggregate && !info.union;
+  return info.isStatement && !info.groupBy && !info.aggregate && !info.union && !info.distinct;
 }
 
 /** Puts trace_id first in the top-level select list, or returns null for text that is not a SELECT. */
@@ -507,7 +507,6 @@ export function missingStreamAfterFrom(sql: string): boolean {
   return tokens.some((tok, i) => isWord(tok, "from") && isWord(tokens[i + 1], "where"));
 }
 
-/** The first JOIN keyword at any depth. */
 export function sqlJoinKeyword(sql: string): { start: number; end: number } | null {
   const tok = tokenize(sql).find((t) => t.kind === "word" && t.text.toLowerCase() === "join");
   return tok ? { start: tok.start, end: tok.end } : null;

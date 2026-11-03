@@ -117,6 +117,26 @@ describe("TracesSqlErrorState", () => {
     expect(wrapper.text()).toContain("boom");
   });
 
+  it("keeps the shared Configure resource card for 20003 when no fix applies", async () => {
+    const wrapper = mountState({
+      errorCode: 20003,
+      errorMsg: "Search stream has no full text search fields",
+      query: `SELECT * FROM "default"`,
+    });
+    await wrapper.find('[data-test="query-error-configure-resource-card"]').trigger("click");
+    expect(wrapper.emitted("configure-resource")).toHaveLength(1);
+  });
+
+  it("offers no Try wider range card for 20006, since the page has no wider range to apply", () => {
+    const wrapper = mountState({
+      errorCode: 20006,
+      errorMsg: "Search data unavailable",
+      query: `SELECT * FROM "default"`,
+    });
+    expect(wrapper.find('[data-test="query-error-expand-range-card"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="query-error-fix-query-card"]').exists()).toBe(false);
+  });
+
   it("offers Ask AI only when AI is enabled", async () => {
     expect(mountState({}).find('[data-test="query-error-ask-ai-btn"]').exists()).toBe(false);
     const wrapper = mountState({ aiEnabled: true });

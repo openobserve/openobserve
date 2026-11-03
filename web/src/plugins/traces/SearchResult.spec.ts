@@ -683,6 +683,7 @@ describe("SearchResult", () => {
         "open-mobile-fields",
         "add-trace-id",
         "run-sql",
+        "open-group",
       ];
 
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);

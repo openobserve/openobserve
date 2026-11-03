@@ -647,6 +647,28 @@ describe("TracesSearchResultList", () => {
     });
   });
 
+  describe("header sorting", () => {
+    afterEach(() => {
+      (sharedSearchObj.meta as any).sqlMode = false;
+    });
+
+    it("sorts on the server in the span list, and not for typed SQL, whose ORDER BY decides", () => {
+      wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: "spans" as any });
+      expect(wrapper.findComponent({ name: "OTable" }).props("sorting")).toBe("server");
+      wrapper.unmount();
+
+      (sharedSearchObj.meta as any).sqlMode = true;
+      wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: "spans" as any });
+      expect(wrapper.findComponent({ name: "OTable" }).props("sorting")).toBe("none");
+    });
+
+    it("keeps server sorting for SQL in the Traces view, which still sends the sort", () => {
+      (sharedSearchObj.meta as any).sqlMode = true;
+      wrapper = mount_({ hits: [makeHit("t1")], loading: false, searchMode: "traces" as any });
+      expect(wrapper.findComponent({ name: "OTable" }).props("sorting")).toBe("server");
+    });
+  });
+
   describe("Columns button — fill column", () => {
     afterEach(() => {
       sharedSearchObj.data.resultGrid.columns = [];

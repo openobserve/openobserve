@@ -189,6 +189,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   "update:sort": [sort: GroupsSort];
+  "open-group": [term: string];
 }>();
 
 const { t } = useI18nTyped();
@@ -291,8 +292,9 @@ onBeforeUnmount(() => {
 });
 
 const apply = (value: GroupValue, action: "include" | "exclude", toList: boolean) => {
-  searchObj.data.stream.addToFilter = groupTerm(props.request.key, value, action);
-  if (toList) searchObj.meta.groupBy = "";
+  const term = groupTerm(props.request.key, value, action);
+  if (toList) emit("open-group", term);
+  else searchObj.data.stream.addToFilter = term;
 };
 
 // OTable's server sort cycles asc, desc, then cleared; the Groups table is never unsorted, so cleared flips the order.

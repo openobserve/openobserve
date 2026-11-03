@@ -23,6 +23,8 @@ const SPARK_BUCKETS = 24;
 // histogram() bins from date_bin's origin, 2001-01-01T00:00:00Z (config/src/meta/histogram_origin.rs).
 const HISTOGRAM_ORIGIN_US = 978_307_200_000_000;
 
+const TEXT_TYPES = new Set(["Utf8", "LargeUtf8", "Utf8View"]);
+
 export type GroupsSortKey = "value" | "spans" | "errors" | "error_pct" | "p50" | "p95" | "p99";
 
 export const GROUPS_SORT_KEYS: readonly GroupsSortKey[] = [
@@ -60,6 +62,7 @@ export interface GroupsQueryInput {
   key: string;
   filter: string;
   scope: string;
+  textKey?: boolean;
 }
 
 /** The sparkline histogram's interval and its first bucket, so rows land in fixed slots. */
@@ -67,6 +70,10 @@ export interface SparklinePlan {
   intervalSec: number;
   alignedStartUs: number;
   bucketCount: number;
+}
+
+export function isTextType(dataType: unknown): boolean {
+  return TEXT_TYPES.has(String(dataType));
 }
 
 export function isGroupsSortKey(value: unknown): value is GroupsSortKey {
@@ -97,6 +104,10 @@ const sqlString = (value: string | number | boolean) => `'${String(value).replac
 
 const whereOf = (filter: string) => (filter ? ` WHERE ${filter}` : "");
 
+// NULLIF folds '' into NULL so both fall in the one (no value) group; on a non-text key it fails to cast ''.
+const keyExpr = (input: GroupsQueryInput) =>
+  input.textKey ? `NULLIF(${quoteIdentifier(input.key)}, '')` : quoteIdentifier(input.key);
+
 function orderBy(sort: GroupsSort): string {
   const dir = sort.order.toUpperCase();
   if (sort.by === "value") return `value ${dir}`;
@@ -108,7 +119,7 @@ function orderBy(sort: GroupsSort): string {
 
 /** RED per value of one field: the Groups table's rows. */
 export function buildGroupsSql(input: GroupsQueryInput & { sort: GroupsSort }): string {
-  const key = quoteIdentifier(input.key);
+  const key = keyExpr(input);
   const filter = withScope(input.filter, input.scope);
   return (
     `SELECT ${key} AS value, count(*) AS spans, ` +
@@ -141,10 +152,13 @@ export function buildGroupsSparklineSql(
   const listed = input.values.filter((v): v is string | number | boolean => v !== null);
   const parts: string[] = [];
   if (listed.length) parts.push(`${key} IN (${listed.map(sqlString).join(", ")})`);
-  if (listed.length < input.values.length) parts.push(`${key} IS NULL`);
+  if (listed.length < input.values.length) {
+    parts.push(`${key} IS NULL`);
+    if (input.textKey) parts.push(`${key} = ''`);
+  }
   const filter = withScope(withScope(input.filter, input.scope), `(${parts.join(" OR ")})`);
   return (
-    `SELECT histogram(_timestamp, '${input.plan.intervalSec} seconds') AS ts, ${key} AS value, ` +
+    `SELECT histogram(_timestamp, '${input.plan.intervalSec} seconds') AS ts, ${keyExpr(input)} AS value, ` +
     `count(*) AS spans FROM ${quoteIdentifier(input.stream)}${whereOf(filter)} ` +
     `GROUP BY ts, value ORDER BY ts LIMIT ${GROUPS_LIMIT * input.plan.bucketCount}`
   );
@@ -177,7 +191,7 @@ export function sparklineSeries(
 /** Approximate number of values the key has under the same filter, for the footer. */
 export function buildGroupsDistinctSql(input: GroupsQueryInput): string {
   const filter = withScope(input.filter, input.scope);
-  return `SELECT approx_distinct(${quoteIdentifier(input.key)}) AS n FROM ${quoteIdentifier(input.stream)}${whereOf(filter)}`;
+  return `SELECT approx_distinct(${keyExpr(input)}) AS n FROM ${quoteIdentifier(input.stream)}${whereOf(filter)}`;
 }
 
 export function toGroupRows(hits: Record<string, unknown>[]): GroupRow[] {

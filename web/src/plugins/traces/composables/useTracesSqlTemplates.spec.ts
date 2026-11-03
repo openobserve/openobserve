@@ -83,6 +83,39 @@ describe("useTracesSqlTemplates", () => {
     scope.stop();
   });
 
+  it("asks once per relative period, not again when a Run moves the window forward", async () => {
+    searchObj.data.datetime = {
+      type: "relative",
+      relativeTimePeriod: "15m",
+      startTime: 10,
+      endTime: 20,
+    };
+    const scope = effectScope();
+    scope.run(() => useTracesSqlTemplates());
+    searchObj.meta.sqlMode = true;
+    await nextTick();
+    expect(fetchFieldValues).toHaveBeenCalledTimes(1);
+
+    searchObj.data.datetime = {
+      type: "relative",
+      relativeTimePeriod: "15m",
+      startTime: 15,
+      endTime: 25,
+    };
+    await nextTick();
+    expect(fetchFieldValues).toHaveBeenCalledTimes(1);
+
+    searchObj.data.datetime = {
+      type: "relative",
+      relativeTimePeriod: "1h",
+      startTime: 15,
+      endTime: 25,
+    };
+    await nextTick();
+    expect(fetchFieldValues).toHaveBeenCalledTimes(2);
+    scope.stop();
+  });
+
   it("reads service names for the trace templates once SQL mode is on in the Traces view", async () => {
     const { sqlTemplates } = useTracesSqlTemplates();
     expect(fetchFieldValues).not.toHaveBeenCalled();

@@ -381,6 +381,10 @@ describe("insertTraceIdColumn / canAddTraceId", () => {
     expect(canAddTraceId(info(`SELECT x, count(*) FROM "a" GROUP BY x`))).toBe(false);
     expect(canAddTraceId(info(`SELECT count(*) FROM "a"`))).toBe(false);
   });
+
+  it("is not offered for DISTINCT, where trace_id would change what counts as a duplicate", () => {
+    expect(canAddTraceId(info(`SELECT DISTINCT service_name FROM "default"`))).toBe(false);
+  });
 });
 
 describe("resultShape / resultKeys", () => {
