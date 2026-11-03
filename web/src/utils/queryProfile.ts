@@ -42,7 +42,6 @@ export interface ProfileMetric {
   kind: MetricKind | string;
   value: number;
   total?: number;
-  max: number;
 }
 
 export interface ProfileNode {
@@ -75,26 +74,19 @@ export interface RemoteNodeProfile {
   node_name: string;
   node_address: string;
   role: string;
-  region: string;
   cluster: string;
   start_us: number;
-  first_batch_us: number;
   end_us: number;
   output_rows: number;
   output_batches: number;
   output_bytes: number;
-  fetch_ns: number;
   decode_ns: number;
-  assigned_files: number;
   skipped: boolean;
-  error: string;
-  peak_memory: number;
   scan_stats?: RemoteScanStats;
   plan?: ProfileNode;
 }
 
 export interface QueryProfile {
-  version: number;
   node_name: string;
   node_address: string;
   start_us: number;
@@ -176,7 +168,6 @@ export interface StageNode {
   clusterEntry: boolean;
   remote: RemoteNodeProfile;
   wallUs: number;
-  firstBatchUs: number;
   straggler: boolean;
   variantId: string | null;
   planSource: PlanSource;
@@ -702,10 +693,10 @@ function textPlanToProfile(node: OperatorNode): ProfileNode {
   const metrics: ProfileMetric[] = [];
   const ms = Number(node.metrics.elapsed_compute_ms);
   if (ms > 0) {
-    metrics.push({ name: "elapsed_compute", kind: "time", value: ms * 1e6, max: ms * 1e6 });
+    metrics.push({ name: "elapsed_compute", kind: "time", value: ms * 1e6 });
   }
   const rows = Number(node.metrics.output_rows);
-  if (rows > 0) metrics.push({ name: "output_rows", kind: "count", value: rows, max: rows });
+  if (rows > 0) metrics.push({ name: "output_rows", kind: "count", value: rows });
   return {
     name: node.name,
     detail: node.fullText,
@@ -721,20 +712,14 @@ function planOnlyRemote(plan: ProfileNode): RemoteNodeProfile {
     node_name: "",
     node_address: "",
     role: "",
-    region: "",
     cluster: "",
     start_us: 0,
-    first_batch_us: 0,
     end_us: 0,
     output_rows: 0,
     output_batches: 0,
     output_bytes: 0,
-    fetch_ns: 0,
     decode_ns: 0,
-    assigned_files: 0,
     skipped: false,
-    error: "",
-    peak_memory: 0,
     plan,
   };
 }
@@ -759,7 +744,6 @@ export function physicalPlanToProfile(planText: string): QueryProfile | null {
   const root = parseQueryPlanTree(planText);
   if (!root.children.length) return null;
   return {
-    version: 0,
     node_name: "",
     node_address: "",
     start_us: 0,
@@ -933,7 +917,6 @@ function buildStage(
       clusterEntry,
       remote,
       wallUs: remoteWallUs(remote),
-      firstBatchUs: remote.first_batch_us > 0 ? remote.first_batch_us - remote.start_us : 0,
       straggler: false,
       variantId: null,
       planSource: remote.plan ? "profile" : plan ? "text" : "none",
@@ -1166,7 +1149,6 @@ function mergeMetrics(samples: OperatorSample[]): ProfileMetric[] {
       }
       cur.value = m.kind === "gauge" ? Math.max(cur.value, m.value) : cur.value + m.value;
       if (m.total !== undefined) cur.total = (cur.total ?? 0) + m.total;
-      cur.max = Math.max(cur.max, m.max);
     }
   }
   return [...byName.values()];
@@ -1253,7 +1235,7 @@ function measuredNodes(model: ProfileModel): StageNode[] {
 function peakMemory(model: ProfileModel): ProfileSummary["peakMemory"] {
   let best: ProfileSummary["peakMemory"] = null;
   for (const n of measuredNodes(model)) {
-    const bytes = Math.max(n.remote.peak_memory || 0, n.remote.scan_stats?.peak_memory_usage || 0);
+    const bytes = n.remote.scan_stats?.peak_memory_usage || 0;
     if (bytes > 0 && (!best || bytes > best.bytes)) best = { bytes, node: nodeLabel(n) };
   }
   return best;

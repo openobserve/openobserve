@@ -120,20 +120,14 @@ function plainRemote(
     node_name: name,
     node_address: `10.0.0.${partition}:5081`,
     role,
-    region: "",
     cluster: "",
     start_us: T0,
-    first_batch_us: T0 + 1000,
     end_us: T0 + 100_000,
     output_rows: 10,
     output_batches: 1,
     output_bytes: 100,
-    fetch_ns: MS,
     decode_ns: MS,
-    assigned_files: 1,
     skipped: false,
-    error: "",
-    peak_memory: 0,
     plan,
   };
 }
@@ -144,15 +138,14 @@ function scanPlan(ms: number): ProfileNode {
     detail: "DataSourceExec: file_type=parquet",
     partitions: 1,
     metrics: [
-      { name: "output_rows", kind: "count", value: 10, max: 10 },
-      { name: "time_elapsed_processing", kind: "time", value: ms * MS, max: ms * MS },
+      { name: "output_rows", kind: "count", value: 10 },
+      { name: "time_elapsed_processing", kind: "time", value: ms * MS },
     ],
   };
 }
 
 function singleStageProfile(remotes: RemoteNodeProfile[]): QueryProfile {
   return {
-    version: 1,
     node_name: "leader",
     node_address: "10.0.0.100:5081",
     start_us: T0,
@@ -210,17 +203,15 @@ describe("computeTimeNs", () => {
   it("prefers elapsed_compute over time_elapsed_processing", () => {
     expect(
       computeTimeNs([
-        { name: "time_elapsed_processing", kind: "time", value: 9, max: 9 },
-        { name: "elapsed_compute", kind: "time", value: 4, max: 4 },
+        { name: "time_elapsed_processing", kind: "time", value: 9 },
+        { name: "elapsed_compute", kind: "time", value: 4 },
       ]),
     ).toBe(4);
   });
 
   it("falls back to time_elapsed_processing, then 0", () => {
-    expect(
-      computeTimeNs([{ name: "time_elapsed_processing", kind: "time", value: 7, max: 7 }]),
-    ).toBe(7);
-    expect(computeTimeNs([{ name: "output_rows", kind: "count", value: 7, max: 7 }])).toBe(0);
+    expect(computeTimeNs([{ name: "time_elapsed_processing", kind: "time", value: 7 }])).toBe(7);
+    expect(computeTimeNs([{ name: "output_rows", kind: "count", value: 7 }])).toBe(0);
     expect(computeTimeNs(undefined)).toBe(0);
   });
 });
@@ -469,7 +460,7 @@ describe("layoutProfile", () => {
       name: "AggregateExec",
       detail: "AggregateExec: mode=Partial",
       partitions: 1,
-      metrics: [{ name: "elapsed_compute", kind: "time", value: MS, max: MS }],
+      metrics: [{ name: "elapsed_compute", kind: "time", value: MS }],
       children: [
         {
           name: "RemoteScanExec",

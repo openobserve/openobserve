@@ -325,7 +325,6 @@ interface OpNodeRow extends NodeNameRow {
 
 interface RemoteRow extends NodeNameRow {
   wallUs: number;
-  firstBatch: string;
   decode: string;
   rows: string;
   bytes: string;
@@ -350,7 +349,6 @@ const nodeRows = computed<OpNodeRow[]>(() => {
       role: "",
       straggler: r.straggler,
       active: activeNode.value === r.nodeKey,
-      error: "",
       skipped: false,
       computeNs: r.computeNs,
       rows: r.rows,
@@ -406,14 +404,12 @@ function remoteRow(n: StageNode, underCluster = false): RemoteRow {
     role: n.clusterEntry ? "" : n.role,
     straggler: n.straggler,
     active: activeNode.value === n.key,
-    error: n.remote.error,
     skipped: n.remote.skipped,
     wallUs: n.wallUs,
-    firstBatch: n.firstBatchUs ? formatNs(n.firstBatchUs * 1000) : "—",
     decode: formatNs(n.remote.decode_ns),
     rows: formatRows(n.remote.output_rows),
     bytes: formatBytes(n.remote.output_bytes),
-    files: st ? st.files || n.remote.assigned_files || 0 : n.remote.assigned_files || "—",
+    files: st ? st.files : "—",
     memoryCache:
       st && st.querier_files
         ? formatPercent(st.querier_memory_cached_files / st.querier_files)
@@ -421,7 +417,7 @@ function remoteRow(n: StageNode, underCluster = false): RemoteRow {
     diskCache:
       st && st.querier_files ? formatPercent(st.querier_disk_cached_files / st.querier_files) : "—",
     index: st && st.idx_took ? formatNs(st.idx_took * 1e6) : "—",
-    peakMemory: formatBytes(Math.max(n.remote.peak_memory || 0, st?.peak_memory_usage || 0)),
+    peakMemory: formatBytes(st?.peak_memory_usage || 0),
   };
 }
 
@@ -434,7 +430,6 @@ function groupName(cluster: string, count: number): NodeNameRow {
     count,
     straggler: false,
     active: false,
-    error: "",
     skipped: false,
   };
 }
@@ -451,7 +446,6 @@ function clusterRow(cluster: string, nodes: StageNode[]): RemoteRow {
     ...groupName(cluster, nodes.length),
     straggler: children.some((r) => r.straggler),
     wallUs: Math.max(0, ...nodes.map((n) => n.wallUs)),
-    firstBatch: "—",
     decode: formatNs(sum((n) => n.remote.decode_ns)),
     rows: formatRows(sum((n) => n.remote.output_rows)),
     bytes: formatBytes(sum((n) => n.remote.output_bytes)),
@@ -460,12 +454,7 @@ function clusterRow(cluster: string, nodes: StageNode[]): RemoteRow {
     diskCache: cached("querier_disk_cached_files"),
     index: "—",
     peakMemory: formatBytes(
-      Math.max(
-        0,
-        ...nodes.map((n) =>
-          Math.max(n.remote.peak_memory || 0, n.remote.scan_stats?.peak_memory_usage || 0),
-        ),
-      ),
+      Math.max(0, ...nodes.map((n) => n.remote.scan_stats?.peak_memory_usage || 0)),
     ),
     group: true,
     children,
@@ -604,13 +593,6 @@ const returnedColumns: OTableColumnDef[] = [
     header: t("search.queryProfile.fetch"),
     accessorKey: "wallUs",
     size: 90,
-    meta: right,
-  },
-  {
-    id: "firstBatch",
-    header: t("search.queryProfile.firstBatch"),
-    accessorKey: "firstBatch",
-    size: 84,
     meta: right,
   },
   {

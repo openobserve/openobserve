@@ -24,9 +24,7 @@ const MS = 1_000_000;
 export const T0 = 1_760_000_000_000_000;
 
 function metric(name: string, kind: string, value: number, total?: number): ProfileMetric {
-  return total === undefined
-    ? { name, kind, value, max: value }
-    : { name, kind, value, total, max: value };
+  return total === undefined ? { name, kind, value } : { name, kind, value, total };
 }
 
 function op(
@@ -125,20 +123,14 @@ function remote(spec: NodeSpec): RemoteNodeProfile {
     node_name: spec.name,
     node_address: `10.2.0.${spec.partition + 10}:5081`,
     role: spec.role,
-    region: "",
     cluster: "",
     start_us: T0 + spec.startMs * 1000,
-    first_batch_us: T0 + (spec.startMs + 15) * 1000,
     end_us: T0 + spec.endMs * 1000,
     output_rows: rows,
     output_batches: Math.ceil(rows / 8192),
     output_bytes: rows * 40,
-    fetch_ns: (spec.endMs - spec.startMs) * MS,
     decode_ns: 2 * MS,
-    assigned_files: files,
     skipped: false,
-    error: "",
-    peak_memory: spec.name === "q-2" ? 1_200_000_000 : 300_000_000,
     scan_stats: {
       files,
       records: rows * 4,
@@ -151,7 +143,7 @@ function remote(spec: NodeSpec): RemoteNodeProfile {
       idx_took: files ? 40 : 0,
       file_list_took: 0,
       aggs_cache_ratio: 0,
-      peak_memory_usage: 0,
+      peak_memory_usage: spec.name === "q-2" ? 1_200_000_000 : 300_000_000,
       wait_in_queue: 0,
     },
     plan: spec.plan,
@@ -247,7 +239,6 @@ export function joinProfile(): QueryProfile {
     ]),
   ]);
   return {
-    version: 1,
     node_name: "q-1",
     node_address: "10.2.0.11:5081",
     start_us: T0 + 320_000,
@@ -343,7 +334,6 @@ export function superClusterJoinProfile(): QueryProfile {
     ]),
   ]);
   return {
-    version: 1,
     node_name: "sc-a-leader",
     node_address: "10.2.0.1:5081",
     start_us: T0 + 320_000,

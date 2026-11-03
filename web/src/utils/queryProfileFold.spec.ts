@@ -65,7 +65,7 @@ function timed(name: string, ms: number, children: ProfileNode[] = []): ProfileN
     name,
     detail: name,
     partitions: 1,
-    metrics: [{ name: "elapsed_compute", kind: "time", value: ms * MS, max: ms * MS }],
+    metrics: [{ name: "elapsed_compute", kind: "time", value: ms * MS }],
     children,
   };
 }
@@ -76,20 +76,14 @@ function remote(name: string, plan: ProfileNode, partition = 0): RemoteNodeProfi
     node_name: name,
     node_address: `10.0.0.${partition}:5081`,
     role: "querier",
-    region: "",
     cluster: "",
     start_us: T0,
-    first_batch_us: T0 + 1000,
     end_us: T0 + 100_000,
     output_rows: 10,
     output_batches: 1,
     output_bytes: 100,
-    fetch_ns: MS,
     decode_ns: MS,
-    assigned_files: 1,
     skipped: false,
-    error: "",
-    peak_memory: 0,
     plan,
   };
 }
@@ -116,7 +110,6 @@ function unionModel(costs: (number | number[])[]): ProfileModel {
     ],
   });
   const profile: QueryProfile = {
-    version: 1,
     node_name: "leader",
     node_address: "10.0.0.100:5081",
     start_us: T0,

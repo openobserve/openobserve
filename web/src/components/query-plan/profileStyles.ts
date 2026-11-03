@@ -41,7 +41,6 @@ export interface NodeNameRow {
   role: string;
   straggler: boolean;
   active: boolean;
-  error: string;
   skipped: boolean;
   /** Set on a row that stands for a whole cluster: how many of its nodes it covers. */
   count?: number;

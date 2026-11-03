@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >{{ row.name }}</OTruncatedText
     >
     <div
-      v-if="meta || row.straggler || row.skipped || row.error"
+      v-if="meta || row.straggler || row.skipped"
       class="flex max-w-full min-w-0 flex-wrap items-center gap-1"
     >
       <OTruncatedText
@@ -46,10 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OBadge v-if="row.skipped" size="xs" shape="rounded" variant="default-outline">{{
         t("search.queryProfile.skipped")
       }}</OBadge>
-      <OBadge v-if="row.error" size="xs" shape="rounded" variant="error-outline">
-        {{ t("search.queryProfile.error") }}
-        <OTooltip :content="raw(row.error)" />
-      </OBadge>
     </div>
   </div>
 </template>
@@ -58,7 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { NodeNameRow } from "./profileStyles";
 import { roleLabel } from "./profileText";
