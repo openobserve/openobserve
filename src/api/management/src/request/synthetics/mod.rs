@@ -1774,19 +1774,30 @@ async fn process_ack(
             failing_environments: resp.failing_environments.clone(),
             passing_locations: resp.passing_locations.clone(),
             template: resp.template.clone(),
-            event: if recovery {
-                config::meta::alerts::notification_kind::NotificationEvent::Resolved
-            } else if flaky || degraded {
-                config::meta::alerts::notification_kind::NotificationEvent::Informational
-            } else {
-                config::meta::alerts::notification_kind::NotificationEvent::Firing
-            },
+            event: check_event(recovery, flaky, degraded),
         };
         tokio::spawn(async move {
             openobserve_core::synthetics::notify_check_result(notification).await;
         });
     }
     Ok(resp)
+}
+
+/// The platform event of a run's message: a recovery resolves, the notices never open a record.
+#[cfg(feature = "enterprise")]
+fn check_event(
+    recovery: bool,
+    flaky: bool,
+    degraded: bool,
+) -> config::meta::alerts::notification_kind::NotificationEvent {
+    use config::meta::alerts::notification_kind::NotificationEvent;
+    if recovery {
+        NotificationEvent::Resolved
+    } else if flaky || degraded {
+        NotificationEvent::Informational
+    } else {
+        NotificationEvent::Firing
+    }
 }
 
 // ── Agent liveness API (probe-facing, authenticated via o2syn_ token) ────────
@@ -2423,6 +2434,28 @@ mod tests {
     };
 
     use super::{ReferencedByQuery, composition_error_response, stamp_undefined_placeholders};
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_runs_event_follows_the_alerting_decision() {
+        use config::meta::alerts::notification_kind::NotificationEvent;
+        assert_eq!(
+            super::check_event(true, false, false),
+            NotificationEvent::Resolved
+        );
+        assert_eq!(
+            super::check_event(false, true, false),
+            NotificationEvent::Informational
+        );
+        assert_eq!(
+            super::check_event(false, false, true),
+            NotificationEvent::Informational
+        );
+        assert_eq!(
+            super::check_event(false, false, false),
+            NotificationEvent::Firing
+        );
+    }
 
     async fn mapped(e: CE) -> (u16, serde_json::Value) {
         let resp = composition_error_response("acme", "u@x", anyhow::Error::new(e))

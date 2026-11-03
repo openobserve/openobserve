@@ -15,10 +15,7 @@
 
 //! The on-call sender the enterprise engine reaches through its registered slot.
 
-use config::meta::alerts::{
-    level::AlertLevel,
-    notification_kind::{NotificationEvent, NotificationKind},
-};
+use config::meta::alerts::{level::AlertLevel, notification_kind::NotificationKind};
 use o2_enterprise::enterprise::oncall::sender::{OnCallNotification, OnCallSendError, OnCallStage};
 
 use super::{
@@ -131,6 +128,8 @@ fn send_result(result: Result<(), NotifyError>) -> Result<(), OnCallSendError> {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::alerts::notification_kind::NotificationEvent;
+
     use super::*;
     use crate::alerts::notifications::{
         notify::{Route, route},

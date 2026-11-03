@@ -79,7 +79,7 @@ pub async fn deliver(row: &Downtime, due: &DueEvent) -> Result<bool, DowntimeErr
     }
     let destinations = destinations_of(row);
     let result = match send(row, due, record.sent_at, &destinations).await {
-        Ok(()) => RESULT_OK.to_string(),
+        Ok(summary) => summary,
         Err(e) => {
             log::warn!(
                 "[DOWNTIMES] {} notification of {}/{} failed: {e}",
@@ -159,7 +159,7 @@ async fn send(
     due: &DueEvent,
     claimed_at: i64,
     destinations: &[String],
-) -> Result<(), String> {
+) -> Result<String, String> {
     use crate::alerts::notifications::notify::notify;
 
     let counts = super::match_counts(row).await.ok();
@@ -171,19 +171,39 @@ async fn send(
         &get_config().common.web_url,
     );
     let ctx = downtime_context(row, due, claimed_at, vars);
-    let mut errors = Vec::new();
+    let mut results = Vec::with_capacity(destinations.len());
     for name in destinations {
         let mut ctx = ctx.clone();
-        // A platform destination is skipped, and the result names the skip.
-        if let Err(e) = notify(&row.org, name, &[], None, &mut ctx).await {
-            errors.push(format!("{name}: {e}"));
-        }
+        let sent = notify(&row.org, name, &[], None, &mut ctx).await;
+        results.push((name.as_str(), sent.map(|_| ())));
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors.join("; "))
+    summarize(&results)
+}
+
+/// One part per destination; a skip is named but only a real error fails the event.
+fn summarize(
+    results: &[(
+        &str,
+        Result<(), crate::alerts::notifications::notify::NotifyError>,
+    )],
+) -> Result<String, String> {
+    use crate::alerts::notifications::notify::NotifyError;
+
+    if results.iter().all(|(_, r)| r.is_ok()) {
+        return Ok(RESULT_OK.to_string());
     }
+    let summary = results
+        .iter()
+        .map(|(name, r)| match r {
+            Ok(()) => format!("{name}: {RESULT_OK}"),
+            Err(e) => format!("{name}: {e}"),
+        })
+        .collect::<Vec<_>>()
+        .join("; ");
+    let failed = results
+        .iter()
+        .any(|(_, r)| matches!(r, Err(e) if !matches!(e, NotifyError::Skipped(_))));
+    if failed { Err(summary) } else { Ok(summary) }
 }
 
 /// The shared path's context for one downtime event; platforms are skipped, so it has no key.
@@ -531,6 +551,24 @@ mod tests {
         assert_eq!(
             started.render_hints.fallback_subject.as_deref(),
             Some("OpenObserve downtime Nightly \"deploy\" <db>: started")
+        );
+    }
+
+    #[test]
+    fn a_platform_skip_is_named_but_does_not_fail_the_event() {
+        use crate::alerts::notifications::notify::{NotifyError, SkipReason};
+        let skipped = || Err(NotifyError::Skipped(SkipReason::PlatformNotForKind));
+        assert_eq!(
+            summarize(&[("slack", Ok(())), ("pagerduty", skipped())]),
+            Ok("slack: ok; pagerduty: skipped: PlatformNotForKind".to_string())
+        );
+        assert_eq!(summarize(&[("slack", Ok(()))]), Ok(RESULT_OK.to_string()));
+        assert_eq!(
+            summarize(&[
+                ("slack", Ok(())),
+                ("hook", Err(NotifyError::Transport("refused".into())))
+            ]),
+            Err("slack: ok; hook: refused".to_string())
         );
     }
 

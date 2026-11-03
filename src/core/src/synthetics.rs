@@ -862,10 +862,8 @@ mod tests {
         assert_eq!(body.to_string(), build_slack_json(&n));
     }
 
-    #[test]
-    fn a_location_down_skips_platforms_and_keeps_todays_text_on_webhooks() {
-        use crate::alerts::notifications::notify::{NotifyError, Route, SkipReason, route};
-        let loc = infra::table::synthetics_locations::SyntheticsLocationRecord {
+    fn location() -> infra::table::synthetics_locations::SyntheticsLocationRecord {
+        infra::table::synthetics_locations::SyntheticsLocationRecord {
             id: "loc_1".into(),
             org_id: Some("default".into()),
             kind: "private".into(),
@@ -876,8 +874,39 @@ mod tests {
             enabled: true,
             created_at: 0,
             updated_at: 0,
+        }
+    }
+
+    #[test]
+    fn the_location_card_has_no_unknown_marker_on_slack_and_email() {
+        use crate::alerts::notifications::{
+            ChannelFormat, RenderedMessage, UNMATCHED_MARKER,
+            default_template::compiled_synthetics_content, render, resolve_content,
         };
-        let ctx = location_down_context("default", &loc, 3, 120);
+        let ctx = location_down_context("default", &location(), 3, 120);
+        assert_eq!(ctx.alert_status, "firing");
+        let content = resolve_content(&compiled_synthetics_content(), &ctx, "slack");
+        let RenderedMessage::Http { body } = render(ChannelFormat::Slack, &content, &ctx).unwrap()
+        else {
+            panic!("slack renders a body");
+        };
+        assert!(!body.contains(UNMATCHED_MARKER), "{body}");
+        assert!(body.contains("private_location"), "{body}");
+        let email = resolve_content(&compiled_synthetics_content(), &ctx, "email");
+        let RenderedMessage::Email { html, text, .. } =
+            render(ChannelFormat::Email, &email, &ctx).unwrap()
+        else {
+            panic!("email renders a message");
+        };
+        assert!(!html.contains(UNMATCHED_MARKER), "{html}");
+        assert!(!text.contains(UNMATCHED_MARKER), "{text}");
+        assert!(text.contains("is down"), "{text}");
+    }
+
+    #[test]
+    fn a_location_down_skips_platforms_and_keeps_todays_text_on_webhooks() {
+        use crate::alerts::notifications::notify::{NotifyError, Route, SkipReason, route};
+        let ctx = location_down_context("default", &location(), 3, 120);
         assert_eq!(ctx.episode_id, None);
         assert!(matches!(
             route(&resolved_for("pagerduty"), &ctx),
@@ -1227,6 +1256,12 @@ fn location_down_context(
             ("check_status".to_string(), "down".to_string()),
             ("check_status_label".to_string(), "down".to_string()),
             ("check_target".to_string(), loc.region.clone()),
+            ("check_type".to_string(), "private_location".to_string()),
+            (
+                "check_locations_line".to_string(),
+                format!("{} ({affected} affected checks)", loc.region),
+            ),
+            ("check_error".to_string(), String::new()),
             ("check_url".to_string(), locations_url(org_id)),
             ("check_title".to_string(), subject.clone()),
         ],

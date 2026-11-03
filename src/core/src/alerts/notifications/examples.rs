@@ -472,7 +472,14 @@ mod tests {
         let content = resolve_content(&compiled_content_for(kind), &ctx, format.channel_family());
         match render(format, &content, &ctx).unwrap() {
             RenderedMessage::Http { body } => serde_json::from_str(&body).unwrap(),
-            other => panic!("expected Http, got {other:?}"),
+            RenderedMessage::Email {
+                subject,
+                html,
+                text,
+            } => serde_json::json!({"subject": subject, "html": html, "text": text}),
+            RenderedMessage::Sns { subject, message } => {
+                serde_json::json!({"subject": subject, "message": message})
+            }
         }
     }
 
@@ -481,6 +488,8 @@ mod tests {
             "slack_firing": rendered(kind, false, ChannelFormat::Slack),
             "slack_resolved": rendered(kind, true, ChannelFormat::Slack),
             "webhook_firing": rendered(kind, false, ChannelFormat::Webhook),
+            "email_firing": rendered(kind, false, ChannelFormat::Email),
+            "sns_firing": rendered(kind, false, ChannelFormat::Sns),
         })
     }
 

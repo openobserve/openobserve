@@ -487,6 +487,16 @@ mod tests {
     }
 
     #[test]
+    fn a_slack_app_destination_gets_the_card_not_the_legacy_text() {
+        let ctx = anomaly_ctx(NotificationEvent::Firing);
+        let r = resolved_for(
+            DestinationType::SlackApp(Default::default()),
+            TemplateSource::Compiled,
+        );
+        assert_eq!(route(&r, &ctx).unwrap(), Route::Render);
+    }
+
+    #[test]
     fn jira_takes_only_alerts_and_incidents() {
         let ctx = anomaly_ctx(NotificationEvent::Firing);
         let r = resolved_for(http("jira", None), TemplateSource::Compiled);
