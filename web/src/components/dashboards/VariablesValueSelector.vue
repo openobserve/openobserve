@@ -81,7 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="item.value"
           :label="item.label || item.name"
           label-position="inside"
-          clearable
+          :clearable="!item.readOnly"
+          :readonly="item.readOnly === true"
           :data-test="`variable-selector-${item.name}`"
           @update:model-value="onVariablesValueUpdated(Number(index))"
         />

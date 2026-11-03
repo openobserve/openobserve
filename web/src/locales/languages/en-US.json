@@ -7670,7 +7670,7 @@
     "constant": "Constant",
     "textbox": "Textbox",
     "date": "Date",
-    "dateFormat": "Date format",
+    "dateFormat": "Output date format",
     "dateFormatHelp": "Default output in queries. Override per use with ${'{'}name:format{'}'}, e.g. ${'{'}name:epochus{'}'}.",
     "dateFormatIso": "YYYY-MM-DD (iso)",
     "dateFormatDmy": "DD/MM/YYYY (dmy)",
