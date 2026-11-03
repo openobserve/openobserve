@@ -70,7 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            that says only "Ana and Bo swap" leaves the reader to work out which
            week each of them ends up holding. -->
       <OBanner v-if="swapSummary" variant="info" data-test="oncall-swap-summary">
-        {{ swapSummary }}
+        <i18n-t keypath="oncall.swapSummary" tag="span" scope="global">
+          <template #first><OnCallPersonName :email="swapSummary.first" /></template>
+          <template #second><OnCallPersonName :email="swapSummary.second" /></template>
+          <template #firstWhen>{{ swapSummary.firstWhen }}</template>
+          <template #secondWhen>{{ swapSummary.secondWhen }}</template>
+        </i18n-t>
       </OBanner>
       <p
         v-else-if="swapProblem"
@@ -82,14 +87,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <OForm v-else :id="FORM_ID" :form="form" class="flex flex-col gap-5">
-      <OFormSelect
-        name="user_email"
-        :label="t('oncall.coverWho')"
-        :options="memberOptions"
-        :help-text="currentlyOnCall"
-        required
-        data-test="oncall-cover-who"
-      />
+      <div class="flex flex-col gap-1">
+        <OFormSelect
+          name="user_email"
+          :label="t('oncall.coverWho')"
+          :options="memberOptions"
+          searchable
+          required
+          data-test="oncall-cover-who"
+        />
+        <i18n-t
+          v-if="currentHolder"
+          keypath="oncall.coverCurrentlyOnCall"
+          tag="span"
+          scope="global"
+          class="text-input-help-text text-xs"
+          data-test="oncall-cover-currently"
+        >
+          <template #name><OnCallPersonName :email="currentHolder" /></template>
+        </i18n-t>
+      </div>
 
       <!-- Only when there is a choice to make. A one-rotation team has one
            rotation, and a select with one option is a question with one
@@ -136,7 +153,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- What this will actually do, in the team's own clock, before saving. -->
       <OBanner v-if="summary" variant="info" data-test="oncall-cover-summary">
-        {{ summary }}
+        <i18n-t keypath="oncall.coverSummary" tag="span" scope="global">
+          <template #name><OnCallPersonName :email="summary.who" /></template>
+          <template #team>{{ summary.team }}</template>
+          <template #range>{{ summary.range }}</template>
+        </i18n-t>
         <span v-if="teamZoneSummary" class="block" data-test="oncall-cover-summary-team-zone">
           {{ teamZoneSummary }}
         </span>
@@ -182,6 +203,8 @@ export interface UpcomingShift extends Shift {
 }
 import { formatInZone, fromZonedInputValue, toZonedInputValue } from "@/utils/oncall";
 import { makeOnCallCoverSchema } from "./OnCallCoverForm.schema";
+import OnCallPersonName from "./OnCallPersonName.vue";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 
 /**
  * What the cover half of this dialog holds.
@@ -324,15 +347,9 @@ watch(
   },
 );
 
-const memberOptions = computed(() =>
-  props.members.map((member) => ({ label: raw(member.user_email), value: member.user_email })),
-);
+const { nameOf, optionOf } = useOrgUserNames();
 
-const currentlyOnCall = computed<I18nText | undefined>(() =>
-  props.currentHolder
-    ? t("oncall.coverCurrentlyOnCall", { name: raw(props.currentHolder) })
-    : undefined,
-);
+const memberOptions = computed(() => props.members.map((member) => optionOf(member.user_email)));
 
 /// A pre-selected person is only honest if the picker can show them: the caller
 /// passes whoever is reading the page, and a reader who is not on this team has
@@ -462,23 +479,21 @@ const formatRange = (micros: number, zone: string) =>
     timeZoneName: "short",
   });
 
-const summary = computed<I18nText | "">(() => {
+const summary = computed<{ who: string; team: I18nText; range: I18nText } | null>(() => {
   const window = windowValue.value;
   const who = String(userValue.value ?? "");
   // A half-picked range is not a sentence yet — the picker reports one end at
   // a time, and "Sat 18:00 – Invalid Date" is worse than nothing. Nor is a
   // range with nobody against it.
-  if (typeof window?.from !== "number" || typeof window?.to !== "number") return "";
-  if (!who) return "";
+  if (typeof window?.from !== "number" || typeof window?.to !== "number") return null;
+  if (!who) return null;
   const fmt = (micros: number) => formatRange(micros, props.viewerTimezone);
-  // The person TAKING the shift. This read `currentHolder` — whoever is being
-  // relieved — so the confirmation named the wrong side of the handover, and
-  // the team was passed as an empty string.
-  return t("oncall.coverSummary", {
-    name: raw(who),
+  // The person TAKING the shift, not `currentHolder` — whoever is being relieved.
+  return {
+    who,
     team: raw(props.teamName ?? ""),
     range: raw(`${fmt(window.from)} – ${fmt(window.to)}`),
-  });
+  };
 });
 
 /// The same window on the team's clock, and only when that is a different
@@ -527,7 +542,7 @@ const rotationOptions = computed(() =>
 /// the wrong rotation.
 const shiftLabel = (shift: UpcomingShift): I18nText =>
   t(props.rotations.length > 1 ? "oncall.swapShiftOptionInRotation" : "oncall.swapShiftOption", {
-    name: raw(shift.member),
+    name: raw(nameOf(shift.member)),
     rotation: raw(shift.rotationName),
     range: raw(
       `${formatInZone(shift.startMicros, props.timezone, {
@@ -580,9 +595,14 @@ const swapReady = computed(() => !!swapPair.value && !swapProblem.value);
 /// Named both ways round on purpose: "Ana and Bo swap" leaves the reader to
 /// work out which week each of them ends up holding, and getting that backwards
 /// is the whole risk of the errand.
-const swapSummary = computed<I18nText | "">(() => {
+const swapSummary = computed<{
+  first: string;
+  second: string;
+  firstWhen: I18nText;
+  secondWhen: I18nText;
+} | null>(() => {
   const pair = swapPair.value;
-  if (!pair || swapProblem.value) return "";
+  if (!pair || swapProblem.value) return null;
   const when = (shift: UpcomingShift) =>
     raw(
       formatInZone(shift.startMicros, props.timezone, {
@@ -591,12 +611,12 @@ const swapSummary = computed<I18nText | "">(() => {
         month: "short",
       }),
     );
-  return t("oncall.swapSummary", {
-    first: raw(pair.first.member),
-    second: raw(pair.second.member),
+  return {
+    first: pair.first.member,
+    second: pair.second.member,
     firstWhen: when(pair.first),
     secondWhen: when(pair.second),
-  });
+  };
 });
 
 function submitSwap() {

@@ -223,7 +223,14 @@
           :options="userOptions"
           :loading="loadingUsers"
           data-test="oncall-members-user-select"
-        />
+        >
+          <!-- The picked people are listed once, below; chips here would say it twice. -->
+          <template #trigger>
+            <span class="text-select-placeholder flex-1 truncate text-start text-sm">
+              {{ t("oncall.memberPickPlaceholder") }}
+            </span>
+          </template>
+        </OSelect>
         <OInput
           v-else
           ref="memberPickerRef"
@@ -245,7 +252,14 @@
             class="flex items-center justify-between gap-2"
             :data-test="`oncall-members-add-staged-${email}`"
           >
-            <OUserCell :value="email" :name="nameOf(email)" />
+            <span class="flex min-w-0 flex-col">
+              <OTruncatedText class="text-text-heading text-sm">{{
+                raw(nameOf(email))
+              }}</OTruncatedText>
+              <OTruncatedText v-if="nameOf(email) !== email" class="text-text-secondary text-xs">{{
+                raw(email)
+              }}</OTruncatedText>
+            </span>
             <OButton
               variant="ghost"
               size="icon-sm"
@@ -336,7 +350,6 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -727,19 +740,30 @@ const loadingUsers = ref(false);
 // Losing the picker must not lose the ability to add anybody.
 const userLookupFailed = ref(false);
 
-const memberEmails = computed(() => new Set(props.members.map((m) => m.user_email)));
+const memberEmails = computed(() => new Set(props.members.map((m) => m.user_email.toLowerCase())));
 
 /** Every org user; those already on the team are listed but cannot be picked twice. */
 const userOptions = computed(() =>
-  orgUsers.value.map((u) =>
-    memberEmails.value.has(u.email.toLowerCase())
+  orgUsers.value.map((u) => {
+    const name = nameOf(u.email);
+    const option = {
+      label: raw(name),
+      value: u.email,
+      subLabel: name === u.email ? undefined : raw(u.email),
+      subLabelInline: true,
+      searchText: `${name} ${u.email}`.toLowerCase(),
+    };
+    // An inline email row has no room for a badge, so a row already on the team trades its email for "On team".
+    return memberEmails.value.has(u.email.toLowerCase())
       ? {
-          label: t("oncall.membersAddOnTeam", { name: raw(displayName(u)) }),
-          value: u.email,
+          ...option,
+          subLabel: undefined,
           disabled: true,
+          badge: t("oncall.membersOnTeamBadge"),
+          badgeMuted: true,
         }
-      : { label: raw(displayName(u)), value: u.email },
-  ),
+      : option;
+  }),
 );
 
 /// Mirrors the server's `place_member`: simple rotations get the newcomer appended, layered ones need placing by hand.
@@ -776,11 +800,6 @@ const pendingEmails = computed(() => {
 });
 
 /** "Ana Sharma (ana@o2.ai)" when a name exists, the email otherwise. */
-function displayName(user: { email: string; first_name?: string; last_name?: string }): string {
-  const name = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
-  return name ? `${name} (${user.email})` : user.email;
-}
-
 /** Just the name for the table — the email is already on the line below it. */
 function nameOf(email: string): string {
   const user = orgUsers.value.find((u) => u.email.toLowerCase() === email.toLowerCase());

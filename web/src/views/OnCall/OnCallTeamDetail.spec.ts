@@ -279,26 +279,41 @@ describe("OnCallTeamDetail", () => {
       } as any);
     });
 
+    const DialogStub = {
+      name: "ODialog",
+      props: ["open", "title"],
+      template: "<div v-if='open'><slot /></div>",
+    };
+
     async function ask() {
-      const wrapper = render();
+      const wrapper = mount(OnCallTeamDetail, {
+        global: { plugins: [i18n, store], stubs: { ...stubs, ODialog: DialogStub } },
+      });
       await flushPromises();
       wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "policy");
       await flushPromises();
       wrapper.findComponent({ name: "OnCallEscalationLadder" }).vm.$emit("send-test");
       await flushPromises();
-      return wrapper
-        .findAllComponents({ name: "ConfirmDialog" })
+      const confirm = wrapper
+        .findAllComponents({ name: "ODialog" })
         .find((c: any) => c.props("title") === "Send a test page?")!;
+      return { wrapper, confirm };
     }
 
     // The first step by delay, and only the channels its people can receive, which is what the server sends.
     it("names the recipients and channels before sending anything", async () => {
-      const confirm = await ask();
+      const { wrapper, confirm } = await ask();
 
-      expect(confirm.props("modelValue")).toBe(true);
-      expect(confirm.props("message")).toBe(
+      expect(confirm.props("open")).toBe(true);
+      expect(wrapper.find('[data-test="oncall-team-test-page-message"]').text()).toBe(
         "Send a test page for P1 to ana@corp.com, bob@corp.com? Email, SMS. It does not escalate.",
       );
+      // Each name carries its email in a tooltip, because two people can share a name.
+      const people = wrapper.findAllComponents({ name: "OnCallPersonName" });
+      expect(people.map((one: any) => one.props("email"))).toEqual([
+        "ana@corp.com",
+        "bob@corp.com",
+      ]);
       expect(service.testPage).not.toHaveBeenCalled();
     });
 
@@ -313,8 +328,8 @@ describe("OnCallTeamDetail", () => {
           ],
         },
       } as any);
-      const confirm = await ask();
-      confirm.vm.$emit("update:ok");
+      const { confirm } = await ask();
+      confirm.vm.$emit("click:primary");
       await flushPromises();
 
       expect(service.testPage).toHaveBeenCalledWith(expect.objectContaining({ priority: 1 }));
@@ -371,7 +386,62 @@ describe("OnCallTeamDetail", () => {
       const wrapper = render();
       await flushPromises();
 
-      expect(chip(wrapper)).toContain("Rostered, unreachable");
+      expect(chip(wrapper)).toContain("On call but can't be reached");
+    });
+
+    // Green only when every holder can be paged, so the chip agrees with the banner naming the one who cannot.
+    it("is not green while one of two people on call cannot be reached", async () => {
+      service.whoIsOnCall.mockResolvedValue({
+        data: [
+          {
+            rotation_id: "rot_primary",
+            rotation_name: "Primary",
+            rule: "Base",
+            user_email: "ana@corp.com",
+          },
+          {
+            rotation_id: "rot_secondary",
+            rotation_name: "Secondary",
+            rule: "Base",
+            user_email: "bob@corp.com",
+          },
+        ],
+      } as any);
+      service.teamReachability.mockResolvedValue({
+        data: {
+          team_id: "team_1",
+          smtp_configured: true,
+          members: [
+            {
+              user_email: "ana@corp.com",
+              would_a_page_land: false,
+              channels: [],
+              deliverable_channels: [],
+            },
+            {
+              user_email: "bob@corp.com",
+              would_a_page_land: true,
+              channels: [],
+              deliverable_channels: ["email"],
+            },
+          ],
+          reachable: 1,
+          total: 2,
+          unreachable_members: ["ana@corp.com"],
+        },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(chip(wrapper)).toContain("On call but can't be reached");
+      const tag = wrapper
+        .findAllComponents({ name: "OTag" })
+        .find((one: any) => one.props("type") === "oncallCoverage")!;
+      expect(tag.props("value")).toBe("unreachable");
+      const tip = wrapper
+        .findAllComponents({ name: "OTooltip" })
+        .find((one: any) => String(one.props("content")).includes("can't be reached"));
+      expect(tip!.props("content")).toBe("1 of 2 on call can't be reached");
     });
 
     it("stays covered while the holder can actually be paged", async () => {

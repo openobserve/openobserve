@@ -23,6 +23,9 @@ import i18n from "@/locales";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import { toZonedInputValue } from "@/utils/oncall";
 import type { UpcomingShift } from "./OnCallCoverForm.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import { orgUsersQuery } from "@/services/users.queries";
+import store from "@/test/unit/helpers/store";
 
 /// Tomorrow, not a frozen instant in 2023. Every fixture below is a window
 /// somebody could actually be asked to cover, and a schema that refuses hours
@@ -512,6 +515,55 @@ describe("OnCallCoverForm — taking a cover", () => {
     expect(summary).toContain("bo@o2.ai");
     expect(summary).toContain("Platform");
     expect(summary).not.toContain("ana@o2.ai");
+  });
+
+  // Names are what a person recognises; the email tells two namesakes apart, so it is the row's second line and the name's tooltip.
+  it("lists and names people by display name, keeping the email beside it", async () => {
+    queryClient.setQueryData(orgUsersQuery("default").queryKey, [
+      { email: "ana@o2.ai", first_name: "Ana" },
+      { email: "bo@o2.ai", first_name: "Bo", last_name: "Lin" },
+    ]);
+    const wrapper = mount(OnCallCoverForm, {
+      props: {
+        open: true,
+        members: MEMBERS,
+        timezone: "UTC",
+        shifts: [],
+        gap: GAP,
+        currentHolder: "ana@o2.ai",
+        defaultUser: "bo@o2.ai",
+        teamName: "Platform",
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ...stubs,
+          OFormSelect: {
+            name: "OFormSelect",
+            props: ["name"],
+            inheritAttrs: false,
+            template: "<div />",
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    const who = wrapper
+      .findAllComponents({ name: "OFormSelect" })
+      .find((one: any) => one.props("name") === "user_email")!;
+    // `options` reaches OSelect through attribute fall-through; OFormSelect declares only `name`.
+    expect(who.vm.$attrs.options).toEqual([
+      expect.objectContaining({ label: "Ana", value: "ana@o2.ai", subLabel: "ana@o2.ai" }),
+      expect.objectContaining({ label: "Bo Lin", value: "bo@o2.ai", subLabel: "bo@o2.ai" }),
+    ]);
+    expect(wrapper.find('[data-test="oncall-cover-currently"]').text()).toBe(
+      "Currently on call: Ana",
+    );
+    const summary = wrapper.find('[data-test="oncall-cover-summary"]');
+    expect(summary.text()).toContain("Bo Lin covers Platform");
+    expect(summary.findComponent({ name: "OnCallPersonName" }).props("email")).toBe("bo@o2.ai");
+    queryClient.removeQueries({ queryKey: orgUsersQuery("default").queryKey });
   });
 
   /// No person picked yet is the same half-answered state as a half-picked

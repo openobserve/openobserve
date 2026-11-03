@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="canConfigure"
         variant="primary"
         size="sm"
+        icon-left="add"
         data-test="oncall-teams-add-btn"
         @click="openCreate"
       >
@@ -45,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       pagination="client"
       show-index
       table-id="oncall-teams-list"
-      :persist-columns="true"
+      :persist-columns="showToolbar"
       :show-global-filter="false"
       :enable-column-resize="true"
       data-test="oncall-teams-table"
@@ -59,7 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:sort-by="sortBy = $event"
       @update:sort-order="sortOrder = $event"
     >
-      <template #toolbar>
+      <!-- Search, columns and refresh have nothing to act on until a team exists. -->
+      <template v-if="showToolbar" #toolbar>
         <div class="flex w-full items-center gap-2 max-md:contents">
           <OSearchInput
             v-model="search"
@@ -71,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <template #toolbar-trailing>
+      <template v-if="showToolbar" #toolbar-trailing>
         <ORefreshButton
           layout="inline"
           variant="outline"
@@ -122,7 +124,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :data-test="`oncall-teams-primary-gap-${row.id}`"
         />
-        <OUserCell v-else :value="positionsByTeam[row.id]!.first!.user_email" />
+        <OnCallPersonName
+          v-else
+          truncate
+          :email="positionsByTeam[row.id]!.first!.user_email"
+          :data-test="`oncall-teams-primary-${row.id}`"
+        />
       </template>
 
       <template #cell-secondary="{ row }">
@@ -140,7 +147,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="position.rotation_id"
             class="flex flex-wrap items-center gap-1.5"
           >
-            <OUserCell :value="position.user_email" />
+            <OnCallPersonName
+              truncate
+              :email="position.user_email"
+              :data-test="`oncall-teams-secondary-${row.id}-${position.rotation_id}`"
+            />
             <!-- The header already says "secondary". Only a rotation the header
                  does not name has to announce itself. -->
             <OTag
@@ -203,13 +214,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="delete-outline"
               variant="destructive"
               :disabled="row.id === defaultTeamId"
-              :description="
-                row.id === defaultTeamId ? t('oncall.deleteDefaultTeamBlocked') : undefined
-              "
+              :focusable-unavailable="row.id === defaultTeamId"
               :data-test="`oncall-team-delete-${row.id}`"
               @select="teamToDelete = row"
             >
-              <span>{{ t("oncall.deleteTeam") }}</span>
+              <span class="flex-1">
+                {{ t("oncall.deleteTeam") }}
+                <OTooltip
+                  v-if="row.id === defaultTeamId"
+                  side="right"
+                  :content="t('oncall.deleteDefaultTeamBlocked')"
+                />
+              </span>
             </ODropdownItem>
           </ODropdown>
         </div>
@@ -290,7 +306,8 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useListViewState } from "@/composables/useListViewState";
@@ -320,6 +337,7 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
+const { nameOf } = useOrgUserNames();
 const { confirm } = useConfirmDialog();
 const { config: routingConfig, load: loadRoutingConfig } = useOnCallRoutingConfig();
 
@@ -473,6 +491,8 @@ const columns = computed<OTableColumnDef<OnCallTeam>[]>(() => {
   ];
 });
 
+const showToolbar = computed(() => loading.value || teams.value.length > 0 || !!loadError.value);
+
 const filteredTeams = computed(() => {
   const q = search.value.trim().toLowerCase();
   if (!q) return teams.value;
@@ -484,7 +504,10 @@ const filteredTeams = computed(() => {
       // "Which team would page Priya right now" is a question this list can
       // answer in one keystroke; without the holders it costs a drill-in per
       // team, which is the same search done by hand.
-      ...(onCallByTeam.value[team.id] ?? []).map((slot) => slot.user_email),
+      ...(onCallByTeam.value[team.id] ?? []).flatMap((slot) => [
+        slot.user_email,
+        nameOf(slot.user_email),
+      ]),
     ].some((field) => field.toLowerCase().includes(q)),
   );
 });

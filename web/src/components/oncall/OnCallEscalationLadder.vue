@@ -102,7 +102,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OInnerLoading v-if="loading" showing />
 
-      <template v-else>
+      <!-- Pointer-only shortcut to Edit; the header's Edit button stays the keyboard path. -->
+      <div
+        v-else
+        class="rounded-b-surface flex flex-col"
+        :class="canConfigure ? 'hover:bg-table-row-hover-bg cursor-pointer transition-colors' : ''"
+        data-test="oncall-ladder-body"
+        @click="canConfigure && emit('edit')"
+      >
         <!-- Every level of every priority aimed at the whole team, on a team that HAS rotations, is a policy minted before it had members. -->
         <span
           v-if="staleDefaultLadder"
@@ -176,7 +183,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`oncall-ladder-person-${group.firstMicros}-${one.email}`"
                 >
                   <OAvatar :value="one.email" :name="nameOf(one.email)" />
-                  <OTruncatedText>{{ raw(nameOf(one.email)) }}</OTruncatedText>
+                  <OnCallPersonName
+                    truncate
+                    :email="one.email"
+                    :data-test="`oncall-ladder-person-name-${group.firstMicros}-${one.email}`"
+                  />
                   <OTag v-for="seat in one.seats" :key="seat" variant="default-outline" size="sm">
                     {{ raw(seat) }}
                   </OTag>
@@ -212,10 +223,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
 
           <!-- The ending is the rail's last stop: when the ladder runs out is what the delays are read against. -->
-          <li class="relative flex min-h-10 items-center gap-3 py-2" data-test="oncall-ladder-ends">
+          <li
+            class="relative flex min-h-10 items-center gap-3 py-2 max-md:items-start"
+            data-test="oncall-ladder-ends"
+          >
             <span
               v-if="rungGroups.length"
-              class="bg-border-default absolute start-3 top-0 h-1/2 w-px"
+              class="bg-border-default absolute start-3 top-0 h-1/2 w-px max-md:h-5"
               aria-hidden="true"
             />
             <span
@@ -224,28 +238,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="stop-circle" size="sm" />
             </span>
-            <OText variant="meta" class="w-24 shrink-0" data-test="oncall-ladder-ends-time">
-              {{ endTime }}
-            </OText>
-            <!-- How a page can leave this team, in the server's words, on hover of the ending it qualifies. -->
-            <span class="text-text-secondary text-sm" data-test="oncall-ladder-ends-line">
-              {{ endTitle }}
-              <OTooltip
-                v-if="preview.cross_team_moves.length"
-                side="bottom"
-                :content="raw(preview.cross_team_moves.join(' '))"
-              />
-            </span>
-            <OButton
-              v-if="canConfigure"
-              variant="outline"
-              size="sm"
-              icon-left="add"
-              data-test="oncall-ladder-add-rung"
-              @click="emit('edit')"
+            <span
+              class="flex min-w-0 flex-1 items-center gap-3 max-md:flex-col max-md:items-start max-md:gap-1"
             >
-              {{ t("oncall.ladderAddStep") }}
-            </OButton>
+              <OText
+                variant="meta"
+                class="w-24 shrink-0 max-md:w-auto"
+                data-test="oncall-ladder-ends-time"
+              >
+                {{ endTime }}
+              </OText>
+              <!-- How a page can leave this team, in the server's words, on hover of the ending it qualifies. -->
+              <span class="text-text-secondary text-sm" data-test="oncall-ladder-ends-line">
+                {{ endTitle }}
+                <OTooltip
+                  v-if="preview.cross_team_moves.length"
+                  side="bottom"
+                  :content="raw(preview.cross_team_moves.join(' '))"
+                />
+              </span>
+              <OButton
+                v-if="canConfigure"
+                variant="outline"
+                size="sm"
+                icon-left="add"
+                data-test="oncall-ladder-add-rung"
+                @click.stop="emit('edit')"
+              >
+                {{ t("oncall.ladderAddStep") }}
+              </OButton>
+            </span>
           </li>
         </ol>
 
@@ -258,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="auto-awesome" size="sm" class="text-text-secondary" />
           <OText variant="meta">{{ l0Line }}</OText>
         </span>
-      </template>
+      </div>
     </div>
   </div>
 </template>
@@ -273,8 +295,8 @@ import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
 import OAvatarGroup from "@/lib/core/Avatar/OAvatarGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OnCallChannelIcons from "./OnCallChannelIcons.vue";
+import OnCallPersonName from "./OnCallPersonName.vue";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

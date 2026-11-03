@@ -158,7 +158,7 @@ describe("OnCallPolicyEditor", () => {
       ["oncall-policy-channel-1-webhook", "Chat / webhook"],
     ]);
     expect(wrapper.find('[data-test="oncall-policy-channels-hint"]').text()).toBe(
-      "Everyone paged at P1 gets the same set. Texts and calls go to people with a verified phone.",
+      "Texts and calls reach only people with a verified phone.",
     );
   });
 

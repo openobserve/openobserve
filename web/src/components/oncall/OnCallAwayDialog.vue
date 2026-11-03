@@ -21,8 +21,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="oncall-members-away-dialog"
   >
     <div class="flex flex-col gap-3">
-      <span class="flex items-center gap-2">
-        <OUserCell v-if="email" :value="email" />
+      <span v-if="email" class="flex min-w-0 items-center gap-2">
+        <OAvatar :value="email" :name="nameOf(email)" size="sm" />
+        <OnCallPersonName
+          truncate
+          :email="email"
+          class="text-text-heading text-sm font-medium"
+          data-test="oncall-members-away-person"
+        />
       </span>
       <OText variant="meta">{{ t("oncall.awayHintShort") }}</OText>
       <!-- The times below are the team's clock, said the way the Schedule tab says it. -->
@@ -88,7 +94,9 @@ import { useStore } from "vuex";
 import { useMutation } from "@tanstack/vue-query";
 
 import OButton from "@/lib/core/Button/OButton.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODate from "@/lib/forms/Date/ODate.vue";
@@ -117,6 +125,7 @@ const emit = defineEmits<{ saved: [] }>();
 const open = defineModel<boolean>("open", { required: true });
 
 const { t } = useI18nTyped();
+const { nameOf } = useOrgUserNames();
 const { noteConfigurationDenied } = useOnCallPermissions();
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization.identifier);

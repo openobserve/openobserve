@@ -80,6 +80,9 @@ export class OnCallTeamDetailPage {
       timelineChart: '[data-test="oncall-timeline-chart"]',
       timelineEmpty: '[data-test="oncall-timeline-empty"]',
       timelineAdd: '[data-test="oncall-timeline-add"]',
+      // A team with no rotations yet gets a From a template / From scratch menu on Add rotation.
+      timelineAddScratch: '[data-test="oncall-timeline-add-scratch"]',
+      timelineAddTemplate: '[data-test="oncall-timeline-add-template"]',
       laneMenus: '[data-test^="oncall-lane-menu-"]',
       laneStartOver: '[data-test^="oncall-lane-presets-"]',
       timelineGap: '[data-test="oncall-timeline-gap"]',
@@ -364,6 +367,8 @@ export class OnCallTeamDetailPage {
    */
   async openRotationEditor() {
     await this.page.locator(this.locators.timelineAdd).click();
+    const scratch = this.page.locator(this.locators.timelineAddScratch);
+    if (await scratch.isVisible({ timeout: 1500 }).catch(() => false)) await scratch.click();
     await expect(this.page.locator(this.locators.rotationDrawer)).toBeVisible({ timeout: 20000 });
   }
 

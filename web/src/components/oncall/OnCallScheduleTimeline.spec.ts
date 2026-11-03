@@ -173,6 +173,43 @@ describe("OnCallScheduleTimeline", () => {
     expect(add.attributes("data-icon")).toBe("add");
   });
 
+  // A template rewrites the first rotation, so it can only be the way to build one while there is none.
+  it("offers a template or scratch from Add rotation only while the team has no rotations", async () => {
+    const empty = render({ rotations: [], segments: [] });
+    expect(empty.find('[data-test="oncall-timeline-add"]').text()).toBe("Add rotation");
+    await empty.find('[data-test="oncall-timeline-add-template"]').trigger("click");
+    expect(empty.emitted("presets")).toHaveLength(1);
+    await empty.find('[data-test="oncall-timeline-add-scratch"]').trigger("click");
+    expect(empty.emitted("add")).toHaveLength(1);
+
+    const staffed = render();
+    expect(staffed.find('[data-test="oncall-timeline-add-template"]').exists()).toBe(false);
+    await staffed.find('[data-test="oncall-timeline-add"]').trigger("click");
+    expect(staffed.emitted("add")).toHaveLength(1);
+  });
+
+  // The band only has room for a name; two people can share one, so the email rides the tooltip.
+  it("gives a shift band a tooltip with the person's name, email and window", () => {
+    const wrapper = mount(OnCallScheduleTimeline, {
+      props: {
+        rotations: [rotation("Primary")],
+        segments: [seg()],
+        timezone: "UTC",
+        window: { from: 0, to: 0 },
+        "onUpdate:window": () => {},
+      } as any,
+      global: {
+        plugins: [i18n, store],
+        stubs: { ...stubs, OTooltip: { name: "OTooltip", props: ["content"], template: "<i />" } },
+      },
+    });
+    const band = tracksOf(wrapper)[0].bands[0];
+    const tip = wrapper
+      .findAllComponents({ name: "OTooltip" })
+      .find((one: any) => one.attributes("data-test") === `oncall-shift-tip-${band.key}`);
+    expect(String(tip!.props("content"))).toMatch(/^ana@o2\.ai · .+ – .+/);
+  });
+
   it("draws one lane per rotation", () => {
     const wrapper = render({
       rotations: [rotation("Primary"), rotation("Secondary")],

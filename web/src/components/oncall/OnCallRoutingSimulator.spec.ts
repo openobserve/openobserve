@@ -175,20 +175,26 @@ describe("OnCallRoutingSimulator", () => {
       { email: "ana@o2.ai", first_name: "Ana" },
       { email: "raj@o2.ai", first_name: "Raj" },
     ]);
+    const lands = (email: string) => ({
+      user_email: email,
+      reason: "",
+      would_a_page_land: true,
+      deliverable_channels: ["email"],
+    });
     escalationPreview.mockResolvedValue({
       data: {
+        channels: ["email"],
         rungs: [
-          { after_micros: 0, targets: [], recipients: [], resolves_to_nobody: false },
           {
-            after_micros: 120_000_000,
+            after_micros: 0,
             targets: [],
-            recipients: [{ user_email: "ana@o2.ai" }],
+            recipients: [lands("ana@o2.ai")],
             resolves_to_nobody: false,
           },
           {
             after_micros: 300_000_000,
             targets: [],
-            recipients: [{ user_email: "ana@o2.ai" }, { user_email: "raj@o2.ai" }],
+            recipients: [lands("ana@o2.ai"), lands("raj@o2.ai")],
             resolves_to_nobody: false,
           },
         ],
@@ -208,6 +214,79 @@ describe("OnCallRoutingSimulator", () => {
       .findAllComponents(OnCallPersonName)
       .find((c) => c.props("email") === "ana@o2.ai");
     expect(ana!.findComponent(OTooltip).props("content")).toBe("Ana (ana@o2.ai)");
+  });
+
+  // The engine's current responder is one person; a first step paging Primary and Secondary wakes both.
+  it("names everybody the first step pages as woken now, not only the current responder", async () => {
+    vi.useRealTimers();
+    queryClient.setQueryData(orgUsersQuery("default").queryKey, [
+      { email: "ana@o2.ai", first_name: "Ana" },
+      { email: "raj@o2.ai", first_name: "Raj" },
+      { email: "kim@o2.ai", first_name: "Kim" },
+    ]);
+    const lands = (email: string) => ({
+      user_email: email,
+      reason: "",
+      would_a_page_land: true,
+      deliverable_channels: ["email", "sms"],
+    });
+    escalationPreview.mockResolvedValue({
+      data: {
+        channels: ["email", "sms"],
+        rungs: [
+          {
+            after_micros: 0,
+            targets: [],
+            recipients: [lands("ana@o2.ai"), lands("raj@o2.ai")],
+            resolves_to_nobody: false,
+          },
+          {
+            after_micros: 300_000_000,
+            targets: [],
+            recipients: [lands("ana@o2.ai"), lands("raj@o2.ai"), lands("kim@o2.ai")],
+            resolves_to_nobody: false,
+          },
+        ],
+      },
+    });
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    await flushPromises();
+    await flushPromises();
+    const responder = wrapper.find('[data-test="oncall-simulator-responder"]').text();
+    expect(responder).toBe("wakes Ana, Raj now (Email, SMS)");
+    const next = wrapper.find('[data-test="oncall-simulator-next"]').text();
+    expect(next).toBe("then Kim after 5m");
+  });
+
+  it("says why when nobody on the first step can receive a page", async () => {
+    vi.useRealTimers();
+    escalationPreview.mockResolvedValue({
+      data: {
+        channels: ["email"],
+        rungs: [
+          {
+            after_micros: 0,
+            targets: [],
+            recipients: [
+              {
+                user_email: "ana@o2.ai",
+                reason: "",
+                would_a_page_land: false,
+                why_not: "no verified channel",
+                deliverable_channels: [],
+              },
+            ],
+            resolves_to_nobody: false,
+          },
+        ],
+      },
+    });
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    await flushPromises();
+    await flushPromises();
+    const responder = wrapper.find('[data-test="oncall-simulator-responder"]');
+    expect(responder.text()).toBe("no verified channel");
+    expect(responder.classes()).toContain("text-status-error-text");
   });
 
   it("says a silent priority pages nobody rather than naming the responder", async () => {
