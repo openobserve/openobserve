@@ -470,8 +470,23 @@ describe("SyntheticsLocationForm", () => {
 
   // ── Provider options ───────────────────────────────────────────────────────
 
-  it("exposes the four provider options in the computed", () => {
+  it("offers only AWS when creating a location", () => {
     wrapper = createWrapper();
+    const options = wrapper.vm.providerOptions;
+    expect(options.map((o: { value: string }) => o.value)).toEqual(["aws"]);
+  });
+
+  it("keeps all provider options in edit mode to label existing locations", () => {
+    wrapper = createWrapper({
+      isEdit: true,
+      data: {
+        id: "gcp-us-east1",
+        provider: "gcp",
+        region: "us-east1",
+        label: "GCP",
+        enabled: true,
+      },
+    });
     const options = wrapper.vm.providerOptions;
     expect(options).toHaveLength(4);
     expect(options.map((o: { value: string }) => o.value)).toEqual([
