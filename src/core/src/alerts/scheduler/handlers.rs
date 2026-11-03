@@ -961,7 +961,38 @@ pub async fn handle_triggers(
             super::calibration::handle_triggers(trace_id, trigger).await
         }
         db::scheduler::TriggerModule::FleetRollout => handle_fleet_rollout_triggers(trigger).await,
+        db::scheduler::TriggerModule::OncallSlackSync => {
+            handle_oncall_slack_sync_triggers(trigger).await
+        }
     }
+}
+
+/// Runs one Slack sync pass of the page; the pass ends its own row (C11).
+#[cfg(feature = "enterprise")]
+async fn handle_oncall_slack_sync_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    o2_enterprise::enterprise::oncall::chat::pass::run(&trigger).await
+}
+
+/// Completes the page's sync row with no Slack call, fenced by this claim: this build has no
+/// sync pass. Region-local: `infra::scheduler` never replicates.
+#[cfg(not(feature = "enterprise"))]
+async fn handle_oncall_slack_sync_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    let finish = config::meta::triggers::SlackSyncFinish {
+        status: db::scheduler::TriggerStatus::Completed,
+        next_run_at: trigger.next_run_at,
+        data: Default::default(),
+    };
+    if !infra::scheduler::finish_slack_sync(&trigger, &finish).await? {
+        log::warn!(
+            "[ONCALL] Slack sync of {} lost its claim before it finished",
+            trigger.module_key
+        );
+    }
+    Ok(())
 }
 
 /// Region-local (D21): only `infra::scheduler`, which never replicates to other regions.
@@ -1502,7 +1533,8 @@ async fn handle_composite_alert_trigger(
                     .enabled,
         );
         if delivery.should_deliver() && has_targets {
-            let notification_alert = composite_notification_alert(&definition.definition);
+            let notification_alert =
+                crate::alerts::composite::notification_alert(&definition.definition);
             let notification_row = composite_notification_row(
                 &definition.definition.expression,
                 evaluated.result,
@@ -1607,7 +1639,8 @@ async fn handle_composite_alert_trigger(
         #[cfg(feature = "enterprise")]
         if let Some(downtime) = suppressed_by {
             if opens_incident {
-                let notification_alert = composite_notification_alert(&definition.definition);
+                let notification_alert =
+                    crate::alerts::composite::notification_alert(&definition.definition);
                 let rows = [composite_notification_row(
                     &definition.definition.expression,
                     evaluated.result,
@@ -1632,7 +1665,8 @@ async fn handle_composite_alert_trigger(
             && !composite_incident_handled
             && downtime.is_none()
         {
-            let notification_alert = composite_notification_alert(&definition.definition);
+            let notification_alert =
+                crate::alerts::composite::notification_alert(&definition.definition);
             let rows = [composite_notification_row(
                 &definition.definition.expression,
                 evaluated.result,
@@ -1820,36 +1854,6 @@ fn composite_delivery_error(
             incident_error,
         )),
     }
-}
-
-fn composite_notification_alert(
-    definition: &infra::table::entity::alert_composites::Model,
-) -> config::meta::alerts::alert::Alert {
-    let mut alert = config::meta::alerts::alert::Alert::default();
-    alert.id = svix_ksuid::Ksuid::from_str(&definition.id).ok();
-    alert.org_id = definition.org.clone();
-    alert.name = definition.name.clone();
-    alert.description = definition.description.clone().unwrap_or_default();
-    alert.destinations =
-        serde_json::from_value(definition.destinations.clone()).unwrap_or_default();
-    alert.template = definition.template.clone();
-    alert.context_attributes = definition
-        .context_attributes
-        .clone()
-        .and_then(|value| serde_json::from_value(value).ok());
-    alert.creates_incident = definition.creates_incident;
-    alert.workflows = serde_json::from_value(definition.workflows.clone()).unwrap_or_default();
-    alert.priority = definition
-        .priority
-        .and_then(config::meta::alerts::priority::AlertPriority::from_i32);
-    alert.tags = definition
-        .tags
-        .clone()
-        .and_then(|value| serde_json::from_value(value).ok())
-        .unwrap_or_default();
-    alert.trigger_condition.silence = definition.silence_seconds;
-    alert.pending_period_sec = definition.pending_period_sec;
-    alert
 }
 
 fn composite_notification_row(

@@ -494,6 +494,9 @@ test.describe("Pre-Test Cleanup", () => {
     // quietly rather than failing the cleanup every other suite depends on.
     await pm.apiCleanup.cleanupIamArtifacts('ui_auto');
 
+    // Fleet management leftovers (Fleet/*.spec.js); enterprise-only, quiet on OSS.
+    await pm.apiCleanup.cleanupFleetArtifacts(['fl_auto_'], ['fl-auto-']);
+
     testLogger.info('Pre-test cleanup completed successfully');
   });
 });

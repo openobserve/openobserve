@@ -23,6 +23,7 @@ import organizationsService from "@/services/organizations";
 import apiKeysService from "@/services/api_keys";
 import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
+import { rumTokensQuery } from "@/services/api_keys.queries";
 import { createMemoryHistory, createRouter } from "vue-router";
 
 // Mock services with default resolved values
@@ -141,6 +142,7 @@ describe("Ingestion", () => {
       data: { data: { token: "default-token", passcode: "default-passcode" } },
     });
     store.state.organizationData.organizationPasscodeForbidden = false;
+    store.state.organizationData.rumTokenForbidden = false;
 
     try {
       wrapper = mount(Ingestion, {
@@ -842,6 +844,30 @@ describe("Ingestion", () => {
 
       expect(apiKeysService.listRUMTokens).toHaveBeenCalledWith("default");
       expect(dispatchSpy).toHaveBeenCalledWith("setRUMToken", mockResponse.data.data);
+    });
+
+    it("drops a token read earlier once a later read is forbidden", async () => {
+      if (!wrapper) {
+        expect.fail("Component failed to mount");
+        return;
+      }
+      const orgData = wrapper.vm.store.state.organizationData;
+
+      apiKeysService.listRUMTokens.mockResolvedValue({ data: { data: { rum_token: "rum-old" } } });
+      queryClient.clear();
+      await wrapper.vm.getRUMToken();
+      expect(orgData.rumToken.rum_token).toBe("rum-old");
+
+      // the success above is still cached: the 403 is reached only if the read bypasses the cache
+      apiKeysService.listRUMTokens.mockRejectedValue({ response: { status: 403 } });
+      await wrapper.vm.getRUMToken();
+      expect(wrapper.vm.rumTokenForbidden).toBe(true);
+      expect(wrapper.vm.store.state.organizationData.rumToken.rum_token).toBe("");
+      expect(queryClient.getQueryData(rumTokensQuery("default").queryKey)).toBeUndefined();
+
+      apiKeysService.listRUMTokens.mockRejectedValue({ response: { status: 500 } });
+      await wrapper.vm.getRUMToken();
+      expect(wrapper.vm.rumTokenForbidden).toBe(false);
     });
   });
 

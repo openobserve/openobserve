@@ -149,6 +149,18 @@ describe("OnCallRuleEditor", () => {
     );
   });
 
+  /// R10: "nothing claims this" is judged on the draft's conditions alone, and says so.
+  it("says an unclaimed path is judged on these conditions alone", async () => {
+    const wrapper = render({
+      initialDimensions: { "k8s-namespace": "risk" },
+      conflict: { decision: null, team_id: null },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-conflict-now"]').text()).toBe(
+      "Nothing claims this path today, judged on these conditions alone — a page matching it reaches the catch-all, or nobody.",
+    );
+  });
+
   /// A claim arrives with the signal's identity path already filled — the click
   /// worth removing is the one where the user retypes what is on screen.
   it("seeds from a claim's pre-filled dimensions", async () => {

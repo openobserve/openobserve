@@ -14,7 +14,8 @@
       "logs-table-stream-switch.spec.js",
       "logs-internal-streams.spec.js",
       "logs-11966-value-multiselect-quotes.spec.js",
-      "logs-explain-sql-mode.spec.js"
+      "logs-explain-sql-mode.spec.js",
+      "logs-3322-field-filter-similar-names.spec.js"
     ],
     "disabled": []
   },

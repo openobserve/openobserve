@@ -53,7 +53,7 @@ fn annotation_error_response(value: AnnotationError) -> Response {
         (status = 400, description = "Invalid target, Score Config, or Score value", body = ()),
         (status = 403, description = "A selected Score Config is not visible", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Annotations", "operation": "create"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Annotations", "operation": "create"}))),
 )]
 pub async fn annotate_target(
     Path(org_id): Path<String>,

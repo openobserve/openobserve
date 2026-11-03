@@ -204,6 +204,7 @@ export function priorityTone(priority: number): RowRailTone {
 /** Whether a channel reaches a locked, silenced phone: texts and calls do; email and webhook land in apps a night-mode phone does not ring for. */
 export const CHANNEL_WAKES: Record<Channel, boolean> = {
   email: false,
+  slack: false,
   sms: true,
   voice: true,
   webhook: false,
@@ -301,12 +302,21 @@ export function isDeletedTeam(
   return !!teamId && knownTeamIds !== null && !knownTeamIds.includes(teamId);
 }
 
+/** A ringing page whose ladder stopped, or whose team was deleted, pages nobody; the list's count and phrase both ask this. [pure] */
+export function ladderStopped(
+  progress: EscalationProgress | null | undefined,
+  teamDeleted: boolean,
+): boolean {
+  return teamDeleted || !!progress?.stopped_because;
+}
+
 /** What is happening to a page, as one phrase: the Pages list, Recent pages and the page header all say this. */
 export type PagePhrase =
   | { kind: "resolved"; afterMicros: number | null }
   | { kind: "acknowledged"; by: string }
   | { kind: "snoozed"; until: number }
   | { kind: "nobodyAnswered" }
+  | { kind: "nobodyPaged" }
   | { kind: "held"; secondsLeft: number }
   | { kind: "pagesNobody" }
   | { kind: "unknown" }
@@ -330,6 +340,7 @@ export function pagePhrase(input: {
   progressLoaded: boolean;
   totalRungs?: number | null;
   reachedStep?: number | null;
+  teamDeleted?: boolean;
   nowMicros: number;
 }): PagePhrase {
   const { record, progress, nowMicros } = input;
@@ -345,6 +356,7 @@ export function pagePhrase(input: {
   // Before the exhausted check: the server flags an empty ladder exhausted, and nobody can fail to answer it.
   if (input.totalRungs === 0) return { kind: "pagesNobody" };
   if (pageState(record, progress) === "exhausted") return { kind: "nobodyAnswered" };
+  if (ladderStopped(progress, !!input.teamDeleted)) return { kind: "nobodyPaged" };
   const heldUntil = progress?.held_until_micros;
   if (heldUntil && heldUntil > nowMicros) {
     return { kind: "held", secondsLeft: Math.ceil((heldUntil - nowMicros) / 1_000_000) };
@@ -356,8 +368,10 @@ export function pagePhrase(input: {
     return { kind: "unknown" };
   }
   const step = progress ? progress.fired.length : (input.reachedStep ?? 0);
-  if (!step) return { kind: "notPaged" };
   const total = input.totalRungs ?? null;
+  // A restarted ladder's first rung is due before the scheduler sends it; that is paging, not "not paged".
+  const due = !!progress?.next_at && progress.next_at <= nowMicros;
+  if (!step) return due ? { kind: "paging", step: 1, total, who: [] } : { kind: "notPaged" };
   const last = progress?.fired[progress.fired.length - 1];
   if (last?.reached_nobody) return { kind: "reachedNobody", step, total };
   return { kind: "paging", step, total, who: last?.reached ?? [] };
@@ -569,7 +583,7 @@ export function rungProblem(
 }
 
 /// The order a priority's channels are said in, whatever order they are stored in.
-const CHANNEL_ORDER: Channel[] = ["email", "sms", "voice", "webhook"];
+const CHANNEL_ORDER: Channel[] = ["email", "slack", "sms", "voice", "webhook"];
 
 /** A priority's channels as one phrase, "Email, SMS, Voice call". [pure] */
 export function channelList(channels: readonly Channel[] | undefined, t: TranslateFn): string {
@@ -711,7 +725,7 @@ export function dimensionsSentence(dimensions: Record<string, string>): string {
 }
 
 /** Mirrors `Channel::deliverable()` on the server — add to this list only when a new channel's provider actually sends. */
-export const DELIVERABLE_CHANNELS: Channel[] = ["email", "sms", "voice", "webhook"];
+export const DELIVERABLE_CHANNELS: Channel[] = ["email", "slack", "sms", "voice", "webhook"];
 
 export function isDeliverableChannel(channel: Channel): boolean {
   return DELIVERABLE_CHANNELS.includes(channel);
@@ -1090,6 +1104,12 @@ export function shiftBoundary(rule: ShiftRule, index: number, timezone: string):
 /** `rule`'s anchor `shifts` handovers earlier on `timezone`'s clock; mirrors `ShiftRule::offset_from`. [pure] */
 export function offsetAnchor(rule: ShiftRule, shifts: number, timezone: string): number {
   return shiftBoundary(rule, -shifts, timezone) ?? rule.anchor_micros - shifts * rule.shift_micros;
+}
+
+/** How many shifts before `rule`'s anchor the shift containing `nowMicros` starts; zero or negative once the anchor has passed. [pure] */
+export function shiftsBackToNow(rule: ShiftRule, nowMicros: number, timezone: string): number {
+  if (!rule.shift_micros || rule.shift_micros <= 0) return 0;
+  return -localShiftIndex(rule, nowMicros, timezone);
 }
 
 /** Whether `rule` has people and a positive turn length, so its shifts can be counted. [pure] */

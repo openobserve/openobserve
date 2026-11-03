@@ -317,13 +317,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:timezone-change="updateTimezone"
           />
           <RecentSearchesButton
-            source="traces"
-            :examples="recentExamples"
             data-test="traces-search-bar-recent-searches-btn"
-            @run="(entry, when) => emit('recent-restore', entry, when, true)"
-            @load="(entry, when) => emit('recent-restore', entry, when, false)"
             @view-all="openRecentSearches"
-            @example="applyRecentExample"
           />
           <div>
             <div class="flex items-center">

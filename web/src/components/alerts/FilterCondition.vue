@@ -49,6 +49,7 @@
         valueKey="value"
         width="xs"
         :placeholder="t('alerts.column')"
+        :aria-label="t('alerts.column')"
         :creatable="props.allowCustomColumns"
         :class="[inputWidth ? inputWidth : '']"
         data-test="alert-conditions-select-column"
@@ -65,6 +66,7 @@
       <OFormSelect
         :name="`${namePrefix}.operator`"
         :options="triggerOperators"
+        :aria-label="t('common.operator')"
         :dropdownStyle="{ textTransform: 'capitalize' }"
         :class="[
           inputWidth ? inputWidth : store.state.isAiChatEnabled ? 'w-17.5' : computedInputWidth,
@@ -81,6 +83,7 @@
         :name="`${namePrefix}.value`"
         :items="valueSuggestions.options.value"
         :placeholder="t('common.value')"
+        :aria-label="t('common.value')"
         :help-text="valueSuggestions.hint.value"
         :class="[
           inputWidth ? inputWidth : store.state.isAiChatEnabled ? 'w-27.5' : computedValueWidth,
@@ -92,6 +95,7 @@
         v-else
         :name="`${namePrefix}.value`"
         :placeholder="t('common.value')"
+        :aria-label="t('common.value')"
         :class="[
           inputWidth ? inputWidth : store.state.isAiChatEnabled ? 'w-27.5' : computedValueWidth,
         ]"

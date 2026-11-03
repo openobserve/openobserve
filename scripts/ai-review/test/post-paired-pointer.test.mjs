@@ -6,6 +6,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { ANY_REVIEW_MARKER, isPlaceholderComment, selectOwnReviewComment } from "../src/comments.mjs";
+
 const SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), "../post-paired-pointer.sh");
 const MARKER = "<!-- ai-code-review -->";
 const BOT = "o2-reviewer[bot]";
@@ -45,4 +47,30 @@ test("the pointer keeps the review count of the comment it replaces", t => {
   runWithFakeGh(t, [[comment(3, BOT, `${MARKER}\nreview\n<!-- o2-review-pass:2 -->`)]]);
   assert.match(t.body, /<!-- o2-paired-pointer -->/);
   assert.match(t.body, /<!-- o2-review-pass:2 -->$/);
+});
+
+test("the pointer replaces the same comment the runner and the fallback reader pick, whatever marker it carries", t => {
+  const retired = "<!-- ai-code-review-claude -->";
+  const pages = [
+    [comment(1, BOT, `${MARKER}\nolder review`)],
+    [comment(2, BOT, `${retired}\nnewer review\n<!-- o2-review-pass:3 -->`), comment(3, "mallory", MARKER)],
+  ];
+  const calls = runWithFakeGh(t, pages);
+  const selected = selectOwnReviewComment(pages.flat(), BOT, ANY_REVIEW_MARKER);
+  assert.equal(calls, `PATCH repos/o/r/issues/comments/${selected.id}`);
+  assert.match(t.body, /<!-- o2-review-pass:3 -->$/);
+  const after = pages.flat().map(c => (c.id === selected.id ? { ...c, body: t.body } : c));
+  assert.equal(isPlaceholderComment(selectOwnReviewComment(after, BOT, ANY_REVIEW_MARKER).body), true);
+});
+
+test("the pointer never adopts a comment when the bot login is empty", t => {
+  const dir = mkdtempSync(join(tmpdir(), "pointer-test-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(join(dir, "gh"), `#!/usr/bin/env bash
+if [ "$2" = "-X" ]; then echo "$3 $4" >> "${dir}/calls.log"; exit 0; fi
+echo '${JSON.stringify([comment(1, "", MARKER)])}'
+`);
+  chmodSync(join(dir, "gh"), 0o755);
+  execFileSync("bash", [SCRIPT, "o/r", "7", MARKER, "o/e#9", "reviewed", ""], { env: { PATH: `${dir}:${process.env.PATH}` } });
+  assert.equal(readFileSync(join(dir, "calls.log"), "utf-8").trim(), "POST repos/o/r/issues/7/comments");
 });

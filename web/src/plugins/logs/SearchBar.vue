@@ -941,13 +941,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
             </OButtonGroup>
             <RecentSearchesButton
-              source="logs"
-              :examples="recentExamples"
+              class="me-1 size-[2.125rem]!"
               data-test="logs-search-bar-recent-searches-btn"
-              @run="(entry, when) => restoreRecent(entry, when, true)"
-              @load="(entry, when) => restoreRecent(entry, when, false)"
               @view-all="openRecentSearches"
-              @example="applyRecentExample"
             />
             <div
               v-if="
@@ -1875,7 +1871,8 @@ const replaceExistingFieldCondition = (
   const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
   const fieldPat = `(?:"${esc}"|${esc})`;
-  const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
+  // The lookbehind stops `operation_name` from matching inside `db_operation_name`.
+  const condPat = `(?<!\\w)(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
   const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
@@ -4830,15 +4827,12 @@ export default defineComponent({
         guardJobSnapshot.value = null;
         await getJobData(false, snapshot);
       } catch (e) {
-        const status = e?.response?.status;
+        if (e?.response?.status === 403) return;
         toast({
           variant: "error",
-          message:
-            status === 403
-              ? t("search.searchJobNoPermission")
-              : e?.response?.data?.message
-                ? raw(e.response.data.message)
-                : t("search.errorAddingJob"),
+          message: e?.response?.data?.message
+            ? raw(e.response.data.message)
+            : t("search.errorAddingJob"),
         });
       }
     };

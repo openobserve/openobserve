@@ -164,7 +164,7 @@ async fn validate_ratelimit_updater(
         ("org_id" = String, Path, description = "Organization Name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<String>)),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(

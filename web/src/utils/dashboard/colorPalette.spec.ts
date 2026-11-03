@@ -238,6 +238,12 @@ describe("getDistinctSeriesColors", () => {
     });
   });
 
+  it("gives pie slices info and warn different colours", () => {
+    const colors = palette("base.css");
+    const assigned = getDistinctSeriesColors(["debug", "error", "info", "warn"], colors);
+    expect(assigned.get("info")).not.toBe(assigned.get("warn"));
+  });
+
   it("reuses colours only once every slot is taken", () => {
     const names = Array.from({ length: 14 }, (_, i) => `series-${i}`);
     const assigned = getDistinctSeriesColors(names, palette("base.css"));

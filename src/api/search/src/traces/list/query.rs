@@ -212,10 +212,12 @@ pub fn build_llm_trace_query(
             sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
             {total_tokens_expr}, \
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+            {}, \
             array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
             {first_msg_clause} as gen_ai_input_messages, \
             {extra_selects} \
-            FROM {stream_ident}"
+            FROM {stream_ident}",
+            validated.unpriced_selects()
         )
     } else {
         let total_tokens_expr = if validated.has_total_tokens {

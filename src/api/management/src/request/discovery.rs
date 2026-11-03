@@ -83,7 +83,7 @@ fn discovery_error_response(error: DiscoveryError) -> Response {
         (status = 500, description = "Discovery query failed", content_type = "application/json", body = MetaHttpResponse),
         (status = 503, description = "Discovery query service unavailable", content_type = "application/json", body = MetaHttpResponse),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "Discovery", "operation": "list"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "Discovery", "operation": "list"}))),
 )]
 pub async fn list_discovery_items(
     Path(org_id): Path<String>,

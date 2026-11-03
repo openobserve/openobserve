@@ -31,10 +31,10 @@ use openobserve_api_management::request::org_domains;
 #[cfg(feature = "cpu-profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
-    kv, metrics_usage, model_pricing, organization, public_dashboards, query_history,
-    rum_analytics, service_accounts, short_url, slack, slos, sourcemaps, status, status_pages,
-    stream, synthetics, users,
+    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
+    ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
+    query_history, rum_analytics, service_accounts, short_url, slack, slos, sourcemaps, status,
+    status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -91,7 +91,13 @@ use crate::{
 
 pub mod decompression;
 pub mod middlewares;
+#[cfg(all(test, feature = "enterprise"))]
+mod one_ack_oncall_off_tests;
+#[cfg(all(test, feature = "enterprise"))]
+mod one_ack_tests;
 pub mod openapi;
+#[cfg(test)]
+mod openapi_coverage;
 
 use common::meta::http::ERROR_HEADER;
 
@@ -1340,6 +1346,9 @@ pub fn service_routes() -> Router {
         // NOTE: named routes MUST be registered before {model_id} or they match as a model ID
         .route("/{org_id}/llm/models/built-in", get(model_pricing::get_built_in))
         .route("/{org_id}/llm/models/refresh-built-in", post(model_pricing::refresh_built_in))
+        .route("/{org_id}/llm/models/unpriced", get(model_pricing::list_unpriced))
+        // AI data health checks (LLM Insights strip, instrument skill)
+        .route("/{org_id}/gen_ai/data_health", get(gen_ai_health::get_data_health))
         .route("/{org_id}/llm/models/test", post(model_pricing::test_model_match))
         .route("/{org_id}/llm/models/{model_id}", get(model_pricing::get).put(model_pricing::update).delete(model_pricing::delete))
 
@@ -1481,6 +1490,8 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume", post(alerts::incidents::resume_incident_rca_run))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary", get(alerts::incidents::get_incident_rca_summary))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/acknowledge", post(alerts::ack::ack_incident))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/unacknowledge", post(alerts::ack::unack_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
         .route("/v2/{org_id}/incidents/integrations", get(alerts::incident_integrations::list_integrations).post(alerts::incident_integrations::create_integration))
@@ -2324,6 +2335,11 @@ fn oncall_routes(router: Router) -> Router {
             "/{org_id}/oncall/teams/{team_id}/channel",
             get(oncall::get_team_channel).put(oncall::set_team_channel),
         )
+        // RO-6: one plain test message in the team's Slack channel; on-call PUT (RB-2).
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/slack/test",
+            post(oncall::test_team_slack_channel),
+        )
         // Derived on every read, never stored: a saved list argues with the config beside it.
         .route(
             "/{org_id}/oncall/teams/{team_id}/reachability",
@@ -2393,8 +2409,16 @@ fn oncall_routes(router: Router) -> Router {
             post(oncall::acknowledge_response),
         )
         .route(
+            "/{org_id}/oncall/responses/{response_id}/unacknowledge",
+            post(oncall::unacknowledge_response),
+        )
+        .route(
             "/{org_id}/oncall/responses/{response_id}/snooze",
             post(oncall::snooze_response),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/unsnooze",
+            post(oncall::unsnooze_response),
         )
         .route(
             "/{org_id}/oncall/responses/{response_id}/handoff",
@@ -2589,7 +2613,7 @@ fn fleet_router() -> Router {
         .route_layer(middleware::from_fn(fleet_gate))
 }
 
-/// §17: with `O2_FLEET_ENABLED` off, OpAMP answers 503 and management reads work but writes do not.
+/// With `O2_FLEET_ENABLED` off, auth refuses fleet tokens first (401); writes get 503.
 #[cfg(feature = "enterprise")]
 async fn fleet_gate(request: Request, next: Next) -> Response {
     if openobserve_core::fleet::enabled() || request.method() == Method::GET && !is_opamp(&request)
@@ -5193,6 +5217,7 @@ mod tests {
             "POST /{org_id}/oncall/responses/{response_id}/acknowledge",
             "POST /{org_id}/oncall/responses/{response_id}/resolve",
             "POST /{org_id}/oncall/responses/{response_id}/snooze",
+            "POST /{org_id}/oncall/responses/{response_id}/unsnooze",
             "POST /{org_id}/prometheus/api/v1/query",
             "POST /{org_id}/prometheus/api/v1/query_range",
             "POST /{org_id}/{stream_name}/_around",
@@ -5214,8 +5239,10 @@ mod tests {
             "POST /v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/cancel",
             "POST /v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/extend",
             "POST /v2/{org_id}/alerts/{alert_id}/unack",
+            "POST /{org_id}/oncall/responses/{response_id}/acknowledge",
             "POST /{org_id}/oncall/responses/{response_id}/resolve",
             "POST /{org_id}/oncall/responses/{response_id}/snooze",
+            "POST /{org_id}/oncall/responses/{response_id}/unacknowledge",
         ];
         assert_eq!(scope_allows(in_slack_action_scope), sorted(&expected));
     }
@@ -5332,8 +5359,6 @@ mod tests {
         "GET /api/{org_id}/folders/{folder_id}",
         "POST /api/{org_id}/folders",
         "PUT /api/{org_id}/folders/{folder_id}",
-        // o2-enterprise rbac_known_gaps.txt keys this path; fixing it needs a paired change there.
-        "POST /{org_id}/service_streams/_correlate",
     ];
 
     #[cfg(feature = "enterprise")]
@@ -5349,7 +5374,13 @@ mod tests {
     /// An unrouted documented path meets the auth layer's 401, failing its MCP tool.
     #[tokio::test]
     async fn every_openapi_operation_reaches_the_route_it_documents() {
-        let app = local_routes().route_layer(middleware::from_fn(
+        // On-call is mounted only when enabled at runtime; the spec documents it regardless.
+        let routes = if get_o2_config().oncall.enabled {
+            local_routes()
+        } else {
+            local_routes().nest("/api", oncall_routes(Router::new()))
+        };
+        let app = routes.route_layer(middleware::from_fn(
             |req: Request<Body>, _next: Next| async move {
                 let matched = req
                     .extensions()

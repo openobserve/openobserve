@@ -119,10 +119,23 @@ file should pass strict ruff.
 | `serial` | Reads or changes server-wide state (root passcode, shared seed stream, org-wide counts). Jobs that run the default set with `-n` (OSS `api_integration_tests`, ENT `oss_in_ent`) run `-m "not serial" -n 4 --dist loadfile`, then `-m serial` alone; mark any new test of that kind. |
 | `order(N)` | Run order pin (legacy — avoid in new tests). |
 
+## Enterprise suites with their own setup
+
+CI copies `o2-enterprise/tests/*` over `tests/` and runs these suites in their own shards, never in the full run. Locally, deselect them from `rye run pytest` with `--ignore=tests/fleet/ --ignore=tests/fleet_flag_off/ --ignore=tests/fleet_collector/ --ignore=tests/rbac/fleet/`.
+
+| Suite | Needs | Run |
+|---|---|---|
+| `tests/fleet/` | An enterprise server with `O2_FLEET_ENABLED=true` (the default) | `rye run pytest tests/fleet/ -n 4 --dist loadfile` |
+| `tests/fleet_flag_off/` | Two starts over the same `./data`: first with `O2_FLEET_ENABLED=true` to seed a real token, then with `O2_FLEET_ENABLED=false` (fails otherwise) | `FLEET_FLAG_OFF_SEED=/tmp/seed.json PYTHONPATH=.:tests rye run python -m fleet_flag_off.seed_token`, restart the server with the flag off, then `FLEET_FLAG_OFF_SEED=/tmp/seed.json rye run pytest tests/fleet_flag_off/` |
+| `tests/fleet_collector/` | An enterprise server with `O2_FLEET_ENABLED=true`, a running Docker daemon, and the collector image pinned as `IMAGE_REF` in `tests/fleet_collector/collector_docker.py` (pulled on first use). Containers reach the server through `host.docker.internal`. | `rye run pytest tests/fleet_collector/` (no `-n`) |
+| `tests/rbac/fleet/` | An enterprise server with `O2_OPENFGA_ENABLED=true`, `O2_OPENFGA_LIST_ONLY_PERMITTED=true` (the filtered-list checks need it) and a running OpenFGA server; CI runs it in the `ent_rbac` shard | `rye run pytest tests/rbac/fleet/` |
+
+Fleet runs leave `fl_auto_*` orgs behind, because org delete is cloud-only. Most are empty, but the flag-off seed org keeps its fleet and live token, and the fleet suite's orgs keep a disabled ingestion token. Remove them by hand before reusing a local server.
+
 ## Troubleshooting
 
 - **`KeyError: 'ZO_BASE_URL'` on collection** — `conftest.py` reads env vars at import. Export them before running pytest (even `--collect-only`).
-- **On-call ack-token tests skip** — they read the paging mail to get the acknowledgement token, which exists only in the delivered message. Start Mailpit (`MAILPIT_BASE_URL`, default `http://127.0.0.1:8025`) and point the server at it with `ZO_SMTP_ENABLED=true ZO_SMTP_HOST=127.0.0.1 ZO_SMTP_PORT=1025`. CI does not start Mailpit, so these skip there by design.
+- **On-call ack-token tests skip locally** — they read the paging mail to get the acknowledgement token, which exists only in the delivered message. Start Mailpit with `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025 --smtp-allowed-recipients '(?i)@test\.invalid$'` (the filter makes mail to the reachability tests' other domain a real refusal), point the server at it with `ZO_SMTP_ENABLED=true ZO_SMTP_HOST=127.0.0.1 ZO_SMTP_PORT=1025 ZO_SMTP_FROM_EMAIL=oncall@ci.openobserve.test`, and set `MAILPIT_BASE_URL` if it is not `http://127.0.0.1:8025`. With no mailbox they skip locally and fail when `CI` is set. The enterprise `ent_oncall` shard starts Mailpit v1.21.8 on 1025/8025 with that recipient filter and starts the server with the same SMTP settings.
 - **`test_workflow.py` fails with SMTP error** — `ZO_SMTP_ENABLED=true` not set. CI does this; locally you'd need to wire an SMTP env.
 - **Test_organisations.py warning about `yield`** — `test_create_organization` uses pre-pytest-4 yield-style and is silently ignored. Scheduled for rewrite in Phase 4.
 

@@ -71,7 +71,7 @@ export class OnCallTeamDetailPage {
       error: '[data-test="oncall-team-detail-error"]',
       notAvailable: '[data-test="oncall-team-detail-not-available"]',
       coverageTag: '[data-test="oncall-team-coverage"]',
-      configRisks: '[data-test="oncall-team-config-risks"]',
+      configRisks: '[data-test="oncall-attention-expand"]',
       coverageCard: '[data-test="oncall-team-coverage-card"]',
       openSchedule: '[data-test="oncall-team-open-schedule"]',
 
@@ -527,6 +527,16 @@ export class OnCallTeamDetailPage {
     await this.getQuickStartApply().click();
   }
 
+  /** Accept the "replace the shift rules of …" confirm and return the preset write it issues. */
+  async confirmQuickStartReplace() {
+    const write = this.page.waitForResponse(
+      (res) => /\/oncall\/teams\/[^/]+\/schedule\/from-preset/.test(res.url()) && res.request().method() === 'POST',
+      { timeout: 30000 },
+    );
+    await this.page.locator(this.locators.confirmOk).click();
+    return await write;
+  }
+
   /**
    * §11.2: Save with regions unnamed and unstaffed must not be a silent no-op.
    *
@@ -667,14 +677,7 @@ export class OnCallTeamDetailPage {
 
 
 
-  /**
-   * The config-risk count riding the title.
-   *
-   * It is a COUNT, not a list — the risk texts live on
-   * `GET /teams/{id}/config-risks` and are derived on read, so a spec asserting
-   * that a risk cleared reads the endpoint and asserts the tag disappeared.
-   * Returns null when the tag is absent, which is what "no risks" looks like.
-   */
+  /** The attention banner's finding count (config risks, with folded findings discounted), or null when no banner shows. */
   async readConfigRiskCount() {
     const tag = this.page.locator(this.locators.configRisks);
     if ((await tag.count()) === 0) return null;

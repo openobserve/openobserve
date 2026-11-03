@@ -698,23 +698,12 @@ async fn search_window(
     let req = SearchRequest {
         query: Query {
             sql,
-            from: 0,
             // Parts and duplicate rows can push a window past the default row limit.
             size: config::QUERY_WITH_NO_LIMIT,
             start_time: first_at,
             // Inclusive of the last committed batch's timestamp.
             end_time: last_at + 1,
-            quick_mode: false,
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: RequestEncoding::Empty,
         regions: vec![],
