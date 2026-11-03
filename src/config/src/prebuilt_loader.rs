@@ -184,6 +184,7 @@ fn convert_template_config(config: &TemplateConfig, dest_type: &str) -> Template
         template_type,
         body: config.body.clone(),
         kind: TemplateKind::default(),
+        applies_to: Vec::new(),
     }
 }
 

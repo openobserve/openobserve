@@ -60,6 +60,8 @@ pub struct PreviewResponse {
     pub unknown_variables: Vec<String>,
     /// Every variable a template of the requested kind can use.
     pub variables: Vec<String>,
+    /// `common` and one group per kind whose producer renders templates in this release.
+    pub variable_groups: Vec<super::examples::VariableGroup>,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -295,6 +297,7 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
         preview_model,
         unknown_variables: content.unknown_variables,
         variables: super::examples::variables_for(req.kind),
+        variable_groups: super::examples::variable_groups(),
     })
 }
 
@@ -402,6 +405,41 @@ mod tests {
                 .fields
                 .iter()
                 .any(|f| f.label == "runbook")
+        );
+    }
+
+    #[test]
+    fn an_incident_preview_renders_the_incident_sample_and_lists_the_incident_group() {
+        let mut spec = sample_spec();
+        spec.body = "{incident_title} on {incident_service}".into();
+        let resp = preview(&PreviewRequest {
+            definition: spec,
+            channel: "slack".into(),
+            severity: None,
+            sample: None,
+            kind: NotificationKind::Incident,
+        })
+        .unwrap();
+        assert!(
+            resp.unknown_variables.is_empty(),
+            "{:?}",
+            resp.unknown_variables
+        );
+        assert!(resp.variables.iter().any(|v| v == "incident_id"));
+        assert!(resp.preview_model.body_html.contains("checkout"));
+        let groups: Vec<&str> = resp
+            .variable_groups
+            .iter()
+            .map(|g| g.name.as_str())
+            .collect();
+        assert_eq!(groups, ["common", "alert", "incident", "anomaly"]);
+        let incident = &resp.variable_groups[2];
+        assert!(incident.variables.iter().any(|v| v == "incident_severity"));
+        assert!(
+            !resp.variable_groups[0]
+                .variables
+                .iter()
+                .any(|v| v == "incident_id")
         );
     }
 

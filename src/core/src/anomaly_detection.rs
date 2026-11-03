@@ -206,6 +206,9 @@ pub struct CreateAnomalyConfigRequest {
     pub alert_enabled: Option<bool>,
     #[serde(default)]
     pub alert_destinations: Vec<String>,
+    /// Template override for this config's messages; absent, null or "" uses the destination's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
     pub enabled: Option<bool>,
     pub folder_id: Option<String>,
     pub owner: Option<String>,
@@ -317,6 +320,14 @@ pub struct UpdateAnomalyConfigRequest {
     pub retrain_interval_days: Option<i32>,
     pub alert_enabled: Option<bool>,
     pub alert_destinations: Option<Vec<String>>,
+    /// Absent leaves the stored override; null or "" clears it.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<String>)]
+    pub template: Option<Option<String>>,
     pub enabled: Option<bool>,
     pub folder_id: Option<String>,
     pub owner: Option<String>,
@@ -643,6 +654,7 @@ pub async fn create_config(
     mut req: CreateAnomalyConfigRequest,
 ) -> Result<serde_json::Value> {
     let normalized_tags = checked_create_body(&mut req)?;
+    let template = checked_template(org_id, req.template.as_deref()).await?;
 
     let db = get_orm_client_rw().await;
 
@@ -717,6 +729,7 @@ pub async fn create_config(
         last_failed_at: None,
         last_alert_fired_at: None,
         last_recovery_notified_at: None,
+        template,
         detection_lease_us: None,
         last_updated: now_us,
         // NOT NULL legacy column; `band_grouping` is what training reports now.
@@ -820,6 +833,7 @@ pub async fn create_config(
 pub async fn check_create_config(org_id: &str, req: &CreateAnomalyConfigRequest) -> Result<()> {
     let mut req = req.clone();
     checked_create_body(&mut req)?;
+    checked_template(org_id, req.template.as_deref()).await?;
     folder_pk(org_id, create_folder_name(&req))
         .await
         .map(|_| ())
@@ -834,6 +848,9 @@ pub async fn check_update_config(
     let existing = config_to_update(get_orm_client_rw().await, org_id, anomaly_id).await?;
     let mut req = req.clone();
     checked_update_body(&mut req, &existing)?;
+    if let Some(template) = &req.template {
+        checked_template(org_id, template.as_deref()).await?;
+    }
     if let Some(folder) = req.folder_id.as_deref() {
         folder_pk(org_id, folder).await?;
     }
@@ -998,6 +1015,9 @@ pub async fn update_config(
     }
     if let Some(alert_enabled) = req.alert_enabled {
         active_model.alert_enabled = Set(alert_enabled);
+    }
+    if let Some(template) = &req.template {
+        active_model.template = Set(checked_template(org_id, template.as_deref()).await?);
     }
     if let Some(destinations) = req.alert_destinations {
         active_model.alert_destinations = Set(Some(
@@ -1283,6 +1303,7 @@ pub async fn clone_config(
         last_failed_at: None,
         last_alert_fired_at: None,
         last_recovery_notified_at: None,
+        template: src.template.clone(),
         detection_lease_us: None,
         last_updated: now_us,
         created_at: now_us,
@@ -2011,6 +2032,21 @@ fn validation_error(e: anyhow::Error) -> anyhow::Error {
         return e;
     }
     anyhow::anyhow!("validation error: {e}")
+}
+
+/// A template override must name a user template that applies to anomaly; "" means none.
+async fn checked_template(org_id: &str, name: Option<&str>) -> Result<Option<String>> {
+    let Some(name) = name.map(str::trim).filter(|n| !n.is_empty()) else {
+        return Ok(None);
+    };
+    crate::alerts::templates::check_binding(
+        org_id,
+        name,
+        config::meta::alerts::notification_kind::NotificationKind::Anomaly,
+    )
+    .await
+    .map_err(|e| validation_error(anyhow::anyhow!(e)))?;
+    Ok(Some(name.to_string()))
 }
 
 /// Normalizes and validates a create body; returns its normalized tags.
@@ -3771,6 +3807,7 @@ mod tests {
             owner: None,
             priority: None,
             tags: vec![],
+            template: None,
         }
     }
 
@@ -4849,6 +4886,283 @@ mod tests {
         }
     }
 
+    /// Template bindings checked against a migrated store in a child process of their own.
+    mod template_binding {
+        use config::meta::{
+            alerts::notification_kind::NotificationKind::{self, *},
+            destinations::{Template, TemplateKind},
+            system_settings::SystemSetting,
+        };
+        use db::alerts::templates::TemplateError;
+
+        use crate::{
+            alerts::{notifications::org_default, templates as svc},
+            ssrf_test_support::isolated,
+        };
+
+        fn run<F: std::future::Future<Output = ()>>(path: &str, task: impl FnOnce() -> F) {
+            let name = path.rsplit("::").next().unwrap_or(path);
+            let dir = std::env::temp_dir()
+                .join(format!("o2-template-binding-{name}-{}", std::process::id()));
+            let dir = format!("{}/", dir.display());
+            isolated(path, &[("ZO_DATA_DIR", dir.as_str())], task);
+        }
+
+        async fn store() {
+            infra::db_init().await.unwrap();
+            infra::table::migrate().await.unwrap();
+        }
+
+        fn content(org: &str, name: &str, applies_to: Vec<NotificationKind>) -> Template {
+            Template {
+                org_id: org.to_string(),
+                name: name.to_string(),
+                body: serde_json::to_string(
+                    &crate::alerts::notifications::default_template::compiled_default_content(),
+                )
+                .unwrap(),
+                kind: TemplateKind::Content,
+                applies_to,
+                ..Default::default()
+            }
+        }
+
+        async fn bind_anomaly(org: &str, config: &str, template: &str) {
+            let mut model = super::update_interval_validation::stored_config();
+            model.anomaly_id = config::ider::uuid();
+            model.org_id = org.to_string();
+            model.name = config.to_string();
+            model.template = Some(template.to_string());
+            let (folder, _) = infra::table::folders::put(
+                org,
+                None,
+                config::meta::folder::Folder {
+                    folder_id: format!("f-{}", model.anomaly_id),
+                    name: format!("f-{}", model.anomaly_id),
+                    description: String::new(),
+                    icon: None,
+                },
+                config::meta::folder::FolderType::Alerts,
+            )
+            .await
+            .unwrap();
+            model.folder_id = folder.to_string();
+            infra::table::anomaly_detection::config::create(
+                infra::db::get_orm_client_rw().await,
+                model,
+            )
+            .await
+            .unwrap();
+        }
+
+        #[test]
+        fn narrowing_a_template_an_anomaly_config_names_is_refused_and_leaves_the_row() {
+            run(
+                concat!(
+                    module_path!(),
+                    "::narrowing_a_template_an_anomaly_config_names_is_refused_and_leaves_the_row"
+                ),
+                || async {
+                    store().await;
+                    db::alerts::templates::set(content("acme", "ops-card", vec![]))
+                        .await
+                        .unwrap();
+                    bind_anomaly("acme", "error rate on web-logs", "ops-card").await;
+
+                    let err = svc::save(
+                        "ops-card",
+                        content("acme", "ops-card", vec![]),
+                        Some(TemplateKind::Content),
+                        Some(vec![Incident]),
+                        false,
+                        false,
+                    )
+                    .await
+                    .unwrap_err();
+                    assert_eq!(
+                        err.to_string(),
+                        "template is used for anomaly by: anomaly config 'error rate on web-logs'; \
+                         remove the binding first"
+                    );
+                    let stored = infra::table::templates::get("acme", "ops-card")
+                        .await
+                        .unwrap()
+                        .unwrap();
+                    assert!(stored.applies_to.is_empty());
+
+                    // Keeping anomaly in the list narrows nothing the config uses.
+                    let saved = svc::save(
+                        "ops-card",
+                        content("acme", "ops-card", vec![]),
+                        Some(TemplateKind::Content),
+                        Some(vec![Anomaly, Incident]),
+                        false,
+                        false,
+                    )
+                    .await
+                    .unwrap();
+                    assert_eq!(saved.applies_to, vec![Anomaly, Incident]);
+                    // An update that omits applies_to keeps the stored list.
+                    let kept = svc::save(
+                        "ops-card",
+                        content("acme", "ops-card", vec![]),
+                        None,
+                        None,
+                        false,
+                        false,
+                    )
+                    .await
+                    .unwrap();
+                    assert_eq!(kept.applies_to, vec![Anomaly, Incident]);
+                },
+            );
+        }
+
+        #[test]
+        fn an_override_must_be_a_user_template_that_applies_to_anomaly() {
+            run(
+                concat!(
+                    module_path!(),
+                    "::an_override_must_be_a_user_template_that_applies_to_anomaly"
+                ),
+                || async {
+                    store().await;
+                    db::alerts::templates::set(content("acme", "incident-only", vec![Incident]))
+                        .await
+                        .unwrap();
+                    db::alerts::templates::set(content("acme", "ops-card", vec![Anomaly]))
+                        .await
+                        .unwrap();
+                    infra::table::templates::put(content(
+                        config::DEFAULT_ORG,
+                        "o2_default_anomaly",
+                        vec![],
+                    ))
+                    .await
+                    .unwrap();
+
+                    let err = |name: &'static str| async move {
+                        super::super::checked_template("acme", Some(name))
+                            .await
+                            .unwrap_err()
+                            .to_string()
+                    };
+                    assert_eq!(
+                        err("incident-only").await,
+                        "validation error: template 'incident-only' does not apply to anomaly"
+                    );
+                    assert_eq!(
+                        err("o2_default_anomaly").await,
+                        "validation error: template 'o2_default_anomaly' is reserved"
+                    );
+                    assert_eq!(
+                        err("gone").await,
+                        "validation error: template 'gone' does not exist"
+                    );
+                    assert_eq!(
+                        super::super::checked_template("acme", Some("ops-card"))
+                            .await
+                            .unwrap()
+                            .as_deref(),
+                        Some("ops-card")
+                    );
+                    // "" and null clear the override.
+                    assert_eq!(
+                        super::super::checked_template("acme", Some(" "))
+                            .await
+                            .unwrap(),
+                        None
+                    );
+
+                    let pointer_err = org_default::validate_default_templates(
+                        "acme",
+                        &serde_json::json!({"anomaly": "incident-only"}),
+                    )
+                    .await
+                    .unwrap_err();
+                    assert_eq!(
+                        pointer_err,
+                        "default_templates.anomaly: template 'incident-only' does not apply to anomaly"
+                    );
+                    assert!(
+                        org_default::validate_default_templates(
+                            "acme",
+                            &serde_json::json!({"pages": "ops-card"}),
+                        )
+                        .await
+                        .unwrap_err()
+                        .contains("unknown kind 'pages'")
+                    );
+                    org_default::validate_default_templates(
+                        "acme",
+                        &serde_json::json!({"anomaly": "ops-card", "incident": "incident-only"}),
+                    )
+                    .await
+                    .unwrap();
+                },
+            );
+        }
+
+        #[test]
+        fn used_by_counts_bindings_and_a_bound_template_cannot_be_deleted() {
+            run(
+                concat!(
+                    module_path!(),
+                    "::used_by_counts_bindings_and_a_bound_template_cannot_be_deleted"
+                ),
+                || async {
+                    store().await;
+                    db::alerts::templates::set(content("acme", "ops-card", vec![]))
+                        .await
+                        .unwrap();
+                    bind_anomaly("acme", "error rate on web-logs", "ops-card").await;
+                    infra::table::system_settings::set(&SystemSetting::new_org(
+                        "acme",
+                        org_default::DEFAULT_TEMPLATES_KEY,
+                        serde_json::json!({"incident": "ops-card"}),
+                    ))
+                    .await
+                    .unwrap();
+
+                    let used = svc::used_by("acme", "ops-card").await.unwrap();
+                    assert_eq!(used.anomaly, 1);
+                    assert_eq!(used.org_default, vec!["incident".to_string()]);
+                    assert_eq!(used.destinations, 0);
+
+                    // Narrowing away incident is refused because the org pointer names it.
+                    let err = svc::save(
+                        "ops-card",
+                        content("acme", "ops-card", vec![]),
+                        None,
+                        Some(vec![Anomaly]),
+                        false,
+                        false,
+                    )
+                    .await
+                    .unwrap_err();
+                    assert!(
+                        matches!(&err, TemplateError::InUseForKind { kind, by } if kind == "incident" && by.contains("org default template of acme")),
+                        "{err}"
+                    );
+
+                    let err = svc::delete("acme", "ops-card", false).await.unwrap_err();
+                    assert!(
+                        matches!(&err, TemplateError::DeleteWithBinding(by)
+                            if by.contains("anomaly config 'error rate on web-logs'")
+                                && by.contains("org default for incident")),
+                        "{err}"
+                    );
+                    assert!(
+                        infra::table::templates::get("acme", "ops-card")
+                            .await
+                            .unwrap()
+                            .is_some()
+                    );
+                },
+            );
+        }
+    }
+
     // ── P0.4: partial updates validate the MERGED row, not just the payload ──
 
     mod update_interval_validation {
@@ -4906,6 +5220,7 @@ mod tests {
                 last_failed_at: None,
                 last_alert_fired_at: None,
                 last_recovery_notified_at: None,
+                template: None,
                 detection_lease_us: None,
                 last_updated: 0,
                 created_at: 1000,
@@ -5603,6 +5918,7 @@ mod tests {
                 last_failed_at: None,
                 last_alert_fired_at: None,
                 last_recovery_notified_at: None,
+                template: None,
                 detection_lease_us: None,
                 last_updated: 0,
                 created_at: 1000,

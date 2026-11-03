@@ -95,6 +95,43 @@ pub fn variables_for(kind: NotificationKind) -> Vec<String> {
         .collect()
 }
 
+/// One group of the variable guide: `common`, or a kind whose producer renders templates.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
+pub struct VariableGroup {
+    pub name: String,
+    pub variables: Vec<String>,
+}
+
+/// The kinds whose producer sends through templates in this release; the UI hides the others.
+pub const SHIPPED_KINDS: [NotificationKind; 3] = [
+    NotificationKind::Alert,
+    NotificationKind::Incident,
+    NotificationKind::Anomaly,
+];
+
+/// `common`, then one group per shipped kind with its own variables.
+pub fn variable_groups() -> Vec<VariableGroup> {
+    let group = |name: &str, vars: &[&str]| VariableGroup {
+        name: name.to_string(),
+        variables: vars.iter().map(|v| v.to_string()).collect(),
+    };
+    let common: Vec<&str> = COMMON_VARIABLES
+        .iter()
+        .chain(super::resolve::EXTRA_SCALAR_NAMES.iter())
+        .copied()
+        .collect();
+    let mut groups = vec![group("common", &common)];
+    for kind in SHIPPED_KINDS {
+        let vars: &[&str] = match kind {
+            NotificationKind::Anomaly => &ANOMALY_VARIABLES,
+            NotificationKind::Incident => &INCIDENT_VARIABLES,
+            _ => &[],
+        };
+        groups.push(group(kind.as_str(), vars));
+    }
+    groups
+}
+
 /// The sample of the Examples tab for `kind`; `resolved` gives the recovery of the same episode.
 pub fn example_context(kind: NotificationKind, resolved: bool) -> NotificationContext {
     match kind {

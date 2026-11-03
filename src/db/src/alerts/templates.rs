@@ -73,6 +73,14 @@ pub enum TemplateError {
     InvalidKind(String),
     #[error("content template body is not a valid content spec: {0}")]
     InvalidContentSpec(String),
+    #[error(
+        "applies_to: unknown kind '{0}'; allowed: alert, incident, anomaly, synthetics, downtime, on_call"
+    )]
+    UnknownKind(String),
+    #[error("template is used for {kind} by: {by}; remove the binding first")]
+    InUseForKind { kind: String, by: String },
+    #[error("Template is in use by {0}")]
+    DeleteWithBinding(String),
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
@@ -363,6 +371,44 @@ async fn check_not_in_use(org_id: &str, name: &str) -> Result<(), TemplateError>
         }
     }
     Ok(())
+}
+
+/// Cached destinations and alerts that name the template, scoped like the delete guard.
+pub async fn cached_references(org_id: &str, name: &str) -> (Vec<String>, Vec<String>) {
+    let destinations = DESTINATIONS
+        .iter()
+        .filter(|dest| {
+            references_from(org_id, dest.key())
+                && matches!(&dest.module, Module::Alert { template: Some(t), .. } if t == name)
+        })
+        .map(|dest| dest.name.clone())
+        .collect();
+    let alerts = ALERTS
+        .read()
+        .await
+        .iter()
+        .filter(|(key, (_, alert))| {
+            references_from(org_id, key) && alert.template.as_deref() == Some(name)
+        })
+        .map(|(_, (_, alert))| alert.name.clone())
+        .collect();
+    (destinations, alerts)
+}
+
+/// Moves user rows out of the reserved prefix and tells every node's cache.
+pub async fn rename_reserved_collisions()
+-> Result<Vec<table::templates::ReservedRename>, TemplateError> {
+    let renames =
+        table::templates::rename_reserved_collisions(infra::db::get_orm_client_rw().await)
+            .await
+            .map_err(infra::errors::Error::from)?;
+    for r in &renames {
+        infra::coordinator::emit_delete(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.from))
+            .await?;
+        infra::coordinator::emit_put(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.to))
+            .await?;
+    }
+    Ok(renames)
 }
 
 // A `default` template is shared by every org, so its references are checked across all orgs.
@@ -729,6 +775,7 @@ mod tests {
             template_type: config::meta::destinations::TemplateType::Http,
             body: r#"{"text":"{alert_name}"}"#.to_string(),
             kind: TemplateKind::Custom,
+            applies_to: Vec::new(),
         })
         .await
         .unwrap();

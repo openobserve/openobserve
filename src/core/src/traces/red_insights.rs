@@ -191,6 +191,7 @@ impl DetectorTemplate {
             owner: None,
             priority: None,
             tags: self.tags,
+            template: None,
         }
     }
 }
