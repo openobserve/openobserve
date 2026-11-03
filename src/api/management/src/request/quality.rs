@@ -121,7 +121,7 @@ fn quality_error_response(error: QualityError) -> Response {
         (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Quality query failed", content_type = "application/json", body = MetaHttpResponse),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "list"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "list"}))),
 )]
 pub async fn list_quality_summaries(
     Path(org_id): Path<String>,
@@ -164,7 +164,7 @@ pub async fn list_quality_summaries(
         (status = 404, description = "Score Config not found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Quality query failed", content_type = "application/json", body = MetaHttpResponse),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "list"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "list"}))),
 )]
 pub async fn list_quality_scores(
     Path((org_id, entity_id)): Path<(String, String)>,
@@ -202,7 +202,7 @@ pub async fn list_quality_scores(
         (status = 404, description = "Score Config not found", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Quality query failed", content_type = "application/json", body = MetaHttpResponse),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "list"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "list"}))),
 )]
 pub async fn get_quality_timeline(
     Path((org_id, entity_id)): Path<(String, String)>,

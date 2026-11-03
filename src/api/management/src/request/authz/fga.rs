@@ -1155,6 +1155,10 @@ pub async fn get_group_details(Path(_path): Path<(String, String)>) -> Response 
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn get_resources(Path(org_id): Path<String>) -> Response {
@@ -1200,6 +1204,10 @@ pub async fn get_resources(Path(org_id): Path<String>) -> Response {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn get_resources(Path(_org_id): Path<String>) -> Response {
@@ -1746,8 +1754,8 @@ mod tests {
         let bulk = |name: &str| BulkDeleteRequest {
             ids: vec!["fine".to_string(), name.to_string()],
         };
-        // Fits the `role:` object but not the `#has` role user a delete reads back.
-        let too_long = "r".repeat(240);
+        // Fits the `role:` object but not the 512-byte `#has` role user a delete reads back.
+        let too_long = "\u{20ac}".repeat(200);
         assert!(is_storable_name("role", "test_org", &too_long));
         for resp in [
             delete_role(path(&too_long)).await,
@@ -1833,8 +1841,8 @@ mod tests {
     async fn update_role_rejects_invalid_input_with_400() {
         init_ofga_test();
         let members = |user: &str| Some(HashSet::from([user.to_string()]));
-        // Fits the 256-char `role:` object but not the `#has` role-user form.
-        let too_long_for_role_user = "r".repeat(240);
+        // Fits the 256-char `role:` object but not the 512-byte `#has` role user.
+        let too_long_for_role_user = "\u{20ac}".repeat(200);
         assert!(
             o2_openfga::authorizer::org_scoped_object("role", "test_org", &too_long_for_role_user)
                 .is_some()
@@ -1863,10 +1871,11 @@ mod tests {
                 "{name:?}"
             );
         }
+        // Create rewrites non-ASCII to `_`, so only an overlong role object is invalid there.
         let resp = create_role(
             Path("test_org".to_string()),
             Json(UserRoleRequest {
-                role: too_long_for_role_user,
+                role: "r".repeat(250),
                 custom: None,
             }),
         )

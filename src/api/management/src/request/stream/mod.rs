@@ -273,6 +273,7 @@ pub async fn update_settings(
     context_path = "/api",
     tag = "Streams",
     operation_id = "UpdateStreamFields",
+    summary = "Update stream field types",
     security(("Authorization"= [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -284,7 +285,7 @@ pub async fn update_settings(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = Object),
     ),
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Streams", "operation": "update"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -746,7 +747,7 @@ fn stream_comparator(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces. Defaults to logs."),
-        ("ts" = i64, Query, description = "Timestamp in microseconds. If provided, must be > 0. Cache from this timestamp onwards will be retained, older cache will be deleted."),
+        ("ts" = Option<i64>, Query, description = "Timestamp in microseconds. If provided, must be > 0. Cache from this timestamp onwards will be retained, older cache will be deleted."),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -828,7 +829,7 @@ pub async fn delete_stream_cache(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "delete"}))
     )
 )]
@@ -905,6 +906,7 @@ pub async fn delete_stream_data_by_time_range(
         ("Authorization"= [])
     ),
     params(
+        ("id" = String, Path, description = "Deletion job id"),
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
     ),
@@ -912,7 +914,7 @@ pub async fn delete_stream_data_by_time_range(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Streams", "operation": "get"}))
     )
 )]

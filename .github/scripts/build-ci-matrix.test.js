@@ -50,7 +50,7 @@ test("no flag emits the full matrix unchanged", () => {
 
 test("feature-scoped source change selects its shard plus the canary", () => {
   const folders = run(["web/src/components/alerts/AddAlert.vue"]);
-  assert.deepStrictEqual(folders.sort(), ["Alerts", "Logs-SelectStar"]);
+  assert.deepStrictEqual(folders.sort(), ["Alerts", "Alerts-Composite-Library", "Logs-SelectStar"]);
 });
 
 test("spec change selects only the shard owning that spec", () => {
@@ -91,12 +91,12 @@ test("only-ignored changes fall back to the core cross-section", () => {
 
 test("spec not in run_files routes to its folder's shards, not core", () => {
   const folders = run(["tests/ui-testing/playwright-tests/Alerts/brand-new.spec.js"]);
-  assert.deepStrictEqual(folders.sort(), ["Alerts", "Logs-SelectStar"]);
+  assert.deepStrictEqual(folders.sort(), ["Alerts", "Alerts-Composite-Library", "Logs-SelectStar"]);
 });
 
 test("shard-local helper routes to its folder's shards", () => {
   const folders = run(["tests/ui-testing/playwright-tests/Alerts/utils/alerts-api-helpers.js"]);
-  assert.deepStrictEqual(folders.sort(), ["Alerts", "Logs-SelectStar"]);
+  assert.deepStrictEqual(folders.sort(), ["Alerts", "Alerts-Composite-Library", "Logs-SelectStar"]);
 });
 
 test("shared test infrastructure and test data force the full matrix", () => {
@@ -138,12 +138,12 @@ test("frontend unit spec changes are ignored even inside global dirs", () => {
     "web/src/composables/useLogs/useHistogram.spec.ts",
     "web/src/components/alerts/AddAlert.vue",
   ]);
-  assert.deepStrictEqual(folders.sort(), ["Alerts", "Logs-SelectStar"]);
+  assert.deepStrictEqual(folders.sort(), ["Alerts", "Alerts-Composite-Library", "Logs-SelectStar"]);
 });
 
 test("page-object change selects its feature's shards", () => {
   const folders = run(["tests/ui-testing/pages/alertsPages/alertsPage.js"]);
-  assert.deepStrictEqual(folders.sort(), ["Alerts", "Logs-SelectStar"]);
+  assert.deepStrictEqual(folders.sort(), ["Alerts", "Alerts-Composite-Library", "Logs-SelectStar"]);
 });
 
 test("ignored file alongside a mapped file does not widen the selection", () => {

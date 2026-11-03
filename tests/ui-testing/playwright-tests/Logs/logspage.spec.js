@@ -79,6 +79,7 @@ test.describe("Logs Page testcases", () => {
     // Wait for SQL mode toggle to apply — Monaco editor becomes ready
     await page.waitForFunction(
       () => !!window.monaco?.editor?.getEditors?.().length,
+      undefined,
       { timeout: 10000 }
     ).catch(() => {});
     await pm.logsPage.clickQueryEditor();
@@ -197,6 +198,7 @@ test.describe("Logs Page testcases", () => {
     // Start watching for notification before clicking - notify toast has 1s timeout
     const liveNotifPromise = page.waitForFunction(
       () => document.querySelector('[role="alert"]')?.textContent?.includes('Live mode is enabled'),
+      undefined,
       { timeout: 15000 }
     );
     await pm.logsPage.clickLiveMode5Sec();

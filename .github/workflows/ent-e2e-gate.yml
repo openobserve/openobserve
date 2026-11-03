@@ -33,7 +33,7 @@ name: Playwright E2E Crosscheck
 on:
   pull_request:
     types: [synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
-  # Runs once a labelled PR is approved, then for pushes/labels while the approval stands.
+  # Runs on label changes of a ready-for-ci PR and on approval; pushes run only while approved.
   pull_request_review:
     types: [submitted]
   # A required check must also report on merge-queue commits; the gate already passed on the PR head.
@@ -41,7 +41,7 @@ on:
 
 # PR-scoped: a new push/label supersedes the previous gate attempt for the same PR.
 concurrency:
-  # A review that is not an approval does nothing, so it must not cancel a running gate.
+  # A non-approval review does nothing, so it must not cancel a running gate.
   group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
@@ -50,32 +50,40 @@ permissions:
   pull-requests: write
 
 jobs:
-  approval:
+  trigger:
     # reviewDecision of a stacked PR is judged by the stack's merge rules, so it is what the merge will require.
-    if: ${{ github.event_name != 'merge_group' && (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) && (github.event_name != 'pull_request_review' || github.event.review.state == 'approved') }}
+    if: ${{ github.event_name != 'merge_group' && (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) && ((github.event_name == 'pull_request_review' && github.event.review.state == 'approved') || github.event_name == 'pull_request') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       pull-requests: read
     outputs:
-      approved: ${{ steps.check.outputs.approved }}
+      dispatch: ${{ steps.check.outputs.dispatch }}
     steps:
       - id: check
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
+          ACTION: ${{ github.event_name == 'pull_request' && github.event.action || '' }}
+          LABEL: ${{ github.event.label.name }}
         run: |
+          # Any label change cancels the running gate, so it must start a replacement; without approval only label events and ready_for_review do.
+          if [ "$ACTION" = "labeled" ] || [ "$ACTION" = "unlabeled" ] || [ "$ACTION" = "ready_for_review" ]; then
+            echo "Triggered by $ACTION; approval not required."
+            echo "dispatch=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           DECISION=$(gh pr view "$PR" --json reviewDecision --jq .reviewDecision)
           echo "reviewDecision: $DECISION"
-          APPROVED=false
-          if [ "$DECISION" = "APPROVED" ]; then APPROVED=true; fi
-          echo "approved=$APPROVED" >> "$GITHUB_OUTPUT"
+          DISPATCH=false
+          if [ "$DECISION" = "APPROVED" ]; then DISPATCH=true; fi
+          echo "dispatch=$DISPATCH" >> "$GITHUB_OUTPUT"
 
   playwright-e2e-crosscheck:
-    needs: approval
-    # A pre-merge gate: runs once a labelled PR is approved, not on every push.
-    if: ${{ !cancelled() && (github.event_name == 'merge_group' || needs.approval.outputs.approved == 'true') }}
+    needs: trigger
+    # A pre-merge gate: runs when ready-for-ci is added or the PR is approved, and on pushes only while approved.
+    if: ${{ !cancelled() && (github.event_name == 'merge_group' || needs.trigger.outputs.dispatch == 'true') }}
     name: Playwright E2E Crosscheck
     runs-on: ubuntu-latest
     # ~5 min to find the ENT run + up to ~75 min to poll. Generous on purpose: normal is ~20 min,
@@ -294,11 +302,15 @@ jobs:
             # Genuine failure — distinguish an enterprise BUILD failure (compile) from SPEC failures,
             # and for specs list the failing files from the engine's failed-specs artifact.
             BUILD_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="build_binary")|.conclusion' 2>/dev/null || echo "")
-            TEST_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="ent_gate_tests")|.conclusion' 2>/dev/null || echo "")
-            # A test job that failed with no failed step was killed from outside (runner lost), not by a spec.
-            TEST_FAILED_STEPS=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '[.jobs[]|select(.name=="ent_gate_tests")|.steps[]|select(.conclusion=="failure")]|length' 2>/dev/null || echo "")
+            # Single-job re-runs spread shard results over attempts, so each test job counts by its latest attempt; an aggregate counts only without shards.
+            TEST_JOBS=$(gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/jobs?filter=all&per_page=100" --jq '.jobs[]' 2>/dev/null | jq -s '[.[]|select(.name=="ent_gate_tests" or (.name|startswith("ent_gate_tests (")))] | group_by(.name) | map(max_by(.run_attempt)) | (map(select(.name|startswith("ent_gate_tests (")))) as $s | if ($s|length) > 0 then $s else . end' 2>/dev/null || echo '[]')
+            TEST_CONCL=$(jq -r '[.[].conclusion]|if index("failure") then "failure" elif length > 0 then .[0] // "" else "" end' <<<"$TEST_JOBS")
+            # A test job that failed with no failed step lost its runner; one with a failed step had spec failures.
+            TEST_LOST=$(jq '[.[]|select(.conclusion=="failure" and ([.steps[]?|select(.conclusion=="failure")]|length)==0)]|length' <<<"$TEST_JOBS")
+            TEST_SPEC_FAILED=$(jq '[.[]|select(.conclusion=="failure" and ([.steps[]?|select(.conclusion=="failure")]|length)>0)]|length' <<<"$TEST_JOBS")
+            TEST_LOST=${TEST_LOST:-0}; TEST_SPEC_FAILED=${TEST_SPEC_FAILED:-0}
 
-            if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_FAILED_STEPS" = "0" ] && [ "$ATTEMPT" = "1" ]; then
+            if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_LOST" != "0" ] && [ "$ATTEMPT" = "1" ]; then
               ATTEMPT=2
               echo "::warning::ENT test runner was lost — re-running the failed ENT job once."
               if gh run rerun "$RUN_ID" --repo "$REPO" --failed; then
@@ -320,7 +332,13 @@ jobs:
           # The engine's baseline step builds the same ENT ref against OSS main after a failed build.
           BASELINE_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="build_binary")|.steps[]|select(.name|startswith("Baseline"))|.conclusion' 2>/dev/null || echo "")
 
-          if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_FAILED_STEPS" = "0" ]; then
+          rm -rf /tmp/fs; SPEC_LIST=""
+          if [ "$TEST_CONCL" = "failure" ] && gh run download "$RUN_ID" --repo "$REPO" -n failed-specs -D /tmp/fs >/dev/null 2>&1 && [ -f /tmp/fs/failed-specs.txt ]; then
+            SPEC_LIST=$(sed '/^[[:space:]]*$/d; s/^/- `/; s/$/`/' /tmp/fs/failed-specs.txt)
+          fi
+
+          # Spec failures in another shard outrank a lost runner; the artifact only lists their files.
+          if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_LOST" != "0" ] && [ "$TEST_SPEC_FAILED" = "0" ]; then
           sticky "### ⚠️ Playwright E2E Crosscheck — runner lost, re-run needed
 
           $MARKER
@@ -328,10 +346,6 @@ jobs:
 
           $SISTER_NOTE · [ENT run]($RUN_URL)"
           elif [ "$TEST_CONCL" = "failure" ]; then
-            rm -rf /tmp/fs; SPEC_LIST=""
-            if gh run download "$RUN_ID" --repo "$REPO" -n failed-specs -D /tmp/fs >/dev/null 2>&1 && [ -f /tmp/fs/failed-specs.txt ]; then
-              SPEC_LIST=$(sed '/^[[:space:]]*$/d; s/^/- `/; s/$/`/' /tmp/fs/failed-specs.txt)
-            fi
             [ -n "$SPEC_LIST" ] || SPEC_LIST="_(couldn't read the failed-spec list — open the run for details)_"
           sticky "### 🚫 Playwright E2E Crosscheck — Needs Review
 
@@ -372,5 +386,5 @@ jobs:
 
           $SISTER_NOTE"
           fi
-          echo "::error::Enterprise gate failed (conclusion=$CONCL build=$BUILD_CONCL baseline=$BASELINE_CONCL test=$TEST_CONCL failed_steps=$TEST_FAILED_STEPS)."
+          echo "::error::Enterprise gate failed (conclusion=$CONCL build=$BUILD_CONCL baseline=$BASELINE_CONCL test=$TEST_CONCL lost_jobs=$TEST_LOST)."
           exit 1

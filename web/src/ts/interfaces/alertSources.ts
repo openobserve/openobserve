@@ -3,7 +3,8 @@ export interface AlertSourceIntegration {
   org_id: string;
   name: string;
   source_type: string;
-  token: string;
+  /** Absent for a reader without incident integrations edit permission. */
+  token?: string;
   enabled: boolean;
   config: Record<string, any>;
   /** Where notifications go when this source's alerts create/join an
@@ -13,7 +14,8 @@ export interface AlertSourceIntegration {
   created_by: string;
   created_at: number;
   updated_at: number;
-  url: string;
+  /** Carries the token, so absent along with it. */
+  url?: string;
 }
 
 export interface AlertSourceSender {
