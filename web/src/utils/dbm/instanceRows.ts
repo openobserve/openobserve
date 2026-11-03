@@ -67,7 +67,7 @@ const foldOne = (rows: DbTotalsRow[]): DbmInstanceTotals => {
   return {
     db_system: first.db_system,
     db_instance: first.db_instance,
-    // A hand-off scoped to one schema would hide the others, so only a single-schema row names one.
+    // A server row stands for all its schemas, so it names one only when it holds exactly one.
     db_namespace: names.length === 1 ? first.db_namespace : undefined,
     statements: optionalSum(rows, (row) => row.statements),
     calls: optionalSum(rows, (row) => row.calls),

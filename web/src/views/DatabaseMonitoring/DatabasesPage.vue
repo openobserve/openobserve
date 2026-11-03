@@ -454,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // silently drop the page from the cache and bring back the refetch-on-return.
 defineOptions({ name: "DbmDatabasesPage" });
 
-import { computed, ref, watch, shallowRef } from "vue";
+import { computed, onActivated, ref, watch, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -577,15 +577,29 @@ const systemFilter = ref<string | null>((route.query.system as string) ?? null);
 // Client-side: the endpoint takes no namespace, and every schema is already in the response.
 const namespaceFilter = ref<string | null>((route.query.namespace as string) ?? null);
 
+// A schema row's hand-off scopes the page it opened; the tabs carrying it back must not filter this one.
+let handedOffSchema: string | null = null;
+const returnsWithHandedOffSchema = () =>
+  handedOffSchema !== null && route.query.namespace === handedOffSchema;
+
 // This page is kept alive, so the seeds above run ONCE per session — a filter
 // set (or cleared) on a sibling tab would otherwise never reach these refs,
 // leaving the chips and the next read disagreeing with the URL. Re-read on
 // activation, the same moment the range sync uses.
 useDbmOwnFilterSync(
-  () => route.query,
+  () =>
+    returnsWithHandedOffSchema()
+      ? { ...route.query, namespace: namespaceFilter.value ?? undefined }
+      : route.query,
   { system: systemFilter, namespace: namespaceFilter },
   () => void load(),
 );
+// Registered after the re-seed above, which still needs the hand-off to tell it apart.
+onActivated(() => {
+  const returned = returnsWithHandedOffSchema();
+  handedOffSchema = null;
+  if (returned) void syncUrl();
+});
 /** Kept so the empty state can say "we haven't finished counting" rather than "no data". */
 const neverAggregated = ref(false);
 /**
@@ -983,16 +997,7 @@ const onSortChange = ({ column, order }: { column: string; order: "asc" | "desc"
   sortOrder.value = order;
 };
 
-/**
- * Whether this database's split, or a schema row's services, falls short of its
- * own total. Only an open row can have one — OTable renders the warning row between a parent and
- * its children, which is exactly where the gap is readable.
- *
- * `showsShortfall` owns the rule, and the case it excludes is the one that made
- * this caveat repeat verbatim under all four databases: nothing attributed puts
- * every row's shortfall at exactly 1, and the `empty` placeholder child already
- * says that better.
- */
+// Zero attribution is left to the `empty` placeholder, so one 100% caveat never repeats under every row.
 const shortfallOf = (row: TableRow): number | null => {
   if (isBreakdownRow(row)) return schemaShortfall(row);
   // Schema children are exact totals that add up to the server, so its gap shows on each schema row.
@@ -1043,14 +1048,7 @@ const statusLine = (row: DbmBreakdownRow): I18nText => {
 const instanceBreakdowns = shallowRef<Record<string, QueryStatsRow[]> | null>(null);
 const breakdownFailed = ref(false);
 
-/**
- * File one database's split from what the last load returned.
- *
- * The row's own exact total rides along so the aggregation can report its
- * shortfall rather than presenting a sum that silently does not reconcile. The
- * split is keyed by INSTANCE, the row's own grain; under the Schema filter only
- * that schema's rows are kept.
- */
+// The row's exact total rides along so the split reports its shortfall instead of a sum that does not add up.
 const fileBreakdown = (row: DatabaseRow) => {
   const section = instanceBreakdowns.value;
   if (!section || breakdownFailed.value) {
@@ -1489,14 +1487,7 @@ const onRowAction = (id: string, row: DatabaseRow) => {
   );
 };
 
-/**
- * Columns. Sorting is client-side over the complete set, so every numeric
- * column can be sorted honestly — unlike the Top queries table, where the
- * server owns the order and only whitelisted keys may claim to be sortable.
- *
- * The percentile headers say what they mean. A schema row's figures are exact;
- * a server spanning several schemas shows its worst schema's.
- */
+// Percentiles cannot be pooled, so a server spanning several schemas shows its worst schema's.
 const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   {
     id: "instance",
@@ -1765,6 +1756,13 @@ const onEmptyAction = (cause: DbmEmptyCauseId) => {
   }
 };
 
+/** A server row hands off the overview's Schema filter, never the one schema it happens to hold. */
+const handOffSchema = (schema?: string | null): string | null => {
+  const namespace = schema ?? namespaceFilter.value;
+  handedOffSchema = namespace !== namespaceFilter.value ? namespace : null;
+  return namespace;
+};
+
 /**
  * The overview's job is to hand off — a row click carries its scope along, so
  * the Top queries tab opens already filtered to the database the user clicked
@@ -1772,12 +1770,12 @@ const onEmptyAction = (cause: DbmEmptyCauseId) => {
  *
  * `target` is what a breakdown leaf adds: the schema and service the reader
  * picked, so every node of the split is a filter into the query grain rather
- * than a dead end. Its schema wins over the row's, because the leaf is the
+ * than a dead end. Its schema wins over the Schema filter's, because the leaf is the
  * narrower and more recent statement of what the reader wants.
  */
 /** The Metrics tab, scoped to this database — window and filters carry. */
 const openMetrics = (row: DatabaseRow, namespaceOverride?: string | null) => {
-  const namespace = namespaceOverride ?? row.db_namespace;
+  const namespace = handOffSchema(namespaceOverride);
   router
     .push({
       name: "dbmMetrics",
@@ -1787,7 +1785,7 @@ const openMetrics = (row: DatabaseRow, namespaceOverride?: string | null) => {
         ...queryParams.value,
         system: row.db_system,
         instance: row.db_instance,
-        ...(namespace ? { namespace } : {}),
+        namespace: namespace ?? undefined,
       },
     })
     .catch(() => {});
@@ -1797,7 +1795,7 @@ const openQueries = (
   row: DatabaseRow,
   target?: { namespace: string | null; service: string | null },
 ) => {
-  const namespace = target?.namespace ?? row.db_namespace;
+  const namespace = handOffSchema(target?.namespace);
   router
     .push({
       name: "dbmQueries",
@@ -1807,7 +1805,7 @@ const openQueries = (
         ...queryParams.value,
         system: row.db_system,
         instance: row.db_instance,
-        ...(namespace ? { namespace } : {}),
+        namespace: namespace ?? undefined,
         ...(target?.service ? { service: target.service } : {}),
       },
     })
@@ -1852,6 +1850,7 @@ const dbmContext = createDbmContextProvider(
       endTime: current.value.endTime,
       period: range.value.relativeTimePeriod,
       system: systemFilter.value,
+      namespace: namespaceFilter.value,
     },
   }),
   store,

@@ -587,20 +587,14 @@ describe("no page re-fetches the badges the shell already owns", () => {
 /**
  * The coverage caveat under each open database.
  *
- * `showsShortfall` is unit-tested in breakdownRows.spec.ts; what is pinned here
- * is that the page ASKS it. The defect was never in the arithmetic — the
+ * `showsShortfall` is unit-tested in breakdownRows.spec.ts; dbmDatabasesSchemaScope.spec.ts
+ * pins that the page ASKS it. The defect was never in the arithmetic — the
  * per-row percentages were always distinct — it was that the page gated the
  * caveat on `shortfall !== null` directly, which is true even when nothing was
  * attributed and every row therefore reported the identical 100%.
  */
 describe("DatabasesPage gates the coverage caveat on the shared rule", () => {
   const source = read("DatabasesPage.vue");
-
-  it("asks showsShortfall rather than reading shortfall itself", () => {
-    expect(source).toContain('from "@/utils/dbm/breakdownRows"');
-    expect(source).toMatch(/const shortfallOf[\s\S]{0,400}showsShortfall\(/);
-    expect(source).toMatch(/const hasShortfall = \(row: TableRow\): boolean => shortfallOf\(row\)/);
-  });
 
   it("no longer gates the caveat on a bare non-null shortfall", () => {
     expect(source).not.toMatch(/hasShortfall[\s\S]{0,200}breakdown\.shortfall !== null/);
