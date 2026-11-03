@@ -84,6 +84,11 @@ import type { I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useTheme } from "@/composables/useTheme";
+import {
+  applyDevicePixelRatio,
+  currentDevicePixelRatio,
+  useDevicePixelRatioChange,
+} from "@/composables/useDevicePixelRatio";
 import { chartColor } from "@/utils/chartTheme";
 import * as echarts from "echarts/core";
 import {
@@ -927,44 +932,48 @@ export default defineComponent({
       },
     );
 
+    // ECharts fixes the theme at init, so a theme change needs a fresh instance.
+    const rebuildChart = (theme: "dark" | "light") => {
+      cleanupChart();
+      chart = echarts.init(chartRef.value, theme, {
+        renderer: props.renderType,
+        devicePixelRatio: currentDevicePixelRatio(),
+      });
+      trackPointer();
+      const options = props.data.options || {};
+
+      // change color and background color of tooltip
+      options.tooltip &&
+        options.tooltip.textStyle &&
+        (options.tooltip.textStyle.color = chartColor("--color-tooltip-text"));
+      if (options.tooltip) {
+        options.tooltip.backgroundColor = chartColor("--color-tooltip-bg");
+        options.tooltip.borderColor = chartColor("--color-tooltip-border");
+        options.tooltip.borderWidth = 1;
+      }
+      options.animation = false;
+      try {
+        // Use notMerge flag from data prop if available, otherwise default to true
+        const notMerge = props.data?.notMerge !== undefined ? props.data.notMerge : true;
+        const lazyUpdate = props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
+        chart?.setOption(chartOptions(options), { lazyUpdate, notMerge });
+        chart?.setOption({ animation: true }, { lazyUpdate: true });
+      } catch (e: any) {
+        emit("error", {
+          message: e,
+          code: "",
+        });
+      }
+
+      chartInitialSetUp();
+    };
+
     watch(
       () => store.state.theme,
-      (newTheme) => {
-        const theme = newTheme === "dark" ? "dark" : "light";
-        cleanupChart();
-        chart = echarts.init(chartRef.value, theme, {
-          renderer: props.renderType,
-          devicePixelRatio: window.devicePixelRatio || 1,
-        });
-        trackPointer();
-        const options = props.data.options || {};
-
-        // change color and background color of tooltip
-        options.tooltip &&
-          options.tooltip.textStyle &&
-          (options.tooltip.textStyle.color = chartColor("--color-tooltip-text"));
-        if (options.tooltip) {
-          options.tooltip.backgroundColor = chartColor("--color-tooltip-bg");
-          options.tooltip.borderColor = chartColor("--color-tooltip-border");
-          options.tooltip.borderWidth = 1;
-        }
-        options.animation = false;
-        try {
-          // Use notMerge flag from data prop if available, otherwise default to true
-          const notMerge = props.data?.notMerge !== undefined ? props.data.notMerge : true;
-          const lazyUpdate = props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
-          chart?.setOption(chartOptions(options), { lazyUpdate, notMerge });
-          chart?.setOption({ animation: true }, { lazyUpdate: true });
-        } catch (e: any) {
-          emit("error", {
-            message: e,
-            code: "",
-          });
-        }
-
-        chartInitialSetUp();
-      },
+      (newTheme) => rebuildChart(newTheme === "dark" ? "dark" : "light"),
     );
+
+    useDevicePixelRatioChange((ratio) => applyDevicePixelRatio(chart, ratio));
 
     // Repairs a chart that ECharts initialized while the element had no
     // layout size (e.g. mounted mid-splitter/flex settle). In that state
@@ -988,6 +997,7 @@ export default defineComponent({
           cleanupChart();
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
+            devicePixelRatio: currentDevicePixelRatio(),
           });
           trackPointer();
           chart?.setOption(chartOptions(props?.data?.options || {}), {
@@ -1043,6 +1053,7 @@ export default defineComponent({
           cleanupChart();
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
+            devicePixelRatio: currentDevicePixelRatio(),
           });
           trackPointer();
           if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
@@ -1139,6 +1150,7 @@ export default defineComponent({
           cleanupChart();
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
+            devicePixelRatio: currentDevicePixelRatio(),
           });
           trackPointer();
         }

@@ -56,6 +56,11 @@ import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import DOMPurify from "dompurify";
 import { withChartFont } from "@/utils/fonts";
 import { useTheme } from "@/composables/useTheme";
+import {
+  applyDevicePixelRatio,
+  currentDevicePixelRatio,
+  useDevicePixelRatioChange,
+} from "@/composables/useDevicePixelRatio";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
 
 // Register necessary components.
@@ -146,6 +151,7 @@ export default defineComponent({
       if (!chart) {
         chart = echarts.init(chartRef.value, dark ? "dark" : undefined, {
           renderer: "canvas",
+          devicePixelRatio: currentDevicePixelRatio(),
         });
         chartDark = dark;
         if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
@@ -234,6 +240,7 @@ export default defineComponent({
       { deep: true },
     );
     watch(isDark, () => initChart());
+    useDevicePixelRatioChange((ratio) => applyDevicePixelRatio(chart, ratio));
 
     onUnmounted(() => {
       zeroSizeReinitObserver?.disconnect();

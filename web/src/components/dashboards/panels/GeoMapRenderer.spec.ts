@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import GeoMapRenderer from "./GeoMapRenderer.vue";
+import { fakeCanvasPainter, fakeDevicePixelRatio } from "@/test/unit/helpers/devicePixelRatioFake";
 
 // Mock Leaflet
 const mockLeafletMap = {
@@ -51,6 +52,7 @@ const mockChart = {
   dispose: vi.fn(),
   on: vi.fn(),
   off: vi.fn(),
+  getZr: vi.fn((): any => ({})),
   getModel: vi.fn(() => ({
     getComponent: vi.fn((name) => {
       if (name === "lmap") {
@@ -272,6 +274,61 @@ describe("GeoMapRenderer", () => {
       await waitForChartInit(wrapper);
 
       expect(echarts.init).toHaveBeenCalled();
+    });
+
+    it("inits at the live device pixel ratio, not the one zrender cached at import", async () => {
+      const echarts = await import("echarts/core");
+      const display = fakeDevicePixelRatio(2);
+      try {
+        wrapper = createWrapper();
+        await waitForChartInit(wrapper);
+
+        expect(echarts.init).toHaveBeenCalledWith(expect.any(HTMLElement), undefined, {
+          devicePixelRatio: 2,
+        });
+      } finally {
+        display.restore();
+      }
+    });
+
+    it("re-rasterizes in place, keeping the map's pan and zoom, when the window changes display", async () => {
+      const echarts = await import("echarts/core");
+      const display = fakeDevicePixelRatio(1);
+      const painter = fakeCanvasPainter(1);
+      try {
+        wrapper = createWrapper();
+        await waitForChartInit(wrapper);
+        mockChart.getZr.mockImplementation(() => ({ painter }));
+        mockChart.setOption.mockClear();
+        mockLeafletMap.setView.mockClear();
+
+        display.setRatio(2);
+
+        expect(echarts.init).toHaveBeenCalledTimes(1);
+        expect(mockChart.dispose).not.toHaveBeenCalled();
+        expect(mockChart.setOption).not.toHaveBeenCalled();
+        expect(mockLeafletMap.setView).not.toHaveBeenCalled();
+        expect(painter.dpr).toBe(2);
+        expect(painter.refresh).toHaveBeenCalledWith({ paintAll: true });
+      } finally {
+        display.restore();
+        mockChart.getZr.mockImplementation(() => ({}));
+      }
+    });
+
+    it("stops listening for ratio changes on unmount", async () => {
+      const display = fakeDevicePixelRatio(1);
+      try {
+        wrapper = createWrapper();
+        await waitForChartInit(wrapper);
+        expect(display.listenerCount()).toBe(1);
+
+        wrapper.unmount();
+        wrapper = undefined as any;
+        expect(display.listenerCount()).toBe(0);
+      } finally {
+        display.restore();
+      }
     });
 
     it("should set chart options", async () => {

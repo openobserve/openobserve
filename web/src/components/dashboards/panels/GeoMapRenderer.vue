@@ -56,6 +56,11 @@ import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import { withChartFont } from "@/utils/fonts";
 import { reclusterSeries } from "@/utils/dashboard/geoMapCluster";
+import {
+  applyDevicePixelRatio,
+  currentDevicePixelRatio,
+  useDevicePixelRatioChange,
+} from "@/composables/useDevicePixelRatio";
 
 echarts.use([
   TitleComponent,
@@ -152,6 +157,8 @@ export default defineComponent({
       appliedView = view;
     };
 
+    useDevicePixelRatioChange((ratio) => applyDevicePixelRatio(chart, ratio));
+
     onMounted(async () => {
       await nextTick();
       await nextTick();
@@ -161,7 +168,9 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       if (chartRef.value) {
-        chart = echarts.init(chartRef.value);
+        chart = echarts.init(chartRef.value, undefined, {
+          devicePixelRatio: currentDevicePixelRatio(),
+        });
       }
       applyOptions();
       window.addEventListener("resize", windowResizeEventCallback);
