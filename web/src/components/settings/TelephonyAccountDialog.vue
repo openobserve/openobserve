@@ -135,7 +135,7 @@ const tokenHelp = computed<I18nText | undefined>(() => {
 const submitting = form.useStore((s) => s.isSubmitting);
 const primaryLabel = computed<I18nText>(() => {
   if (submitting.value) return t("telephony.checking", { provider: PROVIDER });
-  return props.mode === "connect" ? t("telephony.connect") : t("telephony.update");
+  return t("common.save");
 });
 
 function failureText(err: unknown): I18nText {

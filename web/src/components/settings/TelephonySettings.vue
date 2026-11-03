@@ -134,8 +134,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'telephony.disconnectToEmail'
       "
       :message-name="view?.org ? shortSid(view.org.account_sid) : ''"
-      :ok-label="t('telephony.disconnect')"
+      :ok-label="t('telephony.disconnectConfirm', { provider: PROVIDER })"
       ok-variant="destructive"
+      focus-cancel
       @update:ok="disconnect"
     />
   </OPageLayout>

@@ -75,8 +75,8 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
     expect(w.find('[data-test="slack-oncall-unlinked-count"]').text()).toBe("2 people");
     expect(section.text()).toContain("kim@acme.io");
     expect(section.text()).toContain("Payments");
-    expect(w.find('[data-test="slack-oncall-unlinked-reminder-kim@acme.io"]').text()).toContain(
-      "DM sent",
+    expect(w.find('[data-test="slack-oncall-unlinked-reminder-kim@acme.io"]').text()).toBe(
+      "Oct 17, 2025",
     );
     expect(w.find('[data-test="slack-oncall-unlinked-reminder-sam@acme.io"]').text()).toBe(
       "Not sent",
@@ -100,7 +100,7 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
             team_id: "t2",
             team_name: "Search",
             next_shift_at: nowUs + 7_200_000_000,
-            reminded_at: 5,
+            reminded_at: nowUs - 120_000_000,
           },
           {
             email: "zed@acme.io",
@@ -138,7 +138,10 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
       ),
     ).toEqual(["Payments", "Search"]);
     expect(w.find('[data-test="slack-oncall-unlinked-reminder-bob@acme.io"]').text()).toContain(
-      "DM sent",
+      "ago",
+    );
+    expect(w.find('[data-test="slack-oncall-unlinked-reminder-amy@acme.io"]').text()).toBe(
+      "Not sent",
     );
   });
 

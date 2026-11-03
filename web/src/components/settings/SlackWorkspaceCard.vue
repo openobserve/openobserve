@@ -651,7 +651,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
       :title="t('slackApp.card.forgetTitle')"
       message-keypath="slackApp.card.forgetMessage"
       :message-name="installation.team_name"
-      :ok-label="t('slackApp.card.forget')"
+      :ok-label="t('slackApp.card.forgetConfirm')"
       ok-variant="destructive"
       focus-cancel
       @update:ok="forget"

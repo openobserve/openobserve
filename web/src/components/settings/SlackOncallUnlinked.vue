@@ -23,11 +23,12 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { remindOncallUnlinkedMutation, slackOncallUnlinkedQuery } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { InstallationView, SlackOncallUnlinkedMember } from "@/types/slack";
-import { formatTimestamp } from "@/utils/date";
 
 interface UnlinkedPerson {
   email: string;
@@ -42,6 +43,7 @@ const props = defineProps<{ installation: InstallationView }>();
 const { t } = useI18nTyped();
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+const timezone = computed<string | undefined>(() => store.state.timezone || undefined);
 
 const unlinked = useQuery(() => slackOncallUnlinkedQuery(org.value, props.installation.id));
 const remind = useMutation(() => remindOncallUnlinkedMutation(org.value, props.installation.id));
@@ -125,7 +127,8 @@ const runRemind = async () => {
         <span class="text-text-heading flex items-center gap-2 text-sm font-medium">
           {{ t("slackApp.oncallUnlinked.title", { product: raw("Slack") }) }}
           <OTag
-            variant="warning-soft"
+            type="countChip"
+            value="warning"
             size="sm"
             :label="t('slackApp.oncallUnlinked.count', { count: rows.length }, rows.length)"
             data-test="slack-oncall-unlinked-count"
@@ -156,7 +159,9 @@ const runRemind = async () => {
       dense
     >
       <template #cell-email="{ row }">
-        <span :data-test="`slack-oncall-unlinked-person-${row.email}`">{{ raw(row.email) }}</span>
+        <span :data-test="`slack-oncall-unlinked-person-${row.email}`">
+          <OUserCell :value="row.email" />
+        </span>
       </template>
       <template #cell-teams="{ row }">
         <span class="flex flex-wrap gap-1">
@@ -178,19 +183,23 @@ const runRemind = async () => {
           :label="t('slackApp.oncallUnlinked.onCallNow')"
           :data-test="`slack-oncall-unlinked-now-${row.email}`"
         />
-        <span v-else-if="row.nextShiftAt">{{
-          raw(formatTimestamp(row.nextShiftAt, "EEE d MMM, HH:mm"))
-        }}</span>
-        <span v-else class="text-text-muted">{{ raw("—") }}</span>
+        <OTimeCell
+          v-else
+          :value="row.nextShiftAt"
+          unit="us"
+          :timezone="timezone"
+          :empty-label="raw('—')"
+        />
       </template>
       <template #cell-reminder="{ row }">
-        <span :data-test="`slack-oncall-unlinked-reminder-${row.email}`">{{
-          row.remindedAt
-            ? t("slackApp.oncallUnlinked.dmSent", {
-                time: raw(formatTimestamp(row.remindedAt, "EEE h:mm a")),
-              })
-            : t("slackApp.oncallUnlinked.notSent")
-        }}</span>
+        <span :data-test="`slack-oncall-unlinked-reminder-${row.email}`">
+          <OTimeCell
+            :value="row.remindedAt"
+            unit="us"
+            :timezone="timezone"
+            :empty-label="t('slackApp.oncallUnlinked.notSent')"
+          />
+        </span>
       </template>
     </OTable>
   </OCard>

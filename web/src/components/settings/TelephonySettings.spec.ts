@@ -242,7 +242,7 @@ describe("TelephonySettings", () => {
       await flushPromises();
       expect(toast).toHaveBeenLastCalledWith({
         variant: "success",
-        message: "Twilio accepted the account",
+        message: "Twilio account verified",
       });
     });
 
@@ -436,6 +436,7 @@ describe("TelephonySettings", () => {
       expect(document.body.textContent).toContain("Disconnects the ACte…0001 account.");
       const ok = document.querySelector('[data-test="o-dialog-primary-btn"]');
       expect(ok?.className).toContain("bg-button-destructive");
+      expect(ok?.textContent?.trim()).toBe("Disconnect Twilio");
     });
   });
 
