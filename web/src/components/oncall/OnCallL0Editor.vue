@@ -69,6 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`oncall-l0-mode-${row.testKey}`"
               @update:model-value="(v: unknown) => setMode(row.field, v)"
             >
+              <!-- The closed select names the mode only; its sentence is read in the open list. -->
+              <template #trigger="{ value }">{{ modeLabel(value as L0Mode) }}</template>
               <!-- What each mode does lives in its own item, so the row carries no sentence beside the select. -->
               <OSelectItem
                 v-for="option in optionsFor(row.field)"
@@ -128,51 +130,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OIcon>
       </span>
 
+      <!-- Label left, switch on the row's right edge and centred on it, the same column on every row. -->
       <div class="border-border-default rounded-surface flex flex-col border">
-        <OSettingRow :label="t('oncall.l0RaisePriority')" data-test="oncall-l0-row-promotion">
-          <span class="flex items-center gap-3">
-            <OSelect
-              v-if="draft.allow_promotion"
-              :model-value="draft.max_promotion_steps"
-              :options="maxStepOptions"
-              size="sm"
-              width="sm"
-              :aria-label="t('oncall.l0RaisePriority')"
-              data-test="oncall-l0-max-steps"
-              @update:model-value="(v: unknown) => setMaxSteps(v)"
-            />
-            <OSwitch
-              :model-value="draft.allow_promotion"
-              :aria-label="t('oncall.l0RaisePriority')"
-              size="sm"
-              data-test="oncall-l0-allow-promotion"
-              @update:model-value="(v: unknown) => update({ allow_promotion: !!v })"
-            />
-          </span>
-        </OSettingRow>
-        <OSettingRow :label="t('oncall.l0QuietOne')" data-test="oncall-l0-row-downgrade">
-          <OSwitch
-            :model-value="draft.allow_downgrade"
-            :aria-label="t('oncall.l0QuietOne')"
-            size="sm"
-            data-test="oncall-l0-allow-downgrade"
-            @update:model-value="(v: unknown) => update({ allow_downgrade: !!v })"
-          />
-        </OSettingRow>
-        <!-- The one consequence worth a visible line: until this is on, Suppress is only advice. -->
-        <OSettingRow
-          :label="t('oncall.l0AllowSuppress')"
-          :description="t('oncall.l0SuppressShort')"
-          data-test="oncall-l0-row-suppress"
+        <div
+          v-for="row in permissionRows"
+          :key="row.key"
+          class="border-border-default flex min-h-12 items-center gap-3 border-b px-3 py-2 last:border-b-0"
+          :data-test="`oncall-l0-row-${row.key}`"
         >
-          <OSwitch
-            :model-value="draft.allow_suppress"
-            :aria-label="t('oncall.l0AllowSuppress')"
+          <span class="flex min-w-0 flex-1 flex-col">
+            <span class="text-text-heading text-sm font-medium">{{ row.label }}</span>
+            <OTruncatedText v-if="row.description" class="text-text-secondary text-xs">
+              {{ row.description }}
+            </OTruncatedText>
+          </span>
+          <OSelect
+            v-if="row.key === 'promotion' && draft.allow_promotion"
+            :model-value="draft.max_promotion_steps"
+            :options="maxStepOptions"
             size="sm"
-            data-test="oncall-l0-allow-suppress"
-            @update:model-value="(v: unknown) => update({ allow_suppress: !!v })"
+            width="sm"
+            :aria-label="t('oncall.l0RaisePriority')"
+            data-test="oncall-l0-max-steps"
+            @update:model-value="(v: unknown) => setMaxSteps(v)"
           />
-        </OSettingRow>
+          <OSwitch
+            :model-value="draft[row.field]"
+            :aria-label="row.label"
+            size="sm"
+            class="shrink-0"
+            :data-test="`oncall-l0-${row.switchTest}`"
+            @update:model-value="(v: unknown) => update({ [row.field]: !!v })"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -183,8 +173,8 @@ import { computed, reactive, watch } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -269,6 +259,37 @@ const budgetOptions = computed(() => {
     : [...BUDGET_SECONDS, stored].sort((a, b) => a - b);
   return seconds.map((n) => ({ label: t("oncall.l0BudgetSeconds", { count: n }, n), value: n }));
 });
+
+const permissionRows = computed(
+  (): {
+    key: string;
+    field: "allow_promotion" | "allow_downgrade" | "allow_suppress";
+    switchTest: string;
+    label: I18nText;
+    description?: I18nText;
+  }[] => [
+    {
+      key: "promotion",
+      field: "allow_promotion",
+      switchTest: "allow-promotion",
+      label: t("oncall.l0RaisePriority"),
+    },
+    {
+      key: "downgrade",
+      field: "allow_downgrade",
+      switchTest: "allow-downgrade",
+      label: t("oncall.l0QuietOne"),
+    },
+    // The one consequence worth a visible line: until this is on, Suppress is only advice.
+    {
+      key: "suppress",
+      field: "allow_suppress",
+      switchTest: "allow-suppress",
+      label: t("oncall.l0AllowSuppress"),
+      description: t("oncall.l0SuppressShort"),
+    },
+  ],
+);
 
 /// One to three. A verdict that can climb four steps turns a P5 into a P1,
 /// which is the whole reason the ratchet is bounded.

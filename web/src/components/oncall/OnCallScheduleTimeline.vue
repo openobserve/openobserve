@@ -799,7 +799,7 @@ function shiftActions(bandKey: string): ShiftMenuItem[] {
   if (who && (props.canMarkAway || who.toLowerCase() === props.selfEmail.toLowerCase())) {
     items.push({
       id: "away",
-      icon: "event",
+      icon: "event-busy",
       label: t("oncall.shiftMenuAway", { name: raw(nameOf(who)) }),
     });
   }

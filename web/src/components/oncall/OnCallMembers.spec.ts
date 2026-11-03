@@ -22,7 +22,7 @@ import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
 import store from "@/test/unit/helpers/store";
-import type { ChannelReadiness, OnCallTeamMember } from "@/ts/interfaces/oncall";
+import type { ChannelReadiness, OnCallTeamMember, Rotation } from "@/ts/interfaces/oncall";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -124,7 +124,7 @@ const stubs = {
     name: "OSelect",
     props: ["modelValue", "options", "multiple"],
     template: `<select multiple @change="$emit('update:modelValue', pick($event))">
-      <option v-for="o in options" :key="String(o.value)" :value="o.value">{{ o.label }}</option>
+      <option v-for="o in options" :key="String(o.value)" :value="o.value" :disabled="o.disabled">{{ o.label }}</option>
     </select>`,
     methods: {
       pick(e: any) {
@@ -251,11 +251,11 @@ describe("OnCallMembers", () => {
     expect(wrapper.find('[data-test="oncall-members-user-select"]').text()).toContain("cara@o2.ai");
   });
 
-  it("names the member picker for a screen reader", async () => {
+  it("labels the member picker", async () => {
     const wrapper = render();
     await flushPromises();
     await openAdd(wrapper);
-    expect(wrapper.find('[data-test="oncall-members-user-select"]').attributes("aria-label")).toBe(
+    expect(wrapper.find('[data-test="oncall-members-user-select"]').attributes("label")).toBe(
       "People to add",
     );
   });
@@ -270,18 +270,29 @@ describe("OnCallMembers", () => {
     expect(wrapper.find('[data-test="oncall-members-user-select"]').exists()).toBe(false);
     const input = wrapper.find('[data-test="oncall-members-email-input"]');
     expect(input.exists()).toBe(true);
-    expect(input.attributes("aria-label")).toBe("People to add");
+    expect(input.attributes("label")).toBe("People to add");
   });
 
-  // Already on the team means nothing left to add.
-  it("hides people already on the team", async () => {
+  // Listed so the picker explains why they are missing, but they cannot be added twice.
+  it("shows people already on the team as disabled", async () => {
     const wrapper = render([member("ana@o2.ai")]);
     await flushPromises();
     await openAdd(wrapper);
 
-    const picker = wrapper.find('[data-test="oncall-members-user-select"]');
-    expect(picker.text()).not.toContain("Ana Sharma");
-    expect(picker.text()).toContain("Bob");
+    const options = wrapper.find('[data-test="oncall-members-user-select"]').findAll("option");
+    const ana = options.find((o) => o.element.value === "ana@o2.ai")!;
+    expect(ana.text()).toContain("On team");
+    expect(ana.attributes("disabled")).toBeDefined();
+    expect(options.find((o) => o.element.value === "bob@o2.ai")!.attributes("disabled")).toBe(
+      undefined,
+    );
+  });
+
+  it("names the button without a count until somebody is picked", async () => {
+    const wrapper = render();
+    await flushPromises();
+    await openAdd(wrapper);
+    expect(wrapper.find('[data-test="oncall-members-add-btn"]').text()).toBe("Add members");
   });
 
   // The whole point of the change: adding six people is one action, not six.
@@ -330,6 +341,42 @@ describe("OnCallMembers", () => {
       return wrapper;
     }
 
+    // The dialog states what the server's place_member will do before anyone presses Add.
+    it.each([
+      [[], "They join the team, and a rotation is created with them in it."],
+      [
+        [rotation("r1", "Primary", ["ana@o2.ai"]), rotation("r2", "Secondary", ["ana@o2.ai"])],
+        "Added to the end of the handover order in Primary and Secondary.",
+      ],
+      [
+        [
+          {
+            id: "r1",
+            name: "Primary",
+            shift_rules: [
+              { name: "Day", members: ["ana@o2.ai"], shift_micros: WEEK, anchor_micros: 0 },
+              { name: "Night", members: ["ana@o2.ai"], shift_micros: WEEK, anchor_micros: 0 },
+            ],
+          },
+        ],
+        "They join the team but aren't on any rotation yet; place them in Schedule.",
+      ],
+    ])("states the outcome before adding (%#)", async (rotations, expected) => {
+      const wrapper = render({
+        members: [member("ana@o2.ai")],
+        rotations: rotations as unknown as Rotation[],
+      });
+      await flushPromises();
+      await openAdd(wrapper);
+      const picker = wrapper.find('[data-test="oncall-members-user-select"]');
+      picker.findAll("option").find((o) => o.element.value === "bob@o2.ai")!.element.selected =
+        true;
+      await picker.trigger("change");
+
+      expect(wrapper.find('[data-test="oncall-members-add-outcome"]').text()).toBe(expected);
+      expect(wrapper.find('[data-test="oncall-members-add-btn"]').text()).toBe("Add 1 member");
+    });
+
     it("names the rotations they joined the end of, from the refreshed schedule", async () => {
       const wrapper = await addBob(
         [rotation("r1", "Primary", ["ana@o2.ai"]), rotation("r2", "Secondary", ["ana@o2.ai"])],
@@ -368,6 +415,7 @@ describe("OnCallMembers", () => {
       oncall.getSchedule.mockRejectedValue(new Error("boom"));
       const wrapper = render({ members: [member("ana@o2.ai")], rotations: [] });
       await flushPromises();
+      await openAdd(wrapper);
       const picker = wrapper.find('[data-test="oncall-members-user-select"]');
       picker.findAll("option").find((o) => o.element.value === "bob@o2.ai")!.element.selected =
         true;
@@ -376,14 +424,14 @@ describe("OnCallMembers", () => {
       await flushPromises();
 
       expect(toast.mock.calls.at(-1)![0]).toEqual(
-        expect.objectContaining({ variant: "success", message: "Bob added." }),
+        expect.objectContaining({ variant: "success", message: "1 member added" }),
       );
     });
 
     it("does not claim a shift stayed put when no existing rotation took them", async () => {
       await addBob([], [rotation("r1", "Primary", ["ana@o2.ai", "bob@o2.ai"])]);
 
-      expect(toast.mock.calls.at(-1)![0].message).toBe("Bob added.");
+      expect(toast.mock.calls.at(-1)![0].message).toBe("1 member added");
     });
   });
 
@@ -719,6 +767,38 @@ describe("OnCallMembers", () => {
       const wrapper = render([member]);
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-members-away-m1"]').exists()).toBe(true);
+    });
+
+    // Somebody already away gets Clear away in the same slot, so the row never offers both.
+    it("swaps Mark away for Clear away on a member who is away, and clears it", async () => {
+      const now = Date.now() * 1000;
+      oncall.listUnavailability.mockResolvedValue({
+        data: [
+          {
+            id: "u1",
+            org_id: "default",
+            user_email: "ana@o2.ai",
+            start_at: now - 1,
+            end_at: now + 86_400_000_000,
+            created_by: "ana@o2.ai",
+            created_at: now,
+          },
+        ],
+      } as any);
+      oncall.deleteUnavailability.mockResolvedValue({ data: {} } as any);
+      const wrapper = render([member]);
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-members-mark-away-m1"]').exists()).toBe(false);
+      const clear = wrapper.find('[data-test="oncall-members-clear-away-m1"]');
+      expect(clear.attributes("aria-label")).toBe("Clear away");
+      await clear.trigger("click");
+      await flushPromises();
+
+      expect(oncall.deleteUnavailability).toHaveBeenCalledWith(
+        expect.objectContaining({ unavailability_id: "u1" }),
+      );
+      expect(wrapper.emitted("changed")).toBeTruthy();
     });
 
     it("records an absence for the chosen person and tells the schedule", async () => {

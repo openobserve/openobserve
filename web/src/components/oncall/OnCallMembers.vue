@@ -14,16 +14,6 @@
     >
       <template #toolbar>
         <div class="flex w-full flex-wrap items-center gap-2">
-          <OButton
-            v-if="canConfigure"
-            variant="outline"
-            size="sm"
-            icon-left="person-add"
-            data-test="oncall-members-add-open"
-            @click="openAddDialog"
-          >
-            {{ t("oncall.membersAddOpen") }}
-          </OButton>
           <OSearchInput
             v-model="memberFilter"
             clearable
@@ -31,6 +21,16 @@
             :placeholder="t('oncall.memberSearchShort')"
             data-test="oncall-members-search"
           />
+          <OButton
+            v-if="canConfigure"
+            variant="primary"
+            size="sm"
+            icon-left="person-add"
+            data-test="oncall-members-add-open"
+            @click="openAddDialog"
+          >
+            {{ t("oncall.membersAddOpen") }}
+          </OButton>
         </div>
       </template>
 
@@ -52,15 +52,6 @@
               <OTag variant="warning-soft" size="sm" :data-test="`oncall-members-away-${row.id}`">
                 {{ awayLabel(row.away) }}
               </OTag>
-              <OButton
-                v-if="mayMarkAway(row.user_email)"
-                variant="ghost"
-                size="icon-xs"
-                icon-left="close"
-                :aria-label="t('oncall.awayRemove')"
-                :data-test="`oncall-members-away-remove-${row.id}`"
-                @click.stop="removeAbsence(row.away)"
-              />
             </span>
             <OTag v-if="row.unreachable" variant="error-soft" size="sm">
               {{ t("oncall.contactUnreachable") }}
@@ -113,10 +104,22 @@
       <template #cell-actions="{ row }">
         <div class="flex items-center justify-end">
           <OButton
-            v-if="mayMarkAway(row.user_email)"
+            v-if="mayMarkAway(row.user_email) && row.away"
             variant="ghost"
             size="icon-sm"
-            icon-left="event"
+            icon-left="event-available"
+            class="max-md:hidden"
+            :aria-label="t('oncall.awayClear')"
+            :data-test="`oncall-members-clear-away-${row.id}`"
+            @click.stop="removeAbsence(row.away)"
+          >
+            <OTooltip side="bottom" :content="t('oncall.awayClear')" />
+          </OButton>
+          <OButton
+            v-else-if="mayMarkAway(row.user_email)"
+            variant="ghost"
+            size="icon-sm"
+            icon-left="event-busy"
             class="max-md:hidden"
             :aria-label="t('oncall.awayMark')"
             :data-test="`oncall-members-mark-away-${row.id}`"
@@ -150,8 +153,17 @@
               />
             </template>
             <ODropdownItem
-              v-if="mayMarkAway(row.user_email)"
-              icon-left="event"
+              v-if="mayMarkAway(row.user_email) && row.away"
+              icon-left="event-available"
+              class="md:hidden"
+              :data-test="`oncall-members-clear-away-${row.id}-menu`"
+              @select="removeAbsence(row.away)"
+            >
+              <span>{{ t("oncall.awayClear") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              v-else-if="mayMarkAway(row.user_email)"
+              icon-left="event-busy"
               class="md:hidden"
               :data-test="`oncall-members-mark-away-${row.id}-menu`"
               @select="openAway(row.user_email)"
@@ -187,7 +199,9 @@
       size="md"
       :title="t('oncall.membersAddOpen')"
       :primary-button-label="
-        t('oncall.membersAddCta', { count: pendingEmails.length }, pendingEmails.length)
+        pendingEmails.length
+          ? t('oncall.membersAddCta', { count: pendingEmails.length }, pendingEmails.length)
+          : t('oncall.membersAddOpen')
       "
       :secondary-button-label="t('oncall.cancel')"
       :primary-button-disabled="!pendingEmails.length"

@@ -263,16 +263,18 @@
                         :key="i"
                       >
                         <span v-if="line?.people.length" class="flex items-center gap-2">
-                          <span class="flex -space-x-1">
-                            <OAvatar
-                              v-for="email in line.people.slice(0, AVATARS_SHOWN)"
-                              :key="email"
-                              :value="email"
-                              class="ring-surface-base ring-2"
-                            />
-                          </span>
+                          <OAvatarGroup
+                            :people="
+                              line.people.map((email) => ({ value: email, name: nameOf(email) }))
+                            "
+                            :max="AVATARS_SHOWN"
+                          />
                           <OText variant="meta">
-                            {{ t("oncall.policyTodayIs", { who: raw(line.people.join(", ")) }) }}
+                            {{
+                              t("oncall.policyTodayIs", {
+                                who: raw(line.people.map(nameOf).join(", ")),
+                              })
+                            }}
                           </OText>
                         </span>
 
@@ -283,14 +285,12 @@
                           :data-test="`oncall-policy-open-members-${current.priority}-${stepIndex}`"
                           @click="openMembers"
                         >
-                          <span class="flex -space-x-1">
-                            <OAvatar
-                              v-for="member in teamMembers.slice(0, AVATARS_SHOWN)"
-                              :key="member"
-                              :value="member"
-                              class="ring-surface-base ring-2"
-                            />
-                          </span>
+                          <OAvatarGroup
+                            :people="
+                              teamMembers.map((email) => ({ value: email, name: nameOf(email) }))
+                            "
+                            :max="AVATARS_SHOWN"
+                          />
                           <OText variant="meta" class="hover:underline">
                             {{
                               t(
@@ -564,8 +564,6 @@
                  editing steps must never silently rewrite the gate. -->
           <OTabPanel name="triage" data-test="oncall-policy-triage">
             <div class="flex flex-col gap-3 px-4 pt-3 pb-4">
-              <OText variant="meta">{{ t("oncall.l0Hint") }}</OText>
-
               <OnCallL0Editor
                 :l0="l0Draft ?? props.policy?.l0 ?? null"
                 @update:l0="onL0Update"
@@ -615,7 +613,8 @@ import OnCallTeamSlackChannel from "@/components/oncall/OnCallTeamSlackChannel.v
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import { stableStringify } from "@/utils/drafts/editorDraftStore";
-import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
+import OAvatarGroup from "@/lib/core/Avatar/OAvatarGroup.vue";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -709,6 +708,7 @@ interface PolicyDraftData {
 }
 
 const { t } = useI18nTyped();
+const { nameOf } = useOrgUserNames();
 const store = useStore();
 const router = useRouter();
 const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();

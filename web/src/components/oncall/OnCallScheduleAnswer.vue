@@ -36,7 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   to somebody, so "is anybody backing the first up" is a count.
 -->
 <template>
+  <!-- A strip with nothing to say would draw a second rule under the tabs. -->
   <div
+    v-if="!holder || !hasMembers || !secondary"
     class="border-border-default px-page-edge flex flex-wrap items-center gap-x-8 gap-y-3 border-b py-3"
     data-test="oncall-schedule-answer"
   >
@@ -57,7 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="!hasMembers"
         variant="primary"
-        size="sm-action"
+        size="sm"
+        icon-left="person-add"
         data-test="oncall-answer-add-people"
         @click="emit('add-people')"
       >
@@ -66,7 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else-if="!secondary"
         variant="outline"
-        size="sm-action"
+        size="sm"
+        icon-left="add"
         data-test="oncall-answer-assign-secondary"
         @click="emit('assign-secondary')"
       >

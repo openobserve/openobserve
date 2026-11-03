@@ -129,4 +129,18 @@ describe("OnCallScheduleAnswer", () => {
     expect(wrapper.find('[data-test="oncall-answer-add-people"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-answer-assign-secondary"]').exists()).toBe(true);
   });
+
+  // Both seats held leaves the strip nothing to say, and an empty strip is a second rule under the tabs.
+  it("renders nothing when both seats are held", () => {
+    const seat = (rotation: string, email: string) => ({
+      rotation_id: rotation,
+      rotation_name: rotation,
+      rule: "Base",
+      user_email: email,
+    });
+    const wrapper = render({
+      positions: [seat("Primary", "a@o2.ai"), seat("Secondary", "b@o2.ai")],
+    });
+    expect(wrapper.find('[data-test="oncall-schedule-answer"]').exists()).toBe(false);
+  });
 });

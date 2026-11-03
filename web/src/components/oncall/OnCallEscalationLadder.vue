@@ -128,15 +128,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </p>
 
         <!-- A numbered rail with a fixed time column, so every "who" starts on the same line. -->
-        <ol v-else-if="preview" class="flex flex-col px-4 py-3" data-test="oncall-ladder-rungs">
+        <ol v-else-if="preview" class="flex flex-col px-4 py-2" data-test="oncall-ladder-rungs">
           <li
             v-for="(group, index) in rungGroups"
             :key="group.key"
-            class="relative flex items-start gap-3 pb-4"
+            class="relative flex min-h-10 items-center gap-3 py-2"
             :data-test="`oncall-ladder-rung-${group.firstMicros}`"
           >
+            <!-- Symmetric padding puts each marker at the row's half-height, so the rail joins centre to centre. -->
             <span
-              class="bg-border-default absolute start-3 top-6 bottom-0 w-px"
+              class="bg-border-default absolute start-3 bottom-0 w-px"
+              :class="index === 0 ? 'top-1/2' : 'top-0'"
               aria-hidden="true"
             />
             <span
@@ -147,52 +149,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OText
               variant="meta"
-              class="w-24 shrink-0 pt-0.5"
+              class="w-24 shrink-0"
               :data-test="`oncall-ladder-rung-time-${group.firstMicros}`"
             >
               {{ delayLabel(group.firstMicros) }}
             </OText>
-            <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <template v-if="isWholeTeamRung(group.rung)">
                 <span>{{ t("oncall.ladderWholeTeam") }}</span>
-                <span
-                  class="flex items-center"
+                <OAvatarGroup
+                  :people="
+                    group.rung.recipients.map((one) => ({
+                      value: one.user_email,
+                      name: nameOf(one.user_email),
+                    }))
+                  "
+                  :max="STACK"
                   :data-test="`oncall-ladder-people-${group.firstMicros}`"
-                >
-                  <OAvatar
-                    v-for="one in group.rung.recipients.slice(0, STACK)"
-                    :key="one.user_email"
-                    :value="one.user_email"
-                    :name="nameOf(one.user_email)"
-                    size="sm"
-                    class="ring-surface-base -ms-1 ring-2 first:ms-0"
-                  />
-                  <span
-                    v-if="group.rung.recipients.length > STACK"
-                    class="text-text-secondary ms-1 text-xs"
-                  >
-                    {{ raw(`+${group.rung.recipients.length - STACK}`) }}
-                  </span>
-                  <OTooltip side="bottom" :content="peopleNames(group.rung)" />
-                </span>
+                />
               </template>
               <template v-else>
+                <span
+                  v-for="one in seatedPeople(group.rung)"
+                  :key="one.email"
+                  class="flex min-w-0 items-center gap-1.5"
+                  :data-test="`oncall-ladder-person-${group.firstMicros}-${one.email}`"
+                >
+                  <OAvatar :value="one.email" :name="nameOf(one.email)" />
+                  <OTruncatedText>{{ raw(nameOf(one.email)) }}</OTruncatedText>
+                  <OTag v-for="seat in one.seats" :key="seat" variant="default-outline" size="sm">
+                    {{ raw(seat) }}
+                  </OTag>
+                </span>
+                <!-- A seat nobody holds still says which seat, so the gap is visible on the rung. -->
                 <OTag
-                  v-for="seat in group.rung.targets.map(seatOf)"
-                  :key="seat"
+                  v-for="seat in unheldSeats(group.rung)"
+                  :key="`unheld-${seat}`"
                   variant="default-outline"
                   size="sm"
                 >
                   {{ raw(seat) }}
                 </OTag>
-                <span
-                  v-for="one in group.rung.recipients"
-                  :key="one.user_email"
-                  class="flex min-w-0 items-center gap-1.5"
-                >
-                  <OAvatar :value="one.user_email" :name="nameOf(one.user_email)" size="sm" />
-                  <span class="truncate">{{ raw(nameOf(one.user_email)) }}</span>
-                </span>
               </template>
               <span v-if="group.count > 1" class="text-text-secondary text-xs">
                 {{ t("oncall.ladderRepeatsUntil", { to: durationLabel(group.lastMicros) }) }}
@@ -212,17 +209,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OTag>
             </span>
-            <OnCallChannelIcons
-              v-if="stepChannels(group.rung).length"
-              class="ms-auto shrink-0 pt-0.5"
-              :channels="stepChannels(group.rung)"
-            />
           </li>
 
           <!-- The ending is the rail's last stop: when the ladder runs out is what the delays are read against. -->
-          <li class="flex items-center gap-3" data-test="oncall-ladder-ends">
+          <li class="relative flex min-h-10 items-center gap-3 py-2" data-test="oncall-ladder-ends">
             <span
-              class="border-border-default bg-surface-base text-text-secondary flex size-6 shrink-0 items-center justify-center rounded-full border"
+              v-if="rungGroups.length"
+              class="bg-border-default absolute start-3 top-0 h-1/2 w-px"
+              aria-hidden="true"
+            />
+            <span
+              class="border-border-default bg-surface-base text-text-secondary relative flex size-6 shrink-0 items-center justify-center rounded-full border"
               aria-hidden="true"
             >
               <OIcon name="stop-circle" size="sm" />
@@ -240,6 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
             <OButton
+              v-if="canConfigure"
               variant="outline"
               size="sm"
               icon-left="add"
@@ -272,8 +270,10 @@ import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
+import OAvatarGroup from "@/lib/core/Avatar/OAvatarGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OnCallChannelIcons from "./OnCallChannelIcons.vue";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
@@ -282,6 +282,7 @@ import type {
   Channel,
   EscalationPreview,
   OnCallPolicy,
+  OnCallPosition,
   PreviewRung,
   Rotation,
   TeamRungSummary,
@@ -306,6 +307,8 @@ const props = withDefaults(
     loading?: boolean;
     /** May send a test page, which needs config access. */
     canConfigure?: boolean;
+    /** Who holds each seat now, so a name carries the seat it is paged for. */
+    onCallNow?: OnCallPosition[];
   }>(),
   {
     priorities: () => [],
@@ -315,6 +318,7 @@ const props = withDefaults(
     preview: null,
     loading: false,
     canConfigure: false,
+    onCallNow: () => [],
   },
 );
 
@@ -491,8 +495,25 @@ function seatOf(target: string): string {
   return onCall ? onCall[1] : speakTarget(target, t);
 }
 
-function peopleNames(rung: PreviewRung): I18nText {
-  return raw(rung.recipients.map((one) => nameOf(one.user_email)).join(", "));
+/// Each person with the seat(s) they hold right now; the live roster is the truth, index pairing only a fallback.
+function seatedPeople(rung: PreviewRung): { email: string; seats: string[] }[] {
+  const seats = rung.targets.map(seatOf);
+  const pairByIndex = seats.length === rung.recipients.length;
+  return rung.recipients.map((one, index) => {
+    const email = one.user_email.toLowerCase();
+    const held = props.onCallNow
+      .filter((position) => position.user_email.toLowerCase() === email)
+      .map((position) => position.rotation_name)
+      .filter((name) => seats.includes(name));
+    if (held.length) return { email: one.user_email, seats: [...new Set(held)] };
+    return { email: one.user_email, seats: pairByIndex ? [seats[index]] : [] };
+  });
+}
+
+/// Seats this rung aims at that no listed person was matched to.
+function unheldSeats(rung: PreviewRung): string[] {
+  const shown = new Set(seatedPeople(rung).flatMap((one) => one.seats));
+  return [...new Set(rung.targets.map(seatOf))].filter((seat) => !shown.has(seat));
 }
 
 /// The exception badge per rung, keyed by delay so the template asks once.
@@ -514,11 +535,6 @@ const endTitle = computed<I18nText>(() =>
 
 /// How many faces a whole-team step shows before it counts the rest.
 const STACK = 3;
-
-/// Who a step could actually reach, by channel — the union of its people's deliverable channels.
-function stepChannels(rung: PreviewRung): Channel[] {
-  return [...new Set(rung.recipients.flatMap((one) => one.deliverable_channels))];
-}
 
 const headerChannels = computed<Channel[]>(() => {
   const entry = props.priorities.find((p) => p.priority === props.selected);

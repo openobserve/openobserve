@@ -350,6 +350,7 @@
               :preview="preview"
               :loading="previewLoading"
               :can-configure="canConfigure"
+              :on-call-now="onCallNow"
               @edit="openPolicyEditor"
               @open-members="activeTab = 'members'"
               @send-test="testPageOpen = true"

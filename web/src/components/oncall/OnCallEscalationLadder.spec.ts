@@ -35,7 +35,11 @@ vi.mock("@/services/users", () => ({
 
 const stubs = {
   OTag: { name: "OTag", props: ["variant", "type", "value"], template: "<span><slot /></span>" },
-  OTooltip: { name: "OTooltip", props: ["content"], template: "<span>{{ content }}</span>" },
+  OTooltip: {
+    name: "OTooltip",
+    props: ["content"],
+    template: "<span>{{ content }}<slot name='content' /></span>",
+  },
   OTimeline: { name: "OTimeline", template: "<ol><slot /></ol>" },
   OTimelineItem: {
     name: "OTimelineItem",
@@ -389,15 +393,45 @@ describe("OnCallEscalationLadder", () => {
   /// that resolves to right now. One line — the channels that would carry it
   /// are noise until one of them cannot.
   /// The seat as a bordered pill, then the person in it, and the channels that would reach them.
-  it("names the seat and who sits in it, with the step's channels", () => {
+  // Channels belong to the priority, so they sit on the card header and never on a step row.
+  it("names who sits in the seat, with the seat pill after the name and no channel icons", () => {
     const row = render().find('[data-test="oncall-ladder-rung-0"]');
+    const person = row.find('[data-test="oncall-ladder-person-0-ana@o2.ai"]');
 
-    const seat = row
+    const seat = person
       .findAllComponents({ name: "OTag" })
       .find((tag) => tag.text() === "Whoever is on call");
     expect(seat?.props("variant")).toBe("default-outline");
-    expect(row.findComponent({ name: "OAvatar" }).props("value")).toBe("ana@o2.ai");
-    expect(row.find('[data-test="oncall-channel-icon-email"]').exists()).toBe(true);
+    expect(person.findComponent({ name: "OAvatar" }).props("value")).toBe("ana@o2.ai");
+    expect(row.find('[data-test^="oncall-channel-icon-"]').exists()).toBe(false);
+  });
+
+  // The live roster says which seat each person holds, even when one person holds both.
+  it("pairs each person with the seat they hold now", () => {
+    const wrapper = render({
+      preview: preview({
+        rungs: [
+          {
+            after_micros: 0,
+            targets: ["whoever is on call in Primary", "whoever is on call in Secondary"],
+            recipients: [person({ user_email: "bob@o2.ai" }), person({ user_email: "ana@o2.ai" })],
+            resolves_to_nobody: false,
+          },
+        ],
+      }),
+      onCallNow: [
+        { rotation_id: "r1", rotation_name: "Primary", rule: "Base", user_email: "ana@o2.ai" },
+        { rotation_id: "r2", rotation_name: "Secondary", rule: "Base", user_email: "bob@o2.ai" },
+      ],
+    });
+    const seatOf = (email: string) =>
+      wrapper
+        .find(`[data-test="oncall-ladder-person-0-${email}"]`)
+        .findAllComponents({ name: "OTag" })
+        .map((tag) => tag.text());
+
+    expect(seatOf("ana@o2.ai")).toEqual(["Primary"]);
+    expect(seatOf("bob@o2.ai")).toEqual(["Secondary"]);
   });
 
   /// Six addresses are a wall, not an answer.
@@ -421,29 +455,24 @@ describe("OnCallEscalationLadder", () => {
     expect(people.text()).toContain("+2");
   });
 
-  /// The names live in a tooltip on the count, not behind a separate "See who" link.
-  it("names a whole-team rung's people in a tooltip on its count", () => {
+  // Every face names itself, and the "+N" chip names the people it hides, each with their address.
+  it("names a whole-team rung's people in tooltips on the faces and the count", () => {
     const wrapper = render({
       preview: preview({
         rungs: [
           {
             after_micros: 0,
             targets: ["the whole team"],
-            recipients: [
-              person({ user_email: "a@o2.ai" }),
-              person({ user_email: "b@o2.ai" }),
-              person({ user_email: "c@o2.ai" }),
-            ],
+            recipients: ["a", "b", "c", "d"].map((x) => person({ user_email: `${x}@o2.ai` })),
             resolves_to_nobody: false,
           },
         ],
       }),
     });
 
-    const count = wrapper.find('[data-test="oncall-ladder-people-0"]');
-    expect(count.findComponent({ name: "OTooltip" }).props("content")).toBe(
-      "a@o2.ai, b@o2.ai, c@o2.ai",
-    );
+    const people = wrapper.find('[data-test="oncall-ladder-people-0"]');
+    expect(people.findAllComponents({ name: "OTooltip" })).toHaveLength(4);
+    expect(people.find('[data-test="o-avatar-group-more"]').text()).toContain("d@o2.ai");
     expect(wrapper.find('[data-test="oncall-ladder-open-members-0"]').exists()).toBe(false);
   });
 
@@ -693,10 +722,16 @@ describe("OnCallEscalationLadder", () => {
   });
 
   it("offers a way to add a final rung when the ladder runs out", async () => {
-    const wrapper = render({ preview: preview({ reaches_nobody: true }) });
+    const wrapper = render({ preview: preview({ reaches_nobody: true }), canConfigure: true });
     await wrapper.find('[data-test="oncall-ladder-add-rung"]').trigger("click");
 
     expect(wrapper.emitted("edit")).toHaveLength(1);
+  });
+
+  it("offers no Add a step to a reader who cannot change the policy", () => {
+    const wrapper = render({ preview: preview({ reaches_nobody: true }) });
+
+    expect(wrapper.find('[data-test="oncall-ladder-add-rung"]').exists()).toBe(false);
   });
 
   /// On a gated priority the rail's first rung is NOT what fires at 0m — the
