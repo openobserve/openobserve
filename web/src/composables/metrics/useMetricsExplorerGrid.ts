@@ -896,10 +896,11 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * cost the page size exists to bound.
    *
    * So the budget is counted BEFORE the no-data filter and the hiding happens
-   * WITHIN the slice: at most `pageSize` cards are ever rendered or queried, and
-   * hiding empties shrinks the visible grid rather than refilling it. "Show more"
-   * is how the user asks to spend more; the one exception is a page that resolves
-   * to nothing visible, which spends one bounded "Show more" walk per page reset.
+   * WITHIN the slice: at most `pageSize` cards are ever rendered, and hiding
+   * empties shrinks the visible grid rather than refilling it. "Show more" is how
+   * the user asks to spend more, and its look-ahead is the only thing that queries
+   * past the slice, in bounded batches; it also runs once per page generation
+   * when a page resolves to nothing visible.
    */
   const sortedCandidates = computed(() =>
     sortCards(cards.value.filter((card) => passesExcept(card, "empty"))),
@@ -962,8 +963,9 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const pageSize = ref(INITIAL_PAGE_SIZE);
 
   /**
-   * The page's query budget: at most `pageSize` cards, chosen BEFORE the no-data
-   * filter. Nothing outside this slice is ever rendered or queried.
+   * The page's committed query budget: at most `pageSize` cards, chosen BEFORE the
+   * no-data filter. Nothing outside it is rendered; only a "Show more" look-ahead
+   * queries past it, in bounded batches, before committing a larger slice.
    */
   const pageSlice = computed(() => sortedCandidates.value.slice(0, pageSize.value));
 
@@ -978,9 +980,9 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   /** True while a "Show more" click is resolving; drives the button's spinner. */
   const showingMore = ref(false);
 
-  // Bumped by every page reset, so a walk started before one can never commit over it.
+  // Bumped whenever the look-ahead is owed again (page reset, new window, filter off), so an older walk never commits.
   let pageGeneration = 0;
-  // Generation whose look-ahead walk committed: one walk per page reset, then only Show more.
+  // Generation whose look-ahead walk committed: one walk per generation, then only Show more.
   let autoAdvancedFor: number | null = null;
 
   /**
@@ -1008,6 +1010,9 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       const generation = pageGeneration;
       // A reload or usage re-sort changes the list without a page reset, and `cursor` indexes the old one.
       const key = candidatesKey.value;
+      // Paused means nobody is looking; the auto-advance re-runs the walk on unpause if it is still owed.
+      const abandoned = () =>
+        pageGeneration !== generation || candidatesKey.value !== key || paused.value;
       let cursor = pageSize.value;
       let revealed = 0;
       let batches = 0;
@@ -1016,7 +1021,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         cursor < cands.length &&
         revealed < PAGE_SIZE_INCREMENT
       ) {
-        if (pageGeneration !== generation || candidatesKey.value !== key) return;
+        if (abandoned()) return;
         const next = Math.min(cands.length, cursor + PAGE_SIZE_INCREMENT);
         await Promise.all(
           cands
@@ -1029,7 +1034,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       }
       // The list changed while we were querying (filter edit, org switch) — the
       // reset watcher already chose the right page size for the new list.
-      if (pageGeneration !== generation || candidatesKey.value !== key) return;
+      if (abandoned()) return;
       pageSize.value = cursor;
       autoAdvancedFor = generation;
     } finally {
@@ -1059,11 +1064,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     { deep: true },
   );
 
-  // Registered after the page-one reset (watchers flush in creation order) and cannot fire mid-sweep: an unresolved card still renders.
-  // `showingMore` re-runs this when a walk ends, so one aborted by a list change still owes the new list its walk.
+  watch(hideEmptyPanels, (on) => {
+    // Turning it back on then finds this generation unwalked, so the same list earns a fresh auto-advance.
+    if (!on) pageGeneration++;
+  });
+
+  // After the page-one reset (watchers flush in creation order); `showingMore` re-runs it so an aborted walk is retried.
   watch([pagedCards, pageSlice, hasMore, hideEmptyPanels, paused, showingMore], () => {
-    // Turning the filter back on earns the same list a fresh auto-advance.
-    if (!hideEmptyPanels.value) autoAdvancedFor = null;
     if (!hideEmptyPanels.value || paused.value || showingMore.value) return;
     if (!hasMore.value || !pageSlice.value.length || pagedCards.value.length) return;
     if (autoAdvancedFor === pageGeneration) return;
@@ -2577,7 +2584,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
   const setTimeRange = (
     range: { start_time: number; end_time: number },
-    opts?: { keepPreviews?: boolean },
+    opts?: { keepPreviews?: boolean; keepPage?: boolean },
   ) => {
     timeRange.value = range;
     queue.cancelAll();
@@ -2601,9 +2608,9 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // A new window deserves its own bounded recheck, not one already spent by
     // the window just left.
     emptyRecheckedCards.value = new Set();
-    // Cards empty in the old window may have data in this one, so the look-ahead is owed again, from page one.
+    // Cards empty in the old window may have data in this one; a zoom keeps its page so the dragged card stays.
     pageGeneration++;
-    pageSize.value = INITIAL_PAGE_SIZE;
+    if (!opts?.keepPage) pageSize.value = INITIAL_PAGE_SIZE;
 
     // Label VALUES are a property of the window too — `job` has the values it had
     // in the last 15 minutes, which is not what it had over 30 days. Their cache

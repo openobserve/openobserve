@@ -1319,6 +1319,85 @@ describe("useMetricsExplorerGrid", () => {
         expect(Math.max(...oldList)).toBe(INITIAL_PAGE_SIZE + PAGE_SIZE_INCREMENT - 1);
         expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
       });
+
+      it("a zoom's new window keeps the page, so the dragged card stays, and still earns the look-ahead", async () => {
+        const grid = await walkedGrid();
+        const before = grid.pageSlice.value.map((c: any) => c.name);
+
+        grid.setTimeRange(
+          { start_time: NOW_US - 60_000_000, end_time: NOW_US },
+          { keepPage: true },
+        );
+        expect(grid.pageSlice.value.map((c: any) => c.name)).toEqual(before);
+        expect(grid.pagedCards.value).toHaveLength(walked);
+
+        const asked: number[] = [];
+        await emptyVisibleAndDrain(grid, asked);
+        expect(Math.max(...asked)).toBe(walked + SHOW_MORE_MAX_BATCHES * PAGE_SIZE_INCREMENT - 1);
+        expect(grid.pageSlice.value).toHaveLength(
+          walked + SHOW_MORE_MAX_BATCHES * PAGE_SIZE_INCREMENT,
+        );
+      });
+
+      /** Resolves page one as empty and returns once the auto-advance's first batch is in flight. */
+      const walkInFlight = async () => {
+        getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
+        const grid = createGrid(t);
+        grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
+        await grid.loadStreams();
+        for (const card of [...grid.pagedCards.value]) {
+          let settled = false;
+          const preview = grid.requestPreview(card).finally(() => (settled = true));
+          for (let round = 0; round < 100 && !settled; round++) {
+            await flush();
+            answerAll(() => NO_SERIES, []);
+          }
+          await preview;
+        }
+        for (let round = 0; round < 20 && !inFlight.length; round++) await flush();
+        expect(grid.showingMore.value).toBe(true);
+        return grid;
+      };
+
+      it("pausing mid-walk stops its queries without committing, and unpausing resumes it", async () => {
+        const grid = await walkInFlight();
+
+        grid.paused.value = true;
+        const asked: number[] = [];
+        await drainWalk(grid, () => NO_SERIES, asked);
+        expect(Math.max(...asked)).toBe(INITIAL_PAGE_SIZE + PAGE_SIZE_INCREMENT - 1);
+        expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
+
+        grid.paused.value = false;
+        await drainWalk(grid, () => NO_SERIES, []);
+        expect(grid.pagedCards.value).toHaveLength(0);
+        expect(grid.pageSlice.value).toHaveLength(walked);
+      });
+
+      it("turning With data off mid-walk stops its queries without committing", async () => {
+        const grid = await walkInFlight();
+
+        grid.hideEmptyPanels.value = false;
+        const asked: number[] = [];
+        await drainWalk(grid, () => NO_SERIES, asked);
+        expect(Math.max(...asked)).toBe(INITIAL_PAGE_SIZE + PAGE_SIZE_INCREMENT - 1);
+        expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
+      });
+
+      it("turning With data off and on again earns the same list one more walk", async () => {
+        const grid = await walkedGrid();
+
+        grid.hideEmptyPanels.value = false;
+        await flush();
+        expect(grid.pagedCards.value).toHaveLength(walked);
+        grid.hideEmptyPanels.value = true;
+        const asked: number[] = [];
+        await drainWalk(grid, () => NO_SERIES, asked);
+        expect(Math.min(...asked)).toBe(walked);
+        expect(grid.pageSlice.value).toHaveLength(
+          walked + SHOW_MORE_MAX_BATCHES * PAGE_SIZE_INCREMENT,
+        );
+      });
     });
   });
   describe("an org switch must not be polluted by the previous org", () => {

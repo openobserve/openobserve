@@ -919,6 +919,34 @@ describe("MetricsExplorer wiring", () => {
       expect(refresh).toHaveBeenCalledTimes(1);
     });
 
+    it("keeps the grid's page for the zoom's date change, and only for that one", () => {
+      const wrapper = mountExplorer();
+      const vm = wrapper.vm as any;
+      vm.dateTimePickerRef = {
+        setCustomDate: vi.fn(),
+        refresh: () => vm.onDateChange(),
+        getConsumableDateTime: () => ({ startTime: 10, endTime: 20 }),
+      };
+      grid.setTimeRange.mockClear();
+
+      zoomOn(wrapper, {
+        start: new Date("2026-07-16T10:00:00.000Z").getTime(),
+        end: new Date("2026-07-16T10:30:00.000Z").getTime(),
+      });
+      expect(grid.setTimeRange).toHaveBeenCalledTimes(1);
+      expect(grid.setTimeRange).toHaveBeenLastCalledWith(
+        { start_time: 10, end_time: 20 },
+        { keepPage: true },
+      );
+
+      vm.onDateChange();
+      expect(grid.setTimeRange).toHaveBeenCalledTimes(2);
+      expect(grid.setTimeRange).toHaveBeenLastCalledWith(
+        { start_time: 10, end_time: 20 },
+        undefined,
+      );
+    });
+
     it("widens a click-without-drag (start === end) into a real window", () => {
       const wrapper = mountExplorer();
       const setCustomDate = vi.fn();

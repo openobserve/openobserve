@@ -2106,11 +2106,14 @@ export default defineComponent({
       dateTimePickerRef.value?.setSavedDate?.(pickerSavedDate(date));
     };
 
-    const syncTimeRange = (opts?: { keepPreviews?: boolean }) => {
+    const syncTimeRange = (opts?: { keepPreviews?: boolean; keepPage?: boolean }) => {
       const consumable = dateTimePickerRef.value?.getConsumableDateTime?.();
       if (!consumable) return;
       grid.setTimeRange({ start_time: consumable.startTime, end_time: consumable.endTime }, opts);
     };
+
+    // True only around a zoom's picker refresh, which emits synchronously: the zoomed card must stay on the page.
+    let zooming = false;
 
     const onDateChange = async () => {
       // `dateTimePickerRef.refresh()` re-emits a date change, so a manual
@@ -2119,7 +2122,7 @@ export default defineComponent({
       // to a skeleton on each refresh.
       if (refreshing.value) return;
 
-      syncTimeRange();
+      syncTimeRange(zooming ? { keepPage: true } : undefined);
       // A deliberate change of window must reach the backend — repainting the
       // persisted result would hand the user back the data they just moved away
       // from.
@@ -2175,7 +2178,12 @@ export default defineComponent({
       // `refresh()` calls `saveDate()` directly, which is what emits
       // `on:date-change` -> `onDateChange` -> skipCache + sweep. This is exactly
       // why ViewDashboard.onDataZoom calls it too; the pair is the contract.
-      dateTimePickerRef.value?.refresh?.();
+      zooming = true;
+      try {
+        dateTimePickerRef.value?.refresh?.();
+      } finally {
+        zooming = false;
+      }
       track("metrics_explorer_card_zoomed", {
         window_seconds: Math.round((range.end.getTime() - range.start.getTime()) / 1000),
       });
