@@ -231,11 +231,10 @@ impl InputOutputExtractor {
             return true;
         }
 
-        // TraceLoop nested prompt/completion (`gen_ai.prompt.0.content`, …) and
-        // other `gen_ai.prompt.*` / `gen_ai.completion.*` keys such as prompt
-        // template variables are not stored as columns. The prompt reference
-        // (name/version/label) is not a message; the processor overwrites it
-        // with the normalised value, or removes it when the value is invalid.
+        // TraceLoop nested prompt/completion (`gen_ai.prompt.0.content`, …) are
+        // extracted to the input/output columns. The prompt reference
+        // (name/version/label) and template variables (gen_ai.prompt.variable.*)
+        // stay on the span.
         if matches!(
             key,
             GenAiAttributes::PROMPT_NAME
@@ -244,10 +243,13 @@ impl InputOutputExtractor {
         ) {
             return false;
         }
-        key == TRACELOOP_PROMPT_PREFIX
-            || key == TRACELOOP_COMPLETION_PREFIX
-            || key.starts_with("gen_ai.prompt.")
-            || key.starts_with("gen_ai.completion.")
+        if key.starts_with("gen_ai.prompt.variable.")
+            || key.starts_with("gen_ai.completion.variable.")
+        {
+            return false;
+        }
+        is_traceloop_indexed_key(key, TRACELOOP_PROMPT_PREFIX)
+            || is_traceloop_indexed_key(key, TRACELOOP_COMPLETION_PREFIX)
     }
 
     fn extract_vercel_ai_sdk(
@@ -796,7 +798,7 @@ mod tests {
 
         assert!(extractor.is_input_output_attribute("gen_ai.prompt.0.content"));
         assert!(extractor.is_input_output_attribute("gen_ai.completion.0.content"));
-        assert!(extractor.is_input_output_attribute("gen_ai.prompt.variable.customer"));
+        assert!(!extractor.is_input_output_attribute("gen_ai.prompt.variable.customer"));
         assert!(!extractor.is_input_output_attribute(GenAiAttributes::PROMPT_NAME));
     }
 

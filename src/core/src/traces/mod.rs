@@ -2391,9 +2391,7 @@ mod tests {
             Some(0.0)
         );
         assert_eq!(
-            record
-                .get("gen_ai_prompt_version")
-                .and_then(|v| v.as_str()),
+            record.get("gen_ai_prompt_version").and_then(|v| v.as_str()),
             Some("3")
         );
         assert_eq!(

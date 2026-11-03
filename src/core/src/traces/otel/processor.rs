@@ -626,8 +626,7 @@ impl OtelIngestionProcessor {
         }
 
         // The raw prompt reference survives extraction; replace it with the normalised value,
-        // or drop it when the extractor rejected it (a non-string name, a version that is not a
-        // positive integer), so `gen_ai_prompt_version` stays an Int64 column.
+        // or drop it when the extractor rejected it (non-string name, empty/null version).
         for (key, value) in [
             (
                 GenAiAttributes::PROMPT_NAME,
@@ -635,7 +634,7 @@ impl OtelIngestionProcessor {
             ),
             (
                 GenAiAttributes::PROMPT_VERSION,
-                extracted.prompt_version.map(|v| json::json!(v)),
+                extracted.prompt_version.as_deref().map(|v| json::json!(v)),
             ),
             (
                 GenAiAttributes::PROMPT_LABEL,
@@ -1436,7 +1435,7 @@ mod tests {
     #[test]
     fn process_span_replaces_or_drops_raw_prompt_reference() {
         let processor = OtelIngestionProcessor::new();
-        // Rejected by the extractor: a non-numeric version and a non-string name.
+        // Rejected by the extractor: a non-string name; the version is kept.
         let mut rejected = HashMap::from([
             (GenAiAttributes::PROMPT_NAME.to_string(), json::json!(42)),
             (
@@ -1449,14 +1448,17 @@ mod tests {
             ),
         ]);
         processor.process_span(&mut rejected, &HashMap::new(), None, &[]);
-        assert!(!rejected.contains_key(GenAiAttributes::PROMPT_VERSION));
         assert!(!rejected.contains_key(GenAiAttributes::PROMPT_NAME));
+        assert_eq!(
+            rejected.get(GenAiAttributes::PROMPT_VERSION),
+            Some(&json::json!("latest"))
+        );
         assert_eq!(
             rejected.get(GenAiAttributes::PROMPT_LABEL),
             Some(&json::json!("production"))
         );
 
-        // A numeric string version is stored as the integer it names.
+        // String versions are kept as strings, including numeric strings.
         let mut accepted = HashMap::from([
             (
                 GenAiAttributes::PROMPT_NAME.to_string(),
@@ -1470,7 +1472,7 @@ mod tests {
         processor.process_span(&mut accepted, &HashMap::new(), None, &[]);
         assert_eq!(
             accepted.get(GenAiAttributes::PROMPT_VERSION),
-            Some(&json::json!(3))
+            Some(&json::json!("3"))
         );
         assert_eq!(
             accepted.get(GenAiAttributes::PROMPT_NAME),

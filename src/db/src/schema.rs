@@ -980,9 +980,11 @@ mod tests {
 
     #[test]
     fn test_gen_ai_schema_fields_widens_existing_int64_prompt_version() {
-        let existing_schema = SchemaCache::new(Schema::new(vec![
-            Field::new("gen_ai_prompt_version", DataType::Int64, true),
-        ]));
+        let existing_schema = SchemaCache::new(Schema::new(vec![Field::new(
+            "gen_ai_prompt_version",
+            DataType::Int64,
+            true,
+        )]));
 
         let fields_to_update: Vec<Field> = GEN_AI_SCHEMA_FIELDS
             .iter()
@@ -990,7 +992,10 @@ mod tests {
                 None => true,
                 Some(existing) => {
                     existing.data_type() != f.data_type()
-                        && infra::schema::is_widening_conversion(existing.data_type(), f.data_type())
+                        && infra::schema::is_widening_conversion(
+                            existing.data_type(),
+                            f.data_type(),
+                        )
                 }
             })
             .cloned()
@@ -1000,9 +1005,6 @@ mod tests {
             .iter()
             .find(|f| f.name() == "gen_ai_prompt_version");
         assert!(prompt_version_field.is_some());
-        assert_eq!(
-            prompt_version_field.unwrap().data_type(),
-            &DataType::Utf8
-        );
+        assert_eq!(prompt_version_field.unwrap().data_type(), &DataType::Utf8);
     }
 }

@@ -35,7 +35,8 @@ pub struct PromptAttribution {
 pub struct PromptExtractor;
 
 impl PromptExtractor {
-    /// Extracts prompt identity from official GenAI attributes, falling back to legacy Langfuse aliases.
+    /// Extracts prompt identity from official GenAI attributes, falling back to legacy Langfuse
+    /// aliases.
     pub fn extract(&self, attributes: &HashMap<String, json::Value>) -> PromptAttribution {
         PromptAttribution {
             name: string_with_fallback(
