@@ -14,8 +14,8 @@ name: Playwright E2E Crosscheck
 #       · open sister ENT PR (same-named branch) → DEFER to that PR's checks (link it, don't build here)
 #       · sister ENT branch only (no PR)          → build the enterprise binary against that branch
 #       · PR base is a release line (not main) with a same-named ENT branch → build against THAT branch
-#       · no ENT counterpart                      → build against ENT main, testing the PR merged into
-#                                                   OSS main (refs/pull/N/merge; branch head if not mergeable)
+#       · no ENT counterpart                      → build against ENT main, testing the merge commit SHA tied to
+#                                                   the event's head SHA (the head SHA itself if there is none)
 #     then POLL and mirror pass/fail. Only a lost test runner is re-run, up to twice, before it is reported.
 #
 # A single STICKY comment per PR (found by a hidden marker) reports running → passed / failed, lists the
@@ -148,12 +148,12 @@ jobs:
               echo "::notice::No gate result on $HEAD_SHA yet — nothing to mirror."
               exit 0
             fi
-            # A cancelled check whose Run step never started is a superseded mirror or gate, not a result.
-            if [ "$STATUS" = "completed" ] && [ "$CONCL" = "cancelled" ]; then
-              if ! RAN=$(gh api "repos/${{ github.repository }}/actions/jobs/$ID" -q '[.steps[]? | select((.name | startswith("Run — ")) and .conclusion != null and .conclusion != "skipped")] | length'); then
-                api_error; continue
-              fi
-              if [ "$RAN" = "0" ]; then IGNORE=$(jq -c --argjson i "$ID" '. + [$i]' <<<"$IGNORE"); continue; fi
+            # Mirrors share this check name, so a check that ran the Mirror step, or a cancelled one whose Run step never started, is no gate result.
+            if ! RAN=$(gh api "repos/${{ github.repository }}/actions/jobs/$ID" -q '[.steps[]? | select(.status == "in_progress" or (.conclusion != null and .conclusion != "skipped")) | .name | split(" — ")[0]] | join(" ")'); then
+              api_error; continue
+            fi
+            if [[ " $RAN " == *" Mirror "* ]] || { [ "$CONCL" = "cancelled" ] && [[ " $RAN " != *" Run "* ]]; }; then
+              IGNORE=$(jq -c --argjson i "$ID" '. + [$i]' <<<"$IGNORE"); continue
             fi
             if [ "$STATUS" = "completed" ]; then break; fi
             # This check is newer than the running gate, so it must end with the gate's result, not before it.

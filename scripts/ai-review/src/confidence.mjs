@@ -50,12 +50,14 @@ export function mergeConfidence({
   if (ranCount === 0) return { level: "low", reasons: ["no reviewer ran"] };
   if (ranCount > 0 && failedReviewers.length >= ranCount) return { level: "low", reasons: ["no reviewer finished"] };
 
-  const blockers = (counts.p0 ?? 0) + (counts.p1 ?? 0);
+  const blockers = counts.p0 ?? 0;
+  const major = counts.p1 ?? 0;
   const core = failedReviewers.filter(name => CORE_REVIEWER_RE.test(shortName(name)));
   const other = failedReviewers.filter(name => !core.includes(name));
   const unfinished = name => `${shortName(name)} reviewer did not finish`;
   const low = [
-    ...(blockers > 0 ? [`${plural(blockers, "blocker")} (P0/P1)`] : []),
+    ...(blockers > 0 ? [`${plural(blockers, "blocker")} (P0)`] : []),
+    ...(major > 0 ? [`${plural(major, "major concern")} (P1)`] : []),
     ...(findingsKnown ? [] : ["findings could not be counted"]),
     ...core.map(unfinished),
   ];

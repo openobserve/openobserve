@@ -169,8 +169,8 @@ test("merge confidence applies every rule, the lowest level wins and every cause
     ["clean", {}, "high", ["no blockers; all reviewers finished; tests changed"]],
     ["no production code", { prodChanged: false, testsChanged: false }, "high", ["no blockers; all reviewers finished"]],
     ["p3 alone", { counts: { p3: 2 } }, "high", ["no blockers; all reviewers finished; tests changed"]],
-    ["one blocker", { counts: { p1: 1 } }, "low", ["1 blocker (P0/P1)"]],
-    ["two blockers", { counts: { p0: 1, p1: 1 } }, "low", ["2 blockers (P0/P1)"]],
+    ["one major concern", { counts: { p1: 1 } }, "low", ["1 major concern (P1)"]],
+    ["a blocker and a major concern", { counts: { p0: 1, p1: 1 } }, "low", ["1 blocker (P0)", "1 major concern (P1)"]],
     ["uncounted", { findingsKnown: false }, "low", ["findings could not be counted"]],
     ["security unfinished", { failedReviewers: ["Security Reviewer"] }, "low", ["Security reviewer did not finish"]],
     ["correctness unfinished", { failedReviewers: ["Correctness Reviewer"] }, "low", ["Correctness reviewer did not finish"]],
@@ -182,7 +182,7 @@ test("merge confidence applies every rule, the lowest level wins and every cause
     ["all failed", { failedReviewers: ["Security Reviewer", "Release Reviewer"], ranCount: 2 }, "low", ["no reviewer finished"]],
     ["none ran", { ranCount: 0 }, "low", ["no reviewer ran"]],
     ["lowest wins, worst first", { counts: { p1: 1, p2: 1 }, testsChanged: false, failedReviewers: ["Release Reviewer"] }, "low",
-      ["1 blocker (P0/P1)", "Release reviewer did not finish", "1 P2 finding", "no tests changed"]],
+      ["1 major concern (P1)", "Release reviewer did not finish", "1 P2 finding", "no tests changed"]],
   ];
   for (const [name, change, level, reasons] of table) {
     assert.deepEqual(mergeConfidence({ ...clean, ...change }), { level, reasons }, name);
