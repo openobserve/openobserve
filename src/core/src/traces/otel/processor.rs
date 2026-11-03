@@ -625,8 +625,7 @@ impl OtelIngestionProcessor {
             );
         }
 
-        // The raw prompt reference survives extraction; replace it with the normalised value,
-        // or drop it when the extractor rejected it (non-string name, empty/null version).
+        // Replace raw prompt reference with normalised value, or drop if rejected by extractor.
         for (key, value) in [
             (
                 GenAiAttributes::PROMPT_NAME,

@@ -231,10 +231,8 @@ impl InputOutputExtractor {
             return true;
         }
 
-        // TraceLoop nested prompt/completion (`gen_ai.prompt.0.content`, …) are
-        // extracted to the input/output columns. The prompt reference
-        // (name/version/label) and template variables (gen_ai.prompt.variable.*)
-        // stay on the span.
+        // TraceLoop indexed keys (gen_ai.prompt.0.content) extract to columns; prompt metadata and
+        // variables stay on span.
         if matches!(
             key,
             GenAiAttributes::PROMPT_NAME
