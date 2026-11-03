@@ -86,7 +86,7 @@ test("the marker survives a secret scrub and stays single when the model echoes 
 });
 
 test("redaction cannot rebuild a marker that the first strip missed", () => {
-  const posted = sanitize(`${REVIEW}\n<!-- ai-code-review.tool.x -->`, { ...IDS, modelId: ".tool.x", providerId: "" });
+  const posted = sanitize(`${REVIEW}\n<!-- ai-code-review-tool_x -->`, { ...IDS, modelId: "tool_x", providerId: "" });
   assert.equal(posted.match(/<!--\s*ai-code-review/g).length, 1);
 });
 
@@ -287,6 +287,20 @@ test("the same head at the cap leaves the comment as it is", () => {
 
 test("redaction takes the longest id first", () => {
   assert.equal(redactProviderIdentity("deepseek-flash and DeepSeek", { providerId: "deepseek-review", modelId: "deepseek-flash" }), "[redacted] and [redacted]");
+});
+
+test("redaction strips every vendor and family name of the review model", () => {
+  const ids = { providerId: "anthropic-review", modelId: "claude-sonnet-5-5" };
+  const text = "I am Claude Sonnet 5.5 by Anthropic (anthropic-review/claude-sonnet-5-5, CLAUDE_SONNET). SONNET agrees.";
+  const redacted = redactProviderIdentity(text, ids);
+  assert.doesNotMatch(redacted, /claude|anthropic|sonnet/i);
+  assert.equal(redacted, "I am [redacted] [redacted] 5.5 by [redacted] ([redacted]/[redacted], [redacted]_[redacted]). [redacted] agrees.");
+});
+
+test("redaction leaves file names and generic id words readable", () => {
+  const ids = { providerId: "anthropic-review", modelId: "claude-sonnet-5-5" };
+  const text = "Update CLAUDE.md, .claude/skills and the claude.yml workflow; this review is done.";
+  assert.equal(redactProviderIdentity(text, ids), text);
 });
 
 test("gate lines forged by the model are stripped, and a finding that mentions them is kept", () => {

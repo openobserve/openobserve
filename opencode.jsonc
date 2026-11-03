@@ -14,10 +14,26 @@
   // Policies refuse every other provider, including the bundled free ones; a review talks to one endpoint only.
   "policies": [
     { "action": "provider.use", "resource": "*", "effect": "deny" },
-    { "action": "provider.use", "resource": "deepseek-review", "effect": "allow" }
+    { "action": "provider.use", "resource": "anthropic-review", "effect": "allow" }
   ],
 
   "providers": {
+    "anthropic-review": {
+      "name": "Anthropic (review)",
+      // Bundled in the opencode binary; its default endpoint is https://api.anthropic.com/v1.
+      "package": "@opencode/ai/providers/anthropic",
+      // Not ANTHROPIC_API_KEY, so no other provider opencode knows about can pick the key up.
+      "env": ["ANTHROPIC_REVIEW_API_KEY"],
+      "models": {
+        "claude-sonnet-5-5": {
+          "name": "Claude Sonnet 5.5",
+          // Selected with REVIEW_MODEL_VARIANT=high; opencode sends adaptive thinking and "output_config": { "effort": "high" }.
+          "variants": [{ "id": "high", "settings": { "thinking": { "type": "adaptive" }, "effort": "high" } }],
+          "limit": { "context": 1000000, "output": 128000 }
+        }
+      }
+    },
+    // Denied by the policy above; kept so switching back needs no new provider block.
     "deepseek-review": {
       "name": "DeepSeek (review)",
       // Bundled in the opencode binary, so nothing is installed at run time.
@@ -37,13 +53,13 @@
     }
   },
 
-  "model": "deepseek-review/deepseek-flash",
+  "model": "anthropic-review/claude-sonnet-5-5",
 
   // Last match wins, so the "*" deny must come first; src/opencode.mjs selfCheck refuses any other allowed tool.
   "agents": {
     "ai-review-security": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-flash",
+      "model": "anthropic-review/claude-sonnet-5-5",
       "permissions": [
         { "action": "*", "resource": "*", "effect": "deny" },
         { "action": "read", "resource": "*", "effect": "allow" },
@@ -54,7 +70,7 @@
     },
     "ai-review-correctness": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-flash",
+      "model": "anthropic-review/claude-sonnet-5-5",
       "permissions": [
         { "action": "*", "resource": "*", "effect": "deny" },
         { "action": "read", "resource": "*", "effect": "allow" },
@@ -65,7 +81,7 @@
     },
     "ai-review-code-quality": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-flash",
+      "model": "anthropic-review/claude-sonnet-5-5",
       "permissions": [
         { "action": "*", "resource": "*", "effect": "deny" },
         { "action": "read", "resource": "*", "effect": "allow" },
@@ -76,7 +92,7 @@
     },
     "ai-review-performance": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-flash",
+      "model": "anthropic-review/claude-sonnet-5-5",
       "permissions": [
         { "action": "*", "resource": "*", "effect": "deny" },
         { "action": "read", "resource": "*", "effect": "allow" },
@@ -87,7 +103,7 @@
     },
     "ai-review-documentation": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-flash",
+      "model": "anthropic-review/claude-sonnet-5-5",
       "permissions": [
         { "action": "*", "resource": "*", "effect": "deny" },
         { "action": "read", "resource": "*", "effect": "allow" },
@@ -98,7 +114,7 @@
     },
     "ai-review-release": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-flash",
+      "model": "anthropic-review/claude-sonnet-5-5",
       "permissions": [
         { "action": "*", "resource": "*", "effect": "deny" },
         { "action": "read", "resource": "*", "effect": "allow" },
@@ -109,7 +125,7 @@
     },
     "ai-review-frontend": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-flash",
+      "model": "anthropic-review/claude-sonnet-5-5",
       "permissions": [
         { "action": "*", "resource": "*", "effect": "deny" },
         { "action": "read", "resource": "*", "effect": "allow" },
@@ -120,7 +136,7 @@
     },
     "ai-review-qa": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-flash",
+      "model": "anthropic-review/claude-sonnet-5-5",
       "permissions": [
         { "action": "*", "resource": "*", "effect": "deny" },
         { "action": "read", "resource": "*", "effect": "allow" },
@@ -131,7 +147,7 @@
     },
     "ai-review-coordinator": {
       "mode": "primary",
-      "model": "deepseek-review/deepseek-flash",
+      "model": "anthropic-review/claude-sonnet-5-5",
       "permissions": [
         { "action": "*", "resource": "*", "effect": "deny" },
         { "action": "read", "resource": "*", "effect": "allow" },
