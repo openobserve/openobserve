@@ -97,6 +97,11 @@ export class OnCallRoutingPage {
       unroutedHeader: '[data-test="oncall-unrouted-header"]',
       unroutedEmpty: '[data-test="oncall-unrouted-empty"]',
       unroutedClaimAll: '[data-test="oncall-unrouted-claim-all"]',
+      // Org-level bulk claim: header button, then a team picker dialog stating the outcome.
+      claimAll: '[data-test="oncall-routing-claim-all"]',
+      claimAllDialog: '[data-test="oncall-routing-claim-all-dialog"]',
+      claimAllTeam: '[data-test="oncall-routing-claim-all-team"]',
+      claimAllOutcome: '[data-test="oncall-routing-claim-all-outcome"]',
 
       // Test routing (OnCallRoutingSimulator), in the tester drawer. Rows share OnCallConditionRows.
       simulator: '[data-test="oncall-routing-simulator"]',
@@ -111,6 +116,7 @@ export class OnCallRoutingPage {
       simulatorTeam: '[data-test="oncall-simulator-team"]',
       simulatorResponder: '[data-test="oncall-simulator-responder"]',
       simulatorNext: '[data-test="oncall-simulator-next"]',
+      ruleEditorOnCall: '[data-test="oncall-rule-editor-on-call"]',
       simulatorSendTest: '[data-test="oncall-simulator-send-test"]',
 
       // The org's catch-all nomination dialog (OnCallDefaultTeamCard), opened from the pinned row.

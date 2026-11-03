@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            "assign everything unowned to one team" is rarely the true intent. -->
       <OButton
         v-if="signals.length && teamName"
-        variant="outline"
+        variant="primary"
         size="sm"
         icon-left="add"
         class="ms-auto"
@@ -155,15 +155,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <span class="flex items-center justify-end gap-1">
           <OButton
-            variant="ghost-primary"
-            size="icon-sm"
-            icon-left="add"
+            variant="outline-primary"
+            size="xs"
+            icon-left="alt-route"
             class="max-md:hidden"
-            :aria-label="claimLabel"
             :data-test="`oncall-unrouted-claim-${row.id}`"
             @click.stop="emit('claim', row)"
           >
-            <OTooltip side="bottom" :content="claimLabel" />
+            {{ claimLabel }}
           </OButton>
           <OButton
             variant="ghost"
@@ -302,7 +301,7 @@ const timezone = computed<string | undefined>(() => store.state.timezone || unde
 const claimLabel = computed<I18nText>(() =>
   props.teamName
     ? t("oncall.unroutedClaimFor", { team: raw(props.teamName) })
-    : t("oncall.unroutedGiveOwner"),
+    : t("oncall.unroutedClaimShort"),
 );
 
 const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
@@ -351,7 +350,7 @@ const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
     isAction: true,
     pinned: "right",
     sortable: false,
-    size: 100,
+    size: 160,
     meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
 ]);

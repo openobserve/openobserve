@@ -316,6 +316,31 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
+  // Whether the transport took a page; `sent` is handed off with no receipt yet, so it stays neutral.
+  oncallDelivery: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      sent: { variant: "default-soft", labelKey: "oncall.deliveryStatus_sent" },
+      delivered: { variant: "success-soft", labelKey: "oncall.deliveryStatus_delivered" },
+      failed: { variant: "error-soft", labelKey: "oncall.deliveryStatus_failed" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // The phone provider's live check; `unchecked` means the provider was unreachable, not broken.
+  oncallTelephonyStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      checking: { variant: "default-soft", labelKey: "telephony.statusChecking" },
+      ok: { variant: "success-soft", labelKey: "telephony.connected" },
+      broken: { variant: "error-soft", labelKey: "telephony.statusBroken" },
+      unchecked: { variant: "warning-soft", labelKey: "telephony.statusUnchecked" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Alert severity LEVEL (alerts_2.md Feature 1) — dot, PILL.
   //
   // A separate axis from `alertState` above, which renders the run OUTCOME

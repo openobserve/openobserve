@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :catalogue="catalogue"
         :signals="signals"
         :services="services"
+        :rules="rules"
         test-prefix="oncall-simulator"
       />
     </div>
@@ -69,21 +70,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-busy="loading"
       data-test="oncall-simulator-result"
     >
-      <p class="text-text-body text-sm" data-test="oncall-simulator-answer">
-        <span class="text-text-heading font-semibold" data-test="oncall-simulator-team">
+      <span class="flex min-w-0 items-baseline gap-1 text-sm" data-test="oncall-simulator-answer">
+        <span class="text-text-heading shrink-0 font-semibold" data-test="oncall-simulator-team">
           {{ t("oncall.simulatorAnswerTeam", { team: teamLabel }) }}
         </span>
-        <template v-if="preview.team_id">
-          <span>{{ raw(" · ") }}</span>
-          <span :class="responderTone" data-test="oncall-simulator-responder">
+        <OTruncatedText v-if="preview.team_id" class="text-text-body flex-1">
+          <span>{{ raw("· ") }}</span>
+          <i18n-t
+            v-if="wakes"
+            keypath="oncall.simulatorWakesNow"
+            tag="span"
+            scope="global"
+            :class="responderTone"
+            data-test="oncall-simulator-responder"
+          >
+            <template #who>
+              <OnCallPersonName
+                :email="wakes.email"
+                data-test="oncall-simulator-responder-person"
+              />
+            </template>
+            <template #channels>{{ wakes.channels }}</template>
+          </i18n-t>
+          <span v-else :class="responderTone" data-test="oncall-simulator-responder">
             {{ responderNote }}
           </span>
-          <template v-if="nextNote">
+          <template v-if="nextStep">
             <span>{{ raw(" · ") }}</span>
-            <span data-test="oncall-simulator-next">{{ nextNote }}</span>
+            <i18n-t
+              keypath="oncall.simulatorNextStep"
+              tag="span"
+              scope="global"
+              data-test="oncall-simulator-next"
+            >
+              <template #who>
+                <template v-for="(email, index) in nextStep.emails" :key="email">
+                  <span v-if="index">{{ raw(", ") }}</span>
+                  <OnCallPersonName :email="email" data-test="oncall-simulator-next-person" />
+                </template>
+              </template>
+              <template #after>{{ nextStep.after }}</template>
+            </i18n-t>
           </template>
-        </template>
-      </p>
+        </OTruncatedText>
+      </span>
 
       <OCollapsible :label="t('oncall.simulatorWhy')" data-test="oncall-simulator-why">
         <div class="flex flex-col gap-1 pt-1">
@@ -96,12 +126,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="meta"
             :data-test="`oncall-simulator-also-${other.rule_id}`"
           >
-            {{ t("oncall.simulatorAlsoMatched", { path: raw(readable(other.path)) }) }}
-            {{ alsoTarget(other) }}
-            {{ raw(other.lost_because) }}
+            {{ alsoLine(other) }}
           </OText>
           <OText
-            v-for="(note, index) in preview.notes ?? []"
+            v-for="(note, index) in matchedNotes"
             :key="index"
             variant="meta"
             :data-test="`oncall-simulator-note-${index}`"
@@ -161,13 +189,16 @@ import { useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 
 import OnCallConditionRows from "@/components/oncall/OnCallConditionRows.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { escalationPreviewQuery } from "@/services/oncall.queries";
 import type {
   AlsoMatchedRule,
@@ -175,6 +206,7 @@ import type {
   DimensionCatalogue,
   DiscoveredService,
   OwnershipRuleStats,
+  PreviewRung,
   RoutingPreview,
   TeamRungSummary,
   TestPageAttempt,
@@ -184,7 +216,13 @@ import type {
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
-import { SERVICE_DIMENSION, claimableDimensions, dimensionsSentence } from "@/utils/oncall";
+import {
+  SERVICE_DIMENSION,
+  claimableDimensions,
+  dimensionsOfPath,
+  ownershipPath,
+  readableConditions,
+} from "@/utils/oncall";
 
 export interface SimulatorQuery {
   dimensions: Record<string, string>;
@@ -234,6 +272,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const store = useStore();
+const { nameOf } = useOrgUserNames();
 
 const PRIORITIES = ["P1", "P2", "P3", "P4", "P5"];
 const STARTS_SHOWN = 10;
@@ -252,28 +291,20 @@ function seedWith(next: Record<string, string>) {
   seedKey.value += 1;
 }
 
-watch(
-  () => props.seed,
-  (next) => {
-    if (next) seedWith(next);
-  },
-  { immediate: true },
-);
-
 /// Three kinds of real starting point, each tagged by its source so one id space cannot collide with another.
 const startOptions = computed<SelectOption[]>(() => {
   const signals = [...props.signals]
     .sort((a, b) => b.occurrences - a.occurrences)
     .slice(0, STARTS_SHOWN)
     .map((signal) => ({
-      label: raw(dimensionsSentence(claimableDimensions(signal.dimensions)) || signal.path),
+      label: raw(readable(claimableDimensions(signal.dimensions)) || signal.path),
       value: `signal:${signal.id}`,
       icon: "notifications-active",
       subLabel: t("oncall.routingFiresWindow", { count: signal.occurrences }, signal.occurrences),
       subLabelInline: true,
     }));
   const rules = props.rules.slice(0, STARTS_SHOWN).map((rule) => ({
-    label: raw(dimensionsSentence(rule.dimensions)),
+    label: raw(readable(rule.dimensions)),
     value: `rule:${rule.rule_id}`,
     icon: "alt-route",
     subLabel: raw(teamNameOf(rule.team_id) || rule.team_name || ""),
@@ -292,6 +323,28 @@ const startOptions = computed<SelectOption[]>(() => {
     ...group(t("oncall.simulatorStartServices"), services),
   ];
 });
+
+/// Names the start a seed came from, so the picker never reads "Choose…" over rows it filled.
+function startOf(seed: Record<string, string>): string | null {
+  const path = ownershipPath(seed);
+  const rule = props.rules.find((one) => ownershipPath(one.dimensions) === path);
+  if (rule) return `rule:${rule.rule_id}`;
+  const signal = props.signals.find(
+    (one) => ownershipPath(claimableDimensions(one.dimensions)) === path,
+  );
+  return signal ? `signal:${signal.id}` : null;
+}
+
+watch(
+  () => props.seed,
+  (next) => {
+    if (!next) return;
+    const start = startOf(next);
+    startPick.value = startOptions.value.some((option) => option.value === start) ? start : null;
+    seedWith(next);
+  },
+  { immediate: true },
+);
 
 function startFrom(value: unknown) {
   const pick = String(value ?? "");
@@ -332,21 +385,32 @@ function teamNameOf(teamId: string | null | undefined): string {
   return props.teams.find((team) => team.id === teamId)?.name || teamId;
 }
 
-/// `k8s-namespace=payments` as stored, spaced out for reading.
-function readable(path: string): string {
-  return path.split("/").join(" · ").split("=").join(" = ");
+function readable(dimensions: Record<string, string>): string {
+  return readableConditions(dimensions, props.aliases, {
+    and: String(t("oncall.ruleEditorAnd")),
+    startsWith: (field) => String(t("oncall.ruleChipStartsWith", { field: raw(field) })),
+  });
 }
 
 const teamLabel = computed<I18nText>(() =>
   props.preview?.team_id ? raw(teamNameOf(props.preview.team_id)) : t("oncall.wouldPageNobody"),
 );
 
+/// Plain words, never the engine's `k=v` notes: they restate this line in storage notation.
 const wonLine = computed<I18nText>(() => {
   const path = props.preview?.decision?.path;
-  if (props.preview?.landed_on_default || typeof path !== "string") {
-    return t("oncall.simulatorDefaultTeam");
+  if (typeof path === "string" && !props.preview?.landed_on_default) {
+    return t("oncall.simulatorWonPlain", { conditions: raw(readable(dimensionsOfPath(path))) });
   }
-  return t("oncall.simulatorWon", { path: raw(readable(path)) });
+  return props.preview?.team_id
+    ? t("oncall.simulatorNoRuleDefault", { team: teamLabel.value })
+    : t("oncall.simulatorNoRuleNobody");
+});
+
+/// The no-match note only restates `wonLine` in `k=v` form; a matched route's notes are real caveats.
+const matchedNotes = computed<string[]>(() => {
+  const kind = props.preview?.decision?.kind;
+  return kind === "ownership" || kind === "explicit" ? (props.preview?.notes ?? []) : [];
 });
 
 const ladderEntry = computed<TeamRungSummary | null>(
@@ -364,19 +428,23 @@ const sentChannels = computed<Channel[]>(() => {
   return person.deliverable_channels.filter((channel) => entry.channels.includes(channel));
 });
 
+/// The person and channels when a page would land, so the name renders with its email tooltip.
+const wakes = computed<{ email: string; channels: string } | null>(() => {
+  if (ladderEntry.value && !ladderEntry.value.pages_anyone) return null;
+  const person = responder.value;
+  if (!person?.would_a_page_land || !sentChannels.value.length) return null;
+  const channels = sentChannels.value
+    .map((channel) => String(t(`oncall.channel_${channel}`)))
+    .join(", ");
+  return { email: person.user_email, channels };
+});
+
 const responderNote = computed<I18nText>(() => {
   if (ladderEntry.value && !ladderEntry.value.pages_anyone) return t("oncall.reachPagesNobody");
   const person = responder.value;
   if (!person) return t("oncall.simulatorNobodyOnCall");
   if (!person.would_a_page_land) return raw(person.why_not) || t("oncall.contactNoChannel");
-  if (!sentChannels.value.length) return t("oncall.simulatorSendsNothing");
-  const channels = sentChannels.value
-    .map((channel) => String(t(`oncall.channel_${channel}`)))
-    .join(", ");
-  return t("oncall.simulatorWakesNow", {
-    who: raw(person.user_email),
-    channels: raw(channels),
-  });
+  return t("oncall.simulatorSendsNothing");
 });
 
 const responderTone = computed(() => {
@@ -398,18 +466,18 @@ const escalation = useQuery(() =>
   ),
 );
 
-/// The second step of the ladder, if there is one; hidden when the reader may not see it.
-const nextNote = computed<I18nText | "">(() => {
-  if (escalation.isError.value) return "";
-  const step = escalation.data.value?.rungs?.[1];
-  if (!step) return "";
-  const people = [...new Set(step.recipients.map((one) => one.user_email))];
-  const who = people.length ? people.join(", ") : step.targets.join(", ");
-  if (!who) return "";
-  return t("oncall.simulatorNextStep", {
-    who: raw(who),
-    after: raw(formatMicrosDuration(step.after_micros)),
-  });
+/// The next step that wakes somebody new; hidden when the reader may not see the ladder.
+const nextStep = computed<{ emails: string[]; after: string } | null>(() => {
+  if (escalation.isError.value) return null;
+  const woken = responder.value?.user_email.toLowerCase();
+  const fresh = (rung: PreviewRung) =>
+    rung.recipients.map((one) => one.user_email).filter((email) => email.toLowerCase() !== woken);
+  const step = (escalation.data.value?.rungs ?? []).slice(1).find((rung) => fresh(rung).length);
+  if (!step) return null;
+  return {
+    emails: [...new Set(fresh(step))],
+    after: formatMicrosDuration(step.after_micros),
+  };
 });
 
 /// A result is shown only beside the inputs it was sent for.
@@ -429,7 +497,7 @@ const sentAttempts = computed(
 
 function attemptLine(attempt: TestPageAttempt): I18nText {
   const params = {
-    person: raw(attempt.recipient),
+    person: raw(nameOf(attempt.recipient)),
     channel: t(`oncall.channel_${attempt.channel}`),
   };
   if (attempt.delivered) return t("oncall.testPageAttemptSent", params);
@@ -439,9 +507,10 @@ function attemptLine(attempt: TestPageAttempt): I18nText {
 }
 
 /// A loser pointing at the same team changes nothing; one pointing elsewhere is a page on another team's phone.
-function alsoTarget(other: AlsoMatchedRule): I18nText {
-  if (other.same_team) return t("oncall.simulatorSameTeam");
-  const name = other.team_name || teamNameOf(other.team_id);
-  return t("oncall.simulatorOtherTeamNamed", { team: raw(name || other.team_id) });
+function alsoLine(other: AlsoMatchedRule): I18nText {
+  const conditions = raw(readable(dimensionsOfPath(other.path)));
+  if (other.same_team) return t("oncall.simulatorLostSameTeam", { conditions });
+  const team = raw(other.team_name || teamNameOf(other.team_id) || other.team_id);
+  return t("oncall.simulatorLostOtherTeam", { conditions, team });
 }
 </script>

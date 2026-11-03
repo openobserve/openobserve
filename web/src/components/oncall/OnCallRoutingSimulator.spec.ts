@@ -16,7 +16,10 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallRoutingSimulator from "@/components/oncall/OnCallRoutingSimulator.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { orgUsersQuery } from "@/services/users.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import type {
@@ -166,16 +169,26 @@ describe("OnCallRoutingSimulator", () => {
     expect(select(wrapper, "oncall-simulator-op-0").props("modelValue")).toBe("prefix");
   });
 
-  it("answers in one line: team, who is woken now, and the next step", async () => {
+  it("answers in one line by name: team, who is woken now, and the next new person", async () => {
     vi.useRealTimers();
+    queryClient.setQueryData(orgUsersQuery("default").queryKey, [
+      { email: "ana@o2.ai", first_name: "Ana" },
+      { email: "raj@o2.ai", first_name: "Raj" },
+    ]);
     escalationPreview.mockResolvedValue({
       data: {
         rungs: [
           { after_micros: 0, targets: [], recipients: [], resolves_to_nobody: false },
           {
+            after_micros: 120_000_000,
+            targets: [],
+            recipients: [{ user_email: "ana@o2.ai" }],
+            resolves_to_nobody: false,
+          },
+          {
             after_micros: 300_000_000,
             targets: [],
-            recipients: [{ user_email: "raj@o2.ai" }],
+            recipients: [{ user_email: "ana@o2.ai" }, { user_email: "raj@o2.ai" }],
             resolves_to_nobody: false,
           },
         ],
@@ -186,8 +199,15 @@ describe("OnCallRoutingSimulator", () => {
     await flushPromises();
     const answer = wrapper.find('[data-test="oncall-simulator-answer"]').text();
     expect(answer).toContain("→ Payments SRE");
-    expect(answer).toContain("wakes ana@o2.ai now");
-    expect(wrapper.find('[data-test="oncall-simulator-next"]').text()).toContain("raj@o2.ai");
+    expect(answer).toContain("wakes Ana now");
+    expect(answer).not.toContain("@");
+    const next = wrapper.find('[data-test="oncall-simulator-next"]').text();
+    expect(next).toContain("then Raj after 5m");
+    expect(next).not.toContain("Ana");
+    const ana = wrapper
+      .findAllComponents(OnCallPersonName)
+      .find((c) => c.props("email") === "ana@o2.ai");
+    expect(ana!.findComponent(OTooltip).props("content")).toBe("Ana (ana@o2.ai)");
   });
 
   it("says a silent priority pages nobody rather than naming the responder", async () => {
@@ -213,12 +233,33 @@ describe("OnCallRoutingSimulator", () => {
         ],
       }),
     });
-    expect(wrapper.find('[data-test="oncall-simulator-won"]').text()).toContain(
-      "service = payments-api",
+    expect(wrapper.find('[data-test="oncall-simulator-won"]').text()).toBe(
+      "Matched the rule for Service payments-api",
     );
-    const lost = wrapper.find('[data-test="oncall-simulator-also-r9"]').text();
-    expect(lost).toContain("Checkout");
-    expect(lost).toContain("fewer conditions");
+    expect(wrapper.find('[data-test="oncall-simulator-also-r9"]').text()).toBe(
+      "Also matched K8s namespace payments → Checkout: less specific, so it lost",
+    );
+  });
+
+  it("says a miss in plain words, never the engine's k=v note", () => {
+    const wrapper = render({
+      seed: { service: "orphan" },
+      preview: preview({
+        decision: { kind: "unrouted" },
+        team_id: null,
+        current_responder: null,
+        notes: ["no ownership rule covers service=orphan"],
+      }),
+    });
+    expect(wrapper.find('[data-test="oncall-simulator-won"]').text()).toBe(
+      "No rule matches, so nobody is paged",
+    );
+    expect(wrapper.text()).not.toContain("no ownership rule covers");
+  });
+
+  it("names the start the seed came from instead of a blank picker", () => {
+    const wrapper = render({ seed: { "k8s-namespace": "payments" } });
+    expect(select(wrapper, "oncall-simulator-start").props("modelValue")).toBe("rule:r1");
   });
 
   it("names nobody when no team owns the alert", () => {

@@ -16,7 +16,10 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallRuleEditor from "@/components/oncall/OnCallRuleEditor.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { orgUsersQuery } from "@/services/users.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -138,11 +141,15 @@ describe("OnCallRuleEditor", () => {
     ]);
   });
 
-  it("ignores an incomplete row and says so inline", async () => {
+  it("ignores an incomplete row, and says so only once its value was cleared", async () => {
     const wrapper = render();
     select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "risk-api");
     await wrapper.find('[data-test="oncall-rule-editor-add-condition"]').trigger("click");
     select(wrapper, "oncall-rule-editor-field-1").vm.$emit("update:modelValue", "k8s-namespace");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-pick-value-1"]').exists()).toBe(false);
+    select(wrapper, "oncall-rule-editor-value-1").vm.$emit("update:modelValue", "risk");
+    select(wrapper, "oncall-rule-editor-value-1").vm.$emit("update:modelValue", null);
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-rule-editor-pick-value-1"]').text()).toBe(
       "Pick a value",
@@ -192,13 +199,36 @@ describe("OnCallRuleEditor", () => {
     expect(wrapper.find('[data-test="oncall-rule-editor-signals"]').exists()).toBe(false);
   });
 
-  it("states one outcome: how many waiting signals the draft matches", async () => {
+  it("states one outcome: where future alerts go and how many waiting signals it catches", async () => {
     const wrapper = render();
+    select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "risk-api");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').text()).toBe(
+      "Future alerts like this go to Search · catches 1 signal that needs an owner",
+    );
+  });
+
+  it("counts the waiting signals alone while no team is picked", async () => {
+    const wrapper = render({ teamId: "" });
     select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "risk-api");
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').text()).toBe(
       "Matches 1 of the signals that need an owner",
     );
+  });
+
+  it("offers fields the signals and existing rules use, labelled in sentence case", async () => {
+    const wrapper = render({
+      catalogue: { present: ["service"], values: {} },
+      rules: [{ rule_id: "r1", team_id: "team_2", dimensions: { environment: "prod" } }],
+    });
+    await wrapper.find('[data-test="oncall-rule-editor-add-condition"]').trigger("click");
+    const fields = select(wrapper, "oncall-rule-editor-field-1").props("options") as {
+      label: string;
+      value: string;
+    }[];
+    expect(fields.map((o) => o.value)).toEqual(["k8s-namespace", "environment"]);
+    expect(fields[0].label).toBe("K8s namespace");
   });
 
   it("names the team it takes alerts from when another team holds a broader path", async () => {
@@ -218,12 +248,17 @@ describe("OnCallRuleEditor", () => {
 
   it("shows who is on call now for the picked team", async () => {
     whoIsOnCall.mockResolvedValue({ data: [{ user_email: "ana@example.com" }] });
+    queryClient.setQueryData(orgUsersQuery("default").queryKey, [
+      { email: "ana@example.com", first_name: "Ana", last_name: "Silva" },
+    ]);
     const wrapper = render();
     await flushPromises();
     await flushPromises();
-    expect(select(wrapper, "oncall-rule-editor-team").props("helpText")).toBe(
-      "On call now: ana@example.com",
+    expect(wrapper.find('[data-test="oncall-rule-editor-on-call"]').text()).toBe(
+      "On call now: Ana Silva",
     );
+    const person = wrapper.findComponent(OnCallPersonName);
+    expect(person.findComponent(OTooltip).props("content")).toBe("Ana Silva (ana@example.com)");
   });
 
   it("hides the on-call line when the schedule cannot be read", async () => {
@@ -231,7 +266,7 @@ describe("OnCallRuleEditor", () => {
     const wrapper = render();
     await flushPromises();
     await flushPromises();
-    expect(select(wrapper, "oncall-rule-editor-team").props("helpText")).toBeUndefined();
+    expect(wrapper.find('[data-test="oncall-rule-editor-on-call"]').exists()).toBe(false);
   });
 
   it("asks the host who holds the drafted path once the conditions settle", async () => {

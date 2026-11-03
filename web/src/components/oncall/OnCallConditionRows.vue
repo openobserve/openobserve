@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         width="sm"
         searchable
+        :aria-label="t('oncall.conditionFieldAria')"
         :data-test="`${testPrefix}-field-${index}`"
         @update:model-value="(v: unknown) => setField(row, v)"
       />
@@ -38,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="operatorOptions"
         size="sm"
         width="xs"
+        :aria-label="t('oncall.conditionOperatorAria')"
         :data-test="`${testPrefix}-op-${index}`"
         @update:model-value="(v: unknown) => (row.op = v === 'prefix' ? 'prefix' : 'is')"
       />
@@ -50,9 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           searchable
           creatable
+          :aria-label="t('oncall.conditionValueAria')"
           :data-test="`${testPrefix}-value-${index}`"
-          @update:model-value="(v: unknown) => (row.value = v === null ? '' : String(v))"
-          @create="(v: string) => (row.value = v)"
+          @update:model-value="(v: unknown) => setValue(row, v === null ? '' : String(v))"
+          @create="(v: string) => setValue(row, v)"
         />
       </span>
       <OButton
@@ -64,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="removeRow(index)"
       />
       <OText
-        v-if="row.name && !row.value.trim()"
+        v-if="row.touched && row.name && !row.value.trim()"
         variant="meta"
         class="basis-full"
         :data-test="`${testPrefix}-pick-value-${index}`"
@@ -95,7 +98,12 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { DimensionCatalogue, DiscoveredService, UnroutedSignal } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { SERVICE_DIMENSION, normalizeDimensionValue } from "@/utils/oncall";
+import {
+  SERVICE_DIMENSION,
+  fieldLabel,
+  normalizeDimensionValue,
+  routingFieldIds,
+} from "@/utils/oncall";
 
 type Operator = "is" | "prefix";
 
@@ -104,6 +112,8 @@ interface ConditionRow {
   name: string;
   op: Operator;
   value: string;
+  /** Set once a value was picked, so an untouched row never repeats its own placeholder. */
+  touched: boolean;
 }
 
 const props = withDefaults(
@@ -116,6 +126,8 @@ const props = withDefaults(
     signals?: UnroutedSignal[];
     /** Offered as values of the service field. */
     services?: DiscoveredService[];
+    /** Existing rules: the fields they pin are offered even when discovery has not seen them. */
+    rules?: { dimensions: Record<string, string> }[];
     testPrefix?: string;
   }>(),
   {
@@ -124,6 +136,7 @@ const props = withDefaults(
     catalogue: () => ({ present: [], values: {} }),
     signals: () => [],
     services: () => [],
+    rules: () => [],
     testPrefix: "oncall-rule-editor",
   },
 );
@@ -137,10 +150,10 @@ const { t } = useI18nTyped();
 
 let nextKey = 0;
 
-/// What this org has emitted, or the whole vocabulary when discovery has nothing yet.
+/// What this org emits or already routes on; the whole vocabulary only when none of that is known.
 const fieldIds = computed<string[]>(() => {
-  const present = props.catalogue.present;
-  return present.length ? present : props.aliases.map((alias) => alias.id);
+  const known = routingFieldIds(props.catalogue.present, props.signals, props.rules);
+  return known.length ? known : props.aliases.map((alias) => alias.id);
 });
 
 function rowsFrom(dimensions: Record<string, string>): ConditionRow[] {
@@ -154,6 +167,7 @@ function rowsFrom(dimensions: Record<string, string>): ConditionRow[] {
         name,
         op: prefix ? "prefix" : "is",
         value: prefix ? value.slice(0, -1) : value,
+        touched: false,
       };
     });
 }
@@ -161,7 +175,13 @@ function rowsFrom(dimensions: Record<string, string>): ConditionRow[] {
 function emptyRow(taken: ConditionRow[]): ConditionRow {
   const used = new Set(taken.map((row) => row.name));
   const service = fieldIds.value.includes(SERVICE_DIMENSION) && !used.has(SERVICE_DIMENSION);
-  return { key: nextKey++, name: service ? SERVICE_DIMENSION : "", op: "is", value: "" };
+  return {
+    key: nextKey++,
+    name: service ? SERVICE_DIMENSION : "",
+    op: "is",
+    value: "",
+    touched: false,
+  };
 }
 
 const seeded = rowsFrom(props.modelValue);
@@ -185,7 +205,7 @@ watch(complete, (dimensions) => emit("update:modelValue", dimensions), {
 });
 
 function labelOf(id: string): I18nText {
-  return raw(props.aliases.find((alias) => alias.id === id)?.display || id);
+  return raw(fieldLabel(id, props.aliases));
 }
 
 function fieldOptionsFor(row: ConditionRow) {
@@ -200,26 +220,48 @@ const operatorOptions = computed(() => [
   { label: t("oncall.ruleEditorOpStartsWith"), value: "prefix" },
 ]);
 
-/// Known values first, by how many services carry them; the queue's values and discovered services fill the gaps.
+/// Known values first, by how many services carry them, then by how often an unowned alert fired with them.
 function valueOptionsFor(row: ConditionRow) {
   if (!row.name) return [];
-  const seen = new Map<string, number>(Object.entries(props.catalogue.values[row.name] ?? {}));
-  const add = (value: string | undefined) => {
-    if (value && !seen.has(value)) seen.set(value, 0);
-  };
-  props.signals.forEach((signal) => add(signal.dimensions?.[row.name]));
-  if (row.name === SERVICE_DIMENSION) props.services.forEach((service) => add(service.name));
-  add(row.value);
-  return [...seen.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([value, services]) => ({
-      label: raw(value),
-      value,
-      subLabel: services
-        ? t("oncall.ruleEditorValueServices", { count: services }, services)
-        : undefined,
-      subLabelInline: true,
-    }));
+  const services = new Map<string, number>(Object.entries(props.catalogue.values[row.name] ?? {}));
+  const fired = new Map<string, number>();
+  const known = new Set<string>(services.keys());
+  props.signals.forEach((signal) => {
+    const value = signal.dimensions?.[row.name];
+    if (!value) return;
+    known.add(value);
+    fired.set(value, (fired.get(value) ?? 0) + signal.occurrences);
+  });
+  if (row.name === SERVICE_DIMENSION) props.services.forEach((service) => known.add(service.name));
+  if (row.value) known.add(row.value);
+  const weight = (value: string) => [services.get(value) ?? 0, fired.get(value) ?? 0];
+  return (
+    [...known]
+      .sort((a, b) => {
+        const [sa, fa] = weight(a);
+        const [sb, fb] = weight(b);
+        return sb - sa || fb - fa || a.localeCompare(b);
+      })
+      // Not `subLabelInline`: the stacked layout cuts a long value with a tooltip instead of clipping it.
+      .map((value) => ({ label: raw(value), value, subLabel: countOf(value, services, fired) }))
+  );
+}
+
+function countOf(
+  value: string,
+  services: Map<string, number>,
+  fired: Map<string, number>,
+): I18nText | undefined {
+  const serviceCount = services.get(value) ?? 0;
+  if (serviceCount)
+    return t("oncall.ruleEditorValueServices", { count: serviceCount }, serviceCount);
+  const fires = fired.get(value) ?? 0;
+  return fires ? t("oncall.routingFiresWindow", { count: fires }, fires) : undefined;
+}
+
+function setValue(row: ConditionRow, value: string) {
+  row.value = value;
+  row.touched = true;
 }
 
 function setField(row: ConditionRow, value: unknown) {

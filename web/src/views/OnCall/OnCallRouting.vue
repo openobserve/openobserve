@@ -45,6 +45,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("oncall.newRule") }}
       </OButton>
+      <OButton
+        v-if="ready && tab === 'signals' && canConfigure && openSignals.length"
+        variant="primary"
+        size="sm"
+        icon-left="alt-route"
+        :loading="claimingAll"
+        data-test="oncall-routing-claim-all"
+        @click="openClaimAll"
+      >
+        {{ t("oncall.unroutedClaimAll", { count: openSignals.length }) }}
+      </OButton>
     </template>
     <template #actions-overflow>
       <OButton
@@ -275,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :catalogue="catalogue"
       :services="services"
       :signals="openSignals"
+      :rules="rules"
       :conflict="conflict"
       :saving="saving"
       @update:open="(v: boolean) => (dialogOpen = v)"
@@ -282,11 +294,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @preview="previewConflict"
     />
 
+    <ODialog
+      :open="claimAllOpen"
+      size="sm"
+      :title="
+        t('oncall.unroutedClaimAllTitlePlain', { count: openSignals.length }, openSignals.length)
+      "
+      :primary-button-label="t('oncall.unroutedClaimAll', { count: openSignals.length })"
+      :secondary-button-label="t('oncall.cancel')"
+      :primary-button-disabled="!claimAllTeam"
+      :primary-button-loading="claimingAll"
+      data-test="oncall-routing-claim-all-dialog"
+      @update:open="(v: boolean) => (claimAllOpen = v)"
+      @click:primary="claimAll"
+      @click:secondary="claimAllOpen = false"
+    >
+      <div class="flex flex-col gap-5">
+        <OSelect
+          :model-value="claimAllTeam || null"
+          :label="t('oncall.ruleEditorWake')"
+          :options="teamOptions"
+          :placeholder="t('oncall.ruleEditorWakePlaceholder')"
+          size="sm"
+          searchable
+          data-test="oncall-routing-claim-all-team"
+          @update:model-value="(v: unknown) => (claimAllTeam = v === null ? '' : String(v))"
+        />
+        <OText v-if="claimAllTeam" variant="body" data-test="oncall-routing-claim-all-outcome">
+          {{ t("oncall.unroutedClaimAllOutcome", { team: raw(teamNameOf(claimAllTeam)) }) }}
+        </OText>
+      </div>
+    </ODialog>
+
     <ConfirmDialog
       :model-value="!!ruleToDelete"
       :title="t('oncall.removeRuleTitle')"
       message-keypath="oncall.removeRuleMessageNamed"
-      :message-name="ruleToDelete ? dimensionsSentence(ruleToDelete.dimensions) : ''"
+      :message-name="ruleToDelete ? readable(ruleToDelete.dimensions) : ''"
       ok-variant="destructive"
       :ok-label="t('oncall.removeRule')"
       focus-cancel
@@ -323,7 +367,10 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
@@ -359,7 +406,12 @@ import type {
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { claimableDimensions, dimensionsSentence, isOnCallUnavailable } from "@/utils/oncall";
+import {
+  claimableDimensions,
+  isOnCallUnavailable,
+  ownershipPath,
+  readableConditions,
+} from "@/utils/oncall";
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
@@ -447,6 +499,13 @@ function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) 
     message: message
       ? t("oncall.toastFailedReason", { action: fallback, reason: raw(message) })
       : fallback,
+  });
+}
+
+function readable(dimensions: Record<string, string>): string {
+  return readableConditions(dimensions, aliases.value, {
+    and: String(t("oncall.ruleEditorAnd")),
+    startsWith: (field) => String(t("oncall.ruleChipStartsWith", { field: raw(field) })),
   });
 }
 
@@ -607,8 +666,6 @@ async function fetchAliases(force = false) {
   }
 }
 
-/// Which of those field names this org has ever emitted, and with what values.
-/// Both degrade to empty, which is what this screen did before they existed.
 /// Who holds a drafted path today, answered by the engine.
 ///
 /// The draft's own conditions are replayed as if they were a signal, so this is
@@ -634,6 +691,7 @@ async function previewConflict(dimensions: Record<string, string>) {
   }
 }
 
+/// Which field names this org has ever emitted, and with what values; degrades to empty.
 async function fetchCatalogue(force = false) {
   try {
     const summary = await read<DimensionAnalyticsSummary>(
@@ -656,7 +714,8 @@ async function fetchServices(force = false) {
     const seen = new Map<string, DiscoveredService>();
     for (const row of rows) {
       const name = String(row.service_name ?? "");
-      if (!name) continue;
+      // Filed under its stream's name, which routing ignores, so offering it would claim nothing.
+      if (!name || row.named_after_stream === true) continue;
       const identity = (row.disambiguation ?? {}) as Record<string, string>;
       const existing = seen.get(name);
       if (!existing || (!Object.keys(existing.identity).length && Object.keys(identity).length)) {
@@ -717,7 +776,7 @@ async function saveRule(draft: RuleDraft) {
     toast({
       variant: "success",
       message: t(edited ? "oncall.toastRuleUpdated" : "oncall.toastRuleCreated", {
-        name: raw(dimensionsSentence(draft.dimensions)),
+        name: raw(readable(draft.dimensions)),
       }),
     });
     // A claimed signal is never dismissed — the evidence stays in case the rule is wrong.
@@ -737,13 +796,67 @@ async function deleteRule() {
     await ruleDelete.mutateAsync(rule.rule_id);
     toast({
       variant: "success",
-      message: t("oncall.toastRuleRemoved", { name: raw(dimensionsSentence(rule.dimensions)) }),
+      message: t("oncall.toastRuleRemoved", { name: raw(readable(rule.dimensions)) }),
     });
     // A path nothing owns again is unrouted again — the queue is half of what a delete moves.
     await Promise.all([fetchRules(), fetchSignals()]);
   } catch (err) {
     failed(err, t("oncall.deleteRuleFailed"));
   }
+}
+
+const claimAllOpen = ref(false);
+const claimAllTeam = ref("");
+const claimingAll = ref(false);
+
+const teamOptions = computed(() =>
+  teams.value.map((team) => ({ label: raw(team.name), value: team.id })),
+);
+
+function teamNameOf(teamId: string): string {
+  return teams.value.find((team) => team.id === teamId)?.name || teamId;
+}
+
+function openClaimAll() {
+  claimAllTeam.value = "";
+  claimAllOpen.value = true;
+}
+
+/// Sequential and deduped by path: the server keys rules on the path, so a parallel twin reads as a failed claim.
+async function claimAll() {
+  const teamId = claimAllTeam.value;
+  if (!teamId) return;
+  claimingAll.value = true;
+  const owned = new Set(rules.value.map((rule) => ownershipPath(rule.dimensions)));
+  let claimed = 0;
+  let lastError: unknown = null;
+  for (const signal of openSignals.value) {
+    const dimensions = claimableDimensions(signal.dimensions);
+    const path = ownershipPath(dimensions);
+    if (!path || owned.has(path)) continue;
+    owned.add(path);
+    try {
+      await ruleCreate.mutateAsync({ team_id: teamId, dimensions });
+      claimed += 1;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  claimingAll.value = false;
+  claimAllOpen.value = false;
+  if (claimed) {
+    toast({
+      variant: "success",
+      message: t(
+        "oncall.toastSignalsClaimed",
+        { count: claimed, team: raw(teamNameOf(teamId)) },
+        claimed,
+      ),
+    });
+  } else {
+    failed(lastError, t("oncall.claimSignalsFailed"));
+  }
+  await Promise.all([fetchRules(), fetchSignals()]);
 }
 
 async function dismissSignal(signal: UnroutedSignal) {

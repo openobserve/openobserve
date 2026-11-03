@@ -168,11 +168,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-else>{{ t("oncall.routingDefaultAlsoGets") }}</template>
         </span>
-        <span v-if="editable" class="ms-auto flex w-16 shrink-0 items-center justify-end gap-1">
+        <!-- The team tab's way out is a labelled link to another page, not a row edit, so it is not an icon slot. -->
+        <OButton
+          v-if="editable && teamId"
+          variant="outline"
+          size="sm"
+          icon-left="alt-route"
+          class="ms-auto"
+          data-test="oncall-routing-catch-all-set"
+          @click="emit('change-default')"
+        >
+          {{ t("oncall.routingChangeInRouting") }}
+        </OButton>
+        <span
+          v-else-if="editable"
+          class="ms-auto flex w-16 shrink-0 items-center justify-end gap-1"
+        >
           <OButton
             variant="ghost"
             size="icon-sm"
-            :icon-left="teamId ? 'alt-route' : 'edit'"
+            icon-left="edit"
             :aria-label="catchAllAction"
             data-test="oncall-routing-catch-all-set"
             @click="emit('change-default')"
@@ -201,7 +216,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OwnershipRuleStats } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { compareRulePrecedence } from "@/utils/oncall";
+import { compareRulePrecedence, fieldLabel } from "@/utils/oncall";
 
 interface RuleCondition {
   name: string;
@@ -290,12 +305,9 @@ const defaultTeamName = computed<I18nText>(() =>
   raw(props.teams.find((team) => team.id === props.defaultTeamId)?.name || props.defaultTeamId),
 );
 
-const catchAllAction = computed<I18nText>(() => {
-  if (props.teamId) return t("oncall.routingChangeInRouting");
-  return props.defaultTeamId
-    ? t("oncall.routingChangeCatchAll")
-    : t("oncall.routingCatchAllRowSet");
-});
+const catchAllAction = computed<I18nText>(() =>
+  props.defaultTeamId ? t("oncall.routingChangeCatchAll") : t("oncall.routingCatchAllRowSet"),
+);
 
 const emptyDescription = computed<I18nText>(() => {
   if (!props.teamId) return t("oncall.noOwnershipRulesOrg");
@@ -306,7 +318,7 @@ const emptyDescription = computed<I18nText>(() => {
 });
 
 function displayOf(name: string): string {
-  return props.aliases.find((alias) => alias.id === name)?.display || name;
+  return fieldLabel(name, props.aliases);
 }
 
 function teamNameOf(rule: OwnershipRuleStats): I18nText {

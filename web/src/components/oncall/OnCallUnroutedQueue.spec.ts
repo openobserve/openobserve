@@ -93,7 +93,7 @@ describe("OnCallUnroutedQueue", () => {
 
   it("offers to claim for the team whose screen this is", async () => {
     const wrapper = render();
-    expect(wrapper.find('[data-test="oncall-unrouted-claim-s1"]').attributes("aria-label")).toBe(
+    expect(wrapper.find('[data-test="oncall-unrouted-claim-s1"]').text()).toBe(
       "Claim for Payments",
     );
 
@@ -173,14 +173,12 @@ describe("OnCallUnroutedQueue", () => {
   /// The org screen hosts the queue with no team of its own: a claim starts by
   /// choosing one, so the button says what happens instead of naming a team it
   /// does not have, and the one-team bulk action is not offered at all.
-  it("offers to give it an owner, not claim for a team, when hosted without one", async () => {
+  it("offers a labelled Claim, not claim for a team, when hosted without one", async () => {
     const wrapper = mount(OnCallUnroutedQueue, {
       props: { signals: [signal()] },
       global: { plugins: [i18n, store], stubs },
     });
-    expect(wrapper.find('[data-test="oncall-unrouted-claim-s1"]').attributes("aria-label")).toBe(
-      "Give it an owner",
-    );
+    expect(wrapper.find('[data-test="oncall-unrouted-claim-s1"]').text()).toBe("Claim");
     expect(wrapper.find('[data-test="oncall-unrouted-claim-all"]').exists()).toBe(false);
 
     await wrapper.find('[data-test="oncall-unrouted-claim-s1"]').trigger("click");

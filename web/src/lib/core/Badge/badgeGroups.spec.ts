@@ -26,6 +26,25 @@ describe("badgeGroups", () => {
     expect(r.labelKey).toBe("oncall.state_exhausted");
   });
 
+  it("resolves the on-call routing, delivery and telephony groups as pills", () => {
+    expect(resolveBadge("oncallRuleHealth", "shadowed").variant).toBe("warning-soft");
+    expect(resolveBadge("oncallUnroutedOutcome", "nobody").labelKey).toBe(
+      "oncall.unroutedPagedNobody",
+    );
+    expect(resolveBadge("oncallDelivery", "failed").variant).toBe("error-soft");
+    expect(resolveBadge("oncallDelivery", "sent").labelKey).toBe("oncall.deliveryStatus_sent");
+    expect(resolveBadge("oncallTelephonyStatus", "unchecked").variant).toBe("warning-soft");
+    expect(resolveBadge("oncallTelephonyStatus", "ok").labelKey).toBe("telephony.connected");
+    for (const group of [
+      "oncallRuleHealth",
+      "oncallUnroutedOutcome",
+      "oncallDelivery",
+      "oncallTelephonyStatus",
+    ] as const) {
+      expect(BADGE_GROUPS[group].shape).toBe("pill");
+    }
+  });
+
   it("resolves alertStatus to dot mode (no icon)", () => {
     const r = resolveBadge("alertStatus", "active");
     expect(r.mode).toBe("dot");

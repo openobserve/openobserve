@@ -58,20 +58,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :catalogue="catalogue"
           :signals="signals"
           :services="services"
+          :rules="rules"
         />
       </div>
 
-      <OSelect
-        :model-value="team || null"
-        :label="t('oncall.ruleEditorWake')"
-        :options="teamOptions"
-        :placeholder="t('oncall.ruleEditorWakePlaceholder')"
-        :help-text="onCallNote"
-        size="sm"
-        searchable
-        data-test="oncall-rule-editor-team"
-        @update:model-value="(v: unknown) => (team = v === null ? '' : String(v))"
-      />
+      <div class="flex flex-col gap-1">
+        <OSelect
+          :model-value="team || null"
+          :label="t('oncall.ruleEditorWake')"
+          :options="teamOptions"
+          :placeholder="t('oncall.ruleEditorWakePlaceholder')"
+          size="sm"
+          searchable
+          data-test="oncall-rule-editor-team"
+          @update:model-value="(v: unknown) => (team = v === null ? '' : String(v))"
+        />
+        <i18n-t
+          v-if="onCallEmails.length"
+          keypath="oncall.ruleEditorOnCallNow"
+          tag="span"
+          scope="global"
+          class="text-text-secondary text-xs"
+          data-test="oncall-rule-editor-on-call"
+        >
+          <template #names>
+            <template v-for="(email, index) in onCallEmails" :key="email">
+              <span v-if="index">{{ raw(", ") }}</span>
+              <OnCallPersonName :email="email" data-test="oncall-rule-editor-on-call-person" />
+            </template>
+          </template>
+        </i18n-t>
+      </div>
 
       <OText v-if="outcome" variant="body" data-test="oncall-rule-editor-outcome">
         {{ outcome }}
@@ -79,14 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <template #footer-left>
-      <span
-        v-if="saveProblem"
-        class="flex items-center gap-1.5"
-        data-test="oncall-rule-editor-save-problem"
-      >
-        <OIcon name="info-outline" size="sm" class="text-text-secondary shrink-0" />
-        <OText variant="meta">{{ saveProblem }}</OText>
-      </span>
+      <OText v-if="saveProblem" variant="meta" data-test="oncall-rule-editor-save-problem">
+        {{ saveProblem }}
+      </OText>
     </template>
   </ODialog>
 </template>
@@ -97,6 +109,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 
 import OnCallConditionRows from "@/components/oncall/OnCallConditionRows.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -114,7 +127,7 @@ import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   claimableDimensions,
-  dimensionsSentence,
+  readableConditions,
   ownershipPath,
   ruleClaimsDimensions,
 } from "@/utils/oncall";
@@ -145,6 +158,8 @@ const props = withDefaults(
     conflict?: RoutingPreview | null;
     /** Signals that need an owner: the "start from" list and the match count. */
     signals?: UnroutedSignal[];
+    /** Every rule, so the fields they pin are pickable. */
+    rules?: OwnershipRuleStats[];
     saving?: boolean;
   }>(),
   {
@@ -158,6 +173,7 @@ const props = withDefaults(
     services: () => [],
     conflict: null,
     signals: () => [],
+    rules: () => [],
     saving: false,
   },
 );
@@ -211,7 +227,12 @@ const startable = computed(() =>
 
 const startOptions = computed(() =>
   startable.value.map((signal) => ({
-    label: raw(dimensionsSentence(claimableDimensions(signal.dimensions)) || signal.path),
+    label: raw(
+      readableConditions(claimableDimensions(signal.dimensions), props.aliases, {
+        and: String(t("oncall.ruleEditorAnd")),
+        startsWith: (field) => String(t("oncall.ruleChipStartsWith", { field: raw(field) })),
+      }) || signal.path,
+    ),
     value: signal.id,
     icon: "notifications-active",
     subLabel: t("oncall.routingFiresWindow", { count: signal.occurrences }, signal.occurrences),
@@ -237,11 +258,9 @@ const onCallQuery = useQuery(() =>
 );
 
 /// Hidden when the reader may not see the schedule: a wrong or empty name is worse than none.
-const onCallNote = computed<I18nText | undefined>(() => {
-  if (onCallQuery.isError.value) return undefined;
-  const emails = [...new Set((onCallQuery.data.value ?? []).map((one) => one.user_email))];
-  if (!emails.length) return undefined;
-  return t("oncall.ruleEditorOnCallNow", { names: raw(emails.join(", ")) });
+const onCallEmails = computed<string[]>(() => {
+  if (onCallQuery.isError.value) return [];
+  return [...new Set((onCallQuery.data.value ?? []).map((one) => one.user_email))];
 });
 
 /// The live winner for the drafted path; the losers are `also_matched`, so the decision names the holder.
@@ -280,6 +299,13 @@ const outcome = computed<I18nText | "">(() => {
       return t("oncall.ruleEditorKeptBy", { team: other });
     }
     return t("oncall.ruleEditorContends", { team: other });
+  }
+  if (team.value) {
+    return t(
+      "oncall.ruleEditorGoesTo",
+      { team: raw(teamNameOf(team.value)), count: matchedCount.value },
+      matchedCount.value,
+    );
   }
   if (!props.signals.length) return "";
   return t("oncall.ruleEditorMatches", { count: matchedCount.value }, matchedCount.value);

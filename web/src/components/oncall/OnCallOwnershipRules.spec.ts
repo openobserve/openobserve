@@ -147,9 +147,7 @@ describe("OnCallOwnershipRules", () => {
     expect(own.find('[data-test="oncall-routing-catch-all"]').text()).toContain(
       "Also gets every alert no team owns",
     );
-    expect(own.find('[data-test="oncall-routing-catch-all-set"]').attributes("aria-label")).toBe(
-      "Change in Routing",
-    );
+    expect(own.find('[data-test="oncall-routing-catch-all-set"]').text()).toBe("Change in Routing");
     const other = render({ teamId: "team_1", defaultTeamId: "team_2" });
     expect(other.find('[data-test="oncall-routing-catch-all"]').exists()).toBe(false);
   });

@@ -1925,6 +1925,52 @@ export function claimableDimensions(dimensions: Record<string, string>): Record<
   return Object.keys(kept).length ? kept : { ...(dimensions ?? {}) };
 }
 
+/** A field as a person names it, sentence case: `k8s-namespace` or "K8s Namespace" read "K8s namespace". */
+export function fieldLabel(id: string, aliases: { id: string; display?: string }[] = []): string {
+  const base = aliases.find((alias) => alias.id === id)?.display || id.replace(/[-_]+/g, " ");
+  const words = base.trim().split(/\s+/).filter(Boolean);
+  return words
+    .map((word, index) => {
+      if (!index) return word.charAt(0).toUpperCase() + word.slice(1);
+      // Acronyms (AWS, ID) and tokens with digits (K8s) keep their casing.
+      if (/\d/.test(word) || (word.length > 1 && word === word.toUpperCase())) return word;
+      return word.toLowerCase();
+    })
+    .join(" ");
+}
+
+/** Conditions as prose, "K8s namespace prod and Service starts with api"; the words come from the caller's `t`. */
+export function readableConditions(
+  dimensions: Record<string, string>,
+  aliases: { id: string; display?: string }[],
+  words: { and: string; startsWith: (field: string) => string },
+): string {
+  return Object.keys(dimensions ?? {})
+    .sort()
+    .map((name) => {
+      const value = String(dimensions[name]);
+      const label = fieldLabel(name, aliases);
+      return value.endsWith("*")
+        ? `${words.startsWith(label)} ${value.slice(0, -1)}`
+        : `${label} ${value}`;
+    })
+    .join(` ${words.and} `);
+}
+
+/** Every field a rule could pin here: what the org emits, what the unowned signals carry and what rules already use. */
+export function routingFieldIds(
+  present: string[],
+  signals: { dimensions?: Record<string, string> }[],
+  rules: { dimensions?: Record<string, string> }[],
+): string[] {
+  const ids = new Set(present);
+  signals.forEach((signal) =>
+    Object.keys(claimableDimensions(signal.dimensions ?? {})).forEach((id) => ids.add(id)),
+  );
+  rules.forEach((rule) => Object.keys(rule.dimensions ?? {}).forEach((id) => ids.add(id)));
+  return [...ids];
+}
+
 /**
  * The severity a promotion derives when the caller sends none — the record's
  * own priority, with P5 folded into P4 because the incident scale has no P5.

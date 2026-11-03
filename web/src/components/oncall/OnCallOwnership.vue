@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :catalogue="catalogue"
       :services="services"
       :signals="openSignals"
+      :rules="rules"
       :conflict="conflict"
       :saving="saving"
       @update:open="(v: boolean) => (editorOpen = v)"
@@ -84,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :model-value="!!ruleToDelete"
       :title="t('oncall.removeRuleTitle')"
       message-keypath="oncall.removeRuleMessageNamed"
-      :message-name="ruleToDelete ? dimensionsSentence(ruleToDelete.dimensions) : ''"
+      :message-name="ruleToDelete ? readable(ruleToDelete.dimensions) : ''"
       ok-variant="destructive"
       :ok-label="t('oncall.removeRule')"
       focus-cancel
@@ -132,7 +133,7 @@ import type {
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { SERVICE_DIMENSION, dimensionsSentence } from "@/utils/oncall";
+import { SERVICE_DIMENSION, readableConditions } from "@/utils/oncall";
 
 const props = defineProps<{
   teamId: string;
@@ -195,6 +196,13 @@ function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) 
     message: message
       ? t("oncall.toastFailedReason", { action: fallback, reason: raw(message) })
       : fallback,
+  });
+}
+
+function readable(dimensions: Record<string, string>): string {
+  return readableConditions(dimensions, aliases.value, {
+    and: String(t("oncall.ruleEditorAnd")),
+    startsWith: (field) => String(t("oncall.ruleChipStartsWith", { field: raw(field) })),
   });
 }
 
@@ -307,7 +315,7 @@ async function saveRule(draft: RuleDraft) {
     toast({
       variant: "success",
       message: t(rule ? "oncall.toastRuleUpdated" : "oncall.toastRuleCreated", {
-        name: raw(dimensionsSentence(draft.dimensions)),
+        name: raw(readable(draft.dimensions)),
       }),
     });
     await Promise.all([fetchRules(), fetchSignals()]);
@@ -326,7 +334,7 @@ async function deleteRule() {
     await ruleDelete.mutateAsync(rule.rule_id);
     toast({
       variant: "success",
-      message: t("oncall.toastRuleRemoved", { name: raw(dimensionsSentence(rule.dimensions)) }),
+      message: t("oncall.toastRuleRemoved", { name: raw(readable(rule.dimensions)) }),
     });
     await Promise.all([fetchRules(), fetchSignals()]);
   } catch (err) {

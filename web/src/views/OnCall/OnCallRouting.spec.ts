@@ -313,7 +313,7 @@ describe("OnCallRouting", () => {
     expect(dialog.props("okVariant")).toBe("destructive");
     expect(dialog.props("okLabel")).toBe("Remove rule");
     expect(dialog.attributes("focus-cancel")).toBeDefined();
-    expect(dialog.props("messageName")).toBe("service = cart");
+    expect(dialog.props("messageName")).toBe("Service cart");
   });
 
   /// G4: claiming an unrouted signal opens the rule dialog with the failing
@@ -484,6 +484,60 @@ describe("OnCallRouting", () => {
 
     await showSignals(wrapper);
     expect(wrapper.find('[data-test="oncall-routing-add-rule"]').exists()).toBe(false);
+  });
+
+  it("claims every unowned path for one team, once per path, after naming the outcome", async () => {
+    const signal = (id: string, dimensions: Record<string, string>) => ({
+      id,
+      org_id: "default",
+      path: "",
+      dimensions,
+      occurrences: 1,
+    });
+    service.ownershipStats.mockResolvedValue({
+      data: { rules: [{ rule_id: "r1", team_id: "team_1", dimensions: { service: "owned" } }] },
+    } as any);
+    service.unroutedSignals.mockResolvedValue({
+      data: [
+        signal("s1", { service: "cart", "k8s-pod-name": "pod-1" }),
+        signal("s2", { service: "cart", "k8s-pod-name": "pod-2" }),
+        signal("s3", { service: "owned" }),
+        signal("s4", { service: "search" }),
+      ],
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+    await showSignals(wrapper);
+    expect(wrapper.find('[data-test="oncall-routing-add-rule"]').exists()).toBe(false);
+    await wrapper.find('[data-test="oncall-routing-claim-all"]').trigger("click");
+
+    const dialog = wrapper
+      .findAllComponents({ name: "ODialog" })
+      .find((c) => c.attributes("data-test") === "oncall-routing-claim-all-dialog")!;
+    expect(dialog.props("open")).toBe(true);
+    expect(dialog.props("primaryButtonDisabled")).toBe(true);
+    wrapper
+      .findAllComponents({ name: "OSelect" })
+      .find((c) => c.attributes("data-test") === "oncall-routing-claim-all-team")!
+      .vm.$emit("update:modelValue", "team_2");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-claim-all-outcome"]').text()).toBe(
+      "Future alerts like these go to Payments",
+    );
+
+    dialog.vm.$emit("click:primary");
+    await flushPromises();
+    const written = service.createOwnershipRule.mock.calls.map(
+      (call) => (call[0] as { data: unknown }).data,
+    );
+    expect(written).toEqual([
+      { team_id: "team_2", dimensions: { service: "cart" } },
+      { team_id: "team_2", dimensions: { service: "search" } },
+    ]);
+    expect(toast).toHaveBeenCalledWith({
+      variant: "success",
+      message: "2 signals now go to Payments",
+    });
   });
 
   /// One list at a time: rules are what the org owns, the queue is what it

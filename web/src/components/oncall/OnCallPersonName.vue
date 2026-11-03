@@ -1,0 +1,47 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!-- A person by display name inside a sentence; the email rides in the tooltip because two people can share a name. -->
+<template>
+  <span :data-test="dataTest">
+    <OTooltip side="bottom" :content="tooltip" />
+    <span>{{ name }}</span>
+  </span>
+</template>
+
+<script setup lang="ts">
+import { computed } from "vue";
+
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import type { I18nText } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+
+const props = withDefaults(defineProps<{ email: string; dataTest?: string }>(), {
+  dataTest: "oncall-person-name",
+});
+
+const { t } = useI18nTyped();
+const { nameOf } = useOrgUserNames();
+
+const name = computed<I18nText>(() => raw(nameOf(props.email)));
+
+const tooltip = computed<I18nText>(() =>
+  String(name.value) === props.email
+    ? raw(props.email)
+    : t("oncall.personNameWithEmail", { name: name.value, email: raw(props.email) }),
+);
+</script>
