@@ -213,6 +213,9 @@ jobs:
       labels: ubicloud-standard-16
     permissions:
       contents: read
+    env:
+      # Replaces .cargo/config.toml target rustflags, so it repeats them; -Zthreads parallelises the rustc frontend.
+      RUSTFLAGS: "-C target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2 -Zthreads=8"
 
     steps:
       - name: Remove unused tools
