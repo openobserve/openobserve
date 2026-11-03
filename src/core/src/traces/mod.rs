@@ -1917,7 +1917,7 @@ async fn write_traces(
     let mut evaluated_alerts = HashSet::new();
     // An org with an alert downtime classifies every matching row, so a muted row hides none.
     let mut mute_split = cur_stream_alerts
-        .and_then(|_| crate::ingestion::realtime_mute::RealtimeMuteSplit::for_org(org_id));
+        .and_then(|_| crate::ingestion::realtime_mute::RealtimeMuteSplit::for_org(org_id, 1));
     // End get stream alert
 
     // Start check for schema
@@ -1988,7 +1988,11 @@ async fn write_traces(
                     alert.get_unique_key()
                 );
                 // check if alert already evaluated
-                if mute_split.is_none() && evaluated_alerts.contains(&key) {
+                let done = match &mute_split {
+                    Some(split) => split.is_full(&key),
+                    None => evaluated_alerts.contains(&key),
+                };
+                if done {
                     continue;
                 }
 

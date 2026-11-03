@@ -740,8 +740,11 @@ async fn cancel_follow_ups(org: &str, user_id: &str, parent_id: &str, now: i64) 
     let rows = match primary_rows(org).await {
         Ok(rows) => rows,
         Err(e) => {
-            log::warn!("[downtimes] could not list the follow-ups of {org}/{parent_id}: {e}");
-            return;
+            // The parent cancel already committed, so the cache beats leaving every follow-up live.
+            log::warn!(
+                "[downtimes] primary list of {org} failed, cancelling follow-ups of {parent_id} from the cache: {e}"
+            );
+            db::downtimes::list_cached(org).as_ref().clone()
         }
     };
     for id in follow_ups_to_cancel(&rows, parent_id, now) {

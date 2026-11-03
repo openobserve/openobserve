@@ -308,6 +308,12 @@ pub(super) async fn apply_redaction<T>(
     }
 }
 
+/// One stream's realtime alert work, sent only after its records are written.
+pub(super) struct StreamTriggers {
+    triggers: TriggerAlertData,
+    mute_split: Option<crate::ingestion::realtime_mute::RealtimeMuteSplit>,
+}
+
 /// Buffers one stream's records into write partitions, running its realtime alerts on each first.
 pub(super) async fn buffer_stream_records(
     org_id: &str,
@@ -317,7 +323,7 @@ pub(super) async fn buffer_stream_records(
     partition_keys: Option<&Vec<StreamPartition>>,
     alerts: Option<&Vec<alert::Alert>>,
     partitions: &mut HashMap<String, SchemaRecords>,
-) -> Option<TriggerAlertData> {
+) -> Option<StreamTriggers> {
     let partition_keys = partition_keys.unwrap_or(&NO_PARTITION_KEYS);
     let partition_time_level = infra::schema::get_partition_time_level(StreamType::Metrics);
     let mut partition_memo = PartitionMemo::new(partition_keys, partition_time_level);
@@ -339,8 +345,12 @@ pub(super) async fn buffer_stream_records(
     let mut triggers: TriggerAlertData = Vec::with_capacity(alert_keys.len());
     let mut trigger_slots: HashMap<String, super::TriggerSlot> = HashMap::new();
     // An org with an alert downtime classifies each series before the label cap.
-    let mut mute_split =
-        alerts.and_then(|_| crate::ingestion::realtime_mute::RealtimeMuteSplit::for_org(org_id));
+    let mut mute_split = alerts.and_then(|_| {
+        crate::ingestion::realtime_mute::RealtimeMuteSplit::for_org(
+            org_id,
+            super::TRIGGER_LABEL_LIMIT,
+        )
+    });
 
     for (record, timestamp) in records {
         if let Some(alerts) = alerts {
@@ -368,10 +378,10 @@ pub(super) async fn buffer_stream_records(
         partition.records.push(Arc::new(record));
     }
 
-    if let Some(split) = mute_split {
-        tokio::spawn(split.evaluate());
-    }
-    (!triggers.is_empty()).then_some(triggers)
+    (!triggers.is_empty() || mute_split.is_some()).then_some(StreamTriggers {
+        triggers,
+        mute_split,
+    })
 }
 
 /// Each stream's WAL entries, from its JSON partitions and from what went straight to arrow.
@@ -494,10 +504,15 @@ pub(super) fn observe_request(
 }
 
 /// Sends each stream's alert notification off the request path.
-pub(super) fn spawn_triggers(stream_trigger_map: HashMap<String, Option<TriggerAlertData>>) {
+pub(super) fn spawn_triggers(stream_trigger_map: HashMap<String, Option<StreamTriggers>>) {
     // only one trigger per request; notification/db work must not block ingestion
     for entry in stream_trigger_map.into_values().flatten() {
-        tokio::spawn(evaluate_trigger(entry));
+        if !entry.triggers.is_empty() {
+            tokio::spawn(evaluate_trigger(entry.triggers));
+        }
+        if let Some(split) = entry.mute_split {
+            tokio::spawn(split.evaluate());
+        }
     }
 }
 
@@ -636,8 +651,7 @@ async fn evaluate_record_alerts(
     for (alert, key) in alerts.iter().zip(alert_keys) {
         // one row per label set: a series repeats its labels on every sample
         let wanted = match mute_split.as_deref() {
-            // The split caps unmuted series only, after it classifies them.
-            Some(split) => !split.seen(key, dedup),
+            Some(split) => !split.is_full(key) && !split.seen(key, dedup),
             None => super::trigger_wants_labels(trigger_slots, key, dedup),
         };
         if !wanted {

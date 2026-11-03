@@ -74,6 +74,16 @@ pub mod ingestion_service;
 pub mod realtime_mute;
 pub mod rejections;
 
+/// Global atomic counter for round-robin distribution of requests across memory table buckets.
+/// This ensures even distribution of ingestion load across multiple buckets in axum.
+static REQUEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+/// `org/alert` and `org/alert/downtime` -> until, so one node evaluates each once per floor.
+static REALTIME_FLOOR_CLAIMS: LazyLock<DashMap<String, (i64, u64)>> = LazyLock::new(DashMap::new);
+
+/// Tells claims of one key apart, so a request releases only its own.
+static REALTIME_FLOOR_TOKENS: AtomicU64 = AtomicU64::new(0);
+
 /// Each real-time alert with its matching rows and what is known of their downtime.
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>, RealtimeMute)>;
 
@@ -87,16 +97,6 @@ pub enum RealtimeMute {
     /// Every matching row was muted; the merged downtime.
     Muted(config::meta::downtimes::ActiveDowntime),
 }
-
-/// Global atomic counter for round-robin distribution of requests across memory table buckets.
-/// This ensures even distribution of ingestion load across multiple buckets in axum.
-static REQUEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-/// `org/alert -> until`, taken before the downtime check so concurrent requests run it once.
-static REALTIME_FLOOR_CLAIMS: LazyLock<DashMap<String, (i64, u64)>> = LazyLock::new(DashMap::new);
-
-/// Tells claims of one key apart, so a request releases only its own.
-static REALTIME_FLOOR_TOKENS: AtomicU64 = AtomicU64::new(0);
 
 /// Memoizes the write partition per time bucket while no partition key is enabled.
 pub struct PartitionMemo<'a> {
@@ -278,8 +278,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             RealtimeMute::Muted(downtime) => Some(downtime.clone()),
         };
         let delivered = if let Some(downtime) = downtime {
-            // One suppressed record per downtime per floor; other rows of the alert stay live.
-            // Expired claims go first, since a downtime key is never released.
+            // Downtime keys are never released, so expired claims are dropped before a new one.
             REALTIME_FLOOR_CLAIMS.retain(|_, (until, _)| *until > now);
             if claim_realtime_floor(
                 &format!("{floor_key}/{}", downtime.id),

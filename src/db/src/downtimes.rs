@@ -503,8 +503,7 @@ mod tests {
         assert_eq!(ids(b), ["y"]);
     }
 
-    /// A refresh of `org` whose read returns `rows` once `gate` opens, after it says
-    /// `read_started`.
+    /// A refresh whose read signals `read_started`, then returns `rows` once `gate` opens.
     fn gated_refresh(
         org: &'static str,
         rows: Vec<Downtime>,

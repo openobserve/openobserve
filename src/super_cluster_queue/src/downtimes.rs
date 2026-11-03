@@ -15,6 +15,11 @@
 
 //! Applies downtime rows replicated from another region, so each region decides locally.
 
+use std::{
+    collections::HashMap,
+    sync::{LazyLock, Mutex, PoisonError},
+};
+
 use config::{
     meta::{
         downtimes::Downtime,
@@ -36,6 +41,12 @@ use sea_orm::{ConnectionTrait, TransactionTrait};
 
 /// Compare-and-swap rounds before a replicated write gives up on a row that keeps changing.
 const WRITE_ATTEMPTS: usize = 8;
+
+/// The queue has no delivery limit, and a folder made while replication was off never arrives.
+const FOLDER_WAIT_MICROS: i64 = 10 * 60 * 1_000_000;
+
+/// `org/id` -> when this node first saw the row wait for its folder, so a backlog still waits.
+static FOLDER_WAITS: LazyLock<Mutex<HashMap<String, i64>>> = LazyLock::new(Default::default);
 
 /// The re-measure plan of a put, injected so a test plans against its own database.
 type PlanFuture<'a> = std::pin::Pin<
@@ -77,6 +88,20 @@ struct PlannedPut {
 struct WrittenPut {
     planned: PlannedPut,
     plan: RemeasurePlan,
+}
+
+/// Whether the stored live row and the incoming row are cancelled.
+#[derive(Clone, Copy, Debug, Default)]
+struct Cancels {
+    stored: bool,
+    incoming: bool,
+}
+
+#[derive(Debug, PartialEq)]
+enum FolderAction {
+    Use,
+    UseDefault,
+    Missing,
 }
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
@@ -305,16 +330,7 @@ fn log_order(order: PutOrder, downtime: &Downtime, stored: Option<RowVersion>) {
     }
 }
 
-/// Whether the stored live row and the incoming row are cancelled.
-#[derive(Clone, Copy, Debug, Default)]
-struct Cancels {
-    stored: bool,
-    incoming: bool,
-}
-
-/// Version first, since region clocks differ. On a tie: a tombstone's rule, then a cancel wins
-/// over a live row, so a same-version edit from another region never undoes a sent cancel,
-/// then the later `updated_at`.
+/// Version first, since region clocks differ; on a tie a sent cancel is never undone by an edit.
 fn put_order(stored: RowVersion, cancels: Cancels, version: i64, updated_at: i64) -> PutOrder {
     match version.cmp(&stored.version) {
         std::cmp::Ordering::Less => PutOrder::Stale,
@@ -374,20 +390,40 @@ async fn remeasure_plan<'a>(
     })
 }
 
-/// How long a row waits for its folder to replicate before it is filed under `default`.
-/// The queue has no delivery limit, and a folder made while replication was off never
-/// arrives, so an unbounded wait would keep the mute out of this region for good.
-const FOLDER_WAIT_MICROS: i64 = 10 * 60 * 1_000_000;
-
-/// The local folder of a replicated row; a folder that has not replicated yet fails the
-/// message, so the queue redelivers it after the folder lands instead of misfiling it.
+/// The local folder of a replicated row, waiting for a folder that has not replicated yet.
 async fn local_folder_id(downtime: &Downtime) -> Result<String> {
     let known =
         table::folders::get_pk_by_name(&downtime.org, &downtime.folder_id, FolderType::Downtimes)
             .await?
             .is_some();
-    let waited = now_micros().saturating_sub(downtime.updated_at);
-    match folder_action(&downtime.folder_id, known, waited) {
+    let first_seen_key = format!("{}/{}", downtime.org, downtime.id);
+    let (stored_in_default, waited) = if known || downtime.folder_id == DEFAULT_FOLDER {
+        (false, 0)
+    } else {
+        let client = infra::db::get_orm_client_rw().await;
+        let Some(planned) = plan_put(client, downtime).await? else {
+            // `apply_put` drops a stale put before any write, so its folder does not matter.
+            return Ok(downtime.folder_id.clone());
+        };
+        let stored_in_default = planned
+            .before
+            .is_some_and(|before| before.folder_id == DEFAULT_FOLDER);
+        let now = now_micros();
+        let first_seen = *FOLDER_WAITS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .entry(first_seen_key.clone())
+            .or_insert(now);
+        (stored_in_default, now.saturating_sub(first_seen))
+    };
+    let action = folder_action(&downtime.folder_id, known, stored_in_default, waited);
+    if action != FolderAction::Missing {
+        FOLDER_WAITS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(&first_seen_key);
+    }
+    match action {
         FolderAction::Use => Ok(downtime.folder_id.clone()),
         FolderAction::Missing => Err(Error::Message(format!(
             "[DOWNTIMES] folder {} of downtime {}/{} is not in this region yet",
@@ -396,13 +432,12 @@ async fn local_folder_id(downtime: &Downtime) -> Result<String> {
         FolderAction::UseDefault => {
             if downtime.folder_id != DEFAULT_FOLDER {
                 log::warn!(
-                    "[DOWNTIMES] folder {} of downtime {}/{} did not replicate; filing it under {DEFAULT_FOLDER}",
+                    "[DOWNTIMES] folder {} of downtime {}/{} is not in this region; filing it under {DEFAULT_FOLDER}",
                     downtime.folder_id,
                     downtime.org,
                     downtime.id
                 );
             }
-            // The default folder is created lazily in each region, so its absence is not a lag.
             table::folders::get_or_create(&downtime.org, default_folder(), FolderType::Downtimes)
                 .await?;
             Ok(DEFAULT_FOLDER.to_owned())
@@ -410,19 +445,21 @@ async fn local_folder_id(downtime: &Downtime) -> Result<String> {
     }
 }
 
-#[derive(Debug, PartialEq)]
-enum FolderAction {
-    Use,
-    UseDefault,
-    Missing,
-}
-
-fn folder_action(folder_id: &str, known: bool, waited_micros: i64) -> FolderAction {
-    match (known, folder_id == DEFAULT_FOLDER) {
-        (true, _) => FolderAction::Use,
-        (false, true) => FolderAction::UseDefault,
-        (false, false) if waited_micros < FOLDER_WAIT_MICROS => FolderAction::Missing,
-        (false, false) => FolderAction::UseDefault,
+fn folder_action(
+    folder_id: &str,
+    known: bool,
+    stored_in_default: bool,
+    waited_micros: i64,
+) -> FolderAction {
+    if known {
+        FolderAction::Use
+    } else if folder_id == DEFAULT_FOLDER
+        || stored_in_default
+        || waited_micros >= FOLDER_WAIT_MICROS
+    {
+        FolderAction::UseDefault
+    } else {
+        FolderAction::Missing
     }
 }
 
@@ -693,21 +730,32 @@ mod tests {
 
     #[test]
     fn a_row_waits_for_its_folder_and_then_falls_back_to_the_default_folder() {
-        assert_eq!(folder_action("ops", true, 0), FolderAction::Use);
-        assert_eq!(folder_action("ops", false, 0), FolderAction::Missing);
+        assert_eq!(folder_action("ops", true, false, 0), FolderAction::Use);
+        assert_eq!(folder_action("ops", false, false, 0), FolderAction::Missing);
         assert_eq!(
-            folder_action("ops", false, FOLDER_WAIT_MICROS - 1),
+            folder_action("ops", false, false, FOLDER_WAIT_MICROS - 1),
             FolderAction::Missing
         );
         assert_eq!(
-            folder_action("ops", false, FOLDER_WAIT_MICROS),
+            folder_action("ops", false, false, FOLDER_WAIT_MICROS),
             FolderAction::UseDefault
         );
         assert_eq!(
-            folder_action(DEFAULT_FOLDER, false, 0),
+            folder_action(DEFAULT_FOLDER, false, false, 0),
             FolderAction::UseDefault
         );
-        assert_eq!(folder_action(DEFAULT_FOLDER, true, 0), FolderAction::Use);
+        assert_eq!(
+            folder_action(DEFAULT_FOLDER, true, false, 0),
+            FolderAction::Use
+        );
+    }
+
+    #[test]
+    fn a_later_edit_of_a_row_filed_under_default_does_not_wait_again() {
+        assert_eq!(
+            folder_action("ops", false, true, 0),
+            FolderAction::UseDefault
+        );
     }
 
     #[test]

@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The downtime decision of a real-time alert, made per row before any row cap, so a muted
-//! service never hides an unmuted one in the same request.
+//! Per-row downtime decisions for real-time alerts, so a muted service never hides an unmuted one.
 
 use std::collections::{HashMap, HashSet};
+#[cfg(feature = "enterprise")]
+use std::sync::{Arc, LazyLock};
 
 use config::{
     meta::{
@@ -25,55 +26,117 @@ use config::{
     },
     utils::json::{Map, Value},
 };
+#[cfg(feature = "enterprise")]
+use dashmap::DashMap;
 
 use super::{RealtimeMute, TriggerAlertData};
 
+/// The most rows a delivered metrics notification carries.
 const ROW_CAP: usize = PAYLOAD_SAMPLE_ROWS as usize;
 
+/// Matches the downtime cache's full reload, so settings are as fresh as the downtimes.
+#[cfg(feature = "enterprise")]
+const SEMANTIC_GROUPS_TTL_MICROS: i64 = 60 * 1_000_000;
+
+/// The settings read caches only a row it finds, so an org without an override reads per call.
+#[cfg(feature = "enterprise")]
+static SEMANTIC_GROUPS: LazyLock<DashMap<String, (i64, SemanticGroups)>> =
+    LazyLock::new(DashMap::new);
+
+/// Service discovery ran once per realtime floor before the split, so it is cached for one floor.
+#[cfg(feature = "enterprise")]
+static FALLBACK_SERVICES: LazyLock<DashMap<String, (i64, Option<String>)>> =
+    LazyLock::new(DashMap::new);
+
+#[cfg(feature = "enterprise")]
+type SemanticGroups = Arc<Vec<config::meta::correlation::FieldAlias>>;
 type Row = Map<String, Value>;
 type Dims = HashMap<String, String>;
 
-/// One group's decision, kept so every row of the group gets the answer its first row got.
+/// A group's first row decides every row of the group, as in a scheduled run.
 #[derive(Clone)]
 enum Group {
-    /// The first row had no identity; the empty bucket decides it at the end.
     Empty,
     Decided(Option<ActiveDowntime>),
 }
 
 /// The rows of one alert in one request, split by their downtime decision.
-#[derive(Default)]
 pub(crate) struct RowSplit {
+    cap: usize,
     unmuted: Vec<Row>,
-    /// Rows with no identity share one identity, so they share one decision at [Self::finish].
+    /// Rows with no identity share one decision, made at [Self::finish].
     empty: Vec<Row>,
-    empty_count: usize,
     muted: Option<ActiveDowntime>,
-    muted_count: usize,
-    muted_sample: Option<Row>,
-    /// Whether any row (a multi-alert: any group's first row) had an identity.
+    muted_ids: HashSet<String>,
     any_identity: bool,
     groups: HashMap<String, Group>,
+    /// Plain rows with the same identity get the same answer, so the cache scan runs once each.
+    decided: HashMap<Vec<(String, String)>, Option<ActiveDowntime>>,
     seen: HashSet<u64>,
 }
 
 /// What a request's rows of one alert come to.
 #[derive(Debug, PartialEq)]
 pub(crate) enum Verdict {
-    /// The unmuted rows, at most [ROW_CAP].
     Deliver(Vec<Row>),
-    Suppress {
-        downtime: ActiveDowntime,
-        muted_rows: usize,
-        sample: Row,
-    },
+    Suppress(ActiveDowntime),
     Nothing,
 }
 
+/// What a row needs to be classified: the alert's id, folder and identity rules.
+#[cfg(feature = "enterprise")]
+struct Scope {
+    alert_id: String,
+    folder_id: String,
+    semantic_groups: SemanticGroups,
+    group_by: Option<Vec<String>>,
+}
+
+struct AlertEntry {
+    alert: Alert,
+    /// `None` leaves the rows unmuted, as `realtime_downtime` does without an id or folder.
+    #[cfg(feature = "enterprise")]
+    scope: Option<Scope>,
+    rows: RowSplit,
+}
+
+/// Per request: every matching row of every real-time alert, classified as it arrives.
+pub struct RealtimeMuteSplit {
+    org: String,
+    now: i64,
+    row_cap: usize,
+    alerts: HashMap<String, AlertEntry>,
+    order: Vec<String>,
+}
+
+impl Default for RowSplit {
+    fn default() -> Self {
+        Self::with_cap(ROW_CAP)
+    }
+}
+
 impl RowSplit {
-    /// Whether a series with this signature was already taken, so its evaluation can be skipped.
+    fn with_cap(cap: usize) -> Self {
+        Self {
+            cap,
+            unmuted: Vec::new(),
+            empty: Vec::new(),
+            muted: None,
+            muted_ids: HashSet::new(),
+            any_identity: false,
+            groups: HashMap::new(),
+            decided: HashMap::new(),
+            seen: HashSet::new(),
+        }
+    }
+
     pub(crate) fn seen(&self, signature: u64) -> bool {
         self.seen.contains(&signature)
+    }
+
+    /// A full unmuted bucket fixes the verdict at Deliver, so later rows change nothing.
+    pub(crate) fn is_full(&self) -> bool {
+        self.unmuted.len() >= self.cap
     }
 
     /// Files one matching row; `group` is its multi-alert group key, `None` for a plain alert.
@@ -85,6 +148,9 @@ impl RowSplit {
         dims_of: impl FnOnce(&Row) -> Dims,
         active_for: impl FnOnce(&Dims) -> Option<ActiveDowntime>,
     ) {
+        if self.is_full() {
+            return;
+        }
         if let Some(signature) = signature
             && !self.seen.insert(signature)
         {
@@ -94,32 +160,29 @@ impl RowSplit {
             Some(key) => match self.groups.get(&key) {
                 Some(group) => group.clone(),
                 None => {
-                    let group = self.classify(&row, dims_of, active_for);
+                    let group = self.classify(&row, false, dims_of, active_for);
                     self.groups.insert(key, group.clone());
                     group
                 }
             },
-            None => self.classify(&row, dims_of, active_for),
+            None => self.classify(&row, true, dims_of, active_for),
         };
         match decision {
             Group::Empty => {
-                self.empty_count += 1;
-                if self.empty.len() < ROW_CAP {
+                if self.empty.len() < self.cap {
                     self.empty.push(row);
                 }
             }
-            Group::Decided(None) => {
-                if self.unmuted.len() < ROW_CAP {
-                    self.unmuted.push(row);
-                }
-            }
-            Group::Decided(Some(downtime)) => self.mute(downtime, 1, row),
+            Group::Decided(None) => self.unmuted.push(row),
+            Group::Decided(Some(downtime)) => self.mute(downtime),
         }
     }
 
+    /// A group's decision may be group-scoped, so only plain rows share the identity cache.
     fn classify(
         &mut self,
         row: &Row,
+        cacheable: bool,
         dims_of: impl FnOnce(&Row) -> Dims,
         active_for: impl FnOnce(&Dims) -> Option<ActiveDowntime>,
     ) -> Group {
@@ -128,20 +191,31 @@ impl RowSplit {
             return Group::Empty;
         }
         self.any_identity = true;
-        Group::Decided(active_for(&dims))
+        if !cacheable {
+            return Group::Decided(active_for(&dims));
+        }
+        let mut identity: Vec<(String, String)> =
+            dims.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        identity.sort_unstable();
+        let decision = self
+            .decided
+            .entry(identity)
+            .or_insert_with(|| active_for(&dims))
+            .clone();
+        Group::Decided(decision)
     }
 
-    fn mute(&mut self, downtime: ActiveDowntime, rows: usize, sample: Row) {
-        self.muted_count += rows;
-        self.muted_sample.get_or_insert(sample);
+    fn mute(&mut self, downtime: ActiveDowntime) {
+        if !self.muted_ids.insert(downtime.id.clone()) {
+            return;
+        }
         self.muted = Some(match self.muted.take() {
             Some(merged) => merge(merged, downtime),
             None => downtime,
         });
     }
 
-    /// The row the service-discovery fallback reads: the first matching row, and only when no
-    /// row had an identity, as `downtime_identities_by_key` decides for a scheduled run.
+    /// Only when no row had an identity, as `downtime_identities_by_key` decides it.
     #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
     pub(crate) fn fallback_row(&self) -> Option<&Row> {
         (!self.any_identity).then(|| self.empty.first()).flatten()
@@ -153,17 +227,12 @@ impl RowSplit {
         empty_identity: Dims,
         active_for: impl FnOnce(&Dims) -> Option<ActiveDowntime>,
     ) -> Verdict {
-        if self.empty_count > 0 {
+        if !self.empty.is_empty() {
             let empty = std::mem::take(&mut self.empty);
             match active_for(&empty_identity) {
-                Some(downtime) => {
-                    let count = self.empty_count;
-                    if let Some(sample) = empty.into_iter().next() {
-                        self.mute(downtime, count, sample);
-                    }
-                }
+                Some(downtime) => self.mute(downtime),
                 None => {
-                    let room = ROW_CAP.saturating_sub(self.unmuted.len());
+                    let room = self.cap.saturating_sub(self.unmuted.len());
                     self.unmuted.extend(empty.into_iter().take(room));
                 }
             }
@@ -171,72 +240,38 @@ impl RowSplit {
         if !self.unmuted.is_empty() {
             return Verdict::Deliver(self.unmuted);
         }
-        match (self.muted, self.muted_sample) {
-            (Some(downtime), Some(sample)) => Verdict::Suppress {
-                downtime,
-                muted_rows: self.muted_count,
-                sample,
-            },
-            _ => Verdict::Nothing,
+        match self.muted {
+            Some(downtime) => Verdict::Suppress(downtime),
+            None => Verdict::Nothing,
         }
     }
 }
 
-#[cfg(feature = "enterprise")]
-fn merge(a: ActiveDowntime, b: ActiveDowntime) -> ActiveDowntime {
-    crate::alerts::downtimes::enterprise::merged(a, b)
-}
-
-#[cfg(not(feature = "enterprise"))]
-fn merge(a: ActiveDowntime, _b: ActiveDowntime) -> ActiveDowntime {
-    a
-}
-
-/// What a row needs to be classified: the alert's id, folder and identity rules.
-#[cfg(feature = "enterprise")]
-struct Scope {
-    alert_id: String,
-    folder_id: String,
-    semantic_groups: Vec<config::meta::correlation::FieldAlias>,
-    /// A multi-alert's group-by, so rows of one group share a decision.
-    group_by: Option<Vec<String>>,
-}
-
-struct AlertEntry {
-    alert: Alert,
-    /// `None` when the alert has no id or no cached folder; its rows are then unmuted, as
-    /// `realtime_downtime` decides for them.
-    #[cfg(feature = "enterprise")]
-    scope: Option<Scope>,
-    rows: RowSplit,
-}
-
-/// Per request: every matching row of every real-time alert, classified as it arrives.
-pub struct RealtimeMuteSplit {
-    org: String,
-    now: i64,
-    alerts: HashMap<String, AlertEntry>,
-    order: Vec<String>,
-}
-
 impl RealtimeMuteSplit {
-    /// `None` unless the org has an alert downtime; other orgs keep the first-row path.
-    pub fn for_org(org: &str) -> Option<Self> {
+    /// `None` unless the org has an alert downtime; `row_cap` is the most rows one alert delivers.
+    pub fn for_org(org: &str, row_cap: usize) -> Option<Self> {
         crate::alerts::downtimes::any_for(org, config::meta::downtimes::TargetModule::Alerts).then(
             || Self {
                 org: org.to_string(),
                 now: config::utils::time::now_micros(),
+                row_cap,
                 alerts: HashMap::new(),
                 order: Vec::new(),
             },
         )
     }
 
-    /// Whether `key` already took a series with this signature.
     pub fn seen(&self, key: &str, signature: u64) -> bool {
         self.alerts
             .get(key)
             .is_some_and(|entry| entry.rows.seen(signature))
+    }
+
+    /// Lets the caller skip evaluating an alert whose verdict is already Deliver.
+    pub fn is_full(&self, key: &str) -> bool {
+        self.alerts
+            .get(key)
+            .is_some_and(|entry| entry.rows.is_full())
     }
 
     /// Files the matching rows of `alert`, keyed as the caller keys its alerts.
@@ -245,8 +280,8 @@ impl RealtimeMuteSplit {
             let entry = AlertEntry {
                 alert: alert.clone(),
                 #[cfg(feature = "enterprise")]
-                scope: scope(&self.org, alert).await,
-                rows: RowSplit::default(),
+                scope: scope(&self.org, self.now, alert).await,
+                rows: RowSplit::with_cap(self.row_cap),
             };
             self.alerts.insert(key.to_string(), entry);
             self.order.push(key.to_string());
@@ -257,8 +292,7 @@ impl RealtimeMuteSplit {
         }
     }
 
-    /// Decides and sends the split's alerts. The ingest path spawns it, because the
-    /// verdicts read the alert cache and service correlation.
+    /// Spawned by the ingest path after the write, since the verdicts may read service discovery.
     pub async fn evaluate(self) {
         let triggers = self.finish().await;
         if !triggers.is_empty() {
@@ -273,15 +307,50 @@ impl RealtimeMuteSplit {
             let Some(entry) = self.alerts.remove(&key) else {
                 continue;
             };
-            let verdict = finish_entry(&self.org, self.now, entry.alert.clone(), entry).await;
-            out.extend(verdict);
+            out.extend(finish_entry(&self.org, self.now, &key, entry).await);
         }
         out
     }
 }
 
 #[cfg(feature = "enterprise")]
-async fn scope(org: &str, alert: &Alert) -> Option<Scope> {
+fn merge(a: ActiveDowntime, b: ActiveDowntime) -> ActiveDowntime {
+    crate::alerts::downtimes::enterprise::merged(a, b)
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn merge(a: ActiveDowntime, _b: ActiveDowntime) -> ActiveDowntime {
+    a
+}
+
+#[cfg(feature = "enterprise")]
+async fn semantic_groups(org: &str, now: i64) -> SemanticGroups {
+    if let Some(cached) = SEMANTIC_GROUPS.get(org)
+        && now.saturating_sub(cached.0) < SEMANTIC_GROUPS_TTL_MICROS
+    {
+        return cached.1.clone();
+    }
+    let groups = Arc::new(crate::db::system_settings::get_semantic_field_groups(org).await);
+    SEMANTIC_GROUPS.insert(org.to_string(), (now, groups.clone()));
+    groups
+}
+
+#[cfg(feature = "enterprise")]
+async fn fallback_service(org: &str, key: &str, now: i64, row: &Row) -> Option<String> {
+    let floor = config::meta::alerts::TriggerCondition::min_silence_micros();
+    if let Some(cached) = FALLBACK_SERVICES.get(key)
+        && now.saturating_sub(cached.0) < floor
+    {
+        return cached.1.clone();
+    }
+    FALLBACK_SERVICES.retain(|_, (at, _)| now.saturating_sub(*at) < floor);
+    let service = crate::alerts::incidents::correlated_service_for_routing(org, row).await;
+    FALLBACK_SERVICES.insert(key.to_string(), (now, service.clone()));
+    service
+}
+
+#[cfg(feature = "enterprise")]
+async fn scope(org: &str, now: i64, alert: &Alert) -> Option<Scope> {
     let alert_id = alert.id.as_ref()?.to_string();
     let (folder, _) = crate::db::alerts::alert::get_alert_from_cache(org, &alert_id).await?;
     let group_by = alert
@@ -291,7 +360,7 @@ async fn scope(org: &str, alert: &Alert) -> Option<Scope> {
     Some(Scope {
         alert_id,
         folder_id: folder.folder_id,
-        semantic_groups: crate::db::system_settings::get_semantic_field_groups(org).await,
+        semantic_groups: semantic_groups(org, now).await,
         group_by,
     })
 }
@@ -308,6 +377,7 @@ fn push_row(org: &str, now: i64, entry: &mut AlertEntry, row: Row, signature: Op
     let group = scope.group_by.as_ref().map(|group_by| {
         crate::alerts::scheduler::handlers::downtime_row_key(alert, group_by, &row)
     });
+    let group_key = group.clone();
     entry.rows.push(
         row,
         group,
@@ -320,11 +390,12 @@ fn push_row(org: &str, now: i64, entry: &mut AlertEntry, row: Row, signature: Op
             )
         },
         |dims| {
-            crate::alerts::downtimes::active_for_alert(
+            crate::alerts::downtimes::active_for_alert_key(
                 org,
                 &scope.alert_id,
                 &scope.folder_id,
                 dims,
+                group_key.as_deref(),
                 now,
             )
         },
@@ -339,40 +410,40 @@ fn push_row(_org: &str, _now: i64, entry: &mut AlertEntry, row: Row, signature: 
 }
 
 #[cfg(feature = "enterprise")]
-async fn finish_entry(org: &str, now: i64, alert: Alert, entry: AlertEntry) -> TriggerAlertData {
+async fn finish_entry(org: &str, now: i64, key: &str, entry: AlertEntry) -> TriggerAlertData {
+    let AlertEntry { alert, scope, rows } = entry;
+    let Some(scope) = scope else {
+        return into_trigger(alert, rows.finish(Dims::new(), |_| None));
+    };
     let mut empty_identity = Dims::new();
-    if let Some(row) = entry.rows.fallback_row()
-        && let Some(service) =
-            crate::alerts::incidents::correlated_service_for_routing(org, row).await
+    if let Some(row) = rows.fallback_row()
+        && let Some(service) = fallback_service(org, key, now, row).await
     {
         empty_identity.insert(config::meta::oncall::SERVICE_DIMENSION.to_string(), service);
     }
-    let verdict = match &entry.scope {
-        Some(scope) => entry.rows.finish(empty_identity, |dims| {
-            crate::alerts::downtimes::active_for_alert(
-                org,
-                &scope.alert_id,
-                &scope.folder_id,
-                dims,
-                now,
-            )
-        }),
-        None => entry.rows.finish(empty_identity, |_| None),
-    };
+    // The empty bucket mixes groups, so it is decided per alert, as the fallback is.
+    let verdict = rows.finish(empty_identity, |dims| {
+        crate::alerts::downtimes::active_for_alert(
+            org,
+            &scope.alert_id,
+            &scope.folder_id,
+            dims,
+            now,
+        )
+    });
     into_trigger(alert, verdict)
 }
 
 #[cfg(not(feature = "enterprise"))]
-async fn finish_entry(_org: &str, _now: i64, alert: Alert, entry: AlertEntry) -> TriggerAlertData {
-    into_trigger(alert, entry.rows.finish(Dims::new(), |_| None))
+async fn finish_entry(_org: &str, _now: i64, _key: &str, entry: AlertEntry) -> TriggerAlertData {
+    into_trigger(entry.alert, entry.rows.finish(Dims::new(), |_| None))
 }
 
 fn into_trigger(alert: Alert, verdict: Verdict) -> TriggerAlertData {
     match verdict {
         Verdict::Deliver(rows) => vec![(alert, rows, RealtimeMute::Unmuted)],
-        Verdict::Suppress {
-            downtime, sample, ..
-        } => vec![(alert, vec![sample], RealtimeMute::Muted(downtime))],
+        // A suppressed run reads only the downtime, never the rows.
+        Verdict::Suppress(downtime) => vec![(alert, vec![], RealtimeMute::Muted(downtime))],
         Verdict::Nothing => vec![],
     }
 }
@@ -447,14 +518,7 @@ mod tests {
     fn only_muted_rows_suppress_with_the_downtime() {
         let verdict = split(&["a", "a"], None, mutes_a).finish(Dims::new(), mutes_a);
         match verdict {
-            Verdict::Suppress {
-                downtime,
-                muted_rows,
-                ..
-            } => {
-                assert_eq!(downtime.id, "dt-a");
-                assert_eq!(muted_rows, 2);
-            }
+            Verdict::Suppress(downtime) => assert_eq!(downtime.id, "dt-a"),
             other => panic!("expected a suppression, got {other:?}"),
         }
     }
@@ -499,7 +563,7 @@ mod tests {
         let fallback = Dims::from([("service".to_string(), "a".to_string())]);
         assert!(matches!(
             split_rows.finish(fallback, mutes_a),
-            Verdict::Suppress { muted_rows: 2, .. }
+            Verdict::Suppress(_)
         ));
     }
 
@@ -518,17 +582,11 @@ mod tests {
     }
 
     #[test]
-    fn empty_rows_past_the_cap_are_counted_when_the_downtime_covers_them() {
+    fn empty_rows_past_the_cap_suppress_when_the_downtime_covers_them() {
         let mut rows = vec![""; 150];
         rows.push("b");
         let verdict = split(&rows, None, mutes_all).finish(Dims::new(), mutes_all);
-        assert!(matches!(
-            verdict,
-            Verdict::Suppress {
-                muted_rows: 151,
-                ..
-            }
-        ));
+        assert!(matches!(verdict, Verdict::Suppress(_)));
     }
 
     #[test]
@@ -538,7 +596,7 @@ mod tests {
         let fallback = Dims::from([("service".to_string(), "a".to_string())]);
         assert!(matches!(
             split_rows.finish(fallback, mutes_a),
-            Verdict::Suppress { muted_rows: 2, .. }
+            Verdict::Suppress(_)
         ));
     }
 }

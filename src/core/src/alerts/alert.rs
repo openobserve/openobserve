@@ -5515,6 +5515,11 @@ mod send_path_tests {
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::DataType;
+    use serde_json::json;
+
+    use super::*;
+
     #[test]
     fn a_failed_send_keeps_its_text_and_hides_the_body_when_asked() {
         let status = reqwest::StatusCode::INTERNAL_SERVER_ERROR;
@@ -5532,11 +5537,6 @@ mod tests {
         assert_eq!(typed.status, status);
         assert!(typed.body.is_none());
     }
-
-    use arrow_schema::DataType;
-    use serde_json::json;
-
-    use super::*;
 
     #[tokio::test]
     async fn a_multi_alert_with_recovery_saves() {

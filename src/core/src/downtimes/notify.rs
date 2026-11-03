@@ -254,7 +254,8 @@ fn outcome_summary(name: &str, e: &anyhow::Error) -> String {
     }
 }
 
-/// A stored outcome as written since bodies were dropped, else [RESULT_FAILED] for an older row.
+/// A stored outcome in the status-only format, else [RESULT_FAILED] so an older row never shows a
+/// reply body.
 fn safe_result(result: String, destinations: &[String]) -> String {
     let safe_part = |part: &str| {
         part.rsplit_once(": ").is_some_and(|(name, outcome)| {
