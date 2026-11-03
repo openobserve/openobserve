@@ -35,11 +35,18 @@ export const DEFAULT_BAR_GAUGE_ORIENTATION = "horizontal";
 const GRADIENT_START_ALPHA = 0.35;
 const LCD_CELL_LENGTH = 6;
 const LCD_CELL_GAP = 2;
-const VALUE_LABEL_ROOM = 64;
+const VALUE_LABEL_MAX = 160;
+const VALUE_LABEL_DISTANCE = 5;
 const NAME_LABEL_MAX = 160;
+const NAME_LABEL_SHARE = 0.3;
+const VALUE_LABEL_SHARE = 0.25;
 const NAME_LABEL_MARGIN = 8;
 const GRID_EDGE = 8;
 const BAR_CATEGORY_GAP = "30%";
+const VERTICAL_LABEL_GAP = 4;
+const VERTICAL_LABEL_MIN = 24;
+const FALLBACK_PANEL_WIDTH = 800;
+const EMPTY_NAME_LABEL = "(empty)";
 
 /** One bar: a reduced series value on its own min..max range, in the colour the gauge converter gave it. */
 export interface BarGaugeItem {
@@ -66,10 +73,53 @@ const toNumber = (value: unknown): number | null => {
   return Number.isFinite(numeric) ? numeric : null;
 };
 
+const hasTopLevelOrderBy = (sql: string): boolean => {
+  const code = sql.replace(/'(?:[^']|'')*'|--[^\n]*|\/\*[\s\S]*?\*\//g, " ");
+  const orderBy = /order\s+by\b/iy;
+  let depth = 0;
+  for (let i = 0; i < code.length; i++) {
+    if (code[i] === "(") depth++;
+    else if (code[i] === ")") depth--;
+    else if (depth === 0 && !/\w/.test(code[i - 1] ?? "")) {
+      orderBy.lastIndex = i;
+      if (orderBy.test(code)) return true;
+    }
+  }
+  return false;
+};
+
+// Derived builder fields never reach ORDER BY, so their sortBy orders nothing.
+const queryHasSort = (query: any): boolean =>
+  query?.customQuery
+    ? hasTopLevelOrderBy(String(query?.query ?? ""))
+    : [...(query?.fields?.x ?? []), ...(query?.fields?.y ?? [])].some(
+        (field: any) => field?.sortBy && !field?.isDerived,
+      );
+
+const compareNames = (a: string, b: string): number => {
+  const numeric = a.trim() !== "" && b.trim() !== "" && Number.isFinite(+a) && Number.isFinite(+b);
+  return numeric ? +a - +b : a.localeCompare(b, undefined, { numeric: true });
+};
+
 /** A bar gauge scales to its data unless the user picked a fixed range. */
 export const isBarGaugeAutoRange = (
   queryConfig: { range_mode?: string | null } | null | undefined,
 ) => queryConfig?.range_mode !== "fixed";
+
+/** Where a value sits on its own min..max, 0 at min and 1 at max, so each bar fills by its own query's range. */
+export const barGaugeFraction = (value: number | null, min: number, max: number): number => {
+  if (value === null) return 0;
+  const span = max - min;
+  if (!(span > 0)) return value >= max ? 1 : 0;
+  return Math.min(1, Math.max(0, (value - min) / span));
+};
+
+/** The drilldown variables of a clicked bar, carrying its real value rather than the 0..1 fill it is drawn at. */
+export const barGaugeDrilldownSeries = (params: any) => ({
+  __name: params?.name,
+  __value: params?.data?.rawValue,
+  __axisValue: params?.name,
+});
 
 /** The panel as a gauge for the gauge converters, with each query's unset range resolved to auto. */
 export const barGaugeSchemaAsGauge = (panelSchema: any) => ({
@@ -82,20 +132,23 @@ export const barGaugeSchemaAsGauge = (panelSchema: any) => ({
   ),
 });
 
-/** The bars behind gauge options: one per dial, named by its label or else the value field. */
+/** The bars behind gauge options: one per dial, named by its label or else its query's value field. */
 export const barGaugeItems = (gaugeOptions: any, panelSchema: any): BarGaugeItem[] => {
-  const query = panelSchema?.queries?.[0];
-  const yField = query?.fields?.y?.[0];
-  const fallbackName =
-    getFieldLabel(yField, panelSchema?.config, query?.customQuery) || yField?.alias || "";
+  const queries: any[] = panelSchema?.queries ?? [];
+  const promql = panelSchema?.queryType === "promql";
+  const fallbackNames = queries.map((query) => {
+    const yField = query?.fields?.y?.[0];
+    return getFieldLabel(yField, panelSchema?.config, query?.customQuery) || yField?.alias || "";
+  });
   const noValue = String(panelSchema?.config?.no_value_replacement ?? "");
   const series: any[] = Array.isArray(gaugeOptions?.series) ? gaugeOptions.series : [];
   const overrides = createSeriesOverrideLookup(panelSchema?.config);
   // Silent gauges are the display-name title overlays the gauge overrides add, not dials.
-  return series
+  const dials = series
     .filter((gauge) => gauge?.type === "gauge" && !gauge.silent && gauge?.data?.[0])
-    .map((gauge, index) => {
+    .map((gauge) => {
       const item = gauge.data[0];
+      const queryIndex = gauge._queryIndex ?? 0;
       const value = toNumber(item.value);
       const formatter = item.detail?.formatter;
       const text =
@@ -104,17 +157,38 @@ export const barGaugeItems = (gaugeOptions: any, panelSchema: any): BarGaugeItem
           : typeof formatter === "function"
             ? String(formatter(value))
             : String(value);
-      const name = String(item.name || fallbackName);
+      // A blank name with a value is an empty group; without a label field, or with no rows at all, it is the value field.
+      const hasLabelField = !promql && queries[queryIndex]?.fields?.x?.length > 0;
+      const blankIsGroup = hasLabelField && value !== null;
+      const name =
+        String(item.name ?? "") || (blankIsGroup ? "" : (fallbackNames[queryIndex] ?? ""));
+      const shown = String(overrides.displayName(name));
       return {
-        name,
-        label: String(overrides.displayName(name)),
-        value,
-        min: toNumber(gauge.min) ?? 0,
-        max: toNumber(gauge.max) ?? 100,
-        color: item.itemStyle?.color || echartsPaletteColor(index),
-        text,
+        queryIndex,
+        item: {
+          name,
+          label: shown.trim() ? shown : EMPTY_NAME_LABEL,
+          value,
+          min: toNumber(gauge.min) ?? 0,
+          max: toNumber(gauge.max) ?? 100,
+          color: item.itemStyle?.color as string | undefined,
+          text,
+        },
       };
     });
+  // An aggregate without ORDER BY comes back in any order, so name order keeps a refreshing panel steady.
+  const keepOrder = queries.map((query) => promql || queryHasSort(query));
+  dials.sort((a, b) =>
+    a.queryIndex !== b.queryIndex
+      ? a.queryIndex - b.queryIndex
+      : keepOrder[a.queryIndex]
+        ? 0
+        : compareNames(a.item.name, b.item.name),
+  );
+  return dials.map(({ item }, index) => ({
+    ...item,
+    color: item.color || echartsPaletteColor(index),
+  }));
 };
 
 /** The colour bands of one bar's range from its threshold steps; the part below the first step takes the base colour. */
@@ -143,7 +217,8 @@ const gradientFill = (
   bands: BarGaugeBand[],
   horizontal: boolean,
 ): Record<string, unknown> => {
-  const value = item.value ?? item.min;
+  // The bar stops at the track ends, so the stops sit on the value clamped to the range.
+  const value = Math.min(Math.max(item.value ?? item.min, item.min), item.max);
   const span = value - item.min;
   const shown = bands.filter((band) => band.from < value || band.from === item.min);
   const colorStops =
@@ -166,7 +241,6 @@ const lcdSeries = (
   bandsByItem: BarGaugeBand[][],
   horizontal: boolean,
   showUnfilled: boolean,
-  max: number,
 ) => {
   const cell = {
     type: "pictorialBar",
@@ -175,7 +249,7 @@ const lcdSeries = (
     symbolMargin: LCD_CELL_GAP,
     symbolSize: horizontal ? [LCD_CELL_LENGTH, "70%"] : ["70%", LCD_CELL_LENGTH],
     symbolClip: true,
-    symbolBoundingData: max,
+    symbolBoundingData: 1,
     barGap: "-100%",
     barCategoryGap: BAR_CATEGORY_GAP,
     silent: true,
@@ -191,7 +265,7 @@ const lcdSeries = (
       const range = bandsByItem[index][band];
       if (!range || item.value === null || item.value <= range.from) return "-";
       return {
-        value: Math.min(item.value, range.to),
+        value: barGaugeFraction(Math.min(item.value, range.to), item.min, item.max),
         itemStyle: { color: range.color },
       };
     }),
@@ -202,7 +276,7 @@ const lcdSeries = (
           ...cell,
           z: 2,
           data: items.map(() => ({
-            value: max,
+            value: 1,
             itemStyle: { color: chartColor("--color-border-subtle") },
           })),
         },
@@ -212,7 +286,7 @@ const lcdSeries = (
 };
 
 /** Converts gauge-converted options into a bar gauge: one bar per dial, coloured by its thresholds. */
-export const convertBarGaugeData = (gaugeOptions: any, panelSchema: any) => {
+export const convertBarGaugeData = (gaugeOptions: any, panelSchema: any, panelWidth?: number) => {
   const config = panelSchema?.config ?? {};
   const items = barGaugeItems(gaugeOptions, panelSchema);
   if (!items.length) return { series: [] };
@@ -221,8 +295,6 @@ export const convertBarGaugeData = (gaugeOptions: any, panelSchema: any) => {
     : DEFAULT_BAR_GAUGE_MODE;
   const horizontal = (config.bar_gauge_orientation ?? DEFAULT_BAR_GAUGE_ORIENTATION) !== "vertical";
   const showUnfilled = config.bar_gauge_show_unfilled !== false;
-  const min = Math.min(...items.map((item) => item.min));
-  const max = Math.max(...items.map((item) => item.max));
   const bandsByItem = items.map((item, index) => {
     const thresholds = getSeriesThresholds(config, item.name);
     const resolved = thresholds
@@ -243,7 +315,8 @@ export const convertBarGaugeData = (gaugeOptions: any, panelSchema: any) => {
       : {}),
     data: items.map((item, index) => ({
       name: item.name,
-      value: item.value ?? min,
+      value: barGaugeFraction(item.value, item.min, item.max),
+      rawValue: item.value ?? item.min,
       itemStyle: {
         color: lcd
           ? "transparent"
@@ -253,6 +326,23 @@ export const convertBarGaugeData = (gaugeOptions: any, panelSchema: any) => {
       },
     })),
   };
+
+  // Vertical labels share the panel width, one slot per bar, so long names truncate instead of running together.
+  const width = panelWidth || FALLBACK_PANEL_WIDTH;
+  const slotWidth = (width - 2 * GRID_EDGE) / items.length - VERTICAL_LABEL_GAP;
+  // Below this width ECharts cuts text without an ellipsis, so labels thin out instead of shrinking further.
+  const crowded = !horizontal && slotWidth < VERTICAL_LABEL_MIN;
+  const labelWidth = Math.max(slotWidth, VERTICAL_LABEL_MIN);
+  // Both horizontal gutters are capped by a share of the panel, so a narrow panel keeps room for the track.
+  const gutter = (texts: string[], max: number, share: number) =>
+    Math.min(max, width * share, Math.max(...texts.map((text) => calculateWidthText(text))) + 2);
+  const valueWidth = horizontal
+    ? gutter(
+        items.map((item) => item.text),
+        VALUE_LABEL_MAX,
+        VALUE_LABEL_SHARE,
+      )
+    : labelWidth;
 
   // The value text sits past the end of the track, so it never lands on the fill whatever the bar's length.
   const valueLabels = {
@@ -265,18 +355,25 @@ export const convertBarGaugeData = (gaugeOptions: any, panelSchema: any) => {
     tooltip: { show: false },
     itemStyle: { color: "transparent" },
     label: {
-      show: true,
+      show: !crowded,
       position: horizontal ? "right" : "top",
+      distance: VALUE_LABEL_DISTANCE,
+      width: valueWidth,
+      overflow: "truncate",
       color: chartColor("--color-text-heading"),
       formatter: (params: any) => items[params.dataIndex]?.text ?? "",
     },
-    data: items.map(() => max),
+    data: items.map(() => 1),
   };
 
   // Horizontal names get a gutter sized to the widest one, so a late web font truncates them instead of clipping at the edge.
   const nameWidth = horizontal
-    ? Math.min(NAME_LABEL_MAX, Math.max(...items.map((item) => calculateWidthText(item.label))) + 2)
-    : undefined;
+    ? gutter(
+        items.map((item) => item.label),
+        NAME_LABEL_MAX,
+        NAME_LABEL_SHARE,
+      )
+    : labelWidth;
   const categoryAxis = {
     type: "category",
     data: items.map((item) => item.name),
@@ -288,18 +385,18 @@ export const convertBarGaugeData = (gaugeOptions: any, panelSchema: any) => {
       overflow: "truncate",
       width: nameWidth,
       margin: NAME_LABEL_MARGIN,
-      interval: 0,
+      interval: crowded ? "auto" : 0,
       formatter: (_value: string, index: number) => items[index]?.label ?? "",
     },
   };
-  const valueAxis = { type: "value", min, max, show: false };
+  const valueAxis = { type: "value", min: 0, max: 1, show: false };
 
   return {
     backgroundColor: "transparent",
     grid: {
       containLabel: !horizontal,
-      left: horizontal ? GRID_EDGE + (nameWidth ?? 0) + NAME_LABEL_MARGIN : GRID_EDGE,
-      right: horizontal ? VALUE_LABEL_ROOM : GRID_EDGE,
+      left: horizontal ? GRID_EDGE + nameWidth + NAME_LABEL_MARGIN : GRID_EDGE,
+      right: horizontal ? GRID_EDGE + valueWidth + VALUE_LABEL_DISTANCE : GRID_EDGE,
       top: horizontal ? 8 : 24,
       bottom: 8,
     },
@@ -322,7 +419,7 @@ export const convertBarGaugeData = (gaugeOptions: any, panelSchema: any) => {
     xAxis: horizontal ? valueAxis : categoryAxis,
     yAxis: horizontal ? categoryAxis : valueAxis,
     series: [
-      ...(lcd ? lcdSeries(items, bandsByItem, horizontal, showUnfilled, max) : []),
+      ...(lcd ? lcdSeries(items, bandsByItem, horizontal, showUnfilled) : []),
       valueBar,
       valueLabels,
     ],
