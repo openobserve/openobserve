@@ -3,6 +3,7 @@
     bleed
     data-test="oncall-response-detail-page"
     :title="title"
+    title-min-width
     icon="notifications-active"
     :back="{
       label: t('oncall.backToResponses'),
@@ -66,8 +67,8 @@
     <template #title-trail>
       <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
       <template v-if="response && lgUp">
-        <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-        <span data-test="oncall-response-phrase">
+        <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" class="shrink-0" />
+        <span class="flex min-w-32 shrink-[1000] truncate" data-test="oncall-response-phrase">
           <OnCallEscalationCell
             :response-id="response.id"
             :record="response"
@@ -75,12 +76,13 @@
             :total-rungs="totalRungs"
             :progress-loaded="escalationLoaded"
             :reached-step="headerReachedStep"
+            :team-deleted="teamDeleted"
           />
         </span>
         <!-- How long it has been ringing, beside the word "ringing". The two
              were a stat tile apart, and the one people read first is the
              one that says how bad this already is. -->
-        <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
+        <span class="text-text-secondary shrink-0 text-xs" data-test="oncall-response-elapsed">
           {{ elapsedLabel }}
         </span>
         <!-- Why this team is looking at somebody else's outage, said where the
@@ -305,7 +307,7 @@
           data-test="oncall-response-meta"
         >
           <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-          <span data-test="oncall-response-phrase">
+          <span class="flex min-w-32 shrink-[1000] truncate" data-test="oncall-response-phrase">
             <OnCallEscalationCell
               :response-id="response.id"
               :record="response"
@@ -313,6 +315,7 @@
               :total-rungs="totalRungs"
               :progress-loaded="escalationLoaded"
               :reached-step="headerReachedStep"
+              :team-deleted="teamDeleted"
             />
           </span>
           <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
@@ -888,6 +891,8 @@ import { formatMicrosDuration } from "@/utils/formatters";
 import { formatTimestampInTimezone } from "@/utils/date";
 
 const HOLD_RECHECK_MS = 10_000;
+/// Re-reads of a lapsed rung before giving up: a minute at HOLD_RECHECK_MS.
+const LAPSE_RECHECKS = 6;
 
 const { t } = useI18nTyped();
 const { lgUp } = useBreakpoint();
@@ -960,15 +965,11 @@ const severityOptions = computed(() =>
 /// The record's own severity is the default: the wire derives exactly this
 /// when no severity is sent, so the picker opens on the answer rather than on
 /// an empty box somebody has to fill in mid-incident.
-watch(
-  [response, promoteOpen],
-  () => {
-    if (!promoteOpen.value || !response.value) return;
-    promoteTitle.value = response.value.title || "";
-    promoteSeverity.value = promoteSeverityFloor(response.value.priority);
-  },
-  { immediate: true },
-);
+watch(promoteOpen, (open) => {
+  if (!open || !response.value) return;
+  promoteTitle.value = response.value.title || "";
+  promoteSeverity.value = promoteSeverityFloor(response.value.priority);
+});
 
 /// Makes an incident out of a page that turned out to be one. The refusal path
 /// matters as much as the success one: a 409 means somebody else promoted this
@@ -1038,6 +1039,7 @@ const subjectAlert = ref<{
   stream_type?: string;
   query_condition?: any;
   condition?: any;
+  trigger_condition?: any;
 } | null>(null);
 const escalation = ref<EscalationProgress | null>(null);
 /// False until the progress has answered, so the header makes no paging claim from a missing value.
@@ -1819,8 +1821,28 @@ async function fetchEscalation(force = false) {
   }
 }
 
+/// Re-reads the record and its events, so the rung card and activity agree with a newer progress.
+async function refreshRecord() {
+  const id = responseId.value;
+  try {
+    const data = await read<{ response: OnCallResponse; events: OnCallResponseEvent[] } | null>(
+      responseQuery(orgId.value, id),
+      true,
+    );
+    if (!data?.response || id !== responseId.value) return;
+    response.value = data.response;
+    events.value = data.events ?? [];
+  } catch (err: any) {
+    if (id !== responseId.value) return;
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.loadResponseFailed"),
+    });
+  }
+}
+
 /// A failed re-read keeps the last good progress, so the hold banner and its polling survive until the next tick.
-async function recheckHold() {
+async function recheckProgress() {
   try {
     escalation.value = await read<EscalationProgress | null>(
       responseProgressQuery(orgId.value, responseId.value),
@@ -1843,16 +1865,38 @@ function openResponse(id: string) {
   });
 }
 
-// The ladder's countdown lapses while the entry is still fresh, so this one forces.
+// A lapsed rung is sent a little later, so a few forced re-reads follow until next_at moves.
+let lapseRecheck: ReturnType<typeof setInterval> | null = null;
+function stopLapseRecheck() {
+  if (lapseRecheck !== null) clearInterval(lapseRecheck);
+  lapseRecheck = null;
+}
 watch(
   () => {
     const at = escalation.value?.next_at;
     return !!at && nowMicros.value >= at;
   },
   (lapsed) => {
-    if (lapsed) fetchEscalation(true);
+    stopLapseRecheck();
+    if (!lapsed) return;
+    fetchEscalation(true);
+    let triesLeft = LAPSE_RECHECKS;
+    lapseRecheck = setInterval(() => {
+      if (triesLeft-- <= 0) return stopLapseRecheck();
+      recheckProgress();
+    }, HOLD_RECHECK_MS);
   },
 );
+onBeforeUnmount(stopLapseRecheck);
+
+// The newest rung sent in any ladder run; a run restart resets the count but never moves this back.
+const lastSentAt = computed(() =>
+  escalation.value ? Math.max(0, ...escalation.value.fired.map((rung) => rung.at)) : undefined,
+);
+// A rung the progress saw sent is on the record and its activity too, which this view read earlier.
+watch(lastSentAt, (sent, before) => {
+  if (sent !== undefined && before !== undefined && sent > before) refreshRecord();
+});
 
 // Triage may release the first page before the deadline, so the progress is re-read while held.
 let holdRecheck: ReturnType<typeof setInterval> | null = null;
@@ -1864,7 +1908,7 @@ watch(
   () => holdSecondsLeft.value > 0,
   (held) => {
     stopHoldRecheck();
-    if (held) holdRecheck = setInterval(recheckHold, HOLD_RECHECK_MS);
+    if (held) holdRecheck = setInterval(recheckProgress, HOLD_RECHECK_MS);
   },
 );
 onBeforeUnmount(stopHoldRecheck);
@@ -1897,6 +1941,7 @@ watch(
     priorCauses.value = [];
     firingHistory.value = [];
     report.value = null;
+    promoteOpen.value = false;
     fetchResponse();
   },
   { immediate: true },

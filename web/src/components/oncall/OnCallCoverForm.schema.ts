@@ -25,7 +25,7 @@ const MAX_SPAN_MICROS = 90 * MICROS_PER_DAY;
  * catch a milliseconds-for-microseconds mistake, which lands roughly 55,000
  * years out — so the message says the limit rather than guessing at the cause.
  */
-const MAX_AHEAD_MICROS = 730 * MICROS_PER_DAY;
+export const MAX_AHEAD_MICROS = 730 * MICROS_PER_DAY;
 
 export const makeOnCallCoverSchema = (
   t: TranslateFn,
