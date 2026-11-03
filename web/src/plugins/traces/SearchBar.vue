@@ -856,7 +856,9 @@ import {
   buildTraceSelectorSql,
   buildTracesSql,
   sqlToFilter,
+  withFieldUnits,
 } from "@/utils/traces/tracesSql";
+import { offsetRange, tracesSqlGuards } from "@/utils/traces/tracesSqlErrors";
 import type { TracesSqlTemplate } from "@/utils/traces/tracesSqlTemplates";
 import { useTracesSqlTemplateText } from "@/plugins/traces/composables/useTracesSqlTemplates";
 import { isAuthoredStatement, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
@@ -1036,6 +1038,7 @@ export default defineComponent({
       () => config.isEnterprise === "true" && Boolean(store.state.zoConfig.ai_enabled),
     );
     const toTracesFilter = (sql: string): string | null => {
+      if (searchObj.meta.sqlMode) return sql;
       const filter = nlSqlToTracesFilter(sql, tracesParser.value);
       if (filter === null) toast({ message: t("traces.nlNeedsSql"), variant: "warning" });
       return filter;
@@ -1051,6 +1054,17 @@ export default defineComponent({
       query: computed(() => searchObj.data.editorValue ?? ""),
       streamName: computed(() => searchObj.data.stream.selectedStream?.value),
       externalErrors: toRef(searchObj.data, "sqlSyntaxErrorRanges"),
+      sqlChecks: (text) => {
+        const { startTime, endTime } = searchObj.data.datetime;
+        return tracesSqlGuards(text, endTime - startTime).map((guard) => ({
+          ...offsetRange(text, guard.start, guard.end),
+          error:
+            guard.kind === "strayKeyword"
+              ? t("traces.sqlMode.strayKeyword", { word: guard.word })
+              : t("traces.sqlMode.joinLongRange"),
+          ...(guard.kind === "joinLongRange" ? { severity: "warning" as const } : {}),
+        }));
+      },
     });
 
     const queryEditorBoxRef = ref<HTMLElement | null>(null);
@@ -1205,9 +1219,9 @@ export default defineComponent({
     });
 
     watch(
-      () => searchObj.data.stream.selectedStreamFields,
-      (fields) => {
-        if (fields.length) updateFieldKeywords(fields);
+      () => [searchObj.data.stream.selectedStreamFields, searchObj.meta.sqlMode] as const,
+      ([fields, sqlMode]) => {
+        if (fields.length) updateFieldKeywords(sqlMode ? withFieldUnits(fields) : fields);
       },
       { immediate: true, deep: true },
     );
@@ -1701,7 +1715,8 @@ export default defineComponent({
     const buildSavedViewData = () => {
       const { datetime, stream } = searchObj.data;
       return {
-        version: 1,
+        version: 2,
+        sqlMode: !!searchObj.meta.sqlMode,
         stream: { label: stream.selectedStream.label, value: stream.selectedStream.value },
         editorValue: searchObj.data.editorValue,
         datetime: {

@@ -34,10 +34,11 @@
  *   buildColumns(showLlmColumns, searchMode, selectedFields)
  */
 
-import { ref } from "vue";
+import { h, ref } from "vue";
 import { useStore } from "vuex";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
-import { raw, useI18nTyped, type I18nKey, type TranslateFn } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
@@ -213,13 +214,27 @@ export function fillLastColumn(
   last.meta = { ...last.meta, autoWidth: true, fillRemaining: true };
 }
 
-/** One column per field typed SQL returned, headed by its name or alias. */
-export function buildResultColumns(keys: string[]): OTableColumnDef<Record<string, any>>[] {
+/** One column per field typed SQL returned, headed by its name or alias; hinted columns get an info icon and tooltip. */
+export function buildResultColumns(
+  keys: string[],
+  hints: Record<string, I18nText> = {},
+): OTableColumnDef<Record<string, any>>[] {
   const cols: OTableColumnDef<Record<string, any>>[] = keys.map((key) => ({
     id: key,
-    header: raw(key),
+    header: hints[key]
+      ? () =>
+          h("span", { class: "inline-flex items-center gap-1" }, [
+            key,
+            h(OIcon, {
+              name: "info-outline",
+              size: "xs",
+              class: "text-text-secondary shrink-0",
+              "data-test": "traces-sql-column-hint",
+            }),
+          ])
+      : raw(key),
     size: 160,
-    meta: {},
+    meta: hints[key] ? { headerTooltip: hints[key] } : {},
     accessorFn: (row: any) => {
       const value = row?.[key];
       return value !== null && typeof value === "object" ? JSON.stringify(value) : value;

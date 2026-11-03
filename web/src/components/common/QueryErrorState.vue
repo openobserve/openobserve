@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="rounded-default bg-surface-panel border-border-default max-h-40 overflow-y-auto border px-3 py-2"
         data-test="query-error-detail-expanded"
       >
-        <p class="text-text-secondary m-0 font-mono text-xs break-all whitespace-pre-wrap">
+        <p class="text-text-secondary m-0 font-mono text-xs wrap-break-word whitespace-pre-wrap">
           {{ detailBody }}
         </p>
       </div>

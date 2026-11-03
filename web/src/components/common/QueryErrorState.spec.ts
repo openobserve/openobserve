@@ -237,6 +237,20 @@ describe("QueryErrorState plain-language errors", () => {
     expect(body).not.toContain("TraceID");
   });
 
+  it("wraps the raw detail at spaces, not mid-word", async () => {
+    const wrapper = mountState({ errorMsg: PARSER_EOF, query: "SELECT * FROM" });
+    await wrapper.find('[data-test="error-detail-toggle-btn"]').trigger("click");
+    const classes = wrapper.find('[data-test="error-detail-body"] p').classes();
+    expect(classes).toContain("wrap-break-word");
+    expect(classes).not.toContain("break-all");
+
+    const block = mountState({ size: "block", errorMsg: PARSER_EOF, query: "SELECT * FROM" });
+    await block.find('[data-test="query-error-toggle-detail-btn"]').trigger("click");
+    const blockClasses = block.find('[data-test="query-error-detail-expanded"] p').classes();
+    expect(blockClasses).toContain("wrap-break-word");
+    expect(blockClasses).not.toContain("break-all");
+  });
+
   it("draws no divider above the toggle when the summary row is absent", () => {
     const toggleRow = (errorMsg: string) =>
       mountState({ errorMsg, query: "SELECT * FROM", resourceName: "app_logs" }).find(
@@ -269,6 +283,16 @@ describe("QueryErrorState plain-language errors", () => {
     expect(wrapper.find('[data-test="error-detail-summary"]').text()).toBe(
       "Search SQL execute error",
     );
+  });
+
+  it("shows a token like > as typed, not as an HTML entity", () => {
+    const wrapper = mountState({
+      errorMsg:
+        "sql parser error: Expected: end of statement, found: > at Line: 1, Column: 26 <script>alert(1)</script>",
+    });
+    expect(wrapper.text()).toContain(tr("queryError.explain.unexpectedToken", { token: '">"' }));
+    expect(wrapper.text()).not.toContain("&gt;");
+    expect(wrapper.text()).not.toContain("alert(1)");
   });
 
   it("shows the plain sentence as the summary in the compact layout", () => {

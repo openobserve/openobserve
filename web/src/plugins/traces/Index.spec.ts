@@ -4412,12 +4412,35 @@ describe("Index.vue (Main Traces Page)", () => {
       const before = mockSearchObj.data.editorValue;
       const modeBefore = mockSearchObj.meta.searchMode;
 
-      await applyView(savedView({ version: 2 }));
+      await applyView(savedView({ version: 3 }));
 
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
       expect(mockSearchObj.data.editorValue).toBe(before);
       expect(mockSearchObj.meta.searchMode).toBe(modeBefore);
       expect(ownSearches()).toHaveLength(0);
+    });
+
+    it("restores SQL mode from a version 2 view", async () => {
+      await mountPage();
+      const sql = `SELECT * FROM "default" WHERE a = 1`;
+      await applyViewAndWaitForSearch(savedView({ version: 2, sqlMode: true, editorValue: sql }));
+      expect(mockSearchObj.meta.sqlMode).toBe(true);
+      expect(mockSearchObj.data.editorValue).toBe(sql);
+      mockSearchObj.meta.sqlMode = false;
+    });
+
+    it("loads a version 2 view saved in filter mode as chips", async () => {
+      await mountPage();
+      mockSearchObj.meta.sqlMode = true;
+      await applyViewAndWaitForSearch(savedView({ version: 2, sqlMode: false }));
+      expect(mockSearchObj.meta.sqlMode).toBe(false);
+    });
+
+    it("loads a version 1 view as chips", async () => {
+      await mountPage();
+      mockSearchObj.meta.sqlMode = true;
+      await applyViewAndWaitForSearch(savedView());
+      expect(mockSearchObj.meta.sqlMode).toBe(false);
     });
 
     it("toasts and leaves state unchanged when the stream no longer exists", async () => {
@@ -5287,6 +5310,96 @@ describe("Index.vue (Main Traces Page)", () => {
       } as any);
       await mountSql();
       expect(mockSearchObj.meta.sqlMode).toBe(false);
+    });
+
+    const failRun = async (sql: string, error: Record<string, unknown>) => {
+      const { handlers } = await runSql(sql);
+      handlers.error({}, { content: error });
+      await flushPromises();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+    };
+
+    it("shows a SQL-mode error with the server's own message and its suggestions", async () => {
+      await mountSql();
+      await failRun(`SELECT servce_name FROM "default"`, {
+        code: 20004,
+        message: "unknown field 'servce_name'",
+        suggestions: ["service_name"],
+      });
+      const state = wrapper.findComponent({ name: "TracesSqlErrorState" });
+      expect(state.props("errorMsg")).toBe("unknown field 'servce_name'");
+      expect(state.props("suggestions")).toEqual(["service_name"]);
+      expect(state.props("query")).toBe(`SELECT servce_name FROM "default"`);
+    });
+
+    it("keeps the filter-mode error as it was", async () => {
+      await mountSql();
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.data.editorValue = "servce_name = 'a'";
+      wrapper.vm.searchData();
+      await flushPromises();
+      const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      handlers.error({}, { content: { code: 20004, message: "unknown field 'servce_name'" } });
+      await flushPromises();
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+      expect(wrapper.findComponent({ name: "TracesSqlErrorState" }).exists()).toBe(false);
+      expect(mockSearchObj.data.errorMsg).toBe(i18n.global.t("message.SearchFieldNotFound"));
+    });
+
+    it("runs the rewritten SQL a fix card sends", async () => {
+      await mountSql();
+      await failRun(`SELECT servce_name FROM "default"`, {
+        code: 20004,
+        message: "unknown field 'servce_name'",
+      });
+      mockFetchQueryDataWithHttpStream.mockClear();
+      wrapper
+        .findComponent({ name: "TracesSqlErrorState" })
+        .vm.$emit("run-sql", `SELECT service_name FROM "default"`);
+      await flushPromises();
+      expect(mockSearchObj.data.editorValue).toBe(`SELECT service_name FROM "default"`);
+      const [request] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      expect(b64DecodeUnicode(request.queryReq.query.sql)).toBe(
+        `SELECT service_name FROM "default"`,
+      );
+    });
+
+    it("narrows to the last hour and runs for Use last 1 hour", async () => {
+      await mountSql();
+      await failRun(`SELECT * FROM "default" c JOIN "default" p ON c.t = p.t`, {
+        code: 500,
+        message: "Search SQL execute error: Resources exhausted: Failed to allocate",
+      });
+      mockFetchQueryDataWithHttpStream.mockClear();
+      wrapper.findComponent({ name: "TracesSqlErrorState" }).vm.$emit("use-last-hour");
+      await flushPromises();
+      expect(mockSearchObj.data.datetime.type).toBe("relative");
+      expect(mockSearchObj.data.datetime.relativeTimePeriod).toBe("1h");
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("tells the field list when the stream packs extra fields into _all", async () => {
+      await mountSql();
+      const base = mockStreamList.list.find((st: any) => st.name === "default");
+      mockGetStream.mockResolvedValueOnce({
+        ...base,
+        settings: { ...base.settings, defined_schema_fields: ["service_name"] },
+      });
+      await wrapper.vm.extractFields();
+      await flushPromises();
+      expect(wrapper.vm.storesExtraFieldsInAll).toBe(true);
+      await wrapper.vm.extractFields();
+      await flushPromises();
+      expect(wrapper.vm.storesExtraFieldsInAll).toBe(false);
+    });
+
+    it("marks the result partial when the server says it was cut", async () => {
+      await mountSql();
+      const { handlers } = await runSql(grouped);
+      await finish(handlers, [{ service_name: "api", n: 3 }], { is_partial: true });
+      expect(mockSearchObj.data.queryResults.is_partial).toBe(true);
     });
 
     it("waits for Run when the stream changes in SQL mode, even with auto-run on", async () => {

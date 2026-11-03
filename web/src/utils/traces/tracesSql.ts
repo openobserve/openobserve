@@ -47,6 +47,8 @@ export interface TracesSqlInfo {
   fromSubquery: boolean;
   explain: boolean;
   selectNames: string[];
+  /** Every select item has a name and none is a star, so the result has exactly `selectNames`. */
+  selectExplicit: boolean;
 }
 
 export interface TraceSelector {
@@ -122,6 +124,13 @@ const AGGREGATE_FUNCTIONS = new Set([
   "bool_or",
 ]);
 
+const STRAY_BEFORE_WHERE = new Set(["and", "or", "not"]);
+
+/** The column match_all is rewritten to search when the stream has no full-text fields. */
+export const MATCH_ALL_FALLBACK_FIELD = "operation_name";
+
+const FIELD_UNITS: Record<string, string> = { duration: "µs", start_time: "ns", end_time: "ns" };
+
 const WORD_START = /[A-Za-z_]/;
 const WORD_CHAR = /[A-Za-z0-9_]/;
 const DIGIT = /[0-9]/;
@@ -192,6 +201,8 @@ export function analyzeTracesSql(sql: string, parser: any): TracesSqlInfo {
       ? columns.some((col) => hasAggregate(col?.expr))
       : selectListHasAggregate(tokens, selectIdx >= 0 ? top[selectIdx] : undefined, fromTok);
 
+  const selectNames = selectNamesOf(columns);
+
   const targetIdx = target ? top.indexOf(target) : -1;
   const next = targetIdx >= 0 ? top[targetIdx + 1] : undefined;
   const cleanAfterTarget =
@@ -218,7 +229,8 @@ export function analyzeTracesSql(sql: string, parser: any): TracesSqlInfo {
     limit,
     fromSubquery,
     explain,
-    selectNames: selectNamesOf(columns),
+    selectNames,
+    selectExplicit: !selectAll && columns.length > 0 && selectNames.length === columns.length,
   };
   info.plainSelectAll =
     firstWord === "select" && selectAll && stream !== null && cleanAfterTarget && isRowQuery(info);
@@ -392,12 +404,113 @@ export function resultShape(keys: string[]): TracesSqlShape {
 }
 
 /** Every returned column once, in select-list order and then in order of first appearance. */
-export function resultKeys(hits: Record<string, unknown>[], selectNames: string[]): string[] {
+export function resultKeys(
+  hits: Record<string, unknown>[],
+  selectNames: string[],
+  explicit = false,
+): string[] {
   const seen = new Set<string>();
   for (const hit of hits) for (const key of Object.keys(hit ?? {})) seen.add(key);
+  // The server omits a null value's key and adds keys like _timestamp, so hits alone misreport the columns.
+  if (explicit) {
+    const keyOf = (name: string) =>
+      seen.has(name)
+        ? name
+        : ([...seen].find((key) => key.toLowerCase() === name.toLowerCase()) ?? name);
+    return [...new Set(selectNames.map(keyOf))];
+  }
   const ordered = selectNames.filter((name) => seen.has(name));
   const named = new Set(ordered);
   return [...ordered, ...[...seen].filter((key) => !named.has(key))];
+}
+
+/** Fields with their stored time unit in `type`, which autocomplete shows as the detail. */
+export function withFieldUnits<T extends { name: string; dataType?: string }>(
+  fields: T[],
+): (T & { type?: string })[] {
+  return fields.map((field) => {
+    const unit = FIELD_UNITS[field.name];
+    if (!unit) return field;
+    return { ...field, type: field.dataType ? `${field.dataType} · ${unit}` : unit };
+  });
+}
+
+/** Renames a column wherever it is an identifier; strings and comments keep their text. */
+export function replaceSqlIdentifier(sql: string, from: string, to: string): string {
+  const bare = from.toLowerCase();
+  const hits = tokenize(sql).filter(
+    (tok) =>
+      (tok.kind === "word" && tok.text.toLowerCase() === bare) ||
+      (tok.kind === "quoted" && tok.text === `"${from}"`),
+  );
+  return hits.reduceRight(
+    (out, tok) =>
+      out.slice(0, tok.start) + (tok.kind === "quoted" ? `"${to}"` : to) + out.slice(tok.end),
+    sql,
+  );
+}
+
+/** Every match_all('x') rewritten as str_match(field, 'x'); null when there is none. */
+export function matchAllToStrMatch(
+  sql: string,
+  field: string,
+): { sql: string; call: string } | null {
+  const tokens = tokenize(sql);
+  const calls: { start: number; end: number; call: string }[] = [];
+  tokens.forEach((tok, i) => {
+    const [open, literal, close] = tokens.slice(i + 1, i + 4);
+    if (
+      tok.kind === "word" &&
+      tok.text.toLowerCase() === "match_all" &&
+      open?.text === "(" &&
+      literal?.kind === "string" &&
+      close?.text === ")"
+    ) {
+      calls.push({
+        start: tok.start,
+        end: close.end,
+        call: `str_match(${field}, ${literal.text})`,
+      });
+    }
+  });
+  if (calls.length === 0) return null;
+  const rewritten = calls.reduceRight(
+    (out, c) => out.slice(0, c.start) + c.call + out.slice(c.end),
+    sql,
+  );
+  return { sql: rewritten, call: calls[0].call };
+}
+
+/** AND/OR/NOT between the FROM target and WHERE, which the server drops instead of rejecting. */
+export function strayKeywordBeforeWhere(
+  sql: string,
+): { start: number; end: number; word: string } | null {
+  const top = tokenize(sql).filter((tok) => tok.depth === 0);
+  const isWord = (tok: Token, word: string) =>
+    tok.kind === "word" && tok.text.toLowerCase() === word;
+  const fromIdx = top.findIndex((tok) => isWord(tok, "from"));
+  const whereIdx = top.findIndex((tok, i) => i > fromIdx && isWord(tok, "where"));
+  if (fromIdx < 0 || whereIdx < 0) return null;
+  const between = top.slice(fromIdx + 2, whereIdx);
+  if (between.some((tok) => isWord(tok, "join") || isWord(tok, "on"))) return null;
+  const stray = between.find(
+    (tok) => tok.kind === "word" && STRAY_BEFORE_WHERE.has(tok.text.toLowerCase()),
+  );
+  return stray ? { start: stray.start, end: stray.end, word: stray.text } : null;
+}
+
+/** FROM followed directly by WHERE, so the stream name is missing. */
+export function missingStreamAfterFrom(sql: string): boolean {
+  const isWord = (tok: Token | undefined, word: string) =>
+    tok?.kind === "word" && tok.text.toLowerCase() === word;
+  const tokens = tokenize(sql);
+  return tokens.some((tok, i) => isWord(tok, "from") && isWord(tokens[i + 1], "where"));
+}
+
+/** The first JOIN keyword at any depth. */
+export function sqlJoinKeyword(sql: string): { start: number; end: number } | null {
+  const tok = tokenize(sql).find((t) => t.kind === "word" && t.text.toLowerCase() === "join");
+  return tok ? { start: tok.start, end: tok.end } : null;
 }
 
 function sliceFrom(text: string, top: Token[], fromIdx: number): string {

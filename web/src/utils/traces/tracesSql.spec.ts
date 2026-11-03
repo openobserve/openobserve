@@ -21,6 +21,12 @@ import {
   canAddTraceId,
   insertTraceIdColumn,
   isRedEligible,
+  matchAllToStrMatch,
+  missingStreamAfterFrom,
+  replaceSqlIdentifier,
+  sqlJoinKeyword,
+  strayKeywordBeforeWhere,
+  withFieldUnits,
   isRowQuery,
   parseTracesSql,
   resultKeys,
@@ -158,6 +164,16 @@ describe("analyzeTracesSql: query features", () => {
       info(`SELECT service_name, count(*) AS spans, max(duration) d FROM "a" GROUP BY service_name`)
         .selectNames,
     ).toEqual(["service_name", "spans", "d"]);
+  });
+
+  it("marks a select list as explicit only when every item has a name", () => {
+    const explicit = (sql: string) => info(sql).selectExplicit;
+    expect(explicit(`SELECT service_name, count(*) AS n FROM "a" GROUP BY service_name`)).toBe(
+      true,
+    );
+    expect(explicit(`SELECT * FROM "a"`)).toBe(false);
+    expect(explicit(`SELECT t.*, x FROM "a" t`)).toBe(false);
+    expect(explicit(`SELECT service_name, count(*) FROM "a" GROUP BY service_name`)).toBe(false);
   });
 
   it("flags a plain SELECT * with only WHERE and ORDER BY", () => {
@@ -382,6 +398,21 @@ describe("resultShape / resultKeys", () => {
     expect(resultKeys(hits, ["service_name", "n"])).toEqual(["service_name", "n", "extra"]);
     expect(resultKeys(hits, [])).toEqual(["n", "service_name", "extra"]);
   });
+
+  it("shows exactly the selected columns for an explicit select list", () => {
+    const hits = [{ _timestamp: 1, service_name: "redis" }];
+    expect(resultKeys(hits, ["service_name", "http_status_code"], true)).toEqual([
+      "service_name",
+      "http_status_code",
+    ]);
+  });
+
+  it("takes the server's key for a name typed in another case", () => {
+    expect(resultKeys([{ service_name: "a" }], ["SERVICE_NAME", "n"], true)).toEqual([
+      "service_name",
+      "n",
+    ]);
+  });
 });
 
 describe("cleanTraceSelectorSql", () => {
@@ -516,5 +547,136 @@ describe("traceIdSuggestion", () => {
 
   it("returns null for text that is not a SELECT", () => {
     expect(traceIdSuggestion("a = 1")).toBeNull();
+  });
+});
+
+describe("replaceSqlIdentifier", () => {
+  it("replaces every bare use of the column", () => {
+    const sql = `SELECT servce_name, count(*) FROM "default" GROUP BY servce_name`;
+    expect(replaceSqlIdentifier(sql, "servce_name", "service_name")).toBe(
+      `SELECT service_name, count(*) FROM "default" GROUP BY service_name`,
+    );
+  });
+
+  it("leaves string literals and comments alone", () => {
+    const sql = `SELECT servce_name FROM "a" -- servce_name\nWHERE x = 'servce_name'`;
+    expect(replaceSqlIdentifier(sql, "servce_name", "service_name")).toBe(
+      `SELECT service_name FROM "a" -- servce_name\nWHERE x = 'servce_name'`,
+    );
+  });
+
+  it("keeps the quotes of a quoted identifier and skips longer names", () => {
+    const sql = `SELECT "servce_name", servce_name_x FROM "a"`;
+    expect(replaceSqlIdentifier(sql, "servce_name", "service_name")).toBe(
+      `SELECT "service_name", servce_name_x FROM "a"`,
+    );
+  });
+
+  it("matches a bare name in any case, as the server folds it", () => {
+    expect(replaceSqlIdentifier(`SELECT Servce_Name FROM "a"`, "servce_name", "service_name")).toBe(
+      `SELECT service_name FROM "a"`,
+    );
+  });
+});
+
+describe("matchAllToStrMatch", () => {
+  it("rewrites match_all into str_match on the field", () => {
+    expect(
+      matchAllToStrMatch(
+        `SELECT * FROM "default"\nWHERE match_all('PlaceOrder')`,
+        "operation_name",
+      ),
+    ).toEqual({
+      sql: `SELECT * FROM "default"\nWHERE str_match(operation_name, 'PlaceOrder')`,
+      call: "str_match(operation_name, 'PlaceOrder')",
+    });
+  });
+
+  it("rewrites every call and keeps the rest of the WHERE", () => {
+    const sql = `SELECT * FROM "a" WHERE MATCH_ALL('x') AND duration > 5 OR match_all( 'y' )`;
+    expect(matchAllToStrMatch(sql, "operation_name")?.sql).toBe(
+      `SELECT * FROM "a" WHERE str_match(operation_name, 'x') AND duration > 5 OR str_match(operation_name, 'y')`,
+    );
+  });
+
+  it("returns null without a match_all call", () => {
+    expect(matchAllToStrMatch(`SELECT * FROM "a" WHERE x = 'match_all(1)'`, "operation_name")).toBe(
+      null,
+    );
+    expect(matchAllToStrMatch(`SELECT * FROM "a" WHERE match_all_raw('x')`, "operation_name")).toBe(
+      null,
+    );
+  });
+});
+
+describe("strayKeywordBeforeWhere", () => {
+  it("flags an AND between the stream and WHERE", () => {
+    const sql = `SELECT * FROM "otel_demo" AND WHERE duration > 100`;
+    const start = sql.indexOf("AND");
+    expect(strayKeywordBeforeWhere(sql)).toEqual({ start, end: start + 3, word: "AND" });
+  });
+
+  it("flags OR after a table alias", () => {
+    expect(strayKeywordBeforeWhere(`SELECT * FROM "a" s OR WHERE s.x = 1`)?.word).toBe("OR");
+  });
+
+  it("does not flag a well-formed query or a JOIN condition", () => {
+    expect(strayKeywordBeforeWhere(`SELECT * FROM "a" WHERE x = 1 AND y = 2`)).toBeNull();
+    expect(
+      strayKeywordBeforeWhere(
+        `SELECT * FROM "a" c JOIN "a" p ON c.t = p.t AND c.s = p.s WHERE c.x = 1`,
+      ),
+    ).toBeNull();
+    expect(strayKeywordBeforeWhere(`SELECT * FROM "a"`)).toBeNull();
+  });
+
+  it("ignores a keyword inside a subquery", () => {
+    expect(
+      strayKeywordBeforeWhere(`SELECT * FROM (SELECT * FROM "a" WHERE x AND y) t WHERE z = 1`),
+    ).toBeNull();
+  });
+});
+
+describe("missingStreamAfterFrom", () => {
+  it("flags FROM directly followed by WHERE, in any case", () => {
+    expect(missingStreamAfterFrom(`SELECT * FROM WHERE duration > 1`)).toBe(true);
+    expect(missingStreamAfterFrom(`select * from\n  where x = 1`)).toBe(true);
+  });
+
+  it("ignores a stream named where, strings and comments", () => {
+    expect(missingStreamAfterFrom(`SELECT * FROM "where" WHERE x = 1`)).toBe(false);
+    expect(missingStreamAfterFrom(`SELECT * FROM "a" WHERE x = 'from where'`)).toBe(false);
+    expect(missingStreamAfterFrom(`SELECT * FROM -- where\n "a" WHERE x = 1`)).toBe(false);
+    expect(missingStreamAfterFrom(`SELECT * FROM "a" WHERE x = 1`)).toBe(false);
+  });
+});
+
+describe("sqlJoinKeyword", () => {
+  it("finds the JOIN keyword", () => {
+    const sql = `SELECT * FROM "a" c LEFT JOIN "a" p ON c.t = p.t`;
+    const start = sql.indexOf("JOIN");
+    expect(sqlJoinKeyword(sql)).toEqual({ start, end: start + 4 });
+  });
+
+  it("returns null without a join, even in a string", () => {
+    expect(sqlJoinKeyword(`SELECT * FROM "a" WHERE x = 'join'`)).toBeNull();
+  });
+});
+
+describe("withFieldUnits", () => {
+  it("adds the stored unit to the time fields' type", () => {
+    expect(
+      withFieldUnits([
+        { name: "duration", dataType: "Int64" },
+        { name: "start_time", dataType: "Int64" },
+        { name: "end_time" },
+        { name: "service_name", dataType: "Utf8" },
+      ]),
+    ).toEqual([
+      { name: "duration", dataType: "Int64", type: "Int64 · µs" },
+      { name: "start_time", dataType: "Int64", type: "Int64 · ns" },
+      { name: "end_time", type: "ns" },
+      { name: "service_name", dataType: "Utf8" },
+    ]);
   });
 });

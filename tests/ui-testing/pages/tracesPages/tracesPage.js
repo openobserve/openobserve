@@ -4015,4 +4015,12 @@ export class TracesPage {
   getTraceResultRows() {
     return this.page.locator(this.searchResultItem);
   }
+
+  getSqlErrorState() {
+    return this.page.locator('[data-test="traces-sql-error-state"]');
+  }
+
+  getSqlSuggestionFixCard() {
+    return this.page.locator('[data-test="traces-sql-fix-suggestion-card"]');
+  }
 }

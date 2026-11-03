@@ -17221,7 +17221,32 @@
         "tracesTitle": "Run the query to see traces",
         "spansTitle": "Run the query to see results",
         "description": "Nothing has run yet. Run query sends the SQL in the editor."
-      }
+      },
+      "errors": {
+        "fieldNotFoundTitle": "Field not found: {field}",
+        "fieldNotFoundDesc": "A field with a similar name exists in this stream.",
+        "didYouMean": "Did you mean {field}?",
+        "didYouMeanDesc": "Replaces {field} in the query, then runs it",
+        "outOfMemoryTitle": "This query ran out of memory",
+        "outOfMemoryDesc": "Queries over long ranges can use more memory than the server allows.",
+        "useLastHour": "Use last 1 hour",
+        "useLastHourDesc": "Narrows the time range, then runs the query",
+        "missingStreamTitle": "Stream name missing after FROM",
+        "missingStreamDesc": "Write the stream name after FROM, for example FROM \"{stream}\".",
+        "noFullTextTitle": "This stream has no full-text fields",
+        "noFullTextDesc": "match_all searches full-text fields only. Search one field with str_match instead."
+      },
+      "matchAllEmpty": {
+        "title": "No spans found",
+        "description": "Nothing matched this query in the selected window. The stream may have no populated full-text fields, so match_all may have nothing to search.",
+        "searchOneField": "Search one field instead",
+        "searchOneFieldDesc": "Runs {call}"
+      },
+      "strayKeyword": "The server ignores {word} between the stream name and WHERE. Remove it, or move the condition into the WHERE.",
+      "joinLongRange": "A JOIN over more than 1 hour can run out of memory. Narrow the time range if the query fails.",
+      "partialResults": "The result was cut at the row limit, so some rows are missing. Add a LIMIT or narrow the query.",
+      "allFieldsNote": "Fields outside the stream schema are stored in {column}. Use json_get_str({column}, 'field').",
+      "maybeInAll": "This field may be stored in {column}"
     },
     "redActions": {
       "menuGroupDashboards": "Dashboards",

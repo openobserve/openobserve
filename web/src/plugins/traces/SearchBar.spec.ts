@@ -67,7 +67,11 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 // The last autoCompleteData the component created, so tests can read the stream context it was given.
-const suggestState = vi.hoisted(() => ({ autoCompleteData: null as any }));
+const suggestState = vi.hoisted(() => ({
+  autoCompleteData: null as any,
+  updateFieldKeywords: null as any,
+}));
+const editorDiagnostics = vi.hoisted(() => ({ last: null as any }));
 
 vi.mock("@/composables/useSuggestions", () => ({
   default: () => ({
@@ -83,7 +87,7 @@ vi.mock("@/composables/useSuggestions", () => ({
     autoCompleteKeywords: ref(["SELECT", "FROM", "WHERE"]),
     effectiveKeywords: ref([]),
     getSuggestions: vi.fn(),
-    updateFieldKeywords: vi.fn(),
+    updateFieldKeywords: (suggestState.updateFieldKeywords = vi.fn()),
     updateStreamKeywords: vi.fn(),
   }),
 }));
@@ -396,6 +400,7 @@ const sharedStubs = {
         setValue: vi.fn(),
         getCursorIndex: vi.fn().mockReturnValue(0),
         triggerAutoComplete: vi.fn(),
+        addErrorDiagnostics: (ranges: unknown) => (editorDiagnostics.last = ranges),
         // Monaco fires its focus event inside focus(), in the same tick.
         focus: () => emit("focus"),
       };
@@ -1896,6 +1901,17 @@ describe("SearchBar", () => {
       expect(toastMock).not.toHaveBeenCalled();
     });
 
+    it("writes the full generated SQL into the editor in SQL mode, without running it", async () => {
+      searchObjInstance.meta.sqlMode = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const sql = "SELECT service_name, count(*) FROM default GROUP BY service_name";
+      expect(editor().props("transformGeneratedQuery")(sql)).toBe(sql);
+      expect(nlFilterMock).not.toHaveBeenCalled();
+      expect(wrapper.emitted("searchdata")).toBeUndefined();
+      searchObjInstance.meta.sqlMode = false;
+    });
+
     it("keeps the user's text and says the question needs SQL when no filter fits", async () => {
       nlFilterMock.mockReturnValue(null);
       wrapper = mountSearchBar();
@@ -1966,6 +1982,26 @@ describe("SearchBar", () => {
       expect(data.streamType).toBe("traces");
       expect(data.streamName).toBe("default");
       expect([...data.fieldValues.service_name]).toEqual(["api"]);
+    });
+
+    it("adds units to the time fields in SQL mode only", async () => {
+      searchObjInstance.data.stream.selectedStreamFields = [
+        { name: "duration", dataType: "Int64" },
+        { name: "service_name", dataType: "Utf8" },
+      ] as any;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(suggestState.updateFieldKeywords).toHaveBeenLastCalledWith([
+        { name: "duration", dataType: "Int64" },
+        { name: "service_name", dataType: "Utf8" },
+      ]);
+      searchObjInstance.meta.sqlMode = true;
+      await flushPromises();
+      expect(suggestState.updateFieldKeywords).toHaveBeenLastCalledWith([
+        { name: "duration", dataType: "Int64", type: "Int64 · µs" },
+        { name: "service_name", dataType: "Utf8" },
+      ]);
+      searchObjInstance.meta.sqlMode = false;
     });
 
     it("follows a stream change without waiting for the query to change", async () => {
@@ -2436,7 +2472,8 @@ describe("SearchBar", () => {
     let widthSpy: ReturnType<typeof mockToolbarWidth>;
 
     const expectedData = () => ({
-      version: 1,
+      version: 2,
+      sqlMode: false,
       stream: { label: "default", value: "default" },
       editorValue: "span_status = 'ERROR'",
       datetime: { type: "relative", relativeTimePeriod: "1h", startTime: 10, endTime: 20 },
@@ -2566,6 +2603,23 @@ describe("SearchBar", () => {
         view_type: "traces",
         data: expectedData(),
       });
+    });
+
+    it("saves SQL mode with the view", async () => {
+      searchObjInstance.meta.sqlMode = true;
+      searchObjInstance.data.editorValue = `SELECT * FROM "default"`;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      (wrapper.vm as any).newViewName = "sql view";
+      await (wrapper.vm as any).saveAsNewView();
+
+      expect(mockSavedViewsPost.mock.calls[0][1].data).toEqual({
+        ...expectedData(),
+        sqlMode: true,
+        editorValue: `SELECT * FROM "default"`,
+      });
+      searchObjInstance.meta.sqlMode = false;
     });
 
     it("marks a just-created view as applied when the response has its id", async () => {
@@ -3297,6 +3351,37 @@ describe("SearchBar", () => {
       tracesParserRef.value = shownParser;
       setPinned(true);
       if (!isPinned("savedViews")) togglePin("savedViews");
+    });
+
+    it("flags a keyword between the stream and WHERE on blur", async () => {
+      searchObjInstance.meta.sqlMode = true;
+      searchObjInstance.data.editorValue = `SELECT * FROM "default" AND WHERE a = 1`;
+      editorDiagnostics.last = null;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await (wrapper.vm as any).onQueryEditorBlur();
+      await flushPromises();
+      expect(editorDiagnostics.last).toEqual([
+        expect.objectContaining({ startLine: 1, column: 25, endColumn: 28 }),
+      ]);
+      expect(editorDiagnostics.last[0].severity).toBeUndefined();
+      searchObjInstance.meta.sqlMode = false;
+    });
+
+    it("warns about a JOIN over more than one hour on blur", async () => {
+      searchObjInstance.meta.sqlMode = true;
+      searchObjInstance.data.editorValue = `SELECT * FROM "default" c JOIN "default" p ON c.a = p.a`;
+      searchObjInstance.data.datetime.startTime = 0;
+      searchObjInstance.data.datetime.endTime = 24 * 3_600_000_000;
+      editorDiagnostics.last = null;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await (wrapper.vm as any).onQueryEditorBlur();
+      await flushPromises();
+      expect(editorDiagnostics.last).toEqual([
+        expect.objectContaining({ severity: "warning", column: 27, endColumn: 31 }),
+      ]);
+      searchObjInstance.meta.sqlMode = false;
     });
 
     it("shows the pinned switch on the bar by default", async () => {

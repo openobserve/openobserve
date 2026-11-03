@@ -137,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :field-list="searchObj.data.stream.selectedStreamFields"
                       :active-include-field-values="activeIncludeFilterValues"
                       :active-exclude-field-values="activeExcludeFilterValues"
+                      :stores-extra-fields-in-all="storesExtraFieldsInAll"
                       data-test="traces-search-index-list"
                       class="h-full"
                       @update:changeStream="onChangeStream"
@@ -181,7 +182,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="traces-search-error-message"
                       class="bg-card-glass-bg h-full"
                     >
+                      <TracesSqlErrorState
+                        v-if="searchObj.meta.sqlMode"
+                        :error-code="searchObj.data.errorCode"
+                        :error-msg="searchObj.data.errorMsg"
+                        :error-detail="searchObj.data.errorDetail"
+                        :ai-enabled="isAiEnabled"
+                        :stream-name="searchObj.data.stream.selectedStream.value"
+                        :query="String(searchObj.data.editorValue ?? '')"
+                        :suggestions="sqlErrorSuggestions"
+                        :fields="searchObj.data.stream.selectedStreamFields.map((f: any) => f.name)"
+                        :range-us="
+                          searchObj.data.datetime.endTime - searchObj.data.datetime.startTime
+                        "
+                        @ask-ai="onAskAiTracing"
+                        @run-sql="onSqlRewriteRun"
+                        @use-last-hour="onSqlUseLastHour"
+                      />
                       <QueryErrorState
+                        v-else
                         :error-code="tracesErrorCode"
                         :error-msg="searchObj.data.errorMsg"
                         :error-detail="searchObj.data.errorDetail"
@@ -281,6 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @send-to-ai-chat="sendToAiChat"
                         @open-mobile-fields="mobileFieldsOpen = true"
                         @add-trace-id="onSqlAddTraceId"
+                        @run-sql="onSqlRewriteRun"
                       />
                     </div>
                   </div>
@@ -308,6 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :field-list="searchObj.data.stream.selectedStreamFields"
           :active-include-field-values="activeIncludeFilterValues"
           :active-exclude-field-values="activeExcludeFilterValues"
+          :stores-extra-fields-in-all="storesExtraFieldsInAll"
           data-test="traces-search-index-list-mobile"
           class="h-full"
           @update:changeStream="onChangeStream"
@@ -395,6 +416,8 @@ import {
 import { useTracesSqlTemplates } from "./composables/useTracesSqlTemplates";
 import TracesSqlTemplateGallery from "./components/TracesSqlTemplateGallery.vue";
 import TracesSqlSelectorProblem from "./components/TracesSqlSelectorProblem.vue";
+import TracesSqlErrorState from "./components/TracesSqlErrorState.vue";
+import { ONE_HOUR_US } from "@/utils/traces/tracesSqlErrors";
 import { isAuthoredStatement } from "@/utils/query/freeTextFilter";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
@@ -433,6 +456,7 @@ import type { HistoryTime, QueryHistoryEntry } from "@/services/query_history";
 
 interface TracesSavedView {
   version?: number;
+  sqlMode?: boolean;
   stream: { label: string; value: string };
   editorValue: string;
   datetime: { type: string; relativeTimePeriod: string; startTime: number; endTime: number };
@@ -1256,6 +1280,9 @@ async function getQueryData(
             if (submittedSql && typeof eligible === "boolean") {
               searchObj.data.queryResults.is_histogram_eligible = eligible;
             }
+            if (submittedSql && response.content?.results?.is_partial === true) {
+              searchObj.data.queryResults.is_partial = true;
+            }
 
             const rawHits: any[] = response.content?.results?.hits || [];
             if (rawHits.length === 0) return;
@@ -1336,7 +1363,7 @@ async function getQueryData(
           if (isPagination) noteTracesPageLoad(searchTraceId, "error");
 
           const errData = err?.content || err;
-          const { message, trace_id, code, error_detail } = errData ?? {};
+          const { message, trace_id, code, error_detail, suggestions } = errData ?? {};
           if (historyRun) {
             const result = runResultFromError(
               toRunError({ code, status: errData?.status, message }),
@@ -1353,8 +1380,10 @@ async function getQueryData(
           if (code) {
             searchObj.data.errorCode = code;
             const customMessage = logsErrorMessage(code);
-            if (customMessage) errorMsg = t(customMessage);
+            // SQL-mode fix cards read the field or stream the server named in its own message.
+            if (customMessage && !searchObj.meta.sqlMode) errorMsg = t(customMessage);
           }
+          sqlErrorSuggestions.value = Array.isArray(suggestions) ? suggestions : [];
           if (trace_id) {
             // Markup + an English "TraceID:" label on purpose: useQueryError reads
             // the id back out of this string with /TraceID:\s*([a-f0-9A-F-]+)/i, so a
@@ -1520,6 +1549,7 @@ async function extractFields() {
       fieldsOwner = "";
       searchObj.data.stream.selectedStreamFields = [];
       selectedStreamStats.value = null;
+      storesExtraFieldsInAll.value = false;
     }
 
     if (!searchObj.data.stream?.selectedStream?.value) {
@@ -1578,6 +1608,8 @@ async function extractFields() {
       }
       schema.push(...stream.schema);
       ftsKeys = new Set([...stream.settings.full_text_search_keys]);
+      // Ingestion packs fields outside a user-defined schema into the _all column.
+      storesExtraFieldsInAll.value = (stream.settings?.defined_schema_fields?.length ?? 0) > 0;
 
       const idFields = {
         trace_id: 1,
@@ -2625,6 +2657,28 @@ const onSqlAddTraceId = (source?: string) => {
   searchData();
 };
 
+const sqlErrorSuggestions = ref<string[]>([]);
+const storesExtraFieldsInAll = ref(false);
+
+const onSqlRewriteRun = (sql: string) => {
+  searchObj.data.editorValue = sql;
+  searchBarRef.value?.setEditorValue?.(sql);
+  searchData();
+};
+
+const onSqlUseLastHour = async () => {
+  const endTime = Date.now() * 1000;
+  const datetime = {
+    type: "relative",
+    relativeTimePeriod: "1h",
+    startTime: endTime - ONE_HOUR_US,
+    endTime,
+  };
+  searchObj.data.datetime = { ...searchObj.data.datetime, ...datetime };
+  await syncSavedViewDateTime(datetime);
+  searchData();
+};
+
 // A template fills the editor only; typed SQL always waits for Run.
 const onUseSqlTemplate = (sql: string) => {
   searchObj.data.editorValue = sql;
@@ -2648,11 +2702,11 @@ const syncSavedViewDateTime = async (datetime: TracesSavedView["datetime"]) => {
 
 let savedViewApplySeq = 0;
 const onApplySavedView = async (view: TracesSavedView) => {
-  if (view.version !== undefined && view.version !== 1) {
+  if (view.version !== undefined && view.version !== 1 && view.version !== 2) {
     toast({ variant: "error", message: t("search.errorWhileApplyingSavedView") });
     return;
   }
-  await applyTracesView(view, true);
+  await applyTracesView({ ...view, sqlMode: view.version === 2 && view.sqlMode === true }, true);
 };
 
 /** Applies a stream, filter, window and mode in place, then runs unless only loading. */
@@ -2681,8 +2735,8 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
   searchObj.data.datetime = { ...searchObj.data.datetime, ...view.datetime };
   await syncSavedViewDateTime(view.datetime);
   if (seq !== savedViewApplySeq) return;
-  // Version 1 views carry no mode, so the text itself says whether it is SQL.
-  searchObj.meta.sqlMode = isAuthoredStatement(view.editorValue ?? "");
+  // A recent search carries no mode, so the text itself says whether it is SQL.
+  searchObj.meta.sqlMode = view.sqlMode ?? isAuthoredStatement(view.editorValue ?? "");
   searchObj.data.editorValue = view.editorValue;
   searchBarRef.value?.setEditorValue?.(view.editorValue);
   searchObj.meta.resultGrid.sortBy = view.sortBy;

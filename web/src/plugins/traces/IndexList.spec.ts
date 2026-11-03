@@ -250,6 +250,7 @@ function mountIndexList(props: Record<string, unknown> = {}) {
               name="field-row"
               :row="row"
             />
+            <slot name="before-list" />
             <slot name="after-list" :currentPage="1" :totalPages="1" :isFirstPage="true" :isLastPage="true" />
             <slot name="loading" />
           </div>`,
@@ -882,6 +883,36 @@ describe("IndexList Component", () => {
       expect(await valuesSql(clause, "service_name")).toBe(
         `SELECT * FROM "test_stream" WHERE status = '1'`,
       );
+    });
+  });
+
+  describe("fields stored in _all", () => {
+    const note = (w: any) => w.find('[data-test="traces-sql-all-fields-note"]');
+
+    afterEach(() => {
+      mockSearchObj.meta.sqlMode = false;
+    });
+
+    it("notes _all in SQL mode when the stream stores extra fields there", async () => {
+      mockSearchObj.meta.sqlMode = true;
+      const w = mountIndexList({ storesExtraFieldsInAll: true });
+      await flushPromises();
+      expect(note(w).text()).toBe(
+        "Fields outside the stream schema are stored in _all. Use json_get_str(_all, 'field').",
+      );
+      w.unmount();
+    });
+
+    it("has no note in filter mode or for a stream without a schema limit", async () => {
+      const filterMode = mountIndexList({ storesExtraFieldsInAll: true });
+      await flushPromises();
+      expect(note(filterMode).exists()).toBe(false);
+      filterMode.unmount();
+      mockSearchObj.meta.sqlMode = true;
+      const noUds = mountIndexList({ storesExtraFieldsInAll: false });
+      await flushPromises();
+      expect(note(noUds).exists()).toBe(false);
+      noUds.unmount();
     });
   });
 

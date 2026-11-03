@@ -55,6 +55,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:search="searchObj.data.stream.filterField = $event"
         @update:current-page="setPage($event)"
       >
+        <template v-if="searchObj.meta.sqlMode && storesExtraFieldsInAll" #before-list>
+          <p
+            class="px-page-edge text-text-secondary m-0 py-1 text-xs"
+            data-test="traces-sql-all-fields-note"
+          >
+            {{
+              t("traces.sqlMode.allFieldsNote", {
+                column: store.state.zoConfig?.all_fields_name || "_all",
+              })
+            }}
+          </p>
+        </template>
         <template #field-row="{ row }">
           <FieldRow
             :field="row"
@@ -285,6 +297,11 @@ export default defineComponent({
     activeExcludeFieldValues: {
       type: Object as () => Record<string, string[]>,
       default: () => ({}),
+    },
+    /** The stream has a user-defined schema, so fields outside it are packed into the _all column. */
+    storesExtraFieldsInAll: {
+      type: Boolean,
+      default: false,
     },
   },
   setup(props, { emit }) {

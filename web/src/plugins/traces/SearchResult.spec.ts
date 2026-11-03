@@ -528,6 +528,7 @@ describe("SearchResult", () => {
         "send-to-ai-chat",
         "open-mobile-fields",
         "add-trace-id",
+        "run-sql",
       ];
 
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);
@@ -822,6 +823,63 @@ describe("SearchResult in a kept-alive page", () => {
       expect(dashboard().exists()).toBe(true);
       expect(redIcon().exists()).toBe(false);
       expect(wrapper.find('[data-test="traces-sql-rows-count"]').exists()).toBe(false);
+    });
+
+    it("warns next to the count when the server cut the result", async () => {
+      await showResults(`SELECT span_id, count(*) AS n FROM "default" GROUP BY span_id`, [
+        { span_id: "a", n: 1 },
+      ]);
+      expect(wrapper.find('[data-test="traces-sql-partial-icon"]').exists()).toBe(false);
+      mockSearchObj.data.queryResults.is_partial = true;
+      await flushPromises();
+      expect(wrapper.find('[data-test="traces-sql-partial-icon"]').exists()).toBe(true);
+    });
+
+    it("offers str_match after a match_all query returns no rows, and runs the rewrite", async () => {
+      await showResults(`SELECT * FROM "default"\nWHERE match_all('PlaceOrder')`, []);
+      const empty = wrapper.find('[data-test="traces-sql-match-all-empty"]');
+      expect(empty.exists()).toBe(true);
+      expect(empty.text()).toContain("no populated full-text fields");
+      const card = wrapper.find('[data-test="traces-sql-match-all-fix-card"]');
+      expect(card.text()).toContain("Runs str_match(operation_name, 'PlaceOrder')");
+      await card.trigger("click");
+      expect(wrapper.emitted("run-sql")?.[0]).toEqual([
+        `SELECT * FROM "default"\nWHERE str_match(operation_name, 'PlaceOrder')`,
+      ]);
+    });
+
+    it("keeps the usual empty state for a query without match_all", async () => {
+      await showResults(`SELECT * FROM "default" WHERE a = 1`, []);
+      expect(wrapper.find('[data-test="traces-sql-match-all-empty"]').exists()).toBe(false);
+    });
+
+    it("marks a result column that is null in every row as maybe stored in _all", async () => {
+      await showResults(
+        `SELECT service_name, http_status_code, count(*) AS n FROM "default" GROUP BY 1, 2`,
+        [
+          { service_name: "api", http_status_code: null, n: 2 },
+          { service_name: "db", n: 1 },
+        ],
+      );
+      const columns = sqlTable().props("columns");
+      const hinted = columns.filter((c: any) => c.meta?.headerTooltip);
+      expect(hinted.map((c: any) => c.id)).toEqual(["http_status_code"]);
+      expect(String(hinted[0].meta.headerTooltip)).toBe("This field may be stored in _all");
+    });
+
+    it("shows a selected column the server left out of every row, and not its added _timestamp", async () => {
+      await showResults(
+        `SELECT service_name, http_status_code FROM "default" WHERE service_name = 'redis' LIMIT 20`,
+        [
+          { _timestamp: 1, service_name: "redis" },
+          { _timestamp: 2, service_name: "redis" },
+        ],
+      );
+      const columns = sqlTable().props("columns");
+      expect(columns.map((c: any) => c.id)).toEqual(["service_name", "http_status_code"]);
+      expect(columns.find((c: any) => c.id === "http_status_code").meta.headerTooltip).toBe(
+        "This field may be stored in _all",
+      );
     });
 
     it("opens a span row without span times inside the page time range", async () => {
