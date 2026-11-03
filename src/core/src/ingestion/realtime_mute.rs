@@ -17,7 +17,10 @@
 
 use std::collections::{HashMap, HashSet};
 #[cfg(feature = "enterprise")]
-use std::sync::{Arc, LazyLock};
+use std::sync::{
+    Arc, LazyLock,
+    atomic::{AtomicI64, Ordering},
+};
 
 use config::{
     meta::{alerts::alert::Alert, downtimes::ActiveDowntime},
@@ -37,10 +40,15 @@ const SEMANTIC_GROUPS_TTL_MICROS: i64 = 60 * 1_000_000;
 static SEMANTIC_GROUPS: LazyLock<DashMap<String, (i64, SemanticGroups)>> =
     LazyLock::new(DashMap::new);
 
-/// Discovery answers from the row's fields, so the answer is cached per alert and field set.
+/// Discovery matches only semantic-group fields, so the answer is cached per alert and those
+/// fields.
 #[cfg(feature = "enterprise")]
 static FALLBACK_SERVICES: LazyLock<DashMap<String, (i64, Option<String>)>> =
     LazyLock::new(DashMap::new);
+
+/// When [FALLBACK_SERVICES] was last pruned, so a miss scans it at most once per floor.
+#[cfg(feature = "enterprise")]
+static FALLBACK_PRUNED_AT: AtomicI64 = AtomicI64::new(0);
 
 #[cfg(feature = "enterprise")]
 type SemanticGroups = Arc<Vec<config::meta::correlation::FieldAlias>>;
@@ -341,26 +349,42 @@ async fn semantic_groups(org: &str, now: i64) -> SemanticGroups {
 }
 
 #[cfg(feature = "enterprise")]
-async fn fallback_service(org: &str, key: &str, now: i64, row: &Row) -> Option<String> {
+async fn fallback_service(
+    org: &str,
+    key: &str,
+    now: i64,
+    groups: &[config::meta::correlation::FieldAlias],
+    row: &Row,
+) -> Option<String> {
     let floor = config::meta::alerts::TriggerCondition::min_silence_micros();
-    let cache_key = format!("{key}/{:x}", fields_hash(row));
+    let cache_key = format!("{key}/{:x}", fields_hash(row, groups));
     if let Some(cached) = FALLBACK_SERVICES.get(&cache_key)
         && now.saturating_sub(cached.0) < floor
     {
         return cached.1.clone();
     }
-    FALLBACK_SERVICES.retain(|_, (at, _)| now.saturating_sub(*at) < floor);
+    let pruned_at = FALLBACK_PRUNED_AT.load(Ordering::Relaxed);
+    if now.saturating_sub(pruned_at) >= floor
+        && FALLBACK_PRUNED_AT
+            .compare_exchange(pruned_at, now, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+    {
+        FALLBACK_SERVICES.retain(|_, (at, _)| now.saturating_sub(*at) < floor);
+    }
     let service = crate::alerts::incidents::correlated_service_for_routing(org, row).await;
     FALLBACK_SERVICES.insert(cache_key, (now, service.clone()));
     service
 }
 
-/// The scalar fields discovery reads, in key order, so equal rows hash equal.
+/// The scalar fields `correlate` can match (a group id or one of its fields), so `_timestamp` is
+/// out.
 #[cfg(feature = "enterprise")]
-fn fields_hash(row: &Row) -> u64 {
+fn fields_hash(row: &Row, groups: &[config::meta::correlation::FieldAlias]) -> u64 {
     use std::hash::{Hash, Hasher};
+    let matched = |k: &String| groups.iter().any(|g| g.id == *k || g.fields.contains(k));
     let mut fields: Vec<(&String, String)> = row
         .iter()
+        .filter(|(k, _)| matched(k))
         .filter_map(|(k, v)| match v {
             Value::String(s) => Some((k, s.clone())),
             Value::Number(n) => Some((k, n.to_string())),
@@ -442,7 +466,7 @@ async fn finish_entry(org: &str, now: i64, key: &str, entry: AlertEntry) -> Trig
     };
     let mut empty_identity = Dims::new();
     if let Some(row) = rows.fallback_row()
-        && let Some(service) = fallback_service(org, key, now, row).await
+        && let Some(service) = fallback_service(org, key, now, &scope.semantic_groups, row).await
     {
         empty_identity.insert(config::meta::oncall::SERVICE_DIMENSION.to_string(), service);
     }
@@ -650,5 +674,28 @@ mod tests {
         let all_muted = split(&["", ""], Some(&["g1", "g2"]), mutes_a)
             .finish(Dims::new(), |_, group| group.map(downtime));
         assert!(matches!(all_muted, Verdict::Suppress(_)));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn the_discovery_key_ignores_fields_outside_the_semantic_groups() {
+        use config::meta::correlation::FieldAlias;
+        let groups = [FieldAlias::new("service", "Service", &["service", "svc"])];
+        let with = |svc: &str, ts: i64| {
+            let mut row = row("");
+            row.insert("svc".to_string(), Value::String(svc.to_string()));
+            row.insert("_timestamp".to_string(), Value::from(ts));
+            fields_hash(&row, &groups)
+        };
+        assert_eq!(
+            with("a", 1),
+            with("a", 2),
+            "_timestamp must not split the cache"
+        );
+        assert_ne!(
+            with("a", 1),
+            with("b", 1),
+            "a different service must not share it"
+        );
     }
 }
