@@ -516,7 +516,7 @@ export class ReportsPage {
           if (!t) return false;
           const text = t.textContent || '';
           return /Showing \d+ - \d+/.test(text) || !!document.querySelector('[data-test="o2-empty-state"]');
-        }, { timeout: 10000 });
+        }, undefined, { timeout: 10000 });
         await this.reportSearchInputField.fill(reportName);
         return await btn.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
       }, {

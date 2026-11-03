@@ -230,6 +230,25 @@ fn list_body(list: Vec<PublicLinkView>) -> Response {
 }
 
 /// GET /{org_id}/public_dashboards — every public link in the org; slugs only where readable.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/public_dashboards",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "ListOrgPublicDashboardLinks",
+    summary = "List public dashboard links of an organization",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn list_org(Path(org_id): Path<String>, Headers(user): Headers<UserEmail>) -> Response {
     if let Some(r) = feature_gate() {
         return r;
@@ -241,6 +260,26 @@ pub async fn list_org(Path(org_id): Path<String>, Headers(user): Headers<UserEma
 }
 
 /// GET /{org_id}/dashboards/{dashboard_id}/public_links — this dashboard's links, newest first.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/dashboards/{dashboard_id}/public_links",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "ListPublicDashboardLinks",
+    summary = "List public links of a dashboard",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn list(
     Path((org_id, dashboard_id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -255,6 +294,27 @@ pub async fn list(
 }
 
 /// POST /{org_id}/dashboards/{dashboard_id}/public_links — create another link.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/dashboards/{dashboard_id}/public_links",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "CreatePublicDashboardLink",
+    summary = "Create a public link for a dashboard",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard id"),
+    ),
+    request_body(content = PublicDashboardConfig, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn create(
     Path((org_id, dashboard_id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -287,6 +347,27 @@ pub async fn create(
 }
 
 /// GET /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}
+#[utoipa::path(
+    get,
+    path = "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "GetPublicDashboardLink",
+    summary = "Get a public dashboard link",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard id"),
+        ("link_id" = String, Path, description = "Link id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn get(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -301,6 +382,28 @@ pub async fn get(
 }
 
 /// PUT /{org_id}/dashboards/{dashboard_id}/public_links/{link_id} — the slug is kept.
+#[utoipa::path(
+    put,
+    path = "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "UpdatePublicDashboardLink",
+    summary = "Update a public dashboard link",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard id"),
+        ("link_id" = String, Path, description = "Link id"),
+    ),
+    request_body(content = PublicDashboardConfig, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn update(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -326,6 +429,27 @@ pub async fn update(
 }
 
 /// POST /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/pause
+#[utoipa::path(
+    post,
+    path = "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/pause",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "PausePublicDashboardLink",
+    summary = "Pause a public dashboard link",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard id"),
+        ("link_id" = String, Path, description = "Link id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn pause(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -347,6 +471,27 @@ pub async fn pause(
 }
 
 /// POST /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/resume
+#[utoipa::path(
+    post,
+    path = "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/resume",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "ResumePublicDashboardLink",
+    summary = "Resume a public dashboard link",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard id"),
+        ("link_id" = String, Path, description = "Link id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn resume(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -368,6 +513,28 @@ pub async fn resume(
 }
 
 /// POST .../public_links/{link_id}/take_over — the caller becomes the publisher; same slug.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/take_over",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "TakeOverPublicDashboardLink",
+    summary = "Take over ownership of a public dashboard link",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard id"),
+        ("link_id" = String, Path, description = "Link id"),
+    ),
+    request_body(content = TakeOverRequest, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn take_over(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -396,6 +563,27 @@ pub async fn take_over(
 }
 
 /// POST .../public_links/{link_id}/refresh — every range is due on its next view; no query runs.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/refresh",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "RefreshPublicDashboardLink",
+    summary = "Refresh the data of a public dashboard link",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard id"),
+        ("link_id" = String, Path, description = "Link id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn refresh(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -417,6 +605,27 @@ pub async fn refresh(
 }
 
 /// DELETE /{org_id}/dashboards/{dashboard_id}/public_links/{link_id} — revoke.
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "DeletePublicDashboardLink",
+    summary = "Delete a public dashboard link",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard id"),
+        ("link_id" = String, Path, description = "Link id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
     Headers(user): Headers<UserEmail>,

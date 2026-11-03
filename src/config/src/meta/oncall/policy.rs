@@ -378,6 +378,7 @@ impl LadderStep {
 /// One priority's ladder and channel set.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct PriorityRung {
+    #[schema(value_type = u8, example = 3)]
     pub priority: AlertPriority,
     /// Empty means this priority never pages a human.
     pub steps: Vec<LadderStep>,
