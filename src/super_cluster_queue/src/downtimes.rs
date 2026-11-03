@@ -235,15 +235,20 @@ async fn apply_put<'a, C: ConnectionTrait + TransactionTrait>(
 /// Orders the put against the stored row; `None` if the stored row wins.
 async fn plan_put<C: ConnectionTrait>(conn: &C, downtime: &Downtime) -> Result<Option<PlannedPut>> {
     let stored = table::downtimes::version_with(conn, &downtime.org, &downtime.id).await?;
+    // The live row only; a tombstone's cancel state never decides (rule 2 of put_order).
+    let before = table::downtimes::get_with(conn, &downtime.org, &downtime.id).await?;
+    let cancels = Cancels {
+        stored: before.as_ref().is_some_and(|b| b.cancelled_at.is_some()),
+        incoming: downtime.cancelled_at.is_some(),
+    };
     // The queue neither orders nor deduplicates, so an older Put must not undo a newer edit.
     let order = stored.map_or(PutOrder::Apply, |stored| {
-        put_order(stored, downtime.version, downtime.updated_at)
+        put_order(stored, cancels, downtime.version, downtime.updated_at)
     });
     log_order(order, downtime, stored);
     if !order.applies() {
         return Ok(None);
     }
-    let before = table::downtimes::get_with(conn, &downtime.org, &downtime.id).await?;
     let mut downtime = downtime.clone();
     if let Some(before) = &before {
         downtime.origin_region = before.origin_region.clone();
@@ -300,11 +305,27 @@ fn log_order(order: PutOrder, downtime: &Downtime, stored: Option<RowVersion>) {
     }
 }
 
-/// Version first, since region clocks differ; equal versions from two regions fall to `updated_at`.
-fn put_order(stored: RowVersion, version: i64, updated_at: i64) -> PutOrder {
+/// Whether the stored live row and the incoming row are cancelled.
+#[derive(Clone, Copy, Debug, Default)]
+struct Cancels {
+    stored: bool,
+    incoming: bool,
+}
+
+/// Version first, since region clocks differ. On a tie: a tombstone's rule, then a cancel wins
+/// over a live row, so a same-version edit from another region never undoes a sent cancel,
+/// then the later `updated_at`.
+fn put_order(stored: RowVersion, cancels: Cancels, version: i64, updated_at: i64) -> PutOrder {
     match version.cmp(&stored.version) {
         std::cmp::Ordering::Less => PutOrder::Stale,
         std::cmp::Ordering::Greater => PutOrder::Apply,
+        std::cmp::Ordering::Equal if !stored.deleted && cancels.stored != cancels.incoming => {
+            if cancels.incoming {
+                PutOrder::Apply
+            } else {
+                PutOrder::Stale
+            }
+        }
         std::cmp::Ordering::Equal => {
             // A tombstone wins a tie, so only a strictly later row restores it.
             let apply = if stored.deleted {
@@ -353,22 +374,41 @@ async fn remeasure_plan<'a>(
     })
 }
 
-/// A row that arrives before its folder is filed in the default folder until its next edit.
+/// The local folder of a replicated row; a folder that has not replicated yet fails the
+/// message, so the queue redelivers it after the folder lands instead of misfiling it.
 async fn local_folder_id(downtime: &Downtime) -> Result<String> {
-    if table::folders::get_pk_by_name(&downtime.org, &downtime.folder_id, FolderType::Downtimes)
-        .await?
-        .is_some()
-    {
-        return Ok(downtime.folder_id.clone());
+    let known =
+        table::folders::get_pk_by_name(&downtime.org, &downtime.folder_id, FolderType::Downtimes)
+            .await?
+            .is_some();
+    match folder_action(&downtime.folder_id, known) {
+        FolderAction::Use => Ok(downtime.folder_id.clone()),
+        // The default folder is created lazily in each region, so its absence is not a lag.
+        FolderAction::CreateDefault => {
+            table::folders::get_or_create(&downtime.org, default_folder(), FolderType::Downtimes)
+                .await?;
+            Ok(DEFAULT_FOLDER.to_owned())
+        }
+        FolderAction::Missing => Err(Error::Message(format!(
+            "[DOWNTIMES] folder {} of downtime {}/{} is not in this region yet",
+            downtime.folder_id, downtime.org, downtime.id
+        ))),
     }
-    log::warn!(
-        "[DOWNTIMES] folder {} of downtime {}/{} is not in this region yet, filing it in the default folder",
-        downtime.folder_id,
-        downtime.org,
-        downtime.id
-    );
-    table::folders::get_or_create(&downtime.org, default_folder(), FolderType::Downtimes).await?;
-    Ok(DEFAULT_FOLDER.to_owned())
+}
+
+#[derive(Debug, PartialEq)]
+enum FolderAction {
+    Use,
+    CreateDefault,
+    Missing,
+}
+
+fn folder_action(folder_id: &str, known: bool) -> FolderAction {
+    match (known, folder_id == DEFAULT_FOLDER) {
+        (true, _) => FolderAction::Use,
+        (false, true) => FolderAction::CreateDefault,
+        (false, false) => FolderAction::Missing,
+    }
 }
 
 async fn default_folder_pk<C: ConnectionTrait>(conn: &C, org: &str, id: &str) -> Result<String> {
@@ -637,28 +677,110 @@ mod tests {
     }
 
     #[test]
+    fn a_row_waits_for_its_folder_and_only_the_default_folder_is_created() {
+        assert_eq!(folder_action("ops", true), FolderAction::Use);
+        assert_eq!(folder_action("ops", false), FolderAction::Missing);
+        assert_eq!(
+            folder_action(DEFAULT_FOLDER, false),
+            FolderAction::CreateDefault
+        );
+        assert_eq!(folder_action(DEFAULT_FOLDER, true), FolderAction::Use);
+    }
+
+    #[test]
+    fn a_cancel_wins_a_version_tie_over_a_live_edit() {
+        let live = |version, updated_at| RowVersion {
+            version,
+            updated_at,
+            deleted: false,
+        };
+        let stored_cancelled = Cancels {
+            stored: true,
+            incoming: false,
+        };
+        let incoming_cancel = Cancels {
+            stored: false,
+            incoming: true,
+        };
+        let both = Cancels {
+            stored: true,
+            incoming: true,
+        };
+        // A later edit at the cancel's version does not undo the cancel ...
+        assert_eq!(
+            put_order(live(2, 100), stored_cancelled, 2, 900),
+            PutOrder::Stale
+        );
+        // ... and an earlier cancel at the edit's version still lands.
+        assert_eq!(
+            put_order(live(2, 900), incoming_cancel, 2, 100),
+            PutOrder::Apply
+        );
+        // Both arrival orders end cancelled: region A holds the cancel, region B the edit.
+        let region_a = put_order(live(2, 100), stored_cancelled, 2, 900).applies();
+        let region_b = put_order(live(2, 900), incoming_cancel, 2, 100).applies();
+        assert!(!region_a && region_b);
+        // The same cancel twice is idempotent.
+        assert_eq!(put_order(live(2, 100), both, 2, 100), PutOrder::Apply);
+        // Version still rules first: a later edit at a higher version applies.
+        assert_eq!(
+            put_order(live(2, 100), stored_cancelled, 3, 50),
+            PutOrder::Apply
+        );
+        assert_eq!(
+            put_order(live(3, 100), incoming_cancel, 2, 900),
+            PutOrder::Stale
+        );
+        // A tombstone keeps its own rule; a cancel does not change it.
+        let tombstone = RowVersion {
+            deleted: true,
+            ..live(2, 100)
+        };
+        assert_eq!(
+            put_order(tombstone, incoming_cancel, 2, 100),
+            PutOrder::Stale
+        );
+        assert_eq!(
+            put_order(tombstone, incoming_cancel, 2, 101),
+            PutOrder::Conflict { apply: true }
+        );
+    }
+
+    #[test]
     fn put_order_reads_the_version_then_the_clock() {
         let live = |version, updated_at| RowVersion {
             version,
             updated_at,
             deleted: false,
         };
-        assert_eq!(put_order(live(2, 100), 1, 900), PutOrder::Stale);
-        assert_eq!(put_order(live(2, 100), 3, 1), PutOrder::Apply);
-        assert_eq!(put_order(live(2, 100), 2, 100), PutOrder::Apply);
         assert_eq!(
-            put_order(live(2, 100), 2, 101),
+            put_order(live(2, 100), Cancels::default(), 1, 900),
+            PutOrder::Stale
+        );
+        assert_eq!(
+            put_order(live(2, 100), Cancels::default(), 3, 1),
+            PutOrder::Apply
+        );
+        assert_eq!(
+            put_order(live(2, 100), Cancels::default(), 2, 100),
+            PutOrder::Apply
+        );
+        assert_eq!(
+            put_order(live(2, 100), Cancels::default(), 2, 101),
             PutOrder::Conflict { apply: true }
         );
         assert_eq!(
-            put_order(live(2, 100), 2, 99),
+            put_order(live(2, 100), Cancels::default(), 2, 99),
             PutOrder::Conflict { apply: false }
         );
         let tombstone = RowVersion {
             deleted: true,
             ..live(2, 100)
         };
-        assert_eq!(put_order(tombstone, 2, 100), PutOrder::Stale);
+        assert_eq!(
+            put_order(tombstone, Cancels::default(), 2, 100),
+            PutOrder::Stale
+        );
     }
 
     #[tokio::test]
@@ -817,7 +939,8 @@ mod tests {
         assert!(delete_applies(row(2, 100, true), 2, 101));
         for (stored_at, incoming_at) in [(100, 99), (100, 100), (100, 101)] {
             let live_after_delete = !delete_applies(row(2, stored_at, false), 2, incoming_at);
-            let live_after_put = put_order(row(2, incoming_at, true), 2, stored_at).applies();
+            let live_after_put =
+                put_order(row(2, incoming_at, true), Cancels::default(), 2, stored_at).applies();
             assert_eq!(live_after_delete, live_after_put);
         }
     }
