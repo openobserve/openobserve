@@ -1871,10 +1871,11 @@ mod tests {
                 "{name:?}"
             );
         }
+        // Create rewrites non-ASCII to `_`, so only an overlong role object is invalid there.
         let resp = create_role(
             Path("test_org".to_string()),
             Json(UserRoleRequest {
-                role: too_long_for_role_user,
+                role: "r".repeat(250),
                 custom: None,
             }),
         )
