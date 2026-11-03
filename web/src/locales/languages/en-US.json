@@ -28521,11 +28521,14 @@
     },
     "tile": {
       "unpricedTokens": "{tokens} tokens unpriced",
-      "unpricedTooltip": "Cost is a lower bound: {tokens} tokens on {models} have no price. Open the Unpriced tab in LLM Model Pricing."
+      "unpricedTooltip": "Cost is a lower bound: {tokens} tokens on {models} have no price. Open the Unpriced tab in LLM Model Pricing.",
+      "pricedSinceTooltip": "Cost is a lower bound: {tokens} tokens on {models} were recorded before a price was added and keep no cost."
     },
     "chart": {
       "costMissing": "Not in this chart: {models}. {tokens} tokens have no price.",
+      "costMissingPricedSince": "Not in this chart: {models}. {tokens} tokens were recorded before a price was added.",
       "unpricedModels": "Unpriced: {models}",
+      "pricedSinceModels": "Recorded before a price was added: {models}",
       "addPrice": "Add a price"
     },
     "health": {

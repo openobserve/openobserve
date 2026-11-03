@@ -389,13 +389,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="info" size="xs" />
               <span>{{
                 panel.id === "cost-trend"
-                  ? t("llmDataTrust.chart.costMissing", {
-                      models: unpricedModelNames,
-                      tokens: formatTokens(unpriced.tokens),
-                    })
-                  : t("llmDataTrust.chart.unpricedModels", { models: unpricedModelNames })
+                  ? t(
+                      unpriced.pricedSince
+                        ? "llmDataTrust.chart.costMissingPricedSince"
+                        : "llmDataTrust.chart.costMissing",
+                      { models: unpricedModelNames, tokens: formatTokens(unpriced.tokens) },
+                    )
+                  : t(
+                      unpriced.pricedSince
+                        ? "llmDataTrust.chart.pricedSinceModels"
+                        : "llmDataTrust.chart.unpricedModels",
+                      { models: unpricedModelNames },
+                    )
               }}</span>
               <button
+                v-if="!unpriced.pricedSince"
                 type="button"
                 class="text-text-link hover:text-text-link-hover underline"
                 @click="openUnpricedTab"
@@ -1074,10 +1082,12 @@ const kpiCards = computed<KpiCard[]>(() => {
     ...(u
       ? {
           note: t("llmDataTrust.tile.unpricedTokens", { tokens: formatTokens(u.tokens) }),
-          noteTooltip: t("llmDataTrust.tile.unpricedTooltip", {
-            tokens: formatTokens(u.tokens),
-            models: unpricedModelNames.value,
-          }),
+          noteTooltip: t(
+            u.pricedSince
+              ? "llmDataTrust.tile.pricedSinceTooltip"
+              : "llmDataTrust.tile.unpricedTooltip",
+            { tokens: formatTokens(u.tokens), models: unpricedModelNames.value },
+          ),
         }
       : {}),
     sparkData: sparklines.value.cost,

@@ -70,15 +70,17 @@ export function unpricedTotals(check: DataHealthCheck): UnpricedTotals {
 
 export interface UnpricedSummary extends UnpricedTotals {
   spans: number;
+  /** Every model now has a price; the spans were recorded at $0 before it was added. */
+  pricedSince: boolean;
 }
 
-/** The unpriced-models check as a summary for the cost tile and charts; null when it passes. */
+/** The spans recorded unpriced, for the cost tile and charts; null when there are none. */
 export function unpricedSummary(
   health: DataHealthResponse | null | undefined,
 ): UnpricedSummary | null {
   const check = health?.checks.find((c) => c.id === "unpriced_models");
   if (!check || check.affected <= 0) return null;
-  return { ...unpricedTotals(check), spans: check.affected };
+  return { ...unpricedTotals(check), spans: check.affected, pricedSince: check.status === "pass" };
 }
 
 export interface HealthCounts {

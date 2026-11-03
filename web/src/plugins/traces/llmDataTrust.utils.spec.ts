@@ -57,10 +57,10 @@ describe("unpricedFields", () => {
 });
 
 describe("unpricedSummary", () => {
-  it("sums model tokens of a failing unpriced check and is null when it passes", () => {
+  it("sums model tokens of the recorded unpriced spans and is null when there are none", () => {
     expect(unpricedSummary(null)).toBeNull();
-    const passing = { checked_at: 1, checks: [check({ id: "unpriced_models" })] };
-    expect(unpricedSummary(passing)).toBeNull();
+    const clean = { checked_at: 1, checks: [check({ id: "unpriced_models" })] };
+    expect(unpricedSummary(clean)).toBeNull();
     const failing = {
       checked_at: 1,
       checks: [
@@ -75,7 +75,27 @@ describe("unpricedSummary", () => {
         }),
       ],
     };
-    expect(unpricedSummary(failing)).toMatchObject({ tokens: 1000, spans: 3 });
+    expect(unpricedSummary(failing)).toMatchObject({ tokens: 1000, spans: 3, pricedSince: false });
+  });
+
+  it("keeps spans recorded before a price was added as a lower bound once the check passes", () => {
+    const pricedSince = {
+      checked_at: 1,
+      checks: [
+        check({
+          id: "unpriced_models",
+          status: "pass",
+          affected: 2,
+          unpriced_tokens: 500,
+          models: [{ model: "acme", spans: 2, tokens: 500 }],
+        }),
+      ],
+    };
+    expect(unpricedSummary(pricedSince)).toMatchObject({
+      tokens: 500,
+      spans: 2,
+      pricedSince: true,
+    });
   });
 
   it("takes the uncapped totals, not the length or sum of the capped list", () => {

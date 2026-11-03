@@ -739,6 +739,8 @@ async fn compute_checks(
             priced_now(db::model_pricing::find_pricing_sync_at(&entries, m, Some(now)).as_ref())
         }) {
             checks[0].status = CheckStatus::Pass;
+            // Samples are per failing check, as the cached path returns them.
+            checks[0].samples = include_samples.then(Vec::new);
         }
     }
 
