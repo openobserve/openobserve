@@ -248,6 +248,29 @@ describe("FilterBuilder", () => {
       expect(state.value.conditions[3]).toEqual(saved.conditions[2]);
     });
 
+    it.each([
+      ["after adding one", true],
+      ["with nothing typed", false],
+    ])("drops the line a + opened on Escape %s", async (_, adds) => {
+      const state = mountBuilder("alert", saved);
+      await click("add-after-0");
+      if (adds) await addEq("level", "warn");
+      await press("Escape");
+      expect(document.body.querySelector(`[data-test="${DT}-draft-row"]`)).toBeNull();
+      if (!adds) await press("Escape");
+      expect(document.body.querySelector(`[data-test="${DT}-draft-row"]`)).toBeNull();
+      expect(state.value?.conditions ?? saved.conditions).toHaveLength(adds ? 4 : 3);
+    });
+
+    it("drops an empty group Add group opened on Escape", async () => {
+      const state = mountBuilder("alert", v2(leaf("level", "error")));
+      await click("add-group");
+      await press("Escape");
+      expect(document.body.querySelector(`[data-test="${DT}-draft-row"]`)).toBeNull();
+      expect(find("group-1").exists()).toBe(false);
+      expect(state.value.conditions).toHaveLength(1);
+    });
+
     it("starts a group when ( is typed on a line and draws its line inside the new box", async () => {
       const state = mountBuilder("alert", v2(leaf("level", "error")));
       await click("add-condition");

@@ -201,6 +201,8 @@ describe.each<FilterLayout>(["horizontal", "vertical"])("keyboard only (%s)", (l
     await condition("b", "eq", ["2"]);
     expect(sql(state)).toBe("a = 1 AND b = '2' AND c = '3'");
     await key("Escape");
+    // Escape gives a vertical caret's own line back, so the caret steps in again from the end.
+    if (layout === "vertical") await key("ArrowLeft");
     // Delete arms the chip after the caret, a second Delete removes it.
     await key("Delete");
     await key("Delete");

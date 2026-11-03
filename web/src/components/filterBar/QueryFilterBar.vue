@@ -313,6 +313,12 @@ function clearAll() {
   focus();
 }
 
+// A vertical caret holds a line of its own, so Escape gives that line back instead of leaving it empty.
+function onEscape() {
+  if (vertical.value) close();
+  else dismiss();
+}
+
 function onCaretMove(stepBy: -1 | 1) {
   if (editor.moveCaret(stepBy)) armedId.value = null;
 }
@@ -380,7 +386,7 @@ const draftOperator = computed(() => {
     @delete-empty="editor.onDelete"
     @caret-move="onCaretMove"
     @press="onPress"
-    @escape="dismiss"
+    @escape="onEscape"
     @dismiss="dismiss"
     @close="close"
     @leave="close"
