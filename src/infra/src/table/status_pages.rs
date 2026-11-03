@@ -59,6 +59,7 @@ pub struct CheckStateRow {
     pub last_run_class_at: i64,
     /// Seconds between scheduled runs; 0 for cron.
     pub interval_secs: i64,
+    pub created_at: i64,
 }
 
 pub async fn get_page_by_slug<C: ConnectionTrait>(
@@ -140,6 +141,7 @@ pub async fn get_check_states<C: ConnectionTrait>(
         .column(synthetics_checks::Column::LastRunClass)
         .column(synthetics_checks::Column::LastRunClassAt)
         .column(synthetics_checks::Column::Frequency)
+        .column(synthetics_checks::Column::CreatedAt)
         .filter(synthetics_checks::Column::Id.is_in(check_ids.iter().cloned()));
     if let Some(watermark) = since {
         q = q.filter(synthetics_checks::Column::UpdatedAt.gt(watermark));
@@ -157,6 +159,7 @@ pub async fn get_check_states<C: ConnectionTrait>(
             i32,
             i64,
             serde_json::Value,
+            i64,
         )>()
         .all(conn)
         .await?;
@@ -176,6 +179,7 @@ pub async fn get_check_states<C: ConnectionTrait>(
                 last_run_class,
                 last_run_class_at,
                 frequency,
+                created_at,
             )| {
                 if updated_at > max_updated {
                     max_updated = updated_at;
@@ -196,6 +200,7 @@ pub async fn get_check_states<C: ConnectionTrait>(
                     last_run_class,
                     last_run_class_at,
                     interval_secs,
+                    created_at,
                 }
             },
         )

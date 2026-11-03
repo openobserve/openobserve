@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -297,8 +297,10 @@ function startFalseAlarm(notice: StatusPageNotice) {
   falseAlarmReason.value = "";
 }
 
-function apiMessage(err: any): string | undefined {
-  return err?.response?.data?.message || err?.response?.data?.error;
+// The server's own message, shown as is.
+function apiMessage(err: any): I18nText | undefined {
+  const msg = err?.response?.data?.message || err?.response?.data?.error;
+  return msg ? raw(String(msg)) : undefined;
 }
 
 async function markFalseAlarm(notice: StatusPageNotice) {

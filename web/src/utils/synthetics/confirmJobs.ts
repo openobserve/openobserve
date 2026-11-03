@@ -21,6 +21,8 @@ export interface ExecutionSlot {
   browser: string;
   device: string;
   environment: string;
+  /** The job's scheduled time. A confirm job is enqueued later than the run's own jobs. */
+  scheduledTs: number;
   timestamp: number;
   status: ExecutionStatus;
 }
@@ -36,20 +38,25 @@ export interface ConfirmPair<T> {
  *
  * A confirm job re-tests a failure from a second location of the same run, or
  * from the same location when the check has one. Its result row carries no
- * marker, but a run tests each (location, browser, device, environment) slot
- * once, so a second execution in a slot is a confirm job. Each one pairs with a
- * failed execution of the run, on the same device when there is one.
+ * marker, but the job API enqueues it with its own, later `scheduled_ts`, while
+ * the run's own jobs share the run's. Rows without a scheduled time fall back to
+ * the slot rule: a run tests each (location, browser, device, environment) slot
+ * once, so a second execution in a slot is a confirm job. Each confirm job pairs
+ * with a failed execution of the run, on the same device when there is one.
  */
 export function splitConfirms<T extends ExecutionSlot>(
   executions: readonly T[],
 ): { primary: T[]; confirms: ConfirmPair<T>[] } {
-  const ordered = [...executions].sort((a, b) => a.timestamp - b.timestamp);
+  const ordered = [...executions].sort(
+    (a, b) => a.scheduledTs - b.scheduledTs || a.timestamp - b.timestamp,
+  );
+  const runTs = ordered[0]?.scheduledTs ?? 0;
   const seen = new Set<string>();
   const primary: T[] = [];
   const extra: T[] = [];
   for (const e of ordered) {
     const slot = `${e.location}|${e.browser}|${e.device}|${e.environment}`;
-    if (seen.has(slot)) extra.push(e);
+    if ((runTs > 0 && e.scheduledTs > runTs) || seen.has(slot)) extra.push(e);
     else {
       seen.add(slot);
       primary.push(e);

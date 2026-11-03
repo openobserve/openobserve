@@ -21,6 +21,7 @@ const exec = (location: string, status: ExecutionSlot["status"], timestamp: numb
   browser: "",
   device: "",
   environment: "",
+  scheduledTs: 0,
   timestamp,
   status,
 });
@@ -59,6 +60,16 @@ describe("splitConfirms", () => {
       { of: null, confirm: desk },
       { of: failed, confirm: mob },
     ]);
+  });
+
+  it("should tell a confirm job by its later scheduled time, not by when it finished", () => {
+    // The confirm job from b passes before b's own job ends.
+    const a = { ...exec("a", "fail", 1), scheduledTs: 100 };
+    const confirm = { ...exec("b", "pass", 2), scheduledTs: 150 };
+    const b = { ...exec("b", "error", 3), scheduledTs: 100 };
+    const { primary, confirms } = splitConfirms([a, confirm, b]);
+    expect(primary).toEqual([a, b]);
+    expect(confirms).toEqual([{ of: a, confirm }]);
   });
 
   it("should find no confirm job in a run that tests each slot once", () => {

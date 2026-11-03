@@ -756,7 +756,7 @@ fn all_checks_in_error(mapped: &[&str], states: &[table::CheckStateRow]) -> bool
 
 /// When a check last tested the site: the newest finalized run, unless that run did not test it.
 /// After a Not measured or Misconfigured run the last test is the run before the class began,
-/// one interval before `last_run_class_at`.
+/// one interval before `last_run_class_at`; none when that slot is older than the check itself.
 fn tested_at(s: &table::CheckStateRow) -> Option<i64> {
     use config::meta::synthetics::RunClass;
     let ts = match RunClass::from_db(s.last_run_class) {
@@ -765,7 +765,11 @@ fn tested_at(s: &table::CheckStateRow) -> Option<i64> {
             if s.interval_secs == 0 {
                 return None;
             }
-            s.last_run_class_at - s.interval_secs * 1_000_000
+            let before = s.last_run_class_at - s.interval_secs * 1_000_000;
+            if before < s.created_at {
+                return None;
+            }
+            before
         }
         // A row from before the run class existed: trust the badge.
         RunClass::Unknown if s.last_check_status != engine::CHECK_STATUS_ERROR => {
@@ -882,6 +886,7 @@ mod fast_pass_tests {
             last_run_class: 0,
             last_run_class_at: 0,
             interval_secs: 60,
+            created_at: 0,
         }
     }
 
@@ -899,11 +904,18 @@ mod fast_pass_tests {
         gap.interval_secs = 120;
         let states = vec![up.clone(), gap.clone()];
         assert_eq!(last_checked(&["a"], &states), (Some(10 * MIN), Some(180)));
-        assert_eq!(last_checked(&["a", "b"], &states), (Some(18 * MIN), Some(360)));
+        assert_eq!(
+            last_checked(&["a", "b"], &states),
+            (Some(18 * MIN), Some(360))
+        );
         // Misconfigured did not test the site either.
         let mut bad = gap.clone();
         bad.last_run_class = 5;
         assert_eq!(tested_at(&bad), Some(18 * MIN));
+        // A check whose first run was already Not measured was never tested.
+        let mut first = gap.clone();
+        first.created_at = 19 * MIN;
+        assert_eq!(tested_at(&first), None);
     }
 
     #[test]
