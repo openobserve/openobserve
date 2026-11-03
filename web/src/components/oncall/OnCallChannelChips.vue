@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   nobody reads, and the red one has to survive being scanned past.
 -->
 <template>
-  <span class="flex items-center gap-1" :data-test="`oncall-channels-${email}`">
+  <span class="flex flex-wrap items-center gap-1" :data-test="`oncall-channels-${email}`">
     <span v-if="!chips.length" class="text-text-muted text-xs">{{ ABSENT }}</span>
     <template v-for="chip in chips" :key="chip.channel">
       <OButton
@@ -45,6 +45,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OTooltip side="bottom" :content="chip.tip" />
     </template>
+    <!-- Its own line under the icons: the column is sized for three chips, and a cut word says nothing. -->
+    <span
+      v-if="blockedWord"
+      class="text-text-secondary basis-full text-xs"
+      :data-test="`oncall-channels-word-${email}`"
+    >
+      {{ blockedWord }}
+    </span>
   </span>
 </template>
 
@@ -80,13 +88,14 @@ const router = useRouter();
 const store = useStore();
 
 /// The person channels in the order the chips read; webhook is the team's room, not a person's.
-const PERSON_CHANNELS: Channel[] = ["email", "sms", "voice"];
+const PERSON_CHANNELS: Channel[] = ["email", "slack", "sms", "voice"];
 const PHONE_CHANNELS = new Set<Channel>(["sms", "voice"]);
 
 /// A closed map rather than a built key: an unknown channel must fail to
 /// compile, not render a missing glyph next to a person's name.
 const CHANNEL_ICON: Record<Channel, IconName> = {
   email: "mail",
+  slack: "forum",
   sms: "chat",
   voice: "smartphone",
   webhook: "webhook",
@@ -96,6 +105,8 @@ function channelLabel(channel: Channel): I18nText {
   switch (channel) {
     case "email":
       return t("oncall.channel_email");
+    case "slack":
+      return t("oncall.channel_slack");
     case "sms":
       return t("oncall.channel_sms");
     case "voice":
@@ -149,10 +160,32 @@ function chipOf(c: ChannelReadiness): Chip {
     channel: c.channel,
     icon: CHANNEL_ICON[c.channel],
     tone,
-    tip: link ? t("oncall.channelAddPhone", { reason: tip }) : tip,
+    tip: link ? t("oncall.channelAddPhone", { reason: tip }) : ownFixTip(c, tip),
     link,
   };
 }
+
+/// DM-7: a person links their own Slack account from Slack, so only their own "not linked" chip says how. [pure]
+function ownFixTip(c: ChannelReadiness, reason: I18nText): I18nText {
+  return props.own && c.channel === "slack" && c.blocked_because === "not linked"
+    ? t("oncall.channelLinkSlack", { reason })
+    : reason;
+}
+
+/// One word for the worst blocked state; a cause no word names (no provider, failing sends) stays quiet rather than wrong.
+const blockedWord = computed<I18nText | null>(() => {
+  const of = (channel: Channel) => props.channels.find((c) => c.channel === channel);
+  const email = of("email");
+  if (email && !email.deliverable) return t("oncall.reachWordEmailWontArrive");
+  const phone = [of("sms"), of("voice")].filter(
+    (c): c is ChannelReadiness => !!c && !c.deliverable,
+  );
+  if (phone.some((c) => c.configured_but_unverified)) return t("oncall.reachWordNotVerified");
+  if (phone.some((c) => (c.blocked_because ?? "").toLowerCase().includes("no phone on file"))) {
+    return t("oncall.reachWordNoPhone");
+  }
+  return null;
+});
 
 function openMine() {
   router.push({

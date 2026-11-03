@@ -359,14 +359,14 @@ pub enum AWSRecordType {
     KinesisFHMetrics(KinesisFHMetricData),
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GCPIngestionRequest {
     pub message: GCPMessage,
     pub subscription: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GCPMessage {
     pub attributes: GCPAttributes,
@@ -379,7 +379,7 @@ pub struct GCPMessage {
     pub publish_time_dup: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GCPAttributes {
     #[serde(rename = "logging.googleapis.com/timestamp")]

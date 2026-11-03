@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OContent
         :bleed="bleed"
         :y="padY"
-        class="flex min-h-0 w-full flex-1 flex-col overflow-hidden"
+        :class="[BODY_ENTER, 'flex min-h-0 w-full flex-1 flex-col overflow-hidden']"
       >
         <slot />
       </OContent>
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       unit="px"
       :limits="splitterLimits"
       :horizontal="false"
-      class="min-h-0 flex-1 overflow-hidden"
+      :class="[BODY_ENTER, 'min-h-0 flex-1 overflow-hidden']"
     >
       <template #before>
         <div
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OSplitter>
 
     <!-- ── Body: fixed-width sidebar + main ─────────────────────── -->
-    <div v-else-if="!!slots.sidebar" class="flex min-h-0 flex-1">
+    <div v-else-if="!!slots.sidebar" :class="[BODY_ENTER, 'flex min-h-0 flex-1']">
       <aside
         class="border-border-default flex h-full shrink-0 flex-col overflow-hidden border-e"
         :style="{ width: sidebarWidth + 'px' }"
@@ -178,7 +178,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- ── Body: constrained reading column (no sidebar) ────────── -->
-    <ConstrainedPage v-else-if="constrained" :size="contentSize" class="min-h-0 flex-1">
+    <ConstrainedPage
+      v-else-if="constrained"
+      :size="contentSize"
+      :class="[BODY_ENTER, 'min-h-0 flex-1']"
+    >
       <slot />
     </ConstrainedPage>
 
@@ -187,9 +191,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       :bleed="bleed"
       :y="padY"
-      :class="
-        scroll ? 'min-h-0 flex-1 overflow-auto' : 'flex min-h-0 flex-1 flex-col overflow-hidden'
-      "
+      :class="[
+        BODY_ENTER,
+        scroll ? 'min-h-0 flex-1 overflow-auto' : 'flex min-h-0 flex-1 flex-col overflow-hidden',
+      ]"
     >
       <slot />
     </OContent>
@@ -200,6 +205,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { ref, computed, watch, useSlots, provide } from "vue";
 import { useRouter } from "vue-router";
+// The route view already fades the whole page in, so the body takes only the slide and the header stays still.
+import { ENTER_SLIDE as BODY_ENTER } from "@/lib/styles/motion";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";

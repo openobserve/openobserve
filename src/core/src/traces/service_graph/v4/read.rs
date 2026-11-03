@@ -257,7 +257,7 @@ where
     Fut: Future<Output = Result<Vec<InstantValue>, anyhow::Error>>,
 {
     // Range selectors are left-open; +1ms keeps the `start` sample, not a baseline 1ms before it.
-    let range_ms = ((end - start) / 1_000).max(1_000) + 1;
+    let range_ms = (end.saturating_sub(start) / 1_000).max(1_000) + 1;
     let plan =
         |v4_only| plan_queries(filter, v4_only, range_ms, start, end).map_err(anyhow::Error::msg);
     let mut results = run_plan(&plan(true)?, &run).await;
@@ -404,7 +404,7 @@ async fn run_query(
         step,
         query_exemplars: false,
         use_cache: None,
-        search_type: None,
+        search_type: Some(config::meta::search::SearchEventType::Other),
         search_event_context: None,
         regions: vec![],
         clusters: vec![],

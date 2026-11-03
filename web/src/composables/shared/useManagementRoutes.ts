@@ -134,6 +134,7 @@ const useManagementRoutes = () => {
     name: "modelPricingEditor",
     meta: {
       titleKey: "routeTitles.modelPricingEditor",
+      accessScopeQuery: ["id"],
     },
     component: () => import("@/components/settings/ModelPricingEditor.vue"),
     beforeEnter: withFeatureGate("modelPricing", routeGuard),
@@ -338,6 +339,17 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
             titleKey: "settings.organizationManagement",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "org_domain_mapping",
+          name: "orgDomainMapping",
+          component: () => import("@/components/settings/OrgDomainManagement.vue"),
+          meta: {
+            titleKey: "routeTitles.orgDomainMapping",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

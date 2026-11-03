@@ -45,7 +45,7 @@
     "category": "metrics"
   },
   {
-    "path": "/ingestion/custom/metrics/cloudwatch",
+    "path": "/ingestion/custom/metrics/cloudwatchMetrics",
     "label": "CloudWatch Metrics",
     "category": "metrics"
   },
@@ -155,7 +155,7 @@
     "category": "security"
   },
   {
-    "path": "/ingestion/security/googleworkspace",
+    "path": "/ingestion/security/google-workspace",
     "label": "Google Workspace",
     "category": "security"
   },
@@ -195,7 +195,7 @@
     "category": "devops"
   },
   {
-    "path": "/ingestion/devops/githubactions",
+    "path": "/ingestion/devops/github-actions",
     "label": "GitHub Actions",
     "category": "devops"
   },
@@ -205,17 +205,17 @@
     "category": "networking"
   },
   {
-    "path": "/ingestion/messagequeues/kafka",
+    "path": "/ingestion/message-queues/kafka",
     "label": "Kafka",
     "category": "messagequeues"
   },
   {
-    "path": "/ingestion/messagequeues/rabbitmq",
+    "path": "/ingestion/message-queues/rabbitmq",
     "label": "RabbitMQ",
     "category": "messagequeues"
   },
   {
-    "path": "/ingestion/messagequeues/nats",
+    "path": "/ingestion/message-queues/nats",
     "label": "NATS",
     "category": "messagequeues"
   },

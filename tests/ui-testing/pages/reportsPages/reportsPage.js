@@ -483,9 +483,15 @@ export class ReportsPage {
   }
 
   async signOut() {
-    await this.profileButton.click({ force: true });
-    await this.signOutButton.click({ force: true });
-    await confirmDraftSignOut(this.page);
+    // A forced click on the still-opening profile menu can miss, leaving the session alive; retry until /login.
+    await expect(async () => {
+      if (/\/login/.test(this.page.url())) return;
+      if (!(await this.signOutButton.isVisible())) await this.profileButton.click();
+      await this.signOutButton.waitFor({ state: 'visible', timeout: 5000 });
+      await this.signOutButton.click();
+      await confirmDraftSignOut(this.page);
+      await this.page.waitForURL(/\/login/, { timeout: 5000 });
+    }).toPass({ timeout: 45000, intervals: [1000, 2000, 5000] });
   }
 
   async pauseReport(reportName) {
@@ -510,7 +516,7 @@ export class ReportsPage {
           if (!t) return false;
           const text = t.textContent || '';
           return /Showing \d+ - \d+/.test(text) || !!document.querySelector('[data-test="o2-empty-state"]');
-        }, { timeout: 10000 });
+        }, undefined, { timeout: 10000 });
         await this.reportSearchInputField.fill(reportName);
         return await btn.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
       }, {

@@ -14,7 +14,6 @@ export class LogsToolbarPinsPage {
     // ===== STORAGE KEYS (useToolbarPins.ts) =====
     this.pinsKey = 'logs_toolbar_pinned_items';
     this.histogramDecidedKey = 'logs_toolbar_histogram_pin_decided';
-    this.savedViewsDecidedKey = 'logs_toolbar_saved_views_pin_decided';
     this.tracesPinsKey = 'traces_toolbar_pinned_items';
 
     // ===== LOCATORS =====
@@ -70,10 +69,10 @@ export class LogsToolbarPinsPage {
 
   // ===== SETUP =====
 
-  /** Seeds pin storage before boot; a string `pins` is written verbatim, `decided` sets both default-pin flags. */
+  /** Seeds pin storage before boot; a string `pins` is written verbatim, `decided` sets the histogram default-pin flag. */
   async seedPinStorage({ pins, decided } = {}) {
     await this.page.addInitScript(
-      ([key, value, decidedKeys, decidedValue]) => {
+      ([key, value, decidedKey, decidedValue]) => {
         try {
           // addInitScript re-runs on every navigation, so seed once or a reload
           // would wipe what the test just pinned.
@@ -81,10 +80,8 @@ export class LogsToolbarPinsPage {
           sessionStorage.setItem('__pinSeedApplied', '1');
           if (value === null) localStorage.removeItem(key);
           else localStorage.setItem(key, value);
-          for (const decidedKey of decidedKeys) {
-            if (decidedValue === null) localStorage.removeItem(decidedKey);
-            else localStorage.setItem(decidedKey, decidedValue);
-          }
+          if (decidedValue === null) localStorage.removeItem(decidedKey);
+          else localStorage.setItem(decidedKey, decidedValue);
         } catch (_) {
           // Private mode / quota — the app falls back to in-memory pins.
         }
@@ -92,7 +89,7 @@ export class LogsToolbarPinsPage {
       [
         this.pinsKey,
         pins === undefined ? null : typeof pins === 'string' ? pins : JSON.stringify(pins),
-        [this.histogramDecidedKey, this.savedViewsDecidedKey],
+        this.histogramDecidedKey,
         decided === undefined ? null : String(decided),
       ],
     );
@@ -226,10 +223,6 @@ export class LogsToolbarPinsPage {
 
   async readHistogramDecidedFlag() {
     return this.page.evaluate((key) => localStorage.getItem(key), this.histogramDecidedKey);
-  }
-
-  async readSavedViewsDecidedFlag() {
-    return this.page.evaluate((key) => localStorage.getItem(key), this.savedViewsDecidedKey);
   }
 
   async readTracesPins() {

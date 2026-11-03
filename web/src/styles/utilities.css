@@ -63,6 +63,15 @@
   );
 }
 
+/* Previous-period bar in a compared funnel. Consumer: components/rum/productAnalytics/funnelParts/FunnelStepBar.vue. */
+@utility bg-hatch-period {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-progress-bar-default) 0 0.125rem,
+    color-mix(in srgb, var(--color-progress-bar-default) 22%, transparent) 0.125rem 0.3125rem
+  );
+}
+
 /* ── Drag-and-drop row affordances ──────────────────────────────────────────
    Sortable adds these classes to a row CLONE it builds at runtime, so no
    template can reach it and the name must be a single token. `!important`
@@ -109,5 +118,15 @@
     135deg,
     var(--color-border-strong) 0 var(--hatch-line),
     transparent var(--hatch-line) 0.3125rem
+  );
+}
+
+/* Green-to-red scale for the click heat legend; hues mirror the canvas palette in utils/rum/clickHeatmap.ts. */
+@utility bg-heat-legend {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-status-positive),
+    var(--color-warning),
+    var(--color-status-negative)
   );
 }

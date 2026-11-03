@@ -8,6 +8,7 @@ every evaluation (~1 min, `fast_eval`) delivers to the self-ingest sink.
 from __future__ import annotations
 
 import concurrent.futures
+import os
 
 from support.client import OpenObserveClient
 from support.wait import wait_until
@@ -15,6 +16,8 @@ from support.wait import wait_until
 from .multialert_helpers import fast_eval, multi_alert, simple_alert, uniq
 
 GROUP_TMPL = "auto_ack_group_tmpl"
+# Must match the server's setting; CI lowers it from the 300 s default.
+COMPOSITE_SWEEP_S = int(os.environ.get("ZO_ALERT_COMPOSITE_SWEEP_SECS", "300"))
 GROUP_DEST = "auto_ack_group_dest"
 
 
@@ -312,10 +315,10 @@ def test_an_ack_withholds_a_composites_repeats(alerts):
     acked = _ack(alerts, composite_id, {"firing_started_at": started})
     assert acked.status_code == 200 and acked.json()["changed"] is True, acked.text
 
-    # A steadily firing composite re-evaluates on the sweep (ZO_ALERT_COMPOSITE_SWEEP_SECS, 300 s).
-    _evaluations(alerts, name, stream, 1, per_run_s=330)
+    # A steadily firing composite re-evaluates only on the sweep.
+    _evaluations(alerts, name, stream, 1, per_run_s=COMPOSITE_SWEEP_S + 30)
     sent = alerts.notifications_for(name)
-    _evaluations(alerts, name, stream, 2, per_run_s=330)
+    _evaluations(alerts, name, stream, 2, per_run_s=COMPOSITE_SWEEP_S + 30)
     assert alerts.notifications_for(name) == sent, "repeats of the acked composite are withheld"
     assert _item(alerts, name)["ack"]["acked_by"] == alerts._c.email
 
@@ -325,4 +328,6 @@ def test_an_ack_withholds_a_composites_repeats(alerts):
         _feed(alerts, stream)
         return alerts.notifications_for(name) > sent
 
-    wait_until(_resumed, timeout=420, interval=10, msg="the composite notifies again after the unack")
+    wait_until(
+        _resumed, timeout=COMPOSITE_SWEEP_S + 120, interval=10, msg="the composite notifies again after the unack"
+    )

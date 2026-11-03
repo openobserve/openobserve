@@ -435,6 +435,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </OSettingRow>
+
+            <OSettingRow
+              v-if="repeatSuppressionAvailable"
+              :label="t('alerts.alertSettings.suppressRepeats')"
+              :info="t('alerts.alertSettings.suppressRepeatsTooltip')"
+              fill
+            >
+              <OFormSwitch
+                name="suppress_repeats"
+                :aria-label="t('alerts.alertSettings.suppressRepeats')"
+                data-test="alert-suppress-repeats-toggle"
+              />
+            </OSettingRow>
           </template>
         </Teleport>
       </div>
@@ -542,6 +555,8 @@ export default defineComponent({
         (config.isEnterprise === "true" || config.isCloud === "true") &&
         store.state.zoConfig?.incidents_enabled === true,
     );
+    // The backend honours the switch only in enterprise builds.
+    const repeatSuppressionAvailable = config.isEnterprise === "true" || config.isCloud === "true";
 
     // Field refs consumed by the parent's AlertFocusManager (registered off the
     // step ref). Scheduled-only.
@@ -741,6 +756,17 @@ export default defineComponent({
       return destination ? platformRecoveryKeys[platformOf(destination)] : undefined;
     };
 
+    const isJira = (name: any): boolean => {
+      const destination = props.destinationObjects.find((d: any) => d?.name === name);
+      return !!destination && platformOf(destination) === "jira";
+    };
+
+    // Jira keeps one ticket per alert, so its recovery is a comment there, not a new message.
+    const messageKeyFor = (name: any): I18nKey =>
+      isJira(name)
+        ? "alerts.alertSettings.recoveryJiraComment"
+        : "alerts.alertSettings.recoveryChatMessage";
+
     // Ticket closes always go to the firing's own destinations; only the message can be
     // redirected, so an override lists both halves rather than replacing the first.
     const recoveryPlan = computed(() => {
@@ -751,16 +777,16 @@ export default defineComponent({
           const platformKey = platformKeyFor(name);
           return {
             name: String(name),
-            isPlatform: !!platformKey,
-            action: t(platformKey ?? "alerts.alertSettings.recoveryChatMessage"),
+            isPlatform: !!platformKey || isJira(name),
+            action: t(platformKey ?? messageKeyFor(name)),
           };
         });
       if (!redirected) return rows;
       return rows.concat(
         props.recoveryDestinations.map((name: any) => ({
           name: String(name),
-          isPlatform: false,
-          action: t("alerts.alertSettings.recoveryChatMessage"),
+          isPlatform: isJira(name),
+          action: t(messageKeyFor(name)),
         })),
       );
     });
@@ -775,6 +801,7 @@ export default defineComponent({
       t,
       store,
       incidentsEnabled,
+      repeatSuppressionAvailable,
       handlePeriodChange,
       // Field refs for the parent focus manager
       periodFieldRef,

@@ -18,7 +18,7 @@ import { defineComponent } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
-import useSearchBar from "./useSearchBar";
+import useSearchBar, { streamSwitchPending } from "./useSearchBar";
 import searchState from "./searchState";
 import { resetLogsAutoRunForTests, useLogsAutoRun } from "./logsAutoRun";
 import { REFRESH_QUERY_ORIGIN } from "./logsRowNav";
@@ -109,8 +109,9 @@ vi.mock("@/composables/useLogs/useSearchStream", () => ({
   }),
 }));
 
+const { mockExtractFields } = vi.hoisted(() => ({ mockExtractFields: vi.fn() }));
 vi.mock("@/composables/useLogs/useStreamFields", () => ({
-  default: () => ({ extractFields: vi.fn().mockResolvedValue(undefined) }),
+  default: () => ({ extractFields: mockExtractFields }),
 }));
 
 const { mockConfig, mockLoadSemanticGroups, mockGetCachedSemanticGroups } = vi.hoisted(() => ({
@@ -160,6 +161,7 @@ describe("useSearchBar Composable", () => {
       data: [{ is_success: true }],
     });
     mockBuildSearch.mockReturnValue({ query: { sql: "SELECT * FROM test" } });
+    mockExtractFields.mockResolvedValue(undefined);
     wrapper = mount(TestComponent, {
       global: { plugins: [store, i18n] },
     });
@@ -419,6 +421,50 @@ describe("useSearchBar Composable", () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
 
         expect(logs).not.toHaveBeenCalled();
+      });
+
+      it("builds the field list from the schema it just fetched instead of fetching it again", async () => {
+        store.state.zoConfig.query_on_stream_selection = true;
+        const { searchObj } = searchState();
+        searchObj.data.stream.selectedStream = ["new_stream"];
+        searchObj.data.streamResults = { list: [{ name: "new_stream", schema: [] }] } as any;
+
+        await wrapper.vm.onStreamChange("", { origin: "selector" });
+
+        expect(mockExtractFields).toHaveBeenCalledWith({ reuseLoadedSchema: true });
+        expect(searchObj.data.streamResults.list[0].schema).toEqual([{ name: "field1" }]);
+      });
+
+      it("keeps the results skeleton until the stream's run has started", async () => {
+        store.state.zoConfig.query_on_stream_selection = true;
+        store.state.zoConfig.auto_query_enabled = true;
+        const { searchObj } = searchState();
+        searchObj.data.stream.selectedStream = ["new_stream"];
+        searchObj.data.stream.streamLists = [{ label: "new_stream", value: "new_stream" }];
+        searchObj.meta.liveMode = true;
+        searchObj.meta.editorDirty = false;
+        let pendingAtRun: boolean | null = null;
+        useLogsAutoRun().setExecutors({
+          logs: () => void (pendingAtRun = streamSwitchPending.value),
+        });
+
+        const switching = wrapper.vm.onStreamChange("", { origin: "selector" });
+        expect(streamSwitchPending.value).toBe(true);
+        await switching;
+        expect(streamSwitchPending.value).toBe(true);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(pendingAtRun).toBe(true);
+        expect(streamSwitchPending.value).toBe(false);
+      });
+
+      it("shows no results skeleton for an editor-origin stream change, which never runs", async () => {
+        const { searchObj } = searchState();
+        searchObj.data.stream.selectedStream = ["typed_stream"];
+
+        const switching = wrapper.vm.onStreamChange("", { origin: "editor" });
+        expect(streamSwitchPending.value).toBe(false);
+        await switching;
       });
 
       it("keeps the legacy run when the deployment auto-queries on stream selection", async () => {

@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OToggleGroup
       data-test="edit-role-permissions-ui-type-toggle"
       :model-value="modelValue"
+      :disabled="disabled"
       @update:model-value="(value) => emit('update:modelValue', value as string)"
     >
       <OToggleGroupItem value="table" size="sm" data-test="edit-role-permissions-show-table-btn">
@@ -40,7 +41,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
-defineProps<{ count: number; modelValue: string; loading?: boolean }>();
+defineProps<{ count: number; modelValue: string; loading?: boolean; disabled?: boolean }>();
 
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
 

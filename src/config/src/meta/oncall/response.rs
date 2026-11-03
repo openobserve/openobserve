@@ -515,8 +515,7 @@ pub struct Response {
     /// it expires — which is what makes it safe to offer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snoozed_until: Option<i64>,
-    /// What the ladder measures its step delays from; `opened_at` until a
-    /// snooze pushes it forward.
+    /// Where step delays count from: `opened_at`, moved by a snooze or a triage-held first page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ladder_anchor: Option<i64>,
     /// Which run of the ladder the record is on.
@@ -858,9 +857,12 @@ pub fn dependents_all_clear(impacted: &[Response], confirmed_id: &str) -> bool {
 /// Three stages and no more: the room needs "somebody was woken", "somebody has
 /// it" and "it is over, and why". Every rung in between is the ladder's
 /// business, and posting them turns a flapping alert into channel noise.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ChannelPostStage {
+    // Variant order is the page's order; `is_behind` compares by it, so never reorder.
     Paged,
     Acknowledged,
     Resolved,
@@ -886,6 +888,16 @@ impl ChannelPostStage {
             ResponseState::Resolved => Some(Self::Resolved),
             ResponseState::Triaged => None,
         }
+    }
+
+    /// The stage to render for a page in this state, `Triaged` showing as paged (RO-5). [pure]
+    pub fn current(state: ResponseState) -> Self {
+        Self::of(state).unwrap_or(Self::Paged)
+    }
+
+    /// Whether the page has moved past this stage, so a post of it would be stale (RO-5). [pure]
+    pub fn is_behind(self, state: ResponseState) -> bool {
+        self < Self::current(state)
     }
 }
 
@@ -1867,6 +1879,30 @@ mod tests {
             Some(ChannelPostStage::Resolved)
         );
         assert_eq!(ChannelPostStage::of(ResponseState::Triaged), None);
+    }
+
+    /// RO-5: a pass renders the page's current stage; a stage the page moved past is not posted.
+    #[test]
+    fn test_the_current_stage_and_whether_a_requested_stage_is_behind_it() {
+        use ChannelPostStage::{Acknowledged as A, Paged as P, Resolved as R};
+        use ResponseState::{Acknowledged, Resolved, Triaged, Triggered};
+        // (page state, its current stage, which of P, A, R are behind it)
+        let table = [
+            (Triggered, P, [false, false, false]),
+            (Triaged, P, [false, false, false]),
+            (Acknowledged, A, [true, false, false]),
+            (Resolved, R, [true, true, false]),
+        ];
+        for (state, current, behind) in table {
+            assert_eq!(ChannelPostStage::current(state), current, "{state:?}");
+            for (requested, want) in [P, A, R].into_iter().zip(behind) {
+                assert_eq!(
+                    requested.is_behind(state),
+                    want,
+                    "{requested} on a {state:?} page"
+                );
+            }
+        }
     }
 
     /// The whole point of the change: the room learns what fired and who has

@@ -28,7 +28,10 @@ use config::{
     meta::{
         promql,
         promql::get_metadata_from_schema as get_prom_metadata_from_schema,
-        self_reporting::{ai_chat::is_protected_ai_chat_stream, usage::AUDIT_STREAM},
+        self_reporting::{
+            ai_chat::is_protected_ai_chat_stream,
+            usage::{AUDIT_STREAM, is_system_stream},
+        },
         stream::{
             DistinctField, PartitionTimeLevel, StreamField, StreamSettings, StreamStats,
             StreamType, TimeRange, UpdateStreamSettings,
@@ -155,9 +158,8 @@ pub async fn get_streams(
     indices_res
 }
 
-// org_id is only for pattern associations, which is ent only
 pub fn stream_res(
-    _org_id: &str,
+    org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     schema: Schema,
@@ -209,7 +211,7 @@ pub fn stream_res(
     // we get the patterns, otherwise report them as empty
     #[cfg(feature = "vectorscan")]
     let pattern_associations = match PATTERN_MANAGER.get() {
-        Some(m) => m.get_associations(_org_id, stream_type, stream_name),
+        Some(m) => m.get_associations(org_id, stream_type, stream_name),
         None => vec![],
     };
     let is_derived = unwrap_stream_is_derived(&schema);
@@ -226,6 +228,7 @@ pub fn stream_res(
         metrics_meta,
         pattern_associations,
         is_derived,
+        is_internal: is_system_stream(org_id, stream_name),
     }
 }
 
@@ -1659,6 +1662,34 @@ mod tests {
 
         let stream = stream_res("org1", "derived_stream", StreamType::Logs, schema, None);
         assert_eq!(stream.is_derived, Some(true));
+    }
+
+    #[test]
+    fn test_stream_res_marks_system_streams_internal() {
+        let schema = Schema::new(vec![Field::new("field1", DataType::Utf8, true)]);
+        let stream = stream_res("org1", "_rumdata", StreamType::Logs, schema.clone(), None);
+        assert!(stream.is_internal);
+        assert_eq!(json::to_value(&stream).unwrap()["is_internal"], true);
+
+        let errors = stream_res(
+            META_ORG_ID,
+            "errors",
+            StreamType::Logs,
+            schema.clone(),
+            None,
+        );
+        assert!(errors.is_internal);
+        let user_errors = stream_res("org1", "errors", StreamType::Logs, schema, None);
+        assert!(!user_errors.is_internal);
+    }
+
+    #[test]
+    fn test_stream_res_omits_is_internal_for_user_streams() {
+        let schema = Schema::new(vec![Field::new("field1", DataType::Utf8, true)]);
+        let stream = stream_res("org1", "default", StreamType::Logs, schema, None);
+        assert!(!stream.is_internal);
+        let value = json::to_value(&stream).unwrap();
+        assert!(value.get("is_internal").is_none());
     }
 
     #[test]

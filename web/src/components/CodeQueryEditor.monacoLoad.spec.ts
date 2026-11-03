@@ -174,11 +174,30 @@ const attachHost = (id: string) => {
   document.body.appendChild(host);
 };
 
-const mountEditor = (editorId: string) =>
+const mountEditor = (editorId: string, extra: Record<string, unknown> = {}) =>
   mount(CodeQueryEditor, {
-    props: { editorId, query: "SELECT * FROM logs", language: "sql" },
+    props: { editorId, query: "SELECT * FROM logs", language: "sql", ...extra },
     global: { plugins: [createStore({ state: { theme: "light" } })] },
   });
+
+const stepFrames = () => {
+  const frames: FrameRequestCallback[] = [];
+  const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+    frames.push(cb);
+    return frames.length;
+  });
+  const step = async () => {
+    for (const cb of frames.splice(0)) cb(0);
+    await flushPromises();
+  };
+  return { frames, raf, step };
+};
+
+const addViewLine = (host: Element) => {
+  const line = document.createElement("div");
+  line.className = "view-line";
+  host.appendChild(line);
+};
 
 const settle = async () => {
   for (let i = 0; i < 5; i++) {
@@ -207,5 +226,93 @@ describe("CodeQueryEditor Monaco loading", () => {
 
     first.unmount();
     second.unmount();
+  });
+
+  it("draws no preview unless the textPreview prop is set", () => {
+    attachHost("editor-no-preview");
+    const wrapper = mountEditor("editor-no-preview");
+    expect(wrapper.find('[data-test="query-editor-preview"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("shows the query as plain text until the editor mounts, then hands over to Monaco", async () => {
+    const monacoApi: any = await import("monaco-editor/esm/vs/editor/editor.api");
+    attachHost("editor-preview");
+    monacoApi.editor.create.mockImplementationOnce((host: HTMLElement) => {
+      addViewLine(host);
+      return monacoApi.editor.create.getMockImplementation()!();
+    });
+    const wrapper = mountEditor("editor-preview", { textPreview: true });
+    const preview = wrapper.find('[data-test="query-editor-preview"]');
+    expect(preview.exists()).toBe(true);
+    expect(preview.text()).toContain("SELECT * FROM logs");
+    expect(preview.attributes("aria-hidden")).toBe("true");
+    await settle();
+    expect(wrapper.find('[data-test="query-editor-preview"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("hands over in the frame Monaco first draws its lines", async () => {
+    const monacoApi: any = await import("monaco-editor/esm/vs/editor/editor.api");
+    attachHost("editor-handover");
+    const { frames, raf, step } = stepFrames();
+    monacoApi.editor.create.mockImplementationOnce((host: HTMLElement) => {
+      requestAnimationFrame(() => addViewLine(host));
+      return monacoApi.editor.create.getMockImplementation()!();
+    });
+    const wrapper = mountEditor("editor-handover", { textPreview: true });
+    await settle();
+    expect(frames.length).toBeGreaterThan(0);
+    expect(wrapper.find('[data-test="query-editor-preview"]').exists()).toBe(true);
+    await step();
+    expect(wrapper.find('[data-test="query-editor-preview"]').exists()).toBe(false);
+    raf.mockRestore();
+    wrapper.unmount();
+  });
+
+  it("keeps the preview until Monaco has drawn a line", async () => {
+    attachHost("editor-late-lines");
+    const { raf, step } = stepFrames();
+    const wrapper = mountEditor("editor-late-lines", { textPreview: true });
+    await settle();
+    await step();
+    await step();
+    expect(wrapper.find('[data-test="query-editor-preview"]').exists()).toBe(true);
+    addViewLine(document.getElementById("editor-late-lines")!);
+    await step();
+    expect(wrapper.find('[data-test="query-editor-preview"]').exists()).toBe(false);
+    raf.mockRestore();
+    wrapper.unmount();
+  });
+
+  it("draws no preview for an empty query", () => {
+    attachHost("editor-empty");
+    const wrapper = mount(CodeQueryEditor, {
+      props: { editorId: "editor-empty", query: "   ", language: "sql", textPreview: true },
+      global: { plugins: [createStore({ state: { theme: "light" } })] },
+    });
+    expect(wrapper.find('[data-test="query-editor-preview"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("does not build an editor for an instance unmounted before its setup finished", async () => {
+    const monacoApi: any = await import("monaco-editor/esm/vs/editor/editor.api");
+    load.release();
+    monacoApi.editor.create.mockClear();
+    attachHost("editor-remounted");
+    const mountWith = (query: string) =>
+      mount(CodeQueryEditor, {
+        props: { editorId: "editor-remounted", query, language: "sql" },
+        global: { plugins: [createStore({ state: { theme: "light" } })] },
+      });
+
+    mountWith("old payload").unmount();
+    await settle();
+    expect(monacoApi.editor.create).not.toHaveBeenCalled();
+
+    const fresh = mountWith("new payload");
+    await vi.waitFor(() => expect(monacoApi.editor.create).toHaveBeenCalledTimes(1));
+    expect(monacoApi.editor.create.mock.calls[0][1].value).toBe("new payload");
+    fresh.unmount();
   });
 });

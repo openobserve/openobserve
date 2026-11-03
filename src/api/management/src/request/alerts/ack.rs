@@ -17,17 +17,18 @@
 
 use axum::{
     Extension, Json,
+    body::Bytes,
     extract::Path,
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
 };
 use config::meta::alerts::ack::{
-    AckConflict, AckListResponse, AckRequest, AckResponse, AckSource, ActRefusal, UnackRequest,
-    UnackResponse,
+    AckConflict, AckListResponse, AckRequest, AckResponse, AckSource, ActRefusal,
+    ProblemAckRequest, UnackRequest, UnackResponse,
 };
 use openobserve_api_common::{auth::delegation::DelegatedCaller, extractors::Headers};
 use openobserve_core::{
-    alerts::ack::{self, AckError, AckTarget, Act},
+    alerts::ack::{self, AckError, Act, Groups, Problem, Verb},
     auth::UserEmail,
 };
 
@@ -41,7 +42,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     tag = "Alerts",
     operation_id = "AckAlert",
     summary = "Acknowledge an alert's current firing",
-    description = "Acknowledges the current firing of one group (or every firing group with `all_groups`), so repeat notifications stop until it clears; a level increase still notifies. Allowed for admins and editors (alert edit access with OpenFGA on) and for members of the team of an open on-call response for the alert or its incident. Also acknowledges the firing's incident and, when no other group fires unacknowledged, its on-call pages.",
+    description = "Acknowledges the problem behind the alert: its incident when the firing is in one, else the current firing of one group (or every firing group with `all_groups`). Repeat notifications stop until it clears; a level increase still notifies. Allowed for root, admins and editors (alert edit access with OpenFGA on) and members of a team the problem pages. Every on-call page of the problem stops, unless another group still fires unacknowledged. `take_over` moves an acknowledgement held by someone else to the caller.",
     security(
         ("Authorization"= [])
     ),
@@ -70,14 +71,24 @@ pub async fn ack_alert(
     Json(req): Json<AckRequest>,
 ) -> Response {
     let source = ack_source(delegated.as_deref(), &headers);
-    let target = match authorized_target(&org_id, &alert_id, &user_email.user_id).await {
-        Ok(t) => t,
-        Err(resp) => return resp,
+    let groups = if req.all_groups {
+        Groups::All
+    } else {
+        Groups::One {
+            group_key: req.group_key,
+            firing_started_at: req.firing_started_at,
+        }
     };
-    match ack::ack(&target, &req, &user_email.user_id, source).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(e) => error_response(e),
-    }
+    let problem = match ack::problem_of_alert(&org_id, &alert_id, groups).await {
+        Ok(p) => p,
+        Err(e) => return error_response(e),
+    };
+    let verb = if req.take_over {
+        Verb::TakeOver
+    } else {
+        Verb::Acknowledge
+    };
+    act_on(&problem, &user_email.user_id, verb, source).await
 }
 
 /// UnackAlert
@@ -88,7 +99,7 @@ pub async fn ack_alert(
     tag = "Alerts",
     operation_id = "UnackAlert",
     summary = "Remove the acknowledgement of an alert's firing",
-    description = "Marks the group's ack unacknowledged. Repeat notifications resume one silence interval after the unack. A no-op when the firing is not acknowledged. The incident and on-call pages stay acknowledged.",
+    description = "Clears the acknowledgement of the problem behind the alert: its incident when the firing is in one, else the group's firing. Repeat notifications resume one silence interval after the unack, and the on-call pages the acknowledgement stopped restart at step 1. A no-op when nothing is acknowledged.",
     security(
         ("Authorization"= [])
     ),
@@ -116,14 +127,99 @@ pub async fn unack_alert(
     Json(req): Json<UnackRequest>,
 ) -> Response {
     let source = ack_source(delegated.as_deref(), &headers);
-    let target = match authorized_target(&org_id, &alert_id, &user_email.user_id).await {
-        Ok(t) => t,
+    let groups = Groups::One {
+        group_key: req.group_key,
+        firing_started_at: req.firing_started_at,
+    };
+    let problem = match ack::problem_of_alert(&org_id, &alert_id, groups).await {
+        Ok(p) => p,
+        Err(e) => return error_response(e),
+    };
+    act_on(&problem, &user_email.user_id, Verb::Unack, source).await
+}
+
+/// AcknowledgeIncident
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/acknowledge",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "AcknowledgeIncident",
+    summary = "Acknowledge an incident",
+    description = "Acknowledges the incident, every firing of its alerts and every on-call page for it. Allowed for root, admins and editors (edit access to any of its alerts with OpenFGA on) and members of a team it pages. `take_over` moves an acknowledgement held by someone else to the caller. Enterprise only.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    request_body(content = ProblemAckRequest, description = "Optional; `take_over` moves someone else's acknowledgement", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = AckResponse),
+        (status = 403, description = "Refused, with who is on call and who can act", content_type = "application/json", body = ActRefusal),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+    )
+)]
+pub async fn ack_incident(
+    Path((org_id, incident_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    delegated: Option<Extension<DelegatedCaller>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let verb = match take_over_of(&body) {
+        Ok(true) => Verb::TakeOver,
+        Ok(false) => Verb::Acknowledge,
         Err(resp) => return resp,
     };
-    match ack::unack(&target, &req, &user_email.user_id, source).await {
-        Ok(body) => MetaHttpResponse::json(body),
-        Err(e) => error_response(e),
-    }
+    let source = ack_source(delegated.as_deref(), &headers);
+    incident_verb(org_id, incident_id, &user_email.user_id, verb, source).await
+}
+
+/// UnacknowledgeIncident
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/unacknowledge",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "UnacknowledgeIncident",
+    summary = "Remove the acknowledgement of an incident",
+    description = "Clears the acknowledgement of the incident and of its alerts' firings, and restarts the on-call pages it stopped at step 1. The incident goes back to open without a new analysis run. Enterprise only.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = UnackResponse),
+        (status = 403, description = "Refused, with who is on call and who can act", content_type = "application/json", body = ActRefusal),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
+    )
+)]
+pub async fn unack_incident(
+    Path((org_id, incident_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    delegated: Option<Extension<DelegatedCaller>>,
+    headers: HeaderMap,
+) -> Response {
+    let source = ack_source(delegated.as_deref(), &headers);
+    incident_verb(
+        org_id,
+        incident_id,
+        &user_email.user_id,
+        Verb::Unack,
+        source,
+    )
+    .await
 }
 
 /// ListAlertAcks
@@ -164,7 +260,7 @@ pub async fn list_alert_acks(Path((org_id, alert_id)): Path<(String, String)>) -
 }
 
 /// `slack` for a `slack_action` token, `ui` for the web's session cookie, `api` otherwise.
-pub(super) fn ack_source(delegated: Option<&DelegatedCaller>, headers: &HeaderMap) -> AckSource {
+pub(crate) fn ack_source(delegated: Option<&DelegatedCaller>, headers: &HeaderMap) -> AckSource {
     if let Some(caller) = delegated {
         // An assistant token is an agent turn, not a Slack button press.
         return if caller.is_slack_action() {
@@ -188,21 +284,83 @@ pub(super) fn ack_source(delegated: Option<&DelegatedCaller>, headers: &HeaderMa
     }
 }
 
-pub(super) async fn authorized_target(
-    org_id: &str,
-    alert_id: &str,
+/// Runs the one rule on the problem, then the verb, and answers with the verb's body.
+pub(crate) async fn act_on(
+    problem: &Problem,
     actor: &str,
-) -> Result<AckTarget, Response> {
-    let target = ack::resolve_target(org_id, alert_id)
-        .await
-        .map_err(error_response)?;
-    ack::authorize(&target, actor, Act::Ack)
-        .await
-        .map_err(|refusal| error_response(AckError::Refused(refusal)))?;
-    Ok(target)
+    verb: Verb,
+    source: AckSource,
+) -> Response {
+    if let Err(e) = ack::authorize_problem(problem, actor, Act::Ack).await {
+        return error_response(e);
+    }
+    match act(problem, actor, verb, source).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(e) => error_response(e),
+    }
 }
 
-pub(super) fn error_response(e: AckError) -> Response {
+/// The verb's answer as JSON: an `AckResponse`, or an `UnackResponse` for an unack.
+pub(crate) async fn act(
+    problem: &Problem,
+    actor: &str,
+    verb: Verb,
+    source: AckSource,
+) -> Result<serde_json::Value, AckError> {
+    let body = match verb {
+        Verb::Acknowledge => serde_json::to_value(ack::acknowledge(problem, actor, source).await?),
+        Verb::TakeOver => serde_json::to_value(ack::take_over(problem, actor, source).await?),
+        Verb::Unack => serde_json::to_value(ack::unack(problem, actor, source).await?),
+        Verb::HandOff => {
+            serde_json::to_value(ack::release_for_hand_off(problem, actor, source).await?)
+        }
+    };
+    body.map_err(|e| AckError::Internal(e.to_string()))
+}
+
+/// An empty body is a plain acknowledge; `{"take_over": true}` asks for a take-over.
+pub(crate) fn take_over_of(body: &[u8]) -> Result<bool, Response> {
+    if body.iter().all(u8::is_ascii_whitespace) {
+        return Ok(false);
+    }
+    serde_json::from_slice::<ProblemAckRequest>(body)
+        .map(|r| r.take_over)
+        .map_err(|e| MetaHttpResponse::bad_request(e.to_string()))
+}
+
+#[cfg(feature = "enterprise")]
+async fn incident_verb(
+    org_id: String,
+    incident_id: String,
+    actor: &str,
+    verb: Verb,
+    source: AckSource,
+) -> Response {
+    match infra::table::alert_incidents::get(&org_id, &incident_id).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return MetaHttpResponse::not_found("incident not found"),
+        Err(e) => return error_response(AckError::Internal(e.to_string())),
+    }
+    let problem = Problem::Incident {
+        org_id,
+        incident_id,
+    };
+    act_on(&problem, actor, verb, source).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn incident_verb(
+    org_id: String,
+    incident_id: String,
+    actor: &str,
+    verb: Verb,
+    source: AckSource,
+) -> Response {
+    let _ = (org_id, incident_id, actor, verb, source);
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+pub(crate) fn error_response(e: AckError) -> Response {
     match e {
         AckError::NotFound => MetaHttpResponse::not_found("alert not found"),
         AckError::Refused(refusal) => (StatusCode::FORBIDDEN, Json(refusal)).into_response(),

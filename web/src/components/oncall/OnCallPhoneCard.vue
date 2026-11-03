@@ -70,6 +70,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("oncall.phoneChange") }}
         </OButton>
+        <OButton
+          variant="outline-destructive"
+          size="xs"
+          :loading="removing"
+          data-test="oncall-phone-remove"
+          @click="removeOpen = true"
+        >
+          {{ t("oncall.phoneRemove") }}
+        </OButton>
       </span>
 
       <span v-else class="flex flex-wrap items-center gap-2">
@@ -80,7 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           autocomplete="tel"
           :placeholder="PHONE_EXAMPLE"
           :disabled="state === 'noProvider'"
+          :error="!!formatError"
+          :error-message="formatError ?? undefined"
           data-test="oncall-phone-input"
+          @blur="checkFormat"
         />
         <OButton
           variant="primary"
@@ -104,6 +116,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="cancelChange"
         >
           {{ t("common.cancel") }}
+        </OButton>
+        <!-- A saved number can always be taken off, verified or not, provider or not; while editing, Cancel is the way back. -->
+        <OButton
+          v-if="contact.phone && !editing"
+          variant="outline-destructive"
+          size="xs"
+          :loading="removing"
+          data-test="oncall-phone-remove"
+          @click="removeOpen = true"
+        >
+          {{ t("oncall.phoneRemove") }}
         </OButton>
         <OText v-if="state === 'empty'" variant="meta">{{ t("oncall.phoneSendHint") }}</OText>
       </span>
@@ -179,6 +202,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </OBanner>
     </template>
+
+    <ConfirmDialog
+      :model-value="removeOpen"
+      :title="t('oncall.phoneRemoveTitle')"
+      :message="t('oncall.phoneRemoveMessage')"
+      :ok-label="t('oncall.phoneRemove')"
+      ok-variant="destructive"
+      focus-cancel
+      @update:ok="removePhone"
+      @update:cancel="removeOpen = false"
+    />
   </div>
 </template>
 
@@ -188,6 +222,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -205,6 +240,7 @@ import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   formatCountdown,
+  isInternationalPhone,
   phoneCardState,
   phoneRefusalText,
   refusalOf,
@@ -250,6 +286,9 @@ const confirming = ref(false);
 const resendAt = ref(0);
 const countdownPhone = ref("");
 const now = ref(Date.now());
+const formatError = ref<I18nText | null>(null);
+const removeOpen = ref(false);
+const removing = ref(false);
 
 const state = computed(() =>
   contact.value ? phoneCardState(contact.value, codeSent.value, editing.value) : null,
@@ -267,6 +306,18 @@ watch(
   },
   { immediate: true },
 );
+
+// Cleared as soon as the number reads right, so the hint never outlives the mistake.
+watch(draftPhone, (typed) => {
+  if (formatError.value && isInternationalPhone(typed)) formatError.value = null;
+});
+
+/// The server's own format rule, said before the round trip; an empty box is not a mistake yet.
+function checkFormat(): boolean {
+  const typed = draftPhone.value.trim();
+  formatError.value = typed && !isInternationalPhone(typed) ? t("oncall.phoneFormatHint") : null;
+  return !formatError.value;
+}
 
 let timer: ReturnType<typeof setInterval> | undefined;
 
@@ -334,6 +385,7 @@ async function saveNumber(): Promise<Contact | null> {
 
 /// PUT then POST: there is no combined endpoint (§10).
 async function sendCode() {
+  if (!checkFormat()) return;
   error.value = null;
   codeSent.value = false;
   sending.value = true;
@@ -369,6 +421,23 @@ async function confirmCode() {
     error.value = errorText(err, t("oncall.phoneCodeFailed"));
   } finally {
     confirming.value = false;
+  }
+}
+
+/// An empty number clears it (`set_contact`); only this org's copy goes, other orgs keep theirs.
+async function removePhone() {
+  removeOpen.value = false;
+  error.value = null;
+  removing.value = true;
+  try {
+    await saveContact.mutateAsync("");
+    codeSent.value = false;
+    editing.value = false;
+    draftPhone.value = "";
+  } catch (err) {
+    error.value = errorText(err, t("oncall.phoneSaveFailed"));
+  } finally {
+    removing.value = false;
   }
 }
 

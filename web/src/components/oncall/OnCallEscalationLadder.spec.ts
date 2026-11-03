@@ -159,10 +159,94 @@ describe("OnCallEscalationLadder", () => {
   it("offers every priority, including the ones that wake nobody", () => {
     const wrapper = render();
 
-    expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').text()).toContain("3 rungs");
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').text()).toContain("3 steps");
     expect(wrapper.find('[data-test="oncall-ladder-priority-p4"]').text()).toContain(
       "Pages nobody",
     );
+  });
+
+  // S3: what each priority sends, said once on its chip.
+  it("names each priority's channels once, on its chip", () => {
+    const wrapper = render({
+      priorities: [{ ...priorities[0], channels: ["email", "sms", "voice"] }, priorities[1]],
+    });
+
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').text()).toContain(
+      "Email, SMS, Voice call · 3 steps",
+    );
+  });
+
+  // S3: two priorities that send differently are two ladders, whatever their steps.
+  it("does not fold priorities whose channels differ", () => {
+    const policy = {
+      ...sharedPolicy,
+      rungs: sharedPolicy.rungs.map((rung) =>
+        rung.priority === 3 ? { ...rung, channels: ["email" as const, "sms" as const] } : rung,
+      ),
+    };
+    const wrapper = render({ priorities: fivePriorities, policy });
+
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p2-p4"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-ladder-priority-p3"]').exists()).toBe(true);
+  });
+
+  // Send test and Edit are one action group, so neither wraps away from the other.
+  it("keeps Send test and Edit together", () => {
+    const wrapper = render({ canConfigure: true });
+    const actions = wrapper.find('[data-test="oncall-ladder-actions"]');
+
+    expect(actions.find('[data-test="oncall-ladder-send-test"]').exists()).toBe(true);
+    expect(actions.find('[data-test="oncall-policy-edit"]').exists()).toBe(true);
+    // The strip stays on one line: only the chip group may wrap, so the buttons never move down.
+    const strip = wrapper.find('[data-test="oncall-ladder-strip"]');
+    const chips = wrapper.find('[data-test="oncall-ladder-priorities"]');
+    expect(strip.classes()).not.toContain("flex-wrap");
+    expect(chips.classes()).toEqual(expect.arrayContaining(["flex-wrap", "min-w-0", "flex-1"]));
+    expect(actions.classes()).toContain("shrink-0");
+    expect(chips.find('[data-test="oncall-ladder-send-test"]').exists()).toBe(false);
+  });
+
+  // A first step that reaches nobody would send nothing, so Send test is not offered.
+  it("disables Send test while the first step reaches nobody", () => {
+    const wrapper = render({
+      canConfigure: true,
+      preview: preview({
+        rungs: [
+          {
+            after_micros: 300,
+            targets: ["the whole team"],
+            recipients: [person()],
+            resolves_to_nobody: false,
+          },
+          { after_micros: 0, targets: ["the on-call"], recipients: [], resolves_to_nobody: true },
+        ],
+      }),
+    });
+
+    expect(
+      wrapper.find('[data-test="oncall-ladder-send-test"]').attributes("disabled"),
+    ).toBeDefined();
+  });
+
+  // The confirm is built from the preview, so a preview still showing the last priority must not be sent from.
+  it("disables Send test while the preview is for another priority", () => {
+    const wrapper = render({
+      canConfigure: true,
+      selected: "P2",
+      preview: preview({ priority: "P1" }),
+    });
+
+    expect(
+      wrapper.find('[data-test="oncall-ladder-send-test"]').attributes("disabled"),
+    ).toBeDefined();
+  });
+
+  it("offers Send test only to someone who can configure", async () => {
+    expect(render().find('[data-test="oncall-ladder-send-test"]').exists()).toBe(false);
+
+    const wrapper = render({ canConfigure: true });
+    await wrapper.find('[data-test="oncall-ladder-send-test"]').trigger("click");
+    expect(wrapper.emitted("send-test")).toHaveLength(1);
   });
 
   it("asks the caller to switch priority", async () => {

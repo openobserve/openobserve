@@ -201,28 +201,34 @@ test.describe("PromQL pie — legend values and instant reducer", () => {
 
     await setupPromQLRegionPiePanelWithConfig(page, pm, dashboardName);
 
+    // Apply first redraws the previous data under the new config, so each read waits for its own query to finish.
     await pm.dashboardPanelConfigs.selectConfigOption("dashboard-config-aggregation", AGG_LAST);
-    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyAndWaitForPromQLQuery();
     const lastEntries = await pm.dashboardPanelActions.waitForPieLegendEntries((e) => e.length > 0);
 
     await pm.dashboardPanelConfigs.selectConfigOption("dashboard-config-aggregation", AGG_COUNT);
-    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyAndWaitForPromQLQuery();
     const lastByName = Object.fromEntries(lastEntries.map((e) => [e.name, e.value]));
     const countEntries = await pm.dashboardPanelActions.waitForPieLegendEntries(
       (e) => e.some((entry) => entry.value !== lastByName[entry.name])
     );
     testLogger.info("Range slices under Last and Count", { lastEntries, countEntries });
-    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     await pm.dashboardPromQLEditor.selectQueryType("Instant");
     await pm.dashboardPanelConfigs.expectAggregationVisible(false);
-    await pm.dashboardPanelActions.applyDashboardBtn();
-
-    const countByName = Object.fromEntries(countEntries.map((e) => [e.name, e.value]));
-    // Wait for the Instant render to replace the Count one; the stale Count values already pass the >= check.
-    const instantEntries = await pm.dashboardPanelActions.waitForPieLegendEntries(
-      (e) => e.some((entry) => entry.value !== countByName[entry.name])
+    // An instant query is sent to query_range with start equal to end.
+    const instantResponse = await pm.dashboardPanelActions.applyAndWaitForPromQLQuery(
+      (url) => url.searchParams.get("start") !== null && url.searchParams.get("start") === url.searchParams.get("end")
     );
+    const instantSamples = await pm.dashboardPanelActions.promqlSampleValues(instantResponse);
+    testLogger.info("Instant query samples", { instantSamples });
+    expect(instantSamples.length, "instant query returned samples").toBeGreaterThan(0);
+
+    // The final render lands after the query completes, so wait until the slices carry exactly this response's samples.
+    const instantEntries = await pm.dashboardPanelActions.waitForPieLegendEntries((e) => {
+      const values = e.map((entry) => entry.value).sort((a, b) => a - b);
+      return values.length === instantSamples.length && values.every((v, i) => Math.abs(v - instantSamples[i]) < 1e-9);
+    });
     testLogger.info("Instant slices with Count still saved", { instantEntries });
     for (const entry of instantEntries) {
       expect(entry.value, `instant slice ${entry.name} must not be reduced by the saved Count`).toBeGreaterThanOrEqual(MIN_SEEDED_CPU);

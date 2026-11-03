@@ -409,10 +409,14 @@ test.describe("Pre-Test Cleanup", () => {
       [
         /^sdr_traces_/,                // sdr_traces_* (traces SDR test streams: redact/drop/hash × ingestion/query)
         /^trace_genai_parts_/,         // trace_genai_parts_* (GenAI v5 parts rendering test streams)
+        /^e2e_prof_trace_/,            // Profiles/profiles-navigation-entry.spec.js linked-span traces stream
       ],
       ['default'],                     // protect the default traces stream
       { streamType: 'traces' }
     );
+
+    // Profiles specs delete their e2e_prof_* streams in afterAll; this sweeps what a crashed run left behind.
+    await pm.apiCleanup.cleanupStreams([/^e2e_prof_/], ['default'], { streamType: 'profiles' });
 
     // Note: Pipeline regression test streams (e2e_test_cpu_usage for metrics, e2e_test_traces for traces)
     // are created by pipeline-regression.spec.js for Issue #9901 regression tests.
@@ -458,11 +462,6 @@ test.describe("Pre-Test Cleanup", () => {
     // This avoids conflicts both within a test run (parallelIndex) and across test runs (testRunId)
     // The cleanup patterns above will clean up old test streams via regex matching
 
-    // Clean up test semantic groups created by correlation settings tests
-    // Groups: k8s-cluster, k8s-namespace, k8s-deployment, service
-    // These are created by ensureSemanticGroupsExist() in correlationSettingsPage.js
-    await pm.apiCleanup.cleanupCorrelationSettings();
-
     // Clean up service graph test screenshots
     const path = require('path');
     const screenshotDir = path.join(__dirname, '..', 'test-results', 'screenshots');
@@ -494,6 +493,9 @@ test.describe("Pre-Test Cleanup", () => {
     // Enterprise-only (rbac_enabled): on an OSS build /roles answers 4xx, so this skips
     // quietly rather than failing the cleanup every other suite depends on.
     await pm.apiCleanup.cleanupIamArtifacts('ui_auto');
+
+    // Fleet management leftovers (Fleet/*.spec.js); enterprise-only, quiet on OSS.
+    await pm.apiCleanup.cleanupFleetArtifacts(['fl_auto_'], ['fl-auto-']);
 
     testLogger.info('Pre-test cleanup completed successfully');
   });

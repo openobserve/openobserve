@@ -26,7 +26,9 @@ use axum::{
 use config::get_config;
 use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
-#[cfg(feature = "profiling")]
+#[cfg(feature = "cloud")]
+use openobserve_api_management::request::org_domains;
+#[cfg(feature = "cpu-profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
@@ -89,7 +91,13 @@ use crate::{
 
 pub mod decompression;
 pub mod middlewares;
+#[cfg(all(test, feature = "enterprise"))]
+mod one_ack_oncall_off_tests;
+#[cfg(all(test, feature = "enterprise"))]
+mod one_ack_tests;
 pub mod openapi;
+#[cfg(test)]
+mod openapi_coverage;
 
 use common::meta::http::ERROR_HEADER;
 
@@ -952,12 +960,14 @@ pub fn basic_routes() -> Router {
     router = router.nest("/node", node_routes);
 
     // Debug/profiling routes with auth
-    #[cfg(feature = "profiling")]
+    #[cfg(feature = "cpu-profiling")]
     {
-        let debug_routes = Router::new()
+        let debug_routes = Router::new().route("/profile/cpu", get(profiling::cpu_profile));
+        #[cfg(feature = "profiling")]
+        let debug_routes = debug_routes
             .route("/profile/memory", get(profiling::memory_profile))
-            .route("/profile/stats", get(profiling::jemalloc_stats))
-            .route("/profile/cpu", get(profiling::cpu_profile))
+            .route("/profile/stats", get(profiling::jemalloc_stats));
+        let debug_routes = debug_routes
             .layer(middleware::from_fn(password_policy_middleware))
             .layer(middleware::from_fn(auth_middleware));
 
@@ -1259,6 +1269,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/streams/{stream_name}/data_by_time_range", delete(stream::delete_stream_data_by_time_range))
         .route("/{org_id}/streams/{stream_name}/data_by_time_range/status/{id}", get(stream::get_delete_stream_data_status))
         .route("/{org_id}/metrics/{metric_name}/usage", get(metrics_usage::get_metric_usage))
+        .route("/{org_id}/metrics/usage", get(metrics_usage::get_org_metric_usage))
 
         // Logs ingestion
         .route("/{org_id}/_bulk", post(logs::ingest::bulk))
@@ -1376,7 +1387,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/savedviews", get(search::saved_view::get_views).post(search::saved_view::create_view))
         .route("/{org_id}/savedviews/{view_id}", get(search::saved_view::get_view).put(search::saved_view::update_view).delete(search::saved_view::delete_view))
 
-        .route("/{org_id}/query_history", get(query_history::list).post(query_history::record).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
+        .route("/{org_id}/query_history", get(query_history::list).post(query_history::record).delete(query_history::clear).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
         .route("/{org_id}/query_history/{id}", patch(query_history::star).delete(query_history::delete).layer(DefaultBodyLimit::max(query_history::MAX_BODY_BYTES)))
 
         // Functions
@@ -1476,6 +1487,8 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume", post(alerts::incidents::resume_incident_rca_run))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary", get(alerts::incidents::get_incident_rca_summary))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/acknowledge", post(alerts::ack::ack_incident))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/unacknowledge", post(alerts::ack::unack_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
         .route("/v2/{org_id}/incidents/integrations", get(alerts::incident_integrations::list_integrations).post(alerts::incident_integrations::create_integration))
@@ -1499,6 +1512,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/alerts/destinations/prebuilt", get(alerts::destinations::list_prebuilt_destinations))
         .route("/{org_id}/alerts/destinations/{destination_name}", get(alerts::destinations::get_destination).put(alerts::destinations::update_destination).delete(alerts::destinations::delete_destination))
         .route("/{org_id}/alerts/destinations/test", post(alerts::destinations::test_destination))
+        .route("/{org_id}/alerts/destinations/jira/setup", post(alerts::destinations::jira_setup))
         .route("/{org_id}/alerts/destinations/{destination_name}/test_send", post(alerts::destinations::test_send))
         .route("/{org_id}/alerts/destinations/bulk", delete(alerts::destinations::delete_destination_bulk))
 
@@ -2172,6 +2186,18 @@ pub fn service_routes() -> Router {
             )
             .route("/{org_id}/billing_group/members", get(billing_group::check_members))
             .route(
+                "/{org_id}/settings/domains",
+                get(org_domains::get_linked_domain).post(org_domains::link_domain)
+            )
+            .route("/{org_id}/settings/domains/requests",post(org_domains::raise_request).get(org_domains::list_requests))
+            .route("/{org_id}/settings/domain/request/{id}/approve",post(org_domains::approve_request))
+            .route("/{org_id}/settings/domain/request/{id}/reject",post(org_domains::reject_request))
+            .route("/{org_id}/settings/domains/{domain}",delete(org_domains::delete_linked_domain))
+            .route(
+                "/{org_id}/settings/domains/verify/{domain}",
+                post(org_domains::verify_domain),
+            )
+            .route(
                 "/{org_id}/billing_group/members/{member_org_id}",
                 delete(billing_group::remove_member),
             );
@@ -2306,6 +2332,11 @@ fn oncall_routes(router: Router) -> Router {
             "/{org_id}/oncall/teams/{team_id}/channel",
             get(oncall::get_team_channel).put(oncall::set_team_channel),
         )
+        // RO-6: one plain test message in the team's Slack channel; on-call PUT (RB-2).
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/slack/test",
+            post(oncall::test_team_slack_channel),
+        )
         // Derived on every read, never stored: a saved list argues with the config beside it.
         .route(
             "/{org_id}/oncall/teams/{team_id}/reachability",
@@ -2373,6 +2404,10 @@ fn oncall_routes(router: Router) -> Router {
         .route(
             "/{org_id}/oncall/responses/{response_id}/acknowledge",
             post(oncall::acknowledge_response),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/unacknowledge",
+            post(oncall::unacknowledge_response),
         )
         .route(
             "/{org_id}/oncall/responses/{response_id}/snooze",
@@ -2571,7 +2606,7 @@ fn fleet_router() -> Router {
         .route_layer(middleware::from_fn(fleet_gate))
 }
 
-/// §17: with `O2_FLEET_ENABLED` off, OpAMP answers 503 and management reads work but writes do not.
+/// §17: with `O2_FLEET_ENABLED` off, auth refuses fleet tokens first (401); writes get 503.
 #[cfg(feature = "enterprise")]
 async fn fleet_gate(request: Request, next: Next) -> Response {
     if openobserve_core::fleet::enabled() || request.method() == Method::GET && !is_opamp(&request)
@@ -3826,12 +3861,17 @@ mod tests {
             "the editors need the suggest mode before the authenticated config arrives"
         );
 
-        // build_type (enterprise/cloud/opensource) is not sensitive and the o2
-        // CLI + o2-operator read it from this unauthenticated endpoint to gate
-        // enterprise commands — it must stay a real build-type token.
+        // The o2 CLI and o2-operator gate enterprise commands on this unauthenticated field.
+        let expected_build_type = if cfg!(feature = "cloud") {
+            "cloud"
+        } else if cfg!(feature = "enterprise") {
+            "enterprise"
+        } else {
+            "opensource"
+        };
         assert_eq!(
             payload.get("build_type").and_then(Value::as_str),
-            Some("opensource"),
+            Some(expected_build_type),
             "bootstrap build_type must carry the real build kind"
         );
 
@@ -4356,6 +4396,37 @@ mod tests {
         );
     }
 
+    #[test]
+    fn jira_setup_is_published_with_its_403() {
+        let spec = serde_json::to_value(super::openapi::ApiDoc::openapi()).unwrap();
+        let post = &spec["paths"]["/api/{org_id}/alerts/destinations/jira/setup"]["post"];
+        assert_eq!(post["operationId"], "JiraDestinationSetup", "{post}");
+        assert!(post["responses"]["403"].is_object(), "{post}");
+    }
+
+    #[test]
+    fn query_history_list_publishes_both_response_shapes() {
+        let spec = serde_json::to_value(super::openapi::ApiDoc::openapi()).unwrap();
+        let ok = &spec["paths"]["/api/{org_id}/query_history"]["get"]["responses"]["200"];
+        assert_eq!(
+            ok["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/QueryHistoryListResponse"
+        );
+        let shapes = spec["components"]["schemas"]["QueryHistoryListResponse"]["oneOf"]
+            .as_array()
+            .expect("the list response is a oneOf");
+        let shapes = serde_json::to_string(shapes).unwrap();
+        assert!(
+            shapes.contains("#/components/schemas/QueryHistoryEntry"),
+            "{shapes}"
+        );
+        assert!(shapes.contains("\"type\":\"array\""), "{shapes}");
+        assert!(
+            shapes.contains("#/components/schemas/QueryHistoryCountResponse"),
+            "{shapes}"
+        );
+    }
+
     #[cfg(feature = "enterprise")]
     #[test]
     fn experiment_lifecycle_actions_are_published_in_the_openapi_surface() {
@@ -4802,6 +4873,26 @@ mod tests {
         assert_eq!(post.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
+    #[test]
+    fn org_metric_usage_route_is_registered_and_published() {
+        assert!(
+            service_routes_registrations().contains(
+                r#".route("/{org_id}/metrics/usage",get(metrics_usage::get_org_metric_usage))"#
+            ),
+            "GET /{{org_id}}/metrics/usage must be registered in service_routes()"
+        );
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/metrics/usage")
+            .expect("org metric usage is missing from the OpenAPI surface");
+        assert_eq!(
+            path.get.as_ref().and_then(|op| op.operation_id.as_deref()),
+            Some("GetOrgMetricUsage")
+        );
+    }
+
     #[tokio::test]
     async fn rca_steer_route_refuses_put_and_delete() {
         const STEER_PATH: &str =
@@ -5140,8 +5231,10 @@ mod tests {
             "POST /v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/cancel",
             "POST /v2/{org_id}/alerts/{alert_id}/mute/{downtime_id}/extend",
             "POST /v2/{org_id}/alerts/{alert_id}/unack",
+            "POST /{org_id}/oncall/responses/{response_id}/acknowledge",
             "POST /{org_id}/oncall/responses/{response_id}/resolve",
             "POST /{org_id}/oncall/responses/{response_id}/snooze",
+            "POST /{org_id}/oncall/responses/{response_id}/unacknowledge",
         ];
         assert_eq!(scope_allows(in_slack_action_scope), sorted(&expected));
     }
@@ -5258,8 +5351,6 @@ mod tests {
         "GET /api/{org_id}/folders/{folder_id}",
         "POST /api/{org_id}/folders",
         "PUT /api/{org_id}/folders/{folder_id}",
-        // o2-enterprise rbac_known_gaps.txt keys this path; fixing it needs a paired change there.
-        "POST /{org_id}/service_streams/_correlate",
     ];
 
     #[cfg(feature = "enterprise")]
@@ -5275,7 +5366,13 @@ mod tests {
     /// An unrouted documented path meets the auth layer's 401, failing its MCP tool.
     #[tokio::test]
     async fn every_openapi_operation_reaches_the_route_it_documents() {
-        let app = local_routes().route_layer(middleware::from_fn(
+        // On-call is mounted only when enabled at runtime; the spec documents it regardless.
+        let routes = if get_o2_config().oncall.enabled {
+            local_routes()
+        } else {
+            local_routes().nest("/api", oncall_routes(Router::new()))
+        };
+        let app = routes.route_layer(middleware::from_fn(
             |req: Request<Body>, _next: Next| async move {
                 let matched = req
                     .extensions()

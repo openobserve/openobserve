@@ -834,6 +834,7 @@ test.describe("dashboard UI testcases", () => {
         );
         return chartElement && chartElement.hasAttribute("_echarts_instance_");
       },
+      undefined,
       { timeout: 15000 }
     );
 

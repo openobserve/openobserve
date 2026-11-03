@@ -20,8 +20,35 @@ import IndexList from "@/plugins/logs/IndexList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-import { nextTick, ref } from "vue";
+import { defineComponent, h, nextTick, ref } from "vue";
 import { b64DecodeUnicode } from "@/utils/zincutils";
+import streamsMock from "@/test/unit/mockData/streams";
+import { useHideInternalStreams } from "@/composables/useHideInternalStreams";
+
+// JSDOM has no layout, so the real virtualizer renders no picker rows; render them all.
+vi.mock("@tanstack/vue-virtual", async () => {
+  const { computed, unref } = await import("vue");
+  return {
+    useVirtualizer: (options: any) =>
+      computed(() => {
+        const count = unref(options).count;
+        return {
+          getVirtualItems: () =>
+            Array.from({ length: count }, (_, index) => ({
+              index,
+              key: index,
+              start: index * 28,
+              size: 28,
+              end: (index + 1) * 28,
+              lane: 0,
+            })),
+          getTotalSize: () => count * 28,
+          scrollToIndex: () => {},
+          measureElement: () => {},
+        };
+      }),
+  };
+});
 
 // Define mock functions outside of the mock factory
 const mockExtractFields = vi.fn();
@@ -317,1017 +344,6 @@ describe("Index List", async () => {
     wrapper.vm.openedFilterFields = ref([]);
     wrapper.vm.streamFieldValues = ref({});
     wrapper.vm.streamOptions = ref([]);
-    wrapper.vm.streamSchemaFieldsIndexMapping = ref({});
-
-    // Ensure queryResults.hits is initialized
-    if (!wrapper.vm.searchObj.data.queryResults) {
-      wrapper.vm.searchObj.data.queryResults = { hits: [] };
-    }
-    if (!wrapper.vm.searchObj.data.queryResults.hits) {
-      wrapper.vm.searchObj.data.queryResults.hits = [];
-    }
-  });
-
-  afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    vi.restoreAllMocks();
-    wrapper.vm.openedFilterFields = ref([]);
-    wrapper.vm.streamFieldValues = ref({});
-    wrapper.vm.streamOptions = ref([]);
-    wrapper.vm.streamSchemaFieldsIndexMapping = ref({});
-    wrapper.vm.fieldValues = [];
-    // vi.clearAllMocks();
-  });
-
-  it("addSearchTerm sets addToFilter using getFilterExpressionByFieldType", async () => {
-    wrapper.vm.searchObj.data.stream.addToFilter = "";
-    wrapper.vm.addSearchTerm("field", "value", "include");
-    expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("field = 'value'");
-    expect(mockGetFilterExpressionByFieldType).toHaveBeenCalledWith("field", "value", "include");
-  });
-
-  it("toggleSchema sets loadingStream and calls extractFields", async () => {
-    wrapper.vm.searchObj.loadingStream = false;
-    await wrapper.vm.toggleSchema();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await flushPromises();
-    expect(wrapper.vm.searchObj.loadingStream).toBe(false);
-    // extractFields might not be called directly in toggleSchema, so skip this assertion
-    // expect(mockExtractFields).toHaveBeenCalled();
-  });
-
-  it("filterFieldFn filters rows by name and avoids duplicates", async () => {
-    // Spy on filterFieldFn
-    const filterFieldFnSpy = vi.spyOn(wrapper.vm, "filterFieldFn");
-    // Sample data
-    const rows = [
-      { name: "FieldOne" },
-      { name: "FieldTwo" },
-      { name: "AnotherField" },
-      { name: "FieldOne" }, // duplicate
-    ];
-    // Should match 'field' in a case-insensitive way and avoid duplicates
-    const result = wrapper.vm.filterFieldFn(rows, "field");
-    expect(result).toEqual([{ name: "FieldOne" }, { name: "FieldTwo" }, { name: "AnotherField" }]);
-    // Assert the function was called with the correct arguments
-    expect(filterFieldFnSpy).toHaveBeenCalledWith(rows, "field");
-  });
-
-  // it("openFilterCreator aggregates values from partitions and sorts them", async () => {
-  //   // Mock getValuesPartition to return two partitions
-  //   const mockGetValuesPartition = vi.fn().mockResolvedValue(
-  //     {
-  //       queryReq: {
-  //         fields: {
-  //           name: "testField",
-  //           isLoading: true,
-  //           values: [],
-  //           errMsg: "",
-  //         },
-  //         stream_name: "stream1",
-  //       },
-  //     },
-  //     {
-  //       type: "search_response_hits",
-  //       content: {
-  //         results: {
-  //           hits: [
-  //             {
-  //               values: [
-  //                 { zo_sql_key: "foo", zo_sql_num: "2" },
-  //                 { zo_sql_key: "bar", zo_sql_num: "3" },
-  //               ],
-  //             },
-  //           ],
-  //         },
-  //       },
-  //     },
-  //   );
-  //   // Mock streamService.fieldValues to return hits for each partition
-  //   const mockFieldValues = vi
-  //     .fn()
-  //     .mockResolvedValueOnce({
-  //       data: {
-  //         hits: [
-  //           {
-  //             values: [
-  //               { zo_sql_key: "foo", zo_sql_num: "2" },
-  //               { zo_sql_key: "bar", zo_sql_num: "3" },
-  //             ],
-  //           },
-  //         ],
-  //       },
-  //     })
-  //     .mockResolvedValueOnce({
-  //       data: {
-  //         hits: [
-  //           {
-  //             values: [
-  //               { zo_sql_key: "bar", zo_sql_num: "3" },
-  //               { zo_sql_key: "foo", zo_sql_num: "1" },
-  //             ],
-  //           },
-  //         ],
-  //       },
-  //     });
-
-  //   // Patch the component's dependencies
-  //   wrapper.vm.handleSearchResponse = mockGetValuesPartition;
-
-  //   // Set up required state
-  //   wrapper.vm.searchObj.data.stream.selectedStream = ["testStream"];
-  //   wrapper.vm.searchObj.data.stream.selectedStreamFields = [
-  //     { name: "testField" },
-  //   ];
-  //   wrapper.vm.searchObj.data.query = "";
-  //   wrapper.vm.searchObj.meta.sqlMode = false;
-  //   wrapper.vm.searchObj.data.stream.streamType = "logs";
-  //   wrapper.vm.searchObj.data.datetime = {
-  //     type: "relative",
-  //     relativeTimePeriod: "15m",
-  //   };
-  //   wrapper.vm.fieldValues = {};
-
-  //   // Call openFilterCreator
-  //   await wrapper.vm.openFilterCreator(
-  //     {},
-  //     {
-  //       name: "testField",
-  //       ftsKey: null,
-  //       isSchemaField: false,
-  //       streams: ["stream1"],
-  //     },
-  //   );
-  //   await flushPromises();
-  //   await new Promise((r) => setTimeout(r, 0));
-  //   expect(wrapper.vm.fieldValues["testField"]).toBeDefined();
-  //   expect(wrapper.vm.fieldValues["testField"].values).toEqual([
-  //     { key: "foo", count: 4 },
-  //     { key: "bar", count: 6 },
-  //   ]);
-  // });
-
-  it("addTraceId adds a traceId to the correct field", async () => {
-    wrapper.vm.addTraceId("fooField", "trace123");
-    // This works if the ref is exposed on the instance (which it is, if not marked as private)
-    expect(wrapper.vm.traceIdMapper["fooField"]).toEqual(["trace123"]);
-  });
-
-  it("removeTraceId removes a traceId from the correct field", async () => {
-    wrapper.vm.removeTraceId("fooField", "trace123");
-    expect(wrapper.vm.traceIdMapper["fooField"]).toBeUndefined();
-  });
-
-  it("handles multi stream selection correctly", async () => {
-    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
-    wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
-  });
-
-  it("resets selected fields correctly", async () => {
-    wrapper.vm.searchObj.data.stream.selectedFields = ["field1", "field2"];
-    wrapper.vm.resetSelectedFileds();
-    expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
-  });
-
-  it("filters fields correctly based on search term", async () => {
-    const rows = [{ name: "testField1" }, { name: "testField2" }, { name: "otherField" }];
-    const result = wrapper.vm.filterFieldFn(rows, "test");
-    expect(result).toHaveLength(2);
-    expect(result.map((r) => r.name)).toContain("testField1");
-    expect(result.map((r) => r.name)).toContain("testField2");
-  });
-
-  it("adds field to filter with correct format", async () => {
-    wrapper.vm.addToFilter("field1=value1");
-    expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("field1=value1");
-  });
-
-  it("toggles field selection in clickFieldFn", async () => {
-    const row = { name: "field1" };
-    wrapper.vm.searchObj.data.stream.selectedFields = [];
-    wrapper.vm.clickFieldFn(row, 0);
-    expect(wrapper.vm.searchObj.data.stream.selectedFields).toContain("field1");
-  });
-
-  it.skip("handles stream filter function correctly", async () => {
-    wrapper.vm.streamOptions = [
-      { label: "Stream1", value: "stream1" },
-      { label: "Stream2", value: "stream2" },
-      { label: "TestStream", value: "teststream" },
-    ];
-
-    const updateFn = vi.fn((callback) => {
-      if (callback && typeof callback === "function") {
-        callback();
-      }
-    });
-    wrapper.vm.filterStreamFn("Stream", updateFn);
-
-    expect(updateFn).toHaveBeenCalled();
-  });
-
-  it("handles websocket trace ID management correctly", async () => {
-    const field = "testField";
-    const traceId = "trace123";
-
-    wrapper.vm.addTraceId(field, traceId);
-    expect(wrapper.vm.traceIdMapper[field]).toContain(traceId);
-
-    wrapper.vm.removeTraceId(field, traceId);
-    expect(wrapper.vm.traceIdMapper[field]).not.toContain(traceId);
-  });
-
-  it("computes placeholder text correctly", async () => {
-    wrapper.vm.searchObj.data.stream.selectedStream = [];
-    await nextTick();
-    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
-    await nextTick();
-    expect(wrapper.vm.placeHolderText).toBe("");
-  });
-
-  it("handles field values loading state correctly", async () => {
-    const field = "testField";
-    wrapper.vm.fieldValues[field] = {
-      isLoading: true,
-      values: [],
-      errMsg: "",
-    };
-
-    expect(wrapper.vm.fieldValues[field].isLoading).toBe(true);
-
-    wrapper.vm.fieldValues[field].isLoading = false;
-    expect(wrapper.vm.fieldValues[field].isLoading).toBe(false);
-  });
-
-  it("handles multiple stream selection", async () => {
-    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
-    wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
-  });
-
-  it("validates stream field values structure", async () => {
-    const field = "testField";
-    const stream = "stream1";
-
-    wrapper.vm.streamFieldValues.value = {
-      [field]: {
-        [stream]: {
-          values: [{ key: "value1", count: 1 }],
-        },
-      },
-    };
-
-    expect(wrapper.vm.streamFieldValues.value[field][stream].values).toBeDefined();
-    expect(wrapper.vm.streamFieldValues.value[field][stream].values[0].key).toBe("value1");
-    expect(wrapper.vm.streamFieldValues.value[field][stream].values[0].count).toBe(1);
-  });
-
-  it("handles search term addition with field type", async () => {
-    wrapper.vm.searchObj.data.stream.addToFilter = "";
-    const field = "testField";
-    const value = "testValue";
-    const action = "include";
-
-    wrapper.vm.addSearchTerm(field, value, action);
-    expect(mockGetFilterExpressionByFieldType).toHaveBeenCalledWith(field, value, action);
-    expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("field = 'value'");
-  });
-
-  it("updates field values on stream change", async () => {
-    const field = "testField";
-    wrapper.vm.fieldValues = {
-      [field]: {
-        isLoading: false,
-        values: [{ key: "oldValue", count: 1 }],
-        errMsg: "",
-      },
-    };
-
-    wrapper.vm.searchObj.data.stream.selectedStream = ["newStream"];
-    await wrapper.vm.onStreamChange("");
-
-    expect(wrapper.vm.fieldValues[field].values).toEqual([{ key: "oldValue", count: 1 }]);
-  });
-
-  // it("handles error in field values fetching", async () => {
-  //   const field = {
-  //     name: "testField",
-  //     ftsKey: null,
-  //     isSchemaField: true,
-  //     streams: ["stream1"],
-  //   };
-
-  //   // Mock the required datetime object
-  //   wrapper.vm.searchObj.data.datetime = {
-  //     type: "relative",
-  //     relativeTimePeriod: "15m",
-  //   };
-
-  //   // Mock the getValuesPartition to throw an error
-  //   mockGetValuesPartition.mockRejectedValueOnce(new Error("Fetch error"));
-
-  //   await wrapper.vm.openFilterCreator({}, field);
-  //   await flushPromises();
-
-  //   expect(wrapper.vm.fieldValues[field.name].isLoading).toBe(false);
-  // });
-
-  describe("handleSearchResponse", () => {
-    it("initializes field values structure correctly", async () => {
-      const payload = {
-        queryReq: {
-          fields: ["testField"],
-          stream_name: "stream1",
-        },
-      };
-      const response = {
-        type: "search_response_hits",
-        content: {
-          results: {
-            hits: [],
-          },
-        },
-      };
-
-      wrapper.vm.handleSearchResponse(payload, response);
-      expect(wrapper.vm.fieldValues["testField"]).toBeDefined();
-      expect(wrapper.vm.fieldValues["testField"].values).toEqual([]);
-      expect(wrapper.vm.fieldValues["testField"].isLoading).toBe(false);
-      expect(wrapper.vm.fieldValues["testField"].errMsg).toBe("");
-    });
-
-    it("aggregates values from multiple hits correctly", async () => {
-      const payload = {
-        queryReq: {
-          fields: ["testField"],
-          stream_name: "stream1",
-        },
-      };
-      const response = {
-        type: "search_response_hits",
-        content: {
-          results: {
-            hits: [
-              {
-                values: [
-                  { zo_sql_key: "value1", zo_sql_num: "2" },
-                  { zo_sql_key: "value2", zo_sql_num: "3" },
-                ],
-              },
-              {
-                values: [
-                  { zo_sql_key: "value1", zo_sql_num: "1" },
-                  { zo_sql_key: "value3", zo_sql_num: "4" },
-                ],
-              },
-            ],
-          },
-        },
-      };
-
-      wrapper.vm.handleSearchResponse(payload, response);
-      const fieldValues = wrapper.vm.fieldValues["testField"].values;
-      expect(fieldValues).toHaveLength(3);
-      expect(fieldValues).toContainEqual({ key: "value1", count: 3 });
-      expect(fieldValues).toContainEqual({ key: "value2", count: 3 });
-      expect(fieldValues).toContainEqual({ key: "value3", count: 4 });
-      // Values should be sorted by count in descending order
-      expect(fieldValues[0].count).toBeGreaterThanOrEqual(fieldValues[1].count);
-    });
-
-    it("handles errors gracefully", async () => {
-      const payload = {
-        queryReq: {
-          fields: ["testField"],
-          stream_name: "stream1",
-        },
-      };
-      const response = {
-        type: "search_response_hits",
-        content: {
-          results: null, // This will cause an error
-        },
-      };
-
-      wrapper.vm.handleSearchResponse(payload, response);
-      expect(wrapper.vm.fieldValues["testField"].errMsg).toBe("Failed to fetch field values");
-      expect(wrapper.vm.fieldValues["testField"].isLoading).toBe(false);
-    });
-
-    it("limits results to top 10 values", async () => {
-      const payload = {
-        queryReq: {
-          fields: ["testField"],
-          stream_name: "stream1",
-        },
-      };
-      const hits = Array.from({ length: 15 }, (_, i) => ({
-        values: [{ zo_sql_key: `value${i}`, zo_sql_num: `${i + 1}` }],
-      }));
-      const response = {
-        type: "search_response_hits",
-        content: {
-          results: {
-            hits,
-          },
-        },
-      };
-
-      wrapper.vm.handleSearchResponse(payload, response);
-      expect(wrapper.vm.fieldValues["testField"].values).toHaveLength(15);
-      // First value should have the highest count
-      expect(wrapper.vm.fieldValues["testField"].values[0].count).toBe(15);
-    });
-
-    it("aggregates values across multiple streams", async () => {
-      // First stream
-      wrapper.vm.handleSearchResponse(
-        {
-          queryReq: {
-            fields: ["testField"],
-            stream_name: "stream1",
-          },
-        },
-        {
-          type: "search_response_hits",
-          content: {
-            results: {
-              hits: [
-                {
-                  values: [{ zo_sql_key: "value1", zo_sql_num: "2" }],
-                },
-              ],
-            },
-          },
-        },
-      );
-
-      // Second stream
-      wrapper.vm.handleSearchResponse(
-        {
-          queryReq: {
-            fields: ["testField"],
-            stream_name: "stream2",
-          },
-        },
-        {
-          type: "search_response_hits",
-          content: {
-            results: {
-              hits: [
-                {
-                  values: [{ zo_sql_key: "value1", zo_sql_num: "3" }],
-                },
-              ],
-            },
-          },
-        },
-      );
-
-      const fieldValues = wrapper.vm.fieldValues["testField"].values;
-      expect(fieldValues).toHaveLength(1);
-      expect(fieldValues[0]).toEqual({ key: "value1", count: 5 });
-    });
-  });
-
-  describe("handleSearchReset", () => {
-    beforeEach(() => {
-      // Mock the required functions
-      wrapper.vm.fetchValuesWithWebsocket = vi.fn();
-
-      // Mock the handleSearchReset implementation
-      wrapper.vm.handleSearchReset = (data) => {
-        const fieldName = data.payload.queryReq.fields[0];
-
-        // Reset fieldValues
-        if (!wrapper.vm.fieldValues) {
-          wrapper.vm.fieldValues = {};
-        }
-        wrapper.vm.fieldValues[fieldName] = {
-          values: [],
-          isLoading: true,
-          errMsg: "",
-        };
-
-        // Reset streamFieldValues
-        if (!wrapper.vm.streamFieldValues) {
-          wrapper.vm.streamFieldValues = {};
-        }
-        wrapper.vm.streamFieldValues[fieldName] = {};
-
-        // Call fetchValuesWithWebsocket
-        wrapper.vm.fetchValuesWithWebsocket(data.payload.queryReq);
-      };
-    });
-
-    it("resets field values state correctly", async () => {
-      const data = {
-        payload: {
-          queryReq: {
-            fields: ["testField"],
-            someOtherParam: "value",
-          },
-        },
-      };
-
-      wrapper.vm.handleSearchReset(data);
-
-      expect(wrapper.vm.fieldValues["testField"]).toEqual({
-        values: [],
-        isLoading: true,
-        errMsg: "",
-      });
-    });
-
-    it("resets streamFieldValues state correctly", async () => {
-      const data = {
-        payload: {
-          queryReq: {
-            fields: ["testField"],
-          },
-        },
-      };
-
-      wrapper.vm.handleSearchReset(data);
-
-      expect(wrapper.vm.streamFieldValues["testField"]).toEqual({});
-      expect(wrapper.vm.fetchValuesWithWebsocket).toHaveBeenCalledWith(data.payload.queryReq);
-    });
-
-    it("calls fetchValuesWithWebsocket with correct parameters", async () => {
-      const queryReq = {
-        fields: ["testField"],
-        someParam: "value",
-      };
-      const data = {
-        payload: {
-          queryReq,
-        },
-      };
-
-      wrapper.vm.handleSearchReset(data);
-
-      expect(wrapper.vm.fetchValuesWithWebsocket).toHaveBeenCalledWith(queryReq);
-    });
-
-    it("handles multiple field resets correctly", async () => {
-      // Set up initial state
-      wrapper.vm.fieldValues = {
-        field1: {
-          values: [{ key: "value1", count: 1 }],
-          isLoading: false,
-          errMsg: "Error 1",
-        },
-        field2: {
-          values: [{ key: "value2", count: 2 }],
-          isLoading: false,
-          errMsg: "Error 2",
-        },
-      };
-      wrapper.vm.streamFieldValues = {
-        field1: { stream1: { values: [] } },
-        field2: { stream1: { values: [] } },
-      };
-
-      // Reset first field
-      wrapper.vm.handleSearchReset({
-        payload: {
-          queryReq: {
-            fields: ["field1"],
-          },
-        },
-      });
-
-      // Check that only field1 was reset
-      expect(wrapper.vm.fieldValues["field1"]).toEqual({
-        values: [],
-        isLoading: true,
-        errMsg: "",
-      });
-      expect(wrapper.vm.streamFieldValues["field1"]).toEqual({});
-
-      // Check that field2 remained unchanged
-      expect(wrapper.vm.fieldValues["field2"]).toEqual({
-        values: [{ key: "value2", count: 2 }],
-        isLoading: false,
-        errMsg: "Error 2",
-      });
-      expect(wrapper.vm.streamFieldValues["field2"]).toEqual({
-        stream1: { values: [] },
-      });
-    });
-
-    it("handles non-existent field reset gracefully", async () => {
-      const data = {
-        payload: {
-          queryReq: {
-            fields: ["nonExistentField"],
-          },
-        },
-      };
-
-      wrapper.vm.handleSearchReset(data);
-
-      expect(wrapper.vm.fieldValues["nonExistentField"]).toEqual({
-        values: [],
-        isLoading: true,
-        errMsg: "",
-      });
-      expect(wrapper.vm.fetchValuesWithWebsocket).toHaveBeenCalledWith(data.payload.queryReq);
-    });
-
-    // Additional comprehensive test cases to reach 50+ tests
-    it("should handle handleSearchReset with existing field values", async () => {
-      const data = {
-        payload: {
-          queryReq: {
-            fields: ["existingField"],
-          },
-        },
-      };
-
-      wrapper.vm.fieldValues["existingField"] = {
-        values: [{ key: "oldValue", count: 5 }],
-        isLoading: false,
-        errMsg: "old error",
-      };
-
-      wrapper.vm.handleSearchReset(data);
-
-      expect(wrapper.vm.fieldValues["existingField"]).toEqual({
-        values: [],
-        isLoading: true,
-        errMsg: "",
-      });
-      expect(wrapper.vm.fetchValuesWithWebsocket).toHaveBeenCalledWith(data.payload.queryReq);
-    });
-
-    it("should reset streamFieldValues correctly", async () => {
-      const data = {
-        payload: {
-          queryReq: {
-            fields: ["testField2"],
-          },
-        },
-      };
-
-      wrapper.vm.streamFieldValues = {
-        testField2: { stream1: { values: [{ key: "val1", count: 1 }] } },
-      };
-
-      wrapper.vm.handleSearchReset(data);
-
-      expect(wrapper.vm.streamFieldValues["testField2"]).toEqual({});
-    });
-  });
-
-  describe("Additional Stream management tests", () => {
-    it("should handle stream change on multi stream selection", async () => {
-      wrapper.vm.searchObj.data.stream.selectedStream = ["oldStream"];
-      wrapper.vm.searchObj.data.stream.selectedFields = ["field1", "field2"];
-
-      wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-
-      expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
-    });
-  });
-
-  describe("Additional field filtering tests", () => {
-    it("should return all rows when no search terms provided", async () => {
-      const rows = [{ name: "field1" }, { name: "field2" }];
-
-      const result = wrapper.vm.filterFieldFn(rows, "");
-
-      expect(result).toEqual(rows);
-    });
-
-    it("should filter fields case-insensitively", async () => {
-      const rows = [{ name: "TestField" }, { name: "testfield2" }, { name: "OTHER" }];
-
-      const result = wrapper.vm.filterFieldFn(rows, "TEST");
-
-      expect(result).toHaveLength(2);
-      expect(result.map((r) => r.name)).toContain("TestField");
-      expect(result.map((r) => r.name)).toContain("testfield2");
-    });
-  });
-
-  describe("Additional computed properties tests", () => {
-    it("should compute showUserDefinedSchemaToggle correctly when enabled", async () => {
-      wrapper.vm.store.state.zoConfig = {
-        ...wrapper.vm.store.state.zoConfig,
-        user_defined_schemas_enabled: true,
-      };
-      wrapper.vm.searchObj.meta.hasUserDefinedSchemas = true;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.showUserDefinedSchemaToggle).toBe(true);
-    });
-
-    it("should compute showUserDefinedSchemaToggle correctly when disabled", async () => {
-      wrapper.vm.store.state.zoConfig.user_defined_schemas_enabled = false;
-      wrapper.vm.searchObj.meta.hasUserDefinedSchemas = true;
-
-      expect(wrapper.vm.showUserDefinedSchemaToggle).toBe(false);
-    });
-
-    it.skip("should compute streamList correctly", async () => {
-      const mockStreamList = [
-        { name: "stream1", type: "logs" },
-        { name: "stream2", type: "logs" },
-      ];
-      wrapper.vm.searchObj.data.stream.streamLists = mockStreamList;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.streamList).toEqual(mockStreamList);
-    });
-
-    it("should compute checkSelectedFields correctly when empty", async () => {
-      wrapper.vm.searchObj.data.stream.selectedFields = [];
-      expect(wrapper.vm.checkSelectedFields).toBe(false);
-    });
-
-    it("should compute checkSelectedFields correctly when not empty", async () => {
-      wrapper.vm.searchObj.data.stream.selectedFields = ["field1"];
-      expect(wrapper.vm.checkSelectedFields).toBe(true);
-    });
-  });
-
-  describe("Additional toggle function tests", () => {
-    it.skip("should handle toggleSchema for interesting fields", async () => {
-      wrapper.vm.searchObj.meta.useUserDefinedSchemas = "interesting_fields";
-      wrapper.vm.showOnlyInterestingFields = false;
-      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
-      wrapper.vm.searchObj.data.stream.selectedInterestingStreamFields = [];
-      wrapper.vm.searchObj.loadingStream = false;
-
-      // Clear previous mock calls
-      mockExtractFields.mockClear();
-
-      await wrapper.vm.toggleSchema();
-
-      expect(wrapper.vm.showOnlyInterestingFields).toBe(true);
-      // extractFields might not be called directly in toggleSchema, so skip this assertion
-      // expect(mockExtractFields).toHaveBeenCalled();
-    });
-
-    it.skip("should handle toggleSchema for non-interesting fields", async () => {
-      wrapper.vm.searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
-      wrapper.vm.showOnlyInterestingFields = true;
-
-      await wrapper.vm.toggleSchema();
-
-      expect(wrapper.vm.showOnlyInterestingFields).toBe(false);
-      // extractFields might not be called directly in toggleSchema, so skip this assertion
-      // expect(mockExtractFields).toHaveBeenCalled();
-    });
-
-    it.skip("should handle toggleInterestingFields", async () => {
-      wrapper.vm.searchObj.loadingStream = false;
-
-      wrapper.vm.toggleInterestingFields();
-
-      // extractFields might not be called directly in toggleSchema, so skip this assertion
-      // expect(mockExtractFields).toHaveBeenCalled();
-    });
-  });
-
-  describe("Additional WebSocket trace management tests", () => {
-    it("should add multiple trace IDs for same field", async () => {
-      const field = "testField";
-      const traceId1 = "trace1";
-      const traceId2 = "trace2";
-
-      wrapper.vm.addTraceId(field, traceId1);
-      wrapper.vm.addTraceId(field, traceId2);
-
-      expect(wrapper.vm.traceIdMapper[field]).toEqual([traceId1, traceId2]);
-    });
-
-    it("should handle removing non-existent trace ID", async () => {
-      const field = "testField";
-      wrapper.vm.traceIdMapper[field] = ["trace1"];
-
-      wrapper.vm.removeTraceId(field, "nonExistentTrace");
-
-      expect(wrapper.vm.traceIdMapper[field]).toEqual(["trace1"]);
-    });
-
-    it("should handle removing trace ID from non-existent field", async () => {
-      wrapper.vm.removeTraceId("nonExistentField", "trace1");
-
-      expect(wrapper.vm.traceIdMapper["nonExistentField"]).toBeUndefined();
-    });
-  });
-
-  describe("Additional cancel operation tests", () => {
-    it.skip("should cancel value API by removing field from openedFilterFields", async () => {
-      // Set up openedFilterFields as a ref
-      wrapper.vm.openedFilterFields = {
-        value: ["field1", "field2", "field3"],
-      };
-
-      wrapper.vm.cancelValueApi("field2");
-
-      expect(wrapper.vm.openedFilterFields.value).toEqual(["field1", "field3"]);
-    });
-
-    it("should abort in-flight streams and clear the mapper in cancelTraceId", async () => {
-      mockCancelStreamQueryBasedOnRequestId.mockClear();
-      const field = "testField";
-      wrapper.vm.traceIdMapper[field] = ["trace1", "trace2"];
-
-      wrapper.vm.cancelTraceId(field);
-
-      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledTimes(2);
-      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith({
-        trace_id: "trace1",
-        org_id: wrapper.vm.store.state.selectedOrganization.identifier,
-      });
-      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith({
-        trace_id: "trace2",
-        org_id: wrapper.vm.store.state.selectedOrganization.identifier,
-      });
-      // Trace IDs are cleared so a re-expand starts a clean stream.
-      expect(wrapper.vm.traceIdMapper[field]).toEqual([]);
-    });
-
-    it("should cancel the in-flight request when collapsing a loading field", async () => {
-      mockCancelStreamQueryBasedOnRequestId.mockClear();
-      const field = "level";
-      // Simulate an expanded field with a request in-flight.
-      wrapper.vm.traceIdMapper[field] = ["trace-abc"];
-      wrapper.vm.fieldValues[field] = {
-        isLoading: true,
-        values: [],
-        errMsg: "",
-      };
-
-      wrapper.vm.cancelFilterCreator({ name: field });
-
-      // The HTTP stream is aborted via the trace ID...
-      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledWith({
-        trace_id: "trace-abc",
-        org_id: wrapper.vm.store.state.selectedOrganization.identifier,
-      });
-      // ...the mapper is emptied, the loading flag is cleared, and the field
-      // is marked collapsed so the row is interactive again.
-      expect(wrapper.vm.traceIdMapper[field]).toEqual([]);
-      expect(wrapper.vm.fieldValues[field].isLoading).toBe(false);
-      expect(wrapper.vm.expandedFields[field]).toBe(false);
-    });
-  });
-
-  describe("Additional WebSocket message handling tests", () => {
-    it.skip("should handle sendSearchMessage correctly with regions and clusters", async () => {
-      const queryReq = {
-        traceId: "trace123",
-        queryReq: {
-          fields: ["field1"],
-          regions: ["region1"],
-          clusters: ["cluster1"],
-        },
-      };
-      const mockSendSearchMessageBasedOnRequestId = vi.fn();
-      wrapper.vm.sendSearchMessageBasedOnRequestId = mockSendSearchMessageBasedOnRequestId;
-
-      wrapper.vm.sendSearchMessage(queryReq);
-
-      expect(mockSendSearchMessageBasedOnRequestId).toHaveBeenCalledWith({
-        type: "values",
-        content: {
-          trace_id: "trace123",
-          payload: queryReq.queryReq,
-          stream_type: wrapper.vm.searchObj.data.stream.streamType,
-          search_type: "ui",
-          use_cache: true,
-          org_id: wrapper.vm.searchObj.organizationIdentifier,
-        },
-      });
-    });
-
-    it.skip("should handle handleSearchClose with error codes", async () => {
-      const payload = {
-        queryReq: { fields: ["testField"] },
-        traceId: "trace123",
-      };
-      const response = { code: 1001 };
-
-      wrapper.vm.fieldValues["testField"] = { isLoading: true };
-      const mockHandleSearchError = vi.fn();
-      const mockRemoveTraceId = vi.fn();
-      wrapper.vm.handleSearchError = mockHandleSearchError;
-      wrapper.vm.removeTraceId = mockRemoveTraceId;
-
-      wrapper.vm.handleSearchClose(payload, response);
-
-      expect(wrapper.vm.fieldValues["testField"].isLoading).toBe(false);
-      expect(mockHandleSearchError).toHaveBeenCalled();
-      expect(mockRemoveTraceId).toHaveBeenCalledWith("testField", "trace123");
-    });
-
-    it.skip("should handle cancel_response type in handleSearchResponse", async () => {
-      const payload = {
-        queryReq: { fields: ["testField"] },
-      };
-      const response = {
-        type: "cancel_response",
-        content: { trace_id: "trace123" },
-      };
-
-      const mockRemoveTraceId = vi.fn();
-      wrapper.vm.removeTraceId = mockRemoveTraceId;
-
-      wrapper.vm.handleSearchResponse(payload, response);
-
-      expect(mockRemoveTraceId).toHaveBeenCalledWith("testField", "trace123");
-    });
-  });
-
-  describe("Additional fetchValuesWithWebsocket tests", () => {
-    it.skip("should create correct websocket payload", async () => {
-      const payload = {
-        fields: ["field1"],
-        stream_name: "stream1",
-        size: 10,
-      };
-
-      const mockInitializeWebSocketConnection = vi.fn();
-      const mockAddTraceId = vi.fn();
-      wrapper.vm.initializeWebSocketConnection = mockInitializeWebSocketConnection;
-      wrapper.vm.addTraceId = mockAddTraceId;
-
-      wrapper.vm.fetchValuesWithWebsocket(payload);
-
-      expect(mockInitializeWebSocketConnection).toHaveBeenCalledWith({
-        queryReq: payload,
-        type: "values",
-        isPagination: false,
-        traceId: expect.any(String),
-        org_id: wrapper.vm.searchObj.organizationIdentifier,
-        meta: payload,
-      });
-      expect(mockAddTraceId).toHaveBeenCalledWith("field1", expect.any(String));
-    });
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. Define your mock function FIRST
-vi.mock("@/services/stream", () => {
-  // Define the mock function with a console.log
-  const mockFieldValues = vi.fn(() => {
-    // You can customize the return value based on args or call count if needed
-    return Promise.resolve({
-      data: {
-        hits: [
-          {
-            values: [
-              { zo_sql_key: "foo", zo_sql_num: "2" },
-              { zo_sql_key: "bar", zo_sql_num: "3" },
-            ],
-          },
-        ],
-      },
-    });
-  });
-
-  return {
-    default: {
-      fieldValues: mockFieldValues,
-    },
-  };
-});
-
-describe("Index List", async () => {
-  let wrapper: any;
-  beforeEach(async () => {
-    wrapper = mount(IndexList, {
-      attachTo: "#app",
-      global: {
-        provide: {
-          store: store,
-        },
-        plugins: [i18n, router],
-        stubs: {},
-      },
-    });
-    await flushPromises();
-    wrapper.vm.fieldValues = {};
-
-    // Mock the required functions
-    wrapper.vm.onStreamChange = vi.fn();
-    wrapper.vm.updatedLocalLogFilterField = vi.fn();
-    wrapper.vm.reorderSelectedFields = vi.fn(() => []);
-    wrapper.vm.filterHitsColumns = vi.fn();
-
-    // Initialize required refs
-    wrapper.vm.openedFilterFields = ref([]);
-    wrapper.vm.streamFieldValues = ref({});
-    wrapper.vm.streamOptions = ref([]);
 
     // Initialize streamSchemaFieldsIndexMapping as a reactive object
     wrapper.vm.streamSchemaFieldsIndexMapping = {};
@@ -1361,6 +377,44 @@ describe("Index List", async () => {
     wrapper.vm.addSearchTerm("field", "value", "include");
     expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("field = 'value'");
     expect(mockGetFilterExpressionByFieldType).toHaveBeenCalledWith("field", "value", "include");
+  });
+
+  it("keeps the loaded fields up while the same streams reload, and shows another stream's only once loaded", async () => {
+    const stream = wrapper.vm.searchObj.data.stream;
+    stream.selectedStream = ["default"];
+    stream.selectedStreamFields = [{ name: "level" }];
+    await flushPromises();
+    wrapper.vm.searchObj.loadingStream = true;
+    await flushPromises();
+    expect(wrapper.vm.showFieldListSkeleton).toBe(false);
+
+    stream.selectedStream = ["other"];
+    await flushPromises();
+    expect(wrapper.vm.showFieldListSkeleton).toBe(true);
+
+    stream.selectedStreamFields = [{ name: "msg" }];
+    await flushPromises();
+    expect(wrapper.vm.showFieldListSkeleton).toBe(true);
+
+    wrapper.vm.searchObj.loadingStream = false;
+    await flushPromises();
+    expect(wrapper.vm.showFieldListSkeleton).toBe(false);
+  });
+
+  it("keeps the skeleton while the fields wait for their groups", async () => {
+    const stream = wrapper.vm.searchObj.data.stream;
+    stream.selectedStream = ["cold"];
+    wrapper.vm.searchObj.loadingStream = true;
+    await flushPromises();
+    stream.selectedStreamFields = [{ name: "msg" }];
+    wrapper.vm.searchObj.loadingFieldGroups = true;
+    wrapper.vm.searchObj.loadingStream = false;
+    await flushPromises();
+    expect(wrapper.vm.showFieldListSkeleton).toBe(true);
+
+    wrapper.vm.searchObj.loadingFieldGroups = false;
+    await flushPromises();
+    expect(wrapper.vm.showFieldListSkeleton).toBe(false);
   });
 
   it("toggleSchema sets loadingStream and calls extractFields", async () => {
@@ -1480,75 +534,6 @@ describe("Index List", async () => {
     expect(wrapper.vm.traceIdMapper["fooField"]).toBeUndefined();
   });
 
-  it.skip("add a specific field to interesting filed list ", async () => {
-    const field = {
-      name: "testField",
-      streams: ["stream1"],
-      isInterestingField: false,
-      group: "stream1",
-    };
-
-    // Set up the required mapping
-    wrapper.vm.streamSchemaFieldsIndexMapping.value = { testField: 0 };
-    wrapper.vm.searchObj.data.stream.selectedInterestingStreamFields = [];
-    wrapper.vm.searchObj.data.stream.interestingExpandedGroupRowsFieldCount = {
-      stream1: 0,
-    };
-    wrapper.vm.searchObj.data.stream.selectedStreamFields = [field];
-    wrapper.vm.searchObj.organizationIdentifier = "default";
-
-    wrapper.vm.addToInterestingFieldList(field, false);
-    expect(wrapper.vm.searchObj.data.stream.interestingFieldList).toContain("testField");
-  });
-
-  it.skip("removes a field from interesting field list", async () => {
-    const field = {
-      name: "testField",
-      streams: ["stream1"],
-      isInterestingField: true,
-      group: "stream1",
-    };
-
-    // Set up the required mapping
-    wrapper.vm.streamSchemaFieldsIndexMapping.value = { testField: 0 };
-    wrapper.vm.searchObj.data.stream.selectedInterestingStreamFields = [field];
-    wrapper.vm.searchObj.data.stream.interestingExpandedGroupRowsFieldCount = {
-      stream1: 1,
-    };
-    wrapper.vm.searchObj.data.stream.interestingFieldList = ["testField"];
-    wrapper.vm.searchObj.data.stream.selectedStreamFields = [field];
-    wrapper.vm.searchObj.organizationIdentifier = "default";
-
-    wrapper.vm.addToInterestingFieldList(field, true);
-    expect(wrapper.vm.searchObj.data.stream.interestingFieldList).not.toContain("testField");
-  });
-
-  it("handles multi stream selection correctly", async () => {
-    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
-    wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
-  });
-
-  it("resets selected fields correctly", async () => {
-    wrapper.vm.searchObj.data.stream.selectedFields = ["field1", "field2"];
-    wrapper.vm.resetSelectedFileds();
-    expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
-  });
-
-  it("filters fields correctly based on search term", async () => {
-    const rows = [{ name: "testField1" }, { name: "testField2" }, { name: "otherField" }];
-    const result = wrapper.vm.filterFieldFn(rows, "test");
-    expect(result).toHaveLength(2);
-    expect(result.map((r) => r.name)).toContain("testField1");
-    expect(result.map((r) => r.name)).toContain("testField2");
-  });
-
-  it("adds field to filter with correct format", async () => {
-    wrapper.vm.searchObj.meta.sqlMode = false;
-    wrapper.vm.addToFilter("field1=value1");
-    expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("field1=value1");
-  });
-
   it("keeps simple field unquoted when adding filter in SQL mode", async () => {
     wrapper.vm.searchObj.meta.sqlMode = true;
     wrapper.vm.addToFilter("default='alice'");
@@ -1559,120 +544,6 @@ describe("Index List", async () => {
     wrapper.vm.searchObj.meta.sqlMode = true;
     wrapper.vm.addToFilter("user='alice'");
     expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("\"user\"='alice'");
-  });
-
-  it("toggles field selection in clickFieldFn", async () => {
-    const row = { name: "field1" };
-    wrapper.vm.searchObj.data.stream.selectedFields = [];
-    wrapper.vm.clickFieldFn(row, 0);
-    expect(wrapper.vm.searchObj.data.stream.selectedFields).toContain("field1");
-  });
-
-  it.skip("handles stream filter function correctly", async () => {
-    wrapper.vm.streamOptions = [
-      { label: "Stream1", value: "stream1" },
-      { label: "Stream2", value: "stream2" },
-      { label: "TestStream", value: "teststream" },
-    ];
-
-    const updateFn = vi.fn((callback) => {
-      if (callback && typeof callback === "function") {
-        callback();
-      }
-    });
-    wrapper.vm.filterStreamFn("Stream", updateFn);
-
-    expect(updateFn).toHaveBeenCalled();
-  });
-
-  it("handles websocket trace ID management correctly", async () => {
-    const field = "testField";
-    const traceId = "trace123";
-
-    wrapper.vm.addTraceId(field, traceId);
-    expect(wrapper.vm.traceIdMapper[field]).toContain(traceId);
-
-    wrapper.vm.removeTraceId(field, traceId);
-    expect(wrapper.vm.traceIdMapper[field]).not.toContain(traceId);
-  });
-
-  it.skip("computes placeholder text correctly", async () => {
-    // Test when no stream is selected
-    wrapper.vm.searchObj.data.stream.selectedStream = [];
-    await nextTick();
-    expect(wrapper.vm.placeHolderText).toBe("Select Stream");
-
-    // Test when a stream is selected - the computed property should return empty string
-    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
-    await nextTick();
-    // Force reactivity update
-    await wrapper.vm.$forceUpdate();
-    await nextTick();
-    expect(wrapper.vm.placeHolderText).toBe("");
-  });
-
-  it("handles field values loading state correctly", async () => {
-    const field = "testField";
-    wrapper.vm.fieldValues[field] = {
-      isLoading: true,
-      values: [],
-      errMsg: "",
-    };
-
-    expect(wrapper.vm.fieldValues[field].isLoading).toBe(true);
-
-    wrapper.vm.fieldValues[field].isLoading = false;
-    expect(wrapper.vm.fieldValues[field].isLoading).toBe(false);
-  });
-
-  it("handles multiple stream selection", async () => {
-    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
-    wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
-  });
-
-  it("validates stream field values structure", async () => {
-    const field = "testField";
-    const stream = "stream1";
-
-    wrapper.vm.streamFieldValues.value = {
-      [field]: {
-        [stream]: {
-          values: [{ key: "value1", count: 1 }],
-        },
-      },
-    };
-
-    expect(wrapper.vm.streamFieldValues.value[field][stream].values).toBeDefined();
-    expect(wrapper.vm.streamFieldValues.value[field][stream].values[0].key).toBe("value1");
-    expect(wrapper.vm.streamFieldValues.value[field][stream].values[0].count).toBe(1);
-  });
-
-  it("handles search term addition with field type", async () => {
-    wrapper.vm.searchObj.data.stream.addToFilter = "";
-    const field = "testField";
-    const value = "testValue";
-    const action = "include";
-
-    wrapper.vm.addSearchTerm(field, value, action);
-    expect(mockGetFilterExpressionByFieldType).toHaveBeenCalledWith(field, value, action);
-    expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("field = 'value'");
-  });
-
-  it("updates field values on stream change", async () => {
-    const field = "testField";
-    wrapper.vm.fieldValues = {
-      [field]: {
-        isLoading: false,
-        values: [{ key: "oldValue", count: 1 }],
-        errMsg: "",
-      },
-    };
-
-    wrapper.vm.searchObj.data.stream.selectedStream = ["newStream"];
-    await wrapper.vm.onStreamChange("");
-
-    expect(wrapper.vm.fieldValues[field].values).toEqual([{ key: "oldValue", count: 1 }]);
   });
 
   // it("handles error in field values fetching", async () => {
@@ -1699,29 +570,6 @@ describe("Index List", async () => {
   // });
 
   describe("handleSearchResponse", () => {
-    it("initializes field values structure correctly", async () => {
-      const payload = {
-        queryReq: {
-          fields: ["testField"],
-          stream_name: "stream1",
-        },
-      };
-      const response = {
-        type: "search_response_hits",
-        content: {
-          results: {
-            hits: [],
-          },
-        },
-      };
-
-      wrapper.vm.handleSearchResponse(payload, response);
-      expect(wrapper.vm.fieldValues["testField"]).toBeDefined();
-      expect(wrapper.vm.fieldValues["testField"].values).toEqual([]);
-      expect(wrapper.vm.fieldValues["testField"].isLoading).toBe(false);
-      expect(wrapper.vm.fieldValues["testField"].errMsg).toBe("");
-    });
-
     it("aggregates values from multiple hits correctly", async () => {
       const payload = {
         queryReq: {
@@ -1905,21 +753,6 @@ describe("Index List", async () => {
       });
     });
 
-    it("resets streamFieldValues state correctly", async () => {
-      const data = {
-        payload: {
-          queryReq: {
-            fields: ["testField"],
-          },
-        },
-      };
-
-      wrapper.vm.handleSearchReset(data);
-
-      expect(wrapper.vm.streamFieldValues["testField"]).toEqual({});
-      expect(wrapper.vm.fetchValuesWithWebsocket).toHaveBeenCalledWith(data.payload.queryReq);
-    });
-
     it("calls fetchValuesWithWebsocket with correct parameters", async () => {
       const queryReq = {
         fields: ["testField"],
@@ -1983,90 +816,10 @@ describe("Index List", async () => {
       });
     });
 
-    it("handles non-existent field reset gracefully", async () => {
-      const data = {
-        payload: {
-          queryReq: {
-            fields: ["nonExistentField"],
-          },
-        },
-      };
-
-      wrapper.vm.handleSearchReset(data);
-
-      expect(wrapper.vm.fieldValues["nonExistentField"]).toEqual({
-        values: [],
-        isLoading: true,
-        errMsg: "",
-      });
-      expect(wrapper.vm.fetchValuesWithWebsocket).toHaveBeenCalledWith(data.payload.queryReq);
-    });
-
     // Additional comprehensive test cases to reach 50+ tests
-    it("should handle handleSearchReset with existing field values", async () => {
-      const data = {
-        payload: {
-          queryReq: {
-            fields: ["existingField"],
-          },
-        },
-      };
-
-      wrapper.vm.fieldValues["existingField"] = {
-        values: [{ key: "oldValue", count: 5 }],
-        isLoading: false,
-        errMsg: "old error",
-      };
-
-      wrapper.vm.handleSearchReset(data);
-
-      expect(wrapper.vm.fieldValues["existingField"]).toEqual({
-        values: [],
-        isLoading: true,
-        errMsg: "",
-      });
-      expect(wrapper.vm.fetchValuesWithWebsocket).toHaveBeenCalledWith(data.payload.queryReq);
-    });
-
-    it("should reset streamFieldValues correctly", async () => {
-      const data = {
-        payload: {
-          queryReq: {
-            fields: ["testField2"],
-          },
-        },
-      };
-
-      wrapper.vm.streamFieldValues = {
-        testField2: { stream1: { values: [{ key: "val1", count: 1 }] } },
-      };
-
-      wrapper.vm.handleSearchReset(data);
-
-      expect(wrapper.vm.streamFieldValues["testField2"]).toEqual({});
-    });
-  });
-
-  describe("Additional Stream management tests", () => {
-    it("should handle stream change on multi stream selection", async () => {
-      wrapper.vm.searchObj.data.stream.selectedStream = ["oldStream"];
-      wrapper.vm.searchObj.data.stream.selectedFields = ["field1", "field2"];
-
-      wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-
-      expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
-    });
   });
 
   describe("Additional field filtering tests", () => {
-    it("should return all rows when no search terms provided", async () => {
-      const rows = [{ name: "field1" }, { name: "field2" }];
-
-      const result = wrapper.vm.filterFieldFn(rows, "");
-
-      expect(result).toEqual(rows);
-    });
-
     it("should filter fields case-insensitively", async () => {
       const rows = [{ name: "TestField" }, { name: "testfield2" }, { name: "OTHER" }];
 
@@ -2090,24 +843,6 @@ describe("Index List", async () => {
       expect(wrapper.vm.showUserDefinedSchemaToggle).toBe(true);
     });
 
-    it("should compute showUserDefinedSchemaToggle correctly when disabled", async () => {
-      wrapper.vm.store.state.zoConfig.user_defined_schemas_enabled = false;
-      wrapper.vm.searchObj.meta.hasUserDefinedSchemas = true;
-
-      expect(wrapper.vm.showUserDefinedSchemaToggle).toBe(false);
-    });
-
-    it.skip("should compute streamList correctly", async () => {
-      const mockStreamList = [
-        { name: "stream1", type: "logs" },
-        { name: "stream2", type: "logs" },
-      ];
-      wrapper.vm.searchObj.data.stream.streamLists = mockStreamList;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.streamList).toEqual(mockStreamList);
-    });
-
     it("should compute checkSelectedFields correctly when empty", async () => {
       wrapper.vm.searchObj.data.stream.selectedFields = [];
       expect(wrapper.vm.checkSelectedFields).toBe(false);
@@ -2119,85 +854,7 @@ describe("Index List", async () => {
     });
   });
 
-  describe("Additional toggle function tests", () => {
-    it.skip("should handle toggleSchema for interesting fields", async () => {
-      wrapper.vm.searchObj.meta.useUserDefinedSchemas = "interesting_fields";
-      wrapper.vm.showOnlyInterestingFields = false;
-      wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
-      wrapper.vm.searchObj.data.stream.selectedInterestingStreamFields = [];
-      wrapper.vm.searchObj.loadingStream = false;
-
-      // Clear previous mock calls
-      mockExtractFields.mockClear();
-
-      await wrapper.vm.toggleSchema();
-
-      expect(wrapper.vm.showOnlyInterestingFields).toBe(true);
-      // extractFields might not be called directly in toggleSchema, so skip this assertion
-      // expect(mockExtractFields).toHaveBeenCalled();
-    });
-
-    it.skip("should handle toggleSchema for non-interesting fields", async () => {
-      wrapper.vm.searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
-      wrapper.vm.showOnlyInterestingFields = true;
-
-      await wrapper.vm.toggleSchema();
-
-      expect(wrapper.vm.showOnlyInterestingFields).toBe(false);
-      // extractFields might not be called directly in toggleSchema, so skip this assertion
-      // expect(mockExtractFields).toHaveBeenCalled();
-    });
-
-    it.skip("should handle toggleInterestingFields", async () => {
-      wrapper.vm.searchObj.loadingStream = false;
-
-      wrapper.vm.toggleInterestingFields();
-
-      // extractFields might not be called directly in toggleSchema, so skip this assertion
-      // expect(mockExtractFields).toHaveBeenCalled();
-    });
-  });
-
-  describe("Additional WebSocket trace management tests", () => {
-    it("should add multiple trace IDs for same field", async () => {
-      const field = "testField";
-      const traceId1 = "trace1";
-      const traceId2 = "trace2";
-
-      wrapper.vm.addTraceId(field, traceId1);
-      wrapper.vm.addTraceId(field, traceId2);
-
-      expect(wrapper.vm.traceIdMapper[field]).toEqual([traceId1, traceId2]);
-    });
-
-    it("should handle removing non-existent trace ID", async () => {
-      const field = "testField";
-      wrapper.vm.traceIdMapper[field] = ["trace1"];
-
-      wrapper.vm.removeTraceId(field, "nonExistentTrace");
-
-      expect(wrapper.vm.traceIdMapper[field]).toEqual(["trace1"]);
-    });
-
-    it("should handle removing trace ID from non-existent field", async () => {
-      wrapper.vm.removeTraceId("nonExistentField", "trace1");
-
-      expect(wrapper.vm.traceIdMapper["nonExistentField"]).toBeUndefined();
-    });
-  });
-
   describe("Additional cancel operation tests", () => {
-    it.skip("should cancel value API by removing field from openedFilterFields", async () => {
-      // Set up openedFilterFields as a ref
-      wrapper.vm.openedFilterFields = {
-        value: ["field1", "field2", "field3"],
-      };
-
-      wrapper.vm.cancelValueApi("field2");
-
-      expect(wrapper.vm.openedFilterFields.value).toEqual(["field1", "field3"]);
-    });
-
     it("should abort in-flight streams and clear the mapper in cancelTraceId", async () => {
       mockCancelStreamQueryBasedOnRequestId.mockClear();
       const field = "testField";
@@ -2241,99 +898,6 @@ describe("Index List", async () => {
       expect(wrapper.vm.traceIdMapper[field]).toEqual([]);
       expect(wrapper.vm.fieldValues[field].isLoading).toBe(false);
       expect(wrapper.vm.expandedFields[field]).toBe(false);
-    });
-  });
-
-  describe("Additional WebSocket message handling tests", () => {
-    it.skip("should handle sendSearchMessage correctly with regions and clusters", async () => {
-      const queryReq = {
-        traceId: "trace123",
-        queryReq: {
-          fields: ["field1"],
-          regions: ["region1"],
-          clusters: ["cluster1"],
-        },
-      };
-      const mockSendSearchMessageBasedOnRequestId = vi.fn();
-      wrapper.vm.sendSearchMessageBasedOnRequestId = mockSendSearchMessageBasedOnRequestId;
-
-      wrapper.vm.sendSearchMessage(queryReq);
-
-      expect(mockSendSearchMessageBasedOnRequestId).toHaveBeenCalledWith({
-        type: "values",
-        content: {
-          trace_id: "trace123",
-          payload: queryReq.queryReq,
-          stream_type: wrapper.vm.searchObj.data.stream.streamType,
-          search_type: "ui",
-          use_cache: true,
-          org_id: wrapper.vm.searchObj.organizationIdentifier,
-        },
-      });
-    });
-
-    it.skip("should handle handleSearchClose with error codes", async () => {
-      const payload = {
-        queryReq: { fields: ["testField"] },
-        traceId: "trace123",
-      };
-      const response = { code: 1001 };
-
-      wrapper.vm.fieldValues["testField"] = { isLoading: true };
-      const mockHandleSearchError = vi.fn();
-      const mockRemoveTraceId = vi.fn();
-      wrapper.vm.handleSearchError = mockHandleSearchError;
-      wrapper.vm.removeTraceId = mockRemoveTraceId;
-
-      wrapper.vm.handleSearchClose(payload, response);
-
-      expect(wrapper.vm.fieldValues["testField"].isLoading).toBe(false);
-      expect(mockHandleSearchError).toHaveBeenCalled();
-      expect(mockRemoveTraceId).toHaveBeenCalledWith("testField", "trace123");
-    });
-
-    it.skip("should handle cancel_response type in handleSearchResponse", async () => {
-      const payload = {
-        queryReq: { fields: ["testField"] },
-      };
-      const response = {
-        type: "cancel_response",
-        content: { trace_id: "trace123" },
-      };
-
-      const mockRemoveTraceId = vi.fn();
-      wrapper.vm.removeTraceId = mockRemoveTraceId;
-
-      wrapper.vm.handleSearchResponse(payload, response);
-
-      expect(mockRemoveTraceId).toHaveBeenCalledWith("testField", "trace123");
-    });
-  });
-
-  describe("Additional fetchValuesWithWebsocket tests", () => {
-    it.skip("should create correct websocket payload", async () => {
-      const payload = {
-        fields: ["field1"],
-        stream_name: "stream1",
-        size: 10,
-      };
-
-      const mockInitializeWebSocketConnection = vi.fn();
-      const mockAddTraceId = vi.fn();
-      wrapper.vm.initializeWebSocketConnection = mockInitializeWebSocketConnection;
-      wrapper.vm.addTraceId = mockAddTraceId;
-
-      wrapper.vm.fetchValuesWithWebsocket(payload);
-
-      expect(mockInitializeWebSocketConnection).toHaveBeenCalledWith({
-        queryReq: payload,
-        type: "values",
-        isPagination: false,
-        traceId: expect.any(String),
-        org_id: wrapper.vm.searchObj.organizationIdentifier,
-        meta: payload,
-      });
-      expect(mockAddTraceId).toHaveBeenCalledWith("field1", expect.any(String));
     });
   });
 });
@@ -3030,5 +1594,328 @@ describe("Index List — field values query for pipe-bearing filters", () => {
     const sql = lastValuesSql();
     expect(selectListOf(sql)).toBe("SELECT *");
     expect(sql.slice(sql.toUpperCase().indexOf(" FROM "))).toContain("match_all('error')");
+  });
+});
+
+describe("Stream picker — internal streams", () => {
+  let wrapper: any;
+  let setting!: ReturnType<typeof useHideInternalStreams>;
+
+  const stream = (name: string, isInternal = false, docTimeMax = 0) => ({
+    ...streamsMock.stream_list.list[0],
+    name,
+    stats: { doc_time_max: docTimeMax },
+    ...(isInternal ? { is_internal: true } : {}),
+  });
+
+  const loadStreams = async (list: ReturnType<typeof stream>[]) => {
+    wrapper.vm.searchObj.data.streamResults = { list };
+    wrapper.vm.searchObj.data.stream.streamLists = list.map((s) => ({
+      label: s.name,
+      value: s.name,
+      internal: s.is_internal === true,
+    }));
+    await flushPromises();
+  };
+
+  const DEFAULT_LIST = [
+    stream("_rumdata", true, 90),
+    stream("default", false, 50),
+    stream("_anomalies", true, 80),
+    stream("k8s_events", false, 40),
+  ];
+
+  const select = () => wrapper.findComponent({ name: "OSelect" });
+  type Option = { label: string; header?: boolean; headerCount?: string; headerAction?: string };
+  const pickerOptions = () => select().props("options") as Option[];
+  const optionLabels = () =>
+    pickerOptions().map((o) =>
+      o.header ? `# ${o.label} · ${o.headerCount ?? ""} [${o.headerAction}]` : o.label,
+    );
+  const header = () => pickerOptions().find((o) => o.header)!;
+  // Every text node, space-joined: the compiled template drops whitespace between elements.
+  const words = (el: Element) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const parts: string[] = [];
+    while (walker.nextNode()) parts.push(walker.currentNode.textContent!.trim());
+    return parts.filter(Boolean).join(" ");
+  };
+  const quickPickLabels = () =>
+    wrapper
+      .findAll(
+        '[data-test^="logs-search-stream-quick-pick-"], [data-test^="logs-search-stream-group-"]',
+      )
+      .filter(
+        (el: any) =>
+          el.attributes("data-test") !== "logs-search-stream-quick-pick-more" &&
+          !el.attributes("data-test").endsWith("-action"),
+      )
+      .map((el: any) => words(el.element));
+  const quickPickAction = () =>
+    wrapper.find('[data-test="logs-search-stream-group-header-internal-action"]');
+
+  beforeEach(async () => {
+    localStorage.clear();
+    const Probe = defineComponent({
+      setup() {
+        setting = useHideInternalStreams();
+        return () => h("div");
+      },
+    });
+    mount(Probe, { global: { plugins: [store] } });
+    setting.hideInternalStreams.value = false;
+    wrapper = mount(IndexList, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    wrapper.vm.searchObj.data.stream.selectedStream = [];
+    await loadStreams(DEFAULT_LIST);
+  });
+
+  afterEach(async () => {
+    wrapper.vm.searchObj.data.streamResults = [];
+    wrapper.vm.searchObj.data.stream.streamLists = [];
+    wrapper.vm.searchObj.data.stream.selectedStream = [];
+    setting.hideInternalStreams.value = false;
+    wrapper.unmount();
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("lists user streams first and internal streams under a header with a Hide action", () => {
+    expect(optionLabels()).toEqual([
+      "default",
+      "k8s_events",
+      "# Internal streams · 2 [Hide]",
+      "_rumdata",
+      "_anomalies",
+    ]);
+  });
+
+  it("anchors the selected-streams tooltip to the stream select, not the live region", async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = ["default", "k8s_events"];
+    await flushPromises();
+    const announcement = wrapper.find(
+      '[data-test="log-search-index-list-stream-picker-announcement"]',
+    );
+    expect(select().element.hasAttribute("data-o-tooltip-trigger")).toBe(true);
+    expect(announcement.attributes("data-o-tooltip-trigger")).toBeUndefined();
+  });
+
+  it("pins selected streams within their group in multi-select", () => {
+    expect(select().props("multiple")).toBe(true);
+    expect(select().props("pinSelectedInGroups")).toBe(true);
+  });
+
+  it("collapses the group when the header's Hide action fires, and expands it on Show", async () => {
+    select().vm.$emit("header-action", header());
+    await flushPromises();
+    expect(setting.hideInternalStreams.value).toBe(true);
+    expect(optionLabels()).toEqual([
+      "default",
+      "k8s_events",
+      "# Internal streams · 2 hidden [Show]",
+    ]);
+    expect(
+      wrapper.find('[data-test="log-search-index-list-stream-picker-announcement"]').text(),
+    ).toBe("Internal streams hidden");
+
+    select().vm.$emit("header-action", header());
+    await flushPromises();
+    expect(setting.hideInternalStreams.value).toBe(false);
+    expect(optionLabels()).toContain("_rumdata");
+    expect(
+      wrapper.find('[data-test="log-search-index-list-stream-picker-announcement"]').text(),
+    ).toBe("Internal streams shown");
+  });
+
+  it("keeps a selected internal stream visible under the collapsed row", async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = ["_rumdata"];
+    setting.hideInternalStreams.value = true;
+    await flushPromises();
+    expect(optionLabels()).toEqual([
+      "default",
+      "k8s_events",
+      "# Internal streams · 1 hidden [Show]",
+      "_rumdata",
+    ]);
+  });
+
+  it("keeps a stream deselected while the popover is open until it closes", async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = ["_rumdata"];
+    setting.hideInternalStreams.value = true;
+    await flushPromises();
+    select().vm.$emit("open");
+    await flushPromises();
+    wrapper.vm.searchObj.data.stream.selectedStream = [];
+    await flushPromises();
+    expect(optionLabels()).toContain("_rumdata");
+
+    select().vm.$emit("close");
+    await flushPromises();
+    expect(optionLabels()).not.toContain("_rumdata");
+  });
+
+  it("counts hidden streams that match the search text and clears the search on close", async () => {
+    setting.hideInternalStreams.value = true;
+    select().vm.$emit("open");
+    select().vm.$emit("search", "_r");
+    await flushPromises();
+    expect(header()).toMatchObject({ headerCount: "1 hidden match", keepOnSearch: true });
+
+    select().vm.$emit("close");
+    await flushPromises();
+    expect(wrapper.vm.streamPickerSearch).toBe("");
+    expect(header().headerCount).toBe("2 hidden");
+  });
+
+  it("ignores a search that lands after the popover closed", async () => {
+    setting.hideInternalStreams.value = true;
+    select().vm.$emit("open");
+    select().vm.$emit("close");
+    select().vm.$emit("search", "_r");
+    await flushPromises();
+    expect(wrapper.vm.streamPickerSearch).toBe("");
+    expect(header().headerCount).toBe("2 hidden");
+  });
+
+  it("gives an org whose streams are all internal and hidden just the collapsed row", async () => {
+    await loadStreams([stream("_rumdata", true), stream("_anomalies", true)]);
+    setting.hideInternalStreams.value = true;
+    await flushPromises();
+    expect(optionLabels()).toEqual(["# Internal streams · 2 hidden [Show]"]);
+  });
+
+  it("groups streams by the option's own internal flag while the stream results are empty", async () => {
+    wrapper.vm.searchObj.data.streamResults = { list: [] };
+    wrapper.vm.searchObj.data.stream.streamLists = [
+      { label: "_rumdata", value: "_rumdata", internal: true },
+      { label: "default", value: "default", internal: false },
+      { label: "_anomalies", value: "_anomalies", internal: true },
+    ];
+    await flushPromises();
+    expect(optionLabels()).toEqual([
+      "default",
+      "# Internal streams · 2 [Hide]",
+      "_rumdata",
+      "_anomalies",
+    ]);
+    expect(quickPickLabels()).toEqual([
+      "Recently active streams",
+      "default",
+      "Internal streams · 2 Hide",
+      "_rumdata",
+      "_anomalies",
+    ]);
+  });
+
+  it("keeps the current stream highlighted when the single-select picker opens", async () => {
+    await wrapper.setProps({ selectionMode: "single" });
+    wrapper.vm.searchObj.data.stream.selectedStream = ["k8s_events"];
+    await flushPromises();
+    const optionsBefore = select().props("options");
+
+    await wrapper
+      .find('[data-test="log-search-index-list-select-stream-trigger"]')
+      .trigger("click");
+    await flushPromises();
+
+    expect(select().props("options")).toBe(optionsBefore);
+    const highlighted = () =>
+      document.body
+        .querySelector(".bg-select-item-hover-bg[data-test-value]")
+        ?.getAttribute("data-test-value");
+    expect(highlighted()).toBe("k8s_events");
+
+    const search = document.body.querySelector<HTMLInputElement>(
+      '[data-test="log-search-index-list-select-stream-search"]',
+    )!;
+    search.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    await flushPromises();
+    // The next navigable row after k8s_events is the internal header.
+    expect(
+      document.body
+        .querySelector('[data-test="log-search-index-list-select-stream-header"]')
+        ?.hasAttribute("data-highlighted"),
+    ).toBe(true);
+  });
+
+  it("takes the internal flag from the options alone", async () => {
+    wrapper.vm.searchObj.data.stream.streamLists = DEFAULT_LIST.map((s) => ({
+      label: s.name,
+      value: s.name,
+    }));
+    await flushPromises();
+    expect(pickerOptions().some((o) => o.header)).toBe(false);
+  });
+
+  describe("quick pick", () => {
+    it("lists internal streams last under a header row with a Hide action", () => {
+      expect(quickPickLabels()).toEqual([
+        "Recently active streams",
+        "default",
+        "k8s_events",
+        "Internal streams · 2 Hide",
+        "_rumdata",
+        "_anomalies",
+      ]);
+    });
+
+    it("collapses to the header row on Hide and expands again on Show", async () => {
+      await quickPickAction().trigger("click");
+      await flushPromises();
+      expect(setting.hideInternalStreams.value).toBe(true);
+      expect(quickPickLabels()).toEqual([
+        "Recently active streams",
+        "default",
+        "k8s_events",
+        "Internal streams · 2 hidden Show",
+      ]);
+
+      await quickPickAction().trigger("click");
+      await flushPromises();
+      expect(setting.hideInternalStreams.value).toBe(false);
+      expect(quickPickLabels()).toContain("_rumdata");
+    });
+
+    it("shows only the collapsed row for an org whose streams are all internal and hidden", async () => {
+      await loadStreams([stream("_rumdata", true), stream("_anomalies", true)]);
+      setting.hideInternalStreams.value = true;
+      await flushPromises();
+      expect(quickPickLabels()).toEqual(["Internal streams · 2 hidden Show"]);
+    });
+
+    it("fills the slots with user streams before internal ones and counts the rest", async () => {
+      const users = Array.from({ length: 9 }, (_, i) => stream(`app_${i}`, false, i));
+      await loadStreams([stream("_rumdata", true, 100), ...users]);
+      expect(wrapper.vm.quickPickStreams.map((s: { value: string }) => s.value)).not.toContain(
+        "_rumdata",
+      );
+      expect(wrapper.vm.quickPickStreams).toHaveLength(8);
+      expect(wrapper.find('[data-test="logs-search-stream-quick-pick-more"]').text()).toContain(
+        "2",
+      );
+      expect(quickPickAction().exists()).toBe(false);
+    });
+
+    it("counts only the internal rows it lists while shown, and every hidden one while hidden", async () => {
+      const users = Array.from({ length: 6 }, (_, i) => stream(`app_${i}`, false, 10 + i));
+      const internal = ["_rumdata", "_rumlog", "_anomalies"].map((n, i) => stream(n, true, i));
+      await loadStreams([...users, ...internal]);
+      expect(quickPickLabels()).toContain("Internal streams · 2 Hide");
+      expect(quickPickLabels().slice(-2)).toEqual(["_anomalies", "_rumlog"]);
+
+      setting.hideInternalStreams.value = true;
+      await flushPromises();
+      expect(quickPickLabels()).toContain("Internal streams · 3 hidden Show");
+    });
+
+    it("leaves hidden streams out of the more count", async () => {
+      const users = Array.from({ length: 9 }, (_, i) => stream(`app_${i}`, false, i));
+      await loadStreams([stream("_rumdata", true, 100), stream("_rumlog", true, 99), ...users]);
+      setting.hideInternalStreams.value = true;
+      await flushPromises();
+      expect(wrapper.vm.quickPickMoreCount).toBe(1);
+    });
   });
 });

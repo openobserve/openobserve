@@ -626,6 +626,10 @@ pub async fn save_enrichment_table_from_url(
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = String),
         (status = StatusCode::FORBIDDEN, description = "Forbidden", body = String),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Enrichment Table", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn get_all_enrichment_table_statuses(

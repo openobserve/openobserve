@@ -249,7 +249,7 @@ async fn ensure_requested_score_configs_visible(
         (status = 404, description = "Annotation Queue not found", body = ()),
         (status = 409, description = "Item is already queued in this Annotation Queue", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "create"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "create"}))),
 )]
 pub async fn enqueue_annotation_queue_item(
     Path((org_id, queue_id)): Path<(String, String)>,
@@ -287,7 +287,7 @@ pub async fn enqueue_annotation_queue_item(
         (status = 404, description = "Queue or Queue Item not found", body = ()),
         (status = 500, description = "Score lookup or source hydration failed", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "get"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "get"}))),
 )]
 pub async fn get_annotation_queue_item(
     Path((org_id, queue_id, queue_item_id)): Path<(String, String, String)>,
@@ -326,7 +326,7 @@ pub async fn get_annotation_queue_item(
         (status = 404, description = "Queue or Queue Item not found", body = ()),
         (status = 409, description = "Stale bindings or archived Queue Item", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "update"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "update"}))),
 )]
 pub async fn review_annotation_queue_item(
     Path((org_id, queue_id, queue_item_id)): Path<(String, String, String)>,
@@ -371,10 +371,10 @@ pub async fn review_annotation_queue_item(
         ("queue_item_id" = String, Path, description = "Annotation Queue Item ID"),
     ),
     responses(
-        (status = 200, description = "Complete review submissions"),
+        (status = 200, description = "Complete review submissions", content_type = "application/json", body = Object),
         (status = 404, description = "Queue or Queue Item not found", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "list"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "list"}))),
 )]
 pub async fn list_annotation_queue_item_reviews(
     Path((org_id, queue_id, queue_item_id)): Path<(String, String, String)>,
@@ -411,7 +411,7 @@ pub async fn list_annotation_queue_item_reviews(
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Annotation Queue not found", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "update"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "update"}))),
 )]
 pub async fn archive_annotation_queue_items(
     Path((org_id, queue_id)): Path<(String, String)>,
@@ -451,7 +451,7 @@ pub async fn archive_annotation_queue_items(
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Annotation Queue not found", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "delete"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "delete"}))),
 )]
 pub async fn clear_annotation_queue_items(
     Path((org_id, queue_id)): Path<(String, String)>,
@@ -489,7 +489,7 @@ pub async fn clear_annotation_queue_items(
         (status = 200, body = inline(ListAnnotationQueueItemsResponseBody)),
         (status = 400, description = "Bad Request", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "list"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "list"}))),
 )]
 pub async fn list_annotation_queue_items(
     Path(org_id): Path<String>,
@@ -534,7 +534,7 @@ pub async fn list_annotation_queue_items(
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses((status = 200, body = inline(ListAnnotationQueuesResponseBody))),
-    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "list"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "list"}))),
 )]
 pub async fn list_annotation_queues(
     Path(org_id): Path<String>,
@@ -563,7 +563,7 @@ pub async fn list_annotation_queues(
         (status = 400, description = "Bad Request", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "create"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "create"}))),
 )]
 pub async fn create_annotation_queue(
     Path(org_id): Path<String>,
@@ -602,7 +602,7 @@ pub async fn create_annotation_queue(
         (status = 200, body = inline(AnnotationQueueResponseBody)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "get"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "get"}))),
 )]
 pub async fn get_annotation_queue(
     Path((org_id, queue_id)): Path<(String, String)>,
@@ -635,7 +635,7 @@ pub async fn get_annotation_queue(
         (status = 404, description = "Not Found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "update"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "update"}))),
 )]
 pub async fn update_annotation_queue(
     Path((org_id, queue_id)): Path<(String, String)>,
@@ -673,10 +673,10 @@ pub async fn update_annotation_queue(
         ("queue_id" = String, Path, description = "Annotation Queue ID"),
     ),
     responses(
-        (status = 200, description = "Deleted", body = String),
+        (status = 200, description = "Deleted", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "delete"}))),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), ("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "delete"}))),
 )]
 pub async fn delete_annotation_queue(
     Path((org_id, queue_id)): Path<(String, String)>,

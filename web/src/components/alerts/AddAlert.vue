@@ -484,18 +484,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-group
                 data-snap-stop
               />
-              <div
-                v-if="formData.is_real_time === 'false' && tiers.isVisible('dedup')"
-                data-snap-stop
-                :class="rowGroup"
-                data-row-group
-              >
-                <Deduplication
-                  :deduplication="formData.deduplication"
-                  :columns="filteredColumns"
-                  @update:deduplication="updateDeduplication"
-                />
-              </div>
               <AlertTierLinks
                 v-if="!isAnomalyMode"
                 :class="rowGroup"
@@ -895,7 +883,6 @@ import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
 import AlertSettings from "./steps/AlertSettings.vue";
 import CompareWithPast from "./steps/CompareWithPast.vue";
-import Deduplication from "./steps/Deduplication.vue";
 import Advanced from "./steps/Advanced.vue";
 import InlineSelectFolderDropdown from "../common/sidebar/InlineSelectFolderDropdown.vue";
 import PreviewAlert from "./PreviewAlert.vue";
@@ -1003,7 +990,6 @@ export default defineComponent({
     QueryConfig,
     AlertSettings,
     CompareWithPast,
-    Deduplication,
     Advanced,
     PreviewAlert,
     AnomalyDetectionConfig,
@@ -1367,7 +1353,6 @@ export default defineComponent({
         case "holdFor":
         case "recovery":
         case "keepFiring":
-        case "dedup":
           return scheduled;
         case "groupBy":
           return (
@@ -1419,11 +1404,6 @@ export default defineComponent({
           return fd.notify_on_recovery === true || (fd.recovery_destinations ?? []).length > 0;
         case "oncall":
           return has(fd.oncall_team);
-        case "dedup":
-          return (
-            fd.deduplication?.enabled === true ||
-            (fd.deduplication?.fingerprint_fields ?? []).length > 0
-          );
         case "keepFiring":
           return Number(fd.keep_firing_for) > 0;
         case "priority":
@@ -1461,6 +1441,12 @@ export default defineComponent({
         case "name":
         case "folder":
           return !alertForm.beingUpdated.value;
+        case "suppressRepeats":
+          return (
+            fd.is_real_time === "false" &&
+            !alertForm.isAnomalyMode.value &&
+            (config.isEnterprise === "true" || config.isCloud === "true")
+          );
         default:
           return true;
       }

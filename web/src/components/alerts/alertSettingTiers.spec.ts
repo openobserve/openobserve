@@ -28,7 +28,7 @@ describe("ALERT_SETTING_TIERS", () => {
     const ids = ALERT_SETTING_TIERS.map((d) => d.id);
     expect(new Set(ids).size).toBe(ids.length);
     const count = (tier: string) => ALERT_SETTING_TIERS.filter((d) => d.tier === tier).length;
-    expect([count("shown"), count("one"), count("tucked")]).toEqual([4, 3, 9]);
+    expect([count("shown"), count("one"), count("tucked")]).toEqual([4, 3, 8]);
   });
 
   it("puts every one-click setting in a labelled row", () => {
@@ -68,7 +68,7 @@ describe("sectionTierView", () => {
       state({ revealed, isSet: (id) => id === "createsIncident" }),
     );
     expect(view.addLinks.map((d) => d.id)).toEqual(["variables"]);
-    expect(view.tucked.map((d) => d.id)).toEqual(["recovery", "oncall", "dedup", "keepFiring"]);
+    expect(view.tucked.map((d) => d.id)).toEqual(["recovery", "oncall", "keepFiring"]);
   });
 });
 

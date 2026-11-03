@@ -45,6 +45,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            it on navigation. Active MenuLinks defer their fill to this (see
            RailIndicatorActiveKey). Snaps (no slide) on mount/reflow/reveal. -->
       <div ref="indicatorRef" aria-hidden="true" :class="indicatorClass" :style="indicatorStyle" />
+      <div
+        v-if="loading"
+        class="flex flex-col gap-y-1"
+        aria-hidden="true"
+        data-test="navbar-rail-skeleton"
+      >
+        <div
+          v-for="tile in RAIL_SKELETON_TILES"
+          :key="tile"
+          class="mx-1 flex h-12.75 shrink-0 flex-col items-center gap-0.5 py-1"
+        >
+          <OSkeleton class="size-6.5" />
+          <div class="flex h-3.75 items-center">
+            <OSkeleton type="text" class="h-2.5 w-12" />
+          </div>
+        </div>
+      </div>
       <template
         v-for="entry in topEntries"
         :key="entry.type === 'group' ? `g-${entry.key}` : `l-${entry.item.name}`"
@@ -113,7 +130,10 @@ import {
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
 import MenuLink from "@/components/MenuLink.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ONavGroup from "./ONavGroup.vue";
+
+const RAIL_SKELETON_TILES = 12;
 
 defineOptions({ inheritAttrs: false });
 
@@ -121,6 +141,7 @@ const props = withDefaults(defineProps<NavbarProps>(), {
   miniMode: false,
   visible: true,
   overlay: false,
+  loading: false,
 });
 
 const emit = defineEmits<NavbarEmits>();

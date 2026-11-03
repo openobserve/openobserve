@@ -560,6 +560,43 @@ pub async fn list_by_team(
         .collect())
 }
 
+/// Open records `user_email` holds the acknowledgement of, on `team_id` or on any team.
+pub async fn list_open_acknowledged_by(
+    org_id: &str,
+    team_id: Option<&str>,
+    user_email: &str,
+) -> Result<Vec<Response>, errors::Error> {
+    list_open_acknowledged_by_in(get_orm_client_rw().await, org_id, team_id, user_email).await
+}
+
+async fn list_open_acknowledged_by_in<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    team_id: Option<&str>,
+    user_email: &str,
+) -> Result<Vec<Response>, errors::Error> {
+    use oncall_responses::Column;
+
+    let mut query = oncall_responses::Entity::find().filter(Column::OrgId.eq(org_id));
+    if let Some(team_id) = team_id {
+        query = query.filter(Column::TeamId.eq(team_id));
+    }
+    // An open record carries `acked_by` only while acknowledged; the state lets the scan use the
+    // index.
+    Ok(query
+        .filter(Column::State.eq(ResponseState::Acknowledged.to_i32()))
+        .filter(Column::ClosedAt.is_null())
+        .filter(
+            Expr::expr(sea_orm::sea_query::Func::lower(Expr::col(Column::AckedBy)))
+                .eq(user_email.to_ascii_lowercase()),
+        )
+        .all(db)
+        .await?
+        .into_iter()
+        .filter_map(to_response)
+        .collect())
+}
+
 /// Records that the ladder ran out with nobody answering.
 ///
 /// Idempotent: the reconcile sweep and the engine can both reach exhaustion for
@@ -660,7 +697,7 @@ pub async fn reassign_team(
     to_team_id: &str,
     now: i64,
 ) -> Result<Option<Response>, errors::Error> {
-    hand_over(org_id, id, Some(to_team_id), now).await
+    hand_over(org_id, id, Some(to_team_id), None, now).await
 }
 
 /// Hands a record to somebody on the same team, starting its ladder again. Same
@@ -672,7 +709,17 @@ pub async fn restart_ladder(
     id: &str,
     now: i64,
 ) -> Result<Option<Response>, errors::Error> {
-    hand_over(org_id, id, None, now).await
+    hand_over(org_id, id, None, None, now).await
+}
+
+/// [`restart_ladder`] only while `acked_by` still holds the page; `None` when it was not restarted.
+pub async fn restart_ladder_if_acked_by(
+    org_id: &str,
+    id: &str,
+    acked_by: &str,
+    now: i64,
+) -> Result<Option<Response>, errors::Error> {
+    hand_over(org_id, id, None, Some(acked_by), now).await
 }
 
 /// Re-runs an exhausted, unowned page only if its row is still as `seen`, else `None`. [strong]
@@ -736,13 +783,133 @@ async fn restart_exhausted_in<C: ConnectionTrait>(
     Ok(written.rows_affected == 1)
 }
 
+/// Hands an open page `holder` still acknowledges back to its team on a new run, else `None`.
+/// [strong]
+pub async fn release_acknowledgement(
+    org_id: &str,
+    id: &str,
+    holder: &str,
+    now: i64,
+) -> Result<Option<Response>, errors::Error> {
+    release_acknowledgement_in(get_orm_client_rw().await, org_id, id, holder, now).await
+}
+
+/// The compare-and-swap behind [`release_acknowledgement`].
+async fn release_acknowledgement_in<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    id: &str,
+    holder: &str,
+    now: i64,
+) -> Result<Option<Response>, errors::Error> {
+    use oncall_responses::Column;
+
+    let Some(current) = oncall_responses::Entity::find_by_id(id)
+        .filter(Column::OrgId.eq(org_id))
+        .one(db)
+        .await?
+        .and_then(to_response)
+    else {
+        return Ok(None);
+    };
+    let next = current.handed_over(None, now);
+    // The run as read: the new run number is computed from it, so a concurrent restart must lose.
+    let same_run = match current.ladder_run {
+        Some(run) => Column::LadderRun.eq(run),
+        None => Column::LadderRun.is_null(),
+    };
+    let written = oncall_responses::Entity::update_many()
+        .col_expr(Column::State, Expr::value(next.state.to_i32()))
+        .col_expr(Column::AckedBy, Expr::value(next.acked_by.clone()))
+        .col_expr(Column::AckedAt, Expr::value(next.acked_at))
+        .col_expr(Column::SnoozedUntil, Expr::value(next.snoozed_until))
+        .col_expr(Column::LadderAnchor, Expr::value(next.ladder_anchor))
+        .col_expr(Column::LadderRun, Expr::value(next.ladder_run))
+        .col_expr(Column::ExhaustedAt, Expr::value(next.exhausted_at))
+        .col_expr(Column::UpdatedAt, next_revision(now))
+        .filter(Column::Id.eq(id))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::ClosedAt.is_null())
+        .filter(
+            Expr::expr(sea_orm::sea_query::Func::lower(Expr::col(Column::AckedBy)))
+                .eq(holder.to_ascii_lowercase()),
+        )
+        .filter(same_run)
+        .exec(db)
+        .await?;
+    if written.rows_affected != 1 {
+        return Ok(None);
+    }
+    Ok(oncall_responses::Entity::find_by_id(id)
+        .filter(Column::OrgId.eq(org_id))
+        .one(db)
+        .await?
+        .and_then(to_response))
+}
+
+/// Starts an open record's ladder clock at `at` if nothing started it yet, else `None`. [strong]
+pub async fn start_ladder_clock(
+    org_id: &str,
+    id: &str,
+    at: i64,
+) -> Result<Option<Response>, errors::Error> {
+    start_ladder_clock_in(get_orm_client_rw().await, org_id, id, at).await
+}
+
+/// The compare-and-swap behind [`start_ladder_clock`].
+async fn start_ladder_clock_in<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    id: &str,
+    at: i64,
+) -> Result<Option<Response>, errors::Error> {
+    use oncall_responses::Column;
+
+    let written = oncall_responses::Entity::update_many()
+        .col_expr(Column::LadderAnchor, Expr::value(at))
+        .col_expr(Column::UpdatedAt, next_revision(now_micros()))
+        .filter(Column::Id.eq(id))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::ClosedAt.is_null())
+        .filter(Column::LadderAnchor.is_null())
+        .exec(db)
+        .await?;
+    if written.rows_affected != 1 {
+        return Ok(None);
+    }
+    Ok(oncall_responses::Entity::find_by_id(id)
+        .filter(Column::OrgId.eq(org_id))
+        .one(db)
+        .await?
+        .and_then(to_response))
+}
+
 async fn hand_over(
     org_id: &str,
     id: &str,
     to_team_id: Option<&str>,
+    acked_by: Option<&str>,
     now: i64,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = get_orm_client_rw().await;
+    hand_over_in(
+        get_orm_client_rw().await,
+        org_id,
+        id,
+        to_team_id,
+        acked_by,
+        now,
+    )
+    .await
+}
+
+async fn hand_over_in(
+    client: &impl ConnectionTrait,
+    org_id: &str,
+    id: &str,
+    to_team_id: Option<&str>,
+    acked_by: Option<&str>,
+    now: i64,
+) -> Result<Option<Response>, errors::Error> {
     let Some(existing) = oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .one(client)
@@ -756,7 +923,7 @@ async fn hand_over(
     // A handoff's effect on a record is decided in `Response::handed_over`; this writes it down.
     let next = current.handed_over(to_team_id, now);
     // Conditional: a `resolve` landing between the read and this write would tear the row.
-    oncall_responses::Entity::update_many()
+    let mut query = oncall_responses::Entity::update_many()
         .col_expr(
             oncall_responses::Column::TeamId,
             Expr::value(next.team_id.clone()),
@@ -794,11 +961,22 @@ async fn hand_over(
         .filter(oncall_responses::Column::Id.eq(id))
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::ClosedAt.is_null())
-        .filter(oncall_responses::Column::State.ne(ResponseState::Resolved.to_i32()))
-        .exec(client)
-        .await?;
+        .filter(oncall_responses::Column::State.ne(ResponseState::Resolved.to_i32()));
+    if let Some(holder) = acked_by {
+        query = query
+            .filter(oncall_responses::Column::State.eq(ResponseState::Acknowledged.to_i32()))
+            .filter(oncall_responses::Column::AckedBy.eq(holder));
+    }
+    let result = query.exec(client).await?;
+    if acked_by.is_some() && result.rows_affected == 0 {
+        return Ok(None);
+    }
     // Read back, not from the snapshot: after a lost race the answer is the closed record.
-    get(org_id, id).await
+    Ok(oncall_responses::Entity::find_by_id(id)
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+        .and_then(to_response))
 }
 
 /// Records opened because `origin_id` fired — the impacted teams.
@@ -836,6 +1014,30 @@ pub async fn latest_open_for_source(
         .one(client)
         .await?
         .and_then(to_response))
+}
+
+/// Every still-open record of a source, newest first: older firings' pages stay open until closed.
+pub async fn open_records_for_source(
+    org_id: &str,
+    subject_type: SubjectType,
+    source_id: &str,
+) -> Result<Vec<Response>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    Ok(oncall_responses::Entity::find()
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::SubjectType.eq(subject_type.to_i32()))
+        .filter(oncall_responses::Column::SubjectId.starts_with(format!("{source_id}#")))
+        .filter(oncall_responses::Column::State.is_in([
+            ResponseState::Triggered.to_i32(),
+            ResponseState::Triaged.to_i32(),
+            ResponseState::Acknowledged.to_i32(),
+        ]))
+        .order_by_desc(oncall_responses::Column::OpenedAt)
+        .all(client)
+        .await?
+        .into_iter()
+        .filter_map(to_response)
+        .collect())
 }
 
 /// The still-open records a fan-out opened for one source.
@@ -1782,6 +1984,57 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn a_guarded_restart_skips_a_page_someone_else_acknowledged_in_between() {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        db.execute(
+            backend.build(&Schema::new(backend).create_table_from_entity(oncall_responses::Entity)),
+        )
+        .await
+        .unwrap();
+        for (id, holder) in [
+            ("held", "alice@example.com"),
+            ("raced", "carol@example.com"),
+        ] {
+            let mut row = model();
+            row.id = id.into();
+            row.state = ResponseState::Acknowledged.to_i32();
+            row.acked_by = Some(holder.into());
+            row.acked_at = Some(900);
+            oncall_responses::ActiveModel::from(row)
+                .insert(&db)
+                .await
+                .unwrap();
+            let restarted =
+                hand_over_in(&db, "default", id, None, Some("alice@example.com"), 2_000)
+                    .await
+                    .unwrap();
+            let stored = oncall_responses::Entity::find_by_id(id)
+                .one(&db)
+                .await
+                .unwrap()
+                .and_then(to_response)
+                .unwrap();
+            if id == "held" {
+                let restarted = restarted.expect("the holder's page restarts");
+                assert_eq!(
+                    (restarted.state, restarted.acked_by),
+                    (ResponseState::Triggered, None)
+                );
+                assert_eq!(stored.ladder_run, Some(FIRST_LADDER_RUN + 1));
+            } else {
+                assert!(restarted.is_none(), "an ack landing in between is kept");
+                assert_eq!(
+                    (stored.state, stored.acked_by.as_deref()),
+                    (ResponseState::Acknowledged, Some(holder))
+                );
+            }
+        }
+    }
+
     fn model() -> oncall_responses::Model {
         oncall_responses::Model {
             id: "resp_1".into(),
@@ -2126,6 +2379,145 @@ mod tests {
             );
             assert_eq!(row_in(&db).await, to_response(row).unwrap());
         }
+    }
+
+    /// Releasing a leaver's page wins once, and never against a page someone else holds or closed.
+    #[tokio::test]
+    async fn test_releasing_an_acknowledgement_is_a_compare_and_swap() {
+        let now = 10_000_000_000;
+        let held = oncall_responses::Model {
+            state: ResponseState::Acknowledged.to_i32(),
+            acked_by: Some("ana@o2.ai".into()),
+            acked_at: Some(5_000),
+            snoozed_until: Some(now + 1),
+            ..model()
+        };
+
+        let db = table_with(held.clone()).await;
+        let released = release_acknowledgement_in(&db, "default", "resp_1", "ana@o2.ai", now)
+            .await
+            .unwrap()
+            .expect("the holder's page is released");
+        assert_eq!(
+            released,
+            Response {
+                updated_at: released.updated_at,
+                ..to_response(held.clone()).unwrap().handed_over(None, now)
+            }
+        );
+        assert_eq!(
+            release_acknowledgement_in(&db, "default", "resp_1", "ana@o2.ai", now)
+                .await
+                .unwrap(),
+            None,
+            "a second release finds nobody holding it"
+        );
+        assert_eq!(row_in(&db).await, released);
+
+        // Taken over by someone else, or closed, after the leaver's scan: the write loses.
+        let taken = oncall_responses::Model {
+            acked_by: Some("bob@o2.ai".into()),
+            ..held.clone()
+        };
+        let closed = oncall_responses::Model {
+            state: ResponseState::Resolved.to_i32(),
+            closed_at: Some(6_000),
+            ..held
+        };
+        for row in [taken, closed] {
+            let db = table_with(row.clone()).await;
+            assert_eq!(
+                release_acknowledgement_in(&db, "default", "resp_1", "ana@o2.ai", now)
+                    .await
+                    .unwrap(),
+                None
+            );
+            assert_eq!(row_in(&db).await, to_response(row).unwrap());
+        }
+    }
+
+    /// A leaver's open acknowledged pages are found org-wide or on one team, whatever the stored
+    /// case.
+    #[tokio::test]
+    async fn test_open_pages_acknowledged_by_a_person_on_every_or_one_team() {
+        let held = |id: &str, team: &str, holder: &str| oncall_responses::Model {
+            id: id.into(),
+            team_id: Some(team.into()),
+            state: ResponseState::Acknowledged.to_i32(),
+            acked_by: Some(holder.into()),
+            acked_at: Some(5_000),
+            ..model()
+        };
+        let db = table_with(held("resp_1", "team_1", "ana@o2.ai")).await;
+        let rows = [
+            held("resp_2", "team_2", "Ana@O2.ai"),
+            held("resp_3", "team_1", "bob@o2.ai"),
+            oncall_responses::Model {
+                state: ResponseState::Resolved.to_i32(),
+                closed_at: Some(6_000),
+                ..held("resp_4", "team_1", "ana@o2.ai")
+            },
+            oncall_responses::Model {
+                org_id: "other".into(),
+                ..held("resp_5", "team_1", "ana@o2.ai")
+            },
+        ];
+        for row in rows {
+            oncall_responses::ActiveModel::from(row)
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+
+        for (team, expected) in [
+            (None, vec!["resp_1", "resp_2"]),
+            (Some("team_1"), vec!["resp_1"]),
+            (Some("team_2"), vec!["resp_2"]),
+            (Some("team_3"), vec![]),
+        ] {
+            let mut ids: Vec<String> =
+                list_open_acknowledged_by_in(&db, "default", team, "ANA@o2.ai")
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|r| r.id)
+                    .collect();
+            ids.sort();
+            assert_eq!(ids, expected, "team {team:?}");
+        }
+    }
+
+    /// The ladder clock starts once, at the first held page, and never on a closed record.
+    #[tokio::test]
+    async fn test_starting_the_ladder_clock_is_a_compare_and_swap() {
+        let db = table_with(model()).await;
+        let started = start_ladder_clock_in(&db, "default", "resp_1", 4_000)
+            .await
+            .unwrap()
+            .expect("an unstarted clock starts");
+        assert_eq!(started.ladder_anchor, Some(4_000));
+        assert_eq!(
+            start_ladder_clock_in(&db, "default", "resp_1", 7_000)
+                .await
+                .unwrap(),
+            None,
+            "a started clock is not moved"
+        );
+        assert_eq!(row_in(&db).await, started);
+
+        let closed = oncall_responses::Model {
+            state: ResponseState::Resolved.to_i32(),
+            closed_at: Some(6_000),
+            ..model()
+        };
+        let db = table_with(closed.clone()).await;
+        assert_eq!(
+            start_ladder_clock_in(&db, "default", "resp_1", 4_000)
+                .await
+                .unwrap(),
+            None
+        );
+        assert_eq!(row_in(&db).await, to_response(closed).unwrap());
     }
 
     /// The pages list shows how far the current run climbed, not a run a re-page or handoff ended.

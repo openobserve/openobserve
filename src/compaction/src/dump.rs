@@ -206,6 +206,15 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         job.offset
     );
 
+    let dump_stream_name = generate_dump_stream_name(job.stream_type, &job.stream_name);
+    // the dump key outgrows the source's by 10, so a source near the limit cannot be dumped
+    if infra_file_list::stream_key_violation(&job.org_id, StreamType::Filelist, &dump_stream_name)
+        .is_some()
+    {
+        infra_file_list::set_job_dumped_status(&[job.job_id], true).await?;
+        return Ok(());
+    }
+
     // check offset
     let partition_time_level = get_partition_time_level(job.stream_type);
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(job.offset * 1000);
@@ -259,7 +268,6 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
     }
 
     // check if the schema need to be updated
-    let dump_stream_name = generate_dump_stream_name(job.stream_type, &job.stream_name);
     let dump_stream_key = format!(
         "{}/{}/{}",
         job.org_id,
@@ -819,6 +827,23 @@ mod tests {
     use arrow::array::{BooleanArray, Int64Array, StringArray};
 
     use super::*;
+
+    #[test]
+    fn test_dump_key_of_a_source_at_the_limit_cannot_be_stored() {
+        let org_id = "org";
+        let source =
+            "s".repeat(infra::file_list::STREAM_KEY_MAX_LEN - org_id.len() - "/logs/".len());
+        assert!(infra_file_list::stream_key_violation(org_id, StreamType::Logs, &source).is_none());
+        let bounded =
+            infra_file_list::stream_key_violation(org_id, StreamType::Logs, &format!("{source}s"))
+                .is_some();
+        let dump_stream = generate_dump_stream_name(StreamType::Logs, &source);
+        assert_eq!(
+            infra_file_list::stream_key_violation(org_id, StreamType::Filelist, &dump_stream)
+                .is_some(),
+            bounded
+        );
+    }
 
     // ---- DumpJob ----
 

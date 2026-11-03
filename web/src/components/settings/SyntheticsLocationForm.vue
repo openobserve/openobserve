@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="providerOptions"
           :placeholder="t('synthetics.locations.providerPlaceholder')"
           required
+          :disabled="isEdit"
           data-test="synthetics-location-provider-select"
         />
         <OFormInput
@@ -50,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('synthetics.locations.customProviderLabel')"
           :placeholder="t('synthetics.locations.customProviderPlaceholder')"
           required
+          :disabled="isEdit"
           data-test="synthetics-location-custom-provider-input"
         />
         <OFormInput
@@ -57,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('synthetics.locations.region')"
           :placeholder="t('synthetics.locations.regionPlaceholder')"
           required
+          :disabled="isEdit"
           data-test="synthetics-location-region-input"
         />
         <OFormInput
@@ -76,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </label>
           <div
             class="text-text-secondary rounded-default border-border-default bg-surface-subtle border px-3 py-2 text-sm"
+            data-test="synthetics-location-id-preview"
           >
             {{ derivedId || "-" }}
           </div>
@@ -137,13 +141,19 @@ export default defineComponent({
     const locationFormRef = ref<any>(null);
     const locationFormSchema = makeSyntheticsLocationFormSchema(t);
 
-    // Provider options for the select dropdown.
-    const providerOptions = computed(() => [
-      { label: raw("AWS"), value: "aws" },
-      { label: raw("GCP"), value: "gcp" },
-      { label: raw("Azure"), value: "azure" },
-      { label: t("synthetics.locations.providerOther"), value: "custom" },
-    ]);
+    // Provider options for the select dropdown. Only AWS probes are supported,
+    // so create offers AWS alone. Edit keeps the full list so the (disabled)
+    // select still labels locations saved with another provider.
+    const providerOptions = computed(() =>
+      props.isEdit
+        ? [
+            { label: raw("AWS"), value: "aws" },
+            { label: raw("GCP"), value: "gcp" },
+            { label: raw("Azure"), value: "azure" },
+            { label: t("synthetics.locations.providerOther"), value: "custom" },
+          ]
+        : [{ label: raw("AWS"), value: "aws" }],
+    );
 
     // Edit-prefill defaults. OForm reads `:default-values` once at mount; ODrawer
     // (reka-ui `lazy`) unmounts/remounts its body on close/open so this re-seeds
@@ -197,6 +207,13 @@ export default defineComponent({
         watch(
           [liveProvider, liveCustomProvider, liveRegion],
           ([p, cp, r]: [string, string, string]) => {
+            // Edit: the id is immutable, so show the persisted one, never a
+            // value recomputed from (read-only) provider/region fields.
+            const persistedId = props.isEdit ? (props.data as any)?.id : undefined;
+            if (persistedId) {
+              derivedId.value = persistedId;
+              return;
+            }
             const provider = p === "custom" ? cp || "custom" : p;
             derivedId.value = provider && r ? `${provider}-${r}` : "";
           },

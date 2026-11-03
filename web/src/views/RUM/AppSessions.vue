@@ -195,6 +195,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :bounce-base="kpiMetrics.bounceBase"
                 :avg-duration-ms="kpiMetrics.avgDurationMs"
                 :median-duration-ms="kpiMetrics.medianDurationMs"
+                :totals-pending="windowTotalsPending"
+                :page-pending="isLoading.length > 0"
                 :sessions-delta-pct="kpiDeltas?.sessionsPct ?? null"
                 :errors-delta="kpiDeltas?.errors ?? null"
                 :frustrated-delta="kpiDeltas?.frustrated ?? null"
@@ -231,21 +233,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     value="errors"
                     size="xs"
                     data-test="rum-app-sessions-health-errors"
-                    >{{ t("rum.withErrors") }} ·
-                    {{ sessionsSummary.errorSessions }}</OToggleGroupItem
+                    >{{ t("rum.withErrors")
+                    }}{{ segmentCount(sessionsSummary.errorSessions) }}</OToggleGroupItem
                   >
                   <OToggleGroupItem
                     value="frustrated"
                     size="xs"
                     data-test="rum-app-sessions-health-frustrated"
-                    >{{ t("rum.frustrated") }} ·
-                    {{ sessionsSummary.frustratedSessions }}</OToggleGroupItem
+                    >{{ t("rum.frustrated")
+                    }}{{ segmentCount(sessionsSummary.frustratedSessions) }}</OToggleGroupItem
                   >
                   <OToggleGroupItem
                     value="clean"
                     size="xs"
                     data-test="rum-app-sessions-health-clean"
-                    >{{ t("rum.clean") }} · {{ sessionsSummary.cleanSessions }}</OToggleGroupItem
+                    >{{ t("rum.clean")
+                    }}{{ segmentCount(sessionsSummary.cleanSessions) }}</OToggleGroupItem
                   >
                 </OToggleGroup>
 
@@ -263,15 +266,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     value="engaged"
                     size="xs"
                     data-test="rum-app-sessions-type-engaged"
-                    >{{ t("rum.engaged") }} ·
-                    {{ sessionsSummary.engagedSessions }}</OToggleGroupItem
+                    >{{ t("rum.engaged")
+                    }}{{ segmentCount(sessionsSummary.engagedSessions) }}</OToggleGroupItem
                   >
                   <OToggleGroupItem
                     value="bounced"
                     size="xs"
                     data-test="rum-app-sessions-type-bounced"
-                    >{{ t("rum.bounced") }} ·
-                    {{ sessionsSummary.bouncedSessions }}</OToggleGroupItem
+                    >{{ t("rum.bounced")
+                    }}{{ segmentCount(sessionsSummary.bouncedSessions) }}</OToggleGroupItem
                   >
                 </OToggleGroup>
 
@@ -289,22 +292,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     value="desktop"
                     size="xs"
                     data-test="rum-app-sessions-device-desktop"
-                    >{{ t("rum.desktop") }} ·
-                    {{ sessionsSummary.deviceCounts.desktop }}</OToggleGroupItem
+                    >{{ t("rum.desktop")
+                    }}{{ segmentCount(sessionsSummary.deviceCounts.desktop) }}</OToggleGroupItem
                   >
                   <OToggleGroupItem
                     value="mobile"
                     size="xs"
                     data-test="rum-app-sessions-device-mobile"
-                    >{{ t("rum.mobile") }} ·
-                    {{ sessionsSummary.deviceCounts.mobile }}</OToggleGroupItem
+                    >{{ t("rum.mobile")
+                    }}{{ segmentCount(sessionsSummary.deviceCounts.mobile) }}</OToggleGroupItem
                   >
                   <OToggleGroupItem
                     value="tablet"
                     size="xs"
                     data-test="rum-app-sessions-device-tablet"
-                    >{{ t("rum.tablet") }} ·
-                    {{ sessionsSummary.deviceCounts.tablet }}</OToggleGroupItem
+                    >{{ t("rum.tablet")
+                    }}{{ segmentCount(sessionsSummary.deviceCounts.tablet) }}</OToggleGroupItem
                   >
                 </OToggleGroup>
               </div>
@@ -357,25 +360,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <template #cell-session="{ row }">
-                  <div class="flex min-w-0 flex-col justify-center gap-0.5">
-                    <OUserCell
-                      :value="row.user_email || unknownUserLabel"
-                      class="truncate font-medium"
-                    />
-                    <div class="text-text-secondary flex items-center gap-1.5 text-xs">
-                      <span
-                        class="font-mono"
-                        :title="row.session_id"
-                        data-test="rum-app-sessions-session-id-text"
-                        >{{ shortSessionId(row.session_id) }}</span
-                      >
-                      <span aria-hidden="true">·</span>
-                      <OTimeCell
-                        :value="row.zo_sql_timestamp"
-                        unit="us"
-                        :timezone="store.state.timezone"
+                  <div class="flex min-w-0 items-center gap-2">
+                    <div class="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+                      <OUserCell
+                        :value="row.user_email || unknownUserLabel"
+                        class="truncate font-medium"
                       />
+                      <div class="text-text-secondary flex items-center gap-1.5 text-xs">
+                        <span
+                          class="font-mono"
+                          :title="row.session_id"
+                          data-test="rum-app-sessions-session-id-text"
+                          >{{ shortSessionId(row.session_id) }}</span
+                        >
+                        <span aria-hidden="true">·</span>
+                        <OTimeCell
+                          :value="row.zo_sql_timestamp"
+                          unit="us"
+                          :timezone="store.state.timezone"
+                        />
+                      </div>
                     </div>
+                    <OButton
+                      v-if="row.has_replay"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      :aria-label="t('rum.heatmap.viewHeatmap')"
+                      :disabled="heatmapOpening === row.session_id"
+                      data-test="rum-app-sessions-view-heatmap-btn"
+                      @click.stop="openSessionHeatmap(row.session_id, row.start_time * 1000)"
+                    >
+                      <OIcon name="grid-on" size="sm" />
+                      <OTooltip :content="t('rum.heatmap.viewHeatmapTip')" side="bottom" />
+                    </OButton>
                   </div>
                 </template>
                 <template #cell-platform="{ row }">
@@ -520,6 +537,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import useSessionHeatmap from "@/composables/rum/useSessionHeatmap";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
@@ -810,6 +828,7 @@ onMounted(async () => {
 function releaseInFlightSearches() {
   inFlightLoad?.abort();
   inFlightLoad = null;
+  windowTotalsPending.value = false;
   cancelPendingActivityQueries();
 }
 
@@ -964,6 +983,7 @@ const getSessions = () => {
   // Aggregates are now stage 3, so clear the strip here rather than when they start —
   // otherwise it keeps showing the PREVIOUS window's numbers while the new list loads.
   clearWindowAggregates();
+  windowTotalsPending.value = true;
 
   const interval = getTimeInterval(dateTime.value.startTime, dateTime.value.endTime);
   const parsedQuery = parseQuery(sessionState.data.editorValue, false);
@@ -1069,6 +1089,7 @@ const getSessions = () => {
         // time range (they would return 0), and activity sparklines are per-row. Zero the
         // KPI state directly instead of spending 4 more searches to be told the same.
         clearWindowAggregates();
+        windowTotalsPending.value = false;
         return "empty" as const;
       }
 
@@ -1318,6 +1339,10 @@ const fetchWindowAggregates = (baseReq: any, whereClause: string, signal?: Abort
       })
       .catch(() => {
         windowTotals.value = null;
+      })
+      .finally(() => {
+        // An aborted summary belongs to a load that was replaced or left, and that path settles the flag.
+        if (!signal?.aborted) windowTotalsPending.value = false;
       }),
   );
 
@@ -1438,6 +1463,7 @@ const deviceSegment = ref<DeviceSegment>("all");
 // Window-level aggregates (no LIMIT) so the KPI strip reflects the true
 // totals, not just the fetched page. Null until the summary query resolves.
 const windowTotals = ref<WindowTotals | null>(null);
+const windowTotalsPending = ref(true);
 const previousWindowTotals = ref<WindowTotals | null>(null);
 const frustrationCluster = ref<SessionInsight | null>(null);
 const errorCluster = ref<SessionInsight | null>(null);
@@ -1483,6 +1509,9 @@ const enrichedRows = computed(() =>
     platform: classifySource(row.source),
   })),
 );
+
+// The counts come from the fetched page, so while it loads they would be the empty page's zeros.
+const segmentCount = (count: number) => (isLoading.value.length > 0 ? "" : ` · ${count}`);
 
 const sessionsSummary = computed(() => {
   const all = enrichedRows.value;
@@ -1698,6 +1727,7 @@ const getSessionStatusColor = (row: any) => {
 };
 
 const router = useRouter();
+const { openSessionHeatmap, openingSessionId: heatmapOpening } = useSessionHeatmap();
 
 // A RUM tab switch pushes Performance's range, so only a Product Analytics handoff may replace the list's own.
 let enteredFromAnalytics = false;

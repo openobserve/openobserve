@@ -62,8 +62,9 @@ describe("searchAlertSettings", () => {
   });
 
   it.each([
-    ["dedup", "dedup"],
-    ["deduplication", "dedup"],
+    ["dedup", "suppressRepeats"],
+    ["deduplication", "suppressRepeats"],
+    ["flapping", "keepFiring"],
     ["cooldown", "cooldown"],
     ["silence", "cooldown"],
     ["critical", "threshold"],
@@ -90,7 +91,7 @@ describe("searchAlertSettings", () => {
   });
 
   it("matches the visible label too", () => {
-    expect(top("skip dup")).toBe("dedup");
+    expect(top("suppress repeats")).toBe("suppressRepeats");
     expect(top("at most once")).toBe("cooldown");
   });
 
@@ -100,18 +101,8 @@ describe("searchAlertSettings", () => {
     expect(found).toContain("rowTemplate");
   });
 
-  it("lists a setting's own controls right after it", () => {
-    expect(ids("dedup").slice(0, 3)).toEqual(["dedup", "dedupFields", "dedupWindow"]);
-    expect(top("identical within")).toBe("dedupWindow");
-  });
-
-  it("gates a control by the setting that shows it", () => {
-    const found = searchAlertSettings("dedup", t, (id) => id !== "dedup").map((m) => m.entry.id);
-    expect(found).toEqual([]);
-  });
-
   it("leaves out settings that do not apply", () => {
-    expect(top("dedup", (id) => id !== "dedup")).toBeUndefined();
+    expect(top("suppress", (id) => id !== "suppressRepeats")).toBeUndefined();
     expect(ids("cron")).toContain("cron");
     expect(
       searchAlertSettings("cron", t, (id) => id !== "cron").map((m) => m.entry.id),

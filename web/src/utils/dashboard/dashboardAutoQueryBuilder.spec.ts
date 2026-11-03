@@ -2182,6 +2182,81 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toContain("country");
       expect(result).toContain("name_alias");
     });
+
+    describe("WHERE clause with skipped conditions (issue 16022)", () => {
+      const cond = (operator: string, value: any, extra: any = {}) => ({
+        type: "condition",
+        values: [],
+        column: { field: "country", streamAlias: null },
+        operator,
+        value,
+        logicalOperator: "AND",
+        filterType: "condition",
+        ...extra,
+      });
+      const setConditions = (conditions: any[]) => {
+        mockDashboardPanelData.data.queries[0].fields.filter.conditions = conditions;
+      };
+
+      it("keeps a <> '' parsed from SQL and leaves no trailing AND", () => {
+        setConditions([cond("Is Not Null", null), cond("<>", "", { emptyLiteral: true })]);
+        expect(mapChart(mockDashboardPanelData)).toContain(
+          "WHERE country IS NOT NULL AND country <> '' GROUP BY",
+        );
+      });
+
+      it("keeps a lone <> '' parsed from SQL", () => {
+        setConditions([cond("<>", "", { emptyLiteral: true })]);
+        expect(mapChart(mockDashboardPanelData)).toContain("WHERE country <> '' GROUP BY");
+      });
+
+      it("keeps = '' parsed from SQL on a non-string column", () => {
+        setConditions([
+          { ...cond("=", "", { emptyLiteral: true }), column: { field: "id", streamAlias: null } },
+        ]);
+        expect(mapChart(mockDashboardPanelData)).toContain("WHERE id = '' GROUP BY");
+      });
+
+      it("skips an empty value not entered yet without a trailing AND", () => {
+        setConditions([cond("Is Not Null", null), cond("=", "")]);
+        const result = mapChart(mockDashboardPanelData);
+        expect(result).toContain("WHERE country IS NOT NULL GROUP BY");
+        expect(result).not.toMatch(/AND\s+GROUP BY/);
+      });
+
+      it("drops the WHERE clause when every condition is empty", () => {
+        setConditions([cond("=", "")]);
+        expect(mapChart(mockDashboardPanelData)).not.toContain("WHERE");
+      });
+
+      it("keeps each condition's own operator when a middle one is skipped", () => {
+        setConditions([
+          cond("=", "a"),
+          cond("=", ""),
+          { ...cond("=", "b"), logicalOperator: "OR" },
+        ]);
+        expect(mapChart(mockDashboardPanelData)).toContain(
+          "WHERE country = 'a' OR country = 'b' GROUP BY",
+        );
+      });
+
+      it("keeps each condition's own operator inside a group", () => {
+        setConditions([
+          {
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [
+              cond("=", "a"),
+              { ...cond("=", ""), logicalOperator: "AND" },
+              { ...cond("=", "b"), logicalOperator: "OR" },
+            ],
+          },
+        ]);
+        expect(mapChart(mockDashboardPanelData)).toContain(
+          "WHERE (country = 'a' OR country = 'b') GROUP BY",
+        );
+      });
+    });
   });
 
   describe("geoMapChart", () => {

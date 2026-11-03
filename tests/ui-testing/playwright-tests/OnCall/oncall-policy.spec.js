@@ -64,19 +64,17 @@ const BUDGET_MAX = 600;
 /**
  * A team with one rotation and members, in the order the server accepts.
  *
- * Schedule before members: adding the first member to a rotationless team
- * auto-provisions a `source: "default"` rotation and repoints P1-P3 at it, and
- * a schedule written afterwards is then the §8.5 replacement the server
- * refuses.
+ * Members before schedule: a schedule naming somebody not on the team is
+ * refused with a 400.
  */
 async function stageTeam(page, name, { memberCount = 3 } = {}) {
   const users = await createOrgUsers(page, name, memberCount);
   const team = await createTeam(page, { name, timezone: 'UTC' });
+  await addTeamMembers(page, team.id, users);
   await setTeamSchedule(page, team.id, {
     timezone: 'UTC',
     rotations: [rotation({ id: 'Primary', members: users })],
   });
-  await addTeamMembers(page, team.id, users);
   return { team, users };
 }
 
@@ -300,17 +298,18 @@ test.describe('On-call escalation policy editor', {
    * arrive from legacy data or a newer engine. Writing one needs a fixture at
    * the storage layer, which is a decision, not a test.
    */
-  test.fixme('TS-10.08b an unrecognised target kind renders as unrecognised rather than as a deleted rotation — not wired: POST/PUT policy 422s any kind outside rotation|user|whole_team, so the state cannot be seeded through the API, verified 16 Sep on :5090. o2-enterprise#2481.', {
+  test.fixme('TS-10.08b an unrecognised target kind renders as unrecognised rather than as a deleted rotation — the API 422s an unknown kind, so it cannot be seeded. o2-enterprise#2481.', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
     const name = uniqueName(`${workerPrefix(testInfo)}_kind`);
     const { team } = await stageTeam(page, name);
-    await putPolicy(page, team.id, {
+    const seeded = await putPolicy(page, team.id, {
       rungs: [{
         priority: 2, channels: ['email'],
         steps: [{ after_micros: 0, targets: [{ kind: 'martian_relay' }] }],
       }],
     });
+    expect(seeded.status, `the unknown-kind policy must be stored before its rendering can be read: ${seeded.text}`).toBe(200);
 
     await pm.oncallPolicyEditorPage.gotoEscalationTab(ORG, team.id);
     await pm.oncallPolicyEditorPage.openEditor();
@@ -368,6 +367,8 @@ test.describe('On-call escalation policy editor', {
 
     // None — never set, so the policy's list applies again.
     await pm.oncallPolicyEditorPage.clearTeamChannel();
+    // The channel choice is only a draft until the policy's Save, which also closes the editor.
+    await pm.oncallPolicyEditorPage.savePolicy();
     await expect
       .poll(async () => (await getTeamChannel(page, team.id))?.source, {
         timeout: 20000,
@@ -379,6 +380,8 @@ test.describe('On-call escalation policy editor', {
     expect(cleared.destinations,
       'both states render an empty list — which is exactly why source has to carry the difference')
       .toEqual([]);
+    await pm.oncallPolicyEditorPage.openEditor();
+    await pm.oncallPolicyEditorPage.openTab('delivery');
     const policySource = await pm.oncallPolicyEditorPage.readChannelSourceText();
     expect(policySource.toLowerCase(),
       'and the screen must now attribute it to the policy instead')

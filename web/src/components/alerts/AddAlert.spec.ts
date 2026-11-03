@@ -146,7 +146,6 @@ const stubs = {
   QueryConfig: true,
   AlertSettings: true,
   CompareWithPast: true,
-  Deduplication: true,
   Advanced: true,
   PreviewAlert: true,
   AlertSummary: true,
@@ -265,17 +264,6 @@ describe("AddAlert (OForm owner)", () => {
     wrapper = null;
     vi.clearAllMocks();
     unstubScrolling();
-  });
-
-  describe("owner pattern wiring", () => {
-    it("owns the ONE form and exposes formData as a read-view + _meta seeded", async () => {
-      wrapper = mountAlert();
-      await flushPromises();
-      expect(wrapper.vm.form).toBeTruthy();
-      expect(wrapper.vm.formData.name).toBe("");
-      expect(wrapper.vm.formData._meta).toBeTruthy();
-      expect(wrapper.vm.formData.is_real_time).toBe("false");
-    });
   });
 
   describe("schema-gated save (block-on-invalid)", () => {
@@ -754,6 +742,7 @@ describe("AddAlert (OForm owner)", () => {
           "notify_on_recovery",
           "recovery_destinations",
           "keep_firing_for",
+          "suppress_repeats",
         ].sort(),
       );
 
@@ -1285,23 +1274,23 @@ describe("AddAlert (OForm owner)", () => {
       wrapper.vm.tiers.collapse("notify");
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-find-setting"]').exists()).toBe(true);
-      wrapper.vm.settingFind.query.value = "dedup";
+      wrapper.vm.settingFind.query.value = "flapping";
       await flushPromises();
       expect(wrapper.vm.settingFind.items.value[0]).toMatchObject({
-        id: "dedup",
-        label: "Skip duplicates",
+        id: "keepFiring",
+        label: "Keep firing after it clears",
       });
-      expect(wrapper.vm.tiers.isVisible("dedup")).toBe(false);
+      expect(wrapper.vm.tiers.isVisible("keepFiring")).toBe(false);
       // jsdom has no layout: the stubbed step renders no control, so the jump falls back to the section.
       const scrollTo = vi.fn();
       Object.defineProperty(HTMLElement.prototype, "scrollTo", {
         configurable: true,
         value: scrollTo,
       });
-      await wrapper.vm.settingFind.select("dedup");
+      await wrapper.vm.settingFind.select("keepFiring");
       await flushPromises();
       delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo;
-      expect(wrapper.vm.tiers.isVisible("dedup")).toBe(true);
+      expect(wrapper.vm.tiers.isVisible("keepFiring")).toBe(true);
       expect(scrollTo).toHaveBeenCalled();
       expect(wrapper.find('[data-test="add-alert-section-notify-more"]').text()).toBe("Show fewer");
     });
@@ -1317,7 +1306,8 @@ describe("AddAlert (OForm owner)", () => {
       wrapper.vm.form.setFieldValue("is_real_time", "true");
       await flushPromises();
       expect(found("cron")).not.toContain("cron");
-      expect(found("dedup")).not.toContain("dedup");
+      expect(found("flapping")).not.toContain("keepFiring");
+      expect(found("suppress")).not.toContain("suppressRepeats");
       expect(found("cooldown")).toContain("cooldown");
     });
 

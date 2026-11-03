@@ -8,13 +8,14 @@ on:
   pull_request:
     branches:
       - "**"
-    # labeled/unlabeled so adding or removing 'ready-for-ci' starts or resets CI; drafts never run paid CI.
+    # labeled/unlabeled so 'ready-for-ci' gates CI; only a new commit cancels an in-flight run (see concurrency); a draft starts no paid CI (an in-flight run still finishes).
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
-  cancel-in-progress: true
+  # Only a new commit cancels: a cancelled same-SHA run leaves a failed required summary that a newer run cannot clear.
+  cancel-in-progress: ${{ github.event_name != 'pull_request' || github.event.action == 'synchronize' }}
 
 env:
   COLUMNS: 150
@@ -72,8 +73,6 @@ jobs:
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -82,11 +81,13 @@ jobs:
           toolchain: nightly-2026-10-24
           targets: x86_64-unknown-linux-gnu
 
+      # Own cache: the unit-tests cache holds coverage-instrumented builds that clippy cannot reuse.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           cache-on-failure: true
-          shared-key: unit-tests
-          save-if: false
+          shared-key: clippy
+          # main only: merge-queue ref caches are invisible to PRs and would only crowd the repo cache cap
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: bash ./.github/protoc.sh
@@ -129,7 +130,9 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
+          # config::VERSION needs tags from git describe, which a shallow clone lacks; old blobs are not needed
           fetch-depth: 0
+          filter: blob:none
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -173,8 +176,11 @@ jobs:
         run: ./coverage.sh run-cov
         env:
           ZO_DATA_DIR: ${{ runner.temp }}/openobserve-postgres/
+          # The PR run already gated coverage; the queue only needs pass/fail.
+          COVERAGE_NO_REPORT: ${{ github.event_name == 'merge_group' }}
 
       - name: Check PostgreSQL coverage
+        if: github.event_name != 'merge_group'
         run: ./coverage.sh check
 
   backend_unit_tests_sqlite:
@@ -193,7 +199,9 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
+          # config::VERSION needs tags from git describe, which a shallow clone lacks; old blobs are not needed
           fetch-depth: 0
+          filter: blob:none
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -224,8 +232,11 @@ jobs:
         run: ./coverage.sh run-cov
         env:
           ZO_DATA_DIR: ${{ runner.temp }}/openobserve-sqlite/
+          # The PR run already gated coverage; the queue only needs pass/fail.
+          COVERAGE_NO_REPORT: ${{ github.event_name == 'merge_group' }}
 
       - name: Check SQLite coverage
+        if: github.event_name != 'merge_group'
         run: ./coverage.sh check
 
   backend_unit_tests:
@@ -252,10 +263,14 @@ jobs:
           done
           echo "All backend checks completed successfully"
 
-  ui_unit_tests:
+  ui_unit_test_shards:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_ui_changes == 'true'
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     runs-on:
       labels: ubicloud-standard-8
     permissions:
@@ -264,8 +279,6 @@ jobs:
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - uses: ./.github/actions/github-auth
       - name: Setup Node.js
@@ -275,14 +288,92 @@ jobs:
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
+      - name: Restore node_modules
+        id: nm
+        uses: actions/cache/restore@v4
+        with:
+          path: web/node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
+
       - name: Install dependencies
+        if: steps.nm.outputs.cache-hit != 'true'
         working-directory: web
         timeout-minutes: 5
         run: npm ci
 
-      - name: Run frontend unit tests with coverage and check thresholds
+      # Only main saves it: a PR-saved cache is visible to that PR alone and fills the 10 GB repo cache.
+      - name: Save node_modules
+        if: github.ref == 'refs/heads/main' && steps.nm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: web/node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
+
+      - name: Run this shard with coverage
         working-directory: web
-        run: ./coverage.sh check
+        env:
+          UI_SHARD_BALANCE: '1'
+        run: |
+          npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=default --reporter=blob \
+            --coverage.reportOnFailure --coverage.reporter=json \
+            --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
+            --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-unit-blob-${{ matrix.shard }}
+          path: web/.vitest-reports
+          include-hidden-files: true
+          retention-days: 1
+          compression-level: 1
+
+  # Keeps the required-check name `ui_unit_tests` while the work runs in shards.
+  ui_unit_tests:
+    needs: [check_changes, ui_unit_test_shards]
+    if: always() && needs.check_changes.outputs.has_ui_changes == 'true'
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Require every shard to pass
+        run: |
+          [ "${{ needs.ui_unit_test_shards.result }}" = "success" ] || { echo "shards: ${{ needs.ui_unit_test_shards.result }}"; exit 1; }
+
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Restore node_modules
+        id: nm
+        uses: actions/cache/restore@v4
+        with:
+          path: web/node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
+
+      - name: Install dependencies
+        if: steps.nm.outputs.cache-hit != 'true'
+        working-directory: web
+        timeout-minutes: 5
+        run: npm ci
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ui-unit-blob-*
+          path: web/.vitest-reports
+          merge-multiple: true
+
+      - name: Merge shard coverage and check thresholds
+        working-directory: web
+        run: ./coverage.sh merge
 
   ui_code_quality:
     needs: [check_changes]
@@ -306,6 +397,27 @@ jobs:
       - name: Install dependencies
         working-directory: web
         run: npm ci
+
+      # Cheapest first, so a failure skips the slower steps.
+      - name: Check token-file purity (token files contain tokens only)
+        working-directory: web
+        run: npm run lint:token-purity
+
+      - name: Check for undefined CSS custom properties
+        working-directory: web
+        run: npm run lint:tokens
+
+      - name: Lint styles (stylelint — bans legacy --o2-* tokens)
+        working-directory: web
+        run: npm run lint:styles
+
+      - name: Check design-consistency ratchet (strict — hardcoded/arbitrary/raw-token, no slack)
+        working-directory: web
+        run: npm run lint:design:strict
+
+      - name: Lint frontend code
+        working-directory: web
+        run: npm run lint:ci
 
       - name: Prettier format check (any unformatted file fails)
         working-directory: web

@@ -232,7 +232,7 @@ let stale = true;
 let generation = 0;
 let active: AbortController | null = null;
 /** What the last load asked for, so a watcher catching up on it does not ask again. */
-let loadedFor: { key: string; forecastKey: string; timeRange: object } | null = null;
+let loadedFor: { key: string; forecastKey: string; timeRange: object; step: number } | null = null;
 
 const queryKey = () => {
   const exprs = props.queries?.map((query) => query.expr).join("\n");
@@ -259,7 +259,7 @@ const load = async () => {
   const compare = props.compare;
   const forecast = props.forecast;
   const stepSeconds = props.stepSeconds;
-  loadedFor = { key: queryKey() ?? "", forecastKey: forecastKey(), timeRange };
+  loadedFor = { key: queryKey() ?? "", forecastKey: forecastKey(), timeRange, step: stepSeconds };
   active = new AbortController();
   const { signal } = active;
   // Only a chart of this same query is still kept here: a new query resets to IDLE first.
@@ -325,10 +325,11 @@ const invalidate = () => {
     !stale &&
     loadedFor?.key === queryKey() &&
     loadedFor?.forecastKey === forecastKey() &&
-    loadedFor?.timeRange === props.timeRange
+    loadedFor?.timeRange === props.timeRange &&
+    loadedFor?.step === props.stepSeconds
   )
     return;
-  // A new window or forecast alone keeps the drawn chart until the new result lands.
+  // A new window, step or forecast alone keeps the drawn chart until the new result lands.
   const windowOnly = loadedFor?.key === queryKey();
   // A kept chart must not go on drawing a forecast the control no longer asks for.
   if (loadedFor?.forecastKey !== forecastKey() && state.value.forecast) {
@@ -343,7 +344,7 @@ const invalidate = () => {
 };
 
 // Sources compared one by one: a getter returning a fresh array re-fires on every rebuild.
-watch([queryKey, forecastKey, () => props.timeRange], invalidate);
+watch([queryKey, forecastKey, () => props.timeRange, () => props.stepSeconds], invalidate);
 
 watch(visible, (isVisible) => {
   if (isVisible) {

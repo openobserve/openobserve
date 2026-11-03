@@ -39,8 +39,7 @@ export type AlertFindId =
   | "cooldown"
   | "name"
   | "folder"
-  | "dedupFields"
-  | "dedupWindow";
+  | "suppressRepeats";
 
 export interface AlertFindEntry {
   id: AlertFindId;
@@ -241,33 +240,13 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     targets: ["alert-oncall-team-select"],
   },
   {
-    id: "dedup",
-    labelKey: "alerts.plain.dedupTitle",
-    aliases: ["dedup", "deduplication", "duplicates", "fingerprint", "suppress"],
+    id: "suppressRepeats",
+    labelKey: "alerts.alertSettings.suppressRepeats",
+    aliases: ["suppress", "repeat", "once per state", "dedup", "deduplication", "duplicates"],
     section: "notify",
-    tier: "tucked",
+    tier: "shown",
     groupKey: MORE,
-    targets: ["alert-dedup-fingerprint-fields", "alert-dedup-time-window"],
-  },
-  {
-    id: "dedupFields",
-    labelKey: "alerts.deduplication.fingerprintFields",
-    aliases: ["fingerprint fields", "similar alerts", "dedup fields"],
-    section: "notify",
-    tier: "tucked",
-    groupKey: "alerts.plain.dedupTitle",
-    setting: "dedup",
-    targets: ["alert-dedup-fingerprint-fields"],
-  },
-  {
-    id: "dedupWindow",
-    labelKey: "alerts.deduplication.timeWindow",
-    aliases: ["dedup window", "time window", "identical within"],
-    section: "notify",
-    tier: "tucked",
-    groupKey: "alerts.plain.dedupTitle",
-    setting: "dedup",
-    targets: ["alert-dedup-time-window"],
+    targets: ["alert-suppress-repeats-toggle"],
   },
   {
     id: "keepFiring",

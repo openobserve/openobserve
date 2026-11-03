@@ -31,6 +31,7 @@ import requests
 
 pytestmark = [
     pytest.mark.order(2),
+    pytest.mark.serial,
 ]
 
 logger = logging.getLogger(__name__)

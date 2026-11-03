@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 import useIngestion from "@/composables/useIngestion";
-import { b64EncodeStandard } from "@/utils/zincutils";
+import { basicIngestToken } from "@/composables/useCredentialSnippet";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
@@ -48,7 +48,7 @@ const subs = computed<CardSubstitutions>(() => {
   return {
     url: endpoint.value?.url ?? "",
     org: store.state.selectedOrganization?.identifier ?? "",
-    token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
+    token: basicIngestToken(email, passcode),
   };
 });
 

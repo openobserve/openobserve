@@ -1,5 +1,6 @@
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 const testLogger = require("../utils/test-logger.js");
+const { NavRailPage } = require("../../pages/generalPages/navRailPage.js");
 
 const SIZES = [
   { width: 1440, height: 900 },
@@ -24,10 +25,13 @@ async function setLanguageCookie(page, code) {
 
 const isFocused = (locator) => locator.evaluate((el) => el === document.activeElement);
 
-async function openProfileMenuByKeyboard(page) {
+async function openProfileMenuByKeyboard(page, { whileLoading = false } = {}) {
+  const navRail = new NavRailPage(page);
+  if (!whileLoading) await navRail.waitForHomeLoaded();
   await page.locator(PROFILE).focus();
   await page.keyboard.press("Enter");
   await expect(page.locator(ROW)).toBeVisible();
+  if (!whileLoading) await navRail.expectFocusInMenu();
 }
 
 async function arrowToRow(page) {
@@ -40,14 +44,13 @@ async function arrowToRow(page) {
 }
 
 test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
-  test.describe.configure({ mode: "serial" });
-
   for (const size of SIZES) {
     for (const dir of DIRS) {
       test(`language list is reachable and unclipped at ${size.width}x${size.height} ${dir}`, async ({
         page,
       }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
+        const navRail = new NavRailPage(page);
         await page.setViewportSize(size);
         await setLanguageCookie(page, dir === "rtl" ? "ar" : "en-us");
         await navigateToBase(page);
@@ -61,14 +64,11 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
         await expect(row).toHaveAttribute("aria-expanded", "false");
 
         testLogger.step("Focus style matches the sibling items");
-        // ODropdownItem animates its colours over 150 ms; read after the transition has settled.
-        await page.waitForTimeout(300);
-        const rowBg = await row.evaluate((el) => getComputedStyle(el).backgroundColor);
+        const rowBg = await navRail.settledBackground(row);
         await page.keyboard.press("ArrowDown");
         const themeRow = page.locator(THEME_ROW);
         expect(await isFocused(themeRow)).toBe(true);
-        await page.waitForTimeout(300);
-        const siblingBg = await themeRow.evaluate((el) => getComputedStyle(el).backgroundColor);
+        const siblingBg = await navRail.settledBackground(themeRow);
         expect(rowBg).toBe(siblingBg);
         await page.keyboard.press("ArrowUp");
         expect(await isFocused(row)).toBe(true);
@@ -137,6 +137,8 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
         await expect(page.locator(PROFILE)).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.dir || "ltr")).toBe("ltr");
 
+        // The mouse path does not depend on size or direction, so one variant pays for its reload.
+        if (size.width !== SIZES[0].width || dir !== "ltr") return;
         testLogger.step("The same choice works by mouse");
         await page.locator(PROFILE).click();
         await page.locator(ROW).click();
@@ -148,4 +150,34 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
       });
     }
   }
+
+  test("Arrows keep focus in the profile menu opened while the full config loads", async ({
+    page,
+  }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    const navRail = new NavRailPage(page);
+    const { release, served } = await navRail.holdOrgConfig();
+    await page.setViewportSize(SIZES[0]);
+    await setLanguageCookie(page, "en-us");
+
+    testLogger.step("Open the profile menu by keyboard while the full config is held");
+    await navigateToBase(page);
+    // The home view cannot finish loading while the config is held.
+    await openProfileMenuByKeyboard(page, { whileLoading: true });
+
+    testLogger.step("Release the full config");
+    release();
+    await served;
+    await navRail.waitForHomeLoaded();
+    await expect(page.locator(ROW)).toBeVisible();
+
+    testLogger.step("Arrow keys still move between menu rows");
+    await page.keyboard.press("ArrowDown");
+    const first = await navRail.focusedMenuRow();
+    expect(first, "focus is inside the menu").not.toBeNull();
+    await page.keyboard.press("ArrowDown");
+    const second = await navRail.focusedMenuRow();
+    expect(second, "focus is inside the menu").not.toBeNull();
+    expect(second).not.toBe(first);
+  });
 });

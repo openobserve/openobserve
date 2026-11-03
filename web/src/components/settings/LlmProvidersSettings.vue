@@ -276,7 +276,6 @@ const forbidden = computed(() => {
   return e?.status === 403 || e?.response?.status === 403;
 });
 const lastUpdatedAt = providersList.dataUpdatedAt;
-// The grouped access toast already reports a 403; a second red toast adds nothing.
 watch(providersList.error, (err: any) => {
   if (err && !forbidden.value) showError(err, t("llmProviders.loadError"));
 });

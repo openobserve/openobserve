@@ -531,8 +531,8 @@ const navigateToUpload = () => {
 };
 
 // On mount
-onMounted(async () => {
-  await fetchFilterValues();
+onMounted(() => {
+  void fetchFilterValues();
   fetchSourceMaps();
 });
 

@@ -21,6 +21,7 @@ import { raw } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
 import { use as echartsUse } from "echarts/core";
 import {
+  BoxplotChart,
   FunnelChart,
   GraphChart,
   LineChart,
@@ -77,6 +78,7 @@ vi.mock("echarts/charts", () => ({
   TreemapChart: vi.fn(),
   SunburstChart: vi.fn(),
   FunnelChart: vi.fn(),
+  BoxplotChart: vi.fn(),
 }));
 
 vi.mock("echarts/features", () => ({
@@ -147,6 +149,9 @@ describe("ChartRenderer series registration", () => {
   });
   it("registers the graph series the node graph draws", () => {
     expect(registeredAtImport).toContain(GraphChart);
+  });
+  it("registers the box plot series", () => {
+    expect(registeredAtImport).toContain(BoxplotChart);
   });
 });
 
@@ -1616,7 +1621,10 @@ describe("ChartRenderer", () => {
         series: [
           {
             type: "pie",
-            label: { show: true, formatter: "{d}%" },
+            label: {
+              show: true,
+              formatter: (params: { percent: number }) => `${params.percent.toFixed(1)}%`,
+            },
             data: [
               { name: "a", value: 10 },
               { name: "b", value: 10 },

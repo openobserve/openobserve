@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   ErrorDetailPanel — collapsible error detail card used inside QueryErrorState.
 
   Shows:
-    • summaryLine  — first sentence of the error message (always visible)
+    • summaryLine  — first sentence of the error message (empty when the parent explains it)
     • traceId      — backend trace ID for support / debugging
     • detailBody   — expanded full message + raw SQL detail (hidden by default)
 
@@ -29,8 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="rounded-default border-border-default bg-surface-panel flex flex-col border text-left"
     data-test="error-detail-panel"
   >
-    <!-- Summary row (always shown) -->
-    <div class="flex flex-col gap-1 px-4 py-3">
+    <div v-if="summaryLine || traceId" class="flex flex-col gap-1 px-4 py-3">
       <p
         v-if="summaryLine"
         class="text-text-body m-0 text-sm font-medium"
@@ -46,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Toggle row -->
     <template v-if="hasDetail">
-      <div class="border-border-default border-t px-4 py-1">
+      <div class="border-border-default px-4 py-1" :class="{ 'border-t': summaryLine || traceId }">
         <button
           type="button"
           class="text-text-secondary hover:text-text-body flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 py-1.5 text-xs transition-colors"

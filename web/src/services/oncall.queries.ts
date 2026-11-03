@@ -16,6 +16,7 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import oncallService, { RESPONSE_PAGE_LIMIT } from "./oncall";
 import { incidentKeys } from "./incidents.querykeys";
+import { oneAckScopes } from "./alerts.querykeys";
 import { oncallKeys } from "./oncall.querykeys";
 import {
   LIVE_STALE_TIME,
@@ -44,6 +45,7 @@ import type {
   Rotation,
   PutTelephonyBody,
   RoutingConfig,
+  SetTeamChannelBody,
   TeamLoad,
   TelephonyStatus,
   TelephonyView,
@@ -565,10 +567,18 @@ export const removeTeamMemberMutation = (org: string, teamId: string) =>
     meta: { invalidates: teamWriteScopes(org, teamId), silentError: true },
   });
 
+/// Every client schedule write is a human's, so none of it is the untouched default; one place, so no caller can forget.
 export const setTeamScheduleMutation = (org: string, teamId: string) =>
   mutationOptions({
     mutationFn: (data: { timezone: string; rotations: Rotation[] }) =>
-      oncallService.setSchedule({ org_identifier: org, team_id: teamId, data }),
+      oncallService.setSchedule({
+        org_identifier: org,
+        team_id: teamId,
+        data: {
+          ...data,
+          rotations: data.rotations.map((rotation) => ({ ...rotation, source: undefined })),
+        },
+      }),
     meta: { invalidates: teamWriteScopes(org, teamId), silentError: true },
   });
 
@@ -590,13 +600,16 @@ export const setTeamPolicyMutation = (org: string, teamId: string) =>
 
 export const setTeamChannelMutation = (org: string, teamId: string) =>
   mutationOptions({
-    mutationFn: (destinations: string[] | null) =>
-      oncallService.setTeamChannel({
-        org_identifier: org,
-        team_id: teamId,
-        data: { destinations },
-      }),
+    mutationFn: (data: SetTeamChannelBody) =>
+      oncallService.setTeamChannel({ org_identifier: org, team_id: teamId, data }),
     meta: { invalidates: [oncallKeys.team(org, teamId)], silentError: true },
+  });
+
+/** RO-6: posts one plain message and writes no row, so it expires nothing. */
+export const testTeamSlackChannelMutation = (org: string, teamId: string) =>
+  mutationOptions({
+    mutationFn: () => oncallService.testTeamSlackChannel({ org_identifier: org, team_id: teamId }),
+    meta: { silentError: true },
   });
 
 export const createOverrideMutation = (org: string, teamId: string) =>
@@ -675,7 +688,25 @@ export const acknowledgeResponseMutation = (org: string) =>
   mutationOptions({
     mutationFn: (responseId: string) =>
       oncallService.acknowledgeResponse({ org_identifier: org, response_id: responseId }),
-    meta: { invalidates: responseWriteScopes(org), silentError: true },
+    meta: { invalidates: oneAckScopes(org), silentError: true },
+  });
+
+export const takeOverResponseMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (responseId: string) =>
+      oncallService.acknowledgeResponse({
+        org_identifier: org,
+        response_id: responseId,
+        take_over: true,
+      }),
+    meta: { invalidates: oneAckScopes(org), silentError: true },
+  });
+
+export const unacknowledgeResponseMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (responseId: string) =>
+      oncallService.unacknowledgeResponse({ org_identifier: org, response_id: responseId }),
+    meta: { invalidates: oneAckScopes(org), silentError: true },
   });
 
 /** The ladder resumes on its own when the snooze lapses — see the live tier on the reads. */

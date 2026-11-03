@@ -9,7 +9,13 @@
 // a `searchdata` signal and triggers a redundant search.
 
 import { describe, it, expect } from "vitest";
-import { isDatetimeChanged } from "./tracesSearchBar.utils";
+import {
+  isDatetimeChanged,
+  tracesRunIsStaged,
+  tracesRunSignature,
+  tracesSearchRunSignature,
+  tracesToolbarLayout,
+} from "./tracesSearchBar.utils";
 
 // ===========================================================================
 // Relative range — must compare by relativeTimePeriod, NOT raw start/end.
@@ -209,5 +215,124 @@ describe("isDatetimeChanged — defensive cases", () => {
         endTime: "200",
       }),
     ).toBe(true);
+  });
+});
+
+describe("tracesRunSignature", () => {
+  const staged = (over: Record<string, unknown> = {}) => ({
+    editorValue: "service_name = 'a'",
+    stream: "default",
+    sqlMode: false,
+    datetime: { startTime: 1, endTime: 2, relativeTimePeriod: "15m", type: "relative" },
+    ...over,
+  });
+
+  it("is equal for the same staged state even when relative timestamps drift", () => {
+    const later = staged({
+      datetime: { startTime: 50, endTime: 60, relativeTimePeriod: "15m", type: "relative" },
+    });
+    expect(tracesRunSignature(later)).toBe(tracesRunSignature(staged()));
+  });
+
+  it.each([
+    ["editor text", { editorValue: "service_name = 'b'" }],
+    ["stream", { stream: "other" }],
+    ["sql mode", { sqlMode: true }],
+    [
+      "relative period",
+      { datetime: { startTime: 1, endTime: 2, relativeTimePeriod: "1h", type: "relative" } },
+    ],
+    ["absolute window", { datetime: { startTime: 1, endTime: 3, type: "absolute" } }],
+  ])("changes when the %s changes", (_label, over) => {
+    expect(tracesRunSignature(staged(over))).not.toBe(tracesRunSignature(staged()));
+  });
+
+  it("ignores surrounding whitespace in the editor", () => {
+    expect(tracesRunSignature(staged({ editorValue: "  service_name = 'a'\n" }))).toBe(
+      tracesRunSignature(staged()),
+    );
+  });
+});
+
+describe("tracesRunIsStaged", () => {
+  const searchObj = (editorValue: string, liveMode: boolean) => {
+    const obj = {
+      meta: { sqlMode: false, liveMode, lastRunSignature: null as string | null },
+      data: {
+        editorValue: "service_name = 'a'",
+        stream: { selectedStream: { value: "default" } },
+        datetime: { startTime: 1, endTime: 2, relativeTimePeriod: "15m", type: "relative" },
+      },
+    };
+    obj.meta.lastRunSignature = tracesSearchRunSignature(obj);
+    obj.data.editorValue = editorValue;
+    return obj;
+  };
+
+  it("is staged when the editor differs from the last Run and auto-run is off", () => {
+    expect(tracesRunIsStaged(searchObj("service_name = 'b'", false), true)).toBe(true);
+    expect(tracesRunIsStaged(searchObj("service_name = 'b'", true), false)).toBe(true);
+  });
+
+  it("is not staged when auto-run is on", () => {
+    expect(tracesRunIsStaged(searchObj("service_name = 'b'", true), true)).toBe(false);
+  });
+
+  it("is not staged when nothing changed since the last Run", () => {
+    expect(tracesRunIsStaged(searchObj("service_name = 'a'", false), false)).toBe(false);
+  });
+
+  it("is not staged before the first Run", () => {
+    const obj = searchObj("service_name = 'b'", false);
+    obj.meta.lastRunSignature = null;
+    expect(tracesRunIsStaged(obj, false)).toBe(false);
+  });
+});
+
+describe("tracesToolbarLayout", () => {
+  const layout = (available: number, over: Record<string, unknown> = {}) =>
+    tracesToolbarLayout({
+      available,
+      serviceGraph: true,
+      drillDown: true,
+      reset: true,
+      pinnedWidth: 0,
+      ...over,
+    });
+
+  it.each([
+    [1200, "full"],
+    [739, "full"],
+    [738, "compactButtons"],
+    [642, "compactButtons"],
+    [641, "iconToggle"],
+    [370, "iconToggle"],
+    [369, "resetInMenu"],
+    [0, "resetInMenu"],
+  ])("at %i px picks the %s stage", (available, stage) => {
+    expect(layout(available).stage).toBe(stage);
+  });
+
+  it("drops button labels before the view toggle labels", () => {
+    expect(layout(700).stage).toBe("compactButtons");
+  });
+
+  it("shrinks labels before a pinned group falls back into More", () => {
+    expect(layout(800).stage).toBe("full");
+    expect(layout(800, { pinnedWidth: 150 }).stage).toBe("compactButtons");
+  });
+
+  it("keeps the toggle icon-only, not Reset in More, while the base items still fit", () => {
+    const result = layout(400, { pinnedWidth: 171 });
+    expect(result.stage).toBe("iconToggle");
+    expect(result.pinnedBudget).toBe(400 - 310);
+  });
+
+  it("uses the narrower toggle when Service Graph is hidden", () => {
+    expect(layout(650, { serviceGraph: false }).stage).toBe("full");
+  });
+
+  it("never reaches Reset in More on a mode without Reset", () => {
+    expect(layout(0, { reset: false, drillDown: false }).stage).toBe("iconToggle");
   });
 });

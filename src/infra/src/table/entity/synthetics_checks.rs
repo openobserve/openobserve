@@ -31,7 +31,7 @@ pub struct Model {
     /// When the scheduler last fanned out this check (microseconds).
     pub last_triggered_at: i64,
     /// Denormalised status from the most recent completed check.
-    /// 0=Unknown, 1=Up, 2=Warning, 3=Down
+    /// 0=Unknown, 1=Up, 2=Warning, 3=Down, 4=Error (no verdict: dispatch/lease failure)
     pub last_check_status: i32,
     /// Runs that have failed back to back; reset to 0 by a pass. Compared
     /// against `settings.alert_if_fails` to decide whether to notify.

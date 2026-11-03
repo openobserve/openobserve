@@ -409,11 +409,11 @@
                 <div class="flex flex-wrap items-center gap-2">
                   <OText variant="label" class="w-32 shrink-0">{{ t("oncall.channels") }}</OText>
                   <OCheckbox
-                    v-for="channel in CHANNELS"
+                    v-for="channel in channels"
                     :key="channel"
                     :model-value="current.channels.includes(channel)"
                     :label="t(`oncall.channel_${channel}`)"
-                    :disabled="!canConfigure"
+                    :disabled="!canConfigure || (channel === 'email' && emailLocked)"
                     :data-test="`oncall-policy-channel-${current.priority}-${channel}`"
                     @update:model-value="
                       (on: CheckboxModelValue) => toggleChannel(current!, channel, on === true)
@@ -427,6 +427,9 @@
                         priority: raw(priorityLabel(current.priority)),
                       })
                     }}
+                  </OText>
+                  <OText v-if="emailLocked" variant="meta" data-test="oncall-policy-email-locked">
+                    {{ t("oncall.policyEmailLockedBySlack") }}
                   </OText>
                   <span
                     v-if="phoneWithoutEmail(current)"
@@ -498,35 +501,24 @@
                 </span>
                 <OTag
                   v-if="teamChannel"
-                  :variant="teamChannel.source === 'team' ? 'primary-soft' : 'default-soft'"
+                  :variant="channelFromTeam ? 'primary-soft' : 'default-soft'"
                   size="xs"
                   data-test="oncall-team-channel-source"
                 >
                   {{
-                    teamChannel.source === "team"
+                    channelFromTeam
                       ? t("oncall.teamChannelFromTeam")
                       : t("oncall.teamChannelFromPolicy")
                   }}
                 </OTag>
-                <OButton
-                  variant="outline"
-                  size="sm-action"
-                  :loading="savingChannel"
-                  :disabled="!teamChannelDirty"
-                  data-test="oncall-team-channel-save"
-                  @click="saveTeamChannel(teamChannelDraft)"
-                >
-                  {{ t("oncall.teamChannelSave") }}
-                </OButton>
                 <!-- Clearing is its own verb because null and [] are different
                        facts on the wire: back-to-policy versus silence-on-purpose. -->
                 <OButton
-                  v-if="teamChannel?.source === 'team'"
+                  v-if="channelFromTeam"
                   variant="ghost"
                   size="sm-action"
-                  :loading="savingChannel"
                   data-test="oncall-team-channel-clear"
-                  @click="saveTeamChannel(null)"
+                  @click="usePolicyChannel"
                 >
                   {{ t("oncall.teamChannelUsePolicy") }}
                 </OButton>
@@ -534,14 +526,26 @@
                        HTTP destination, which cannot edit what it already sent. Said
                        here so nobody designs an expectation the engine cannot meet. -->
                 <OText variant="meta">{{ t("oncall.teamChannelHint") }}</OText>
+                <!-- Only the team's own empty list is a choice; an empty list inherited from the policy is the policy's. -->
                 <span
-                  v-if="teamChannel && !teamChannel.destinations.length"
+                  v-if="channelFromTeam && !teamChannelDraft.length"
                   class="text-status-warning-text text-xs"
                   data-test="oncall-team-channel-silent"
                 >
                   {{ t("oncall.teamChannelSilent") }}
                 </span>
               </div>
+
+              <!-- Under the team channel, because the backup webhook is picked from its list. -->
+              <OnCallTeamSlackChannel
+                v-if="slackEnabled && teamChannel"
+                :org-id="orgId"
+                :team-id="props.teamId"
+                :team-name="props.teamName"
+                :channel="teamChannel"
+                :saving="savingSlack"
+                @save="saveTeamSlack"
+              />
             </div>
           </OTabPanel>
 
@@ -597,6 +601,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallL0Editor from "@/components/oncall/OnCallL0Editor.vue";
+import OnCallTeamSlackChannel from "@/components/oncall/OnCallTeamSlackChannel.vue";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import { stableStringify } from "@/utils/drafts/editorDraftStore";
@@ -616,6 +621,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { isSlackAppDestination } from "@/utils/slackAppDestination";
+import { readSlackOrgConfig } from "@/utils/slackSettings";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import { queryClient } from "@/composables/query/queryClient";
@@ -630,6 +636,7 @@ import {
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
   Channel,
+  SetTeamChannelBody,
   TeamChannel,
   EscalationTarget,
   L0Policy,
@@ -668,11 +675,15 @@ const props = withDefaults(
      * stored id as the name somebody recognises.
      */
     rotations?: Rotation[];
+    /** For the `/o2 oncall here {team}` line under the Slack channel. */
+    teamName?: string;
   }>(),
-  { rotations: () => [] },
+  { rotations: () => [], teamName: "" },
 );
 const emit = defineEmits<{
   saved: [];
+  /** The policy was written but the drawer stays open, so the page behind it should re-read the ladder. */
+  "policy-written": [];
   "update:open": [boolean];
   "open-members": [];
 }>();
@@ -689,10 +700,6 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
-
-// Only channels a Notifier can actually send. Rendering the rest would let
-// somebody tick SMS and receive nothing.
-const CHANNELS = DELIVERABLE_CHANNELS;
 
 /// Enough faces to read the row as "people", not enough to wrap it. The count
 /// beside them carries the real number.
@@ -765,13 +772,30 @@ const saveChannelWrite = useMutation(() => setTeamChannelMutation(orgId.value, p
 /// The team's room, read whole with its provenance.
 const teamChannel = ref<TeamChannel | null>(null);
 const teamChannelDraft = ref<string[]>([]);
-const savingChannel = ref(false);
+/// "Use the policy's list" pressed: Save sends `null`, which is a different fact from an empty list.
+const channelBackToPolicy = ref(false);
 
-const teamChannelDirty = computed(
-  () =>
-    JSON.stringify([...teamChannelDraft.value].sort()) !==
-    JSON.stringify([...(teamChannel.value?.destinations ?? [])].sort()),
+/// Whether the draft is the team's own list, as Save would leave it.
+const channelFromTeam = computed(
+  () => teamChannel.value?.source === "team" && !channelBackToPolicy.value,
 );
+
+const teamChannelDirty = computed(() =>
+  channelBackToPolicy.value
+    ? teamChannel.value?.source === "team"
+    : JSON.stringify([...teamChannelDraft.value].sort()) !==
+      JSON.stringify([...(teamChannel.value?.destinations ?? [])].sort()),
+);
+
+// Picking a destination after "Use the policy's list" makes the list the team's own again.
+watch(teamChannelDraft, (draft) => {
+  if (draft.length) channelBackToPolicy.value = false;
+});
+
+function usePolicyChannel() {
+  teamChannelDraft.value = [];
+  channelBackToPolicy.value = true;
+}
 
 // Uncached read-modify-write: a stale entry would seed the draft and be saved back.
 async function fetchTeamChannel() {
@@ -782,27 +806,62 @@ async function fetchTeamChannel() {
     });
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
+    channelBackToPolicy.value = false;
   } catch {
     teamChannel.value = null;
   }
 }
 
-/// `null` clears the override; an array (even empty) is the team's own list.
-async function saveTeamChannel(destinations: string[] | null) {
-  savingChannel.value = true;
+/// The channel after the policy, only if it changed; false keeps the drawer open so Save retries it.
+async function saveChannelAfterPolicy(): Promise<boolean> {
+  if (!teamChannelDirty.value) return true;
   try {
-    const res = await saveChannelWrite.mutateAsync(destinations);
-    // The drawer stays open on this answer, and an invalidation cannot repaint a ref.
+    // The same-room destination is omitted, so the server keeps it.
+    const res = await saveChannelWrite.mutateAsync({
+      destinations: channelBackToPolicy.value ? null : teamChannelDraft.value,
+    });
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
-    toast({ variant: "success", message: t("oncall.teamChannelSaved") });
+    channelBackToPolicy.value = false;
+    return true;
   } catch (err: any) {
+    noteConfigurationDenied(err);
+    toast({ variant: "error", message: t("oncall.teamChannelNotSavedAfterPolicy") });
+    return false;
+  }
+}
+
+const slackEnabled = computed(() => readSlackOrgConfig(store.state.zoConfig).enabled);
+
+// Only channels a Notifier can send; a stored Slack tick stays while Slack is off so it can be unticked.
+const channels = computed(() =>
+  DELIVERABLE_CHANNELS.filter(
+    (c) => c !== "slack" || slackEnabled.value || current.value?.channels.includes("slack"),
+  ),
+);
+/// DM-2: a page never goes by Slack alone, so Email stays ticked and locked while Slack is.
+const emailLocked = computed(() => current.value?.channels.includes("slack") ?? false);
+const savingSlack = ref(false);
+
+/// The Slack card's change, written now with the team's stored list; the list's draft is left alone.
+async function saveTeamSlack(slack: Omit<SetTeamChannelBody, "destinations">) {
+  const stored = teamChannel.value;
+  if (!stored) return;
+  savingSlack.value = true;
+  try {
+    const res = await saveChannelWrite.mutateAsync({
+      destinations: stored.source === "team" ? stored.destinations : null,
+      ...slack,
+    });
+    teamChannel.value = res.data ?? null;
+  } catch (err: any) {
+    noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.teamChannelSaveFailed"),
+      message: raw(err?.response?.data?.message) || t("oncall.slackChannelSaveFailed"),
     });
   } finally {
-    savingChannel.value = false;
+    savingSlack.value = false;
   }
 }
 
@@ -1192,7 +1251,9 @@ async function openMembers() {
 // rest of the policy is still worth editing.
 async function fetchDestinations() {
   try {
-    const list = await queryClient.fetchQuery(destinationsQuery(orgId.value, "alert"));
+    const list = await queryClient.fetchQuery(
+      destinationsQuery(orgId.value, "alert", false, ["jira"]),
+    );
     // A Slack app destination cannot carry a page; the team's room is a webhook (7.1).
     availableDestinations.value = list
       .filter((d: { type?: string }) => !isSlackAppDestination(d))
@@ -1249,6 +1310,7 @@ function addStep(rung: PriorityRung) {
 function toggleChannel(rung: PriorityRung, channel: Channel, on: boolean) {
   if (on) {
     if (!rung.channels.includes(channel)) rung.channels.push(channel);
+    if (channel === "slack" && !rung.channels.includes("email")) rung.channels.push("email");
   } else {
     rung.channels = rung.channels.filter((c) => c !== channel);
   }
@@ -1282,6 +1344,10 @@ async function save(): Promise<boolean> {
       final_action: finalAction.value,
       ...(l0Touched.value && l0Draft.value ? { l0: l0Draft.value } : {}),
     });
+    if (!(await saveChannelAfterPolicy())) {
+      emit("policy-written");
+      return false;
+    }
     toast({ variant: "success", message: t("oncall.policySaved") });
     policyDraft.markSaved();
     emit("saved");

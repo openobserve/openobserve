@@ -24,6 +24,7 @@ import useSuggestions from "@/composables/useSuggestions";
 import { parsePromQlQuery } from "@/utils/query/promQLUtils";
 import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
 import { aiCreditsNotice } from "@/utils/aiCredits";
+import { accessDeniedMessage, accessReason, viewDenial } from "@/composables/useAccessStore";
 import analytics from "@/services/product_analytics";
 
 /**
@@ -496,7 +497,10 @@ export function useNLQuery(t: TranslateFn) {
           refusalNotice.value = aiCreditsNotice(body, t);
           streamingResponse.value = refusalNotice.value;
         } else if (response.status === 403) {
-          streamingResponse.value = t(UNAUTHORIZED_MESSAGE_KEY);
+          streamingResponse.value = accessReason(
+            accessDeniedMessage([viewDenial("ai", "update")], t).groups[0],
+            t,
+          );
         }
         return null;
       }

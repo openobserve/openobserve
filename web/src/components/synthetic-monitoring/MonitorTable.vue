@@ -632,14 +632,15 @@ type Mode = "all" | "browser";
 // noticing, not worth acting on this second, and washing it too would put most of
 // a wobbly estate in colour.
 const monitorRowClass = (row: any): string => {
-  if (String(row?.status ?? "").toLowerCase() === "failed") return "!bg-status-error-bg";
+  const st = String(row?.status ?? "").toLowerCase();
+  if (st === "failed" || st === "error") return "!bg-status-error-bg";
   return row?.enabled === false ? "!bg-surface-panel" : "";
 };
 
 const monitorRowStyle = (row: any): Record<string, string> => {
   const status = String(row?.status ?? "").toLowerCase();
   const color =
-    status === "failed"
+    status === "failed" || status === "error"
       ? "var(--color-error-500)"
       : status === "warning"
         ? "var(--color-warning-500)"

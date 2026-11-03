@@ -25,6 +25,8 @@ use config::{
     },
     utils::{json, rand::generate_random_string, time},
 };
+#[cfg(feature = "cloud")]
+use db::organization::get_org_setting;
 use db::{self, org_users, user::is_root_user};
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
@@ -46,6 +48,8 @@ use {
 
 #[cfg(feature = "cloud")]
 use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
+#[cfg(feature = "cloud")]
+use crate::org_domain_ownership::get_cached_org_for_domain;
 use crate::{
     auth::{delete_org_tuples, save_org_tuples},
     common::{
@@ -1101,6 +1105,21 @@ pub async fn generate_invitation(
             .is_err()
         {
             return Err(anyhow::anyhow!("Email Domain not allowed for {invitee}"));
+        }
+
+        let Some((_, domain)) = invitee.split_once('@') else {
+            return Err(anyhow::anyhow!("invalid email id {invitee}"));
+        };
+
+        if let Some(linked_org) = get_cached_org_for_domain(domain).await {
+            let settings = get_org_setting(&linked_org).await?;
+            for mapping in settings.domain_org_mappings {
+                if mapping.domain == domain && mapping.org_id == org_id {
+                    return Err(anyhow::anyhow!(
+                        "invitee '{invitee}' domain is already mapped to org {org_id} so cannot send invite"
+                    ));
+                }
+            }
         }
 
         if get_billing_by_org_id(org_id).await?.is_none() {

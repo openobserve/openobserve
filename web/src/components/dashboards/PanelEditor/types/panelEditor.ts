@@ -355,6 +355,9 @@ export interface PanelEditorEmits {
    */
   (e: "chartApiError", error: any): void;
 
+  /** Every change of the renderer's error; `{ message: "" }` means the last run succeeded. */
+  (e: "renderer-error", error: { message?: unknown; code?: unknown } | string | null): void;
+
   /**
    * Emitted when user zooms on chart (for datetime update).
    * Parent should update its DateTimePicker with new time range.
@@ -659,6 +662,7 @@ export const ALL_CHART_TYPES = [
   "table",
   "heatmap",
   "state-timeline",
+  "boxplot",
   "distribution",
   "treemap",
   "sunburst",
@@ -671,6 +675,7 @@ export const ALL_CHART_TYPES = [
   "markdown",
   "alert-list",
   "flame-graph",
+  "logs",
   "custom_chart",
 ] as const;
 

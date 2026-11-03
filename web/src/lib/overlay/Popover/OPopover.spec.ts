@@ -83,6 +83,22 @@ describe("OPopover", () => {
     wrapper.unmount();
   });
 
+  it("stays open on an outside scroll when closeOnScroll is false", async () => {
+    const wrapper = mount(OPopover, {
+      attachTo: document.body,
+      props: { open: false, closeOnScroll: false },
+      slots: {
+        trigger: "<button>Open</button>",
+        default: '<div data-testid="content">Body</div>',
+      },
+    });
+    await wrapper.setProps({ open: true });
+    document.dispatchEvent(new Event("scroll"));
+    const emitted = wrapper.emitted("update:open") ?? [];
+    expect(emitted.some((args) => args[0] === false)).toBe(false);
+    wrapper.unmount();
+  });
+
   it("ignores scrolls inside its own content", async () => {
     const wrapper = mount(OPopover, {
       attachTo: document.body,
@@ -152,5 +168,23 @@ describe("OPopover", () => {
     const event = new Event("focus");
     content.vm.$emit("open-auto-focus", event);
     expect(wrapper.emitted("open-auto-focus")?.[0]).toEqual([event]);
+  });
+
+  it("forwards outside pointerdown and focus so a consumer can keep it open for a panel it owns", () => {
+    const wrapper = mount(OPopover, {
+      props: { open: true },
+      slots: {
+        trigger: "<button>Open</button>",
+        default: '<div data-testid="content">Body</div>',
+      },
+    });
+    const content = wrapper.findAllComponents(PopoverContent).at(-1)!;
+    const down = new Event("pointerdown", { cancelable: true });
+    const focus = new Event("focusin", { cancelable: true });
+    content.vm.$emit("pointer-down-outside", down);
+    content.vm.$emit("focus-outside", focus);
+    expect(wrapper.emitted("pointer-down-outside")?.[0]).toEqual([down]);
+    expect(wrapper.emitted("focus-outside")?.[0]).toEqual([focus]);
+    expect(down.defaultPrevented).toBe(false);
   });
 });

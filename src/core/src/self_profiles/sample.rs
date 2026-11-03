@@ -33,6 +33,7 @@ pub async fn dump_cpu_profile(duration_secs: u64, frequency: i32) -> Result<Vec<
 }
 
 /// Dump jemalloc heap profile as pprof protobuf bytes.
+#[cfg(feature = "profiling")]
 pub async fn dump_memory_pprof() -> Result<Vec<u8>, String> {
     let prof_ctl = jemalloc_pprof::PROF_CTL
         .as_ref()
@@ -52,6 +53,7 @@ pub async fn dump_memory_pprof() -> Result<Vec<u8>, String> {
 }
 
 /// Dump jemalloc heap flamegraph SVG bytes (for `/debug/profile/memory`).
+#[cfg(feature = "profiling")]
 pub async fn dump_memory_flamegraph() -> Result<Vec<u8>, String> {
     let prof_ctl = jemalloc_pprof::PROF_CTL
         .as_ref()
@@ -71,6 +73,7 @@ pub async fn dump_memory_flamegraph() -> Result<Vec<u8>, String> {
 }
 
 /// Read current jemalloc stats (for `/debug/profile/stats`).
+#[cfg(feature = "profiling")]
 pub fn jemalloc_stats() -> Result<serde_json::Value, String> {
     tikv_jemalloc_ctl::epoch::mib()
         .map_err(|e| format!("Failed to get jemalloc epoch mib: {e}"))?

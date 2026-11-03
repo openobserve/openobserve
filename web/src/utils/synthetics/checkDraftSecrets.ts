@@ -25,7 +25,7 @@ const CREDENTIAL_TARGET =
   /pass(word|wd|code|phrase)|secret|token|api[-_ ]?key|\b(pwd|otp|pin|cvv|cvc|[2m]fa)\b|one[-_ ]?time/i;
 
 // A value made only of `{{name}}` references names a stored secret or variable, so it holds none itself.
-const ONLY_PLACEHOLDERS = /^(\s*\{\{\s*\w+\s*\}\}\s*)+$/;
+const ONLY_PLACEHOLDERS = /^\s*(\{\{\s*\w+\s*\}\}\s*)+$/;
 
 /** Whether a journey step types a credential: into a password, token or one-time-code field, or under such a name. */
 export const stepTypesCredential = (step: BrowserStep): boolean => {

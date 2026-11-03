@@ -89,7 +89,7 @@ const FIELD_SECTION_PREFIXES: ReadonlyArray<[string, AlertSectionId]> = [
   ["template", "notify"],
   ["context_attributes", "notify"],
   ["oncall_team", "notify"],
-  ["deduplication", "notify"],
+  ["suppress_repeats", "notify"],
   ["name", "details"],
   ["description", "details"],
   ["row_template", "details"],

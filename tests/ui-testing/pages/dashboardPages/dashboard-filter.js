@@ -469,7 +469,7 @@ export default class DashboardFilter {
         await conditionTab.waitFor({ state: "visible", timeout: 5000 });
       }
       if ((await conditionTab.getAttribute("data-state")) !== "active") {
-        await conditionTab.click({ force: true, timeout: 5000 });
+        await conditionTab.click({ timeout: 5000 });
       }
       await expect(operatorSelect).toBeVisible({ timeout: 3000 });
     }).toPass({ timeout, intervals: [500, 1000, 2000] });

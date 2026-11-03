@@ -101,6 +101,7 @@ import {
   TreemapChart,
   SunburstChart,
   FunnelChart,
+  BoxplotChart,
 } from "echarts/charts";
 import {
   TitleComponent,
@@ -172,6 +173,7 @@ echarts.use([
   TreemapChart,
   SunburstChart,
   FunnelChart,
+  BoxplotChart,
   LabelLayout,
   UniversalTransition,
   CanvasRenderer,

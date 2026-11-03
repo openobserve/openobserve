@@ -146,7 +146,7 @@ describe("alertsToTerraform", () => {
     expect(hcl).not.toContain("offSet");
   });
 
-  it("renders promql and deduplication blocks", () => {
+  it("renders promql blocks and ignores a legacy deduplication field", () => {
     const { hcl } = alertsToTerraform([
       {
         ...sqlAlert,
@@ -166,8 +166,8 @@ describe("alertsToTerraform", () => {
     expect(hcl).toContain('value    = "0.9"');
     expect(hcl).toContain("promql_warning_value = 0.7");
     expect(hcl).toContain("promql_multi_alert   = true");
-    expect(hcl).toContain('fingerprint_fields  = ["instance"]');
-    expect(hcl).toContain("time_window_minutes = 30");
+    expect(hcl).not.toContain("deduplication");
+    expect(hcl).not.toContain("fingerprint_fields");
   });
 
   it("drops the trigger-side gate on an SLO alert, which the provider rejects", () => {
