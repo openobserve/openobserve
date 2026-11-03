@@ -158,21 +158,10 @@ fn details_request(sql: String, size: usize, range: (i64, i64), timeout: i64) ->
     Request {
         query: Query {
             sql,
-            from: 0,
             size: size as i64 + 1,
             start_time: range.0,
             end_time: range.1.saturating_add(1),
-            quick_mode: false,
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: RequestEncoding::Empty,
         regions: vec![],
