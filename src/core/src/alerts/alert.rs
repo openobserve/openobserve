@@ -4232,6 +4232,11 @@ async fn build_notification_context(
             crate::alerts::notifications::STATUS_FIRING
         }
         .to_string(),
+        event: if resolved {
+            config::meta::alerts::notification_kind::NotificationEvent::Resolved
+        } else {
+            config::meta::alerts::notification_kind::NotificationEvent::Firing
+        },
         episode_id,
         recovery_reason: String::new(),
         alert_priority: alert.priority.map(|p| p.to_string()).unwrap_or_default(),
@@ -9337,5 +9342,31 @@ mod rule_notification_tests {
         assert!(!url.contains("/web/logs"));
         assert!(!url.contains("sql_mode"));
         assert!(!url.contains("query="));
+    }
+
+    #[tokio::test]
+    async fn recovered_alert_context_carries_the_resolved_event() {
+        use config::meta::alerts::notification_kind::NotificationEvent;
+
+        let mut alert = Alert::default();
+        alert.org_id = "org".into();
+        alert.stream_name = "default".into();
+        for (resolved, want) in [
+            (false, NotificationEvent::Firing),
+            (true, NotificationEvent::Resolved),
+        ] {
+            let options = ProcessTemplateOptions {
+                rows_end_time: 0,
+                start_time: None,
+                evaluation_timestamp: 0,
+                is_email: false,
+                level: None,
+                actual_value: None,
+                episode_id: None,
+                resolved,
+            };
+            let ctx = build_notification_context("org", &alert, &[], &[], options, None).await;
+            assert_eq!(ctx.event, want);
+        }
     }
 }

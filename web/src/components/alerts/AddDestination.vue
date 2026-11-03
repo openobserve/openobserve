@@ -1476,11 +1476,6 @@ function headersFromRows(rows: { key: string; value: string }[]): Headers {
   return headers;
 }
 
-// The custom/pipeline save path (dispatched from saveDestination for non-prebuilt
-// types). OForm calls the submit only once the schema (incl. the type-keyed
-// superRefine) passes — the schema, not a manual guard, gates the save. `value`
-// is the validated payload source of truth; the payload is built with explicit
-// keys so no schema-only field (e.g. `credentials`) leaks into the request.
 /** The stored metadata.payload_format as the select's value; anything else is automatic. */
 function storedPayloadFormat(
   metadata: Record<string, unknown> | null,
@@ -1505,6 +1500,11 @@ function withPayloadFormat(
   return metadata;
 }
 
+// The custom/pipeline save path (dispatched from saveDestination for non-prebuilt
+// types). OForm calls the submit only once the schema (incl. the type-keyed
+// superRefine) passes — the schema, not a manual guard, gates the save. `value`
+// is the validated payload source of truth; the payload is built with explicit
+// keys so no schema-only field (e.g. `credentials`) leaks into the request.
 function saveCustomDestination(value: AddDestinationForm) {
   const dismiss = toast({
     variant: "loading",

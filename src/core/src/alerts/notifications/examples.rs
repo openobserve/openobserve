@@ -198,6 +198,7 @@ pub fn example_context(kind: NotificationKind, resolved: bool) -> NotificationCo
             };
             let mut ctx = super::preview::synthetic_context(Some(level));
             ctx.kind = kind;
+            ctx.event = event_of(resolved);
             ctx
         }
     }
@@ -625,6 +626,19 @@ mod tests {
     }
 
     /// Regenerate `render/testdata/examples/`; hand-check every file before committing it.
+    #[test]
+    fn alert_example_event_follows_resolved() {
+        let kind = NotificationKind::Alert;
+        assert_eq!(
+            example_context(kind, false).event,
+            NotificationEvent::Firing
+        );
+        assert_eq!(
+            example_context(kind, true).event,
+            NotificationEvent::Resolved
+        );
+    }
+
     #[test]
     #[ignore]
     fn capture_examples() {
