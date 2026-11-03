@@ -39,15 +39,45 @@ export type AlertSectionTargets = Partial<Record<AlertSectionSlot, HTMLElement |
 
 export interface AlertSectionDef {
   id: AlertSectionId;
+  /** The question the section asks, as its heading. */
   titleKey: I18nKey;
+  /** The same question in a few words, for the section list and the Next button. */
+  navKey: I18nKey;
+  /** One sentence under the heading that tells the user how little this step asks. */
+  helpKey: I18nKey;
 }
 
 export const ALERT_SECTIONS: readonly AlertSectionDef[] = [
-  { id: "watch", titleKey: "alerts.sections.watch.title" },
-  { id: "condition", titleKey: "alerts.sections.condition.title" },
-  { id: "notify", titleKey: "alerts.sections.notify.title" },
-  { id: "schedule", titleKey: "alerts.sections.schedule.title" },
-  { id: "details", titleKey: "alerts.sections.details.title" },
+  {
+    id: "watch",
+    titleKey: "alerts.sections.watch.title",
+    navKey: "alerts.sections.watch.nav",
+    helpKey: "alerts.sections.watch.help",
+  },
+  {
+    id: "condition",
+    titleKey: "alerts.sections.condition.title",
+    navKey: "alerts.sections.condition.nav",
+    helpKey: "alerts.sections.condition.help",
+  },
+  {
+    id: "notify",
+    titleKey: "alerts.sections.notify.title",
+    navKey: "alerts.sections.notify.nav",
+    helpKey: "alerts.sections.notify.help",
+  },
+  {
+    id: "schedule",
+    titleKey: "alerts.sections.schedule.title",
+    navKey: "alerts.sections.schedule.nav",
+    helpKey: "alerts.sections.schedule.help",
+  },
+  {
+    id: "details",
+    titleKey: "alerts.sections.details.title",
+    navKey: "alerts.sections.details.nav",
+    helpKey: "alerts.sections.details.help",
+  },
 ];
 
 /** Change-tracking key for the measure on/off switch, which lives beside the form values. */

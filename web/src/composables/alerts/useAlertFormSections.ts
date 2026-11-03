@@ -26,7 +26,7 @@ import {
 } from "@/components/alerts/alertFormSections";
 import { alertConditionText } from "@/utils/alerts/alertCondition";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
-import type { ReadBackAlert } from "@/utils/alerts/alertReadBack";
+import { eventCountText, type ReadBackAlert } from "@/utils/alerts/alertReadBack";
 
 export type FieldMetaMap = Record<string, { errors?: readonly unknown[] } | undefined>;
 
@@ -58,6 +58,8 @@ export interface AlertFormSectionsInput {
   isEditing: Ref<boolean>;
   /** Sections holding unsaved edits; edit mode only. */
   changedSections?: Ref<ReadonlySet<AlertSectionId>>;
+  /** Sections the user has moved past; until then a section reports no progress or problem. */
+  visited?: Ref<ReadonlySet<AlertSectionId>>;
   t: TranslateFn;
 }
 
@@ -111,10 +113,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     if (qc.type === "promql" || (qc.aggregation && input.isAggregationEnabled.value)) {
       return raw(alertConditionText(fd));
     }
-    return t("alerts.sections.condition.countPhrase", {
-      operator: fd.trigger_condition?.operator ?? ">=",
-      threshold: fd.trigger_condition?.threshold ?? 1,
-    });
+    return eventCountText(fd.trigger_condition, t);
   };
 
   const notifyCount = (fd: AlertSectionsFormData): number => {
@@ -170,7 +169,9 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
           summary:
             count === 0
               ? t("alerts.sections.notify.nobody")
-              : t("alerts.sections.notify.destinationCount", { count }, count),
+              : count === 1 && fd.destinations?.length === 1
+                ? raw(fd.destinations[0])
+                : t("alerts.sections.notify.destinationCount", { count }, count),
         };
       }
       case "schedule":
@@ -185,24 +186,27 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
 
   const items = computed<SectionNavItem[]>(() => {
     const fd = input.formData.value ?? {};
-    return ALERT_SECTIONS.map(({ id, titleKey }) => {
+    return ALERT_SECTIONS.map(({ id, navKey }) => {
       const facts = sectionFacts(id, fd);
       const errors = errorCounts.value[id];
+      const seen = input.isEditing.value || (input.visited?.value.has(id) ?? true);
       let state: SectionNavState = "none";
       let stateLabel: I18nText | undefined;
       if (errors > 0) {
         state = "error";
-        stateLabel = t("alerts.sections.needsFix", { count: errors });
+        stateLabel = t("alerts.sections.needsFix", { count: errors }, errors);
       } else if (facts.missing) {
-        state = "attention";
-        stateLabel = t("alerts.sections.needsValue");
+        if (seen) {
+          state = "attention";
+          stateLabel = facts.summary;
+        }
       } else if (input.changedSections?.value.has(id)) {
         state = "changed";
         stateLabel = t("alerts.editMode.unsaved.changed");
-      } else if (!("empty" in facts && facts.empty)) {
+      } else if (seen && !("empty" in facts && facts.empty)) {
         state = input.isEditing.value ? "saved" : "done";
       }
-      return { id, title: t(titleKey), summary: facts.summary, state, stateLabel };
+      return { id, title: t(navKey), summary: facts.summary, state, stateLabel };
     });
   });
 

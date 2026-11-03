@@ -49,6 +49,41 @@ describe("OSectionNav", () => {
     expect(wrapper.find('[data-test="o-section-nav-state-error"]').text()).toBe("Needs a fix");
   });
 
+  it("numbers an open section and swaps the number for a mark once it has a state", () => {
+    const wrapper = mount(OSectionNav, {
+      props: {
+        items: [
+          { id: "n", title: raw("Open"), state: "none" },
+          { id: "e", title: raw("Broken"), state: "error", stateLabel: raw("Needs a fix") },
+          { id: "d", title: raw("Done"), state: "done" },
+        ],
+        label: raw("Sections"),
+      },
+    });
+    expect(wrapper.find('[data-test="o-section-nav-state-icon-none"]').text()).toBe("1");
+    expect(wrapper.find('[data-test="o-section-nav-state-icon-error"]').text()).toBe("!");
+    expect(wrapper.find('[data-test="o-section-nav-state-icon-done"]').text()).not.toBe("3");
+  });
+
+  it("says a problem once: the label takes the summary's place", () => {
+    const wrapper = mount(OSectionNav, {
+      props: {
+        items: [
+          {
+            id: "x",
+            title: raw("Watch"),
+            summary: raw("Pick a stream"),
+            state: "attention",
+            stateLabel: raw("Pick a stream"),
+          },
+        ],
+        label: raw("Sections"),
+      },
+    });
+    expect(wrapper.find('[data-test="o-section-nav-state-attention"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="o-section-nav-summary-x"]').exists()).toBe(false);
+  });
+
   it("shows the summary phrase", () => {
     const wrapper = mountNav();
     expect(wrapper.find('[data-test="o-section-nav-summary-a"]').text()).toBe("logs_stream");
