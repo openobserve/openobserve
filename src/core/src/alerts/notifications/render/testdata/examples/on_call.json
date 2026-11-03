@@ -1,0 +1,208 @@
+{
+  "slack_firing": {
+    "attachments": [
+      {
+        "color": "#E01E5A",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme|P2 · High error rate on web-logs>*"
+            }
+          },
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*checkout* — paged by policy checkout-escalation\n\nerror rate 12.4% over the 5% threshold on checkout"
+            }
+          },
+          {
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Stage*\n1"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Recipient*\nmaria@acme.com"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "color": "#E01E5A",
+        "blocks": [
+          {
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Acknowledge"
+                },
+                "url": "https://o2.acme.com/api/acme/oncall/ack/resp_31"
+              },
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Runbook"
+                },
+                "url": "https://wiki.acme.com/runbooks/checkout"
+              },
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "View in OpenObserve"
+                },
+                "url": "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme",
+                "style": "primary"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "slack_resolved": {
+    "attachments": [
+      {
+        "color": "#2EB67D",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme|P2 · High error rate on web-logs>*"
+            }
+          },
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*checkout* — the incident was resolved\n\nerror rate 12.4% over the 5% threshold on checkout"
+            }
+          },
+          {
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Stage*\nresolved"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Recipient*\nmaria@acme.com"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "color": "#2EB67D",
+        "blocks": [
+          {
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Runbook"
+                },
+                "url": "https://wiki.acme.com/runbooks/checkout"
+              },
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "View in OpenObserve"
+                },
+                "url": "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme",
+                "style": "primary"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "webhook_firing": {
+    "version": 1,
+    "title": "P2 · High error rate on web-logs",
+    "body_markdown": "**checkout** — paged by policy checkout\\-escalation\n\nerror rate 12\\.4\\% over the 5\\% threshold on checkout",
+    "fields": {
+      "Stage": "1",
+      "Recipient": "maria@acme.com"
+    },
+    "rows": [],
+    "links": [
+      {
+        "label": "Acknowledge",
+        "url": "https://o2.acme.com/api/acme/oncall/ack/resp_31"
+      },
+      {
+        "label": "Runbook",
+        "url": "https://wiki.acme.com/runbooks/checkout"
+      },
+      {
+        "label": "",
+        "url": "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme"
+      }
+    ],
+    "severity": "critical",
+    "chart_url": null,
+    "context": {
+      "org_name": "acme",
+      "stream_type": "logs",
+      "stream_name": "web-logs",
+      "alert_name": "High error rate on web-logs",
+      "alert_type": null,
+      "alert_period": null,
+      "alert_operator": null,
+      "alert_threshold": null,
+      "alert_count": null,
+      "alert_agg_value": null,
+      "alert_level": "critical",
+      "alert_status": "firing",
+      "episode_id": "resp_31",
+      "recovery_reason": null,
+      "alert_priority": null,
+      "alert_tags": null,
+      "alert_threshold_crit": null,
+      "alert_threshold_warn": null,
+      "alert_warning_threshold": null,
+      "alert_start_time": "N/A",
+      "alert_end_time": "N/A",
+      "alert_url": "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme",
+      "alert_trigger_time_str": "2026-11-02 10:05:00",
+      "alert_time": "2026-11-02 10:05:00",
+      "alert_description": "error rate 12.4% over the 5% threshold on checkout",
+      "kind": "on_call",
+      "notification_kind": "on_call",
+      "notification_event": "firing",
+      "cluster_name": "o2-acme",
+      "alert_start_time_millis": "N/A",
+      "alert_end_time_millis": "N/A",
+      "alert_trigger_time": "0",
+      "alert_trigger_time_millis": "0",
+      "alert_trigger_time_seconds": "0",
+      "alert_promql_operator": null,
+      "alert_promql_value": null,
+      "oncall_team": "checkout",
+      "oncall_reason": "paged by policy checkout-escalation",
+      "oncall_stage": "1",
+      "oncall_priority": "P2",
+      "oncall_recipient": "maria@acme.com",
+      "oncall_response_id": "resp_31",
+      "oncall_ack_url": "https://o2.acme.com/api/acme/oncall/ack/resp_31",
+      "runbook_url": "https://wiki.acme.com/runbooks/checkout"
+    }
+  }
+}

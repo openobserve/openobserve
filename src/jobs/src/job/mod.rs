@@ -759,6 +759,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
             o2_enterprise::enterprise::oncall::token::mark_spent(tag, expires_at);
         }));
     }
+    // On-call destination sends go through the shared notification path.
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::oncall::sender::register_oncall_sender(|n| {
+            Box::pin(openobserve_core::alerts::notifications::oncall::notify_destination(n))
+        });
+        if LOCAL_NODE.is_scheduler() {
+            tokio::spawn(
+                openobserve_core::alerts::notifications::oncall::log_mail_destination_policies(),
+            );
+        }
+    }
     // Every node: the validator, which reads the token cache, runs wherever HTTP is served.
     #[cfg(feature = "enterprise")]
     if openobserve_core::fleet::enabled() {

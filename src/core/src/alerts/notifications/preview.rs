@@ -440,7 +440,8 @@ mod tests {
                 "incident",
                 "anomaly",
                 "synthetics",
-                "downtime"
+                "downtime",
+                "on_call"
             ]
         );
         let incident = &resp.variable_groups[2];

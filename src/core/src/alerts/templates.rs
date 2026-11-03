@@ -291,6 +291,14 @@ pub(crate) async fn bindings_for(
                 by.push(format!("synthetics check '{check}'"));
             }
         }
+        NotificationKind::OnCall => {
+            for (_, team) in
+                infra::table::oncall_policies::teams_using_template(binding_scope(org_id), name)
+                    .await?
+            {
+                by.push(format!("on-call policy of team '{team}'"));
+            }
+        }
         NotificationKind::Alert => {
             let (_, alerts) = db::alerts::templates::cached_references(org_id, name).await;
             by.extend(alerts.into_iter().map(|a| format!("alert '{a}'")));
@@ -395,6 +403,12 @@ pub async fn used_by(org_id: &str, name: &str) -> Result<UsedBy, TemplateError> 
     .into_iter()
     .map(|(_, check)| format!("synthetics check '{check}'"))
     .collect();
+    let on_call_names: Vec<String> =
+        infra::table::oncall_policies::teams_using_template(binding_scope(org_id), name)
+            .await?
+            .into_iter()
+            .map(|(_, team)| format!("on-call policy of team '{team}'"))
+            .collect();
     let mut org_default: Vec<String> = Vec::new();
     for (_, kinds) in pointer_orgs(org_id, name).await? {
         for kind in kinds {
@@ -409,9 +423,13 @@ pub async fn used_by(org_id: &str, name: &str) -> Result<UsedBy, TemplateError> 
         alerts: alerts.len(),
         anomaly: anomaly_names.len(),
         synthetics: synthetics_names.len(),
-        on_call: 0,
+        on_call: on_call_names.len(),
         org_default,
-        binding_names: anomaly_names.into_iter().chain(synthetics_names).collect(),
+        binding_names: anomaly_names
+            .into_iter()
+            .chain(synthetics_names)
+            .chain(on_call_names)
+            .collect(),
     })
 }
 

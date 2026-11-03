@@ -404,6 +404,9 @@ pub struct EscalationPolicy {
     /// to behave like a team that never opened the screen.
     #[serde(default = "super::agent::L0Policy::defaults")]
     pub l0: super::agent::L0Policy,
+    /// Template override for this team's on-call messages; `None` uses each destination's.
+    #[serde(default)]
+    pub template: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -548,6 +551,7 @@ impl EscalationPolicy {
                     channels: vec![],
                 },
             ],
+            template: None,
         }
     }
 
@@ -606,6 +610,7 @@ impl EscalationPolicy {
                     channels: vec![],
                 },
             ],
+            template: None,
         }
     }
 

@@ -27,7 +27,7 @@ use config::{
     DEFAULT_ORG,
     meta::{
         alerts::{
-            content_spec::{ChartSpec, ContentField, ContentSpec, RowsSpec},
+            content_spec::{ChartSpec, ContentField, ContentLink, ContentSpec, RowsSpec},
             notification_kind::NotificationKind,
         },
         destinations::{Template, TemplateKind, TemplateType},
@@ -82,6 +82,7 @@ pub fn compiled_content_for(kind: NotificationKind) -> ContentSpec {
         NotificationKind::Incident => compiled_incident_content(),
         NotificationKind::Anomaly => compiled_anomaly_content(),
         NotificationKind::Synthetics => compiled_synthetics_content(),
+        NotificationKind::OnCall => compiled_on_call_content(),
         _ => compiled_default_content(),
     }
 }
@@ -89,9 +90,10 @@ pub fn compiled_content_for(kind: NotificationKind) -> ContentSpec {
 /// The reserved name that `compiled_content_for(kind)` is seeded under.
 pub fn compiled_name_for(kind: NotificationKind) -> &'static str {
     match kind {
-        NotificationKind::Incident | NotificationKind::Anomaly | NotificationKind::Synthetics => {
-            kind.compiled_default_name()
-        }
+        NotificationKind::Incident
+        | NotificationKind::Anomaly
+        | NotificationKind::Synthetics
+        | NotificationKind::OnCall => kind.compiled_default_name(),
         _ => DEFAULT_CONTENT_TEMPLATE_NAME,
     }
 }
@@ -137,6 +139,38 @@ pub fn compiled_synthetics_content() -> ContentSpec {
             format: None,
         },
         links: vec![],
+        chart: ChartSpec { enabled: false },
+    }
+}
+
+/// Today's page header as the title; the Acknowledge and Runbook links drop out when unset.
+pub fn compiled_on_call_content() -> ContentSpec {
+    ContentSpec {
+        title: "{oncall_priority} · {alert_name}".into(),
+        title_overrides: Default::default(),
+        body: "**{oncall_team}** — {oncall_reason}\n\n{alert_description}".into(),
+        fields: vec![
+            field("Stage", "{oncall_stage}"),
+            field("Recipient", "{oncall_recipient}"),
+        ],
+        rows: RowsSpec {
+            enabled: false,
+            max: 5,
+            columns: None,
+            format: None,
+        },
+        links: vec![
+            ContentLink {
+                label: "Acknowledge".into(),
+                url: "{oncall_ack_url}".into(),
+                show_when: None,
+            },
+            ContentLink {
+                label: "Runbook".into(),
+                url: "{runbook_url}".into(),
+                show_when: None,
+            },
+        ],
         chart: ChartSpec { enabled: false },
     }
 }
@@ -192,6 +226,7 @@ pub(crate) async fn ensure_default_content_template(
         NotificationKind::Incident,
         NotificationKind::Anomaly,
         NotificationKind::Synthetics,
+        NotificationKind::OnCall,
     ] {
         ensure_compiled_row(
             compiled_name_for(kind),
