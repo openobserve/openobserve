@@ -19,156 +19,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <p v-if="!split" data-test="settings-license-features-summary">
     {{ t("about.features_all_unlocked") }}
   </p>
-  <div v-else class="flex flex-col gap-3">
-    <i18n-t
-      keypath="about.features_summary"
-      tag="p"
-      :plural="split.free.length"
-      data-test="settings-license-features-summary"
+  <div v-else class="flex flex-col gap-2">
+    <div class="flex items-start justify-between gap-3">
+      <i18n-t
+        keypath="about.features_summary"
+        tag="p"
+        class="min-w-0 flex-1"
+        :plural="split.free.length"
+        data-test="settings-license-features-summary"
+      >
+        <template #ratio>
+          <span class="text-text-heading font-semibold">{{
+            t(
+              "about.features_paid_ratio",
+              { unlocked: split.unlocked.length, paid: split.paid },
+              split.paid,
+            )
+          }}</span>
+        </template>
+        <template #free>{{ split.free.length }}</template>
+      </i18n-t>
+      <OButton
+        v-if="split.missing.length || split.addedLocked.length"
+        variant="ghost-primary"
+        size="xs"
+        icon-right="arrow-forward"
+        class="shrink-0"
+        data-test="settings-license-features-request-access"
+        @click="emit('request-access')"
+      >
+        {{ t("about.features_request_access") }}
+      </OButton>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <OSearchInput
+        v-model="search"
+        class="min-w-0 flex-1 max-md:min-w-40 md:min-w-60"
+        :placeholder="t('about.features_search', { count: total }, total)"
+        data-test="settings-license-features-search"
+      />
+      <OToggleGroup
+        :model-value="filter"
+        type="single"
+        mobile-dropdown
+        data-test="settings-license-features-filter"
+        @update:model-value="(value) => (filter = value as FilterId)"
+      >
+        <OToggleGroupItem
+          v-for="option in filterOptions"
+          :key="option.id"
+          :value="option.id"
+          size="sm"
+          :data-test="`settings-license-features-filter-${option.id}`"
+        >
+          {{ option.label }}
+          <span class="text-text-secondary ms-1">{{ option.count }}</span>
+        </OToggleGroupItem>
+      </OToggleGroup>
+    </div>
+
+    <!-- fixed height so switching tabs or searching never moves what sits below -->
+    <div
+      class="border-border-default bg-surface-subtle rounded-default h-44 [scrollbar-gutter:stable] overflow-auto border px-3 pb-2"
+      data-test="settings-license-features-list"
     >
-      <template #ratio>
-        <span class="text-text-heading font-semibold">{{
-          t(
-            "about.features_paid_ratio",
-            { unlocked: split.unlocked.length, paid: split.paid },
-            split.paid,
-          )
-        }}</span>
-      </template>
-      <template #free>{{ split.free.length }}</template>
-    </i18n-t>
-
-    <template v-if="!expanded">
-      <div v-if="split.unlocked.length" class="flex flex-col gap-1.5">
-        <span class="text-text-secondary text-xs font-semibold">
-          {{ t("about.features_unlocked") }}
-        </span>
-        <div class="flex flex-wrap gap-1.5" data-test="settings-license-features-unlocked">
-          <OBadge v-for="key in split.unlocked" :key="key" variant="success-soft" icon="check">
-            {{ raw(name(key)) }}
-          </OBadge>
-        </div>
-      </div>
-      <div v-if="split.missing.length" class="flex flex-col gap-2">
-        <span class="text-text-secondary text-xs font-semibold">
-          {{ t("about.features_missing") }}
-        </span>
-        <div
-          class="flex flex-wrap items-center gap-1.5"
-          data-test="settings-license-features-missing"
-        >
-          <OBadge v-for="key in split.missing" :key="key" variant="default-outline" icon="lock">
-            {{ raw(name(key)) }}
-          </OBadge>
-          <OButton
-            variant="ghost-primary"
-            size="xs"
-            icon-right="arrow-forward"
-            data-test="settings-license-features-request-access"
-            @click="emit('request-access')"
-          >
-            {{ t("about.features_request_access") }}
-          </OButton>
-        </div>
-      </div>
-      <div v-if="split.added.length" class="flex flex-col gap-2">
-        <div class="flex flex-col">
-          <span class="text-text-secondary text-xs font-semibold">
-            {{ t("about.features_new") }}
-          </span>
-          <span class="text-text-secondary text-xs">{{ t("about.features_new_caption") }}</span>
-        </div>
-        <div class="flex flex-wrap items-center gap-1.5" data-test="settings-license-features-new">
-          <OBadge
-            v-for="key in split.added"
-            :key="key"
-            :variant="split.addedLocked.includes(key) ? 'default-outline' : 'default-soft'"
-            :icon="split.addedLocked.includes(key) ? 'lock' : undefined"
-            :dot="!split.addedLocked.includes(key)"
-          >
-            {{ raw(name(key)) }}
-          </OBadge>
-          <OButton
-            v-if="split.addedLocked.length"
-            variant="ghost-primary"
-            size="xs"
-            icon-right="arrow-forward"
-            data-test="settings-license-features-request-access"
-            @click="emit('request-access')"
-          >
-            {{ t("about.features_request_access") }}
-          </OButton>
-        </div>
-      </div>
-      <template v-if="split.free.length">
-        <OSeparator />
-        <OButton
-          variant="ghost"
-          size="xs"
-          icon-left="chevron-right"
-          class="h-auto! min-h-7 max-w-full self-start py-1 text-start whitespace-normal!"
-          data-test="settings-license-features-expand"
-          @click="expanded = true"
-        >
-          {{ t("about.features_show_free", { count: split.free.length }, split.free.length) }}
-        </OButton>
-      </template>
-    </template>
-
-    <template v-else>
-      <div class="flex flex-wrap items-center gap-2">
-        <OSearchInput
-          v-model="search"
-          class="min-w-0 flex-1 max-md:min-w-40 md:min-w-60"
-          :placeholder="t('about.features_search', { count: total }, total)"
-          data-test="settings-license-features-search"
-        />
-        <OToggleGroup
-          :model-value="filter"
-          type="single"
-          mobile-dropdown
-          data-test="settings-license-features-filter"
-          @update:model-value="(value) => (filter = value as FilterId)"
-        >
-          <OToggleGroupItem
-            v-for="option in filterOptions"
-            :key="option.id"
-            :value="option.id"
-            size="sm"
-            :data-test="`settings-license-features-filter-${option.id}`"
-          >
-            {{ option.label }}
-            <span class="text-text-secondary ms-1">{{ option.count }}</span>
-          </OToggleGroupItem>
-        </OToggleGroup>
-      </div>
-
       <div
         v-for="group in visibleGroups"
         :key="group.id"
-        class="border-border-subtle flex flex-col gap-1.5 border-b border-solid pb-3 last:border-b-0"
         :data-test="`settings-license-features-${group.id}`"
       >
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span class="text-text-secondary text-xs font-semibold">{{ group.heading }}</span>
-          <span class="text-text-secondary text-xs">{{ group.items.length }}</span>
-          <OButton
-            v-if="group.id === 'missing' || (group.id === 'new' && split.addedLocked.length)"
-            variant="ghost-primary"
-            size="xs"
-            icon-right="arrow-forward"
-            class="ms-auto"
-            data-test="settings-license-features-request-access"
-            @click="emit('request-access')"
-          >
-            {{ t("about.features_request_access") }}
-          </OButton>
+        <div
+          v-if="filter === 'all'"
+          class="bg-surface-subtle text-text-secondary sticky top-0 z-10 pt-2 pb-1 text-xs font-semibold"
+        >
+          {{
+            group.id === "free"
+              ? group.heading
+              : t("about.features_group_heading", {
+                  heading: group.heading,
+                  count: group.items.length,
+                })
+          }}
         </div>
-        <ul class="columns-1 gap-x-4 md:columns-2 xl:columns-3">
+        <ul
+          class="grid grid-cols-2 gap-x-4 max-md:grid-cols-1"
+          :class="{ 'pt-2': filter !== 'all' }"
+        >
           <li
             v-for="key in group.items"
             :key="key"
-            class="flex min-w-0 break-inside-avoid items-center gap-1.5 py-0.5"
+            class="flex min-w-0 items-center gap-1.5 py-0.5"
           >
             <OIcon
               v-if="group.id === 'unlocked'"
@@ -180,33 +121,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else-if="group.id === 'missing' || split.addedLocked.includes(key)"
               name="lock"
               size="xs"
-              class="text-text-secondary shrink-0"
+              class="lock-chip shrink-0"
             />
             <span v-else class="bg-border-strong size-1.5 shrink-0 rounded-full" />
-            <span class="min-w-0 truncate" :title="raw(name(key))">{{ raw(name(key)) }}</span>
+            <OTruncatedText class="min-w-0">{{ raw(name(key)) }}</OTruncatedText>
           </li>
         </ul>
       </div>
       <OEmptyState
         v-if="!visibleGroups.length"
-        size="compact"
-        filtered
+        size="inline"
+        icon="search"
+        :title="search.trim() ? t('about.features_no_match') : t('about.features_none')"
         :backdrop="false"
         data-test="settings-license-features-empty"
-        @action="clearSearch"
       />
-
-      <OButton
-        variant="ghost"
-        size="xs"
-        icon-left="expand-less"
-        class="self-start"
-        data-test="settings-license-features-collapse"
-        @click="collapse"
-      >
-        {{ t("about.features_hide_free") }}
-      </OButton>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -214,29 +144,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import { featureState, type FeatureStates } from "@/utils/featureGate";
+import { splitLicenseFeatures, type LicenseFeatureSource } from "@/utils/featureGate";
 
 type GroupId = "unlocked" | "missing" | "free" | "new";
 type FilterId = "all" | GroupId;
-
-interface FeatureDefinition {
-  display_name?: string;
-  gate?: boolean;
-  plumbing?: boolean;
-}
-
-interface LicenseFeatureSource {
-  features?: string[] | null;
-  feature_definition?: { features?: Record<string, FeatureDefinition> } | null;
-}
 
 const props = defineProps<{ license: LicenseFeatureSource | null | undefined }>();
 
@@ -244,7 +162,6 @@ const emit = defineEmits<{ (e: "request-access"): void }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
-const expanded = ref(false);
 const search = ref("");
 const filter = ref<FilterId>("all");
 
@@ -254,37 +171,9 @@ const name = (key: string): string =>
   props.license?.feature_definition?.features?.[key]?.display_name ??
   key;
 
-const split = computed(() => {
-  const license = props.license;
-  if (!license?.features) return null;
-  const states: FeatureStates = store.state.zoConfig?.features ?? {};
-  const definition = license.feature_definition?.features;
-  const gated = definition
-    ? Object.keys(definition).filter((key) => definition[key].gate && !definition[key].plumbing)
-    : Object.keys(states).filter((key) => states[key] === "locked");
-  // The backend reads a list of only "all" as every feature, so the page does the same.
-  const listsOnlyAll =
-    license.features.length > 0 && license.features.every((key) => key === "all");
-  const unlocked = (listsOnlyAll ? [...gated] : [...license.features]).sort();
-  // A listed key counts as paid even when ungated, so "unlocked of paid" never exceeds the total.
-  const paid = new Set([...gated, ...unlocked]);
-  const missing = [...paid].filter((key) => !unlocked.includes(key)).sort();
-  const freeCandidates = definition
-    ? Object.keys(definition).filter((key) => !definition[key].gate || definition[key].plumbing)
-    : Object.keys(states).filter((key) => states[key] === "enabled");
-  const free = freeCandidates
-    .filter((key) => !unlocked.includes(key) && featureState(states, key) !== "hidden")
-    .sort();
-  // Unlocked is excluded too so a listed key missing from its own definition never shows twice.
-  const added = definition
-    ? Object.keys(states)
-        .filter((key) => !(key in definition) && !unlocked.includes(key))
-        .filter((key) => featureState(states, key) !== "hidden")
-        .sort()
-    : [];
-  const addedLocked = added.filter((key) => featureState(states, key) === "locked");
-  return { unlocked, missing, free, added, addedLocked, paid: paid.size };
-});
+const split = computed(() =>
+  splitLicenseFeatures(props.license, store.state.zoConfig?.features ?? {}),
+);
 
 const total = computed(() =>
   split.value
@@ -317,7 +206,7 @@ const filterOptions = computed(() => {
     },
     {
       id: "missing" as const,
-      label: t("about.features_filter_missing"),
+      label: t("about.features_missing"),
       count: s?.missing.length ?? 0,
     },
     { id: "new" as const, label: t("about.features_filter_new"), count: s?.added.length ?? 0 },
@@ -337,14 +226,4 @@ const visibleGroups = computed(() => {
     }))
     .filter((group) => group.items.length);
 });
-
-const clearSearch = () => {
-  search.value = "";
-  filter.value = "all";
-};
-
-const collapse = () => {
-  clearSearch();
-  expanded.value = false;
-};
 </script>
