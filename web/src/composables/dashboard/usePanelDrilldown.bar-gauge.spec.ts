@@ -211,6 +211,8 @@ describe("drilldown on the new chart types", () => {
 
       expect(params.componentType).toBe("series");
       expect(params.dataIndex).not.toBeUndefined();
+      const clickedRow = grouped.find((row) => row.x_axis_1 === params.name);
+      expect(params.data.rawValue).toBe(clickedRow?.y_axis_1);
       expect(popup.style.display).toBe("block");
       expect(api.drilldownArray.value.map((item: any) => item.name)).toEqual(["Logs"]);
       expect(hideChartTooltip).toHaveBeenCalledTimes(1);

@@ -43,6 +43,7 @@ import {
 } from "@/utils/dashboard/convertStateTimelineData";
 import { isFlowChart, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
 import { boxplotDrilldownSeries, boxplotDrilldownTime } from "@/utils/dashboard/convertBoxplotData";
+import { barGaugeDrilldownSeries } from "@/utils/dashboard/convertBarGaugeData";
 import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/convertHostmapData";
 
 // A click on these lands on a named item (slice, bar, tile), not on a named series.
@@ -250,6 +251,7 @@ export function usePanelDrilldown({
     if (panelSchema.value.type === "boxplot") {
       return boxplotDrilldownSeries(panelData?.value?.options, params);
     }
+    if (panelSchema.value.type === "bar-gauge") return barGaugeDrilldownSeries(params);
     return {
       __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type) ? params?.name : params?.seriesName,
       __value: value,
