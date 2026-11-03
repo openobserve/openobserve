@@ -324,6 +324,25 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
       expect(wrapper.find('[data-test="logs-search-apply-search-text"]').exists()).toBe(false);
     });
 
+    it("a search Auto Run starts during a re-apply keeps loading, not the run-query prompt, while it is pending", async () => {
+      const logs = vi.fn(() => {
+        wrapper.vm.searchObj.loading = true;
+        return new Promise(() => {});
+      });
+      await reApply(
+        { type: "search_history_re_apply", stream: "k8s_json", stream_type: "logs", period: "15m" },
+        { auto_query_enabled: true, query_on_stream_selection: false },
+        logs,
+      );
+      await vi.waitFor(() =>
+        expect(wrapper.vm.searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+      );
+      await vi.waitFor(() => expect(logs).toHaveBeenCalled());
+      await flushPromises();
+      expect(wrapper.vm.searchObj.loading).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-apply-search-text"]').exists()).toBe(false);
+    });
+
     it("a re-applied query loaded without running lets the user's edited run push history", async () => {
       await router.replace({ name: "home" });
       await reApply({
