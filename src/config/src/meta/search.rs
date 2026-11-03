@@ -161,13 +161,13 @@ pub struct Query {
     pub end_time: i64,
     #[serde(default)]
     pub from: i64,
-    // Row cap without a SQL LIMIT; `<= 0` means `query_default_limit`, but `Default` sets 10.
+    // `QUERY_WITH_NO_LIMIT`: no cap; other `<= 0`: `query_default_limit`; `Default`: 10.
     #[serde(default = "default_size")]
     pub size: i64,
     /// For `SELECT *` on streams wider than `quick_mode_num_fields`, reads only some columns.
     #[serde(default)]
     pub quick_mode: bool,
-    /// Also counts every matching row, which bypasses the result cache and streaming output.
+    /// Turns the query into a `count(*)` of matching rows; also skips the cache and streaming.
     #[serde(default)]
     pub track_total_hits: bool,
     /// Set when the SQL calls a saved VRL function, which makes the result hits get flattened.
@@ -191,7 +191,7 @@ pub struct Query {
     pub streaming_output: bool,
     #[serde(default)]
     pub streaming_id: Option<String>,
-    /// Seconds; 0 derives it from the time range.
+    /// Seconds; 0 uses the SQL `histogram()` interval, falling back to one from the time range.
     #[serde(default)]
     pub histogram_interval: i64,
     /// Default fixed-offset timezone (e.g. "+08:00") applied to histogram() buckets
