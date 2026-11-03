@@ -1284,12 +1284,11 @@ fn alert_calibration_routes(router: Router) -> Router {
 #[rustfmt::skip]
 fn service_route_table() -> Router {
     // Downtimes, Slack, search and service streams live in their own tables to keep this function under the line limit.
-    let mut router = public_dashboard_admin_routes(
-        Router::new()
-            .merge(downtime_routes())
-            .merge(slack_routes())
-            .merge(search_routes()),
-    );
+    let mut router = Router::new()
+        .merge(downtime_routes())
+        .merge(slack_routes())
+        .merge(search_routes());
+    router = public_dashboard_admin_routes(router);
     router = router.merge(service_streams_routes());
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
