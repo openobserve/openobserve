@@ -372,9 +372,8 @@ export function useSessions() {
     //   duration              → microseconds (server returns ns/1000)
     //   spans                 → [total_spans, error_spans] tuple
     //   service_name          → [{ service_name, count, duration }]
-    //   gen_ai_usage_*        → summed over non-aggregate spans (not invoke_agent /
-    //                           invoke_workflow / chain / task); over the aggregate
-    //                           spans only when no other span reports usage
+    //   gen_ai_usage_*        → summed over LLM-call spans (chat / text_completion /
+    //                           generate_content / embeddings, or no operation name)
     //   gen_ai_input_messages → FIRST_VALUE — the user question
     //
     // `startTimeMicros` / `durationNanos` on the row type are

@@ -272,10 +272,7 @@ pub fn is_llm_trace(attributes: &HashMap<String, json::Value>, scope_name: Optio
 /// Check if a gen_ai.operation.name value represents a generation (chat/completion)
 /// or embedding operation — used to decide whether to auto-count input/output tokens.
 pub fn is_generation_or_embedding(op_name: &str) -> bool {
-    matches!(
-        op_name,
-        "chat" | "text_completion" | "generate_content" | "embeddings"
-    )
+    config::meta::traces::GENERATION_GEN_AI_OPERATIONS.contains(&op_name)
 }
 
 /// Vercel AI SDK operation id, from `ai.operationId` or else the span name.

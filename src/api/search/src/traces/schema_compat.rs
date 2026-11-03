@@ -37,7 +37,7 @@ use arrow_schema::Schema;
 use config::meta::{
     stream::StreamType,
     traces::{
-        AGGREGATE_GEN_AI_OPERATIONS, GEN_AI_OPERATION_NAME_COLUMN, GEN_AI_SENTINEL_COLUMN,
+        GEN_AI_OPERATION_NAME_COLUMN, GEN_AI_SENTINEL_COLUMN, GENERATION_GEN_AI_OPERATIONS,
         OPTIONAL_GEN_AI_FIELDS, OPTIONAL_LLM_FIELDS, REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
     },
 };
@@ -101,7 +101,7 @@ pub(super) fn columns_for(schema: &Schema) -> LlmColumns {
     }
 }
 
-/// Whether the stream stores `gen_ai_operation_name`, which totals need to skip aggregate spans.
+/// Whether the stream stores `gen_ai_operation_name`, which totals need to sum only LLM calls.
 pub(super) fn has_operation_name(schema: &Schema) -> bool {
     has_gen_ai_fields(schema) && schema.field_with_name(GEN_AI_OPERATION_NAME_COLUMN).is_ok()
 }
@@ -121,45 +121,27 @@ pub(super) async fn stream_llm_layout(
         .unwrap_or_default()
 }
 
-/// Spans whose usage is their own, not a roll-up of their children's; no operation name counts.
-pub(super) fn non_aggregate_span_predicate() -> String {
-    let ops = AGGREGATE_GEN_AI_OPERATIONS
+/// LLM-call spans (the ones ingest prices); a span without an operation name also counts.
+pub(super) fn generation_span_predicate() -> String {
+    let ops = GENERATION_GEN_AI_OPERATIONS
         .iter()
         .map(|op| format!("'{op}'"))
         .collect::<Vec<_>>()
         .join(", ");
-    format!(
-        "({GEN_AI_OPERATION_NAME_COLUMN} IS NULL OR {GEN_AI_OPERATION_NAME_COLUMN} NOT IN ({ops}))"
-    )
+    format!("({GEN_AI_OPERATION_NAME_COLUMN} IS NULL OR {GEN_AI_OPERATION_NAME_COLUMN} IN ({ops}))")
 }
 
-/// `1` when the trace has a non-aggregate span reporting tokens, else `0`.
-pub(super) fn has_leaf_usage_expr() -> String {
-    format!(
-        "max(CASE WHEN {} AND (gen_ai_usage_input_tokens > 0 OR gen_ai_usage_output_tokens > 0) \
-         THEN 1 ELSE 0 END)",
-        non_aggregate_span_predicate()
-    )
-}
-
-/// Usage sum skipping aggregate spans, or every span when no non-aggregate span reports tokens.
+/// Usage sum over LLM-call spans, so agent/workflow spans repeating their children's usage don't
+/// count.
 pub(super) fn usage_sum_expr(column: &str, has_operation_name: bool) -> String {
-    if !has_operation_name {
-        return format!("sum({column})");
+    if has_operation_name {
+        format!(
+            "sum(CASE WHEN {} THEN {column} ELSE 0 END)",
+            generation_span_predicate()
+        )
+    } else {
+        format!("sum({column})")
     }
-    format!(
-        "CASE WHEN {} = 1 THEN sum(CASE WHEN {} THEN {column} END) ELSE sum({column}) END",
-        has_leaf_usage_expr(),
-        non_aggregate_span_predicate()
-    )
-}
-
-/// [`usage_sum_expr`] over rows carrying their trace's [`has_leaf_usage_expr`] flag.
-pub(super) fn per_trace_usage_sum_expr(column: &str, has_leaf_usage_col: &str) -> String {
-    format!(
-        "sum(CASE WHEN {has_leaf_usage_col} = 0 OR {} THEN {column} END)",
-        non_aggregate_span_predicate()
-    )
 }
 
 /// Validated schema metadata for an LLM trace stream.
@@ -188,7 +170,7 @@ pub(super) struct ValidatedLlmSchema {
     pub(super) has_cost_net_cache_impact: bool,
     /// `gen_ai_usage_cost_status` exists (ingest marks unpriced / approximate spans).
     pub(super) has_cost_status: bool,
-    /// New schema with `gen_ai_operation_name`, so usage totals skip aggregate spans.
+    /// New schema with `gen_ai_operation_name`, so usage totals sum only LLM-call spans.
     pub(super) has_operation_name: bool,
 }
 

@@ -35,9 +35,6 @@ use crate::{
     search::error_utils::map_error_to_http_response,
 };
 
-/// Per-row column carrying the span's trace-level `has_leaf_usage_expr`.
-const HAS_LEAF_USAGE_COL: &str = "zo_has_leaf_usage";
-
 /// Session-list pagination deliberately avoids an exact count query because
 /// counting every distinct session is more expensive than fetching one page.
 /// `total` is therefore a lower bound while `has_more` is true, and becomes
@@ -1236,28 +1233,6 @@ fn optional_usage_expr(has_field: bool, sum_expr: &str, alias: &str) -> String {
     }
 }
 
-/// `FROM` clause; with `with_leaf_usage` each row also carries its trace's [`HAS_LEAF_USAGE_COL`].
-fn session_span_rows_sql(stream_ident: &str, predicate: &str, with_leaf_usage: bool) -> String {
-    if with_leaf_usage {
-        format!(
-            "FROM (SELECT *, {} OVER (PARTITION BY trace_id) AS {HAS_LEAF_USAGE_COL} \
-             FROM {stream_ident} WHERE {predicate})",
-            super::schema_compat::has_leaf_usage_expr()
-        )
-    } else {
-        format!("FROM {stream_ident} WHERE {predicate}")
-    }
-}
-
-/// Usage total over rows produced by [`session_span_rows_sql`].
-fn session_usage_sum(column: &str, with_leaf_usage: bool) -> String {
-    if with_leaf_usage {
-        super::schema_compat::per_trace_usage_sum_expr(column, HAS_LEAF_USAGE_COL)
-    } else {
-        format!("sum({column})")
-    }
-}
-
 /// Older clients wrapped the agent predicate in a same-stream session
 /// membership subquery. Inside the grouped page query that becomes an
 /// unsupported `InSubquery` expression, while its inner WHERE clause has the
@@ -1512,20 +1487,14 @@ fn build_latest_session_page_sql(
         )
     };
     let direction = sort.order.sql();
-    // Usage sorts must match the totals `build_latest_sessions_sql` reports.
-    let with_leaf_usage = validated.has_operation_name
-        && match sort.field {
-            LatestSessionSortField::TotalTokens => validated.has_total_tokens,
-            LatestSessionSortField::Cost => true,
-            _ => false,
-        };
+    // Usage sorts use the same sum as the totals `build_latest_sessions_sql` reports.
     let (sort_projection, order_by) = match sort.field {
         LatestSessionSortField::EndTime => (
             String::new(),
             format!("session_last_activity {direction}, session_id {direction}"),
         ),
         field => {
-            let sort_expression = latest_session_sort_expression(field, validated, with_leaf_usage);
+            let sort_expression = latest_session_sort_expression(field, validated);
             (
                 format!(", {sort_expression} as session_sort_value"),
                 format!(
@@ -1536,15 +1505,11 @@ fn build_latest_session_page_sql(
         }
     };
     let stream_ident = traces::session::quote_identifier(stream_name);
-    let span_rows = session_span_rows_sql(
-        &stream_ident,
-        &format!("{session_id_col} IS NOT NULL AND {session_id_col} != ''"),
-        with_leaf_usage,
-    );
     format!(
         "SELECT {session_id_col} as session_id, \
          max(end_time) as session_last_activity{sort_projection} \
-         {span_rows} \
+         FROM {stream_ident} \
+         WHERE {session_id_col} IS NOT NULL AND {session_id_col} != '' \
          GROUP BY {session_id_col}{membership_filter} \
          ORDER BY {order_by}"
     )
@@ -1553,7 +1518,6 @@ fn build_latest_session_page_sql(
 fn latest_session_sort_expression(
     field: LatestSessionSortField,
     validated: &super::schema_compat::ValidatedLlmSchema,
-    with_leaf_usage: bool,
 ) -> String {
     match field {
         LatestSessionSortField::EndTime => "max(end_time)".to_string(),
@@ -1570,10 +1534,7 @@ fn latest_session_sort_expression(
             } else {
                 "llm_usage_tokens_total"
             };
-            format!(
-                "COALESCE({}, 0)",
-                session_usage_sum(column, with_leaf_usage)
-            )
+            format!("COALESCE({}, 0)", validated.usage_sum(column))
         }
         LatestSessionSortField::TotalTokens => "0".to_string(),
         LatestSessionSortField::Cost => {
@@ -1582,10 +1543,7 @@ fn latest_session_sort_expression(
             } else {
                 "llm_usage_cost_total"
             };
-            format!(
-                "COALESCE({}, 0)",
-                session_usage_sum(column, with_leaf_usage)
-            )
+            format!("COALESCE({}, 0)", validated.usage_sum(column))
         }
         LatestSessionSortField::Status => {
             "max(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END)".to_string()
@@ -1624,8 +1582,7 @@ fn build_latest_sessions_sql(
         )
     };
 
-    let with_leaf_usage = validated.has_operation_name;
-    let usage = |column: &str| session_usage_sum(column, with_leaf_usage);
+    let usage = |column: &str| validated.usage_sum(column);
     let optional_usage =
         |has_field: bool, column: &str| optional_usage_expr(has_field, &usage(column), column);
     let input_tokens_expr = usage(input_tokens_col);
@@ -1676,11 +1633,6 @@ fn build_latest_sessions_sql(
     );
     let unpriced_selects = validated.unpriced_selects();
     let stream_ident = traces::session::quote_identifier(stream_name);
-    let span_rows = session_span_rows_sql(
-        &stream_ident,
-        &format!("{session_id_col} IN ({session_ids_sql})"),
-        with_leaf_usage,
-    );
 
     format!(
         "SELECT {session_id_col} as session_id, \
@@ -1705,7 +1657,8 @@ fn build_latest_sessions_sql(
          array_agg(DISTINCT {user_id_col}) \
              FILTER (WHERE {user_id_col} IS NOT NULL AND {user_id_col} != '') as user_ids, \
          {first_message_expr} \
-         {span_rows} \
+         FROM {stream_ident} \
+         WHERE {session_id_col} IN ({session_ids_sql}) \
          GROUP BY {session_id_col}"
     )
 }
@@ -2198,35 +2151,27 @@ mod tests {
         let mut legacy = super::super::schema_compat::ValidatedLlmSchema::fallback(false);
         legacy.has_total_tokens = true;
         assert_eq!(
-            latest_session_sort_expression(LatestSessionSortField::UserId, &legacy, false),
+            latest_session_sort_expression(LatestSessionSortField::UserId, &legacy),
             "min(NULLIF(llm_user_id, ''))"
         );
         assert_eq!(
-            latest_session_sort_expression(LatestSessionSortField::TotalTokens, &legacy, false),
+            latest_session_sort_expression(LatestSessionSortField::TotalTokens, &legacy),
             "COALESCE(sum(llm_usage_tokens_total), 0)"
         );
         assert_eq!(
-            latest_session_sort_expression(LatestSessionSortField::Cost, &legacy, false),
+            latest_session_sort_expression(LatestSessionSortField::Cost, &legacy),
             "COALESCE(sum(llm_usage_cost_total), 0)"
         );
 
         legacy.has_total_tokens = false;
         assert_eq!(
-            latest_session_sort_expression(LatestSessionSortField::TotalTokens, &legacy, false),
+            latest_session_sort_expression(LatestSessionSortField::TotalTokens, &legacy),
             "0"
         );
     }
 
-    const NON_AGGREGATE: &str = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name NOT IN \
-                                 ('invoke_agent', 'invoke_workflow', 'chain', 'task'))";
-
-    fn leaf_usage_window() -> String {
-        format!(
-            "max(CASE WHEN {NON_AGGREGATE} AND (gen_ai_usage_input_tokens > 0 OR \
-             gen_ai_usage_output_tokens > 0) THEN 1 ELSE 0 END) OVER (PARTITION BY trace_id) \
-             AS zo_has_leaf_usage"
-        )
-    }
+    const LLM_CALL: &str = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name IN \
+                            ('chat', 'text_completion', 'generate_content', 'embeddings'))";
 
     fn with_operation_name() -> super::super::schema_compat::ValidatedLlmSchema {
         let mut validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
@@ -2237,17 +2182,15 @@ mod tests {
     }
 
     #[test]
-    fn session_trace_details_sql_skips_aggregate_spans_with_fallback() {
-        let sql = build_session_trace_details_sql(
+    fn session_usage_sums_count_only_llm_call_spans() {
+        let validated = with_operation_name();
+        let llm_sum = |column: &str| format!("sum(CASE WHEN {LLM_CALL} THEN {column} ELSE 0 END)");
+        let details = build_session_trace_details_sql(
             "default",
-            &with_operation_name(),
+            &validated,
             false,
             "service_name",
             "trace_id IN ('t1')",
-        );
-        let has_leaf = format!(
-            "max(CASE WHEN {NON_AGGREGATE} AND (gen_ai_usage_input_tokens > 0 OR \
-             gen_ai_usage_output_tokens > 0) THEN 1 ELSE 0 END)"
         );
         for (column, alias) in [
             ("gen_ai_usage_input_tokens", "gen_ai_usage_details_input"),
@@ -2259,43 +2202,39 @@ mod tests {
                 "gen_ai_usage_cache_read_input_tokens",
             ),
         ] {
-            let expected = format!(
-                "CASE WHEN {has_leaf} = 1 THEN sum(CASE WHEN {NON_AGGREGATE} THEN {column} END) \
-                 ELSE sum({column}) END as {alias}"
-            );
-            assert!(sql.contains(&expected), "{alias}: {sql}");
+            let expected = format!("{} as {alias}", llm_sum(column));
+            assert!(details.contains(&expected), "{alias}: {details}");
         }
-        assert!(sql.contains("0 as gen_ai_usage_cache_creation_input_tokens"));
-        assert!(sql.contains("GROUP BY trace_id"));
-    }
+        assert!(details.contains("0 as gen_ai_usage_cache_creation_input_tokens"));
 
-    #[test]
-    fn latest_sessions_sql_sums_each_trace_without_aggregate_spans() {
-        let sql = build_latest_sessions_sql(
-            "bench_traces",
-            &["session-1".to_string()],
-            &with_operation_name(),
-        );
-        assert!(
-            sql.contains(&format!(
-                "FROM (SELECT *, {} FROM \"bench_traces\" \
-                 WHERE gen_ai_conversation_id IN ('session-1')) GROUP BY gen_ai_conversation_id",
-                leaf_usage_window()
-            )),
-            "{sql}"
-        );
+        let sessions =
+            build_latest_sessions_sql("bench_traces", &["session-1".to_string()], &validated);
         for column in [
             "gen_ai_usage_input_tokens",
             "gen_ai_usage_output_tokens",
             "gen_ai_usage_total_tokens",
             "gen_ai_usage_cost",
-            "gen_ai_usage_cache_read_input_tokens",
         ] {
-            let expected = format!(
-                "sum(CASE WHEN zo_has_leaf_usage = 0 OR {NON_AGGREGATE} THEN {column} END) \
-                 as {column}"
+            let expected = format!("{} as {column}", llm_sum(column));
+            assert!(sessions.contains(&expected), "{column}: {sessions}");
+        }
+
+        for (field, column) in [
+            (
+                LatestSessionSortField::TotalTokens,
+                "gen_ai_usage_total_tokens",
+            ),
+            (LatestSessionSortField::Cost, "gen_ai_usage_cost"),
+        ] {
+            let page = build_latest_session_page_sql(
+                "bench_traces",
+                "",
+                &LatestSessionSearch::default(),
+                &sort(field, LatestSessionSortOrder::Desc),
+                &validated,
             );
-            assert!(sql.contains(&expected), "{column}: {sql}");
+            let expected = format!("COALESCE({}, 0) as session_sort_value", llm_sum(column));
+            assert!(page.contains(&expected), "{page}");
         }
     }
 
@@ -2321,59 +2260,11 @@ mod tests {
         );
         for sql in [&sessions, &details, &page] {
             assert!(!sql.contains("gen_ai_operation_name"), "{sql}");
-            assert!(!sql.contains("OVER (PARTITION BY trace_id)"), "{sql}");
         }
         assert!(sessions.contains("sum(gen_ai_usage_input_tokens) as gen_ai_usage_input_tokens"));
         assert!(sessions.contains("FROM \"bench_traces\" WHERE gen_ai_conversation_id IN"));
         assert!(details.contains("sum(gen_ai_usage_cost) as gen_ai_usage_cost_details"));
         assert!(page.contains("COALESCE(sum(gen_ai_usage_cost), 0) as session_sort_value"));
-    }
-
-    #[test]
-    fn session_page_usage_sorts_match_per_trace_totals() {
-        let validated = with_operation_name();
-        for (field, column) in [
-            (
-                LatestSessionSortField::TotalTokens,
-                "gen_ai_usage_total_tokens",
-            ),
-            (LatestSessionSortField::Cost, "gen_ai_usage_cost"),
-        ] {
-            let sql = build_latest_session_page_sql(
-                "bench_traces",
-                "",
-                &LatestSessionSearch::default(),
-                &sort(field, LatestSessionSortOrder::Desc),
-                &validated,
-            );
-            assert!(
-                sql.contains(&format!(
-                    "COALESCE(sum(CASE WHEN zo_has_leaf_usage = 0 OR {NON_AGGREGATE} \
-                     THEN {column} END), 0) as session_sort_value"
-                )),
-                "{sql}"
-            );
-            assert!(
-                sql.contains(&format!(
-                    "FROM (SELECT *, {} FROM \"bench_traces\" WHERE gen_ai_conversation_id IS \
-                     NOT NULL AND gen_ai_conversation_id != '') GROUP BY gen_ai_conversation_id",
-                    leaf_usage_window()
-                )),
-                "{sql}"
-            );
-        }
-        // Sorts that don't read usage keep the plain single-table shape.
-        let sql = build_latest_session_page_sql(
-            "bench_traces",
-            "",
-            &LatestSessionSearch::default(),
-            &sort(
-                LatestSessionSortField::TraceCount,
-                LatestSessionSortOrder::Desc,
-            ),
-            &validated,
-        );
-        assert!(!sql.contains("zo_has_leaf_usage"), "{sql}");
     }
 
     // ── List search (`keyword`) ─────────────────────────────────────────────

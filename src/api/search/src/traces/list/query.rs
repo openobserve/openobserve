@@ -392,27 +392,20 @@ mod tests {
     }
 
     #[test]
-    fn test_build_llm_trace_query_skips_aggregate_spans_with_fallback() {
+    fn test_build_llm_trace_query_sums_only_llm_call_spans() {
         let mut validated = schema_compat::ValidatedLlmSchema::fallback(true);
         validated.has_total_tokens = true;
         validated.has_operation_name = true;
         let sql = build_llm_trace_query("default", &validated, "count(*) AS span_count");
-        let non_aggregate = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name NOT IN \
-                             ('invoke_agent', 'invoke_workflow', 'chain', 'task'))";
-        let has_leaf = format!(
-            "max(CASE WHEN {non_aggregate} AND (gen_ai_usage_input_tokens > 0 OR \
-             gen_ai_usage_output_tokens > 0) THEN 1 ELSE 0 END)"
-        );
+        let llm_call = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name IN \
+                        ('chat', 'text_completion', 'generate_content', 'embeddings'))";
         for (column, alias) in [
             ("gen_ai_usage_input_tokens", "gen_ai_usage_details_input"),
             ("gen_ai_usage_output_tokens", "gen_ai_usage_details_output"),
             ("gen_ai_usage_total_tokens", "gen_ai_usage_details_total"),
             ("gen_ai_usage_cost", "gen_ai_usage_cost_details"),
         ] {
-            let expected = format!(
-                "CASE WHEN {has_leaf} = 1 THEN sum(CASE WHEN {non_aggregate} THEN {column} END) \
-                 ELSE sum({column}) END as {alias}"
-            );
+            let expected = format!("sum(CASE WHEN {llm_call} THEN {column} ELSE 0 END) as {alias}");
             assert!(sql.contains(&expected), "{sql}");
         }
     }

@@ -809,7 +809,7 @@ mod tests {
     }
 
     #[test]
-    fn user_trace_usage_sql_skips_aggregate_spans_with_fallback() {
+    fn user_trace_usage_sql_sums_only_llm_call_spans() {
         let sql = build_user_trace_usage_sql(
             "default",
             "abc-1",
@@ -818,16 +818,14 @@ mod tests {
                 has_operation_name: true,
             },
         );
-        let non_aggregate = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name NOT IN \
-                             ('invoke_agent', 'invoke_workflow', 'chain', 'task'))";
+        let llm_call = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name IN \
+                        ('chat', 'text_completion', 'generate_content', 'embeddings'))";
         assert!(sql.contains(&format!(
-            "THEN sum(CASE WHEN {non_aggregate} THEN gen_ai_usage_total_tokens END) \
-             ELSE sum(gen_ai_usage_total_tokens) END as gen_ai_usage_details_total"
+            "sum(CASE WHEN {llm_call} THEN gen_ai_usage_total_tokens ELSE 0 END) \
+             as gen_ai_usage_details_total"
         )));
         assert!(sql.contains(&format!(
-            "THEN sum(CASE WHEN {non_aggregate} THEN gen_ai_usage_cost END) \
-             ELSE sum(gen_ai_usage_cost) END as gen_ai_usage_cost_details"
+            "sum(CASE WHEN {llm_call} THEN gen_ai_usage_cost ELSE 0 END) as gen_ai_usage_cost_details"
         )));
-        assert!(sql.contains("GROUP BY trace_id"));
     }
 }
