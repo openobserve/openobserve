@@ -152,6 +152,8 @@ export default class DashboardPanelConfigs {
     //Guage chart locators
     this.gaugeMin = page.locator('[data-test="dashboard-config-gauge-min"]');
     this.gaugeMax = page.locator('[data-test="dashboard-config-gauge-max"]');
+    this.gaugeMinField = this.gaugeMin.locator('[data-test$="-field"]');
+    this.gaugeMaxField = this.gaugeMax.locator('[data-test$="-field"]');
     this.gaugeRangeMode = page.locator('[data-test="dashboard-config-gauge-range-mode"]');
     this.gaugeStyle = page.locator('[data-test="dashboard-config-gauge_style"]');
 

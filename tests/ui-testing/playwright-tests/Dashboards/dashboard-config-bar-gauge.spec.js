@@ -76,8 +76,9 @@ test.describe("ConfigPanel — Bar Gauge Settings", () => {
 
     await setupBarGaugePanelWithConfig(page, pm, dashboardName);
 
-    for (const mode of ["Gradient", "Basic", "Retro LCD"]) {
+    for (const [mode, value] of [["Gradient", "gradient"], ["Basic", "basic"], ["Retro LCD", "lcd"]]) {
       await configs.selectBarGaugeMode(mode);
+      await configs.expectConfigSelectValue(configs.barGaugeModeTrigger, value);
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.dashboardPanelActions.waitForChartToRender();
       await pm.dashboardPanelActions.verifyChartHasData(expect);
@@ -131,8 +132,8 @@ test.describe("ConfigPanel — Bar Gauge Settings", () => {
     testLogger.info("Verifying bar gauge Fixed range and bounds persist after save");
     await reopenPanelConfig(page, pm);
     await configs.expectConfigSelectValue(configs.barGaugeRangeModeTrigger, "fixed");
-    await expect(configs.gaugeMin.locator('[data-test$="-field"]')).toHaveValue("0");
-    await expect(configs.gaugeMax.locator('[data-test$="-field"]')).toHaveValue("1000");
+    await expect(configs.gaugeMinField).toHaveValue("0");
+    await expect(configs.gaugeMaxField).toHaveValue("1000");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -194,7 +195,11 @@ test.describe("ConfigPanel — Bar Gauge Settings", () => {
     await configs.expandAllConfigSections();
     await configs.scrollSidebarToElement(configs.barGaugeMode);
     await expect(configs.barGaugeMode).toBeVisible();
+    await expect(configs.barGaugeOrientation).toBeVisible();
+    await expect(configs.barGaugeShowUnfilled).toBeVisible();
+    await expect(configs.barGaugeRangeMode).toBeVisible();
     await expect(configs.gaugeStyle).toBeHidden();
+    await expect(configs.gaugeRangeMode).toBeHidden();
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.verifyChartHasData(expect);
