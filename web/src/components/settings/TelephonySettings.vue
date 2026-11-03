@@ -61,18 +61,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :read-only="readOnly"
         data-test="telephony-settings-deployment"
       >
-        <span class="flex flex-wrap items-center gap-1">
-          <OText variant="meta">{{ t("telephony.deploymentOwner") }}</OText>
+        <OText variant="meta">{{ t("telephony.deploymentOwner") }}</OText>
+        <template #actions>
           <OButton
-            variant="ghost-primary"
-            size="xs"
+            variant="outline"
+            size="sm-action"
+            icon-left="swap-horiz"
             :disabled="readOnly"
             data-test="telephony-settings-use-own"
             @click="openDialog('connect')"
           >
             {{ t("telephony.useOwn", { provider: PROVIDER }) }}
           </OButton>
-        </span>
+        </template>
       </TelephonyAccountCard>
 
       <TelephonyAccountCard
@@ -90,10 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="telephony-settings-connected"
         @update="openDialog('update')"
       >
-        <div class="flex flex-wrap justify-end gap-2">
+        <template #actions>
           <OButton
             variant="outline"
             size="sm-action"
+            icon-left="edit"
             :disabled="readOnly"
             data-test="telephony-settings-update"
             @click="openDialog('update')"
@@ -103,13 +105,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline-destructive"
             size="sm-action"
+            icon-left="link-off"
             :disabled="readOnly"
             data-test="telephony-settings-disconnect"
             @click="confirmingDisconnect = true"
           >
             {{ t("telephony.disconnect") }}
           </OButton>
-        </div>
+        </template>
       </TelephonyAccountCard>
     </div>
 

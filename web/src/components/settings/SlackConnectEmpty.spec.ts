@@ -316,6 +316,26 @@ describe("SlackConnectEmpty self-hosted (A1)", () => {
     }
   });
 
+  it("offers Connect this org to an existing workspace before the setup wizard", () => {
+    const w = mountEmpty({
+      isCloud: false,
+      available: [{ installation_id: "inst-9", team_name: "Acme Corp" }],
+    });
+    const html = w.html();
+    expect(html.indexOf('data-test="slack-available"')).toBeLessThan(
+      html.indexOf('data-test="slack-setup-app"'),
+    );
+    const connect = w.find('[data-test="slack-available-inst-9"] button');
+    expect(connect.classes()).toContain("bg-button-primary");
+    expect(w.find('[data-test="slack-setup-app"]').classes()).not.toContain("bg-button-primary");
+  });
+
+  it("keeps Set up Slack app primary when no workspace is set up yet", () => {
+    const w = mountEmpty({ isCloud: false });
+    expect(w.find('[data-test="slack-available"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-setup-app"]').classes()).toContain("bg-button-primary");
+  });
+
   it("AC-12.1 Connect existing proves the admin with Sign in with Slack, then connects", async () => {
     const w = mountEmpty({
       isCloud: false,

@@ -35,7 +35,6 @@ import {
 import { useI18nTyped } from "@/types/i18n";
 import type { InstallationView } from "@/types/slack";
 import SlackLinkedPeople from "./SlackLinkedPeople.vue";
-import SlackOncallUnlinked from "./SlackOncallUnlinked.vue";
 import { makeLinkingSchema, type LinkingForm } from "./SlackSettings.schema";
 
 const props = defineProps<{ installation: InstallationView }>();
@@ -121,8 +120,9 @@ const runLinkAll = async (): Promise<void> => {
       </div>
       <OButton
         v-if="!managed"
-        variant="ghost-primary"
-        size="sm"
+        variant="outline"
+        size="sm-action"
+        icon-left="manage-accounts"
         data-test="slack-linking-manage"
         @click="peopleOpen = true"
       >
@@ -190,6 +190,7 @@ const runLinkAll = async (): Promise<void> => {
               v-if="!editing && !managed"
               variant="outline"
               size="sm"
+              icon-left="edit"
               data-test="slack-linking-edit"
               @click="editing = true"
             >
@@ -248,6 +249,7 @@ const runLinkAll = async (): Promise<void> => {
         <OButton
           variant="outline"
           size="sm-action"
+          icon-left="link"
           :loading="linkAll.isPending.value"
           @click="runLinkAll"
         >
@@ -267,8 +269,6 @@ const runLinkAll = async (): Promise<void> => {
         <OTag variant="success-soft" :label="t('slackApp.linking.enabled')" />
       </div>
     </OCard>
-
-    <SlackOncallUnlinked :installation="installation" />
 
     <SlackLinkedPeople v-model:open="peopleOpen" :installation-id="installation.id" />
   </section>

@@ -17,6 +17,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
@@ -29,6 +30,7 @@ import type {
 import TelephonyAccountDialog from "./TelephonyAccountDialog.vue";
 import TelephonySettings from "./TelephonySettings.vue";
 
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/services/oncall", () => ({
   default: {
     getTelephony: vi.fn(),
@@ -87,7 +89,7 @@ const text = (id: string) => q(id)?.textContent?.replace(/\s+/g, " ").trim() ?? 
 const card = (id: string) =>
   document.querySelector<HTMLElement>(`[data-test="telephony-card-${id}"]`);
 const cardText = (id: string) => card(id)?.textContent?.replace(/\s+/g, " ").trim() ?? "";
-const PRESS4 = "Call keys (4 acknowledge, 6 resolve, 8 escalate)";
+const PRESS4 = "Call keys4 acknowledge · 6 resolve · 8 escalate";
 const NOTE = "Set by the operator, so there is nothing to configure here.";
 const dialog = (id: string) =>
   document.querySelector<HTMLInputElement>(`[data-test="telephony-account-dialog-${id}-field"]`);
@@ -146,12 +148,11 @@ describe("TelephonySettings", () => {
 
     it("5d: without a callback URL press 4 reads not available, with the link fallback", async () => {
       await render({ ...CONNECTED, press4_available: false });
-      expect(text("press4")).toContain(PRESS4);
+      expect(text("press4")).toBe(
+        "Call keysNot available · people acknowledge from the link in their text",
+      );
       expect(q("press4")?.querySelector('[role="img"]')?.getAttribute("aria-label")).toBe(
         "Not available",
-      );
-      expect(text("press4")).toContain(
-        "Calls ask people to acknowledge from the link in their text.",
       );
     });
 
@@ -227,6 +228,31 @@ describe("TelephonySettings", () => {
       expect(text("deployment")).not.toContain("already work");
     });
 
+    it("Check account asks Twilio again and says when it passed", async () => {
+      await render(CONNECTED);
+      expect(service.getTelephonyStatus).toHaveBeenCalledTimes(1);
+      service.getTelephonyStatus.mockResolvedValue({ data: status("account_rejected") } as any);
+      card("check")!.click();
+      await flushPromises();
+      expect(service.getTelephonyStatus).toHaveBeenCalledTimes(2);
+      expect(cardText("status")).toBe("Not working");
+      expect(toast).toHaveBeenLastCalledWith(expect.objectContaining({ variant: "warning" }));
+      service.getTelephonyStatus.mockResolvedValue({ data: status("ok") } as any);
+      card("check")!.click();
+      await flushPromises();
+      expect(toast).toHaveBeenLastCalledWith({
+        variant: "success",
+        message: "Twilio accepted the account",
+      });
+    });
+
+    it("every account action carries an icon", async () => {
+      await render(CONNECTED);
+      for (const button of [q("update"), q("disconnect"), card("check")]) {
+        expect(button?.querySelector("svg")).not.toBeNull();
+      }
+    });
+
     it("an unreachable Twilio reads Couldn't check, not Not working", async () => {
       await render(CONNECTED, true, status("unavailable"));
       expect(cardText("status")).toBe("Couldn't check");
@@ -249,7 +275,7 @@ describe("TelephonySettings", () => {
     it("a trial account says who it can reach", async () => {
       await render(CONNECTED, true, status("ok", { trial: true }));
       expect(cardText("trial")).toBe(
-        "Trial account: texts and calls only reach numbers verified in Twilio.",
+        "Trial account: Twilio only calls and texts numbers verified on the account.",
       );
     });
 
@@ -390,8 +416,11 @@ describe("TelephonySettings", () => {
 
   describe("disconnect", () => {
     it.each([
-      [true, "From the next page step, texts and calls use this deployment's provider."],
-      [false, "From the next page step, pages go by email only."],
+      [true, "On-call texts and calls switch to the account this deployment provides."],
+      [
+        false,
+        "Every on-call team stops getting texts and calls; pages still go out by email, and to Slack where it is set up.",
+      ],
     ])("with a deployment account %s, says what takes over", async (present, expected) => {
       await render({ ...CONNECTED, deployment_account_present: present });
       await click("disconnect");
@@ -404,7 +433,7 @@ describe("TelephonySettings", () => {
       await click("disconnect");
       const name = document.querySelector('[data-test="confirm-dialog-name"]');
       expect(name?.textContent).toBe("ACte…0001");
-      expect(document.body.textContent).toContain("This disconnects the ACte…0001 account.");
+      expect(document.body.textContent).toContain("Disconnects the ACte…0001 account.");
       const ok = document.querySelector('[data-test="o-dialog-primary-btn"]');
       expect(ok?.className).toContain("bg-button-destructive");
     });

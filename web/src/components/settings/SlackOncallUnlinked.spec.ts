@@ -68,10 +68,11 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
     const w = await mountList();
     expect(slack.listOncallUnlinked).toHaveBeenCalledWith("acme", "inst-1");
     const section = w.find('[data-test="slack-oncall-unlinked"]');
-    expect(section.text()).toContain("On-call members not linked to Slack");
+    expect(section.text()).toContain("On-call people not linked to Slack");
     expect(section.text()).toContain(
-      "Link your OpenObserve account so page buttons (Acknowledge, Resolve) and alert buttons (Acknowledge, Mute, Investigate) act as you. Until then your presses wait for you to link.",
+      "Until they link, their Acknowledge and Resolve presses in Slack wait.",
     );
+    expect(w.find('[data-test="slack-oncall-unlinked-count"]').text()).toBe("2 people");
     expect(section.text()).toContain("kim@acme.io");
     expect(section.text()).toContain("Payments");
     expect(w.find('[data-test="slack-oncall-unlinked-reminder-kim@acme.io"]').text()).toContain(
@@ -82,9 +83,71 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
     );
   });
 
-  it("Remind them sends the DMs again", async () => {
+  it("shows one row per person with every team as a chip, on call now first", async () => {
+    const nowUs = Date.now() * 1000;
+    vi.mocked(slack.listOncallUnlinked).mockReturnValue(
+      ok({
+        members: [
+          {
+            email: "bob@acme.io",
+            team_id: "t1",
+            team_name: "Payments",
+            next_shift_at: nowUs + 3_600_000_000,
+            reminded_at: null,
+          },
+          {
+            email: "bob@acme.io",
+            team_id: "t2",
+            team_name: "Search",
+            next_shift_at: nowUs + 7_200_000_000,
+            reminded_at: 5,
+          },
+          {
+            email: "zed@acme.io",
+            team_id: "t1",
+            team_name: "Payments",
+            next_shift_at: nowUs - 60_000_000,
+            reminded_at: null,
+          },
+          {
+            email: "amy@acme.io",
+            team_id: "t3",
+            team_name: "Infra",
+            next_shift_at: null,
+            reminded_at: null,
+          },
+        ],
+      }) as any,
+    );
     const w = await mountList();
-    await w.find('[data-test="slack-oncall-unlinked-remind"]').trigger("click");
+    const people = w
+      .findAll('[data-test^="slack-oncall-unlinked-person-"]')
+      .map((cell) => cell.text());
+    expect(people).toEqual(["zed@acme.io", "bob@acme.io", "amy@acme.io"]);
+    expect(w.find('[data-test="slack-oncall-unlinked-count"]').text()).toBe("3 people");
+    expect(w.find('[data-test="slack-oncall-unlinked-now-zed@acme.io"]').text()).toBe(
+      "On call now",
+    );
+    expect(w.find('[data-test="slack-oncall-unlinked-now-bob@acme.io"]').exists()).toBe(false);
+    const bobRow = w
+      .find('[data-test="slack-oncall-unlinked-person-bob@acme.io"]')
+      .element.closest("tr")!;
+    expect(
+      [...bobRow.querySelectorAll('[data-test="slack-oncall-unlinked-team"]')].map((c) =>
+        c.textContent?.trim(),
+      ),
+    ).toEqual(["Payments", "Search"]);
+    expect(w.find('[data-test="slack-oncall-unlinked-reminder-bob@acme.io"]').text()).toContain(
+      "DM sent",
+    );
+  });
+
+  it("Remind by DM is a labelled icon button that sends the DMs again", async () => {
+    const w = await mountList();
+    const remind = w.find('[data-test="slack-oncall-unlinked-remind"]');
+    expect(remind.text()).toBe("Remind by DM");
+    expect(remind.find("svg").exists()).toBe(true);
+    await remind.trigger("click");
     await flushPromises();
     expect(slack.remindOncallUnlinked).toHaveBeenCalledWith("acme", "inst-1");
   });

@@ -25,6 +25,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { deleteLinkMutation, slackLinksQuery } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { SlackAdminLink } from "@/types/slack";
@@ -130,11 +131,13 @@ const confirmUnlink = (): void => {
         <template #cell-actions="{ row }">
           <OButton
             variant="ghost-destructive"
-            size="sm"
+            size="icon-sm"
+            icon-left="link-off"
+            :aria-label="t('slackApp.people.unlink')"
             :data-test="`slack-people-unlink-${row.id}`"
             @click="askUnlink(row)"
           >
-            {{ t("slackApp.people.unlink") }}
+            <OTooltip side="bottom" :content="t('slackApp.people.unlink')" />
           </OButton>
         </template>
         <template #error>
