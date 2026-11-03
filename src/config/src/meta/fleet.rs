@@ -692,7 +692,6 @@ pub struct PlanPreview {
 #[serde(rename_all = "snake_case")]
 pub enum RolloutStatus {
     Scheduled,
-    /// No collector was online at the start, so nothing is sent until one is (§9.3).
     Waiting,
     InProgress,
     Halted,
