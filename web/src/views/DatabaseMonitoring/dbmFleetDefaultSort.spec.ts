@@ -108,3 +108,13 @@ describe("the overview badge counts the fleet it shows", () => {
     expect(source).not.toMatch(/if \(row\.trafficless\) return;/);
   });
 });
+
+describe("the Schema filter republishes the fleet count under the scope it narrowed", () => {
+  // The badge drops a page's count published before the shell re-keys, so rows re-derive only after the URL settles.
+  it("awaits the URL before re-deriving rows", () => {
+    expect(source).toMatch(
+      /const schemaFilterEntry = createDbmFilterEntry\(async \(\) => \{\s*\n(\s*\/\/.*\n)?\s*await syncUrl\(\);/,
+    );
+    expect(source).toMatch(/const syncUrl = \(.*\) =>\s*\n\s*router\s*\n\s*\.replace\(/);
+  });
+});

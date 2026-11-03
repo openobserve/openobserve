@@ -13,33 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * One Databases row per server, its schemas kept underneath.
- *
- * `db_totals` arrives at (system, instance, namespace) grain. On Postgres the
- * namespace is a database ON the server, so one RDS host serving seventeen of
- * them came back as seventeen rows all titled with the host name — and every
- * one of them expanded to the same server-wide split. The reader's unit is the
- * server; the namespaces are what they want to filter inside it.
- *
- * So the rows are folded here, client-side, and each folded row keeps the
- * per-namespace rows it came from. Those stay EXACT: they are the server's own
- * totals, which is why the schema children are built from them rather than
- * from the top-N `query_stats` split.
- *
- * Counts and time are additive across namespaces, so their sums are exact. A
- * percentile is not: for a server with more than one schema the folded
- * p50/p95/p99 are call-weighted means of the schemas' own percentiles — the
- * same merge the backend uses when it folds rows — while the schema children
- * keep their exact figures.
- */
+// db_totals arrives per schema, but the reader's unit is the server, so rows fold here.
 
 import type { DbTotalsRow } from "@/services/db_monitoring";
+import { detectDrowningDatabases, isCriticalErrorRate } from "@/utils/dbm/insights";
 
 /** A server row, with the per-schema rows it was folded from. */
 export interface DbmInstanceTotals extends DbTotalsRow {
   /** The per-namespace rows, heaviest first. Always at least one. */
   schemas: DbTotalsRow[];
+  /** The schemas that carry a name, heaviest first. */
+  namedSchemas: string[];
 }
 
 const num = (value: number | undefined | null): number =>
@@ -49,30 +33,23 @@ const num = (value: number | undefined | null): number =>
 export const instanceKey = (row: Pick<DbTotalsRow, "db_system" | "db_instance">): string =>
   `${row.db_system}\u0000${row.db_instance}`;
 
-/**
- * Call-weighted mean of one percentile across rows, skipping rows that did not
- * report it. `undefined` when none did — an absent latency must stay absent.
- */
-const weightedPercentile = (
-  rows: DbTotalsRow[],
-  pick: (row: DbTotalsRow) => number | undefined,
+/** The table identity of a server row; it must not move when the schema count or filter does. */
+export const serverRowKey = (row: Pick<DbTotalsRow, "db_system" | "db_instance">): string =>
+  `db\u0000${instanceKey(row)}`;
+
+/** Whether a namespace-grain row falls inside the Schema filter. */
+export const inSchema = (row: Pick<DbTotalsRow, "db_namespace">, namespace?: string | null) =>
+  !namespace || (row.db_namespace ?? "") === namespace;
+
+/** Percentiles cannot be pooled, so a group reports its worst; `undefined` when none reported. */
+export const worstPercentile = <T>(
+  rows: T[],
+  pick: (row: T) => number | null | undefined,
 ): number | undefined => {
-  let weight = 0;
-  let sum = 0;
-  let any = false;
-  for (const row of rows) {
-    const value = pick(row);
-    if (typeof value !== "number" || !Number.isFinite(value)) continue;
-    any = true;
-    const calls = num(row.calls);
-    weight += calls;
-    sum += value * calls;
-  }
-  if (!any) return undefined;
-  if (weight > 0) return sum / weight;
-  // Reported, but over zero calls: there is nothing to weight by, so the worst
-  // reading is the only statement that holds for all of them.
-  return Math.max(...rows.map(pick).filter((v): v is number => typeof v === "number"));
+  const values = rows
+    .map(pick)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  return values.length ? Math.max(...values) : undefined;
 };
 
 const optionalSum = (
@@ -83,47 +60,44 @@ const optionalSum = (
     ? rows.reduce((acc, row) => acc + num(pick(row)), 0)
     : undefined;
 
-const foldOne = (schemas: DbTotalsRow[]): DbmInstanceTotals => {
-  const [first] = schemas;
-  const names = [...new Set(schemas.map((row) => row.db_namespace ?? ""))];
-  const maxes = schemas.map((row) => row.max_ns).filter((v): v is number => typeof v === "number");
+const foldOne = (rows: DbTotalsRow[]): DbmInstanceTotals => {
+  const [first] = rows;
+  const schemas = [...rows].sort((a, b) => num(b.total_time_ns) - num(a.total_time_ns));
+  const names = [...new Set(rows.map((row) => row.db_namespace ?? ""))];
   return {
     db_system: first.db_system,
     db_instance: first.db_instance,
-    // Kept only when it names the whole row. A server row spanning several
-    // schemas has no single namespace, and borrowing one would scope every
-    // hand-off from the row to that schema alone.
+    // A hand-off scoped to one schema would hide the others, so only a single-schema row names one.
     db_namespace: names.length === 1 ? first.db_namespace : undefined,
-    statements: optionalSum(schemas, (row) => row.statements),
-    calls: optionalSum(schemas, (row) => row.calls),
-    errors: optionalSum(schemas, (row) => row.errors),
-    total_time_ns: optionalSum(schemas, (row) => row.total_time_ns),
-    traces: optionalSum(schemas, (row) => row.traces),
-    qps: optionalSum(schemas, (row) => row.qps),
-    p50_ns: weightedPercentile(schemas, (row) => row.p50_ns),
-    p95_ns: weightedPercentile(schemas, (row) => row.p95_ns),
-    p99_ns: weightedPercentile(schemas, (row) => row.p99_ns),
-    max_ns: maxes.length ? Math.max(...maxes) : undefined,
+    statements: optionalSum(rows, (row) => row.statements),
+    calls: optionalSum(rows, (row) => row.calls),
+    errors: optionalSum(rows, (row) => row.errors),
+    total_time_ns: optionalSum(rows, (row) => row.total_time_ns),
+    traces: optionalSum(rows, (row) => row.traces),
+    qps: optionalSum(rows, (row) => row.qps),
+    p50_ns: worstPercentile(rows, (row) => row.p50_ns),
+    p95_ns: worstPercentile(rows, (row) => row.p95_ns),
+    p99_ns: worstPercentile(rows, (row) => row.p99_ns),
+    max_ns: worstPercentile(rows, (row) => row.max_ns),
     trace_stream_name: first.trace_stream_name,
     calling_services: [
-      ...new Set(schemas.flatMap((row) => row.calling_services ?? []).filter(Boolean)),
+      ...new Set(rows.flatMap((row) => row.calling_services ?? []).filter(Boolean)),
     ],
-    schemas: [...schemas].sort((a, b) => num(b.total_time_ns) - num(a.total_time_ns)),
+    schemas,
+    namedSchemas: [
+      ...new Set(schemas.map((row) => row.db_namespace).filter((name): name is string => !!name)),
+    ],
   };
 };
 
-/**
- * Fold namespace-grain rows into one row per (system, instance), first-seen
- * order. `namespace` narrows which schemas fold in — the Schema filter — and a
- * server with none of them drops out.
- */
+/** One row per (system, instance); under the Schema filter a server without it drops out. */
 export const foldByInstance = (
   rows: DbTotalsRow[],
   namespace?: string | null,
 ): DbmInstanceTotals[] => {
   const groups = new Map<string, DbTotalsRow[]>();
   for (const row of rows) {
-    if (namespace && (row.db_namespace ?? "") !== namespace) continue;
+    if (!inSchema(row, namespace)) continue;
     const key = instanceKey(row);
     const group = groups.get(key);
     if (group) group.push(row);
@@ -131,3 +105,27 @@ export const foldByInstance = (
   }
   return [...groups.values()].map(foldOne);
 };
+
+/** Whether any server's speeds are the worst of several db_totals rows rather than its own. */
+export const hasWorstOfPercentiles = (rows: { schemas?: DbTotalsRow[] }[]): boolean =>
+  rows.some((row) => (row.schemas?.length ?? 0) > 1);
+
+/** The servers with a schema slowing against its own baseline, by `instanceKey`. */
+export const drowningInstanceKeys = (
+  rows: DbTotalsRow[],
+  previousRows: DbTotalsRow[],
+  namespace?: string | null,
+): Set<string> =>
+  new Set(
+    detectDrowningDatabases(
+      rows.filter((row) => inSchema(row, namespace)),
+      previousRows.filter((row) => inSchema(row, namespace)),
+    ).map((found) => instanceKey(found.row)),
+  );
+
+/** A server is critical on its own rate, or when any one schema's rate is critical. */
+export const isCriticalServer = (
+  row: Pick<DbTotalsRow, "errors" | "calls"> & { schemas?: DbTotalsRow[] },
+): boolean =>
+  isCriticalErrorRate(row.errors, row.calls) ||
+  (row.schemas ?? []).some((schema) => isCriticalErrorRate(schema.errors, schema.calls));

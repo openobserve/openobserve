@@ -175,6 +175,8 @@ export const unionFleetRows = (
   metricsByKey: Map<string, DbmInstanceMetricSet>,
   context: DbmMergeContext & {
     system?: string | null;
+    /** The Schema filter; only query traffic can show a server holds that schema. */
+    namespace?: string | null;
     /** Instances `_o2_dbm_server` rows name — the second discovery source. */
     serverInstances?: readonly DbmServerInstanceRef[];
   } = {},
@@ -203,6 +205,8 @@ export const unionFleetRows = (
       metrics: resolveRowMetrics(row.db_system, row.db_instance, metricsByKey, context),
     };
   });
+
+  if (context.namespace) return clientRows;
 
   // Both non-client vantages, folded onto one identity key so an instance
   // they both report appears exactly once — with the metric set when the

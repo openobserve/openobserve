@@ -24285,6 +24285,7 @@
       "lineCountedTo": "Counted up to {time}; the last half-minute is still coming in.",
       "lineExact": "All databases reporting. Speeds here are measured across every call, so they're exact.",
       "lineExactEstimated": "All databases reporting. Speeds here are blended from several stretches of time, so they're close but not exact.",
+      "lineExactSlowestSchema": "All databases reporting. Speeds are exact per schema; a database with several schemas shows its slowest one.",
       "lineSubsetUnnamed": "Your filters narrow this below the level these totals add up at, so the percentages describe the rows shown rather than the whole database.",
       "lineQuery": "Timings are measured from your application, so they include network time and any wait for a free connection.",
       "lineUncodedErrors": "{percent} of the failures here came back without a reason code, so they can be counted but not explained.",

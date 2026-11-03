@@ -73,7 +73,13 @@ const ok = (data: unknown) => Promise.resolve({ data });
 const fullEnvelope = () => ({
   // One row deliberately carries no `calls` — legal per the response contract
   // (an idle instance's row omits it); the fold treats it as 0.
-  databases: { hits: [{ calls: 800 }, { calls: 400 }, {}] },
+  databases: {
+    hits: [
+      { db_system: "postgresql", db_instance: "pg-orders", db_namespace: "orders", calls: 800 },
+      { db_system: "postgresql", db_instance: "pg-billing", db_namespace: "billing", calls: 400 },
+      { db_system: "redis", db_instance: "valkey-cart", db_namespace: "" },
+    ],
+  },
   queries: { total: 42 },
   activity: { by_state: [{ state: "active", sessions: 7 }], hits: [{ session_pid: 1 }] },
   deadlocks: { total: 90, truncated: true },
@@ -592,7 +598,8 @@ describe("DatabasesPage gates the coverage caveat on the shared rule", () => {
 
   it("asks showsShortfall rather than reading shortfall itself", () => {
     expect(source).toContain('from "@/utils/dbm/breakdownRows"');
-    expect(source).toMatch(/const hasShortfall[\s\S]{0,400}showsShortfall\(/);
+    expect(source).toMatch(/const shortfallOf[\s\S]{0,400}showsShortfall\(/);
+    expect(source).toMatch(/const hasShortfall = \(row: TableRow\): boolean => shortfallOf\(row\)/);
   });
 
   it("no longer gates the caveat on a bare non-null shortfall", () => {
