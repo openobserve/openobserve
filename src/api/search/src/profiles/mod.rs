@@ -21,9 +21,10 @@ pub mod meta;
 pub mod series;
 pub mod tag_values;
 
+use arrow_schema::Schema;
 use axum::{Json, extract::rejection::JsonRejection, http::Method, response::Response};
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{Query, Request, RequestEncoding, Response as SearchResponse, SearchEventType},
         stream::StreamType,
@@ -532,16 +533,33 @@ pub(crate) fn default_result_size() -> i64 {
 
 pub(crate) async fn load_schema_field_names(org_id: &str, stream_name: &str) -> Vec<String> {
     match infra::schema::get(org_id, stream_name, StreamType::Profiles).await {
-        Ok(schema) => schema
-            .fields()
-            .iter()
-            .map(|f| f.name().to_string())
-            .collect(),
+        Ok(schema) => queryable_field_names(&schema),
         Err(e) => {
             warn!("profiles schema lookup failed: {e}");
             Vec::new()
         }
     }
+}
+
+/// On a UDS stream the other columns are packed into `_all`, so they hold no rows to filter on.
+fn queryable_field_names(schema: &Schema) -> Vec<String> {
+    let defined_schema_fields = infra::schema::unwrap_stream_settings(schema)
+        .map(|settings| settings.defined_schema_fields)
+        .unwrap_or_default();
+    let column_all = &get_config().common.column_all;
+    // `_all` outlives a cleared UDS in the schema, so it is never a filter key
+    schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .filter(|name| {
+            *name != column_all
+                && (defined_schema_fields.is_empty()
+                    || *name == TIMESTAMP_COL_NAME
+                    || defined_schema_fields.contains(name))
+        })
+        .cloned()
+        .collect()
 }
 
 #[cfg(test)]
@@ -716,6 +734,51 @@ mod tests {
         assert!(
             text.contains("start_time and end_time are required (microseconds)"),
             "{text}"
+        );
+    }
+
+    #[test]
+    fn queryable_field_names_follow_the_user_defined_schema() {
+        use arrow_schema::{DataType, Field};
+        use config::meta::stream::StreamSettings;
+
+        let fields = [
+            TIMESTAMP_COL_NAME,
+            "stack",
+            "value",
+            "service_name",
+            "k8s_pod_name",
+            "k8s_node_name",
+            "_all",
+        ]
+        .map(|name| Field::new(name, DataType::Utf8, true));
+        let settings = StreamSettings {
+            defined_schema_fields: ["k8s_pod_name", "service_name", "stack", "value"]
+                .map(str::to_string)
+                .to_vec(),
+            ..Default::default()
+        };
+        let metadata = std::collections::HashMap::from([(
+            "settings".to_string(),
+            json::to_string(&settings).unwrap(),
+        )]);
+
+        let cleared_uds = queryable_field_names(&Schema::new(fields.to_vec()));
+        assert_eq!(cleared_uds.len(), fields.len() - 1);
+        assert!(!cleared_uds.iter().any(|name| name == "_all"));
+
+        let uds = Schema::new_with_metadata(fields.to_vec(), metadata);
+        let mut names = queryable_field_names(&uds);
+        names.sort();
+        assert_eq!(
+            names,
+            [
+                TIMESTAMP_COL_NAME,
+                "k8s_pod_name",
+                "service_name",
+                "stack",
+                "value"
+            ]
         );
     }
 }
