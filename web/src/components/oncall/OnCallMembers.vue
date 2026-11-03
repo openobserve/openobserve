@@ -911,20 +911,33 @@ const removeTitle = computed<I18nText>(() => {
     : t("oncall.removeMemberTitlePerson", { name });
 });
 
-/// Who takes the shift the removed person holds now. A cover is skipped: it is not the roster handing over.
+/// Who takes the removed person's current shifts (a cover is not the roster handing over), and which rotations reorder.
 const removeMessage = computed<I18nText>(() => {
-  const email = memberToRemove.value?.user_email.toLowerCase();
+  const email = memberToRemove.value?.user_email.toLowerCase() ?? "";
   const leaving = raw(nameOf(memberToRemove.value?.user_email ?? ""));
-  const handovers = props.onCallNow
-    .filter((position) => position.user_email.toLowerCase() === email && !position.override_id)
-    .map((position) => {
-      const next = position.next_user_email;
-      const rotation = raw(position.rotation_name);
-      return next && next.toLowerCase() !== email
-        ? t("oncall.removeMemberHandsOver", { name: raw(nameOf(next)), leaving, rotation })
-        : t("oncall.removeMemberLeavesGap", { leaving, rotation });
-    });
-  return raw([t("oncall.removeMemberBody"), ...handovers].join(" "));
+  const held = props.onCallNow.filter(
+    (position) => position.user_email.toLowerCase() === email && !position.override_id,
+  );
+  const handovers = held.map((position) => {
+    const next = position.next_user_email;
+    const rotation = raw(position.rotation_name);
+    return next && next.toLowerCase() !== email
+      ? t("oncall.removeMemberHandsOver", { name: raw(nameOf(next)), leaving, rotation })
+      : t("oncall.removeMemberLeavesGap", { leaving, rotation });
+  });
+  // Who these rotations put on call next is the server's shift maths, so the dialog names them without guessing.
+  const reordered = (props.rotations ?? [])
+    .filter((rotation) => !held.some((position) => position.rotation_id === rotation.id))
+    .filter((rotation) => rotationMembers(rotation).some((m) => m.toLowerCase() === email))
+    .map((rotation) => rotation.name);
+  const reshuffle = reordered.length
+    ? [
+        t("oncall.removeMemberReorders", {
+          rotations: raw(listInLocale(reordered, locale.value)),
+        }),
+      ]
+    : [];
+  return raw([t("oncall.removeMemberBody"), ...handovers, ...reshuffle].join(" "));
 });
 
 async function confirmRemoveMember() {

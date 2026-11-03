@@ -353,6 +353,15 @@ describe("IncidentTimeline - getInlineEventText", () => {
     expect(text).toContain("5 times");
   });
 
+  /// O1: a page Resolve that ended the incident's ack says so, not "Reopened".
+  it("says a page Resolve ended the acknowledgement", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    const event = { type: "AckEndedByPageResolve", data: { user_id: "ana@o2.ai" } };
+    expect((w.vm as any).getEventBadgeText(event)).toBe("Acknowledgement ended");
+    expect((w.vm as any).getInlineEventText(event)).toBe("by resolving one of its pages");
+  });
+
   it("returns text for ai_analysis_begin", async () => {
     const w = await mountComp();
     await flushPromises();
