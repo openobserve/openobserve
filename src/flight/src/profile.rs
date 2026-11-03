@@ -38,7 +38,7 @@ pub struct ProfileNode {
     pub metrics: Vec<ProfileMetric>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<ProfileNode>,
-    /// Only on a remote scan, which then has no children: one entry per remote node.
+    /// Only on a remote scan, which then has no children: one entry per node it called directly.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub remote: Vec<RemoteNodeProfile>,
 }
@@ -85,6 +85,7 @@ pub struct RemoteNodeProfile {
     pub skipped: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scan_stats: Option<ScanStats>,
+    /// The plan this node ran; its own remote scans nest the nodes below it the same way.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plan: Option<ProfileNode>,
 }
