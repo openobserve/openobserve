@@ -3323,12 +3323,30 @@ fn anomaly_alert_message(
     link: &str,
 ) -> String {
     use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
+    let body = anomaly_alert_body(ctx);
+    let verb = if ctx.kind == AnomalyAlertKind::Recovery {
+        "Anomaly recovered"
+    } else {
+        "Anomaly detected"
+    };
+    format!(
+        "{verb} in stream '{}' (anomaly name: '{}'): {body} | details: {link}",
+        ctx.stream_name, ctx.config_name
+    )
+}
+
+/// The finding alone; each destination prints the stream, name and link its own way.
+#[cfg(feature = "enterprise")]
+fn anomaly_alert_body(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> String {
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
     let window = format!(
         "{}\u{2013}{}",
         fmt_alert_us(ctx.window_start_us),
         fmt_alert_us(ctx.window_end_us)
     );
-    let body = match ctx.kind {
+    match ctx.kind {
         AnomalyAlertKind::Absence => format!(
             "no data received in window {window}, although the stream's learned schedule \
              expected data"
@@ -3347,16 +3365,7 @@ fn anomaly_alert_message(
             format!("a full detection run found no anomalies in window {window}")
         }
         AnomalyAlertKind::Value => value_anomaly_body(ctx, &window),
-    };
-    let verb = if ctx.kind == AnomalyAlertKind::Recovery {
-        "Anomaly recovered"
-    } else {
-        "Anomaly detected"
-    };
-    format!(
-        "{verb} in stream '{}' (anomaly name: '{}'): {body} | details: {link}",
-        ctx.stream_name, ctx.config_name
-    )
+    }
 }
 
 /// The numeric section for a scored value anomaly, degrading field by field so a cold
@@ -3474,9 +3483,76 @@ async fn muted_by_downtime(org_id: &str, anomaly_id: &str) -> Option<String> {
     .map(|downtime| downtime.id)
 }
 
-/// The webhook an anomaly alert posts to, or `None` for a destination the sender skips.
-/// Jira is a skip, not an error: an error holds the detection cursor for a retry, so a
-/// Jira-only detector would re-run the same window forever. [pure]
+/// The Jira endpoint of a destination, which gets an issue instead of the webhook body. [pure]
+#[cfg(any(feature = "enterprise", test))]
+fn anomaly_jira(module: &Module) -> Option<config::meta::destinations::Endpoint> {
+    match module {
+        Module::Alert {
+            destination_type: DestinationType::Http(ep),
+            ..
+        } if crate::alerts::notifications::jira::is_jira(ep) => Some(ep.clone()),
+        _ => None,
+    }
+}
+
+/// The alert context `jira::send` reads; the anomaly id keys one open issue per detector.
+#[cfg(feature = "enterprise")]
+fn anomaly_jira_context(
+    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+    link: &str,
+) -> crate::alerts::notifications::NotificationContext {
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
+
+    use crate::alerts::notifications::{NotificationContext, STATUS_FIRING, STATUS_RESOLVED};
+
+    let (status, level) = match actx.kind {
+        AnomalyAlertKind::Value => (STATUS_FIRING, "critical"),
+        AnomalyAlertKind::PartialDrop => (STATUS_FIRING, "warning"),
+        AnomalyAlertKind::Absence => (STATUS_FIRING, "no_data"),
+        AnomalyAlertKind::Recovery => (STATUS_RESOLVED, "ok"),
+    };
+    let kind = serde_json::to_value(actx.kind)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_string))
+        .unwrap_or_default();
+    NotificationContext {
+        alert_name: actx.config_name.clone(),
+        alert_status: status.to_string(),
+        alert_level: level.to_string(),
+        stream_name: actx.stream_name.clone(),
+        alert_start_time_millis: (actx.window_start_us / 1000).to_string(),
+        alert_end_time_millis: (actx.window_end_us / 1000).to_string(),
+        alert_trigger_time: config::utils::time::now_micros(),
+        alert_description: anomaly_alert_body(actx),
+        alert_url: link.to_string(),
+        context_attributes: vec![
+            ("anomaly_id".to_string(), actx.anomaly_id.clone()),
+            ("anomaly_kind".to_string(), kind),
+        ],
+        ..Default::default()
+    }
+}
+
+/// A Jira refusal keeps its status, so a bad token commits the run and a 429 or 5xx retries.
+#[cfg(feature = "enterprise")]
+fn anomaly_jira_error(e: anyhow::Error) -> anyhow::Error {
+    match e.downcast::<crate::alerts::notifications::jira::JiraRejected>() {
+        Ok(rejected) => {
+            o2_enterprise::enterprise::anomaly_detection::query_executor::DestinationRejected {
+                status: rejected.status,
+                body: rejected
+                    .message
+                    .chars()
+                    .take(REJECTION_BODY_MAX_CHARS)
+                    .collect(),
+            }
+            .into()
+        }
+        Err(e) => e,
+    }
+}
+
+/// The webhook an anomaly alert posts to; `None` for Jira, which `anomaly_jira` sends. [pure]
 #[cfg(any(feature = "enterprise", test))]
 fn anomaly_webhook(module: &Module) -> Option<config::meta::destinations::Endpoint> {
     match module {
@@ -3490,8 +3566,9 @@ fn anomaly_webhook(module: &Module) -> Option<config::meta::destinations::Endpoi
 
 /// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
 /// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
-/// Non-HTTP destinations (email, SNS) and Jira are skipped with a warning — a known, parked
-/// gap that recovery messages inherit. Returns `Ok(true)` only when the webhook accepted the
+/// A Jira destination gets one open issue per detector through `jira::send`. Non-HTTP
+/// destinations (email, SNS) are skipped with a warning — a known, parked gap that recovery
+/// messages inherit. Returns `Ok(true)` only when the webhook accepted the
 /// send (2xx); a skip returns `Ok(false)` and a non-2xx answer is a `DestinationRejected`
 /// error, so the caller never arms a cooldown, or records a run as delivered, on a send
 /// nobody actually received, and the history row can name the rejection.
@@ -3514,6 +3591,16 @@ pub async fn send_anomaly_alert(
         }
     };
 
+    let link = anomaly_detail_link(&ctx.org_id, &ctx.anomaly_id);
+    if let Some(endpoint) = anomaly_jira(&dest.module) {
+        let jira_ctx = anomaly_jira_context(&ctx, &link);
+        let sent = crate::alerts::notifications::jira::send(&endpoint, &jira_ctx)
+            .await
+            .map_err(anomaly_jira_error)?;
+        log::info!("[anomaly_detection {anomaly_id}] Jira destination '{destination_id}': {sent}");
+        return Ok(true);
+    }
+
     let Some(endpoint) = anomaly_webhook(&dest.module) else {
         log::warn!(
             "[anomaly_detection {}] destination '{}' is not a webhook destination — skipping",
@@ -3523,7 +3610,6 @@ pub async fn send_anomaly_alert(
         return Ok(false);
     };
 
-    let link = anomaly_detail_link(&ctx.org_id, &ctx.anomaly_id);
     let message = anomaly_alert_message(&ctx, &link);
     // Slack-compatible shape: `text` renders in Slack, other receivers read the fields.
     let payload = anomaly_alert_payload(&ctx, &message, &link);
@@ -3595,7 +3681,7 @@ pub async fn send_anomaly_alert(
 
 #[cfg(test)]
 mod tests {
-    /// A Jira destination is skipped like email or SNS, never an error that holds the cursor.
+    /// Jira goes to `anomaly_jira`, never to the webhook post; email and SNS go to neither.
     #[test]
     fn test_anomaly_webhook_skips_jira_and_non_http_destinations() {
         use config::meta::destinations::Endpoint;
@@ -3619,11 +3705,19 @@ mod tests {
             )))
             .is_none()
         );
+        assert!(
+            anomaly_jira(&http(Some(
+                crate::alerts::notifications::jira::DESTINATION_TYPE
+            )))
+            .is_some()
+        );
+        assert!(anomaly_jira(&http(None)).is_none());
         let email = Module::Alert {
             template: None,
             destination_type: DestinationType::Email(Default::default()),
         };
         assert!(anomaly_webhook(&email).is_none());
+        assert!(anomaly_jira(&email).is_none());
     }
 
     // ── Feature 2: priority & tags on anomaly configs ───────────────────────
@@ -6813,6 +6907,118 @@ mod tests {
             let p = anomaly_alert_payload(&c, "m", LINK);
             assert_eq!(p["max_deviation_percent"], 52.4);
             assert_eq!(p["worst_actual_value"], 612.0);
+        }
+    }
+
+    mod jira_send {
+        use o2_enterprise::enterprise::anomaly_detection::{
+            query_executor::DestinationRejected,
+            types::{AnomalyAlertContext, AnomalyAlertKind},
+        };
+
+        use super::super::{anomaly_alert_body, anomaly_jira_context, anomaly_jira_error};
+        use crate::alerts::notifications::{STATUS_FIRING, STATUS_RESOLVED, jira::JiraRejected};
+
+        const LINK: &str = "https://o2.example/web/alerts/anomaly/edit/id1?org_identifier=org";
+
+        fn ctx(kind: AnomalyAlertKind) -> AnomalyAlertContext {
+            AnomalyAlertContext {
+                org_id: "org".to_string(),
+                config_name: "login-errors".to_string(),
+                anomaly_id: "id1".to_string(),
+                anomaly_count: 3,
+                stream_name: "app_logs".to_string(),
+                kind,
+                max_deviation_percent: None,
+                worst_actual_value: None,
+                worst_expected: None,
+                score: None,
+                threshold: None,
+                window_start_us: 1_704_067_200_000_000,
+                window_end_us: 1_704_070_800_000_000,
+            }
+        }
+
+        fn attribute<'a>(
+            ctx: &'a crate::alerts::notifications::NotificationContext,
+            key: &str,
+        ) -> &'a str {
+            ctx.context_attributes
+                .iter()
+                .find(|(k, _)| k == key)
+                .map_or("", |(_, v)| v.as_str())
+        }
+
+        #[test]
+        fn the_context_carries_the_detector_id_kind_level_and_window() {
+            for (kind, name, status, level) in [
+                (AnomalyAlertKind::Value, "value", STATUS_FIRING, "critical"),
+                (
+                    AnomalyAlertKind::PartialDrop,
+                    "partial_drop",
+                    STATUS_FIRING,
+                    "warning",
+                ),
+                (
+                    AnomalyAlertKind::Absence,
+                    "absence",
+                    STATUS_FIRING,
+                    "no_data",
+                ),
+                (
+                    AnomalyAlertKind::Recovery,
+                    "recovery",
+                    STATUS_RESOLVED,
+                    "ok",
+                ),
+            ] {
+                let actx = ctx(kind);
+                let c = anomaly_jira_context(&actx, LINK);
+                assert_eq!(attribute(&c, "anomaly_id"), "id1");
+                assert_eq!(attribute(&c, "anomaly_kind"), name);
+                assert_eq!(c.alert_status, status);
+                assert_eq!(c.alert_level, level);
+                assert_eq!(c.alert_name, "login-errors");
+                assert_eq!(c.stream_name, "app_logs");
+                assert_eq!(c.alert_start_time_millis, "1704067200000");
+                assert_eq!(c.alert_end_time_millis, "1704070800000");
+                assert_eq!(c.alert_description, anomaly_alert_body(&actx));
+                assert_eq!(c.alert_url, LINK);
+                assert!(c.alert_id.is_empty() && c.incident_id.is_empty());
+            }
+        }
+
+        #[test]
+        fn a_jira_refusal_is_a_destination_rejection_and_only_try_later_retries() {
+            let mapped = |status| {
+                anomaly_jira_error(
+                    JiraRejected {
+                        status,
+                        message: "x".repeat(2000),
+                    }
+                    .into(),
+                )
+            };
+            for status in [401, 404] {
+                let e = mapped(status);
+                let rejected = e.downcast_ref::<DestinationRejected>().unwrap();
+                assert_eq!(rejected.status, status);
+                assert_eq!(
+                    rejected.body.chars().count(),
+                    super::super::REJECTION_BODY_MAX_CHARS
+                );
+                assert!(!rejected.is_retryable(), "{status}");
+            }
+            for status in [429, 503] {
+                let e = mapped(status);
+                assert!(
+                    e.downcast_ref::<DestinationRejected>()
+                        .unwrap()
+                        .is_retryable()
+                );
+            }
+            let network = anomaly_jira_error(anyhow::anyhow!("Connection to x failed"));
+            assert!(network.downcast_ref::<DestinationRejected>().is_none());
         }
     }
 
