@@ -404,6 +404,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('alert_destinations.skip_tls_verify')"
                 />
               </div>
+              <div
+                v-if="isCustomWebhook"
+                class="w-1/2 py-2"
+                data-test="add-destination-payload-format"
+              >
+                <OFormSelect
+                  data-test="add-destination-payload-format-select"
+                  name="payload_format"
+                  :label="t('alert_destinations.payloadFormat')"
+                  :options="payloadFormatOptions"
+                  labelKey="label"
+                  valueKey="value"
+                  tabindex="0"
+                />
+                <div class="text-text-secondary mt-1 text-xs">
+                  {{ t("alert_destinations.payloadFormatHelp") }}
+                </div>
+              </div>
 
               <!-- Test Result Display -->
               <DestinationTestResult
@@ -889,6 +907,11 @@ const showPrebuiltFinalActions = computed(
 const isCustomWebhook = computed(
   () => props.isAlerts && dtVal.value === "custom" && typeVal.value === "http",
 );
+const payloadFormatOptions = computed(() => [
+  { label: t("alert_destinations.payloadFormatAuto"), value: "auto" },
+  { label: t("alert_destinations.payloadFormatLegacy"), value: "legacy" },
+  { label: t("alert_destinations.payloadFormatRendered"), value: "rendered" },
+]);
 const handleSlackFlowChange = (): void => {
   clearTestResult();
 };
@@ -1078,6 +1101,7 @@ const setupDestinationData = () => {
       url: props.destination.url ?? "",
       method: props.destination.method ?? "post",
       skip_tls_verify: props.destination.skip_tls_verify ?? false,
+      payload_format: storedPayloadFormat(parsedMetadata),
       template: props.destination.template ?? "",
       emails: props.destination?.emails ?? [],
       type: props.destination.type || "http",
@@ -1455,6 +1479,28 @@ function headersFromRows(rows: { key: string; value: string }[]): Headers {
 // superRefine) passes — the schema, not a manual guard, gates the save. `value`
 // is the validated payload source of truth; the payload is built with explicit
 // keys so no schema-only field (e.g. `credentials`) leaks into the request.
+/** The stored metadata.payload_format as the select's value; anything else is automatic. */
+function storedPayloadFormat(metadata: any): "auto" | "legacy" | "rendered" {
+  const stored = metadata?.payload_format;
+  return stored === "legacy" || stored === "rendered" ? stored : "auto";
+}
+
+/** The destination's metadata with payload_format set, or removed for automatic. */
+function withPayloadFormat(
+  stored: DestinationPayload["metadata"],
+  format: string | undefined,
+): Record<string, string> {
+  let metadata: Record<string, string> = {};
+  try {
+    metadata = typeof stored === "string" ? JSON.parse(stored || "{}") : { ...(stored ?? {}) };
+  } catch {
+    metadata = {};
+  }
+  delete metadata.payload_format;
+  if (format === "legacy" || format === "rendered") metadata.payload_format = format;
+  return metadata;
+}
+
 function saveCustomDestination(value: AddDestinationForm) {
   const dismiss = toast({
     variant: "loading",
@@ -1479,6 +1525,10 @@ function saveCustomDestination(value: AddDestinationForm) {
   if (value.type === "email") {
     payload["type"] = "email";
     payload["emails"] = value.emails ?? [];
+  }
+
+  if (isCustomWebhook.value) {
+    payload.metadata = withPayloadFormat(props.destination?.metadata, value.payload_format);
   }
 
   if (isUpdatingDestination.value) {
