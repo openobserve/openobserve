@@ -63,30 +63,23 @@ impl FlightDecoderStream {
     pub fn process_custom_message(&mut self, message: CustomMessage) {
         match message {
             CustomMessage::ScanStats(stats) => {
-                if let Some(p) = &self.query_context.node_profile {
-                    p.record_scan_stats(&stats);
-                }
                 self.scan_stats.add(&stats);
                 self.query_context.scan_stats.lock().add(&stats);
             }
             CustomMessage::Metrics(mut metrics) => {
-                if let Some(p) = &self.query_context.node_profile {
-                    p.take_plan(&mut metrics);
-                }
+                self.query_context.node_profile.take_plan(&mut metrics);
                 self.query_context.cluster_metrics.lock().extend(metrics);
             }
             CustomMessage::PeakMemory(peak_memory) => {
-                if let Some(p) = &self.query_context.node_profile {
-                    p.record_peak_memory(peak_memory);
-                }
+                self.query_context
+                    .node_profile
+                    .record_peak_memory(peak_memory);
                 self.query_context
                     .peak_memory
                     .fetch_max(peak_memory, Ordering::Relaxed);
             }
             CustomMessage::PartialErr(err) => {
-                if let Some(p) = &self.query_context.node_profile {
-                    p.record_error(&err);
-                }
+                self.query_context.node_profile.record_error(&err);
                 if !err.is_empty() {
                     let mut guard = self.query_context.partial_err.lock();
                     if guard.is_empty() {
@@ -135,9 +128,7 @@ impl Stream for FlightDecoderStream {
                     break;
                 }
                 Some(Err(e)) => {
-                    if let Some(p) = &self.query_context.node_profile {
-                        p.record_error(&e.to_string());
-                    }
+                    self.query_context.node_profile.record_error(&e.to_string());
                     log::error!(
                         "[trace_id {}] flight->search: response node: {}, name: {}, is_super: {}, is_querier: {}, err: {e:?}, took: {} ms",
                         self.query_context.trace_id,
@@ -154,9 +145,7 @@ impl Stream for FlightDecoderStream {
                 // translate data
                 Some(Ok(data)) => match data {
                     FlightMessage::RecordBatch(batch) => {
-                        if let Some(p) = &self.query_context.node_profile {
-                            p.record_batch(&batch);
-                        }
+                        self.query_context.node_profile.record_batch();
                         self.query_context.num_rows += batch.num_rows();
                         self.query_context.req_id += 1;
                         let took = self.query_context.req_last_time.elapsed().as_millis();
@@ -209,9 +198,10 @@ impl Stream for FlightDecoderStream {
 
 impl Drop for FlightDecoderStream {
     fn drop(&mut self) {
-        if let Some(p) = &self.query_context.node_profile {
-            p.finish(&self.metrics);
-        }
+        let scan_stats = self.scan_stats;
+        self.query_context
+            .node_profile
+            .finish(&self.metrics, scan_stats);
         let QueryContext {
             trace_id,
             node,
@@ -227,7 +217,6 @@ impl Drop for FlightDecoderStream {
         } else {
             "follower".to_string()
         };
-        let scan_stats = self.scan_stats;
         let batches = self.metrics.batches_received.value();
         let bytes = self.metrics.bytes_received.value();
         let avg_ms = self.metrics.avg_batch_time_ms();

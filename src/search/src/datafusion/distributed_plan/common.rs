@@ -42,7 +42,7 @@ pub struct QueryContext {
     pub req_id: u64,
     pub req_last_time: std::time::Instant,
     pub print_key_event: bool,
-    pub node_profile: Option<NodeProfileRecorder>,
+    pub node_profile: NodeProfileRecorder,
 }
 
 impl QueryContext {
@@ -61,7 +61,7 @@ impl QueryContext {
             req_id: 0,
             req_last_time: std::time::Instant::now(),
             print_key_event: config::get_config().common.print_key_event,
-            node_profile: None,
+            node_profile: NodeProfileRecorder::default(),
         }
     }
 
@@ -105,7 +105,7 @@ impl QueryContext {
         self
     }
 
-    pub fn with_node_profile(mut self, node_profile: Option<NodeProfileRecorder>) -> Self {
+    pub fn with_node_profile(mut self, node_profile: NodeProfileRecorder) -> Self {
         self.node_profile = node_profile;
         self
     }

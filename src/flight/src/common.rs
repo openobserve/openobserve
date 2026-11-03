@@ -298,7 +298,10 @@ mod tests {
     }
 
     fn test_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
-        crate::profile::build_profile(plan, &|_| None)
+        ProfileNode {
+            name: plan.name().to_string(),
+            ..Default::default()
+        }
     }
 
     fn create_test_execution_plan() -> Arc<dyn ExecutionPlan> {

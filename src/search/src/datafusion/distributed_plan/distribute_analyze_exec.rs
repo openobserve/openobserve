@@ -164,12 +164,11 @@ impl ExecutionPlan for DistributeAnalyzeExec {
 
         // Create future that computes the final output
         let start = std::time::Instant::now();
-        let start_us = now_micros();
         let captured_input = Arc::clone(&self.input);
         let captured_schema = Arc::clone(&self.schema);
         let verbose = self.verbose;
         let show_statistics = self.show_statistics;
-        let profile = self.profile;
+        let profile_start_us = self.profile.then(now_micros);
 
         let mut stream = execute_stream(self.input.clone(), context.clone())?;
         let output = async move {
@@ -177,16 +176,16 @@ impl ExecutionPlan for DistributeAnalyzeExec {
             while let Some(batch) = stream.next().await.transpose()? {
                 total_rows += batch.num_rows();
             }
-            // remote decoders record each node's end time and fetch/decode time when dropped
+            // remote nodes publish their profiles when their streams are dropped
             drop(stream);
 
             let duration = std::time::Instant::now() - start;
             create_output_batch(
                 verbose,
                 show_statistics,
-                profile,
+                profile_start_us,
                 total_rows,
-                (start_us, duration),
+                duration,
                 captured_input,
                 captured_schema,
             )
@@ -202,9 +201,9 @@ impl ExecutionPlan for DistributeAnalyzeExec {
 fn create_output_batch(
     verbose: bool,
     _show_statistics: bool,
-    profile: bool,
+    profile_start_us: Option<i64>,
     total_rows: usize,
-    (start_us, duration): (i64, std::time::Duration),
+    duration: std::time::Duration,
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
 ) -> Result<RecordBatch> {
@@ -222,8 +221,8 @@ fn create_output_batch(
         .to_string();
     plan_builder.append_value(annotated_plan);
 
-    let profile = profile
-        .then(|| profile_json(input.as_ref(), total_rows, (start_us, duration)))
+    let profile = profile_start_us
+        .map(|start_us| profile_json(input.as_ref(), total_rows, start_us))
         .transpose()?;
 
     // add metrics from remote scan
@@ -264,17 +263,13 @@ fn create_output_batch(
     RecordBatch::try_new(schema, columns).map_err(DataFusionError::from)
 }
 
-fn profile_json(
-    input: &dyn ExecutionPlan,
-    total_rows: usize,
-    (start_us, duration): (i64, std::time::Duration),
-) -> Result<String> {
+fn profile_json(input: &dyn ExecutionPlan, total_rows: usize, start_us: i64) -> Result<String> {
     let profile = QueryProfile {
         version: PROFILE_VERSION,
         node_name: LOCAL_NODE.get_name(),
         node_address: LOCAL_NODE.get_grpc_addr(),
         start_us,
-        end_us: start_us + duration.as_micros() as i64,
+        end_us: now_micros(),
         output_rows: total_rows,
         plan: build_profile(input),
     };
