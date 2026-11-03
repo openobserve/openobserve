@@ -236,6 +236,26 @@ describe("resolveColor", () => {
   it("returns null for a token that was never declared", () => {
     expect(resolveColor("--nothing", scopeOf({}))).toBeNull();
   });
+
+  it("applies a relative oklch() to an sRGB origin's channels", () => {
+    const scope = scopeOf({ "--ink": "#ff0000", "--soft": "oklch(from var(--ink) l c h / 0.5)" });
+    const soft = resolveColor("--soft", scope)!;
+    expect(soft.a).toBe(0.5);
+    expect([soft.r, soft.g, soft.b].map(Math.round)).toEqual([255, 0, 0]);
+  });
+
+  it("keeps a wide-gamut oklch() origin's channels until the relative transform", () => {
+    const scope = scopeOf({
+      "--ink": "oklch(64.6% 0.222 41.116)",
+      "--glow": "oklch(from var(--ink) 0.5 c h / 0.45)",
+    });
+    const expected = parseColor("oklch(0.5 0.222 41.116 / 0.45)")!;
+    const glow = resolveColor("--glow", scope)!;
+    expect(glow.r).toBeCloseTo(expected.r, 2);
+    expect(glow.g).toBeCloseTo(expected.g, 2);
+    expect(glow.b).toBeCloseTo(expected.b, 2);
+    expect(glow.a).toBeCloseTo(0.45, 5);
+  });
 });
 
 describe("compositing and contrast", () => {
