@@ -25,7 +25,7 @@ use datafusion::physical_plan::{
 };
 use flight::{
     common::{Metrics, RemoteScanMetrics},
-    profile::{MetricKind, ProfileMetric, ProfileNode, RemoteNodeProfile},
+    profile::{MetricKind, ProfileInputs, ProfileMetric, ProfileNode, RemoteNodeProfile},
 };
 use parking_lot::Mutex;
 
@@ -98,7 +98,18 @@ impl Drop for NodeProfileRecorder {
 /// Profile of an executed plan; a remote scan carries its nodes' plans, as its local children never
 /// ran.
 pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
-    let mut node = ProfileNode {
+    let inputs = match plan.downcast_ref::<RemoteScanExec>() {
+        Some(remote) => {
+            ProfileInputs::Remote(remote.node_profiles.lock().values().cloned().collect())
+        }
+        None => ProfileInputs::Children(
+            plan.children()
+                .into_iter()
+                .map(|child| build_profile(child.as_ref()))
+                .collect(),
+        ),
+    };
+    ProfileNode {
         name: plan.name().to_string(),
         detail: displayable(plan)
             .one_line()
@@ -110,19 +121,8 @@ pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
             .metrics()
             .map(|m| convert_metrics(&m))
             .unwrap_or_default(),
-        children: Vec::new(),
-        remote: Vec::new(),
-    };
-    if let Some(remote) = plan.downcast_ref::<RemoteScanExec>() {
-        node.remote = remote.node_profiles.lock().values().cloned().collect();
-        return node;
+        inputs,
     }
-    node.children = plan
-        .children()
-        .into_iter()
-        .map(|child| build_profile(child.as_ref()))
-        .collect();
-    node
 }
 
 /// One entry per metric name in first-seen order, so related metrics stay adjacent.
@@ -313,9 +313,11 @@ mod tests {
         let plan = UnionExec::try_new(vec![empty(), empty()]).unwrap();
         let profile = build_profile(plan.as_ref());
         assert_eq!(profile.name, "UnionExec");
-        assert_eq!(profile.children.len(), 2);
-        assert_eq!(profile.children[0].name, "EmptyExec");
-        assert!(profile.remote.is_empty());
+        let ProfileInputs::Children(children) = profile.inputs else {
+            panic!("expected children");
+        };
+        assert_eq!(children.len(), 2);
+        assert_eq!(children[0].name, "EmptyExec");
     }
 
     #[test]
@@ -336,7 +338,9 @@ mod tests {
         ));
         let profile = build_profile(&remote);
         assert_eq!(profile.name, "RemoteScanExec");
-        assert!(profile.children.is_empty());
-        assert_eq!(profile.remote[0].node_name, "q-0");
+        let ProfileInputs::Remote(remote) = profile.inputs else {
+            panic!("expected remote inputs");
+        };
+        assert_eq!(remote[0].node_name, "q-0");
     }
 }

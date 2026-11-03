@@ -16,9 +16,9 @@
 //! Structured EXPLAIN ANALYZE profile: the executed plan with typed, per-node metrics.
 //!
 //! The profile is a tree that follows the leader's physical plan. Ordinary operators
-//! recurse through `ProfileNode::children`. A `RemoteScanExec` stops the recursion:
-//! its `children` stay empty, because the subtree under it on the leader is only the
-//! plan template sent to the remote nodes and never ran there. Its `remote` list
+//! recurse through `ProfileInputs::Children`. A `RemoteScanExec` stops the recursion
+//! with `ProfileInputs::Remote` instead, because the subtree under it on the leader is
+//! only the plan template sent to the remote nodes and never ran there. That list
 //! holds one `RemoteNodeProfile` per node it called directly (one per partition),
 //! including nodes skipped because they had no files.
 //!
@@ -68,11 +68,24 @@ pub struct ProfileNode {
     pub partitions: usize,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub metrics: Vec<ProfileMetric>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub children: Vec<ProfileNode>,
-    /// Only on a remote scan, which then has no children: one entry per node it called directly.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub remote: Vec<RemoteNodeProfile>,
+    #[serde(flatten)]
+    pub inputs: ProfileInputs,
+}
+
+/// Where a node's input came from; serialized as a `children` or a `remote` key.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ProfileInputs {
+    /// Operators that ran on this node; empty for a leaf.
+    Children(Vec<ProfileNode>),
+    /// Only on a remote scan: one entry per node it called directly.
+    Remote(Vec<RemoteNodeProfile>),
+}
+
+impl Default for ProfileInputs {
+    fn default() -> Self {
+        Self::Children(Vec::new())
+    }
 }
 
 /// A metric summed across partitions.
@@ -139,11 +152,31 @@ mod tests {
             ..Default::default()
         };
         let json = serde_json::to_string(&node).unwrap();
-        assert!(!json.contains("children"));
+        assert!(json.contains(r#""children":[]"#) && !json.contains("remote"));
         let back: ProfileNode = serde_json::from_str(&json).unwrap();
         assert_eq!(back.metrics, node.metrics);
+        assert!(matches!(back.inputs, ProfileInputs::Children(c) if c.is_empty()));
         let m: ProfileMetric =
             serde_json::from_str(r#"{"name":"x","kind":"future_kind","value":1}"#).unwrap();
         assert_eq!(m.kind, MetricKind::Other);
+    }
+
+    #[test]
+    fn test_remote_inputs_serialize_under_remote_key() {
+        let node = ProfileNode {
+            name: "RemoteScanExec".to_string(),
+            inputs: ProfileInputs::Remote(vec![RemoteNodeProfile {
+                node_name: "q-0".to_string(),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&node).unwrap();
+        assert!(json.contains(r#""remote":[{"#) && !json.contains("children"));
+        let back: ProfileNode = serde_json::from_str(&json).unwrap();
+        let ProfileInputs::Remote(remote) = back.inputs else {
+            panic!("expected remote inputs");
+        };
+        assert_eq!(remote[0].node_name, "q-0");
     }
 }
