@@ -804,7 +804,7 @@ export const fleetMock: FleetApi = {
     const offset = params.offset ?? 0;
     return reply({
       total: matching.length,
-      items: matching.slice(offset, offset + (params.limit ?? 50)),
+      items: matching.slice(offset, offset + (params.limit ?? 100)),
     });
   },
   listRollouts: () => reply({ items: store.rollouts, total: store.rollouts.length }),

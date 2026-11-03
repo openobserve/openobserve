@@ -32,8 +32,6 @@ pub const DEFAULT_GATE_WINDOW_SECS: u32 = 5 * 60;
 pub const DEFAULT_GATE_PASS_PERCENT: u32 = 95;
 pub const DEFAULT_PAGE_LIMIT: usize = 100;
 pub const MAX_PAGE_LIMIT: usize = 1000;
-pub const DEFAULT_AUDIT_LIMIT: usize = 50;
-pub const MAX_AUDIT_LIMIT: usize = 500;
 
 /// Issues keyed by pipeline id; the empty key holds document-level issues.
 pub type Issues = BTreeMap<String, Vec<ConfigIssue>>;
@@ -440,7 +438,6 @@ pub struct AuditList {
     pub audit_disabled: bool,
 }
 
-/// One page of the trail; `limit` defaults to 50 and is capped at 500.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct AuditQuery {
@@ -459,18 +456,6 @@ pub struct AuditQuery {
     pub module: Option<AuditModule>,
     #[serde(default)]
     pub actor: Option<AuditActor>,
-}
-
-impl AuditQuery {
-    pub fn offset(&self) -> usize {
-        self.offset.unwrap_or(0)
-    }
-
-    pub fn limit(&self) -> usize {
-        self.limit
-            .unwrap_or(DEFAULT_AUDIT_LIMIT)
-            .clamp(1, MAX_AUDIT_LIMIT)
-    }
 }
 
 /// The part of the fleet API an event was made through; `settings` is the org's fleet settings.
