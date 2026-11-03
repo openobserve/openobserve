@@ -789,19 +789,19 @@ const silentReviewer = key => ({ ...finishedReviewer(key), parsed: false, rawTex
 const smallRawDiff = "diff --git a/docs/a.md b/docs/a.md\n--- a/docs/a.md\n+++ b/docs/a.md\n@@ -1 +1 @@\n-old\n+new\n";
 
 // Every default makes the run an approvable one, so a test changes the single fact it is about.
-async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], byPass = null, pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, manual = false, head = MAIN_HEAD, coordinatorOutput = cleanCoordinatorOutput, rawDiff = smallRawDiff, keptDiff = null } = {}) {
+async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], byPass = null, pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, manual = false, head = MAIN_HEAD, coordinatorOutput = cleanCoordinatorOutput, rawDiff = smallRawDiff, keptDiff = null, variantError = "", ignorePassLimit = false, forceFull = false } = {}) {
   const run = { posted: "", approvals: [], logs: [], coordinatorCalls: 0, coordinatorArgs: null, reviewerCalls: [], artifact: null, updates: 0, creates: 0, claims: 0, sanitized: 0 };
   const pr = { ...eligibleInput().pr, title: "fix a bug", body: "plain words", head: { sha: head }, changed_files: 1, additions: 1, deletions: 1, ...prNow };
   const noop = () => {};
   const scope = {
     ...commentsModule, ...confidenceModule, ...approvalModule, ...reportModule, ...passesModule,
     REVIEW_COLD_PASSES: 2, REVIEWER_CONCURRENCY: 16,
-    process: { env: { PR_NUMBER: "1", GITHUB_REPOSITORY: "test/repo", HEAD_SHA: head, MERGE_BASE_SHA: "c".repeat(40) } },
+    process: { env: { PR_NUMBER: "1", GITHUB_REPOSITORY: "test/repo", HEAD_SHA: head, MERGE_BASE_SHA: "c".repeat(40), ...(forceFull ? { FORCE_FULL: "true" } : {}) } },
     console: { log: (...args) => run.logs.push(args.join(" ")), warn: noop, error: noop },
     TRACE: { startSpan: () => ({}), endSpan: noop, setSpanAttributes: noop }, activeRootSpan: null, isoNow: () => "now", prepareReviewTree: noop,
     findExistingReviewComment: () => ({ comment: existing, ok: true }),
     passesDoneIn: comment => (comment ? commentsModule.reviewPassCount(comment.body) : 0),
-    REVIEW_IGNORE_PASS_LIMIT: false, REVIEW_MANUAL_RUN: manual, diffFingerprint, variantProblem: () => "", MODEL_VARIANT: "high", COORDINATOR_VARIANT: "high", REVIEW_MAX_PASSES: 0, REVIEW_BOT_LOGIN: "review[bot]", REVIEW_PAIR_CLEAR: true, AUTO_APPROVE_MODE: mode,
+    REVIEW_IGNORE_PASS_LIMIT: ignorePassLimit, REVIEW_MANUAL_RUN: manual, diffFingerprint, variantProblem: () => variantError, MODEL_VARIANT: "high", COORDINATOR_VARIANT: "high", REVIEW_MAX_PASSES: 0, REVIEW_BOT_LOGIN: "review[bot]", REVIEW_PAIR_CLEAR: true, AUTO_APPROVE_MODE: mode,
     REVIEW_MARKER: "<!-- ai-code-review -->", PAIRED: { repo: "", prNumber: "", dir: "", mergeBase: "", head: "", ...paired }, PR_DIR: "/pr", resolve: (...parts) => parts.join("/"),
     githubReviewApi: () => ({ readPr: () => pr, listReviews: () => [], dismissReview: noop, approve: payload => run.approvals.push(payload) }),
     noteSkippedPush: noop, apiKey: () => "configured", API_KEY_VAR_NAME: "TEST_KEY", MODEL_SLUG: "test/model",
@@ -952,6 +952,57 @@ test("a hand-started run, a changed diff or an unpinned diff is reviewed even af
     assert.equal(run.claims, 1);
     assert.ok(run.reviewerCalls.length > 0);
     assert.equal(commentsModule.reviewPassCount(run.posted), 2);
+  }
+});
+
+test("a hand-started, force-full or pass-limit-ignoring run reviews the head the last review already covered", async () => {
+  const first = await runMain({ mode: "off" });
+  const existing = { id: 1, body: first.posted };
+  for (const bypass of [{ manual: true }, { forceFull: true }, { ignorePassLimit: true }]) {
+    const run = await runMain({ mode: "off", existing, ...bypass });
+    assert.equal(run.error, undefined, JSON.stringify(bypass));
+    assert.equal(run.logs.some(line => /already_reviewed|unchanged_diff/.test(line)), false, JSON.stringify(bypass));
+    assert.ok(run.reviewerCalls.length > 0, JSON.stringify(bypass));
+    assert.equal(run.claims, 1, JSON.stringify(bypass));
+  }
+  const automatic = await runMain({ mode: "off", existing });
+  assert.ok(automatic.logs.some(line => line.includes("already_reviewed")));
+  assert.deepEqual(automatic.reviewerCalls, []);
+});
+
+test("reviewers cut short at their soft deadline are not finished, so the verdict is not High and the gate does not approve", async () => {
+  const wrapped = key => ({ ...finishedReviewer(key), wrappedUp: true });
+  for (const results of [[wrapped("security"), wrapped("correctness")], [finishedReviewer("security"), wrapped("correctness")]]) {
+    const run = await runMain({ results });
+    assert.equal(run.error, undefined);
+    assert.equal(run.approvals.length, 0);
+    assert.doesNotMatch(run.posted, /Merge confidence: 🟢 High/);
+    assert.doesNotMatch(run.posted, /all reviewers finished/);
+    assert.doesNotMatch(run.posted, /Auto-approved/);
+    assert.equal(commentsModule.reviewedDiffFingerprint(run.posted), "");
+  }
+  const byPass = (key, pass) => ({ ...finishedReviewer(key), wrappedUp: pass === 2 });
+  const oneCleanPass = await runMain({ byPass });
+  assert.equal(oneCleanPass.approvals.length, 1, "an area with one uninterrupted pass is still reviewed");
+});
+
+test("an invalid effort setting retracts the old verdict and approval line without claiming a pass", async () => {
+  const first = await runMain();
+  assert.match(first.posted, /Merge confidence: 🟢 High/);
+  assert.match(first.posted, /Auto-approved/);
+  const variantError = 'variant "typo" is not declared for test/model in opencode.ci.jsonc (declared: high)';
+  for (const stop of [{ head: PAIRED_MAIN_HEAD, rawDiff: `${smallRawDiff}+more\n` }, { manual: true }]) {
+    const run = await runMain({ existing: { id: 1, body: first.posted }, variantError, ...stop });
+    assert.match(run.error, /variant "typo" is not declared/);
+    assert.equal(run.claims, 0);
+    assert.deepEqual(run.reviewerCalls, []);
+    assert.equal(run.updates, 1);
+    assert.doesNotMatch(run.posted, /High/);
+    assert.doesNotMatch(run.posted, /Auto-approved/);
+    assert.match(run.posted, /the review did not run/);
+    assert.doesNotMatch(run.posted, /typo|test\/model/, "the configuration detail stays in the log");
+    assert.equal(commentsModule.reviewPassCount(run.posted), 1);
+    assert.equal(commentsModule.reviewedKey(run.posted), MAIN_HEAD);
   }
 });
 

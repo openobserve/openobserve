@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
+import { isLoaderPath } from "./sanitize.mjs";
 
 // Dependency bots whose PRs only bump versions; any other bot or App can write code and is reviewed.
 const DEPENDENCY_BOTS = new Set(["dependabot[bot]", "renovate[bot]"]);
@@ -47,7 +48,7 @@ export function narrowTier(paths) {
 
 // Prompt, agent-rule and workflow markdown steers the AI or CI, so it is reviewed like code.
 export function isDocsPath(filePath) {
-  if (/^(scripts\/ai-review\/|\.claude\/|\.agents\/|\.github\/)/.test(filePath) || /(^|\/)(AGENTS|CLAUDE)\.md$/.test(filePath)) return false;
+  if (/^(scripts\/ai-review\/|\.github\/)/.test(filePath) || isLoaderPath(filePath)) return false;
   return /\.md$/i.test(filePath) || /^docs\//.test(filePath);
 }
 

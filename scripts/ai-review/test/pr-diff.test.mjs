@@ -231,8 +231,34 @@ test("a rebase that moves the PR's lines keeps its diff fingerprint, a changed l
 
 test("the fingerprint ignores only blob ids and hunk numbers", () => {
   const base = "diff --git a/a b/a\nindex 1111111..2222222 100644\n--- a/a\n+++ b/a\n@@ -1,2 +1,2 @@ fn x\n ctx\n-old\n+new\n";
-  assert.equal(diffFingerprint(base.replace("1111111..2222222", "3333333..4444444").replace("-1,2 +1,2 @@ fn x", "-9,2 +12,2 @@ fn y")), diffFingerprint(base));
+  assert.equal(diffFingerprint(base.replace("1111111..2222222", "3333333..4444444").replace("-1,2 +1,2 @@ fn x", "-9,2 +12,2 @@ fn x")), diffFingerprint(base));
+  assert.notEqual(diffFingerprint(base.replace("@@ fn x", "@@ fn y")), diffFingerprint(base), "the function a hunk sits in is part of what was reviewed");
   assert.notEqual(diffFingerprint(base.replace("+new", "+newer")), diffFingerprint(base));
   assert.notEqual(diffFingerprint(base.replace("diff --git a/a b/a", "diff --git a/b b/b")), diffFingerprint(base));
   assert.match(diffFingerprint(base), /^[0-9a-f]{64}$/);
+});
+
+test("the same lines changed inside a different function get a different fingerprint", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ai-review-fingerprint-"));
+  const git = (...args) => execFileSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], { encoding: "utf-8" });
+  const fn = (name, allowed = "user.active") => `function ${name}(user) {\n  const id = user.id;\n  const name = user.name;\n  const role = user.role;\n  const group = user.group;\n  const allowed = ${allowed};\n  const details = { id, name, role, group };\n  const present = Boolean(details);\n  const result = Boolean(allowed);\n  return present && result;\n}\n`;
+  try {
+    git("init", "-q", "-b", "main");
+    writeFileSync(join(dir, "rules.js"), `${fn("preview")}\n${fn("authorize")}`);
+    git("add", ".");
+    git("commit", "-qm", "base");
+    git("checkout", "-qb", "safe");
+    writeFileSync(join(dir, "rules.js"), `${fn("preview", "true")}\n${fn("authorize")}`);
+    git("commit", "-qam", "safe");
+    git("checkout", "-qb", "unsafe", "main");
+    writeFileSync(join(dir, "rules.js"), `${fn("preview")}\n${fn("authorize", "true")}`);
+    git("commit", "-qam", "unsafe");
+    const safe = localDiff(dir, "main", "safe");
+    const unsafe = localDiff(dir, "main", "unsafe");
+    assert.match(safe, /^@@ .* @@ function preview\(user\) \{$/m);
+    assert.match(unsafe, /^@@ .* @@ function authorize\(user\) \{$/m);
+    assert.notEqual(diffFingerprint(unsafe), diffFingerprint(safe));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

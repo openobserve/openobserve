@@ -33,6 +33,7 @@ import {
   NOTICE_TAG,
   REVIEW_HEADING,
   REVIEW_TITLE,
+  bodyAtFailedRun,
   bodyAtPassLimit,
   bodyAtReviewedHead,
   bodyAtUnchangedDiff,
@@ -1175,6 +1176,10 @@ function noteReviewedHead(prNumber, comment) {
   noteOnComment(prNumber, comment, bodyAtReviewedHead(comment.body, REVIEW_MAX_PASSES));
 }
 
+function noteFailedRun(prNumber, comment, key) {
+  if (comment) noteOnComment(prNumber, comment, bodyAtFailedRun(comment.body, key));
+}
+
 function noteSkippedPush(prNumber, comment, key) {
   noteOnComment(prNumber, comment, bodyAtPassLimit(comment.body, REVIEW_MAX_PASSES, key));
 }
@@ -1379,6 +1384,7 @@ async function main() {
       maxPasses: REVIEW_MAX_PASSES,
       ignorePassLimit: REVIEW_IGNORE_PASS_LIMIT,
       forceFull: process.env.FORCE_FULL === "true",
+      manual: REVIEW_MANUAL_RUN,
     });
     const gate = createAutoApproveGate({
       mode: AUTO_APPROVE_MODE,
@@ -1435,6 +1441,7 @@ async function main() {
     if (variantError) {
       outcome = "misconfigured";
       TRACE.setSpanAttributes(rootSpan, { "review.skipped": true, "review.skip_reason": "unknown_variant" });
+      noteFailedRun(prNumber, existingComment, headKey);
       throw new Error(`${variantError}; fix AI_REVIEW_EFFORT or AI_REVIEW_COORDINATOR_EFFORT.`);
     }
     console.log(`[${isoNow()}] ${MODEL_SLUG} (via opencode serve): configured, reviewers at "${MODEL_VARIANT || "default"}", coordinator at "${COORDINATOR_VARIANT || "default"}"`);

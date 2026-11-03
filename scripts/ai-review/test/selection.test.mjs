@@ -7,6 +7,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { isCiOnlyPath, isDocsPath, isReleaseFile, isTestOnlyPath, narrowTier, nothingToReviewReason, resolveRulesFiles } from "../src/selection.mjs";
+import { isSensitivePath } from "../src/auto-approve.mjs";
+import { LOADER_DIRS, LOADER_FILES } from "../src/sanitize.mjs";
 
 test("release review runs only for release-relevant files", () => {
   for (const path of [
@@ -145,4 +147,16 @@ test("the workflow never waits, skips nothing-to-review PRs before installing an
 test("markdown that steers the AI or CI is not docs-only", () => {
   for (const p of ["README.md", "docs/guide/a.md"]) assert.equal(isDocsPath(p), true, p);
   for (const p of ["scripts/ai-review/agents/coordinator.md", "AGENTS.md", "web/CLAUDE.md", ".claude/skills/x/SKILL.md", ".agents/skills/x/SKILL.md", ".agents/README.md", ".github/PULL_REQUEST_TEMPLATE.md"]) assert.equal(isDocsPath(p), false, p);
+});
+
+test("every instruction loader the sanitizer removes, at any depth and case, is reviewed rather than skipped as docs", () => {
+  const paths = ["CONTEXT.md", "src/Context.md", "web/agents.md", "web/.claude/skills/x/SKILL.md", "web/.agents/skills/x/SKILL.md", "web/.opencode/agents/reviewer.md", "docs/.Claude/notes.md"];
+  for (const name of LOADER_FILES) if (name.endsWith(".md")) paths.push(`docs/deep/${name.toUpperCase()}`);
+  for (const dir of LOADER_DIRS) paths.push(`docs/${dir}/guide.md`);
+  for (const p of paths) {
+    assert.equal(isSensitivePath(p), true, `the approval gate already treats ${p} as an instruction loader`);
+    assert.equal(isDocsPath(p), false, p);
+    assert.equal(nothingToReviewReason({ author: "alice", paths: [p] }), "", p);
+  }
+  for (const p of ["docs/context-menu.md", "web/agents-guide.md", "docs/claude/notes.md"]) assert.equal(isDocsPath(p), true, p);
 });

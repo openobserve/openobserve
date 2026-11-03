@@ -61,7 +61,8 @@ passes them as `REVIEW_MODEL_VARIANT` and `REVIEW_COORDINATOR_VARIANT`, and the 
 variant of its own, so the variables are the only source. Each value is a variant of
 `claude-sonnet-5-5` in both opencode configs, which opencode sends as adaptive thinking plus
 `"output_config": { "effort": "<value>" }`. A value that is not a declared variant stops the run
-before it claims a pass or calls the model. Spans carry the effort in
+before it claims a pass or calls the model, and the comment's earlier verdict and `Auto-approved`
+line give way to a 🔴 Low line saying the review did not run. Spans carry the effort in
 `gen_ai.request.reasoning_effort`.
 
 ### PRs that are never reviewed
@@ -72,8 +73,9 @@ author login, committer login and signature state of each commit, and runs `skip
 `src/selection.mjs`). A PR is skipped, with nothing posted and no model called, when its author is
 `dependabot[bot]` or `renovate[bot]` and every commit is authored by that same bot, committed by
 it or by `web-flow` (how GitHub commits a bot's API-made commits) and carries a signature GitHub
-verified, when every file is docs (`*.md` or `docs/**`, but not markdown under `scripts/ai-review/`, `.claude/`, `.agents/`,
-`.github/` or an `AGENTS.md`/`CLAUDE.md`, which steers the AI or CI), or when every file is one the
+verified, when every file is docs (`*.md` or `docs/**`, but not markdown under `scripts/ai-review/` or
+`.github/`, nor any instruction loader the sanitizer strips, at any depth and in any case: `AGENTS.md`, `CLAUDE.md`,
+`CONTEXT.md` or a file under `.claude/`, `.agents/` or `.opencode/`; `isLoaderPath` in `src/sanitize.mjs`), or when every file is one the
 translation workflow commits (`web/src/locales/languages/*.json` other than `en-US.json`, which a
 person writes, and `scripts/translations/.translation_state.json`). Every other bot or App author
 is reviewed, and so is a dependency-bot PR someone else pushed to. A manual dispatch always
@@ -97,8 +99,8 @@ latest review is recorded, so a force-push back to an older reviewed head is rev
 finished review records what it covered in a hidden `o2-review-sha` tag (the head SHA, plus the paired head in a
 paired review, so a new commit on either side is new) and shows it in a visible `Reviewed commit`
 line with the review number. A run whose head matches the tag skips before any model call, which
-covers a queued run, a re-label and a plain dispatch, including the paired dispatch from
-openobserve. The tag is only written when it is true: the diff the reviewers read is rebuilt locally
+covers a queued run, a re-label and the paired dispatch from openobserve (o2-enterprise does not
+set `REVIEW_MANUAL_RUN`); a manual dispatch here, `force_full` or `ignore_pass_limit` reviews it again. The tag is only written when it is true: the diff the reviewers read is rebuilt locally
 from `MERGE_BASE_SHA` and `HEAD_SHA` (both sides of a paired review), because the API serves the
 branch as it is now. If that cannot be done, or no reviewer finished (each one failed or returned
 nothing parseable), the run writes no tag and names no commit, so that commit can be reviewed again.
@@ -108,7 +110,7 @@ A stamped review that was complete (every reviewer pass finished without a failu
 wrap-up, and the coordinator merged them without falling back; `reviewComplete` in
 `src/passes.mjs`) also records a fingerprint of the filtered diff it read, in a hidden
 `o2-review-diff` tag (`diffFingerprint` in `src/pr-diff.mjs`: a SHA-256 of the diff with blob ids
-and hunk line numbers removed, so a rebase or a merge from main that leaves the PR's own changed
+and hunk line numbers removed but each hunk's function context kept, so the same lines changed in another function differ, while a rebase or a merge from main that leaves the PR's own changed
 and context lines alone keeps it). When a new head's pinned diff has the same fingerprint, the run
 skips with `unchanged_diff` before any model call: it uses no pass, keeps the review and its merge
 confidence, and moves the `o2-review-sha` tag and the `Reviewed commit` line to the new head. The
@@ -130,9 +132,9 @@ the list call fails) the run fails instead of reviewing, since neither the revie
 count can be checked.
 
 A push does not cancel a review in progress: the paid run finishes and only the newest push waits
-in the concurrency queue. To review a commit again, dispatch the workflow with `ignore_pass_limit`
-(it bypasses both the dedupe and the cap, and is forwarded to a paired o2-enterprise review) or with
-`force_full` (it bypasses the dedupe only), or delete the review comment to reset the count.
+in the concurrency queue. To review a commit again, dispatch the workflow (a plain dispatch or
+`force_full` bypasses the dedupe only; `ignore_pass_limit` bypasses both the dedupe and the cap; the
+two inputs are forwarded to a paired o2-enterprise review), or delete the review comment to reset the count.
 
 The comment marker is matched as a pattern, so a retired provider leg's comment is adopted and
 rewritten in place, including older comments whose marker was redacted to
@@ -294,7 +296,9 @@ before the interrupt keeps its own answer. No agent sets opencode's `steps` cap:
 turn ends the request on an assistant message (its "maximum steps reached" text), a prefill the
 model rejects with a 400 when thinking is on; `test/integration/opencode-sandbox.test.mjs` pins
 that. Reviewer
-spans carry `review.wrapped_up`. Sessions shorter than 6 minutes, and the coordinator, get no
+spans carry `review.wrapped_up`. A wrapped-up answer counts as findings but not as a finished
+reviewer, so an area with no uninterrupted pass lowers merge confidence like an unfinished one and
+blocks auto-approval. Sessions shorter than 6 minutes, and the coordinator, get no
 wrap-up.
 
 The binary is pinned in `opencode-pin.env` and installed by `install-opencode.sh`, which verifies

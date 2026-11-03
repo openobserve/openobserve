@@ -56,12 +56,12 @@ export function fetchPinnedDiff(params) {
   return pinDiff({ ...params, diff: fetchDiff(params) });
 }
 
-// Blob ids and hunk line numbers move with the base, so a rebase or a merge from main that leaves the PR's own changes alone keeps its fingerprint.
+// Blob ids and hunk line numbers move with the base, so a rebase keeps the fingerprint; the function context after `@@` stays, as the same lines in another function are another change.
 export function diffFingerprint(diff) {
   const normalized = String(diff ?? "")
     .split("\n")
     .filter(line => !/^index [0-9a-f]+\.\.[0-9a-f]+/.test(line))
-    .map(line => (line.startsWith("@@") ? "@@" : line))
+    .map(line => line.replace(/^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/, "@@"))
     .join("\n")
     .trimEnd();
   return createHash("sha256").update(normalized).digest("hex");

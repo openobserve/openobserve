@@ -1,4 +1,4 @@
-import { isSettledConfidenceLine, mergeConfidenceLine, reviewingConfidenceLine, staleConfidenceLine } from "./confidence.mjs";
+import { isSettledConfidenceLine, mergeConfidenceLine, notRunConfidenceLine, reviewingConfidenceLine, staleConfidenceLine } from "./confidence.mjs";
 import { scrubReviewBody } from "./scrub.mjs";
 
 export const REVIEW_PASS_TAG = "<!--\\s*o2-review-pass:(\\d+)\\s*-->";
@@ -114,8 +114,8 @@ export function bodyAtUnchangedDiff(body, key, maxPasses) {
   return withReviewShaTag(relined, key);
 }
 
-export function shouldSkipAsReviewed(body, key, { ignorePassLimit = false, forceFull = false } = {}) {
-  if (!key || ignorePassLimit || forceFull) return false;
+export function shouldSkipAsReviewed(body, key, { ignorePassLimit = false, forceFull = false, manual = false } = {}) {
+  if (!key || ignorePassLimit || forceFull || manual) return false;
   return reviewedKey(body) === key;
 }
 
@@ -130,8 +130,8 @@ export function passLimitReached(passes, maxPasses) {
 }
 
 // Dedupe comes first so a queued run on a reviewed head stays silent instead of rewriting the limit note.
-export function reviewSkipReason({ body, key, passesDone, maxPasses, ignorePassLimit = false, forceFull = false }) {
-  if (shouldSkipAsReviewed(body, key, { ignorePassLimit, forceFull })) return "already_reviewed";
+export function reviewSkipReason({ body, key, passesDone, maxPasses, ignorePassLimit = false, forceFull = false, manual = false }) {
+  if (shouldSkipAsReviewed(body, key, { ignorePassLimit, forceFull, manual })) return "already_reviewed";
   if (!ignorePassLimit && passLimitReached(passesDone, maxPasses)) return "pass_limit_reached";
   return "";
 }
@@ -232,6 +232,11 @@ export function bodyAtReviewedHead(body, maxPasses) {
 
 export function bodyAtPassLimit(body, maxPasses, head) {
   return bodyAtUnreviewedHead(withPassLimitNote(body, passLimitNote(maxPasses, reviewedKey(body), head)), head);
+}
+
+// Even on the covered commit: the run already dismissed the approval, so the old verdict and gate line must not read as current.
+export function bodyAtFailedRun(body, head) {
+  return head ? withConfidenceLine(withHeldVerdict(body), notRunConfidenceLine(shortKey(head))) : body;
 }
 
 // The sha tag says that exact commit was read and stops it being reviewed again, so a run that cannot prove that leaves it off.

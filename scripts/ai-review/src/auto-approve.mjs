@@ -1,4 +1,5 @@
 import { removeRepeatedly } from "./comments.mjs";
+import { reviewerCompleted } from "./confidence.mjs";
 import { LOADER_DIRS, LOADER_FILES } from "./sanitize.mjs";
 
 export const MAX_APPROVE_LINES = 100;
@@ -235,7 +236,7 @@ function reviewerReasons(reviewers) {
 
 // Parsed reviewer output is the only proof a reviewer looked; a clean exit with empty text is not.
 export function reviewerFacts(results) {
-  return results.map(r => ({ key: r.agentKey, ran: !r.skipped, finished: !r.skipped && !r.error && r.parsed === true, fullDiff: r.fullDiff === true }));
+  return results.map(r => ({ key: r.agentKey, ran: !r.skipped, finished: reviewerCompleted(r), fullDiff: r.fullDiff === true }));
 }
 
 function pairingReasons({ paired, pairClear }) {
