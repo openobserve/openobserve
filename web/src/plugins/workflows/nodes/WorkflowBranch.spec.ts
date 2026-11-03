@@ -65,6 +65,7 @@ vi.mock("@/components/flow/forms/ConditionBuilder.vue", () => ({
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { ALERT_PAYLOAD_FIELDS } from "@/plugins/workflows/alertFields";
 import { INCIDENT_PAYLOAD_FIELDS } from "@/plugins/workflows/incidentFields";
+import { httpEditorState, resetHttpEditorState } from "@/plugins/workflows/httpEndpointUi";
 import WorkflowBranch from "./WorkflowBranch.vue";
 
 const seedTrigger = (kind = "alert_fired") => {
@@ -522,5 +523,34 @@ describe("WorkflowBranch", () => {
       const payload = await (wrapper.vm as any).submit();
       expect(payload.cases[0].conditions).toBeNull();
     });
+  });
+});
+
+describe("WorkflowBranch HTTP request field group (AC-UI-32)", () => {
+  beforeEach(() => {
+    workflowObj.currentSelectedNodeData = null;
+    seedTrigger("incident_event");
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: true };
+  });
+  afterEach(() => {
+    resetHttpEditorState();
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+    workflowObj.currentSelectedWorkflow.nodes = [];
+  });
+
+  it("every case offers the HTTP group while the endpoint is on, and only the kind's list while off", () => {
+    expect(builders(createWrapper())[0].props("fields")).toEqual(INCIDENT_PAYLOAD_FIELDS);
+    httpEditorState.endpointOn = true;
+    const fields = builders(createWrapper())[0].props("fields");
+    const values = fields.map((f: any) => f.value);
+    expect(values).toContain("meta_event_type");
+    expect(values).toContain("meta_trigger_source");
+    expect(values.filter((v: string) => v.startsWith("data"))).toEqual([]);
+    expect(fields.map((f: any) => String(f.label))).not.toContain(
+      i18n.global.t("workflow.http.fieldGroupBodyHint"),
+    );
+    expect(
+      createWrapper().find('[data-test="workflow-condition-http-body-hint"]').text(),
+    ).toContain(i18n.global.t("workflow.http.fieldGroupBodyHint"));
   });
 });

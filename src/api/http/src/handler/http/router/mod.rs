@@ -464,6 +464,10 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
     if method == Method::PUT && segments.ends_with(&["prompts", "settings", "secret"]) {
         return true;
     }
+    // Sample data for an endpoint test is often a pasted real call, credentials included.
+    if method == Method::POST && segments.ends_with(&["http_trigger", "test"]) {
+        return true;
+    }
     if let Some(slack) = slack_path(&segments) {
         return is_slack_secret_write(method, slack);
     }
@@ -1023,6 +1027,14 @@ pub fn basic_routes() -> Router {
             alerts::external_events::MAX_BODY_BYTES,
         ));
 
+    // Merged after the route_layer above, so the incident body limit does not wrap these routes.
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().common.workflows_enabled
+        && openobserve_core::workflows::http_trigger::hooks_enabled()
+    {
+        router = router.merge(workflow_hook_routes());
+    }
+
     // Slack signs these requests; ENT verifies the signature, so they stay out of auth_middleware.
     router = router
         .route(
@@ -1091,6 +1103,23 @@ pub fn basic_routes() -> Router {
     }
 
     router
+}
+
+/// Public workflow hooks; the handler reads the body itself, this limit is only defence in depth.
+#[cfg(feature = "enterprise")]
+fn workflow_hook_routes() -> Router {
+    Router::new()
+        .route(
+            "/api/v2/{org_id}/workflows/hooks/{trigger_id}",
+            post(workflows::hooks::invoke),
+        )
+        .route(
+            "/api/v2/{org_id}/workflows/hooks/{trigger_id}/runs/{run_id}",
+            get(workflows::hooks::run_status),
+        )
+        .layer(DefaultBodyLimit::max(
+            openobserve_core::workflows::http_trigger::HARD_BODY_CAP,
+        ))
 }
 
 /// Create config routes. `/` is served WITHOUT auth (the login page bootstraps
@@ -1927,6 +1956,31 @@ pub fn service_routes() -> Router {
                     "/{org_id}/workflows/promote/{id}",
                     post(workflows::promote_draft),
                 );
+            if openobserve_core::workflows::http_trigger::hooks_enabled() {
+                router = router
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger",
+                        get(workflows::http_trigger::get_http_trigger)
+                            .put(workflows::http_trigger::put_http_trigger)
+                            .delete(workflows::http_trigger::delete_http_trigger),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/credentials",
+                        post(workflows::http_trigger::rotate_http_credential),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}",
+                        delete(workflows::http_trigger::revoke_http_credential),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/credentials/{cred_id}/secret",
+                        get(workflows::http_trigger::reveal_http_credential_secret),
+                    )
+                    .route(
+                        "/{org_id}/workflows/{id}/http_trigger/test",
+                        post(workflows::http_trigger::test_http_trigger),
+                    );
+            }
         }
     }
 
@@ -3105,6 +3159,27 @@ mod tests {
     }
 
     #[test]
+    fn workflow_endpoint_test_bodies_are_redacted() {
+        for path in [
+            "org/workflows/wf1/http_trigger/test",
+            "api/org/workflows/wf1/http_trigger/test",
+        ] {
+            assert!(is_secret_write(&Method::POST, path), "{path}");
+            assert_eq!(
+                audited(Method::POST, path, r#"{"data":[{"password":"p"}]}"#),
+                "[REDACTED: secret write]"
+            );
+        }
+        for (method, path) in [
+            (Method::PUT, "org/workflows/wf1/http_trigger"),
+            (Method::POST, "org/workflows/wf1/http_trigger/credentials"),
+            (Method::POST, "org/workflows/test"),
+        ] {
+            assert!(!is_secret_write(&method, path), "{method} {path}");
+        }
+    }
+
+    #[test]
     fn slack_secret_writes_are_redacted() {
         for (method, path) in [
             (Method::POST, "org/slack/install/exchange"),
@@ -3739,6 +3814,71 @@ mod tests {
         assert_ne!(
             app.oneshot(req).await.unwrap().status(),
             StatusCode::NOT_FOUND
+        );
+    }
+
+    // Refused before any lookup, so a 400 proves the hook handler owns the path without a DB.
+    #[cfg(feature = "enterprise")]
+    fn credential_in_url_probe() -> Request<Body> {
+        Request::builder()
+            .method(Method::POST)
+            .uri("/api/v2/o/workflows/hooks/x?token=a")
+            .body(Body::empty())
+            .unwrap()
+    }
+
+    // basic_routes already holds the hook routes when the process runs with hooks on.
+    #[cfg(feature = "enterprise")]
+    fn hook_routes_unless_registered() -> Router {
+        if get_o2_config().common.workflows_enabled
+            && openobserve_core::workflows::http_trigger::hooks_enabled()
+        {
+            Router::new()
+        } else {
+            workflow_hook_routes()
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn create_app_router_builds_with_workflow_hook_routes() {
+        let app = Router::new()
+            .merge(basic_routes())
+            .merge(hook_routes_unless_registered())
+            .merge(splunk_collector_routes())
+            .nest("/config", config_routes())
+            .nest("/api", service_routes())
+            .merge(other_service_routes())
+            .merge(proxy_routes(true));
+        let status = app
+            .oneshot(credential_in_url_probe())
+            .await
+            .unwrap()
+            .status();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn router_node_app_builds_with_workflow_hook_routes() {
+        let router_routes = Router::new()
+            .merge(crate::router::http::create_router_routes())
+            .nest("/config", config_routes())
+            .merge(proxy_routes(true));
+        let app = Router::new()
+            .merge(basic_routes())
+            .merge(hook_routes_unless_registered())
+            .merge(crate::router::http::create_splunk_collector_proxy_routes())
+            .merge(router_routes);
+        let status = app
+            .oneshot(credential_in_url_probe())
+            .await
+            .unwrap()
+            .status();
+        assert_eq!(
+            status,
+            StatusCode::BAD_REQUEST,
+            "the hook route wins over /api/{{*path}}"
         );
     }
 
