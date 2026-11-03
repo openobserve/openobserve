@@ -370,11 +370,7 @@ function isMaxTokens(value: unknown): boolean {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 0xffffffff;
 }
 
-/** The sampling params one run sends: the carried ones, plus the temperature when it is set.
- *  A stored temperature is carried only when numeric, and that one already moved into the
- *  temperature field; any other stored temperature, and any max tokens that are not a
- *  non-negative integer, stay in the saved config but are left out of the run, which the
- *  server would otherwise reject. Of `max_tokens` and `maxTokens`, only the first is sent. */
+/** The params one run sends, leaving out stored values the server rejects (they stay saved). */
 export function runParams(variant: PlaygroundVariant): Record<string, unknown> {
   const { temperature: _stored, ...params } = variant.params ?? {};
   if (!isMaxTokens(params.max_tokens)) delete params.max_tokens;
