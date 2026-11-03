@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @exit="onExit"
         />
 
-        <FleetRolloutPhases v-if="rolloutTagValue(active) !== 'empty'" :rollout="active" />
+        <FleetRolloutPhases v-if="active.phases.length" :rollout="active" />
 
         <div v-if="active.events.length" class="flex flex-col gap-2">
           <OText variant="panel-title">{{ t("fleet.rollouts.timeline") }}</OText>
@@ -189,6 +189,7 @@ const emit = defineEmits<{
 const EVENT_VARIANT: Record<string, TimelineItemVariant> = {
   started: "primary",
   scheduled: "info",
+  waiting: "info",
   deploying: "primary",
   converged: "success",
   observing: "info",
@@ -242,6 +243,8 @@ function eventTitle(ev: RolloutRow["events"][number]): I18nText {
       return t("fleet.rollouts.eventStarted");
     case "scheduled":
       return t("fleet.badge.scheduled");
+    case "waiting":
+      return t("fleet.rollouts.eventWaiting");
     case "deploying":
       return phase
         ? t("fleet.rollouts.eventDeployingPhase", { n: phase })

@@ -309,11 +309,26 @@ describe("FleetNewRolloutDialog", () => {
     expect(form(wrapper).state.values.fleet).toBe("one");
   });
 
-  it("says an empty fleet gets the version at once", async () => {
+  it("says an empty fleet's rollout waits for a collector and still lets it be scheduled", async () => {
     wrapper = mountDialog({ fleetId: "void", config: "edge", toVersion: 2 });
     await settlePreview();
     expect(wrapper.find('[data-test="fleet-new-rollout-dialog-plan"]').text()).toContain(
-      "The fleet has no collectors, so the version is set at once",
+      "The fleet has no collectors, so the rollout waits until one joins",
+    );
+    const at = wrapper
+      .findAllComponents({ name: "OToggleGroupItem" })
+      .find((c) => c.props("value") === "at")!;
+    expect(at.props("disabled")).toBeFalsy();
+  });
+
+  it("says a deploy of the stable version to an empty fleet is set at once", async () => {
+    const stableFleet = fleetOf("void", 0);
+    stableFleet.state!.stable = { config: "edge", version: 2 };
+    vi.mocked(fleet.listFleets).mockResolvedValue({ data: { items: [stableFleet] } } as any);
+    wrapper = mountDialog({ fleetId: "void", config: "edge", toVersion: 2 });
+    await settlePreview();
+    expect(wrapper.find('[data-test="fleet-new-rollout-dialog-plan"]').text()).toContain(
+      "No collector is online; the stable version goes to each one when it connects",
     );
   });
 

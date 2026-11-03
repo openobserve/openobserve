@@ -762,6 +762,7 @@
     "dragToReorder": "Arraste para reordenar",
     "timeAmount": "Quantidade de tempo",
     "timeUnit": "Unidade de tempo",
+    "unitFor": "Unidade de {label}",
     "queryEditorAriaLabel": "Editor de consulta. Pressione Escape para ir para o próximo controle.",
     "queryEditorEscapeAction": "Mover o foco para o próximo controle",
     "inlineEdit": {
@@ -11956,6 +11957,7 @@
       "budgetLabel": "Orçamento de alertas",
       "budgetPerDay": "por dia",
       "budgetPerWeek": "por semana",
+      "budgetPeriod": "Período do orçamento de alertas",
       "budgetRange": "Introduza um número maior que 0",
       "chartsTab": "Gráficos",
       "checkEvery": "Verificar a cada",
@@ -11965,6 +11967,7 @@
       "sendsToStatus": "Envia para {targets} cada vez que uma anomalia é detetada.",
       "detectionAlreadyRunning": "A deteção já está em curso; tente novamente dentro de instantes.",
       "detectionCharts": "Resultados de deteção",
+      "detectionFunctionField": "Campo da função de deteção",
       "detectionFunctionTooltip": "O que medir em cada bucket de tempo. count observa quantos registos chegam; avg, min, max e sum observam um campo numérico. p50, p95 e p99 observam a distribuição desse campo — por exemplo, o p95 de response_time_ms deteta o agravamento da latência nos pedidos mais lentos mesmo quando o tráfego permanece estável.",
       "detectionResolution": "Resolução de deteção",
       "detectionResolutionTooltip": "Quão granular é cada ponto de dados. Por exemplo, “5m” significa que anomalias são detetadas com resolução de 5 minutos.",

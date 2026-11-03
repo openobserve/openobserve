@@ -56,8 +56,9 @@ export const FLOW_POLL_MS = 15_000;
 const inFlight = (delivery: string | null | undefined) =>
   delivery === "assigned" || delivery === "sent" || delivery === "accepted";
 
-// A scheduled rollout changes only when it becomes due, so a slow poll is enough to wake its row.
-const SCHEDULED_POLL_MS = 60_000;
+// A scheduled or waiting rollout changes only when it is due or a collector connects.
+const IDLE_POLL_MS = 60_000;
+const idle = (status: string | undefined) => status === "scheduled" || status === "waiting";
 
 // An auto-rollback commits in its own transaction after the halt, so the halt is not the last word.
 const rollbackOwed = (r: Pick<FleetRollout, "auto_rollback" | "halt">) =>
@@ -68,14 +69,14 @@ const rolloutMoving = (r: Pick<FleetRollout, "status" | "auto_rollback" | "halt"
 
 const rolloutPoll = (rollouts: FleetRollout[]) => {
   if (rollouts.some(rolloutMoving)) return DELIVERY_POLL_MS;
-  return rollouts.some((r) => r.status === "scheduled") ? SCHEDULED_POLL_MS : false;
+  return rollouts.some((r) => idle(r.status)) ? IDLE_POLL_MS : false;
 };
 
 const fleetPoll = (fleets: Fleet[]) => {
   const statuses = fleets.map((f) => f.state?.rollout?.status);
   // The fleet state cannot tell whether an auto-rollback is owed, so a halted fleet keeps polling.
   if (statuses.includes("in_progress") || statuses.includes("halted")) return DELIVERY_POLL_MS;
-  return statuses.includes("scheduled") ? SCHEDULED_POLL_MS : false;
+  return statuses.some(idle) ? IDLE_POLL_MS : false;
 };
 
 export interface BulkResult {

@@ -65,11 +65,11 @@ jobs:
         # provider? Give it a distinct `<!-- ai-code-review-<suffix> -->` marker — run-review.mjs
         # matches that shape, so two legs sharing one marker overwrite each other's comment.
         provider:
-          - name: deepseek
-            provider_id: deepseek-review
-            model_id: deepseek-flash
-            model_variant: max
-            api_key_env: DEEPSEEK_API_KEY
+          - name: anthropic
+            provider_id: anthropic-review
+            model_id: claude-sonnet-5-5
+            model_variant: high
+            api_key_env: ANTHROPIC_REVIEW_API_KEY
             marker: "<!-- ai-code-review -->"
     steps:
       # Debounce: lets a burst of pushes land so Resolve PR picks up the newest head.
@@ -298,8 +298,8 @@ jobs:
           REVIEW_OPENCODE_CONFIG: ci-full
           # Empty under the github.token fallback: any workflow a same-repo PR adds can also post as github-actions[bot].
           REVIEW_BOT_LOGIN: ${{ steps.app_token.outputs.token && format('{0}[bot]', steps.app_token.outputs.app-slug) || '' }}
-          # Review-only key held in the ai-review environment (the org-wide key is readable by any same-repo PR workflow).
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # A name no bundled opencode provider reads (they default to ANTHROPIC_API_KEY), so only anthropic-review gets the key.
+          ANTHROPIC_REVIEW_API_KEY: ${{ secrets.USAGE_CREDIT_API_KEY }}
           O2_TRACE_INGEST_URL: ${{ secrets.O2_TRACE_INGEST_URL }}
           O2_TRACE_ORG: ${{ secrets.O2_TRACE_ORG }}
           O2_TRACE_USERNAME: ${{ secrets.O2_TRACE_USERNAME }}
