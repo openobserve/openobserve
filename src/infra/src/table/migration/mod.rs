@@ -878,7 +878,7 @@ mod tests {
         (133, "m20261103_000001_add_status_streaks_to_synthetics"),
         (134, "m20261028_000001_add_llm_dataset_item_write_version"),
         (135, "m20261103_000002_add_run_class_to_synthetics"),
-        (136, "m20261103_000003_add_gap_state_to_synthetics"),
+        (137, "m20261103_000003_add_gap_state_to_synthetics"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
