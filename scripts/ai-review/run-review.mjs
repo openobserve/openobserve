@@ -1751,9 +1751,11 @@ async function main() {
     const reviewed = completedAgents.length > 0;
     const passes = reviewed ? passesDone + 1 : passesDone;
     const complete = reviewComplete(passResults, coordinatorResult);
+    // A reviewer reads at most MAX_DIFF_TOKENS chars of diff, so a longer one was never fully reviewed.
+    const fullyRead = diff.length <= MAX_DIFF_TOKENS;
     if (reviewed && !complete) console.warn(`[${isoNow()}] The review was partial, so the next push re-reviews even an unchanged diff`);
     if (reviewed && !diffPinned) console.warn(`[${isoNow()}] The reviewed diff is not tied to ${headKey}, so the commit stays reviewable`);
-    finalReview = finishReviewBody(sanitizedReview, { key: headKey, passes, maxPasses: REVIEW_MAX_PASSES, reviewed: reviewed && diffPinned, confidence, gateLine: autoApproveLine(autoApprove), diffFingerprint: complete && diffPinned && hunksLocatable(diff, readBaseFile) ? fingerprint : "" });
+    finalReview = finishReviewBody(sanitizedReview, { key: headKey, passes, maxPasses: REVIEW_MAX_PASSES, reviewed: reviewed && diffPinned, confidence, gateLine: autoApproveLine(autoApprove), diffFingerprint: complete && fullyRead && diffPinned && hunksLocatable(diff, readBaseFile) ? fingerprint : "" });
     TRACE.setSpanAttributes(rootSpan, { "review.final_length": finalReview.length });
     console.log(`[${isoNow()}] Final review length: ${finalReview.length} chars`);
 

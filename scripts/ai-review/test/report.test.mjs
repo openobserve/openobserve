@@ -801,7 +801,7 @@ async function runMain({ results = [finishedReviewer("security"), finishedReview
     TRACE: { startSpan: () => ({}), endSpan: noop, setSpanAttributes: noop }, activeRootSpan: null, isoNow: () => "now", prepareReviewTree: noop,
     findExistingReviewComment: () => ({ comment: existing, ok: true }),
     passesDoneIn: comment => (comment ? commentsModule.reviewPassCount(comment.body) : 0),
-    REVIEW_IGNORE_PASS_LIMIT: ignorePassLimit, REVIEW_MANUAL_RUN: manual, diffFingerprint, hunksLocatable, readBaseFile: () => baseFile, variantProblem: () => variantError, MODEL_VARIANT: "high", COORDINATOR_VARIANT: "high", REVIEW_MAX_PASSES: 0, REVIEW_BOT_LOGIN: "review[bot]", REVIEW_PAIR_CLEAR: true, AUTO_APPROVE_MODE: mode,
+    REVIEW_IGNORE_PASS_LIMIT: ignorePassLimit, REVIEW_MANUAL_RUN: manual, MAX_DIFF_TOKENS: 150_000, diffFingerprint, hunksLocatable, readBaseFile: () => baseFile, variantProblem: () => variantError, MODEL_VARIANT: "high", COORDINATOR_VARIANT: "high", REVIEW_MAX_PASSES: 0, REVIEW_BOT_LOGIN: "review[bot]", REVIEW_PAIR_CLEAR: true, AUTO_APPROVE_MODE: mode,
     REVIEW_MARKER: "<!-- ai-code-review -->", PAIRED: { repo: "", prNumber: "", dir: "", mergeBase: "", head: "", ...paired }, PR_DIR: "/pr", resolve: (...parts) => parts.join("/"),
     githubReviewApi: () => ({ readPr: () => pr, listReviews: () => [], dismissReview: noop, approve: payload => run.approvals.push(payload) }),
     noteSkippedPush: noop, apiKey: () => "configured", API_KEY_VAR_NAME: "TEST_KEY", MODEL_SLUG: "test/model",
@@ -1471,6 +1471,11 @@ test("test-only and CI-only PRs of any size get their narrow reviewer set, unles
   assert.equal(assessRiskTier(diff(["src/service/search.rs"], 50)), "lite");
 });
 
+test("an action or workflow under a test-named directory stays ci-only, not test-only", () => {
+  assert.equal(narrowTier([".github/actions/test/action.yml"]), "ci-only");
+  assert.equal(narrowTier([".github/workflows/tests.yml"]), "ci-only");
+});
+
 test("a narrow tier needs both a rename's source and its destination to qualify", () => {
   const { assessRiskTier } = riskTierFns();
   const moved = (oldPath, newPath) => ({ files: [{ oldPath, newPath }], totalAdded: 120, totalRemoved: 120 });
@@ -1478,4 +1483,10 @@ test("a narrow tier needs both a rename's source and its destination to qualify"
   assert.equal(assessRiskTier(moved("scripts/deploy.sh", ".github/workflows/deploy.yml")), "full");
   assert.equal(assessRiskTier(moved("src/handler/http/auth/login.rs", "src/service/login.rs")), "full", "a security-looking source still escalates");
   assert.equal(assessRiskTier(moved("tests/a_test.py", "tests/b_test.py")), "test-only");
+});
+
+test("a diff longer than a reviewer reads records no fingerprint, so the next push reviews it", async () => {
+  const big = `diff --git a/docs/a.md b/docs/a.md\n--- a/docs/a.md\n+++ b/docs/a.md\n@@ -1 +1,2 @@\n-old\n+new\n+${"x".repeat(160_000)}\n`;
+  const run = await runMain({ mode: "off", rawDiff: big });
+  assert.equal(commentsModule.reviewedDiffFingerprint(run.posted), "");
 });

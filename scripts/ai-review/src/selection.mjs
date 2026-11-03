@@ -32,6 +32,7 @@ export function resolveRulesFiles(files, exists = existsSync) {
 
 // Test code only: test trees, spec/test files and fixtures, in any language.
 export function isTestOnlyPath(filePath) {
+  if (isCiOnlyPath(filePath)) return false;
   if (/(^|\/)(tests?|__tests__|e2e|fixtures?|testdata)\//.test(filePath)) return true;
   if (/\.(spec|test)\.[cm]?[jt]sx?$/.test(filePath)) return true;
   return /(^|\/)[^/]+_test\.(rs|go|py)$/.test(filePath) || /(^|\/)test_[^/]+\.py$/.test(filePath);

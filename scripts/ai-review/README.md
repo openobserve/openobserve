@@ -23,7 +23,7 @@ documentation) in parallel — plus any *conditional* agent whose domain the dif
 qa, and release for migrations, `Cargo.toml`/`package.json`, `src/config/src/config.rs`, `.github/`,
 `deploy/` and Docker files) — and a coordinator consolidates their findings into one comment with
 a decision. Correctness owns the PR's behaviour end to end (callers, sibling
-paths, state, the tests that prove the change); every tier runs it. Before the agents start, the
+paths, state, the tests that prove the change); every tier but `ci-only` runs it. Before the agents start, the
 runner greps the PR tree for where each symbol the diff changes is used outside the diff, and for
 other definitions of the same name (`src/impact.mjs`), and gives that map to every reviewer.
 Security and correctness also get `openobserve-checklist.md`, the defect classes that recur in
