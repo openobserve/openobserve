@@ -67,7 +67,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_backend_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
     steps:
@@ -272,7 +272,7 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4]
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
 
@@ -379,7 +379,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_ui_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
 
