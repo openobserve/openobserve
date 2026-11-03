@@ -259,8 +259,10 @@ app reports a missing key that `.env` has, `unset` the empty variable in the she
 ## 6. Verify: first trace and data health
 
 ```bash
-python3 <skill dir>/scripts/verify.py --env-file .env --stream <stream> --since "$START" --service <agent name>
+python3 <skill dir>/scripts/verify.py --env-file .env --stream <stream> --since "$START" --service <agent name> --agent <agent name>
 ```
+
+`--agent` scopes the data-health checks to this app; without it they cover every app on the stream.
 
 The script waits up to 120 s for GenAI spans (those with `gen_ai.operation.name`; HTTP or database
 spans alone do not count), prints the span count and the link to the first trace, then calls
@@ -302,7 +304,7 @@ What each failed check means and where to fix it:
 When the user fixes something and asks to check again, rerun only the checks:
 
 ```bash
-python3 <skill dir>/scripts/verify.py --env-file .env --stream <stream> --health-only
+python3 <skill dir>/scripts/verify.py --env-file .env --stream <stream> --since "$START" --agent <agent name> --health-only
 ```
 
 ## 7. Report

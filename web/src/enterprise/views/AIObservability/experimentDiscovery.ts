@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { LlmExperiment } from "@/services/llm-experiments.service";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 export type ExperimentScoreSummary =
   | { name: string; kind: "numeric"; value: number; sampleCount: number }
@@ -58,6 +59,27 @@ export function experimentCostDisplay(
   return cost !== null && cost !== undefined && cost > 0
     ? { kind: "atLeast", value: cost }
     : { kind: "unknown" };
+}
+
+/** The cost text the experiment list and detail page both show. */
+export function experimentCostText(
+  cost: number | null | undefined,
+  incomplete: boolean | null | undefined,
+  t: TranslateFn,
+): I18nText {
+  const display = experimentCostDisplay(cost, incomplete);
+  switch (display.kind) {
+    case "none":
+      return raw("—");
+    case "exact":
+      return raw(`$${display.value.toFixed(4)}`);
+    case "atLeast":
+      return t("aiObservability.experiments.costAtLeast", {
+        cost: `$${display.value.toFixed(4)}`,
+      });
+    case "unknown":
+      return t("aiObservability.experiments.costUnknown");
+  }
 }
 
 export interface ExperimentDatasetGroup {

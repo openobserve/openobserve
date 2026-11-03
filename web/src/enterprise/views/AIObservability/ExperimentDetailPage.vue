@@ -443,7 +443,7 @@ import {
   formatDuration,
 } from "@/enterprise/components/AIObservability/experimentRowContent";
 import { experimentScoreSummaryValue, openExperimentTrace } from "./experimentResults";
-import { experimentCostDisplay } from "./experimentDiscovery";
+import { experimentCostText } from "./experimentDiscovery";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AIExperimentDetailPage" });
@@ -747,7 +747,7 @@ const metricCards = computed<MetricCard[]>(() => {
   cards.push({
     key: "cost",
     label: t("aiObservability.experiments.detail.totalCost"),
-    value: costValue(aggregate?.totalCost, aggregate?.costIncomplete),
+    value: experimentCostText(aggregate?.totalCost, aggregate?.costIncomplete, t),
     footer: t(
       aggregate?.costIncomplete
         ? "aiObservability.experiments.detail.partialCostBreakdown"
@@ -803,24 +803,6 @@ const metricCards = computed<MetricCard[]>(() => {
   }
   return cards;
 });
-
-/** An unpriced task or judge call makes the total a floor; a zero floor is
- *  unknown, not free. */
-function costValue(cost: number | null | undefined, incomplete: boolean | undefined): string {
-  const display = experimentCostDisplay(cost, incomplete);
-  switch (display.kind) {
-    case "none":
-      return "—";
-    case "exact":
-      return `$${display.value.toFixed(4)}`;
-    case "atLeast":
-      return t("aiObservability.experiments.costAtLeast", {
-        cost: `$${display.value.toFixed(4)}`,
-      });
-    case "unknown":
-      return t("aiObservability.experiments.costUnknown");
-  }
-}
 
 /** One side of the breakdown. A zero on an incomplete run is not a price. */
 function formatCost(cost: number | null | undefined, incomplete?: boolean): string {
