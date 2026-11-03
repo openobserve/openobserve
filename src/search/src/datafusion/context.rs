@@ -23,7 +23,7 @@ use super::{
     exec::{DataFusionContextBuilder, register_udf},
     optimizer::{
         context::PhysicalOptimizerContext, generate_analyzer_rules, generate_optimizer_rules,
-        generate_physical_optimizer_rules, physical_optimizer::distribute_analyze::AnalyzeProfile,
+        generate_physical_optimizer_rules,
     },
     sort_order::FileSortOrder,
     table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
@@ -75,12 +75,6 @@ impl SearchContextBuilder {
 
         register_udf(&ctx, &sql.org_id)?;
         datafusion_functions_json::register_all(&mut ctx)?;
-        if req.analyze_profile {
-            ctx.state_ref()
-                .write()
-                .config_mut()
-                .set_extension(Arc::new(AnalyzeProfile));
-        }
 
         Ok(ctx)
     }
