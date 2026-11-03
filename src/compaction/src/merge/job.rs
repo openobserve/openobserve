@@ -38,13 +38,22 @@ use super::dynamic::merged_by_day;
 pub(super) enum JobScope {
     /// The stream's own partition: an hour, or the day for daily-partitioned types.
     Partition(PartitionTimeLevel),
-    /// The whole day, downsampled; the output stays in the hour directories.
+    /// The whole day, downsampled; the output stays in the hour directories unless merged by day.
     DownsampledDay,
     /// The whole day under the dynamic merge policy; merged output goes to `DD/00`.
     DynamicDay,
 }
 
 impl JobScope {
+    /// A merged day holds one file set, so a downsample over it must not split by hour.
+    pub(super) fn groups_by_day(self, dynamic_day: bool) -> bool {
+        match self {
+            Self::DynamicDay => true,
+            Self::DownsampledDay => dynamic_day,
+            Self::Partition(_) => false,
+        }
+    }
+
     pub(super) fn time_level(self) -> PartitionTimeLevel {
         match self {
             Self::Partition(level) => level,
@@ -514,6 +523,15 @@ mod tests {
         // a downsampling rule takes the day first
         let scope = job_scope(StreamType::Metrics, day, true, true, |_| true);
         assert_eq!(scope, JobScope::DownsampledDay);
+    }
+
+    /// A downsample splits by hour unless the day is dynamically merged.
+    #[test]
+    fn test_groups_by_day_follows_the_dynamic_day() {
+        assert!(JobScope::DynamicDay.groups_by_day(true));
+        assert!(JobScope::DownsampledDay.groups_by_day(true));
+        assert!(!JobScope::DownsampledDay.groups_by_day(false));
+        assert!(!JobScope::Partition(PartitionTimeLevel::Hourly).groups_by_day(true));
     }
 
     #[test]

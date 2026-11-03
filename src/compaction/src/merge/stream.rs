@@ -153,11 +153,12 @@ pub async fn merge_by_stream(
     }
 
     // do partition by partition key
+    let groups_by_day = scope.groups_by_day(dynamic_day);
     let mut partition_files_with_size: HashMap<String, Vec<FileKey>> = HashMap::default();
     for file in files {
         let prefix = &file.key[..file.key.rfind('/').unwrap()];
-        // the dynamic merge job sees a partition's hours as one group, written to DD/00
-        let prefix = if scope == JobScope::DynamicDay {
+        // a day job sees a partition's hours as one group, written to DD/00
+        let prefix = if groups_by_day {
             day_prefix(prefix)
         } else {
             prefix.to_string()
