@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="trace-details-sidebar-header-toolbar-view-profile-btn"
                 >
                   <template #icon-left>
-                    <OIcon name="lock" class="text-icon-locked" size="sm" />
+                    <OIcon name="lock" class="lock-chip" size="sm" />
                   </template>
                   {{ t("traces.viewProfile") }}
                 </OButton>

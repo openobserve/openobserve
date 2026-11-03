@@ -156,12 +156,12 @@ describe("OTab", () => {
 
   it("paints a lock suffix with the locked-icon token", () => {
     const wrapper = mountTab({ label: "Alerts", suffixIcon: "lock" });
-    expect(wrapper.find(".text-icon-locked").exists()).toBe(true);
+    expect(wrapper.find(".lock-chip").exists()).toBe(true);
   });
 
   it("does not paint other suffix icons", () => {
     const wrapper = mountTab({ label: "Alerts", suffixIcon: "add" });
-    expect(wrapper.find(".text-icon-locked").exists()).toBe(false);
+    expect(wrapper.find(".lock-chip").exists()).toBe(false);
   });
 
   it("gives a lock suffix screen-reader text from suffixLabel, else the tooltip", () => {

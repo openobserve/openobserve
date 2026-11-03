@@ -132,12 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="rbacAccess.allowed ? serviceAccountRolesText(row.email) : rbacAccess.message"
               @click="!rbacAccess.allowed && openUpgradeDialog()"
               >{{ serviceAccountRolesText(row.email) }}
-              <OIcon
-                v-if="!rbacAccess.allowed"
-                name="lock"
-                size="xs"
-                class="text-icon-locked shrink-0"
-              />
+              <OIcon v-if="!rbacAccess.allowed" name="lock" size="xs" class="lock-chip shrink-0" />
             </span>
           </template>
 
@@ -489,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     rbacAccess.allowed
                       ? 'text-text-secondary group-hover:translate-x-0.5'
-                      : 'text-icon-locked'
+                      : 'lock-chip'
                   "
                   class="shrink-0 transition-transform"
                 />
@@ -508,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     rbacAccess.allowed
                       ? 'text-text-secondary group-hover:translate-x-0.5'
-                      : 'text-icon-locked'
+                      : 'lock-chip'
                   "
                   class="shrink-0 transition-transform"
                 />

@@ -432,7 +432,7 @@ function onAlertsTile() {
                 <OIcon
                   name="lock"
                   size="sm"
-                  class="text-icon-locked"
+                  class="lock-chip"
                   data-test="k8s2-overview-kpi-alerts-lock"
                 />
               </span>

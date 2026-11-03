@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left>
                 <OIcon
                   name="lock"
-                  class="text-icon-locked"
+                  class="lock-chip"
                   size="sm"
                   data-test="rca-paused-connect-lock"
                 />

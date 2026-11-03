@@ -45,7 +45,7 @@ describe("OToggleGroupItem", () => {
 
   it.each(["iconLeft", "iconRight"])("paints a %s lock with the locked-icon token", (prop) => {
     const wrapper = mountItem({ value: "x", [prop]: "lock" }, { default: () => h("span", "A") });
-    expect(wrapper.find(".text-icon-locked").exists()).toBe(true);
+    expect(wrapper.find(".lock-chip").exists()).toBe(true);
     wrapper.unmount();
   });
 

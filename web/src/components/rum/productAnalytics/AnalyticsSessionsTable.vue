@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="lock"
               size="sm"
-              class="text-icon-locked"
+              class="lock-chip"
               :data-test="`${dataTestPrefix}-row-${index}-locked`"
             />
           </span>

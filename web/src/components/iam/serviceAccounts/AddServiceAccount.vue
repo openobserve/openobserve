@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="showLabelOnTop mt-2"
               >
                 <template v-if="rbacLocked" #icon-left>
-                  <OIcon name="lock" size="sm" class="text-icon-locked" />
+                  <OIcon name="lock" size="sm" class="lock-chip" />
                 </template>
               </OFormSelect>
               <div class="mt-1 flex justify-end">
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="!rbacAccess.allowed ? undefined : (showAddRoleDialog = true)"
                 >
                   <template v-if="!rbacAccess.allowed || rbacLocked" #icon-left>
-                    <OIcon name="lock" size="sm" class="text-icon-locked" />
+                    <OIcon name="lock" size="sm" class="lock-chip" />
                   </template>
                   <template v-else #icon-left><OIcon name="add" size="sm" /></template>
                   {{ t("serviceAccounts.form.roles.create") }}
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="showLabelOnTop mt-2"
               >
                 <template v-if="rbacLocked" #icon-left>
-                  <OIcon name="lock" size="sm" class="text-icon-locked" />
+                  <OIcon name="lock" size="sm" class="lock-chip" />
                 </template>
               </OFormSelect>
             </div>

@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="ms-2"
         @click="openUpgradeDialog"
       >
-        <template #icon-left><OIcon name="lock" size="sm" class="text-icon-locked" /></template>
+        <template #icon-left><OIcon name="lock" size="sm" class="lock-chip" /></template>
         {{ t("workflow.create") }}
       </OButton>
     </template>

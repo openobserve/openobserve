@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="correlationLocked"
                 name="lock"
                 size="sm"
-                class="text-icon-locked"
+                class="lock-chip"
                 data-test="oncall-rule-editor-correlation-lock"
               >
                 <OTooltip side="right" :content="correlationLockedReason" />

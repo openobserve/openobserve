@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               v-if="tab.disabled"
               name="lock"
-              class="text-icon-locked"
+              class="lock-chip"
               size="xs"
               aria-hidden="true"
               :data-test="`dbm-detail-tab-lock-${tab.key}`"

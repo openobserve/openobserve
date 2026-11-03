@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template #icon-left>
                     <OIcon
-                      :class="option.locked ? 'text-icon-locked' : undefined"
+                      :class="option.locked ? 'lock-chip' : undefined"
                       :name="option.locked ? 'lock' : option.icon"
                       size="sm"
                     />

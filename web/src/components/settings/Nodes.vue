@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`nodes-${key}-filter-locked`"
                   >
                     <template #icon-left>
-                      <OIcon name="lock" size="sm" class="text-icon-locked" />
+                      <OIcon name="lock" size="sm" class="lock-chip" />
                     </template>
                     {{ t(`nodes.${key}`) }}
                   </OButton>

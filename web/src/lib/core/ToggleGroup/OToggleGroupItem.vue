@@ -82,7 +82,7 @@ const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
 };
 
 function lockClass(icon: string): string | undefined {
-  return icon === "lock" ? "text-icon-locked" : undefined;
+  return icon === "lock" ? "lock-chip" : undefined;
 }
 
 // Icon size mirrors the toggle size

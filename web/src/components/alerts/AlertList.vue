@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left>
                 <OIcon
                   name="lock"
-                  class="text-icon-locked"
+                  class="lock-chip"
                   size="sm"
                   data-test="alert-list-add-anomaly-lock"
                 />
@@ -742,7 +742,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #icon-left>
                         <OIcon
-                          :class="anomalyRowLocked(row) ? 'text-icon-locked' : undefined"
+                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
                           :name="
                             anomalyRowLocked(row) ? 'lock' : row.enabled ? 'pause' : 'play-arrow'
                           "
@@ -761,7 +761,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #icon-left>
                         <OIcon
-                          :class="rowAnomalyLocked(row) ? 'text-icon-locked' : undefined"
+                          :class="rowAnomalyLocked(row) ? 'lock-chip' : undefined"
                           :name="rowAnomalyLocked(row) ? 'lock' : 'edit'"
                           size="sm"
                         />
@@ -778,7 +778,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #icon-left>
                         <OIcon
-                          :class="anomalyRowLocked(row) ? 'text-icon-locked' : undefined"
+                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
                           :name="anomalyRowLocked(row) ? 'lock' : 'content-copy'"
                           size="sm"
                         />
@@ -795,7 +795,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #icon-left>
                         <OIcon
-                          :class="anomalyRowLocked(row) ? 'text-icon-locked' : undefined"
+                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
                           :name="anomalyRowLocked(row) ? 'lock' : 'drive-file-move'"
                           size="sm"
                         />
@@ -857,7 +857,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #icon-left>
                         <OIcon
-                          :class="anomalyRowLocked(row) ? 'text-icon-locked' : undefined"
+                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
                           :name="anomalyRowLocked(row) ? 'lock' : 'delete'"
                           size="sm"
                         />
@@ -876,7 +876,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left>
                         <OIcon
                           size="sm"
-                          :class="anomalyRowLocked(row) ? 'text-icon-locked' : undefined"
+                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
                           :name="anomalyRowLocked(row) ? 'lock' : 'download'"
                         />
                       </template>
@@ -895,7 +895,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left>
                           <OIcon
                             size="sm"
-                            :class="anomalyLicenseLocked ? 'text-icon-locked' : undefined"
+                            :class="anomalyLicenseLocked ? 'lock-chip' : undefined"
                             :name="anomalyLicenseLocked ? 'lock' : 'sound-sampler'"
                           />
                         </template>
@@ -911,7 +911,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left>
                           <OIcon
                             size="sm"
-                            :class="anomalyLicenseLocked ? 'text-icon-locked' : undefined"
+                            :class="anomalyLicenseLocked ? 'lock-chip' : undefined"
                             :name="anomalyLicenseLocked ? 'lock' : 'replay'"
                           />
                         </template>

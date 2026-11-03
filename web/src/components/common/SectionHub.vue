@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="item.locked || item.licenseLocked"
                     name="lock"
                     size="xs"
-                    class="text-icon-locked"
+                    class="lock-chip"
                   />
                 </span>
                 <span

@@ -107,7 +107,7 @@
             <template #icon-left>
               <OIcon
                 name="lock"
-                class="text-icon-locked"
+                class="lock-chip"
                 size="sm"
                 data-test="alerts-alertdetail-edit-lock"
               />

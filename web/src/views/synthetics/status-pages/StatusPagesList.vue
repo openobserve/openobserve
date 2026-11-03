@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="lock"
                   size="xs"
-                  class="text-icon-locked ms-auto"
+                  class="lock-chip ms-auto"
                   aria-hidden="true"
                   :data-test="`status-pages-post-update-lock-${(row as any).id}`"
                 />
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="lock"
                   size="xs"
-                  class="text-icon-locked ms-auto"
+                  class="lock-chip ms-auto"
                   aria-hidden="true"
                   :data-test="`status-pages-view-updates-lock-${(row as any).id}`"
                 />
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="lock"
                   size="xs"
-                  class="text-icon-locked ms-auto"
+                  class="lock-chip ms-auto"
                   aria-hidden="true"
                   :data-test="`status-pages-domains-lock-${(row as any).id}`"
                 />

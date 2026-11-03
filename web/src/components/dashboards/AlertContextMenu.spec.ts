@@ -41,7 +41,7 @@ describe("AlertContextMenu Component", () => {
         expect(item.attributes("aria-disabled")).toBe("true");
         expect(item.attributes("tabindex")).toBe("0");
         expect(wrapper.find(`[data-test="alert-context-menu-${id}-lock"]`).classes()).toContain(
-          "text-icon-locked",
+          "lock-chip",
         );
         expect(wrapper.find(`[data-test="alert-context-menu-${id}-reason"]`).text()).toBe(
           "Locked: needs Alerts",

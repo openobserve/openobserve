@@ -87,9 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openUpgradeDialog"
           >
             {{ t("aiObservability.traceActions.annotate.button") }}
-            <template #icon-right
-              ><OIcon name="lock" size="sm" class="text-icon-locked"
-            /></template>
+            <template #icon-right><OIcon name="lock" size="sm" class="lock-chip" /></template>
           </OButton>
         </template>
         <OTooltip

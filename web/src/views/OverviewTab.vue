@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'cursor-pointer': !incidentsLicenseLocked }"
         @click="!incidentsLicenseLocked && openUpgradeDialog()"
       >
-        <OIcon name="lock" size="md" class="text-icon-locked shrink-0" />
+        <OIcon name="lock" size="md" class="lock-chip shrink-0" />
         <span class="text-text-secondary text-sm">{{
           incidentsLicenseLocked ? incidentsLockedReason : incidentsAccess.message
         }}</span>
@@ -325,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default bg-surface-subtle rounded-default flex cursor-pointer items-center gap-3 border border-[0.0625em] px-4 py-5"
         @click="openUpgradeDialog"
       >
-        <OIcon name="lock" size="md" class="text-icon-locked shrink-0" />
+        <OIcon name="lock" size="md" class="lock-chip shrink-0" />
         <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
       </div>
     </section>
@@ -413,7 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="border-border-default bg-surface-subtle rounded-default flex items-center gap-3 border border-[0.0625em] px-4 py-5"
       >
-        <OIcon name="lock" size="md" class="text-icon-locked shrink-0" />
+        <OIcon name="lock" size="md" class="lock-chip shrink-0" />
         <span class="text-text-secondary text-sm">{{ anomalyLock.lockedReason.value }}</span>
       </div>
     </section>

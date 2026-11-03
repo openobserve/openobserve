@@ -772,9 +772,7 @@ function onChildMouseenter(event: MouseEvent) {
                 name="lock"
                 size="xs"
                 class="ms-auto shrink-0"
-                :class="
-                  child.locked || child.licenseLocked ? 'text-icon-locked' : 'text-text-secondary'
-                "
+                :class="child.locked || child.licenseLocked ? 'lock-chip' : 'text-text-secondary'"
                 :data-test="`${childDataTest(child)}-lock`"
                 aria-hidden="true"
               />
@@ -826,7 +824,7 @@ function onChildMouseenter(event: MouseEvent) {
               class="ms-auto shrink-0"
               :class="
                 block.child.locked || block.child.licenseLocked
-                  ? 'text-icon-locked'
+                  ? 'lock-chip'
                   : 'text-text-secondary'
               "
               :data-test="`${childDataTest(block.child)}-lock`"
@@ -941,9 +939,7 @@ function onChildMouseenter(event: MouseEvent) {
                   name="lock"
                   size="xs"
                   class="ms-auto shrink-0"
-                  :class="
-                    child.locked || child.licenseLocked ? 'text-icon-locked' : 'text-text-secondary'
-                  "
+                  :class="child.locked || child.licenseLocked ? 'lock-chip' : 'text-text-secondary'"
                   :data-test="`${childDataTest(child)}-lock`"
                   aria-hidden="true"
                 />
@@ -1002,7 +998,7 @@ function onChildMouseenter(event: MouseEvent) {
                 class="ms-auto shrink-0"
                 :class="
                   block.child.locked || block.child.licenseLocked
-                    ? 'text-icon-locked'
+                    ? 'lock-chip'
                     : 'text-text-secondary'
                 "
                 :data-test="`${childDataTest(block.child)}-lock`"

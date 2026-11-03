@@ -58,7 +58,7 @@ describe("HomeNoDataState", () => {
       .findAllComponents({ name: "EmptyStateIngestionChip" })
       .find((c) => c.attributes("data-test") === "home-no-data-profiles-btn")!;
     expect(chipComponent.props("unavailable")).toBe(true);
-    expect(chip.find(".text-icon-locked").exists()).toBe(true);
+    expect(chip.find(".lock-chip").exists()).toBe(true);
     await chip.trigger("click");
     expect(push).not.toHaveBeenCalled();
     store.state.zoConfig = { ...store.state.zoConfig, features: {} };

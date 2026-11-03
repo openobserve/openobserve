@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="s.licenseLocked"
           name="lock"
           size="xs"
-          class="text-icon-locked shrink-0"
+          class="lock-chip shrink-0"
           :data-test="`pipeline-section-tab-${s.key}-lock`"
           aria-hidden="true"
         />

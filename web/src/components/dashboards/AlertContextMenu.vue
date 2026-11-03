@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="lock"
             size="sm"
-            class="text-icon-locked me-2"
+            class="lock-chip me-2"
             :data-test="`alert-context-menu-${item.condition}-lock`"
           />
           <span class="flex min-w-0 flex-col">

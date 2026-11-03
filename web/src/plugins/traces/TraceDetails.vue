@@ -177,9 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="openUpgradeDialog"
               >
                 <OIcon name="fact-check" size="sm" />
-                <template #icon-right
-                  ><OIcon name="lock" size="xs" class="text-icon-locked"
-                /></template>
+                <template #icon-right><OIcon name="lock" size="xs" class="lock-chip" /></template>
               </OButton>
             </template>
 
@@ -193,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="table-chart" size="sm" />
               <template v-if="!queuesAccess.allowed" #icon-right>
-                <OIcon name="lock" size="xs" class="text-icon-locked" />
+                <OIcon name="lock" size="xs" class="lock-chip" />
               </template>
               <OTooltip
                 v-if="queuesAccess.allowed"
@@ -568,7 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   disabled
                 >
                   <template #icon-left>
-                    <OIcon name="lock" class="text-icon-locked" size="sm" />
+                    <OIcon name="lock" class="lock-chip" size="sm" />
                   </template>
                   {{ t("rum.playSessionReplay") }}
                 </OButton>

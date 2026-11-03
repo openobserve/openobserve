@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="inline-flex">
             <EmptyStateIngestionChip unavailable data-test="home-no-data-profiles-btn">
-              <OIcon name="lock" size="xs" class="text-icon-locked shrink-0" />
+              <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
               {{ t("home.noDataState.profiles") }}
             </EmptyStateIngestionChip>
           </span>
