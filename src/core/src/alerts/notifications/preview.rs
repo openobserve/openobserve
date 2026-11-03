@@ -432,7 +432,17 @@ mod tests {
             .iter()
             .map(|g| g.name.as_str())
             .collect();
-        assert_eq!(groups, ["common", "alert", "incident", "anomaly"]);
+        assert_eq!(
+            groups,
+            [
+                "common",
+                "alert",
+                "incident",
+                "anomaly",
+                "synthetics",
+                "downtime"
+            ]
+        );
         let incident = &resp.variable_groups[2];
         assert!(incident.variables.iter().any(|v| v == "incident_severity"));
         assert!(

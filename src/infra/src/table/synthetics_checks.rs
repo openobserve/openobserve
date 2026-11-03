@@ -143,6 +143,7 @@ impl TryFrom<synthetics_checks::Model> for Synthetic {
             locations,
             enabled: m.enabled,
             destinations,
+            template: m.template,
             retries: settings.retries,
             cooldown_mins: settings.cooldown_mins,
             wait_before_retry_secs: settings.wait_before_retry_secs,
@@ -943,6 +944,27 @@ pub async fn update_last_check_status<C: ConnectionTrait>(
     Ok(res.rows_affected > 0)
 }
 
+/// `(org, name)` of each check whose template override is `template`; `None` is every org.
+pub async fn names_using_template<C: ConnectionTrait>(
+    conn: &C,
+    org_id: Option<&str>,
+    template: &str,
+) -> Result<Vec<(String, String)>, errors::Error> {
+    let mut query = Entity::find()
+        .select_only()
+        .column(Column::OrgId)
+        .column(Column::Name)
+        .filter(Column::Template.eq(template));
+    if let Some(org) = org_id {
+        query = query.filter(Column::OrgId.eq(org));
+    }
+    Ok(query
+        .order_by_asc(Column::Name)
+        .into_tuple::<(String, String)>()
+        .all(conn)
+        .await?)
+}
+
 /// The alert bookkeeping a completed run needs in order to decide whether to
 /// notify. Read and written by the ack path only.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -1187,6 +1209,7 @@ fn update_mutable_fields(am: &mut ActiveModel, check: &Synthetic) -> Result<(), 
     am.locations = Set(locations);
     am.enabled = Set(check.enabled);
     am.destinations = Set(destinations);
+    am.template = Set(check.template.clone());
     am.settings = Set(settings);
     am.secrets = Set(pack_secrets(check)?);
     Ok(())
@@ -1208,6 +1231,7 @@ fn build_active_model(check: &Synthetic) -> Result<ActiveModel, errors::Error> {
         locations: Set(locations),
         enabled: Set(check.enabled),
         destinations: Set(destinations),
+        template: Set(check.template.clone()),
         settings: Set(settings),
         secrets: Set(pack_secrets(check)?),
         ..Default::default()
@@ -1281,6 +1305,7 @@ pub(crate) mod tests {
             last_alert_at: 0,
             alerting: false,
             degraded_notified_at: 0,
+            template: None,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
@@ -1940,6 +1965,28 @@ pub(crate) mod tests {
         let am: ActiveModel = model.into();
         am.reset_all().insert(&db).await.unwrap();
         db
+    }
+
+    #[tokio::test]
+    async fn names_using_template_finds_the_checks_that_name_it() {
+        use sea_orm::{ActiveModelTrait, IntoActiveModel};
+
+        let db = db_with_one_check(0).await;
+        let mut am = make_model().into_active_model();
+        am.template = Set(Some("ops-card".to_string()));
+        am.update(&db).await.unwrap();
+        assert_eq!(
+            names_using_template(&db, Some("org1"), "ops-card")
+                .await
+                .unwrap(),
+            vec![("org1".to_string(), "Login Flow".to_string())]
+        );
+        assert!(
+            names_using_template(&db, Some("other"), "ops-card")
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     async fn stored_status(db: &sea_orm::DatabaseConnection, id: &str) -> i32 {

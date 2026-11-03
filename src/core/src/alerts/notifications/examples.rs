@@ -50,6 +50,36 @@ pub const INCIDENT_VARIABLES: [&str; 6] = [
     "incident_url",
 ];
 
+pub const SYNTHETICS_VARIABLES: [&str; 16] = [
+    "check_id",
+    "check_name",
+    "check_type",
+    "check_target",
+    "check_status",
+    "check_status_label",
+    "check_status_reason",
+    "check_locations_line",
+    "check_location_count",
+    "check_consecutive_failures",
+    "check_flaky",
+    "check_degraded",
+    "check_run_id",
+    "check_url",
+    "check_error",
+    "check_title",
+];
+
+pub const DOWNTIME_VARIABLES: [&str; 8] = [
+    "downtime_name",
+    "downtime_event",
+    "downtime_reason",
+    "downtime_starts_at",
+    "downtime_ends_at",
+    "downtime_targets",
+    "downtime_counts",
+    "downtime_url",
+];
+
 const COMMON_VARIABLES: [&str; 27] = [
     "org_name",
     "stream_type",
@@ -85,6 +115,8 @@ pub fn variables_for(kind: NotificationKind) -> Vec<String> {
     let kind_vars: &[&str] = match kind {
         NotificationKind::Anomaly => &ANOMALY_VARIABLES,
         NotificationKind::Incident => &INCIDENT_VARIABLES,
+        NotificationKind::Synthetics => &SYNTHETICS_VARIABLES,
+        NotificationKind::Downtime => &DOWNTIME_VARIABLES,
         _ => &[],
     };
     COMMON_VARIABLES
@@ -103,10 +135,12 @@ pub struct VariableGroup {
 }
 
 /// The kinds whose producer sends through templates in this release; the UI hides the others.
-pub const SHIPPED_KINDS: [NotificationKind; 3] = [
+pub const SHIPPED_KINDS: [NotificationKind; 5] = [
     NotificationKind::Alert,
     NotificationKind::Incident,
     NotificationKind::Anomaly,
+    NotificationKind::Synthetics,
+    NotificationKind::Downtime,
 ];
 
 /// `common`, then one group per shipped kind with its own variables.
@@ -125,6 +159,8 @@ pub fn variable_groups() -> Vec<VariableGroup> {
         let vars: &[&str] = match kind {
             NotificationKind::Anomaly => &ANOMALY_VARIABLES,
             NotificationKind::Incident => &INCIDENT_VARIABLES,
+            NotificationKind::Synthetics => &SYNTHETICS_VARIABLES,
+            NotificationKind::Downtime => &DOWNTIME_VARIABLES,
             _ => &[],
         };
         groups.push(group(kind.as_str(), vars));
@@ -137,6 +173,7 @@ pub fn example_context(kind: NotificationKind, resolved: bool) -> NotificationCo
     match kind {
         NotificationKind::Anomaly => anomaly_example(resolved),
         NotificationKind::Incident => incident_example(resolved),
+        NotificationKind::Synthetics => synthetics_example(resolved),
         _ => {
             let level = if resolved {
                 AlertLevel::Ok
@@ -232,6 +269,65 @@ fn anomaly_example(resolved: bool) -> NotificationContext {
     ctx
 }
 
+fn synthetics_example(resolved: bool) -> NotificationContext {
+    let url = "https://o2.acme.com/web/synthetic/chk_9d/results?org_identifier=acme";
+    let level = if resolved {
+        AlertLevel::Ok
+    } else {
+        AlertLevel::Critical
+    };
+    let mut ctx = base(NotificationKind::Synthetics, resolved, level);
+    ctx.stream_type = "synthetics".into();
+    ctx.stream_name = "https://shop.acme.com/api/health".into();
+    ctx.alert_name = "checkout API".into();
+    ctx.alert_url = url.into();
+    ctx.episode_id = Some("chk_9d".into());
+    ctx.event = event_of(resolved);
+    ctx.alert_trigger_time_str = "2026-11-02 10:05:00".into();
+    let (title, description, label, locations, error) = if resolved {
+        (
+            "[OpenObserve Synthetics] ✅ checkout API has RECOVERED",
+            "checkout API has recovered",
+            "recovered",
+            "us-east-1, eu-west-1 recovered",
+            "",
+        )
+    } else {
+        (
+            "[OpenObserve Synthetics] 🔴 checkout API is FAILED",
+            "checkout API is failing\nconnection timed out after 10s",
+            "failed",
+            "1 of 2 failed: us-east-1",
+            "connection timed out after 10s",
+        )
+    };
+    ctx.alert_description = description.into();
+    ctx.context_attributes = [
+        ("check_id", "chk_9d"),
+        ("check_name", "checkout API"),
+        ("check_type", "http"),
+        ("check_target", "https://shop.acme.com/api/health"),
+        ("check_status", if resolved { "passed" } else { "failed" }),
+        ("check_status_label", label),
+        ("check_status_reason", ""),
+        ("check_locations_line", locations),
+        ("check_location_count", "2"),
+        (
+            "check_consecutive_failures",
+            if resolved { "0" } else { "3" },
+        ),
+        ("check_flaky", "false"),
+        ("check_degraded", "false"),
+        ("check_run_id", "run_42"),
+        ("check_url", url),
+        ("check_error", error),
+        ("check_title", title),
+    ]
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .to_vec();
+    ctx
+}
+
 fn incident_example(resolved: bool) -> NotificationContext {
     let url = "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme";
     let level = if resolved {
@@ -311,6 +407,7 @@ mod tests {
 
     const EXAMPLE_ANOMALY: &str = include_str!("render/testdata/examples/anomaly.json");
     const EXAMPLE_INCIDENT: &str = include_str!("render/testdata/examples/incident.json");
+    const EXAMPLE_SYNTHETICS: &str = include_str!("render/testdata/examples/synthetics.json");
 
     fn rendered(
         kind: NotificationKind,
@@ -357,6 +454,19 @@ mod tests {
     }
 
     #[test]
+    fn golden_example_synthetics_keeps_the_subject_line_as_its_title() {
+        let want: serde_json::Value = serde_json::from_str(EXAMPLE_SYNTHETICS).unwrap();
+        assert_eq!(example(NotificationKind::Synthetics), want);
+        let title = &want["slack_firing"]["attachments"][0]["blocks"][0]["text"]["text"];
+        assert!(
+            title
+                .as_str()
+                .unwrap()
+                .contains("[OpenObserve Synthetics] 🔴 checkout API is FAILED")
+        );
+    }
+
+    #[test]
     fn anomaly_recovery_hides_empty_fields() {
         let ctx = example_context(NotificationKind::Anomaly, true);
         let content = resolve_content(
@@ -389,6 +499,7 @@ mod tests {
         for (kind, file) in [
             (NotificationKind::Anomaly, "anomaly.json"),
             (NotificationKind::Incident, "incident.json"),
+            (NotificationKind::Synthetics, "synthetics.json"),
         ] {
             let body = serde_json::to_string_pretty(&example(kind)).unwrap() + "\n";
             std::fs::write(format!("{dir}/{file}"), body).unwrap();

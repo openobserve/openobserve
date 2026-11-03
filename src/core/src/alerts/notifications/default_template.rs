@@ -81,6 +81,7 @@ pub fn compiled_content_for(kind: NotificationKind) -> ContentSpec {
     match kind {
         NotificationKind::Incident => compiled_incident_content(),
         NotificationKind::Anomaly => compiled_anomaly_content(),
+        NotificationKind::Synthetics => compiled_synthetics_content(),
         _ => compiled_default_content(),
     }
 }
@@ -88,7 +89,9 @@ pub fn compiled_content_for(kind: NotificationKind) -> ContentSpec {
 /// The reserved name that `compiled_content_for(kind)` is seeded under.
 pub fn compiled_name_for(kind: NotificationKind) -> &'static str {
     match kind {
-        NotificationKind::Incident | NotificationKind::Anomaly => kind.compiled_default_name(),
+        NotificationKind::Incident | NotificationKind::Anomaly | NotificationKind::Synthetics => {
+            kind.compiled_default_name()
+        }
         _ => DEFAULT_CONTENT_TEMPLATE_NAME,
     }
 }
@@ -103,6 +106,29 @@ pub fn compiled_anomaly_content() -> ContentSpec {
             field("Expected", "{worst_expected}"),
             field("Window", "{window_start} to {window_end}"),
             field("Score", "{score} vs {threshold}"),
+        ],
+        rows: RowsSpec {
+            enabled: false,
+            max: 5,
+            columns: None,
+            format: None,
+        },
+        links: vec![],
+        chart: ChartSpec { enabled: false },
+    }
+}
+
+/// The title is today's subject line, so a mail or SNS subject reads exactly as before.
+pub fn compiled_synthetics_content() -> ContentSpec {
+    ContentSpec {
+        title: "{check_title}".into(),
+        title_overrides: Default::default(),
+        body: "{alert_description}".into(),
+        fields: vec![
+            field("Check", "{check_name} ({check_type})"),
+            field("Target", "{check_target}"),
+            field("Locations", "{check_locations_line}"),
+            field("Error", "{check_error}"),
         ],
         rows: RowsSpec {
             enabled: false,
@@ -165,6 +191,7 @@ pub(crate) async fn ensure_default_content_template(
         NotificationKind::Alert,
         NotificationKind::Incident,
         NotificationKind::Anomaly,
+        NotificationKind::Synthetics,
     ] {
         ensure_compiled_row(
             compiled_name_for(kind),

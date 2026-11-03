@@ -120,10 +120,13 @@ pub async fn send_to_destination(
             // Unchanged legacy path — byte-identical output.
             let msg = apply_custom_template(&template.body, ctx, is_email);
             let msg = stamp_platform_key(dest_type, ctx, msg);
-            let title = if let TemplateType::Email { title } = &template.template_type {
-                apply_custom_template(title, ctx, is_email)
-            } else {
-                template.name.clone()
+            // Alerts never set a fallback, so their subjects are unchanged.
+            let fallback = ctx.render_hints.fallback_subject.as_ref();
+            let title = match &template.template_type {
+                TemplateType::Email { title } if !(title.is_empty() && fallback.is_some()) => {
+                    apply_custom_template(title, ctx, is_email)
+                }
+                _ => fallback.cloned().unwrap_or_else(|| template.name.clone()),
             };
             let (email_subject, sns_subject) = match subject {
                 Subject::Alert(name) => (title, name.to_string()),

@@ -74,6 +74,10 @@ pub struct CheckNotification {
     pub passing_locations: Vec<String>,
     /// Environments that did not pass, worst first.
     pub failing_environments: Vec<String>,
+    /// The check's template override.
+    pub template: Option<String>,
+    /// Firing for failed and error, Resolved for recovered, Informational for the notices.
+    pub event: config::meta::alerts::notification_kind::NotificationEvent,
 }
 
 /// Fires once per run (when all jobs have completed) for non-passing runs.
@@ -93,72 +97,155 @@ pub async fn notify_check_result(n: CheckNotification) {
         return;
     }
 
-    use config::meta::destinations::{DestinationType, Module};
+    use crate::alerts::notifications::notify::{NotifyError, notify};
 
+    let ctx = synthetics_notification_context(&n);
+    let explicit =
+        crate::alerts::notifications::org_default::load_override(&n.org_id, n.template.as_deref())
+            .await;
     for dest_name in &n.destinations {
-        match crate::alerts::destinations::get_with_template(&n.org_id, dest_name).await {
-            Ok((dest, _tpl)) => {
-                let Module::Alert {
-                    destination_type, ..
-                } = &dest.module
-                else {
-                    continue;
-                };
-
-                let msg = match destination_type {
-                    DestinationType::Email(_) => build_email_html(&n),
-                    DestinationType::Sns(_) => build_plain_text(&n),
-                    DestinationType::Http(_) | DestinationType::SlackApp(_) => build_slack_json(&n),
-                };
-
-                let subject = if n.recovery {
-                    format!("[OpenObserve Synthetics] ✅ {} has RECOVERED", n.check_name)
-                } else if n.degraded {
-                    // Not "is WARNING": the point of the message is that this needs
-                    // action before it becomes an outage. Named where we know the
-                    // condition, because the subject is the line that decides
-                    // whether anyone opens the alert — and "CERTIFICATE EXPIRING"
-                    // gets renewed where a generic "DEGRADED" gets skimmed.
-                    match n.status_reason.as_deref() {
-                        Some("cert_expiring") => format!(
-                            "[OpenObserve Synthetics] 🟡 {} — CERTIFICATE EXPIRING SOON",
-                            n.check_name
-                        ),
-                        Some("sftp_degraded") => format!(
-                            "[OpenObserve Synthetics] 🟡 {} — SFTP DEGRADED",
-                            n.check_name
-                        ),
-                        _ => format!("[OpenObserve Synthetics] 🟡 {} is DEGRADED", n.check_name),
-                    }
-                } else if n.flaky {
-                    format!("[OpenObserve Synthetics] 🔁 {} is FLAKY", n.check_name)
-                } else {
-                    format!(
-                        "[OpenObserve Synthetics] {} {} is {}",
-                        status_emoji(&n),
-                        n.check_name,
-                        n.status.to_uppercase()
-                    )
-                };
-                if let Err(e) = crate::alerts::alert::dispatch_notification(
-                    &n.org_id,
-                    destination_type,
-                    &subject,
-                    msg,
-                )
-                .await
-                {
-                    log::error!(
-                        "[synthetics] notify dest={dest_name} check={}: {e}",
-                        n.check_id
-                    );
-                }
-            }
-            Err(e) => {
-                log::error!("[synthetics] load dest={dest_name} org={}: {e}", n.org_id);
-            }
+        let mut ctx = ctx.clone();
+        match notify(&n.org_id, dest_name, &explicit, None, &mut ctx).await {
+            Ok(_) | Err(NotifyError::Skipped(_)) => {}
+            Err(e) => log::error!(
+                "[synthetics] notify dest={dest_name} check={}: {e}",
+                n.check_id
+            ),
         }
     }
+}
+
+/// The subject line each run sends today; the synthetics card keeps it as its title.
+#[cfg(feature = "enterprise")]
+fn check_title(n: &CheckNotification) -> String {
+    if n.recovery {
+        format!("[OpenObserve Synthetics] ✅ {} has RECOVERED", n.check_name)
+    } else if n.degraded {
+        // Named where the condition is known: the subject decides whether anyone opens the alert.
+        match n.status_reason.as_deref() {
+            Some("cert_expiring") => format!(
+                "[OpenObserve Synthetics] 🟡 {} — CERTIFICATE EXPIRING SOON",
+                n.check_name
+            ),
+            Some("sftp_degraded") => format!(
+                "[OpenObserve Synthetics] 🟡 {} — SFTP DEGRADED",
+                n.check_name
+            ),
+            _ => format!("[OpenObserve Synthetics] 🟡 {} is DEGRADED", n.check_name),
+        }
+    } else if n.flaky {
+        format!("[OpenObserve Synthetics] 🔁 {} is FLAKY", n.check_name)
+    } else {
+        format!(
+            "[OpenObserve Synthetics] {} {} is {}",
+            status_emoji(n),
+            n.check_name,
+            n.status.to_uppercase()
+        )
+    }
+}
+
+/// The shared path's context for one synthetics message (Backend section 6 field mapping).
+#[cfg(feature = "enterprise")]
+pub fn synthetics_notification_context(
+    n: &CheckNotification,
+) -> crate::alerts::notifications::NotificationContext {
+    use config::meta::alerts::{
+        level::AlertLevel,
+        notification_kind::{NotificationEvent, NotificationKind},
+    };
+
+    use crate::alerts::notifications::{
+        LegacyPayload, NotificationContext, STATUS_FIRING, STATUS_RESOLVED, context::RenderHints,
+    };
+
+    let (level, level_str) = if n.recovery {
+        (AlertLevel::Ok, "ok")
+    } else if n.degraded || n.flaky || n.status == "warning" {
+        (AlertLevel::Warning, "warning")
+    } else {
+        (AlertLevel::Critical, "critical")
+    };
+    let mut description = status_headline(n);
+    if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
+        description.push_str(&format!("\n```\n{e}\n```"));
+    }
+    let checked = crate::anomaly_detection::fmt_local_us(n.checked_at);
+    let legacy: serde_json::Value = serde_json::from_str(&build_slack_json(n)).unwrap_or_default();
+    NotificationContext {
+        org_name: n.org_id.clone(),
+        stream_type: "synthetics".to_string(),
+        stream_name: n.target.clone(),
+        alert_name: n.check_name.clone(),
+        alert_level: level_str.to_string(),
+        alert_status: if n.recovery {
+            STATUS_RESOLVED
+        } else {
+            STATUS_FIRING
+        }
+        .to_string(),
+        episode_id: (n.event != NotificationEvent::Informational).then(|| n.check_id.clone()),
+        alert_start_time: checked.clone(),
+        alert_end_time: checked.clone(),
+        alert_start_time_millis: (n.checked_at / 1000).to_string(),
+        alert_end_time_millis: (n.checked_at / 1000).to_string(),
+        alert_url: run_url(n),
+        alert_trigger_time: n.checked_at,
+        alert_trigger_time_str: checked,
+        alert_description: description,
+        context_attributes: synthetics_attributes(n),
+        level: Some(level),
+        kind: NotificationKind::Synthetics,
+        event: n.event,
+        cluster_name: config::get_cluster_name(),
+        legacy_payload: Some(LegacyPayload::new(move || legacy.clone())),
+        render_hints: RenderHints {
+            fallback_subject: Some(check_title(n)),
+            escape_email_attributes: true,
+        },
+        ..Default::default()
+    }
+}
+
+/// The synthetics variables (Backend section B2) plus `check_title`, today's subject line.
+#[cfg(feature = "enterprise")]
+fn synthetics_attributes(n: &CheckNotification) -> Vec<(String, String)> {
+    let label = if n.recovery {
+        "recovered"
+    } else if n.degraded {
+        "degraded"
+    } else if n.flaky {
+        "flaky"
+    } else {
+        n.status.as_str()
+    };
+    [
+        ("check_id", n.check_id.clone()),
+        ("check_name", n.check_name.clone()),
+        ("check_type", n.check_type.clone()),
+        ("check_target", n.target.clone()),
+        ("check_status", n.status.clone()),
+        ("check_status_label", label.to_string()),
+        (
+            "check_status_reason",
+            n.status_reason.clone().unwrap_or_default(),
+        ),
+        ("check_locations_line", locations_line(n)),
+        ("check_location_count", n.job_count.to_string()),
+        (
+            "check_consecutive_failures",
+            n.consecutive_failures.to_string(),
+        ),
+        ("check_flaky", n.flaky.to_string()),
+        ("check_degraded", n.degraded.to_string()),
+        ("check_run_id", n.run_id.clone()),
+        ("check_url", run_url(n)),
+        ("check_error", n.error.clone().unwrap_or_default()),
+        ("check_title", check_title(n)),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v))
+    .collect()
 }
 
 #[cfg(feature = "enterprise")]
@@ -356,88 +443,6 @@ fn build_slack_json(n: &CheckNotification) -> String {
     ));
 
     serde_json::json!({ "text": lines.join("\n") }).to_string()
-}
-
-/// Plain text — SNS fans out to SMS/lambda/etc. where markup is noise.
-#[cfg(feature = "enterprise")]
-fn build_plain_text(n: &CheckNotification) -> String {
-    let mut lines = vec![
-        status_headline(n),
-        format!("Check: {} ({})", n.check_name, n.check_type),
-        format!("Target: {}", n.target),
-        format!("Status: {}", n.status),
-        format!("Locations: {}", locations_line(n)),
-    ];
-    if let Some(envs) = environments_line(n) {
-        lines.push(format!("Environments: {envs}"));
-    }
-    if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
-        lines.push(format!("Error: {e}"));
-    }
-    lines.push(format!("Time: {}", checked_at_utc(n.checked_at)));
-    lines.push(format!("Run details: {}", run_url(n)));
-    lines.join("\n")
-}
-
-/// HTML card for email destinations (lettre sends it as the HTML alternative).
-#[cfg(feature = "enterprise")]
-fn build_email_html(n: &CheckNotification) -> String {
-    // TODO: update with a better template for all the checks
-    let color = if n.recovery {
-        "#2e7d32"
-    } else {
-        match n.status.as_str() {
-            "warning" => "#b58105",
-            "error" => "#b45309",
-            _ => "#c62828",
-        }
-    };
-    let error_row = match n.error.as_deref().filter(|e| !e.is_empty()) {
-        Some(e) => format!(
-            r#"<tr><td style="padding:6px 12px;color:#666;">Error</td>
-                <td style="padding:6px 12px;"><code>{}</code></td></tr>"#,
-            html_escape(e)
-        ),
-        None => String::new(),
-    };
-    format!(
-        r#"<div style="font-family:sans-serif;max-width:560px;">
-  <h2 style="color:{color};margin-bottom:4px;">{emoji} {headline}</h2>
-  <table style="border-collapse:collapse;background:#f7f7f7;border-radius:6px;width:100%;">
-    <tr><td style="padding:6px 12px;color:#666;width:140px;">Check</td>
-        <td style="padding:6px 12px;">{name} ({mtype})</td></tr>
-    <tr><td style="padding:6px 12px;color:#666;">Target</td>
-        <td style="padding:6px 12px;">{target}</td></tr>
-    <tr><td style="padding:6px 12px;color:#666;">Status</td>
-        <td style="padding:6px 12px;font-weight:bold;color:{color};">{status}</td></tr>
-    <tr><td style="padding:6px 12px;color:#666;">Locations</td>
-        <td style="padding:6px 12px;">{jobs}</td></tr>
-    <tr><td style="padding:6px 12px;color:#666;">Time</td>
-        <td style="padding:6px 12px;">{checked_at}</td></tr>
-    {error_row}
-  </table>
-  <p style="margin-top:12px;">
-    <a href="{url}" style="background:{color};color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none;">View run details</a>
-  </p>
-</div>"#,
-        emoji = status_emoji(n),
-        headline = html_escape(&status_headline(n)),
-        name = html_escape(&n.check_name),
-        mtype = html_escape(&n.check_type),
-        target = html_escape(&n.target),
-        status = n.status.to_uppercase(),
-        jobs = html_escape(&locations_line(n)),
-        checked_at = checked_at_utc(n.checked_at),
-        url = run_url(n),
-    )
-}
-
-#[cfg(feature = "enterprise")]
-fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
 }
 
 // ── Org provisioning ──────────────────────────────────────────────────────────
@@ -753,6 +758,8 @@ mod tests {
             failing_locations: vec!["aws-us-east-1".into(), "aws-us-west-1".into()],
             passing_locations: vec!["aws-eu-central-1".into()],
             failing_environments: vec![],
+            template: None,
+            event: config::meta::alerts::notification_kind::NotificationEvent::Firing,
         }
     }
 
@@ -761,6 +768,7 @@ mod tests {
         CheckNotification {
             status: "passed".into(),
             recovery: true,
+            event: config::meta::alerts::notification_kind::NotificationEvent::Resolved,
             consecutive_failures: 0,
             failing_locations: vec![],
             passing_locations: vec![
@@ -770,6 +778,106 @@ mod tests {
             ],
             ..firing()
         }
+    }
+
+    fn resolved_for(destination_type: &str) -> crate::alerts::notifications::notify::Resolved {
+        use config::meta::alerts::notification_kind::NotificationKind;
+
+        use crate::alerts::notifications::org_default::{
+            EffectiveTemplate, TemplateSource, compiled_fallback_for,
+        };
+        let dest_type = config::meta::destinations::DestinationType::Http(
+            config::meta::destinations::Endpoint {
+                destination_type: Some(destination_type.to_string()).filter(|t| !t.is_empty()),
+                url: "https://hooks.example/x".into(),
+                ..Default::default()
+            },
+        );
+        crate::alerts::notifications::notify::Resolved {
+            destination: Default::default(),
+            channel: crate::alerts::notifications::derive_channel_format(&dest_type),
+            destination_type: dest_type,
+            effective: EffectiveTemplate {
+                template: compiled_fallback_for("default", NotificationKind::Synthetics),
+                source: TemplateSource::Compiled,
+                skipped: vec![],
+            },
+        }
+    }
+
+    #[test]
+    fn a_failing_run_triggers_keyed_by_the_check_and_the_recovery_resolves() {
+        use crate::alerts::notifications::{
+            notify::{Route, route},
+            platform::Platform,
+        };
+        let firing = synthetics_notification_context(&firing());
+        assert_eq!(firing.episode_id.as_deref(), Some("abc123"));
+        assert_eq!(
+            route(&resolved_for("pagerduty"), &firing).unwrap(),
+            Route::Render
+        );
+        let recovered = synthetics_notification_context(&recovered());
+        assert_eq!(recovered.episode_id.as_deref(), Some("abc123"));
+        assert_eq!(
+            route(&resolved_for("pagerduty"), &recovered).unwrap(),
+            Route::PlatformResolve(Platform::PagerDuty)
+        );
+        assert_eq!(
+            route(&resolved_for("slack"), &recovered).unwrap(),
+            Route::Render
+        );
+    }
+
+    #[test]
+    fn a_notice_skips_platforms_and_is_a_card_elsewhere() {
+        use config::meta::alerts::notification_kind::NotificationEvent;
+
+        use crate::alerts::notifications::notify::{NotifyError, Route, SkipReason, route};
+        let notice = CheckNotification {
+            status: "warning".into(),
+            degraded: true,
+            status_reason: Some("cert_expiring".into()),
+            event: NotificationEvent::Informational,
+            ..firing()
+        };
+        let ctx = synthetics_notification_context(&notice);
+        assert_eq!(ctx.episode_id, None);
+        assert!(matches!(
+            route(&resolved_for("pagerduty"), &ctx),
+            Err(NotifyError::Skipped(SkipReason::PlatformNotForKind))
+        ));
+        assert_eq!(route(&resolved_for("slack"), &ctx).unwrap(), Route::Render);
+    }
+
+    #[test]
+    fn a_generic_webhook_gets_todays_text_body_byte_for_byte() {
+        use crate::alerts::notifications::notify::{Route, route};
+        let n = firing();
+        let Route::Legacy(body) =
+            route(&resolved_for(""), &synthetics_notification_context(&n)).unwrap()
+        else {
+            panic!("expected the legacy body");
+        };
+        assert_eq!(body.to_string(), build_slack_json(&n));
+    }
+
+    #[test]
+    fn the_title_is_todays_subject_line() {
+        let ctx = synthetics_notification_context(&recovered());
+        assert_eq!(
+            ctx.render_hints.fallback_subject.as_deref(),
+            Some("[OpenObserve Synthetics] ✅ EU1 Cloud Health Check has RECOVERED")
+        );
+        let title = ctx
+            .context_attributes
+            .iter()
+            .find(|(k, _)| k == "check_title")
+            .map(|(_, v)| v.as_str());
+        assert_eq!(
+            title,
+            Some("[OpenObserve Synthetics] ✅ EU1 Cloud Health Check has RECOVERED")
+        );
     }
 
     // ── 2324-a · the emoji must agree with the headline ────────────────────
@@ -1020,8 +1128,7 @@ mod tests {
     }
 }
 
-/// Sends the "location down" notification to each destination, matching the
-/// per-type message formats of `notify_check_result`.
+/// Sends the "location down" notification through the shared path, keyed by the location id.
 #[cfg(feature = "enterprise")]
 async fn notify_location_down(
     org_id: &str,
@@ -1030,7 +1137,37 @@ async fn notify_location_down(
     stale_secs: i64,
     destinations: &[String],
 ) {
-    use config::meta::destinations::{DestinationType, Module};
+    use crate::alerts::notifications::notify::{NotifyError, notify};
+
+    let ctx = location_down_context(org_id, loc, affected, stale_secs);
+    for dest_name in destinations {
+        let mut ctx = ctx.clone();
+        match notify(org_id, dest_name, &[], None, &mut ctx).await {
+            Ok(_) | Err(NotifyError::Skipped(_)) => {}
+            Err(e) => log::error!(
+                "[synthetics] location-down notify dest={dest_name} location={}: {e}",
+                loc.id
+            ),
+        }
+    }
+}
+
+/// Context for a private location down message; nothing is sent when it comes back (D4).
+#[cfg(feature = "enterprise")]
+fn location_down_context(
+    org_id: &str,
+    loc: &infra::table::synthetics_locations::SyntheticsLocationRecord,
+    affected: usize,
+    stale_secs: i64,
+) -> crate::alerts::notifications::NotificationContext {
+    use config::meta::alerts::{
+        level::AlertLevel,
+        notification_kind::{NotificationEvent, NotificationKind},
+    };
+
+    use crate::alerts::notifications::{
+        LegacyPayload, NotificationContext, STATUS_FIRING, context::RenderHints,
+    };
 
     let subject = format!(
         "[OpenObserve Synthetics] 🔴 Private location {} is DOWN",
@@ -1040,53 +1177,47 @@ async fn notify_location_down(
         "Private location {} ({}) is down — no live agent for over {}s.\nAffected checks: {}\nRestart the agent container or check its network path to OpenObserve.",
         loc.label, loc.region, stale_secs, affected
     );
-
-    for dest_name in destinations {
-        match crate::alerts::destinations::get_with_template(org_id, dest_name).await {
-            Ok((dest, _tpl)) => {
-                let Module::Alert {
-                    destination_type, ..
-                } = &dest.module
-                else {
-                    continue;
-                };
-                let msg = match destination_type {
-                    DestinationType::Email(_) => format!(
-                        r#"<div style="font-family:sans-serif;max-width:560px;">
-  <h2 style="color:#c62828;margin-bottom:4px;">🔴 Private location {} is down</h2>
-  <p>No live agent for over {}s ({}).</p>
-  <p>Affected checks: <b>{}</b></p>
-  <p>Restart the agent container or check its network path to OpenObserve.</p>
-</div>"#,
-                        html_escape(&loc.label),
-                        stale_secs,
-                        html_escape(&loc.region),
-                        affected
-                    ),
-                    DestinationType::Sns(_) => text.clone(),
-                    DestinationType::Http(_) | DestinationType::SlackApp(_) => {
-                        serde_json::json!({ "text": text }).to_string()
-                    }
-                };
-                if let Err(e) = crate::alerts::alert::dispatch_notification(
-                    org_id,
-                    destination_type,
-                    &subject,
-                    msg,
-                )
-                .await
-                {
-                    log::error!(
-                        "[synthetics] location-down notify dest={dest_name} location={}: {e}",
-                        loc.id
-                    );
-                }
-            }
-            Err(e) => {
-                log::error!("[synthetics] load dest={dest_name} org={org_id}: {e}");
-            }
-        }
+    let legacy = serde_json::json!({ "text": text });
+    let now = config::utils::time::now_micros();
+    NotificationContext {
+        org_name: org_id.to_string(),
+        stream_type: "synthetics".to_string(),
+        alert_name: loc.label.clone(),
+        alert_level: "critical".to_string(),
+        alert_status: STATUS_FIRING.to_string(),
+        episode_id: Some(loc.id.clone()),
+        alert_url: locations_url(org_id),
+        alert_trigger_time: now,
+        alert_trigger_time_str: crate::anomaly_detection::fmt_local_us(now),
+        alert_description: text,
+        context_attributes: vec![
+            ("check_name".to_string(), loc.label.clone()),
+            ("check_status".to_string(), "down".to_string()),
+            ("check_status_label".to_string(), "down".to_string()),
+            ("check_target".to_string(), loc.region.clone()),
+            ("check_url".to_string(), locations_url(org_id)),
+            ("check_title".to_string(), subject.clone()),
+        ],
+        level: Some(AlertLevel::Critical),
+        kind: NotificationKind::Synthetics,
+        event: NotificationEvent::Firing,
+        cluster_name: config::get_cluster_name(),
+        legacy_payload: Some(LegacyPayload::new(move || legacy.clone())),
+        render_hints: RenderHints {
+            fallback_subject: Some(subject),
+            escape_email_attributes: true,
+        },
+        ..Default::default()
     }
+}
+
+#[cfg(feature = "enterprise")]
+fn locations_url(org_id: &str) -> String {
+    let cfg = config::get_config();
+    format!(
+        "{}{}/web/settings/synthetics_locations?org_identifier={org_id}",
+        cfg.common.web_url, cfg.common.base_uri
+    )
 }
 
 /// Clears a location's down flag so a future outage notifies again.

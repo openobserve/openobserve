@@ -232,7 +232,12 @@ pub(crate) fn apply_custom_template_plain(
         }
     }
     for (key, value) in ctx.context_attributes.iter() {
-        process_variable_replace(&mut resp, key, &VarValue::Str(value), is_email);
+        if is_email && ctx.render_hints.escape_email_attributes {
+            let escaped = html_escape(value);
+            process_variable_replace(&mut resp, key, &VarValue::Str(&escaped), is_email);
+        } else {
+            process_variable_replace(&mut resp, key, &VarValue::Str(value), is_email);
+        }
     }
 
     // Substitute endpoint metadata variables (e.g., credential_assignmentGroup,
@@ -492,6 +497,15 @@ impl VarValue<'_> {
             }
         }
     }
+}
+
+fn html_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 #[cfg(test)]

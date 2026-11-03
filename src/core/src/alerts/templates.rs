@@ -279,6 +279,18 @@ pub(crate) async fn bindings_for(
                 by.push(format!("anomaly config '{config}'"));
             }
         }
+        NotificationKind::Synthetics => {
+            let db_conn = infra::db::get_orm_client_ro().await;
+            for (_, check) in infra::table::synthetics_checks::names_using_template(
+                db_conn,
+                binding_scope(org_id),
+                name,
+            )
+            .await?
+            {
+                by.push(format!("synthetics check '{check}'"));
+            }
+        }
         NotificationKind::Alert => {
             let (_, alerts) = db::alerts::templates::cached_references(org_id, name).await;
             by.extend(alerts.into_iter().map(|a| format!("alert '{a}'")));
@@ -349,13 +361,13 @@ pub struct UsedBy {
     /// Kinds whose org default pointer names the template.
     pub org_default: Vec<String>,
     #[serde(skip)]
-    anomaly_names: Vec<String>,
+    binding_names: Vec<String>,
 }
 
 impl UsedBy {
     /// The references the cached delete guard does not see, as one message.
     fn bindings_outside_caches(&self) -> Option<String> {
-        let mut by = self.anomaly_names.clone();
+        let mut by = self.binding_names.clone();
         if !self.org_default.is_empty() {
             by.push(format!("org default for {}", self.org_default.join(", ")));
         }
@@ -374,6 +386,15 @@ pub async fn used_by(org_id: &str, name: &str) -> Result<UsedBy, TemplateError> 
     .into_iter()
     .map(|(_, config)| format!("anomaly config '{config}'"))
     .collect();
+    let synthetics_names: Vec<String> = infra::table::synthetics_checks::names_using_template(
+        infra::db::get_orm_client_ro().await,
+        binding_scope(org_id),
+        name,
+    )
+    .await?
+    .into_iter()
+    .map(|(_, check)| format!("synthetics check '{check}'"))
+    .collect();
     let mut org_default: Vec<String> = Vec::new();
     for (_, kinds) in pointer_orgs(org_id, name).await? {
         for kind in kinds {
@@ -387,10 +408,10 @@ pub async fn used_by(org_id: &str, name: &str) -> Result<UsedBy, TemplateError> 
         destinations: destinations.len(),
         alerts: alerts.len(),
         anomaly: anomaly_names.len(),
-        synthetics: 0,
+        synthetics: synthetics_names.len(),
         on_call: 0,
         org_default,
-        anomaly_names,
+        binding_names: anomaly_names.into_iter().chain(synthetics_names).collect(),
     })
 }
 

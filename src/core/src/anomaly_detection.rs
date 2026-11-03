@@ -3527,7 +3527,9 @@ pub async fn send_anomaly_alert(
 ) -> anyhow::Result<bool> {
     use crate::alerts::notifications::notify::{NotifyError, SkipReason, notify};
     let org_id = actx.org_id.clone();
-    let explicit = load_override(&org_id, actx.template.as_deref()).await;
+    let explicit =
+        crate::alerts::notifications::org_default::load_override(&org_id, actx.template.as_deref())
+            .await;
     let mut ctx = anomaly_notification_context(&actx);
     match notify(&org_id, &destination_id, &explicit, None, &mut ctx).await {
         Ok(_) => Ok(true),
@@ -3549,26 +3551,6 @@ pub async fn send_anomaly_alert(
             .into(),
         ),
         Err(e) => Err(e.into()),
-    }
-}
-
-/// The config's template override as a level 1 candidate; a missing template falls through.
-#[cfg(feature = "enterprise")]
-async fn load_override(
-    org_id: &str,
-    name: Option<&str>,
-) -> Vec<config::meta::destinations::Template> {
-    let Some(name) = name.filter(|n| !n.is_empty()) else {
-        return Vec::new();
-    };
-    match db::alerts::templates::get(org_id, name).await {
-        Ok(t) => vec![t],
-        Err(e) => {
-            log::warn!(
-                "[anomaly_detection] template override '{name}' not found, falling through: {e}"
-            );
-            Vec::new()
-        }
     }
 }
 
@@ -3681,7 +3663,7 @@ fn anomaly_attributes(
 
 /// The alert convention for the standard time fields: server local time with no suffix.
 #[cfg(feature = "enterprise")]
-fn fmt_local_us(us: i64) -> String {
+pub(crate) fn fmt_local_us(us: i64) -> String {
     use chrono::TimeZone;
     chrono::Local
         .timestamp_micros(us)

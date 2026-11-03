@@ -15,11 +15,8 @@
 
 use config::{
     get_config,
-    meta::{
-        destinations::{DestinationType, Module, Template, TemplateType},
-        downtimes::{
-            Downtime, DowntimeNotificationLogEntry, DowntimeWindow, NotificationEvent, TargetModule,
-        },
+    meta::downtimes::{
+        Downtime, DowntimeNotificationLogEntry, DowntimeWindow, NotificationEvent, TargetModule,
     },
     utils::time::now_micros,
 };
@@ -27,13 +24,12 @@ use infra::table::downtime_notifications::{self as log_table, DowntimeNotificati
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
 use super::{DowntimeError, MatchCounts};
-use crate::alerts::templates::{DOWNTIME_EMAIL_TITLE, downtime_templates};
+use crate::alerts::templates::DOWNTIME_EMAIL_TITLE;
 
 pub const LOG_LIMIT: u64 = 50;
 /// How often the notifier ticks; a start one tick back is already behind every healthy checkpoint.
 pub const TICK_INTERVAL_SECS: u64 = 30;
 pub const RESULT_OK: &str = "ok";
-const DOWNTIME_VARIABLE_PREFIX: &str = "{downtime_";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DueEvent {
@@ -48,31 +44,6 @@ impl DueEvent {
             event,
             key: window.start,
             window,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Escape {
-    Json,
-    Html,
-    Plain,
-}
-
-impl Escape {
-    fn apply(self, value: &str) -> String {
-        match self {
-            Self::Json => {
-                let quoted = serde_json::Value::String(value.to_string()).to_string();
-                quoted[1..quoted.len() - 1].to_string()
-            }
-            Self::Html => value
-                .replace('&', "&amp;")
-                .replace('<', "&lt;")
-                .replace('>', "&gt;")
-                .replace('"', "&quot;")
-                .replace('\'', "&#39;"),
-            Self::Plain => value.to_string(),
         }
     }
 }
@@ -107,7 +78,7 @@ pub async fn deliver(row: &Downtime, due: &DueEvent) -> Result<bool, DowntimeErr
         return Ok(false);
     }
     let destinations = destinations_of(row);
-    let result = match send(row, due, &destinations).await {
+    let result = match send(row, due, record.sent_at, &destinations).await {
         Ok(()) => RESULT_OK.to_string(),
         Err(e) => {
             log::warn!(
@@ -183,7 +154,14 @@ fn log_entry(row: DowntimeNotification) -> DowntimeNotificationLogEntry {
     }
 }
 
-async fn send(row: &Downtime, due: &DueEvent, destinations: &[String]) -> Result<(), String> {
+async fn send(
+    row: &Downtime,
+    due: &DueEvent,
+    claimed_at: i64,
+    destinations: &[String],
+) -> Result<(), String> {
+    use crate::alerts::notifications::notify::notify;
+
     let counts = super::match_counts(row).await.ok();
     let vars = variables(
         row,
@@ -192,9 +170,12 @@ async fn send(row: &Downtime, due: &DueEvent, destinations: &[String]) -> Result
         counts.as_ref(),
         &get_config().common.web_url,
     );
+    let ctx = downtime_context(row, due, claimed_at, vars);
     let mut errors = Vec::new();
     for name in destinations {
-        if let Err(e) = send_one(&row.org, name, &vars).await {
+        let mut ctx = ctx.clone();
+        // A platform destination is skipped, and the result names the skip.
+        if let Err(e) = notify(&row.org, name, &[], None, &mut ctx).await {
             errors.push(format!("{name}: {e}"));
         }
     }
@@ -205,48 +186,69 @@ async fn send(row: &Downtime, due: &DueEvent, destinations: &[String]) -> Result
     }
 }
 
-async fn send_one(org: &str, name: &str, vars: &[(&str, String)]) -> Result<(), String> {
-    let dest = crate::alerts::destinations::get(org, name)
-        .await
-        .map_err(|e| e.to_string())?;
-    let Module::Alert {
-        template,
-        destination_type,
-    } = dest.module
-    else {
-        return Err("not an alert destination".to_string());
+/// The shared path's context for one downtime event; platforms are skipped, so it has no key.
+fn downtime_context(
+    row: &Downtime,
+    due: &DueEvent,
+    claimed_at: i64,
+    vars: Vec<(&'static str, String)>,
+) -> crate::alerts::notifications::NotificationContext {
+    use config::meta::alerts::notification_kind::{self, NotificationKind};
+
+    use crate::alerts::notifications::{
+        NotificationContext, STATUS_FIRING, STATUS_RESOLVED, context::RenderHints,
     };
-    let own = match template {
-        Some(template) => db::alerts::templates::get(org, &template).await.ok(),
-        None => None,
-    };
-    let template = template_for(own, &destination_type);
-    let escape = if matches!(destination_type, DestinationType::Email(_)) {
-        Escape::Html
-    } else {
-        Escape::Json
-    };
-    let body = render(&template.body, vars, escape);
-    let subject = match &template.template_type {
-        TemplateType::Email { title } if !title.is_empty() => render(title, vars, Escape::Plain),
-        _ => render(DOWNTIME_EMAIL_TITLE, vars, Escape::Plain),
-    };
-    crate::alerts::alert::dispatch_notification(org, &destination_type, &subject, body)
-        .await
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+
+    let ended = matches!(
+        due.event,
+        NotificationEvent::Ended | NotificationEvent::Cancelled
+    );
+    let subject = render_title(&vars);
+    let url = vars
+        .iter()
+        .find(|(name, _)| *name == "downtime_url")
+        .map(|(_, v)| v.clone())
+        .unwrap_or_default();
+    NotificationContext {
+        org_name: row.org.clone(),
+        alert_name: row.name.clone(),
+        alert_status: if ended {
+            STATUS_RESOLVED
+        } else {
+            STATUS_FIRING
+        }
+        .to_string(),
+        alert_start_time: utc(due.window.start),
+        alert_end_time: utc(due.window.end),
+        alert_start_time_millis: (due.window.start / 1000).to_string(),
+        alert_end_time_millis: (due.window.end / 1000).to_string(),
+        alert_url: url,
+        alert_trigger_time: claimed_at,
+        alert_trigger_time_str: utc(claimed_at),
+        alert_description: row.reason.clone().unwrap_or_default(),
+        context_attributes: vars
+            .into_iter()
+            .filter(|(name, _)| *name != "org_name")
+            .map(|(k, v)| (k.to_string(), v))
+            .collect(),
+        kind: NotificationKind::Downtime,
+        event: notification_kind::NotificationEvent::Informational,
+        cluster_name: config::get_cluster_name(),
+        render_hints: RenderHints {
+            fallback_subject: Some(subject),
+            escape_email_attributes: true,
+        },
+        ..Default::default()
+    }
 }
 
-fn template_for(own: Option<Template>, destination_type: &DestinationType) -> Template {
-    if let Some(own) = own.filter(|t| t.body.contains(DOWNTIME_VARIABLE_PREFIX)) {
-        return own;
+/// Today's subject, for a destination whose template has no title of its own.
+fn render_title(vars: &[(&'static str, String)]) -> String {
+    let mut title = DOWNTIME_EMAIL_TITLE.to_string();
+    for (name, value) in vars {
+        title = title.replace(&format!("{{{name}}}"), value);
     }
-    let [http, email] = downtime_templates();
-    if matches!(destination_type, DestinationType::Email(_)) {
-        email
-    } else {
-        http
-    }
+    title
 }
 
 fn variables(
@@ -270,34 +272,6 @@ fn variables(
         ),
         ("org_name", row.org.clone()),
     ]
-}
-
-/// One pass, so a value that itself reads like `{downtime_url}` is not substituted again.
-fn render(body: &str, vars: &[(&str, String)], escape: Escape) -> String {
-    let mut out = String::with_capacity(body.len());
-    let mut rest = body;
-    while let Some(open) = rest.find('{') {
-        out.push_str(&rest[..open]);
-        let tail = &rest[open..];
-        let hit = tail.find('}').and_then(|close| {
-            let name = &tail[1..close];
-            vars.iter()
-                .find(|(n, _)| *n == name)
-                .map(|(_, value)| (close, value))
-        });
-        match hit {
-            Some((close, value)) => {
-                out.push_str(&escape.apply(value));
-                rest = &tail[close + 1..];
-            }
-            None => {
-                out.push('{');
-                rest = &tail[1..];
-            }
-        }
-    }
-    out.push_str(rest);
-    out
 }
 
 fn event_phrase(event: NotificationEvent) -> &'static str {
@@ -350,17 +324,15 @@ fn module_words(module: TargetModule) -> (&'static str, &'static str) {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::{
-        destinations::{Email, Endpoint},
-        downtimes::{
-            DowntimeNotifications, DowntimeSchedule, DowntimeTarget, NotificationEvents, Repeat,
-            TargetFolders,
-        },
+    use config::meta::downtimes::{
+        DowntimeNotifications, DowntimeSchedule, DowntimeTarget, NotificationEvents, Repeat,
+        TargetFolders,
     };
     use infra::table::entity::downtime_notifications::Entity as LogEntity;
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, Schema};
 
     use super::*;
+    use crate::alerts::templates::downtime_templates;
 
     const HOUR: i64 = 3_600_000_000;
 
@@ -499,8 +471,14 @@ mod tests {
         assert_eq!(entries[0].destinations, ["slack", "pagerduty"]);
     }
 
+    fn due(event: NotificationEvent) -> DueEvent {
+        DueEvent::of_window(event, window())
+    }
+
     #[test]
-    fn variables_fill_both_prebuilt_templates_escaped_for_their_format() {
+    fn the_seeded_pair_renders_through_the_shared_path_escaped_for_its_format() {
+        use crate::alerts::notifications::custom::apply_custom_template;
+
         let counts = MatchCounts {
             alerts: 2,
             synthetics: 1,
@@ -513,9 +491,10 @@ mod tests {
             Some(&counts),
             "https://o2.example.com",
         );
+        let ctx = downtime_context(&row(None), &due(NotificationEvent::EndingSoon), 7, vars);
         let [http, email] = downtime_templates();
 
-        let body = render(&http.body, &vars, Escape::Json);
+        let body = apply_custom_template(&http.body, &ctx, false);
         let json: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert_eq!(json["downtime"]["name"], "Nightly \"deploy\" <db>");
         assert_eq!(json["downtime"]["event"], "ends soon");
@@ -530,47 +509,29 @@ mod tests {
         assert_eq!(json["downtime"]["org"], "acme");
         assert_eq!(json["downtime"]["reason"], "CHG-1");
 
-        let html = render(&email.body, &vars, Escape::Html);
+        let html = apply_custom_template(&email.body, &ctx, true);
         assert!(html.contains("Nightly &quot;deploy&quot; &lt;db&gt;"));
         assert!(!html.contains("{downtime_"));
         assert!(!html.contains("{org_name}"));
     }
 
     #[test]
-    fn render_substitutes_once_and_leaves_unknown_braces_alone() {
-        let vars = vec![
-            ("downtime_name", "{downtime_url}".to_string()),
-            ("downtime_url", "https://x".to_string()),
-        ];
+    fn a_downtime_event_is_informational_with_no_platform_key() {
+        let vars = || variables(&row(None), NotificationEvent::Started, &window(), None, "");
+        let started = downtime_context(&row(None), &due(NotificationEvent::Started), 5, vars());
+        assert_eq!(started.kind.as_str(), "downtime");
         assert_eq!(
-            render(
-                "{downtime_name} {alert_name} {downtime_url} {",
-                &vars,
-                Escape::Plain
-            ),
-            "{downtime_url} {alert_name} https://x {"
+            started.event,
+            config::meta::alerts::notification_kind::NotificationEvent::Informational
         );
-        assert_eq!(Escape::Json.apply("a\"b\nc"), "a\\\"b\\nc");
-    }
-
-    #[test]
-    fn a_destination_template_is_used_only_when_written_for_downtimes() {
-        let http = DestinationType::Http(Endpoint::default());
-        let email = DestinationType::Email(Email::default());
-        let own = |body: &str| Template {
-            name: "mine".to_string(),
-            body: body.to_string(),
-            ..Default::default()
-        };
+        assert_eq!(started.episode_id, None);
+        assert_eq!(started.alert_status, "firing");
+        let ended = downtime_context(&row(None), &due(NotificationEvent::Ended), 6, vars());
+        assert_eq!(ended.alert_status, "resolved");
         assert_eq!(
-            template_for(Some(own("{downtime_name} is {downtime_event}")), &http).name,
-            "mine"
+            started.render_hints.fallback_subject.as_deref(),
+            Some("OpenObserve downtime Nightly \"deploy\" <db>: started")
         );
-        assert_eq!(
-            template_for(Some(own("[{alert_status}] {alert_name}")), &http).name,
-            "prebuilt_downtime"
-        );
-        assert_eq!(template_for(None, &email).name, "prebuilt_downtime_email");
     }
 
     #[test]

@@ -251,6 +251,7 @@ mod m20261101_000001_create_oncall_slack;
 mod m20261120_000001_add_template_applies_to;
 mod m20261120_000002_rename_reserved_template_collisions;
 mod m20261120_000003_add_anomaly_template;
+mod m20261201_000001_add_synthetics_template;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -773,6 +774,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261120_000001_add_template_applies_to::Migration),
             Box::new(m20261120_000002_rename_reserved_template_collisions::Migration),
             Box::new(m20261120_000003_add_anomaly_template::Migration),
+            Box::new(m20261201_000001_add_synthetics_template::Migration),
         ]
     }
 }
@@ -876,6 +878,7 @@ mod tests {
         (133, "m20261120_000001_add_template_applies_to"),
         (134, "m20261120_000002_rename_reserved_template_collisions"),
         (135, "m20261120_000003_add_anomaly_template"),
+        (136, "m20261201_000001_add_synthetics_template"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
