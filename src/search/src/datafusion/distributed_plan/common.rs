@@ -25,6 +25,8 @@ use datafusion::{
 use flight::common::Metrics;
 use parking_lot::Mutex;
 
+use super::profile::NodeProfileRecorder;
+
 #[derive(Debug)]
 pub struct QueryContext {
     pub trace_id: String,
@@ -40,6 +42,7 @@ pub struct QueryContext {
     pub req_id: u64,
     pub req_last_time: std::time::Instant,
     pub print_key_event: bool,
+    pub node_profile: Option<NodeProfileRecorder>,
 }
 
 impl QueryContext {
@@ -58,6 +61,7 @@ impl QueryContext {
             req_id: 0,
             req_last_time: std::time::Instant::now(),
             print_key_event: config::get_config().common.print_key_event,
+            node_profile: None,
         }
     }
 
@@ -98,6 +102,11 @@ impl QueryContext {
 
     pub fn with_peak_memory(mut self, peak_memory: Arc<AtomicUsize>) -> Self {
         self.peak_memory = peak_memory;
+        self
+    }
+
+    pub fn with_node_profile(mut self, node_profile: Option<NodeProfileRecorder>) -> Self {
+        self.node_profile = node_profile;
         self
     }
 }

@@ -178,6 +178,10 @@ impl FlightService for FlightServiceImpl {
             plan: plan.clone(),
             is_super_cluster,
             func: Box::new(super_cluster_enabled),
+            build_profile: req
+                .search_info
+                .analyze_profile
+                .then_some(search::datafusion::distributed_plan::profile::build_profile as _),
         });
 
         // Get the peak memory usage from the memory pool

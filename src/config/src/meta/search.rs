@@ -189,6 +189,9 @@ pub struct Query {
     /// that don't carry their own 3rd timezone argument. None / "UTC" / "" => UTC.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
+    /// Adds the structured `profile` column to EXPLAIN ANALYZE output.
+    #[serde(default)]
+    pub analyze_profile: bool,
 }
 
 fn default_size() -> i64 {
@@ -214,6 +217,7 @@ impl Default for Query {
             streaming_id: None,
             histogram_interval: 0,
             timezone: None,
+            analyze_profile: false,
         }
     }
 }
@@ -760,6 +764,7 @@ impl SearchHistoryRequest {
                 streaming_id: None,
                 histogram_interval: 0,
                 timezone: None,
+                analyze_profile: false,
             },
             encoding: RequestEncoding::Empty,
             regions: Vec::new(),
@@ -1409,6 +1414,7 @@ impl MultiStreamRequest {
                     streaming_id: None,
                     histogram_interval: 0,
                     timezone: None,
+                    analyze_profile: false,
                 },
                 regions: self.regions.clone(),
                 clusters: self.clusters.clone(),

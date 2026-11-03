@@ -28,14 +28,18 @@ use crate::datafusion::distributed_plan::{
 };
 
 // replace the AnalyzeExec to DistributeAnalyzeExec
-pub fn optimize_distribute_analyze(plan: Arc<dyn ExecutionPlan>) -> Result<Arc<dyn ExecutionPlan>> {
+pub fn optimize_distribute_analyze(
+    plan: Arc<dyn ExecutionPlan>,
+    profile: bool,
+) -> Result<Arc<dyn ExecutionPlan>> {
     if let Some(analyze) = plan.downcast_ref::<AnalyzeExec>() {
         let distribute_analyze = Arc::new(DistributeAnalyzeExec::new(
             analyze.verbose(),
             analyze.show_statistics(),
+            profile,
             analyze.input().clone(),
         )) as Arc<dyn ExecutionPlan>;
-        let mut rewriter = AnalyzeRewrite::new();
+        let mut rewriter = AnalyzeRewrite::new(profile);
         let plan = distribute_analyze.rewrite(&mut rewriter)?.data;
         return Ok(plan);
     }
@@ -43,11 +47,13 @@ pub fn optimize_distribute_analyze(plan: Arc<dyn ExecutionPlan>) -> Result<Arc<d
 }
 
 #[derive(Debug)]
-struct AnalyzeRewrite {}
+struct AnalyzeRewrite {
+    profile: bool,
+}
 
 impl AnalyzeRewrite {
-    fn new() -> Self {
-        AnalyzeRewrite {}
+    fn new(profile: bool) -> Self {
+        AnalyzeRewrite { profile }
     }
 }
 
@@ -56,7 +62,8 @@ impl TreeNodeRewriter for AnalyzeRewrite {
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
         if let Some(remote) = node.downcast_ref::<RemoteScanExec>() {
-            let remote = Arc::new(remote.clone().set_analyze()) as Arc<dyn ExecutionPlan>;
+            let remote =
+                Arc::new(remote.clone().set_analyze(self.profile)) as Arc<dyn ExecutionPlan>;
             return Ok(Transformed::yes(remote));
         }
         Ok(Transformed::no(node))
@@ -78,9 +85,8 @@ mod tests {
         ]))
     }
 
-    #[test]
-    fn test_optimize_distribute_analyze() {
-        let plan = Arc::new(
+    fn analyze_plan() -> Arc<dyn ExecutionPlan> {
+        Arc::new(
             AnalyzeExec::builder(
                 false,
                 false,
@@ -89,9 +95,20 @@ mod tests {
             )
             .with_metric_types(vec![])
             .build(),
-        );
-        let optimized_plan = optimize_distribute_analyze(plan).unwrap();
+        )
+    }
+
+    #[test]
+    fn test_optimize_distribute_analyze() {
+        let optimized_plan = optimize_distribute_analyze(analyze_plan(), false).unwrap();
         assert_eq!(optimized_plan.name(), "DistributeAnalyzeExec");
+        assert_eq!(optimized_plan.schema().fields().len(), 4);
+    }
+
+    #[test]
+    fn test_optimize_distribute_analyze_with_profile() {
+        let optimized_plan = optimize_distribute_analyze(analyze_plan(), true).unwrap();
+        assert_eq!(optimized_plan.schema().fields().len(), 5);
     }
 
     #[test]
@@ -103,9 +120,13 @@ mod tests {
             )
             .unwrap(),
         ) as Arc<dyn ExecutionPlan>;
-        let mut rewriter = AnalyzeRewrite::new();
-        let plan = plan.rewrite(&mut rewriter).unwrap().data;
-        let remote_scan = plan.downcast_ref::<RemoteScanExec>().unwrap();
-        assert!(remote_scan.analyze());
+        let rewrite = |profile| {
+            let mut rewriter = AnalyzeRewrite::new(profile);
+            let plan = plan.clone().rewrite(&mut rewriter).unwrap().data;
+            let remote_scan = plan.downcast_ref::<RemoteScanExec>().unwrap();
+            (remote_scan.analyze(), remote_scan.analyze_profile())
+        };
+        assert_eq!(rewrite(false), (true, false));
+        assert_eq!(rewrite(true), (true, true));
     }
 }

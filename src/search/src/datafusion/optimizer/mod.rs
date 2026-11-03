@@ -297,6 +297,7 @@ pub fn generate_physical_optimizer_rules(
 pub async fn create_physical_plan(
     ctx: &SessionContext,
     sql: &str,
+    analyze_profile: bool,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     let plan = ctx.state().create_logical_plan(sql).await?;
     // Defense in depth: reject DDL/DML/COPY plans so search SQL cannot write files on the node.
@@ -306,7 +307,7 @@ pub async fn create_physical_plan(
         .with_allow_statements(false)
         .verify_plan(&plan)?;
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-    optimize_distribute_analyze(physical_plan)
+    optimize_distribute_analyze(physical_plan, analyze_profile)
 }
 
 #[cfg(test)]
@@ -542,7 +543,7 @@ mod tests {
             "INSERT INTO t2 VALUES (1)",
         ] {
             assert!(
-                create_physical_plan(&ctx, sql).await.is_err(),
+                create_physical_plan(&ctx, sql, false).await.is_err(),
                 "should reject: {sql}"
             );
         }

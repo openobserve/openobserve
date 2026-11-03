@@ -16,12 +16,12 @@
 use std::sync::Arc;
 
 use arrow::{
-    array::{Int32Builder, StringBuilder},
+    array::{ArrayBuilder, ArrayRef, Int32Builder, StringArray, StringBuilder},
     datatypes::SchemaRef,
     record_batch::RecordBatch,
 };
 use arrow_schema::{DataType, Field, Schema};
-use config::{cluster::LOCAL_NODE, meta::cluster::NodeInfo};
+use config::{cluster::LOCAL_NODE, meta::cluster::NodeInfo, utils::time::now_micros};
 use datafusion::{
     common::{DataFusionError, Result, internal_err, tree_node::TreeNodeRecursion},
     execution::TaskContext,
@@ -32,11 +32,15 @@ use datafusion::{
         stream::RecordBatchStreamAdapter,
     },
 };
-use flight::common::Metrics;
+use flight::{
+    common::Metrics,
+    profile::{PROFILE_VERSION, QueryProfile},
+};
 use futures::StreamExt;
 
 use crate::datafusion::{
-    distributed_plan::display::DisplayableExecutionPlan, plan_metrics::get_cluster_metrics,
+    distributed_plan::{display::DisplayableExecutionPlan, profile::build_profile},
+    plan_metrics::get_cluster_metrics,
 };
 
 /// query EXPLAIN ANALYZE in distributed mode
@@ -44,12 +48,15 @@ use crate::datafusion::{
 /// phase: current we have three phase
 /// node: the ip or partition id
 /// plan: plan with metrics
+/// profile: the structured profile as JSON on the first row, only when requested
 #[derive(Debug)]
 pub struct DistributeAnalyzeExec {
     /// Control how much extra to print
     verbose: bool,
     /// If statistics should be displayed
     show_statistics: bool,
+    /// Whether to add the `profile` column
+    profile: bool,
     /// The input plan (the plan being analyzed)
     pub input: Arc<dyn ExecutionPlan>,
     /// The output schema for RecordBatches of this exec node
@@ -59,18 +66,27 @@ pub struct DistributeAnalyzeExec {
 
 impl DistributeAnalyzeExec {
     /// Create a new AnalyzeExec
-    pub fn new(verbose: bool, show_statistics: bool, input: Arc<dyn ExecutionPlan>) -> Self {
-        let fields = vec![
+    pub fn new(
+        verbose: bool,
+        show_statistics: bool,
+        profile: bool,
+        input: Arc<dyn ExecutionPlan>,
+    ) -> Self {
+        let mut fields = vec![
             Field::new("phase", DataType::Int32, false),
             Field::new("node_address", DataType::Utf8, false),
             Field::new("node_name", DataType::Utf8, false),
             Field::new("plan", DataType::Utf8, false),
         ];
+        if profile {
+            fields.push(Field::new("profile", DataType::Utf8, true));
+        }
         let schema = Arc::new(Schema::new(fields));
         let cache = Self::compute_properties(&input, Arc::clone(&schema));
         DistributeAnalyzeExec {
             verbose,
             show_statistics,
+            profile,
             input,
             schema,
             cache,
@@ -130,6 +146,7 @@ impl ExecutionPlan for DistributeAnalyzeExec {
         Ok(Arc::new(Self::new(
             self.verbose,
             self.show_statistics,
+            self.profile,
             children.pop().unwrap(),
         )))
     }
@@ -147,10 +164,12 @@ impl ExecutionPlan for DistributeAnalyzeExec {
 
         // Create future that computes the final output
         let start = std::time::Instant::now();
+        let start_us = now_micros();
         let captured_input = Arc::clone(&self.input);
         let captured_schema = Arc::clone(&self.schema);
         let verbose = self.verbose;
         let show_statistics = self.show_statistics;
+        let profile = self.profile;
 
         let mut stream = execute_stream(self.input.clone(), context.clone())?;
         let output = async move {
@@ -158,13 +177,16 @@ impl ExecutionPlan for DistributeAnalyzeExec {
             while let Some(batch) = stream.next().await.transpose()? {
                 total_rows += batch.num_rows();
             }
+            // remote decoders record each node's end time and fetch/decode time when dropped
+            drop(stream);
 
             let duration = std::time::Instant::now() - start;
             create_output_batch(
                 verbose,
                 show_statistics,
+                profile,
                 total_rows,
-                duration,
+                (start_us, duration),
                 captured_input,
                 captured_schema,
             )
@@ -180,8 +202,9 @@ impl ExecutionPlan for DistributeAnalyzeExec {
 fn create_output_batch(
     verbose: bool,
     _show_statistics: bool,
+    profile: bool,
     total_rows: usize,
-    duration: std::time::Duration,
+    (start_us, duration): (i64, std::time::Duration),
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
 ) -> Result<RecordBatch> {
@@ -198,6 +221,10 @@ fn create_output_batch(
         .indent(verbose)
         .to_string();
     plan_builder.append_value(annotated_plan);
+
+    let profile = profile
+        .then(|| profile_json(input.as_ref(), total_rows, (start_us, duration)))
+        .transpose()?;
 
     // add metrics from remote scan
     let metrics = collect_metrics(input);
@@ -221,16 +248,37 @@ fn create_output_batch(
         plan_builder.append_value(format!("{duration:?}"));
     }
 
-    RecordBatch::try_new(
-        schema,
-        vec![
-            Arc::new(phase_builder.finish()),
-            Arc::new(address_builder.finish()),
-            Arc::new(name_builder.finish()),
-            Arc::new(plan_builder.finish()),
-        ],
-    )
-    .map_err(DataFusionError::from)
+    let rows = phase_builder.len();
+    let mut columns: Vec<ArrayRef> = vec![
+        Arc::new(phase_builder.finish()),
+        Arc::new(address_builder.finish()),
+        Arc::new(name_builder.finish()),
+        Arc::new(plan_builder.finish()),
+    ];
+    if let Some(profile) = profile {
+        columns.push(Arc::new(StringArray::from_iter(
+            std::iter::once(Some(profile)).chain(std::iter::repeat_n(None, rows - 1)),
+        )));
+    }
+
+    RecordBatch::try_new(schema, columns).map_err(DataFusionError::from)
+}
+
+fn profile_json(
+    input: &dyn ExecutionPlan,
+    total_rows: usize,
+    (start_us, duration): (i64, std::time::Duration),
+) -> Result<String> {
+    let profile = QueryProfile {
+        version: PROFILE_VERSION,
+        node_name: LOCAL_NODE.get_name(),
+        node_address: LOCAL_NODE.get_grpc_addr(),
+        start_us,
+        end_us: start_us + duration.as_micros() as i64,
+        output_rows: total_rows,
+        plan: build_profile(input),
+    };
+    serde_json::to_string(&profile).map_err(|e| DataFusionError::External(e.into()))
 }
 
 fn collect_metrics(plan: Arc<dyn ExecutionPlan>) -> Vec<Metrics> {
@@ -246,6 +294,7 @@ fn collect_metrics(plan: Arc<dyn ExecutionPlan>) -> Vec<Metrics> {
 mod tests {
     use std::sync::Arc;
 
+    use arrow::array::Array;
     use arrow_schema::{DataType, Field, Schema};
     use datafusion::physical_plan::empty::EmptyExec;
 
@@ -259,7 +308,7 @@ mod tests {
     #[test]
     fn test_distribute_analyze_exec_new_non_verbose() {
         let input = empty_input();
-        let exec = DistributeAnalyzeExec::new(false, false, input);
+        let exec = DistributeAnalyzeExec::new(false, false, false, input);
         assert_eq!(exec.name(), "DistributeAnalyzeExec");
         assert_eq!(exec.children().len(), 1);
     }
@@ -267,16 +316,57 @@ mod tests {
     #[test]
     fn test_distribute_analyze_exec_new_verbose() {
         let input = empty_input();
-        let exec = DistributeAnalyzeExec::new(true, true, input);
+        let exec = DistributeAnalyzeExec::new(true, true, false, input);
         assert_eq!(exec.name(), "DistributeAnalyzeExec");
     }
 
     #[test]
     fn test_distribute_analyze_exec_schema_has_four_fields() {
         let input = empty_input();
-        let exec = DistributeAnalyzeExec::new(false, false, input);
+        let exec = DistributeAnalyzeExec::new(false, false, false, input);
         assert_eq!(exec.schema().fields().len(), 4);
         assert_eq!(exec.schema().field(0).name(), "phase");
         assert_eq!(exec.schema().field(1).name(), "node_address");
+    }
+
+    #[test]
+    fn test_distribute_analyze_exec_schema_adds_profile_when_requested() {
+        let exec = DistributeAnalyzeExec::new(false, false, true, empty_input());
+        assert_eq!(exec.schema().fields().len(), 5);
+        assert_eq!(exec.schema().field(4).name(), "profile");
+        assert!(exec.schema().field(4).is_nullable());
+    }
+
+    #[tokio::test]
+    async fn test_distribute_analyze_exec_without_profile_emits_four_columns() {
+        let exec = Arc::new(DistributeAnalyzeExec::new(
+            true,
+            false,
+            false,
+            empty_input(),
+        ));
+        let batches = datafusion::physical_plan::collect(exec, Arc::new(TaskContext::default()))
+            .await
+            .unwrap();
+        assert_eq!(batches[0].num_columns(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_distribute_analyze_exec_emits_profile_on_first_row() {
+        let exec = Arc::new(DistributeAnalyzeExec::new(true, false, true, empty_input()));
+        let batches = datafusion::physical_plan::collect(exec, Arc::new(TaskContext::default()))
+            .await
+            .unwrap();
+        let profile = batches[0]
+            .column(4)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert!(profile.is_valid(0));
+        assert!((1..profile.len()).all(|i| profile.is_null(i)));
+        let parsed: QueryProfile = serde_json::from_str(profile.value(0)).unwrap();
+        assert_eq!(parsed.version, PROFILE_VERSION);
+        assert_eq!(parsed.plan.name, "EmptyExec");
+        assert!(parsed.end_us >= parsed.start_us);
     }
 }

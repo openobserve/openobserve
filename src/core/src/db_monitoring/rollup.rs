@@ -1100,6 +1100,7 @@ pub fn dbm_search_request(
             sampling_config: None,
             sampling_ratio: None,
             timezone: None,
+            analyze_profile: false,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],

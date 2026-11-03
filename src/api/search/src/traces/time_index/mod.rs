@@ -402,6 +402,7 @@ async fn search_index_window(
             streaming_id: None,
             histogram_interval: 0,
             timezone: None,
+            analyze_profile: false,
         },
         encoding: RequestEncoding::Empty,
         regions: vec![],

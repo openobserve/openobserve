@@ -62,6 +62,7 @@ pub(crate) async fn run_graph_search(
             sampling_config: None,
             sampling_ratio: None,
             timezone: None,
+            analyze_profile: false,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],

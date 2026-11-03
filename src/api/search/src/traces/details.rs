@@ -173,6 +173,7 @@ fn details_request(sql: String, size: usize, range: (i64, i64), timeout: i64) ->
             streaming_id: None,
             histogram_interval: 0,
             timezone: None,
+            analyze_profile: false,
         },
         encoding: RequestEncoding::Empty,
         regions: vec![],

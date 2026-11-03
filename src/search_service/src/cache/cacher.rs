@@ -1432,6 +1432,7 @@ mod tests {
                 timezone: None,
                 sampling_ratio: None,
                 sampling_config: None,
+                analyze_profile: false,
             },
             encoding: RequestEncoding::Empty,
             regions: vec![],

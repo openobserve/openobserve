@@ -264,6 +264,7 @@ pub async fn search(
         use_cache: req.use_cache,
         histogram_interval: req.histogram_interval,
         is_analyze: flight_request.search_info.is_analyze,
+        analyze_profile: flight_request.search_info.analyze_profile,
         sampling_config: flight_request.search_info.sampling_config.clone(),
         clear_cache: req.overwrite_cache,
     };
