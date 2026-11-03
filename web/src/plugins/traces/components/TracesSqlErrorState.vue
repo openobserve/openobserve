@@ -58,6 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="traces-sql-fix-str-match-card"
             @click="emit('run-sql', fix.sql)"
           />
+          <EmptyStateActionCard
+            v-else-if="code === 20003"
+            icon="settings"
+            :label="t('queryError.configureResource')"
+            :sublabel="t('queryError.configureResourceDesc')"
+            data-test="query-error-configure-resource-card"
+            @click="emit('configure-resource')"
+          />
         </div>
       </template>
     </QueryErrorState>
@@ -89,6 +97,7 @@ const emit = defineEmits<{
   "ask-ai": [];
   "run-sql": [sql: string];
   "use-last-hour": [];
+  "configure-resource": [];
 }>();
 
 const { t } = useI18nTyped();

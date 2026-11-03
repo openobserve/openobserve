@@ -244,7 +244,7 @@ describe("TracesGroupsTable", () => {
     wrapper
       .findComponent(OTableStub)
       .vm.$emit("row-click", { value: "2" }, new MouseEvent("click"));
-    expect(sharedSearchObj.data.stream.addToFilter).toBe("span_kind = '2'");
+    expect(wrapper.emitted("open-group")).toEqual([["span_kind = '2'"]]);
   });
 
   it("colours Error % red from 5 % and mutes zero", async () => {
@@ -275,14 +275,14 @@ describe("TracesGroupsTable", () => {
     expect(wrapper.emitted("update:sort")).toEqual([[{ by: "errors", order: "asc" }]]);
   });
 
-  it("row click adds the value to the filter and goes back to the list", async () => {
+  it("row click opens the list filtered to the value, leaving the run to the page", async () => {
     respond([hit("it's", 200, 10)], []);
     const wrapper = await mountTable();
     wrapper
       .findComponent(OTableStub)
       .vm.$emit("row-click", { value: "it's" }, new MouseEvent("click"));
-    expect(sharedSearchObj.data.stream.addToFilter).toBe("service_name = 'it''s'");
-    expect(sharedSearchObj.meta.groupBy).toBe("");
+    expect(wrapper.emitted("open-group")).toEqual([["service_name = 'it''s'"]]);
+    expect(sharedSearchObj.data.stream.addToFilter).toBe("");
   });
 
   it("row click on (no value) matches both null and empty", async () => {
@@ -291,9 +291,9 @@ describe("TracesGroupsTable", () => {
     wrapper
       .findComponent(OTableStub)
       .vm.$emit("row-click", { value: null }, new MouseEvent("click"));
-    expect(sharedSearchObj.data.stream.addToFilter).toBe(
-      "(service_name IS NULL OR service_name = '')",
-    );
+    expect(wrapper.emitted("open-group")).toEqual([
+      ["(service_name IS NULL OR service_name = '')"],
+    ]);
   });
 
   const openMenu = async (value: string | null) => {
@@ -322,13 +322,13 @@ describe("TracesGroupsTable", () => {
     expect(sharedSearchObj.meta.groupBy).toBe("service_name");
   });
 
-  it("right-click Open traces filters and goes back to the list", async () => {
+  it("right-click Open traces opens the list filtered to the value", async () => {
     const wrapper = await openMenu(null);
     await wrapper.find('[data-test="traces-groups-context-open-traces"]').trigger("click");
-    expect(sharedSearchObj.data.stream.addToFilter).toBe(
-      "(service_name IS NULL OR service_name = '')",
-    );
-    expect(sharedSearchObj.meta.groupBy).toBe("");
+    expect(wrapper.emitted("open-group")).toEqual([
+      ["(service_name IS NULL OR service_name = '')"],
+    ]);
+    expect(sharedSearchObj.data.stream.addToFilter).toBe("");
   });
 
   it("offers no Open in new tab or Copy item", async () => {

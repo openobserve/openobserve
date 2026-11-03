@@ -61,7 +61,7 @@ test.describe("Traces Groups view testcases", () => {
     await expect(pm.tracesPage.getGroupsTable()).toBeVisible({ timeout: 20000 });
   });
 
-  test("P1: Clicking a group adds its filter and returns to the span list", {
+  test("P1: Clicking a group adds its filter and shows the span list at once", {
     tag: ['@tracesGroups', '@traces', '@query', '@P1', '@all']
   }, async ({ page }) => {
     await pm.tracesPage.pickGroupBy('service_name');
@@ -73,8 +73,6 @@ test.describe("Traces Groups view testcases", () => {
 
     await expect(pm.tracesPage.getGroupByValue()).toHaveText('None');
     await pm.tracesPage.expectQueryEditorValue(`service_name = '${service}'`);
-    // With auto-run off the change waits for Run; with it on, Run repeats the same search.
-    await pm.tracesPage.runSearch();
     await expect(pm.tracesPage.getGroupsTable()).toHaveCount(0, { timeout: 20000 });
     await expect(page.locator(pm.tracesPage.searchResultList)).toBeVisible({ timeout: 20000 });
   });

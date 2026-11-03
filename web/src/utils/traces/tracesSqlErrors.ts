@@ -124,7 +124,6 @@ export function tracesSqlGuards(sql: string, rangeUs: number): TracesSqlGuard[] 
   return guards;
 }
 
-/** 1-based editor lines and columns for a character span. */
 export function offsetRange(
   text: string,
   start: number,
@@ -139,7 +138,6 @@ export function offsetRange(
   return { startLine: from.line, endLine: to.line, column: from.column, endColumn: to.column };
 }
 
-/** Columns that are null or absent in every returned row. */
 export function allNullColumns(hits: Record<string, unknown>[], keys: string[]): string[] {
   if (hits.length === 0) return [];
   return keys.filter((key) => hits.every((hit) => hit?.[key] === null || hit?.[key] === undefined));

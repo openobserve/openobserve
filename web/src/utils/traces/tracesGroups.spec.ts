@@ -23,6 +23,7 @@ import {
   encodeGroupsSort,
   groupTerm,
   GROUPS_LIMIT,
+  isTextType,
   quoteIdentifier,
   sparklinePlan,
   sparklineSeries,
@@ -85,6 +86,12 @@ describe("buildGroupsSql", () => {
     );
   });
 
+  it("folds empty into null for a text key, so (no value) is one row", () => {
+    const sql = buildGroupsSql({ ...base, textKey: true, sort: DEFAULT_GROUPS_SORT });
+    expect(sql).toContain(`SELECT NULLIF("service_name", '') AS value`);
+    expect(sql).toContain(`GROUP BY NULLIF("service_name", '') ORDER BY`);
+  });
+
   it("quotes a key that is not a plain identifier", () => {
     const sql = buildGroupsSql({ ...base, key: "http.method", sort: DEFAULT_GROUPS_SORT });
     expect(sql).toContain('SELECT "http.method" AS value');
@@ -133,6 +140,14 @@ describe("buildGroupsSparklineSql", () => {
     );
   });
 
+  it("buckets a text key's empty and null values as the one (no value) series", () => {
+    const sql = buildGroupsSparklineSql({ ...base, textKey: true, values: [null, "cart"], plan });
+    expect(sql).toContain(`NULLIF("service_name", '') AS value`);
+    expect(sql).toContain(
+      `WHERE ("service_name" IN ('cart') OR "service_name" IS NULL OR "service_name" = '') GROUP BY`,
+    );
+  });
+
   it("keeps the scope", () => {
     const sql = buildGroupsSparklineSql({ ...base, scope: "(x = 1)", values: [2], plan });
     expect(sql).toContain("WHERE ((x = 1)) AND (\"service_name\" IN ('2'))");
@@ -164,6 +179,19 @@ describe("buildGroupsDistinctSql", () => {
     expect(buildGroupsDistinctSql({ ...base, filter: "a = 'b'" })).toBe(
       'SELECT approx_distinct("service_name") AS n FROM "default" WHERE a = \'b\'',
     );
+  });
+
+  it("counts a text key's values without the empty one", () => {
+    expect(buildGroupsDistinctSql({ ...base, textKey: true })).toBe(
+      `SELECT approx_distinct(NULLIF("service_name", '')) AS n FROM "default"`,
+    );
+  });
+});
+
+describe("isTextType", () => {
+  it("is true for the string column types only", () => {
+    expect(["Utf8", "LargeUtf8", "Utf8View"].every(isTextType)).toBe(true);
+    expect([undefined, "Int64", "Float64", "Boolean", "UInt64"].some(isTextType)).toBe(false);
   });
 });
 

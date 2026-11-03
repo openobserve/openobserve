@@ -65,7 +65,7 @@ export function useTracesSqlTemplates() {
     });
   };
 
-  // The stream and range the names were last asked for; the same pair is never asked twice.
+  // The stream and range the names were last asked for; a relative range is keyed by its period, as every Run moves its window.
   let loadedKey = "";
 
   // Only the trace templates name services, so the Spans view never asks for them; the values API needs a range.
@@ -77,11 +77,14 @@ export function useTracesSqlTemplates() {
         searchObj.data.stream.selectedStream?.value,
         searchObj.data.datetime?.startTime,
         searchObj.data.datetime?.endTime,
+        searchObj.data.datetime?.type === "relative"
+          ? searchObj.data.datetime.relativeTimePeriod
+          : null,
       ] as const,
-    ([on, mode, stream, start, end]) => {
+    ([on, mode, stream, start, end, period]) => {
       if (!on || mode !== "traces" || !stream) return;
       if (!(Number(start) > 0 && Number(end) > Number(start))) return;
-      const key = `${stream}|${start}|${end}`;
+      const key = period ? `${stream}|${period}` : `${stream}|${start}|${end}`;
       if (key === loadedKey) return;
       loadedKey = key;
       loadServices(stream);

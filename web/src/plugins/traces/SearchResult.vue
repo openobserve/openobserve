@@ -305,6 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :column-visibility="columnVisibility"
           :wrap="searchObj.meta.resultGrid.wrapCells"
           @update:sort="(sort) => (searchObj.meta.groupsSort = sort)"
+          @open-group="(term: string) => $emit('open-group', term)"
         />
         <TracesSearchResultList
           v-else
@@ -474,6 +475,7 @@ export default defineComponent({
     "open-mobile-fields",
     "add-trace-id",
     "run-sql",
+    "open-group",
   ],
   methods: {
     toggleErrorOnly() {

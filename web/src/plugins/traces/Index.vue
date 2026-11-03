@@ -204,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @ask-ai="onAskAiTracing"
                         @run-sql="onSqlRewriteRun"
                         @use-last-hour="onSqlUseLastHour"
+                        @configure-resource="onConfigureTracesStream"
                       />
                       <QueryErrorState
                         v-else
@@ -307,6 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @open-mobile-fields="mobileFieldsOpen = true"
                         @add-trace-id="onSqlAddTraceId"
                         @run-sql="onSqlRewriteRun"
+                        @open-group="onOpenGroup"
                       />
                     </div>
                   </div>
@@ -413,6 +415,7 @@ import {
   type FieldGroupingConfig,
 } from "@/composables/useServiceCorrelation";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { applyFilterTerm } from "@/utils/traces/filterUtils";
 import {
   isRequiredCondition,
   mergeFilterTerm,
@@ -439,6 +442,7 @@ import {
   withScope,
   type TracesScope,
 } from "@/utils/traces/tracesScope";
+import { isTextType } from "@/utils/traces/tracesGroups";
 import { isAuthoredStatement } from "@/utils/query/freeTextFilter";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
@@ -554,7 +558,6 @@ const activeHealthView = computed(() =>
       ? servicesCatalogRef.value
       : null,
 );
-// The Spans view's Scope row sits under the editor, so the bar grows by it instead of squeezing the editor.
 const SCOPE_ROW_PX = 36;
 const scopeRowPx = () =>
   searchObj.meta.searchMode === "spans" && searchObj.meta.showQuery ? SCOPE_ROW_PX : 0;
@@ -595,7 +598,6 @@ watch(scopeRowPx, (px, was) => {
   if (autoSplitterHeight) autoSplitterHeight += px - was;
   onSplitterUpdate();
 });
-// The 90px bar shows two editor lines of 18px; SQL grows it to show up to six, and never shrinks a taller bar.
 const SQL_BAR_MAX_LINES = 6;
 const EDITOR_LINE_PX = 18;
 watch(
@@ -1169,6 +1171,7 @@ async function getQueryData(
     }
     if (!isPagination && searchObj.meta.sqlMode && sqlRunBlocked()) {
       // A blocked run answers with its reason, so the Run button no longer waits on it.
+      cancelMainSearch();
       searchObj.data.appliedEditorValue = String(searchObj.data.editorValue ?? "");
       searchObj.meta.lastRunSignature = tracesSearchRunSignature(searchObj);
       sqlRanView.value = null;
@@ -1284,6 +1287,11 @@ async function getQueryData(
       searchObj.data.groupsRequest = {
         stream: selectedStreamName.value,
         key: searchObj.meta.groupBy,
+        textKey: isTextType(
+          searchObj.data.stream.selectedStreamFields.find(
+            (f: any) => f.name === searchObj.meta.groupBy,
+          )?.dataType,
+        ),
         filter: combinedFilter,
         scope: submittedScope,
         startTime: queryReq.query.start_time,
@@ -2348,6 +2356,14 @@ const onGroupByChange = (field: string) => {
   getQueryData();
 };
 
+// Opening a group is navigation, so it runs at once even with auto-run off; Include and Exclude stay staged.
+const onOpenGroup = (term: string) => {
+  const text = applyFilterTerm(term, String(searchObj.data.editorValue ?? ""));
+  searchObj.data.editorValue = text;
+  searchBarRef.value?.setEditorValue?.(text);
+  onGroupByChange("");
+};
+
 watch(
   () => [router.currentRoute.value.name, router.currentRoute.value.query.tab] as const,
   ([routeName, tab]) => {
@@ -2791,7 +2807,13 @@ const loadSelectedStreamFields = async () => {
 
 const onChangeStream = async () => {
   await loadSelectedStreamFields();
-  if (!isAutoRunOff() && !searchObj.meta.sqlMode) runQueryFn();
+  const groupBy = searchObj.meta.groupBy;
+  if (groupBy && !searchObj.data.stream.selectedStreamFields.some((f: any) => f.name === groupBy)) {
+    searchObj.meta.groupBy = "";
+    searchObj.data.groupsRequest = null;
+  }
+  if (searchObj.meta.sqlMode) return;
+  if (!isAutoRunOff()) runQueryFn();
 };
 
 // Typed SQL names its stream in FROM; the sidebar follows it, and the SQL waits for Run.
