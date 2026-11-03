@@ -3212,7 +3212,7 @@ mod tests {
     }
 
     #[test]
-    fn writes_load_the_row_from_the_primary_and_the_detail_from_the_replica() {
+    fn writes_and_the_detail_load_the_row_from_the_primary() {
         assert!(body_of("async fn load(").contains("downtimes::get_rw(org, id)"));
         for write in [
             "pub async fn update(",
@@ -3224,8 +3224,11 @@ mod tests {
         ] {
             assert!(body_of(write).contains("load(org, "), "{write}");
         }
-        let detail = body_of("pub async fn get(");
-        assert!(detail.contains("downtimes::get(org, id)"));
-        assert!(!detail.contains("load(org, "));
+        // A detail opened right after its create must not 404 on replica lag.
+        assert!(body_of("pub async fn get(").contains("load(org, id)"));
+        // A follow-up or a mute made moments ago is seen before the cache reloads.
+        assert!(body_of("pub async fn extend(").contains("primary_rows(org)"));
+        assert!(body_of("async fn cancel_follow_ups(").contains("primary_rows(org)"));
+        assert!(body_of("pub(crate) async fn primary_rows(").contains("get_orm_client_rw()"));
     }
 }
