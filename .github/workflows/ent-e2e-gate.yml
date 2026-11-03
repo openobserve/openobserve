@@ -157,6 +157,8 @@ jobs:
           set -euo pipefail
           REPO="openobserve/o2-enterprise"; WF="oss-pr-ent-gate.yml"
           MARKER="<!-- playwright-e2e-crosscheck -->"
+          # The sticky's run record decides reuse, so only this token's own comments may count as the sticky.
+          GATE_LOGIN=$(gh api user -q .login 2>/dev/null || echo "")
 
           # Upsert ONE sticky gate comment per PR (located by the hidden marker) so status updates in
           # place — pass AND fail — instead of spamming a fresh comment each run.
@@ -164,7 +166,7 @@ jobs:
             local body="$1" cid
             if [ -n "${META:-}" ]; then body="$body"$'\n\n'"$META"; fi
             cid=$(gh api "repos/openobserve/openobserve/issues/$PR/comments" --paginate \
-              -q "[.[] | select(.body|contains(\"$MARKER\")) | .id][0]" 2>/dev/null || echo "")
+              -q "[.[] | select(.user.login == \"$GATE_LOGIN\" and (.body|contains(\"$MARKER\"))) | .id][0]" 2>/dev/null || echo "")
             if [ -n "$cid" ] && [ "$cid" != "null" ]; then
               gh api -X PATCH "repos/openobserve/openobserve/issues/comments/$cid" -f body="$body" >/dev/null 2>&1 || true
             else
@@ -173,7 +175,7 @@ jobs:
           }
           sticky_body() {
             gh api "repos/openobserve/openobserve/issues/$PR/comments" --paginate \
-              -q "[.[] | select(.body|contains(\"$MARKER\")) | .body][0] // \"\"" 2>/dev/null || true
+              -q "[.[] | select(.user.login == \"$GATE_LOGIN\" and (.body|contains(\"$MARKER\"))) | .body][0] // \"\"" 2>/dev/null || true
           }
 
           # Sister ENT resolution. An OPEN same-named ENT PR is the live counterpart — let ITS checks
@@ -229,7 +231,7 @@ jobs:
           # Approval and label changes restart this gate; the sticky records the run already started for this exact head and merge commit.
           PRIOR=$(sticky_body | grep -o 'ent-run: [^>]*' | head -n 1 || true)
           read -r P_ID P_HEAD P_TESTED P_OSS P_ENT _ <<<"${PRIOR#ent-run: }"
-          if [ -n "$P_ID" ] && [ "$P_HEAD $P_TESTED $P_OSS $P_ENT" = "$HEAD_SHA $TESTED_SHA $OSS_REF $ENT_CODE_REF" ]; then
+          if [[ "$P_ID" =~ ^[0-9]+$ ]] && [ "$P_HEAD $P_TESTED $P_OSS $P_ENT" = "$HEAD_SHA $TESTED_SHA $OSS_REF $ENT_CODE_REF" ]; then
             P_STATE=$(gh api "repos/$REPO/actions/runs/$P_ID" 2>/dev/null | jq -r --arg m "$MATCH" 'if (.display_title // "" | contains($m)) | not then "none" elif .status != "completed" then "running" elif .conclusion == "success" then "success" else "none" end' 2>/dev/null || echo none)
             if [ "$P_STATE" = "success" ] || [ "$P_STATE" = "running" ]; then
               RUN_ID="$P_ID"
