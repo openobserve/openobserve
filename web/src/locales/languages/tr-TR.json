@@ -762,6 +762,7 @@
     "dragToReorder": "Sıralamak için sürükleyin",
     "timeAmount": "Süre miktarı",
     "timeUnit": "Süre birimi",
+    "unitFor": "{label} birimi",
     "queryEditorAriaLabel": "Sorgu düzenleyici. Sonraki denetime geçmek için Escape tuşuna basın.",
     "queryEditorEscapeAction": "Odağı sonraki denetime taşı",
     "inlineEdit": {
@@ -11956,6 +11957,7 @@
       "budgetLabel": "Uyarı bütçesi",
       "budgetPerDay": "günlük",
       "budgetPerWeek": "haftalık",
+      "budgetPeriod": "Uyarı bütçesi dönemi",
       "budgetRange": "0'dan büyük bir sayı girin",
       "chartsTab": "Grafikler",
       "checkEvery": "Kontrol sıklığı",
@@ -11965,6 +11967,7 @@
       "sendsToStatus": "Her anomali algılandığında {targets} adresine gönderir.",
       "detectionAlreadyRunning": "Algılama zaten çalışıyor; kısa süre sonra yeniden deneyin.",
       "detectionCharts": "Algılama sonuçları",
+      "detectionFunctionField": "Algılama fonksiyonu alanı",
       "detectionFunctionTooltip": "Her zaman aralığında neyin ölçüleceği. count kaç kaydın geldiğini izler; avg, min, max ve sum sayısal bir alanı izler. p50, p95 ve p99 o alanın dağılımını izler — örn. response_time_ms için p95, trafik sabit kalsa bile en yavaş isteklerde gecikmenin kötüleşmesini yakalar.",
       "detectionResolution": "Algılama Çözünürlüğü",
       "detectionResolutionTooltip": "Her veri noktası ne kadar ayrıntılı. Örneğin “5m”, anormalliklerin 5 dakikalık çözünürlükte tespit edildiği anlamına gelir.",

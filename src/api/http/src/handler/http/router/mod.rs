@@ -31,10 +31,10 @@ use openobserve_api_management::request::org_domains;
 #[cfg(feature = "cpu-profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
-    kv, metrics_usage, model_pricing, organization, public_dashboards, query_history,
-    rum_analytics, service_accounts, short_url, slack, slos, sourcemaps, status, status_pages,
-    stream, synthetics, users,
+    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
+    ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
+    query_history, rum_analytics, service_accounts, short_url, slack, slos, sourcemaps, status,
+    status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -1346,6 +1346,9 @@ pub fn service_routes() -> Router {
         // NOTE: named routes MUST be registered before {model_id} or they match as a model ID
         .route("/{org_id}/llm/models/built-in", get(model_pricing::get_built_in))
         .route("/{org_id}/llm/models/refresh-built-in", post(model_pricing::refresh_built_in))
+        .route("/{org_id}/llm/models/unpriced", get(model_pricing::list_unpriced))
+        // AI data health checks (LLM Insights strip, instrument skill)
+        .route("/{org_id}/gen_ai/data_health", get(gen_ai_health::get_data_health))
         .route("/{org_id}/llm/models/test", post(model_pricing::test_model_match))
         .route("/{org_id}/llm/models/{model_id}", get(model_pricing::get).put(model_pricing::update).delete(model_pricing::delete))
 
@@ -2414,6 +2417,10 @@ fn oncall_routes(router: Router) -> Router {
             post(oncall::snooze_response),
         )
         .route(
+            "/{org_id}/oncall/responses/{response_id}/unsnooze",
+            post(oncall::unsnooze_response),
+        )
+        .route(
             "/{org_id}/oncall/responses/{response_id}/handoff",
             post(oncall::handoff_response),
         )
@@ -2606,7 +2613,7 @@ fn fleet_router() -> Router {
         .route_layer(middleware::from_fn(fleet_gate))
 }
 
-/// §17: with `O2_FLEET_ENABLED` off, auth refuses fleet tokens first (401); writes get 503.
+/// With `O2_FLEET_ENABLED` off, auth refuses fleet tokens first (401); writes get 503.
 #[cfg(feature = "enterprise")]
 async fn fleet_gate(request: Request, next: Next) -> Response {
     if openobserve_core::fleet::enabled() || request.method() == Method::GET && !is_opamp(&request)
@@ -5210,6 +5217,7 @@ mod tests {
             "POST /{org_id}/oncall/responses/{response_id}/acknowledge",
             "POST /{org_id}/oncall/responses/{response_id}/resolve",
             "POST /{org_id}/oncall/responses/{response_id}/snooze",
+            "POST /{org_id}/oncall/responses/{response_id}/unsnooze",
             "POST /{org_id}/prometheus/api/v1/query",
             "POST /{org_id}/prometheus/api/v1/query_range",
             "POST /{org_id}/{stream_name}/_around",

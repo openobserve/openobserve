@@ -130,6 +130,16 @@ const useManagementRoutes = () => {
     beforeEnter: withFeatureGate("modelPricing", routeGuard),
   });
   routes[0].children.push({
+    path: "model_pricing/gaps",
+    name: "modelPricingGaps",
+    meta: {
+      keepAlive: true,
+      titleKey: "modelPricing.unpriced.title",
+    },
+    component: () => import("@/components/settings/ModelPricingGaps.vue"),
+    beforeEnter: withFeatureGate("modelPricing", routeGuard),
+  });
+  routes[0].children.push({
     path: "model_pricing/edit",
     name: "modelPricingEditor",
     meta: {

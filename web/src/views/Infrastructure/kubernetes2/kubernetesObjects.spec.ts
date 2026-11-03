@@ -13,10 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { buildInventory, type Series } from "./kubernetesModel";
 import type { QueryId } from "./kubernetesQueries";
+import { setStreamColumns } from "./kubernetesFlatten";
+import { SCHEMAS, missingColumns } from "./__fixtures__/flattenSchemas";
 import {
+  LIST_OBJECT_KINDS,
+  MAP_COLUMNS,
   OVERVIEW_COLUMNS,
   joinObjects,
   objectDetailSql,
@@ -269,5 +273,48 @@ describe("object join", () => {
     );
     expect(inventory.daemonsets[0].nodeSelector).toEqual({ disk: "ssd" });
     expect(inventory.cronjobs[0].lastSchedule).toBe(Date.parse("2026-10-06T02:00:00Z") * 1000);
+  });
+});
+
+describe("flatten-level aware object SQL", () => {
+  afterEach(() => setStreamColumns(null));
+  const build = () => ({
+    ...Object.fromEntries(
+      LIST_OBJECT_KINDS.map((k) => [`list ${k}`, objectListSql(k, "prod", ["data"])]),
+    ),
+    mapPod: objectListSql("pod", "prod", [], MAP_COLUMNS.pod),
+    mapNode: objectListSql("node", "prod", [], MAP_COLUMNS.node),
+    overviewPod: objectListSql("pod", "prod", [], OVERVIEW_COLUMNS.pod),
+    detail: objectDetailSql("pod", "prod", { namespace: "data", name: "x", uid: "u1" }),
+  });
+
+  for (const [level, schema] of Object.entries(SCHEMAS)) {
+    it(`reads only columns that exist at ${level}`, () => {
+      setStreamColumns(schema);
+      for (const [id, sql] of Object.entries(build())) {
+        expect(missingColumns(sql, schema), id).toEqual([]);
+      }
+    });
+  }
+
+  it("leaves the level 3 SQL identical to the schema-less SQL", () => {
+    const before = build();
+    setStreamColumns(SCHEMAS["level 3"]);
+    expect(build()).toEqual(before);
+  });
+
+  it("reads json parents from body_object at level 2 and keeps the aliases", () => {
+    setStreamColumns(SCHEMAS["level 2"]);
+    const sql = objectDetailSql("pod", "prod", { namespace: "data", name: "x", uid: null });
+    expect(sql).toContain("json_get_json(body_object,'metadata') AS body_object_metadata");
+    expect(sql).toContain("json_get_str(body_object,'metadata','uid') AS uid");
+  });
+
+  it("uses the flattened column at level 0 and a null for what cannot be rebuilt", () => {
+    setStreamColumns(SCHEMAS["level 0"]);
+    const sql = objectListSql("pod", "prod", []);
+    expect(sql).toContain("body_object_status_qosclass AS qos_class");
+    expect(sql).toContain("body_object_metadata_uid AS uid");
+    expect(sql).toContain("body_object_metadata_creationtimestamp AS created");
   });
 });

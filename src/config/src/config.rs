@@ -130,7 +130,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 130: add suppress_repeats to alerts.
 // 131: org domain mapping migrations
 // 132: create oncall_chat_messages; add oncall_teams slack columns.
-pub const DB_SCHEMA_VERSION: u64 = 132;
+// 133: add status page run streaks to synthetics.
+// 134: add write_version to llm_dataset_items, so one write request is one Dataset version.
+pub const DB_SCHEMA_VERSION: u64 = 134;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

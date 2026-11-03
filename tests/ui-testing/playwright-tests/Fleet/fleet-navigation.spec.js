@@ -72,12 +72,12 @@ test.describe('Fleet management navigation', { tag: ['@fleet', '@enterprise', '@
     const config = await pm.fleetSeed.createConfig('nav', FLEET_YAML.publishable);
     const version = await pm.fleetSeed.publishConfig(config, FLEET_YAML.publishable);
     const rollout = await pm.fleetSeed.setDesired(fleetB.id, config, version);
-    await pm.fleetSeed.waitForRolloutStatus(rollout.id, 'completed');
+    await pm.fleetSeed.waitForRolloutStatus(rollout.id, 'waiting');
 
     await pm.fleetManagerPage.gotoFleet({ tab: 'fleets', fleet: fleetA.id, rollout: rollout.id });
     await pm.fleetManagerPage.expectQueryParam('fleet', fleetB.id);
     await pm.fleetFleetsPage.expectRailItemActive(fleetB.id);
-    await pm.fleetFleetsPage.expectRolloutDrawerStatus('No collectors targeted');
+    await pm.fleetFleetsPage.expectRolloutDrawerStatus('Waiting');
   });
 
   test('FL-NAV-10 · the config editor deep link opens the editor and Back returns to ?tab=configurations', {

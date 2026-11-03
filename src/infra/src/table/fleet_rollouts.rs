@@ -80,6 +80,13 @@ pub async fn insert_with<C: ConnectionTrait>(
         gates: Set(row.gates),
     };
     Entity::insert(record).exec_without_returning(conn).await?;
+    insert_members_with(conn, members).await
+}
+
+pub async fn insert_members_with<C: ConnectionTrait>(
+    conn: &C,
+    members: Vec<MemberModel>,
+) -> Result<(), Error> {
     for chunk in members.chunks(INSERT_CHUNK) {
         MemberEntity::insert_many(chunk.iter().cloned().map(member_active_model))
             .exec_without_returning(conn)
@@ -177,10 +184,11 @@ pub async fn guard_with<C: ConnectionTrait>(
     Ok(res.rows_affected)
 }
 
-/// Writes status, phases, failure, events and gates of a row the caller already fenced.
+/// Writes status, from_version, phases, failure, events and gates of a row the caller fenced.
 pub async fn save_state_with<C: ConnectionTrait>(conn: &C, row: &Model) -> Result<(), Error> {
     Entity::update_many()
         .col_expr(Column::Status, Expr::value(row.status.clone()))
+        .col_expr(Column::FromVersion, Expr::value(row.from_version))
         .col_expr(Column::Phases, Expr::value(row.phases.clone()))
         .col_expr(Column::Failure, Expr::value(row.failure.clone()))
         .col_expr(Column::Events, Expr::value(row.events.clone()))
@@ -498,6 +506,7 @@ mod tests {
         assert_eq!(members_with(&db, "r1").await.unwrap()[1].state, "running");
 
         row.status = "halted".to_string();
+        row.from_version = Some(7);
         row.failure =
             Some(serde_json::json!({"gate": "rejected", "kind": "rejection"}).to_string());
         row.events = serde_json::json!([{"key": "rejected", "at": 5}]).to_string();

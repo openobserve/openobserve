@@ -145,20 +145,19 @@ test.describe('Fleet management configurations and deploy', { tag: ['@fleet', '@
     expect(await pm.fleetSeed.rolloutsForConfig(config)).toEqual([]);
   });
 
-  test('FL-RO-01 · the deploy dialog disables Scheduled for an empty fleet and refuses counts below 1 and a max below the initial batch', {
+  test('FL-RO-01 · the deploy dialog refuses counts below 1 and a max below the initial batch', {
     tag: ['@fleetDeploy', '@P1'],
   }, async () => {
     const fleet = await pm.fleetSeed.createFleet('guards');
     const config = await pm.fleetSeed.createConfig('guards', FLEET_YAML.publishable);
     const v1 = await pm.fleetSeed.publishConfig(config, FLEET_YAML.publishable);
     const seeded = await pm.fleetSeed.setDesired(fleet.id, config, v1);
-    await pm.fleetSeed.waitForRolloutStatus(seeded.id, 'completed');
+    await pm.fleetSeed.waitForRolloutStatus(seeded.id, 'waiting');
     // A desired v1 plus a published v2 seeds a valid config and version, so only the batching fields are judged.
     await pm.fleetSeed.publishConfig(config, FLEET_YAML.publishable.replace('https://example.com', 'https://example.org'));
     await pm.fleetManagerPage.gotoFleet({ tab: 'fleets', fleet: fleet.id });
     await pm.fleetFleetsPage.openDeploy();
     await pm.fleetRolloutPage.expectReady();
-    await pm.fleetRolloutPage.expectScheduledDisabled();
 
     await pm.fleetRolloutPage.chooseBatching('canary');
     await pm.fleetRolloutPage.setCanaryFirst(0);

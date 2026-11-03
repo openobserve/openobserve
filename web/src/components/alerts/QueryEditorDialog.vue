@@ -142,6 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OSwitch
                           v-if="localTab !== 'promql'"
                           :model-value="!sqlEditorMaximized"
+                          :aria-label="t('alerts.queryEditor.showVrlEditor')"
                           class="o2-toggle-button-xs"
                           @update:model-value="
                             (val) => (val ? restoreVrlEditor() : (sqlEditorMaximized = true))
@@ -278,6 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         clearable
                         @clear="onFunctionClear"
                         :placeholder="t('alerts.placeholders.savedFunctions')"
+                        :aria-label="t('alerts.placeholders.savedFunctions')"
                       >
                         <template #empty>
                           <div class="text-muted-foreground px-3 py-2">

@@ -68,7 +68,6 @@ export class OnCallPolicyEditorPage {
       teamChannel: '[data-test="oncall-team-channel"]',
       teamChannelSelect: '[data-test="oncall-team-channel-select"]',
       teamChannelSource: '[data-test="oncall-team-channel-source"]',
-      teamChannelSave: '[data-test="oncall-team-channel-save"]',
       teamChannelClear: '[data-test="oncall-team-channel-clear"]',
       teamChannelSilent: '[data-test="oncall-team-channel-silent"]',
 
@@ -254,10 +253,6 @@ export class OnCallPolicyEditorPage {
     await option.click();
     // A multi-select keeps its popover open; close it so the Save button is hit.
     await this.page.keyboard.press('Escape');
-  }
-
-  async saveTeamChannel() {
-    await this.page.locator(this.locators.teamChannelSave).first().click();
   }
 
   // ------------------------------------------------------------------ L0

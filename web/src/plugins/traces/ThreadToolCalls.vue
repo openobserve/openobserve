@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? t("traces.threadToolCalls.toolCall")
               : t("traces.threadToolCalls.toolCalls")
           }}
-          · {{ formatDuration(totalToolDuration(toolCalls)) }}
+          · {{ formatTimeWithSuffix(totalToolDuration(toolCalls)) }}
         </span>
         <span class="tt-link text-thread-tool-link">{{
           t("traces.threadToolCalls.showCalls")
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             {{ tool.span_status === "ERROR" ? "ERROR" : "OK" }}
-            · {{ formatDuration(tool.duration) }}
+            · {{ formatTimeWithSuffix(Number(tool.duration)) }}
           </span>
           <button
             class="thread-tool-row__view text-text-secondary"
@@ -121,6 +121,7 @@ import { ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getInputRaw, getOutputRaw } from "./threadView.utils";
+import { formatTimeWithSuffix } from "@/utils/zincutils";
 
 defineProps<{
   /** The turn's execute_tool spans (name/args/result/status/duration). */
@@ -141,6 +142,7 @@ function toggleTool(spanId: string) {
   expandedTools.value = next;
 }
 
+/** Summed span `duration`s, in microseconds. */
 function totalToolDuration(tools: any[]): number {
   let sum = 0;
   for (const t of tools) sum += Number(t.duration) || 0;
@@ -168,15 +170,6 @@ function formatToolPayload(value: unknown): string {
   } catch {
     return String(value);
   }
-}
-
-function formatDuration(ns: number): string {
-  if (!ns || !isFinite(ns)) return "0ms";
-  const ms = ns / 1_000_000;
-  if (ms < 1) return ms.toFixed(2) + "ms";
-  if (ms < 1000) return Math.round(ms) + "ms";
-  if (ms < 60_000) return (ms / 1000).toFixed(2) + "s";
-  return (ms / 60_000).toFixed(2) + "m";
 }
 </script>
 

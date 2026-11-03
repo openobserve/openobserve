@@ -16,6 +16,7 @@
 import { escapeSingleQuotes } from "@/utils/zincutils";
 import type { I18nKey } from "@/types/i18n";
 import { EVENTS_STREAM, KIND_INFO, type DetailKind } from "./kubernetesQueries";
+import { col, selectAs, selectObject } from "./kubernetesFlatten";
 import { inScope, type Inventory, type PodRow, type WarningEvent } from "./kubernetesModel";
 
 export interface InvolvedObject {
@@ -54,10 +55,15 @@ export interface EventScope {
 
 export const W_ROW_LIMIT = 20000;
 
-const EK =
-  "COALESCE(json_get_str(body_object_metadata,'uid'), k8s_namespace_name || '/' || event_name)";
+const EK = () => `COALESCE(${col(["metadata", "uid"])}, k8s_namespace_name || '/' || event_name)`;
 
-const REGARDING = (field: string) => `json_get_str(body_object_regarding,'${field}')`;
+const REGARDING_FIELDS = ["kind", "name", "namespace", "uid"];
+
+const SERIES_FIELDS = ["count", "lastObservedTime"];
+
+const REGARDING = (field: string) => col(["regarding", field]);
+
+const KIND_IS_EVENT = () => `${col(["kind"])} = 'Event'`;
 
 const q = (value: string) => `'${escapeSingleQuotes(value)}'`;
 
@@ -66,20 +72,19 @@ const clusterTerm = (cluster: string | null) => (cluster ? ` AND k8s_cluster = $
 const eventNsFilter = (namespaces: string[]) =>
   namespaces.length ? ` AND ${REGARDING("namespace")} IN (${namespaces.map(q).join(", ")})` : "";
 
-const EVENT_COLUMNS = [
-  "event_name",
-  "body_object_type",
-  "body_object_reason",
-  "body_object_note",
-  "body_object_regarding",
-  "body_object_reportingcontroller",
-  "body_object_reportinginstance",
-  "body_object_series",
-  "body_object_deprecatedcount",
-  "body_object_eventtime",
-  "k8s_namespace_name",
-  "_timestamp",
-].join(", ");
+const eventColumns = () =>
+  [
+    "event_name",
+    ...["type", "reason", "note"].map((f) => selectAs(col([f]), `body_object_${f}`)),
+    ...selectObject(["regarding"], "body_object_regarding", REGARDING_FIELDS),
+    ...["reportingcontroller", "reportinginstance"].map((f) =>
+      selectAs(col([f]), `body_object_${f}`),
+    ),
+    ...selectObject(["series"], "body_object_series", SERIES_FIELDS),
+    ...["deprecatedcount", "eventtime"].map((f) => selectAs(col([f]), `body_object_${f}`)),
+    "k8s_namespace_name",
+    "_timestamp",
+  ].join(", ");
 
 const KIND_BY_NAME = new Map(
   Object.entries(KIND_INFO).map(([kind, info]) => [info.kind, kind as DetailKind]),
@@ -104,9 +109,9 @@ export function warningSql(scope: EventScope, kind: string | null, namespaced: b
     "first_value(note ORDER BY last_seen DESC) AS note FROM (" +
     `SELECT ${REGARDING("kind")} AS kind, ${REGARDING("name")} AS name, ` +
     `${REGARDING("namespace")} AS namespace, ${REGARDING("uid")} AS uid, ` +
-    "body_object_reason AS reason, body_object_note AS note, _timestamp AS last_seen, " +
-    `ROW_NUMBER() OVER (PARTITION BY ${EK} ORDER BY _timestamp DESC) AS rn ` +
-    `FROM "${EVENTS_STREAM}" WHERE body_object_kind = 'Event' AND body_object_type = 'Warning'` +
+    `${selectAs(col(["reason"]), "reason")}, ${selectAs(col(["note"]), "note")}, _timestamp AS last_seen, ` +
+    `ROW_NUMBER() OVER (PARTITION BY ${EK()} ORDER BY _timestamp DESC) AS rn ` +
+    `FROM "${EVENTS_STREAM}" WHERE ${KIND_IS_EVENT()} AND ${col(["type"])} = 'Warning'` +
     `${clusterTerm(scope.cluster)}${nsFilter}${kindFilter}` +
     ") WHERE rn = 1 GROUP BY kind, name, namespace, uid ORDER BY last_seen DESC"
   );
@@ -115,8 +120,8 @@ export function warningSql(scope: EventScope, kind: string | null, namespaced: b
 export function eventCountsSql(cluster: string) {
   return (
     "SELECT count(*) AS total, count(CASE WHEN type = 'Warning' THEN 1 END) AS warnings FROM (" +
-    `SELECT body_object_type AS type, ROW_NUMBER() OVER (PARTITION BY ${EK} ORDER BY _timestamp DESC) AS rn ` +
-    `FROM "${EVENTS_STREAM}" WHERE body_object_kind = 'Event'${clusterTerm(cluster)}` +
+    `SELECT ${selectAs(col(["type"]), "type")}, ROW_NUMBER() OVER (PARTITION BY ${EK()} ORDER BY _timestamp DESC) AS rn ` +
+    `FROM "${EVENTS_STREAM}" WHERE ${KIND_IS_EVENT()}${clusterTerm(cluster)}` +
     ") WHERE rn = 1"
   );
 }
@@ -170,8 +175,14 @@ export function parseWarnings(
 
 export function parseEvents(hits: any[]): EventRow[] {
   return hits.map((h) => {
-    const regarding = parseJson(h.body_object_regarding);
-    const series = parseJson(h.body_object_series);
+    const regarding = {
+      ...flatChildren(h, "regarding", REGARDING_FIELDS),
+      ...parseJson(h.body_object_regarding),
+    };
+    const series = {
+      ...flatChildren(h, "series", SERIES_FIELDS),
+      ...parseJson(h.body_object_series),
+    };
     const seriesCount = Number(series.count);
     const deprecated = Number(h.body_object_deprecatedcount);
     const source = [h.body_object_reportingcontroller, h.body_object_reportinginstance]
@@ -297,11 +308,20 @@ function keepPodEvent(event: WarningEvent, podsByName: Map<string, PodRow[]>) {
 
 function eventsQuery(terms: string, limit: number) {
   return (
-    `SELECT * FROM (SELECT ${EVENT_COLUMNS}, ` +
-    `ROW_NUMBER() OVER (PARTITION BY ${EK} ORDER BY _timestamp DESC) AS rn ` +
-    `FROM "${EVENTS_STREAM}" WHERE body_object_kind = 'Event'${terms}` +
+    `SELECT * FROM (SELECT ${eventColumns()}, ` +
+    `ROW_NUMBER() OVER (PARTITION BY ${EK()} ORDER BY _timestamp DESC) AS rn ` +
+    `FROM "${EVENTS_STREAM}" WHERE ${KIND_IS_EVENT()}${terms}` +
     `) WHERE rn = 1 ORDER BY _timestamp DESC LIMIT ${limit}`
   );
+}
+
+function flatChildren(hit: any, parent: string, fields: string[]) {
+  const out: Record<string, any> = {};
+  for (const f of fields) {
+    const v = hit[`body_object_${parent}_${f.toLowerCase()}`];
+    if (v != null) out[f] = v;
+  }
+  return out;
 }
 
 function parseJson(value: unknown): Record<string, any> {

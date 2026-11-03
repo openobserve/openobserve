@@ -128,6 +128,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { activitySampleTotal } from "@/utils/dbm/activity";
 import { dedupeServerInstanceRefs, type DbmServerInstanceRef } from "@/utils/dbm/fleetRows";
 import { countClaim, overlapClaim, type DbmCountClaim } from "@/utils/dbm/format";
+import { inSchema, instanceKey } from "@/utils/dbm/instanceRows";
 
 /**
  * Everything the tab strips need, from one request.
@@ -300,7 +301,14 @@ export const fetchDbmTabCounts = async (
   const { databases, queries, activity, deadlocks, blocking, table_health: tableHealth } = badges;
 
   const counts: DbmTabCounts = {
-    databaseCount: databases ? (databases.hits?.length ?? 0) : null,
+    // The endpoint ignores `namespace`, so the Overview's client-side Schema filter applies here.
+    databaseCount: databases
+      ? new Set(
+          (databases.hits ?? [])
+            .filter((row) => inSchema(row, filters.namespace))
+            .map((row) => instanceKey(row)),
+        ).size
+      : null,
     // The same databases member, summed instead of counted: its rows carry
     // the rollup's EXACT per-instance `calls` totals, and instances partition
     // calls, so the sum is the window's finished-call population. A row without
@@ -414,7 +422,8 @@ export const fetchDbmTabCounts = async (
     // list the fleet union renders, so this badge counts the rows the tile
     // counts. It can undercount an instance known only to the metric streams;
     // the Overview page's own exact union overrides this the moment it loads.
-    if (counts.databaseCount === 0 && counts.serverInstanceRefs.length) {
+    // Server-known refs name no schema, so under a Schema filter they prove nothing.
+    if (counts.databaseCount === 0 && counts.serverInstanceRefs.length && !filters.namespace) {
       counts.databaseCount = counts.serverInstanceRefs.length;
     }
   }

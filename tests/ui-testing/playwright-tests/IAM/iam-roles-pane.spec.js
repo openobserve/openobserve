@@ -13,7 +13,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const {
-    ns, req, listRoles, createRole, setRolePerms, makeTracker, uniq, org, rbacEnabled,
+    ns, req, listRoles, createRole, setRolePerms, makeTracker, uniq, rbacEnabled,
 } = require('./iam-fixtures.js');
 
 // This file's own namespace. Every artifact it creates lives under it, and its
@@ -24,8 +24,6 @@ const NS = ns('pan');
 // What this spec made, so teardown deletes exactly that — never a prefix sweep,
 // which is what had the IAM specs deleting each other's fixtures mid-test.
 const made = makeTracker();
-
-const obj = (resource) => `${resource}:_all_${org()}`;
 
 test.describe('IAM · Edit Role · pane navigation', { tag: '@enterprise' }, () => {
     // Serial, NOT parallel. every test in this file creates roles under one namespace and afterAll sweeps that
@@ -163,21 +161,27 @@ test.describe('IAM · Edit Role · pane navigation', { tag: '@enterprise' }, () 
     test('P-04 · the pane Selected filter lists only granted rows, and unticking removes one', {
         tag: ['@iam', '@iamRolesPane', '@P1', '@all']
     }, async ({ page }) => {
-        await openWith(page, 'selected', [{ object: obj('function'), permission: 'AllowList' }]);
-        await pm.rolesPage.openModule('function');
+        // Function rows have no List checkbox, so the grant has to be an item-level Get on a function this test owns.
+        const fn = `${NS}_fn_${uniq()}`;
+        const { status } = await req(page, 'POST', '/functions', { name: fn, function: '.p04 = 1', params: 'row', transType: 0 });
+        expect(status, `creating function ${fn}`).toBeLessThan(400);
+        try {
+            await openWith(page, 'selected', [{ object: `function:${fn}`, permission: 'AllowGet' }]);
+            await pm.rolesPage.openModule('function');
+            await expect(pm.rolesPage.paneFilterGranted).toBeVisible({ timeout: 15000 });
+            await pm.rolesPage.paneFilterGranted.click();
 
-        const hasFilter = await pm.rolesPage.paneFilterGranted.isVisible({ timeout: 10000 }).catch(() => false);
-        test.skip(!hasFilter, 'the function module does not render the granted filter here');
-        await pm.rolesPage.paneFilterGranted.click();
+            const shown = pm.rolesPage.entityCheckboxes('AllowGet');
+            await expect(shown, 'the Selected view did not list exactly the granted row').toHaveCount(1, { timeout: 15000 });
+            const box = pm.rolesPage.entityCheckbox(fn, 'AllowGet');
+            await expect(box).toHaveAttribute('aria-checked', 'true');
 
-        const shown = pm.rolesPage.entityCheckboxes('AllowList');
-        const before = await shown.count();
-        expect(before, 'the Selected view showed nothing for a role that holds a grant').toBeGreaterThan(0);
-
-        // Every row in this view is granted by definition.
-        for (let i = 0; i < before; i++) {
-            expect(await pm.rolesPage.isChecked(shown.nth(i)),
-                'the Selected view listed an ungranted row').toBe(true);
+            // setCheckbox re-reads the box after the toggle, but the filter removes the row as soon as it unticks.
+            await box.focus();
+            await page.keyboard.press('Space');
+            await expect(shown, 'unticking left the row in the Selected view').toHaveCount(0, { timeout: 10000 });
+        } finally {
+            await req(page, 'DELETE', `/functions/${fn}`).catch(() => {});
         }
     });
 

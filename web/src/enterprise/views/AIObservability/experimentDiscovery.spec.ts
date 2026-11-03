@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { comparisonEligibility, experimentEvidence, groupExperiments } from "./experimentDiscovery";
+import {
+  comparisonEligibility,
+  experimentCostText,
+  experimentEvidence,
+  groupExperiments,
+} from "./experimentDiscovery";
+import type { TranslateFn } from "@/types/i18n";
 import { makeExperiment } from "./experimentTestFixtures";
 
 const experiment = (id: string, datasetId: string, createdAt: number) =>
@@ -124,6 +130,7 @@ describe("experiment discovery", () => {
       completedSlots: 1,
       totalSlots: 2,
       cost: null,
+      costIncomplete: false,
       scores: [
         { name: "quality", kind: "numeric", value: 0.75, sampleCount: 2 },
         { name: "approved", kind: "boolean", trueCount: 1, falseCount: 1, sampleCount: 2 },
@@ -138,5 +145,18 @@ describe("experiment discovery", () => {
         },
       ],
     });
+  });
+
+  it("reads an incomplete cost as a floor, and a zero floor as unknown rather than free", () => {
+    const t = ((key: string, named?: { cost?: string }) =>
+      named?.cost ? `${key}:${named.cost}` : key) as unknown as TranslateFn;
+    expect(experimentCostText(null, false, t)).toBe("—");
+    expect(experimentCostText(0, false, t)).toBe("$0.0000");
+    expect(experimentCostText(0.12, false, t)).toBe("$0.1200");
+    expect(experimentCostText(0.12, true, t)).toBe(
+      "aiObservability.experiments.costAtLeast:$0.1200",
+    );
+    expect(experimentCostText(0, true, t)).toBe("aiObservability.experiments.costUnknown");
+    expect(experimentCostText(null, true, t)).toBe("aiObservability.experiments.costUnknown");
   });
 });

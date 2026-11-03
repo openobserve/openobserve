@@ -111,6 +111,8 @@ pub enum Verb {
     Unack,
     /// An unack for a hand-off: the hand-off, not the unack, restarts the page it moves.
     HandOff,
+    /// A person fixed the problem: its ack ends and no page restarts.
+    Resolve,
 }
 
 /// Which firing groups of an alert an ack names.
@@ -181,6 +183,15 @@ pub struct PlanFacts {
     /// Who holds the firing groups of the alert the caller did not name.
     pub other_holders: Vec<String>,
     pub pages: Vec<OpenPage>,
+    /// What a page's Resolve may end; `None` ends the whole problem.
+    pub cover: Option<PageCover>,
+}
+
+/// A page covers the firings of its alert that started by the time it closed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PageCover {
+    pub alert_id: String,
+    pub closed_at: i64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -384,7 +395,7 @@ pub async fn resolve_target(org_id: &str, alert_id: &str) -> Result<AckTarget, A
 pub fn plan(f: &PlanFacts) -> AckPlan {
     match f.verb {
         Verb::Acknowledge | Verb::TakeOver => plan_hold(f),
-        Verb::Unack | Verb::HandOff => plan_release(f),
+        Verb::Unack | Verb::HandOff | Verb::Resolve => plan_release(f),
     }
 }
 
@@ -535,7 +546,7 @@ pub async fn take_over(
 /// [weak: the ack is cleared first; a page that fails to restart stays acknowledged until the next
 /// unack; one restarted with no ladder armed is logged and left to `reconcile_abandoned`]
 pub async fn unack(p: &Problem, actor: &str, source: AckSource) -> Result<UnackResponse, AckError> {
-    release(p, Verb::Unack, actor, source).await
+    release(p, Verb::Unack, actor, source, None).await
 }
 
 /// Clears the problem's ack for a hand-off, which restarts the page it moves.
@@ -546,7 +557,28 @@ pub async fn release_for_hand_off(
     actor: &str,
     source: AckSource,
 ) -> Result<UnackResponse, AckError> {
-    release(p, Verb::HandOff, actor, source).await
+    release(p, Verb::HandOff, actor, source, None).await
+}
+
+/// Ends the covered ack after a person's Resolve. [weak: a retried Resolve clears the rest]
+pub async fn resolve(
+    p: &Problem,
+    actor: &str,
+    source: AckSource,
+    cover: Option<PageCover>,
+) -> Result<UnackResponse, AckError> {
+    release(p, Verb::Resolve, actor, source, cover).await
+}
+
+/// An alert page covers its alert's firings up to its first close; an incident page all. [pure]
+pub fn page_cover(subject: &config::meta::oncall::SubjectRef, closed_at: i64) -> Option<PageCover> {
+    match subject.subject_type {
+        config::meta::oncall::SubjectType::Alert => Some(PageCover {
+            alert_id: source_of_page(&subject.source_id).to_string(),
+            closed_at,
+        }),
+        config::meta::oncall::SubjectType::Incident => None,
+    }
 }
 
 /// A firing that joins an acknowledged incident takes the incident's ack, so nobody is re-paged.
@@ -1044,6 +1076,26 @@ async fn org_editors(org_id: &str) -> Vec<(String, UserRole, Option<String>)> {
     out
 }
 
+/// The records a release ends; a page's Resolve leaves its alert's firings newer than its close.
+fn covered(f: &PlanFacts) -> Vec<&HeldRecord> {
+    let Some(c) = f.cover.as_ref().filter(|_| f.verb == Verb::Resolve) else {
+        return f.records.iter().collect();
+    };
+    let newer = |r: &HeldRecord| {
+        matches!(&r.record, AckRecord::Firing { alert_id, firing_started_at, .. }
+            if *alert_id == c.alert_id && *firing_started_at > c.closed_at)
+    };
+    let incident = f
+        .records
+        .iter()
+        .any(|r| matches!(r.record, AckRecord::Incident { .. }));
+    // An incident is one problem: a page whose alert fired again after it closed covers none of it.
+    if incident && f.records.iter().any(newer) {
+        return vec![];
+    }
+    f.records.iter().filter(|r| !newer(r)).collect()
+}
+
 fn same(a: &str, b: &str) -> bool {
     a.trim().eq_ignore_ascii_case(b.trim())
 }
@@ -1137,13 +1189,13 @@ fn hold_step(p: &OpenPage, f: &PlanFacts, by: &str, take_over: bool) -> PageStep
     }
 }
 
-/// An unack restarts the current pages an ack stopped (D34); a hand-off leaves them be.
+/// An unack restarts the current pages an ack stopped (D34); a hand-off and a resolve do not.
 fn plan_release(f: &PlanFacts) -> AckPlan {
+    let ends = covered(f);
     // Any held record, carried ones too: a retry after a partial clear must finish the job.
-    let held = f.records.iter().any(|r| r.holder.is_some());
+    let held = ends.iter().any(|r| r.holder.is_some());
     let writes = if held {
-        f.records
-            .iter()
+        ends.iter()
             .filter_map(|r| {
                 r.holder
                     .as_ref()
@@ -1203,8 +1255,10 @@ async fn release(
     verb: Verb,
     actor: &str,
     source: AckSource,
+    cover: Option<PageCover>,
 ) -> Result<UnackResponse, AckError> {
-    let g = gather(p, verb, actor).await?;
+    let mut g = gather(p, verb, actor).await?;
+    g.facts.cover = cover;
     let plan = plan(&g.facts);
     let out = carry_out(p, &g, &plan, actor, source).await?;
     Ok(UnackResponse {
@@ -1235,6 +1289,7 @@ async fn gather(p: &Problem, verb: Verb, actor: &str) -> Result<Gathered, AckErr
             other_groups_unacked: 0,
             other_holders: vec![],
             pages,
+            cover: None,
         },
         targets: HashMap::new(),
         held: HashMap::new(),
@@ -1293,7 +1348,7 @@ async fn one_row(
     firing_started_at: Option<i64>,
     verb: Verb,
 ) -> Result<Vec<(String, i64)>, AckError> {
-    if matches!(verb, Verb::Unack | Verb::HandOff) {
+    if matches!(verb, Verb::Unack | Verb::HandOff | Verb::Resolve) {
         let firing = match firing_started_at {
             Some(f) => Some(f),
             None => current_firing(target, group_key).await?,
@@ -1354,19 +1409,22 @@ async fn gather_incident(
     };
     let status: IncidentStatus = model.status.parse().unwrap_or_default();
     g.incident_status = Some(status);
-    // A resolved incident has nothing to acknowledge or clear; reopening it is its own verb.
-    if status == IncidentStatus::Resolved {
+    let resolved = status == IncidentStatus::Resolved;
+    // A resolved incident has nothing to acknowledge; only a resolve still clears its alerts' rows.
+    if resolved && g.facts.verb != Verb::Resolve {
         return Ok(());
     }
-    g.facts.records.push(HeldRecord {
-        record: AckRecord::Incident {
-            incident_id: incident_id.to_string(),
-        },
-        holder: (status == IncidentStatus::Acknowledged)
-            .then_some(model.acknowledged_by)
-            .flatten(),
-        named: true,
-    });
+    if !resolved {
+        g.facts.records.push(HeldRecord {
+            record: AckRecord::Incident {
+                incident_id: incident_id.to_string(),
+            },
+            holder: (status == IncidentStatus::Acknowledged)
+                .then_some(model.acknowledged_by)
+                .flatten(),
+            named: true,
+        });
+    }
     for alert_id in incident_alert_ids(incident_id).await? {
         let target = match resolve_target(org_id, &alert_id).await {
             Ok(t) => t,
@@ -1425,7 +1483,8 @@ async fn carry_out(
             .any(|r| &r.record == record && r.named);
         let won = match record {
             AckRecord::Incident { incident_id } => {
-                let won = write_incident(p.org_id(), incident_id, write, actor).await?;
+                let won =
+                    write_incident(p.org_id(), incident_id, write, actor, g.facts.verb).await?;
                 if won {
                     incident_status = Some(status_after(write));
                 } else if *write == RecordWrite::Claim {
@@ -1586,6 +1645,7 @@ async fn write_incident(
     incident_id: &str,
     write: &RecordWrite,
     actor: &str,
+    verb: Verb,
 ) -> Result<bool, AckError> {
     use config::meta::alerts::incidents::IncidentEvent;
     use infra::table::alert_incidents;
@@ -1605,7 +1665,12 @@ async fn write_incident(
         ),
         RecordWrite::Clear { holder } => (
             alert_incidents::unacknowledge(org_id, incident_id, holder).await?,
-            IncidentEvent::reopened(actor, "Unacknowledged"),
+            match verb {
+                Verb::Resolve => IncidentEvent::ack_ended_by_page_resolve(actor),
+                Verb::Acknowledge | Verb::TakeOver | Verb::Unack | Verb::HandOff => {
+                    IncidentEvent::reopened(actor, "Unacknowledged")
+                }
+            },
         ),
     };
     if won {
@@ -1621,6 +1686,7 @@ async fn write_incident(
     _incident_id: &str,
     _write: &RecordWrite,
     _actor: &str,
+    _verb: Verb,
 ) -> Result<bool, AckError> {
     Err(AckError::NotFound)
 }
@@ -2059,6 +2125,14 @@ mod tests {
             other_groups_unacked: 0,
             other_holders: vec![],
             pages,
+            cover: None,
+        }
+    }
+
+    fn cover(closed_at: i64) -> PageCover {
+        PageCover {
+            alert_id: "a1".into(),
+            closed_at,
         }
     }
 
@@ -2226,6 +2300,82 @@ mod tests {
                 Answer::Changed,
             ),
             (
+                "a resolve clears every record and restarts no page",
+                facts_for(
+                    Verb::Resolve,
+                    vec![incident(ana), firing("", ana, false)],
+                    vec![page("owner", ana), page("paging", None)],
+                ),
+                vec![cleared(&incident(ana)), cleared(&firing("", ana, false))],
+                vec![("owner", Leave), ("paging", Leave)],
+                vec![],
+                Answer::Changed,
+            ),
+            (
+                "a resolve with nothing held changes nothing",
+                facts_for(
+                    Verb::Resolve,
+                    vec![firing("", None, true)],
+                    vec![page("p1", ana)],
+                ),
+                vec![],
+                vec![("p1", Leave)],
+                vec![],
+                Answer::NotHeld,
+            ),
+            (
+                "a page's resolve leaves a firing that started after the page closed",
+                PlanFacts {
+                    cover: Some(cover(50)),
+                    ..facts_for(
+                        Verb::Resolve,
+                        vec![firing("", ana, true)],
+                        vec![page("p1", ana)],
+                    )
+                },
+                vec![],
+                vec![("p1", Leave)],
+                vec![],
+                Answer::NotHeld,
+            ),
+            (
+                "a page's resolve ends a firing that started while it was open",
+                PlanFacts {
+                    cover: Some(cover(100)),
+                    ..facts_for(Verb::Resolve, vec![firing("", ana, true)], vec![])
+                },
+                vec![cleared(&firing("", ana, true))],
+                vec![],
+                vec![],
+                Answer::Changed,
+            ),
+            (
+                "a page's resolve covers none of an incident its alert re-fired into after the close",
+                PlanFacts {
+                    cover: Some(cover(50)),
+                    ..facts_for(
+                        Verb::Resolve,
+                        vec![incident(ana), firing("", ana, false)],
+                        vec![],
+                    )
+                },
+                vec![],
+                vec![],
+                vec![],
+                Answer::NotHeld,
+            ),
+            (
+                "a hand-off ignores a cover",
+                PlanFacts {
+                    cover: Some(cover(50)),
+                    ..facts_for(Verb::HandOff, vec![firing("", ana, true)], vec![])
+                },
+                vec![cleared(&firing("", ana, true))],
+                vec![],
+                vec![],
+                Answer::Changed,
+            ),
+            (
                 "an unack with nothing held still restarts the page an ack stopped",
                 facts_for(
                     Verb::Unack,
@@ -2331,6 +2481,17 @@ mod tests {
         ] {
             assert_eq!(snooze_minutes(until, 0), minutes, "{until}");
         }
+    }
+
+    #[test]
+    fn an_alert_page_covers_its_alerts_firings_up_to_its_close_and_an_incident_page_all() {
+        use config::meta::oncall::{SubjectRef, SubjectType};
+        let subject = |kind, source: &str| SubjectRef::new(kind, source.to_string(), 1);
+        assert_eq!(
+            page_cover(&subject(SubjectType::Alert, "a1:group:g1"), 70),
+            Some(cover(70))
+        );
+        assert_eq!(page_cover(&subject(SubjectType::Incident, "i1"), 70), None);
     }
 
     #[test]

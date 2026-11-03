@@ -2277,7 +2277,12 @@ async fn act_by_phone(
             PhoneAction::Acknowledge => {
                 service::phone_ack_outcome(&org_id, &response_id, &actor).await
             }
-            PhoneAction::Resolve | PhoneAction::Escalate => {
+            PhoneAction::Resolve => {
+                // A retried press 6 finishes a clear the first press could not.
+                end_ack_by_phone(&org_id, &response_id, problem.as_ref(), &actor).await?;
+                Ok(o2_enterprise::enterprise::oncall::notify::PressOutcome::Closed)
+            }
+            PhoneAction::Escalate => {
                 Ok(o2_enterprise::enterprise::oncall::notify::PressOutcome::Closed)
             }
         };
@@ -2301,9 +2306,44 @@ async fn act_by_phone(
             }
             service::phone_ack_outcome(&org_id, &response_id, &actor).await
         }
-        PhoneAction::Resolve => service::phone_resolve(&org_id, &response_id, &actor).await,
+        PhoneAction::Resolve => {
+            let outcome = service::phone_resolve(&org_id, &response_id, &actor).await?;
+            end_ack_by_phone(&org_id, &response_id, problem.as_ref(), &actor).await?;
+            Ok(outcome)
+        }
         PhoneAction::Escalate => service::phone_escalate(&org_id, &response_id, &actor).await,
     }
+}
+
+/// Press 6 ends the problem's ack once the page is closed; a page whose alert is gone has none.
+#[cfg(feature = "enterprise")]
+async fn end_ack_by_phone(
+    org_id: &str,
+    response_id: &str,
+    problem: Option<&openobserve_core::alerts::ack::Problem>,
+    actor: &str,
+) -> Result<(), anyhow::Error> {
+    use openobserve_core::alerts::ack;
+
+    let Some(p) = problem else {
+        return Ok(());
+    };
+    let Some(page) = infra::table::oncall_responses::get(org_id, response_id).await? else {
+        return Ok(());
+    };
+    let closed_at = page
+        .closed_at
+        .unwrap_or_else(config::utils::time::now_micros);
+    let cover = ack::page_cover(&page.subject, closed_at);
+    ack::resolve(
+        p,
+        actor,
+        config::meta::alerts::ack::AckSource::Oncall,
+        cover,
+    )
+    .await
+    .map(|_| ())
+    .map_err(|e| anyhow::anyhow!("end the ack after a resolve by phone: {e:?}"))
 }
 
 /// TwiML refusal for an inactive or unreadable org, as `inactive_org_response` refuses email acks.
@@ -2575,18 +2615,25 @@ pub async fn get_response(
 pub async fn resolve_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
     ValidatedJson(body): ValidatedJson<Option<ResolveRequest>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        use crate::request::alerts::ack::{ack_source, error_response};
+
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
-            return resp;
-        }
+        let problem = match page_problem(&org_id, &response_id, &user_email.user_id).await {
+            Ok(p) => p,
+            Err(resp) => return resp,
+        };
         let body = body.unwrap_or_default();
-        match o2_enterprise::enterprise::oncall::escalation::resolve(
+        let record = match o2_enterprise::enterprise::oncall::escalation::resolve(
             &org_id,
             &response_id,
             &user_email.user_id,
@@ -2595,9 +2642,23 @@ pub async fn resolve_response(
         )
         .await
         {
-            Ok(record) => MetaHttpResponse::json(record),
-            Err(e) => to_response(e),
+            Ok(record) => record,
+            Err(e) => return to_response(e),
+        };
+        // Closed first, so a failed clear is retried by resolving the closed page again.
+        if let Some(p) = problem.as_ref() {
+            let source = ack_source(delegated.as_deref(), &headers);
+            let closed_at = record
+                .closed_at
+                .unwrap_or_else(config::utils::time::now_micros);
+            let cover = openobserve_core::alerts::ack::page_cover(&record.subject, closed_at);
+            if let Err(e) =
+                openobserve_core::alerts::ack::resolve(p, &user_email.user_id, source, cover).await
+            {
+                return error_response(e);
+            }
         }
+        MetaHttpResponse::json(record)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -3016,6 +3077,56 @@ pub async fn snooze_response(
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, response_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/responses/{response_id}/unsnooze",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "UnsnoozeOnCallResponse",
+    summary = "End a snooze now, so paging continues from the current step",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn unsnooze_response(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
+        }
+        match o2_enterprise::enterprise::oncall::escalation::unsnooze(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            config::utils::time::now_micros(),
+        )
+        .await
+        {
+            Ok(Some(r)) => MetaHttpResponse::json(r),
+            Ok(None) => MetaHttpResponse::not_found("Response record not found"),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }

@@ -244,6 +244,8 @@ const emit = defineEmits<{
   (e: "update:selectedVersion", value: string): void;
   (e: "filter-mode-change", value: FilterMode): void;
   (e: "stream-change", value: string): void;
+  /** The user picked an env, agent or version: the agent scope is now an explicit choice. */
+  (e: "agent-pick"): void;
 }>();
 
 // v-model bridge for the stream picker — read the prop, write both the model
@@ -276,13 +278,16 @@ const onStreamChange = (value: unknown) => {
 // useAgentScope selection refs and re-derives the lower lists).
 const onSelectedEnvChange = (value: string) => {
   emit("update:selectedEnv", value);
+  emit("agent-pick");
 };
 
 const onSelectedAgentNameChange = (value: string) => {
   emit("update:selectedAgentName", value);
+  emit("agent-pick");
 };
 
 const onSelectedVersionChange = (value: string) => {
   emit("update:selectedVersion", value);
+  emit("agent-pick");
 };
 </script>

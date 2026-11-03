@@ -36,6 +36,14 @@ export function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+// opencode provider ids carry a suffix (anthropic-review); gen_ai.provider.name wants the well-known vendor value.
+export function genAiProviderName(providerId) {
+  const id = String(providerId ?? "").toLowerCase();
+  if (id.includes("anthropic")) return "anthropic";
+  if (id.includes("deepseek")) return "deepseek";
+  return providerId;
+}
+
 export function genAiRequestAttributes(systemInstructions, userMessage) {
   return {
     "gen_ai.system_instructions": JSON.stringify([
@@ -58,13 +66,12 @@ function tokenCount(value) {
   return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : undefined;
 }
 
-// Sums the cost and tokens of several opencode sessions (retried attempts of one call); either side may be missing.
+// Sums the tokens of several opencode sessions (retried attempts of one call); either side may be missing.
 export function addUsage(a, b) {
   if (!a) return b || null;
   if (!b) return a;
   const sum = (x, y) => (tokenCount(x) ?? 0) + (tokenCount(y) ?? 0);
   return {
-    cost: (Number.isFinite(a.cost) ? a.cost : 0) + (Number.isFinite(b.cost) ? b.cost : 0),
     tokens: {
       input: sum(a.tokens?.input, b.tokens?.input),
       output: sum(a.tokens?.output, b.tokens?.output),
@@ -99,7 +106,6 @@ export function genAiUsageAttributes(usage) {
       : undefined,
     "gen_ai.usage.cache_read.input_tokens": cacheReadTokens,
     "gen_ai.usage.cache_creation.input_tokens": cacheWriteTokens,
-    "gen_ai.usage.cost": Number.isFinite(usage?.cost) && usage.cost >= 0 ? usage.cost : undefined,
     "ai.usage.reasoning_tokens": reasoningTokens,
   });
 }

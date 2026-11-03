@@ -161,8 +161,8 @@ pub struct ListQuery {
     pub name: Option<String>,
     /// Exact filter on the toolset kind (`mcp`, `cli`, `skill`, `generic`).
     pub kind: Option<String>,
-    /// Maximum number of results to return.
-    pub limit: Option<i64>,
+    /// Maximum number of results to return; a negative value is rejected with 400.
+    pub limit: Option<u64>,
 }
 
 #[utoipa::path(
@@ -177,11 +177,12 @@ pub struct ListQuery {
         ("org_id" = String, Path, description = "Organization name"),
         ("name"   = Option<String>, Query, description = "Substring filter on name (case-insensitive)"),
         ("kind"   = Option<String>, Query, description = "Exact filter on kind: mcp | cli | skill | generic"),
-        ("limit"  = Option<i64>,   Query, description = "Maximum number of results"),
+        ("limit"  = Option<u64>,   Query, description = "Maximum number of results"),
     ),
     security(("Authorization" = [])),
     responses(
         (status = 200, description = "List of toolsets", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid query parameters, such as a negative limit"),
         (status = 403, description = "Feature not supported", content_type = "application/json"),
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "list"})), ("x-o2-mcp" = json!({"enabled": false})))
