@@ -465,6 +465,7 @@ describe("BrowserJourneyStepEditor flow-control help", () => {
     const always = tips.find((c) => /cleanup/i.test(String(c)));
     expect(optional).toMatch(/never fails the run/i);
     expect(always).toMatch(/after the failed one/i);
+    expect(always).toMatch(/cleanup does not check Required waits/i);
   });
 
   it("leaves both flags independently settable — the combination is legal", async () => {
