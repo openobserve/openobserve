@@ -4246,7 +4246,11 @@
       "show": "Show",
       "searchServiceAccounts": "Search Service Accounts",
       "all": "All",
-      "selected": "Selected"
+      "selected": "Selected",
+      "noneSelectedTitle": "No service accounts selected",
+      "noneSelectedDescription": "None of the service accounts in this organization are selected here. Switch to All to select one.",
+      "showAll": "Show all service accounts",
+      "showAllDesc": "List every service account in this organization"
     },
     "groupUsers": {
       "all": "All",

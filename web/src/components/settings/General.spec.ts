@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import General from "./General.vue";
+import { fullConfigLoad } from "@/composables/useFullConfigLoad";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
@@ -674,6 +675,28 @@ describe("General", () => {
         variant: "success",
         message: "Light Mode logo updated successfully.",
       });
+    });
+
+    it("marks the org's full config loaded after the upload refetches it", async () => {
+      fullConfigLoad.loadedOrg = "";
+      const wrapper = createWrapper();
+
+      await wrapper.vm.uploadImage(new File(["test"], "test.png", { type: "image/png" }));
+      await flushPromises();
+
+      expect(mockConfigService.get_config_full).toHaveBeenCalledWith("test-org");
+      expect(fullConfigLoad.loadedOrg).toBe("test-org");
+    });
+
+    it("marks the org's full config loaded after a delete refetches it", async () => {
+      fullConfigLoad.loadedOrg = "";
+      const wrapper = createWrapper();
+
+      await wrapper.vm.deleteLogo();
+      await flushPromises();
+
+      expect(mockConfigService.get_config_full).toHaveBeenCalledWith("test-org");
+      expect(fullConfigLoad.loadedOrg).toBe("test-org");
     });
 
     it("should upload dark mode image successfully", async () => {

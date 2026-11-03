@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import GroupRoles from "@/components/iam/groups/GroupRoles.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -35,6 +36,14 @@ vi.mock("@/composables/iam/usePermissions", () => ({
     groupsState: {},
   })),
 }));
+
+// OTable holds its skeleton for a minimum time after a load, so a flush alone can land before the rows or empty state paint.
+const waitForTableSettled = async (w: any) => {
+  await flushPromises();
+  await vi.waitFor(() =>
+    expect(w.get('[data-test="o2-table"]').attributes("data-test-loading")).toBe("false"),
+  );
+};
 
 describe("GroupRoles Component", () => {
   let wrapper: any;
@@ -62,7 +71,7 @@ describe("GroupRoles Component", () => {
       },
     });
 
-    await flushPromises();
+    await waitForTableSettled(wrapper);
   });
 
   afterEach(() => {
@@ -321,7 +330,7 @@ describe("GroupRoles Component", () => {
           removedRoles: new Set(),
         },
       });
-      await flushPromises();
+      await waitForTableSettled(emptyWrapper);
 
       // OTable renders the OEmptyState component in its #empty slot when there are no rows
       // The empty state is rendered by OTable internally; verify no role rows are rendered
@@ -569,7 +578,7 @@ describe("GroupRoles Component", () => {
   });
 
   describe("Empty states (ENT#2696)", () => {
-    const mountWithGroupRoles = async (groupRoles: string[]) => {
+    const mountWithGroupRoles = async (groupRoles: string[], { settle = true } = {}) => {
       const emptyGroup = mount(GroupRoles, {
         global: { provide: { store }, plugins: [i18n] },
         props: {
@@ -579,7 +588,8 @@ describe("GroupRoles Component", () => {
           removedRoles: new Set(),
         },
       });
-      await flushPromises();
+      if (settle) await waitForTableSettled(emptyGroup);
+      else await flushPromises();
       return emptyGroup;
     };
 
@@ -687,6 +697,48 @@ describe("GroupRoles Component", () => {
 
       expect(wrapper.text()).toContain("No roles found");
       expectUnclippable(wrapper);
+    });
+
+    it("makes no claim about the org while its role list is still loading", async () => {
+      const { getRoles } = await import("@/services/iam");
+      vi.mocked(getRoles).mockReturnValueOnce(new Promise(() => {}));
+      queryClient.clear();
+      const pending = await mountWithGroupRoles([], { settle: false });
+
+      expect(pending.findComponent(OTable).props("loading")).toBe(true);
+      expect(pending.find('[data-test="iam-roles-selection-none-selected"]').exists()).toBe(false);
+      expect(pending.text()).not.toContain("No roles yet");
+
+      pending.unmount();
+      queryClient.clear();
+    });
+
+    it("shows a load error, not the org-empty copy, when the role list fails, and recovers on retry", async () => {
+      const { getRoles } = await import("@/services/iam");
+      vi.mocked(getRoles).mockRejectedValueOnce({ response: { status: 404 } });
+      queryClient.clear();
+      const failed = await mountWithGroupRoles([]);
+
+      expect(failed.find('[data-test="iam-roles-selection-load-error"]').exists()).toBe(true);
+      expect(failed.find('[data-test="iam-roles-selection-none-selected"]').exists()).toBe(false);
+      expect(failed.text()).not.toContain("No roles yet");
+
+      await (failed.vm as any).updateUserTable("all");
+      await flushPromises();
+      await failed.find('[data-test="iam-roles-selection-load-error"] button').trigger("click");
+      await flushPromises();
+
+      await vi.waitFor(() =>
+        expect(
+          failed
+            .find('[data-test="iam-roles-selection-table-body-row-developer-checkbox"]')
+            .exists(),
+        ).toBe(true),
+      );
+      expect(failed.find('[data-test="iam-roles-selection-load-error"]').exists()).toBe(false);
+
+      failed.unmount();
+      queryClient.clear();
     });
   });
 

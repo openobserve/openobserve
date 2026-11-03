@@ -47,6 +47,7 @@ vi.mock("@/types/i18n", () => ({
 }));
 
 import licenseServer from "@/services/license_server";
+import { fullConfigLoad, markFullConfigFailed } from "@/composables/useFullConfigLoad";
 import { useLicenseRefresh } from "./useLicenseRefresh";
 
 describe("useLicenseRefresh", () => {
@@ -77,6 +78,27 @@ describe("useLicenseRefresh", () => {
       expect.objectContaining({ queryKey: ["config", "acme"], exact: true, refetchType: "none" }),
     );
     expect(fetchQuery).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ["license"] }));
+  });
+
+  it("marks the org's full config loaded once the reload stores it, clearing a failed mark", async () => {
+    fullConfigLoad.loadedOrg = "";
+    markFullConfigFailed("acme");
+    vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({} as never);
+    await useLicenseRefresh().refreshLicenseLimits();
+    await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
+    expect(fullConfigLoad.loadedOrg).toBe("acme");
+    expect(fullConfigLoad.failedOrg).toBe("");
+  });
+
+  it("leaves the full config unmarked when the config reload fails", async () => {
+    fullConfigLoad.loadedOrg = "";
+    fetchQuery.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error("down"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({} as never);
+    await useLicenseRefresh().refreshLicenseLimits();
+    await vi.advanceTimersByTimeAsync(LICENSE_REFRESH_SETTLE_MS);
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(fullConfigLoad.loadedOrg).toBe("");
   });
 
   it("a 403 toasts the permission message and schedules nothing", async () => {

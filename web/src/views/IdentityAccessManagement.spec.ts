@@ -852,14 +852,23 @@ describe("IdentityAccessManagement.vue Component", () => {
     });
 
     it("does not lock the RBAC sections just because the config failed", async () => {
-      store.state.zoConfig = {};
-      markFullConfigFailed("test-org");
+      const prev = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
+      config.isEnterprise = "true";
+      config.isCloud = "false";
+      try {
+        store.state.zoConfig = {};
+        markFullConfigFailed("test-org");
 
-      const w = await mountIam();
+        const w = await mountIam();
 
-      const groups = allItems(w.vm.sectionGroups).find((i: any) => i.key === "groups");
-      expect(groups.lockedMessage).not.toBe(i18n.global.t("enterpriseFeature.rbacDisabled"));
-      w.unmount();
+        const groups = allItems(w.vm.sectionGroups).find((i: any) => i.key === "groups");
+        expect(groups.locked).toBe(false);
+        expect(groups.lockedMessage).not.toBe(i18n.global.t("enterpriseFeature.rbacDisabled"));
+        w.unmount();
+      } finally {
+        config.isEnterprise = prev.isEnterprise;
+        config.isCloud = prev.isCloud;
+      }
     });
 
     it("keeps the banner steady while a retry is in flight", async () => {
