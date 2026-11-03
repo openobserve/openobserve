@@ -29,7 +29,11 @@ import {
 } from "@/utils/dashboard/panelTypeOptions";
 import { TABLE_DENSITIES, TABLE_FOOTER_CALCS } from "@/utils/dashboard/tableOptions";
 import { SPECIAL_VALUE_MATCHES } from "@/utils/dashboard/tableConfigUtils";
-import { BAR_GAUGE_MODES, BAR_GAUGE_ORIENTATIONS } from "@/utils/dashboard/convertBarGaugeData";
+import {
+  BAR_GAUGE_MODES,
+  BAR_GAUGE_ORIENTATIONS,
+  barGaugeSchemaAsGauge,
+} from "@/utils/dashboard/convertBarGaugeData";
 import { DISTRIBUTION_MAX_BUCKETS } from "@/utils/dashboard/convertDistributionData";
 import { FUNNEL_ORIENTS, FUNNEL_SORTS } from "@/utils/dashboard/convertFunnelData";
 import { NODE_GRAPH_LAYOUTS } from "@/utils/dashboard/convertNodeGraphData";
@@ -958,8 +962,10 @@ export const validateJoinFields = (t: TranslateFn, joins: any, errors: string[])
 };
 
 const validateGaugeRanges = (t: TranslateFn, panel: any, errors: string[]) => {
-  if (panel?.type !== "gauge") return;
-  const queries = panel?.queries ?? [];
+  if (panel?.type !== "gauge" && panel?.type !== "bar-gauge") return;
+  // A bar gauge without a range mode is auto, where a plain gauge without one is fixed.
+  const queries =
+    (panel.type === "bar-gauge" ? barGaugeSchemaAsGauge(panel) : panel)?.queries ?? [];
   queries.forEach((query: { config?: GaugeQueryConfig }, index: number) => {
     if (isGaugeFixedRangeValid(query?.config)) return;
     const error = t("dashboard.utils.gaugeMinBelowMax");
