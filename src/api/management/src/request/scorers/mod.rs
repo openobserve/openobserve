@@ -661,9 +661,8 @@ async fn run_scorer_test(
                     org_id, &scorer,
                 )
                 .await
-                .map_err(|e| {
-                    ScorerError::InfraError(infra::errors::Error::Message(e.to_string()))
-                })?;
+                // Prepare only validates the inline config, so its errors are the caller's.
+                .map_err(|e| ScorerError::InvalidProviderConfig(e.to_string()))?;
 
             match remote_cfg.run(&attrs).await {
                 Ok(output) => {
@@ -806,6 +805,25 @@ mod tests {
         .unwrap();
         let resp = test_scorer(Path("org1".to_string()), denied_user(), axum::Json(body)).await;
         assert_eq!(resp.status().as_u16(), 403);
+    }
+
+    #[tokio::test]
+    async fn testing_a_remote_scorer_with_an_invalid_endpoint_is_a_bad_request() {
+        for endpoint in ["", "/evaluate"] {
+            let body: ScorerTestRequestBody = serde_json::from_value(serde_json::json!({
+                "name": "default",
+                "description": null,
+                "scorer": {
+                    "type": "remote",
+                    "template": "",
+                    "params": {"endpoint": endpoint}
+                },
+                "inputVariables": null
+            }))
+            .unwrap();
+            let resp = test_scorer(Path("org1".to_string()), denied_user(), axum::Json(body)).await;
+            assert_eq!(resp.status().as_u16(), 400, "endpoint {endpoint:?}");
+        }
     }
 
     #[tokio::test]
