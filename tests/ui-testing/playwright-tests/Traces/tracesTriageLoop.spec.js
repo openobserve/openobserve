@@ -37,22 +37,29 @@ function bandSql(editorBand) {
   return [lo ? `duration >= ${lo}` : '', hi !== null ? `duration < ${hi}` : ''].filter(Boolean).join(' AND ');
 }
 
+// The default brush spans 35-75% of a 15m range (~10-4 min ago); spans stamped now sit right of it.
+const BRUSH_WINDOW_AGE_MS = 6 * 60 * 1000;
+
+async function seedTraces(browser, ageMs = 0) {
+  const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
+  const page = await context.newPage();
+  try {
+    for (const scenario of [{ count: 6, forceScenario: 'error' }, { count: 10, forceScenario: 'success' }]) {
+      const seeded = await ingestTraces(page, scenario.count, { forceScenario: scenario.forceScenario, ageMs });
+      expect(seeded.failed, `Seeding ${scenario.forceScenario} traces must succeed`).toBe(0);
+    }
+  } finally {
+    await context.close();
+  }
+}
+
 test.describe('Traces triage loop', () => {
   let pm;
   let queries;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120000);
-    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
-    const page = await context.newPage();
-    try {
-      for (const scenario of [{ count: 6, forceScenario: 'error' }, { count: 10, forceScenario: 'success' }]) {
-        const seeded = await ingestTraces(page, scenario.count, { forceScenario: scenario.forceScenario });
-        expect(seeded.failed, `Seeding ${scenario.forceScenario} traces must succeed`).toBe(0);
-      }
-    } finally {
-      await context.close();
-    }
+    await seedTraces(browser);
   });
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -246,8 +253,9 @@ test.describe('Traces triage loop', () => {
 
   test('P1: an Errors brush compares error spans with the rest of its window', {
     tag: ['@tracesTriageLoop', '@traces', '@functional', '@P1', '@all'],
-  }, async ({ page }) => {
+  }, async ({ page, browser }) => {
     test.setTimeout(240000);
+    await seedTraces(browser, BRUSH_WINDOW_AGE_MS);
     await searchWith('');
     const preBox = queries.filter(isTableSearch).at(-1);
     expect(await pm.tracesPage.zoomOnMetricsPanel('Errors')).toBeTruthy();
@@ -267,8 +275,9 @@ test.describe('Traces triage loop', () => {
 
   test('P1: a Rate brush compares its window with the rest of the range', {
     tag: ['@tracesTriageLoop', '@traces', '@functional', '@P1', '@all'],
-  }, async ({ page }) => {
+  }, async ({ page, browser }) => {
     test.setTimeout(240000);
+    await seedTraces(browser, BRUSH_WINDOW_AGE_MS);
     await searchWith('');
     expect(await pm.tracesPage.zoomOnMetricsPanel('Rate')).toBeTruthy();
     await page.waitForTimeout(2000);
@@ -296,8 +305,9 @@ test.describe('Traces triage loop across time zones', () => {
 
   test('P2: an Errors brush under an Asia/Kolkata app zone keeps the brushed window', {
     tag: ['@tracesTriageLoop', '@traces', '@functional', '@P2', '@all'],
-  }, async ({ page }) => {
+  }, async ({ page, browser }) => {
     test.setTimeout(240000);
+    await seedTraces(browser, BRUSH_WINDOW_AGE_MS);
     const queries = [];
     page.on('request', (r) => {
       const q = decodedSqlOf(r);
