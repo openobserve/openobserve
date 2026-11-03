@@ -761,6 +761,10 @@ fn resolve_unpriced(
         (status = 429, description = "Search not allowed for the organization"),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
 )]
 pub async fn list_unpriced(
     Path(org_id): Path<String>,

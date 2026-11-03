@@ -1064,6 +1064,7 @@ use crate::{
         (name = "Domain Management", description = "Allowed email domains for sign-in (enterprise)"),
         (name = "EvalJobs", description = "Online evaluation jobs (enterprise)"),
         (name = "Experiments", description = "LLM evaluation experiments (enterprise)"),
+        (name = "GenAI Settings", description = "GenAI agent mapping, the agent list and AI data health"),
         (name = "Groups", description = "User group management"),
         (name = "Keys", description = "Cipher key management (enterprise)"),
         (name = "LLM", description = "LLM model pricing definitions"),

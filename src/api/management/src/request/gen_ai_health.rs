@@ -914,7 +914,11 @@ async fn authorize_read(org_id: &str, user_id: &str, stream: &str) -> Result<(),
         (status = 429, description = "Search not allowed for the organization"),
         (status = 500, description = "Internal server error")
     ),
-    security(("Authorization" = []))
+    security(("Authorization" = [])),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_data_health(
     Path(org_id): Path<String>,
