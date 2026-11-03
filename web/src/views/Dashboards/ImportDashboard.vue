@@ -102,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <SelectFolderDropdown
                           @folder-selected="selectedFolder = $event"
                           :activeFolderId="selectedFolder.value"
+                          :disabled="!!isLoading"
                         />
                       </div>
                     </div>
@@ -140,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <SelectFolderDropdown
                           @folder-selected="selectedFolder = $event"
                           :activeFolderId="selectedFolder.value"
+                          :disabled="!!isLoading"
                         />
                       </div>
                     </div>

@@ -1573,6 +1573,11 @@ export default defineComponent({
 
     const handleDashboardMoved = async () => {
       showMoveDashboardDialog.value = false;
+      const org = store.state.selectedOrganization?.identifier;
+      // The server rewrites the pin's folder on move; the cached copy would keep routing to the old one.
+      if (org && selectedDashboardIdToMove.value?.some((id) => isHome(id))) {
+        await useHomeDashboard(t).load(org, true);
+      }
     };
 
     const deleteFolder = async () => {
