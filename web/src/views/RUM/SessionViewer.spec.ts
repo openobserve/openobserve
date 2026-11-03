@@ -2906,7 +2906,7 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
         wrapper.unmount();
       });
 
-      it("narrows the columns on the server's own missing-field error event", async () => {
+      it("narrows the columns when the server names the missing field only in its error detail", async () => {
         noSchema();
         server.failed = [traced("doc0", 0, 30, "abc1")];
         server.spans = [span("abc1", { http_status_code: "503" })];
@@ -2915,8 +2915,9 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
             throw Object.assign(new Error("stream error"), {
               content: {
                 code: 400,
-                message:
-                  "Search field not found: No field named http_response_status_code. Valid fields are traces.trace_id, traces.start_time.",
+                message: "Search SQL execute error",
+                error_detail:
+                  "Schema error: No field named http_response_status_code. Valid fields are traces.trace_id, traces.start_time.",
               },
             });
           return answer(server.spans);
