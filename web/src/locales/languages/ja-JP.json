@@ -762,6 +762,7 @@
     "dragToReorder": "ドラッグして並べ替え",
     "timeAmount": "時間の値",
     "timeUnit": "時間の単位",
+    "unitFor": "{label} 単位",
     "queryEditorAriaLabel": "クエリエディタ。Escape キーを押すと次のコントロールに移動します。",
     "queryEditorEscapeAction": "フォーカスを次のコントロールに移動",
     "inlineEdit": {
@@ -11956,6 +11957,7 @@
       "budgetLabel": "アラート予算",
       "budgetPerDay": "1日あたり",
       "budgetPerWeek": "1週間あたり",
+      "budgetPeriod": "アラートバジェット期間",
       "budgetRange": "0 より大きい数値を入力してください",
       "chartsTab": "グラフ",
       "checkEvery": "チェック間隔",
@@ -11965,6 +11967,7 @@
       "sendsToStatus": "異常が検出されるたびに {targets} に送信します。",
       "detectionAlreadyRunning": "検出はすでに実行中です。しばらくしてからもう一度お試しください。",
       "detectionCharts": "検出結果",
+      "detectionFunctionField": "検出関数フィールド",
       "detectionFunctionTooltip": "各時間バケットで何を測定するかを指定します。count は到着するレコード数を監視し、avg、min、max、sum は数値フィールドを監視します。p50、p95、p99 はそのフィールドの分布を監視します — 例えば response_time_ms の p95 は、トラフィックが横ばいでも最も遅いリクエストのレイテンシが悪化していることを捉えます。",
       "detectionResolution": "検出解像度",
       "detectionResolutionTooltip": "各データポイントの細かさ。たとえば、「5m」は、5 分の解像度で異常が検出されたことを意味します。",

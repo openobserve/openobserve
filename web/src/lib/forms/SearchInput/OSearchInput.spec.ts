@@ -147,4 +147,17 @@ describe("OSearchInput", () => {
       expect(wrapper.classes()).not.toContain("max-md:min-w-32");
     },
   );
+
+  it("routes aria-label, aria-labelledby and aria-describedby to the input, not the wrapper", () => {
+    wrapper = mount(OSearchInput, {
+      attrs: { "aria-label": "Name", "aria-labelledby": "lbl", "aria-describedby": "hint" },
+    });
+    const input = wrapper.find("input");
+    expect(input.attributes("aria-label")).toBe("Name");
+    expect(input.attributes("aria-labelledby")).toBe("lbl");
+    expect(input.attributes("aria-describedby")).toBe("hint");
+    expect(wrapper.attributes("aria-label")).toBeUndefined();
+    expect(wrapper.attributes("aria-labelledby")).toBeUndefined();
+    expect(wrapper.attributes("aria-describedby")).toBeUndefined();
+  });
 });
