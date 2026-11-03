@@ -48,6 +48,10 @@ pub struct Model {
     /// a certificate is `warning` on every run for weeks — so it needs
     /// transition-based suppression rather than a time window.
     pub degraded_notified_at: i64,
+    /// When the open alert episode started, in microseconds; 0 when not alerting.
+    pub alerting_since: i64,
+    /// Template override by name for this check's messages; NULL uses the destination's.
+    pub template: Option<String>,
     pub owner: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -88,6 +92,8 @@ mod tests {
             last_alert_at: 0,
             alerting: false,
             degraded_notified_at: 0,
+            alerting_since: 0,
+            template: None,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,

@@ -107,6 +107,16 @@ pub struct NotificationContext {
     pub cluster_name: String,
     /// Today's body for a generic webhook while no user template applies (D1).
     pub legacy_payload: Option<LegacyPayload>,
+    pub render_hints: RenderHints,
+}
+
+/// Producer choices the renderer honors; the defaults keep the alert output unchanged.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RenderHints {
+    /// The email or SNS subject when a Custom template has no title of its own.
+    pub fallback_subject: Option<String>,
+    /// HTML-escape context attributes in email bodies, as the producer's own sender did.
+    pub escape_email_attributes: bool,
 }
 
 /// Builds a producer's pre-template JSON body only when the legacy rule selects it.

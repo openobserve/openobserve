@@ -713,6 +713,28 @@ async fn composition_error_response(
     })
 }
 
+/// A template override must name a user template that applies to synthetics; "" clears it.
+async fn checked_template(
+    org_id: &str,
+    body: &mut config::meta::synthetics::Synthetic,
+) -> Result<(), Response> {
+    body.template = body
+        .template
+        .take()
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty());
+    if let Some(name) = body.template.as_deref() {
+        openobserve_core::alerts::templates::check_binding(
+            org_id,
+            name,
+            config::meta::alerts::notification_kind::NotificationKind::Synthetics,
+        )
+        .await
+        .map_err(|e| MetaHttpResponse::bad_request(e.as_str()))?;
+    }
+    Ok(())
+}
+
 #[utoipa::path(
     post,
     path = "/{org_id}/synthetics",
@@ -775,6 +797,9 @@ pub async fn create_synthetic(
         }
     }
 
+    if let Err(response) = checked_template(&org_id, &mut body).await {
+        return response;
+    }
     let created_by = user_email.user_id.as_str();
     match openobserve_synthetics::service::create_synthetic(&org_id, body, created_by).await {
         Ok(check) => MetaHttpResponse::json(check),
@@ -945,6 +970,10 @@ pub async fn update_synthetic(
     #[cfg(not(feature = "enterprise"))]
     let user_id = "";
 
+    let mut body = body;
+    if let Err(response) = checked_template(&org_id, &mut body).await {
+        return response;
+    }
     match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
         Ok(check) => MetaHttpResponse::json(check),
         Err(e) => {
@@ -1718,7 +1747,7 @@ async fn process_ack(
     let should_notify =
         !matches!(resp.alert, AlertDecision::Silent) && resp.suppressed_by.is_none();
     // Enterprise-gated because alert *destinations* are: the dispatch it ends in
-    // (`alerts::alert::dispatch_notification`) is not built in OSS. An OSS build
+    // (the shared notification path) is not built in OSS. An OSS build
     // runs the check, records the run and serves the result — it just has
     // nowhere to send a notification, exactly as it has for alerts.
     #[cfg(feature = "enterprise")]
@@ -1744,6 +1773,8 @@ async fn process_ack(
             failing_locations: resp.failing_locations.clone(),
             failing_environments: resp.failing_environments.clone(),
             passing_locations: resp.passing_locations.clone(),
+            template: resp.template.clone(),
+            alerting_since: resp.alerting_since,
         };
         tokio::spawn(async move {
             openobserve_core::synthetics::notify_check_result(notification).await;
@@ -2448,6 +2479,8 @@ mod tests {
             failing_environments: Vec::new(),
             usage_events,
             suppressed_by: None,
+            alerting_since: 0,
+            template: None,
         }
     }
 

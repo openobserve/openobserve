@@ -173,9 +173,15 @@ fn validate(query: &DeliveriesQuery) -> Result<(NotificationKind, String), Strin
         )
     })?;
     // Only the kinds whose producers write rows today; the others land with their stages.
-    if !matches!(kind, NotificationKind::Anomaly | NotificationKind::Incident) {
+    if !matches!(
+        kind,
+        NotificationKind::Anomaly
+            | NotificationKind::Incident
+            | NotificationKind::Synthetics
+            | NotificationKind::Downtime
+    ) {
         return Err(format!(
-            "kind: '{}' has no delivery rows yet; allowed: anomaly, incident",
+            "kind: '{}' has no delivery rows yet; allowed: anomaly, incident, synthetics, downtime",
             query.kind
         ));
     }
@@ -200,6 +206,8 @@ fn owner_of_episode(episode_id: &str) -> String {
 async fn can_read(org_id: &str, user_id: &str, kind: NotificationKind, owner: &str) -> bool {
     let object_type = match kind {
         NotificationKind::Incident => "incidents",
+        NotificationKind::Synthetics => "synthetics",
+        NotificationKind::Downtime => "downtimes",
         _ => "alerts",
     };
     openobserve_core::auth::check_permissions(
@@ -250,9 +258,15 @@ mod tests {
 
     #[test]
     fn kinds_without_rows_yet_are_refused() {
-        for kind in ["alert", "synthetics", "downtime", "on_call"] {
+        for kind in ["alert", "on_call"] {
             let err = validate(&q(kind, Some("x1"), None)).unwrap_err();
-            assert!(err.contains("allowed: anomaly, incident"), "{kind}: {err}");
+            assert!(
+                err.contains("allowed: anomaly, incident, synthetics, downtime"),
+                "{kind}: {err}"
+            );
+        }
+        for kind in ["synthetics", "downtime"] {
+            assert!(validate(&q(kind, Some("x1"), None)).is_ok(), "{kind}");
         }
     }
 

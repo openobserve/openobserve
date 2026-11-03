@@ -46,6 +46,32 @@ pub type MayMute = fn(org: &str) -> bool;
 
 static MAY_MUTE: OnceLock<MayMute> = OnceLock::new();
 
+/// The state swap of a run that closes an alert episode, run inside the closer's transaction.
+pub type EpisodeSwap = Box<
+    dyn for<'a> FnOnce(&'a sea_orm::DatabaseTransaction) -> BoxFuture<'a, anyhow::Result<bool>>
+        + Send,
+>;
+
+/// What a closing run hands the closer; `send_resolves` is false for a muted recovery.
+pub struct EpisodeClose {
+    pub org_id: String,
+    pub check_id: String,
+    pub check_name: String,
+    pub check_type: String,
+    pub target: String,
+    pub episode_id: String,
+    pub run_id: String,
+    pub destinations: Vec<String>,
+    pub template: Option<String>,
+    pub send_resolves: bool,
+    pub swap: EpisodeSwap,
+}
+
+/// Closes the episode and runs the swap in one transaction; true when the swap won.
+pub type EpisodeCloser = fn(EpisodeClose) -> BoxFuture<'static, anyhow::Result<bool>>;
+
+static EPISODE_CLOSER: OnceLock<EpisodeCloser> = OnceLock::new();
+
 /// What a completed run is, before any suppression is applied.
 ///
 /// The distinction that matters is between an OUTAGE and a DEGRADATION. An
@@ -220,12 +246,24 @@ pub async fn muted_by(
 
 /// A muted run may close `alerting` but never open it, so a muted recovery is dropped.
 pub fn suppressed_state(prior: AlertState, next: AlertState) -> AlertState {
+    let alerting = prior.alerting && next.alerting;
     AlertState {
         last_alert_at: prior.last_alert_at,
-        alerting: prior.alerting && next.alerting,
+        alerting,
         degraded_notified_at: prior.degraded_notified_at,
+        alerting_since: if alerting { prior.alerting_since } else { 0 },
         ..next
     }
+}
+
+/// Registers the writer that closes an alert episode; OSS registers none and keeps the plain swap.
+pub fn register_episode_closer(f: EpisodeCloser) {
+    let _ = EPISODE_CLOSER.set(f);
+}
+
+/// The registered writer, when this build has a ledger to close the episode on.
+pub fn episode_closer() -> Option<EpisodeCloser> {
+    EPISODE_CLOSER.get().copied()
 }
 
 /// Decides the outcome for one completed run and returns the state to persist.
@@ -269,6 +307,7 @@ pub fn decide(
                 alerting: false,
                 // The target is up, so any degradation has cleared too.
                 degraded_notified_at: 0,
+                alerting_since: 0,
             };
 
             // Closing an incident takes precedence over reporting flakiness. The
@@ -306,6 +345,7 @@ pub fn decide(
                 last_alert_at: prior.last_alert_at,
                 alerting: prior.alerting,
                 degraded_notified_at: prior.degraded_notified_at,
+                alerting_since: prior.alerting_since,
             };
             let reminder = cooldown_us.max(DEGRADED_REMINDER_US);
             let first_time = prior.degraded_notified_at == 0;
@@ -334,6 +374,7 @@ pub fn decide(
                 // longer the headline, and re-entering the degraded state later
                 // is worth saying again.
                 degraded_notified_at: 0,
+                alerting_since: prior.alerting_since,
             };
 
             if consecutive_failures < threshold {
@@ -352,6 +393,9 @@ pub fn decide(
                 return (AlertOutcome::Silent, next);
             }
 
+            if !prior.alerting {
+                next.alerting_since = now_us;
+            }
             next.alerting = true;
             next.last_alert_at = now_us;
             (AlertOutcome::Firing, next)
@@ -372,6 +416,7 @@ mod tests {
             last_alert_at,
             alerting,
             degraded_notified_at: 0,
+            alerting_since: 0,
         }
     }
 
@@ -638,6 +683,55 @@ mod tests {
         // A second pass says nothing — the incident is already closed.
         let (outcome, _) = decide(next, RunClass::Healthy, 1, 30, 1011 * MIN);
         assert_eq!(outcome, AlertOutcome::Silent);
+    }
+
+    #[test]
+    fn an_episode_starts_on_the_opening_firing_and_ends_on_the_recovery() {
+        let (outcome, opened) = decide(AlertState::default(), RunClass::Failing, 1, 30, 10 * MIN);
+        assert_eq!(outcome, AlertOutcome::Firing);
+        assert_eq!(
+            opened.alerting_since,
+            10 * MIN,
+            "the opening firing keys the episode"
+        );
+
+        // A firing after the cooldown re-pages inside the same episode.
+        let (outcome, again) = decide(opened, RunClass::Failing, 1, 30, 50 * MIN);
+        assert_eq!(outcome, AlertOutcome::Firing);
+        assert_eq!(again.alerting_since, 10 * MIN);
+        let (_, degraded) = decide(again, RunClass::Degraded, 1, 30, 51 * MIN);
+        assert_eq!(degraded.alerting_since, 10 * MIN);
+
+        let (outcome, closed) = decide(again, RunClass::Healthy, 1, 30, 60 * MIN);
+        assert_eq!(outcome, AlertOutcome::Recovered);
+        assert_eq!(
+            closed.alerting_since, 0,
+            "a recovered check holds no episode"
+        );
+        let (_, next) = decide(closed, RunClass::Failing, 1, 30, 70 * MIN);
+        assert_eq!(
+            next.alerting_since,
+            70 * MIN,
+            "the next outage is a new episode"
+        );
+    }
+
+    #[test]
+    fn a_muted_recovery_clears_the_episode_and_a_muted_firing_keeps_it() {
+        let paged = AlertState {
+            alerting_since: 5 * MIN,
+            ..state(3, MIN, true)
+        };
+        let (_, recovered) = decide(paged, RunClass::Healthy, 3, 30, 45 * MIN);
+        assert_eq!(suppressed_state(paged, recovered).alerting_since, 0);
+        let (_, firing) = decide(paged, RunClass::Failing, 3, 30, 45 * MIN);
+        assert_eq!(suppressed_state(paged, firing).alerting_since, 5 * MIN);
+        let (_, opening) = decide(AlertState::default(), RunClass::Failing, 1, 30, 45 * MIN);
+        assert_eq!(
+            suppressed_state(AlertState::default(), opening).alerting_since,
+            0,
+            "a muted run never opens an episode"
+        );
     }
 
     #[test]

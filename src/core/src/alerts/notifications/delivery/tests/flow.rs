@@ -915,3 +915,142 @@ fn an_email_with_an_inline_chart_replays_and_filters_recipients_again() {
         },
     );
 }
+
+#[cfg(feature = "enterprise")]
+async fn kind_rows(
+    kind: &str,
+    object: &str,
+) -> Vec<infra::table::entity::notification_deliveries::Model> {
+    let filter = ListFilter {
+        org: "acme".to_string(),
+        kind: kind.into(),
+        object_id: Some(object.to_string()),
+        size: 50,
+        ..Default::default()
+    };
+    ledger::list(infra::db::get_orm_client_rw().await, &filter)
+        .await
+        .unwrap()
+        .1
+}
+
+#[cfg(feature = "enterprise")]
+fn synthetics_close(
+    check: &str,
+    since: i64,
+    send_resolves: bool,
+    won: bool,
+) -> openobserve_synthetics::alerting::EpisodeClose {
+    openobserve_synthetics::alerting::EpisodeClose {
+        org_id: "acme".into(),
+        check_id: check.to_string(),
+        check_name: "checkout".into(),
+        check_type: "http".into(),
+        target: "https://shop.acme.com".into(),
+        episode_id: format!("{check}:{since}"),
+        run_id: "r2".into(),
+        destinations: vec!["pd-syn".into(), "slack-syn".into()],
+        template: None,
+        send_resolves,
+        swap: Box::new(move |_| Box::pin(async move { Ok(won) })),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+#[test]
+fn a_synthetics_recovery_resolves_the_firing_record_and_a_muted_one_writes_no_row() {
+    run(
+        concat!(
+            module_path!(),
+            "::a_synthetics_recovery_resolves_the_firing_record_and_a_muted_one_writes_no_row"
+        ),
+        &[],
+        || async {
+            store().await;
+            let (base, seen) = mock().await;
+            register("pd-syn", http(format!("{base}/pd"), "pagerduty"));
+            register("slack-syn", http(format!("{base}/ok"), "slack"));
+            let check = svix_ksuid::Ksuid::new(None, None).to_string();
+            crate::synthetics::notify_check_result(crate::synthetics::CheckNotification {
+                org_id: "acme".into(),
+                check_name: "checkout".into(),
+                check_id: check.clone(),
+                check_type: "http".into(),
+                target: "https://shop.acme.com".into(),
+                destinations: vec!["pd-syn".into(), "slack-syn".into()],
+                run_id: "r1".into(),
+                status: "failed".into(),
+                job_count: 1,
+                error: Some("timeout".into()),
+                checked_at: 1,
+                recovery: false,
+                consecutive_failures: 1,
+                flaky: false,
+                status_reason: None,
+                error_source: String::new(),
+                degraded: false,
+                failing_locations: vec!["us-east-1".into()],
+                passing_locations: vec![],
+                failing_environments: vec![],
+                template: None,
+                alerting_since: 100,
+            })
+            .await;
+            let triggers = calls(&seen, "/pd");
+            assert_eq!(triggers.len(), 1, "the firing reached PagerDuty once");
+
+            // A lost swap closes nothing and writes no row.
+            assert!(
+                !crate::synthetics::close_alert_episode(synthetics_close(&check, 100, true, false))
+                    .await
+                    .unwrap()
+            );
+            assert!(
+                kind_rows("synthetics", &check)
+                    .await
+                    .iter()
+                    .all(|r| r.event != "resolved")
+            );
+
+            assert!(
+                crate::synthetics::close_alert_episode(synthetics_close(&check, 100, true, true))
+                    .await
+                    .unwrap()
+            );
+            let pd = calls(&seen, "/pd");
+            assert_eq!(pd.len(), 2, "one trigger, then one resolve");
+            let resolve = String::from_utf8_lossy(&pd[1].1).to_string();
+            let trigger = String::from_utf8_lossy(&pd[0].1).to_string();
+            assert!(resolve.contains("resolve"), "{resolve}");
+            assert!(
+                trigger.contains(&format!("{check}:100"))
+                    && resolve.contains(&format!("{check}:100"))
+            );
+            let resolved: Vec<_> = kind_rows("synthetics", &check)
+                .await
+                .into_iter()
+                .filter(|r| r.event == "resolved")
+                .collect();
+            assert_eq!(resolved.len(), 2);
+            assert!(resolved.iter().all(|r| r.status == "sent"), "{resolved:?}");
+
+            // A muted recovery closes its episode without a resolve row.
+            assert!(
+                crate::synthetics::close_alert_episode(synthetics_close(&check, 200, false, true))
+                    .await
+                    .unwrap()
+            );
+            assert!(
+                kind_rows("synthetics", &check)
+                    .await
+                    .iter()
+                    .all(|r| r.episode_id != format!("{check}:200"))
+            );
+            assert_eq!(
+                calls(&seen, "/pd").len(),
+                2,
+                "nothing more reached PagerDuty"
+            );
+        },
+    );
+}

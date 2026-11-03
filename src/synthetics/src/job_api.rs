@@ -1033,6 +1033,12 @@ pub struct AckResponse {
     /// The downtime that muted this run; server-side only, since the ack body goes to a probe.
     #[serde(skip)]
     pub suppressed_by: Option<String>,
+    /// Start of the alert episode a firing or a recovery belongs to; server-side only.
+    #[serde(skip)]
+    pub alerting_since: i64,
+    /// The check's template override; server-side only.
+    #[serde(skip)]
+    pub template: Option<String>,
 }
 
 /// The notification a completed run should send, resolved against the check's
@@ -1642,6 +1648,8 @@ fn stale_lease_response(
         failing_environments: Vec::new(),
         usage_events: Vec::new(),
         suppressed_by: None,
+        alerting_since: 0,
+        template: None,
     }
 }
 
@@ -1832,10 +1840,11 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
     // Decide the notification, once per RUN. Per-job would alert once per
     // location for the same outage, and would advance the failure streak by the
     // fan-out factor rather than by one.
-    let (alert, consecutive_failures, suppressed_by) = if run_complete {
+    let (alert, consecutive_failures, suppressed_by, alerting_since) = if run_complete {
         resolve_alert(
             conn,
             &check.synthetics_id,
+            &check.run_id,
             RunOutcome {
                 status: run_status.as_deref(),
                 attempts: req.attempts,
@@ -1847,7 +1856,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         )
         .await
     } else {
-        (AlertDecision::Silent, 0, None)
+        (AlertDecision::Silent, 0, None, 0)
     };
 
     // Which locations broke and which came back. Only worth a query when the run
@@ -1895,6 +1904,8 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         usage_events,
         failing_environments,
         suppressed_by,
+        alerting_since,
+        template: synthetic.template.clone(),
     })
 }
 
@@ -2019,10 +2030,11 @@ struct RunOutcome<'a> {
 async fn resolve_alert<C: sea_orm::ConnectionTrait>(
     conn: &C,
     synthetics_id: &str,
+    run_id: &str,
     outcome: RunOutcome<'_>,
     check: &config::meta::synthetics::Synthetic,
     now_us: i64,
-) -> (AlertDecision, i32, Option<String>) {
+) -> (AlertDecision, i32, Option<String>, i64) {
     // See `alerting::classify`. Four outcomes, not two: an outage accumulates and
     // drives the streak, a degradation does not (a certificate is not "more
     // expired" on the twentieth check), and `error` is an outage rather than a
@@ -2036,10 +2048,10 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
 
     let prior = match infra::table::synthetics_checks::get_alert_state(conn, synthetics_id).await {
         Ok(Some(state)) => state,
-        Ok(None) => return (AlertDecision::Silent, 0, None), // deleted mid-run
+        Ok(None) => return (AlertDecision::Silent, 0, None, 0), // deleted mid-run
         Err(e) => {
             tracing::warn!(%synthetics_id, "[synthetics] get_alert_state: {e}");
-            return (AlertDecision::Silent, 0, None);
+            return (AlertDecision::Silent, 0, None, 0);
         }
     };
 
@@ -2068,7 +2080,7 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
         {
             tracing::warn!(%synthetics_id, "[synthetics] clear_alert_state: {e}");
         }
-        return (AlertDecision::Silent, 0, None);
+        return (AlertDecision::Silent, 0, None, 0);
     }
 
     let (outcome, next) = crate::alerting::decide(
@@ -2096,25 +2108,60 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
     // decision was made against a stale read, so we discard it rather than
     // overwrite the winner: the streak would otherwise undercount and the
     // notification would double.
-    if next != prior {
-        match infra::table::synthetics_checks::update_alert_state_if(
-            conn,
-            synthetics_id,
-            prior,
-            next,
-        )
-        .await
-        {
-            Ok(true) => {}
-            Ok(false) => {
-                tracing::info!(
-                    %synthetics_id,
-                    "[synthetics] alert state changed under us; another run decided this one"
-                );
-                return (AlertDecision::Silent, next.consecutive_failures, None);
-            }
-            Err(e) => tracing::warn!(%synthetics_id, "[synthetics] update_alert_state: {e}"),
+    let closes_episode = prior.alerting && !next.alerting;
+    let swapped = match crate::alerting::episode_closer().filter(|_| closes_episode) {
+        Some(closer) => {
+            let id = synthetics_id.to_string();
+            let close = crate::alerting::EpisodeClose {
+                org_id: check.org_id.clone(),
+                check_id: synthetics_id.to_string(),
+                check_name: check.name.clone(),
+                check_type: check_type_name(&check.check_type),
+                target: check.target.clone(),
+                episode_id: format!("{synthetics_id}:{}", prior.alerting_since),
+                run_id: run_id.to_string(),
+                destinations: check.destinations.clone(),
+                template: check.template.clone(),
+                send_resolves: suppressed_by.is_none(),
+                swap: Box::new(move |txn| {
+                    Box::pin(async move {
+                        Ok(infra::table::synthetics_checks::update_alert_state_if(
+                            txn, &id, prior, next,
+                        )
+                        .await?)
+                    })
+                }),
+            };
+            // A failed transaction changed nothing, so the next run repeats the recovery.
+            closer(close).await.unwrap_or_else(|e| {
+                tracing::warn!(%synthetics_id, "[synthetics] close alert episode: {e}");
+                false
+            })
         }
+        None if next != prior => {
+            match infra::table::synthetics_checks::update_alert_state_if(
+                conn,
+                synthetics_id,
+                prior,
+                next,
+            )
+            .await
+            {
+                Ok(won) => won,
+                Err(e) => {
+                    tracing::warn!(%synthetics_id, "[synthetics] update_alert_state: {e}");
+                    true
+                }
+            }
+        }
+        None => true,
+    };
+    if !swapped {
+        tracing::info!(
+            %synthetics_id,
+            "[synthetics] alert state changed under us; another run decided this one"
+        );
+        return (AlertDecision::Silent, next.consecutive_failures, None, 0);
     }
 
     let decision = match outcome {
@@ -2124,7 +2171,25 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
         crate::alerting::AlertOutcome::Degraded => AlertDecision::Degraded,
         crate::alerting::AlertOutcome::Recovered => AlertDecision::Recovered,
     };
-    (decision, next.consecutive_failures, suppressed_by)
+    let alerting_since = if closes_episode {
+        prior.alerting_since
+    } else {
+        next.alerting_since
+    };
+    (
+        decision,
+        next.consecutive_failures,
+        suppressed_by,
+        alerting_since,
+    )
+}
+
+/// The wire name of a check type, as the ack response spells it.
+fn check_type_name(check_type: &config::meta::synthetics::SyntheticType) -> String {
+    serde_json::to_value(check_type)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_owned))
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

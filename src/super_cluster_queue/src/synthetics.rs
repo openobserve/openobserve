@@ -635,6 +635,8 @@ mod tests {
             last_alert_at: 0,
             alerting: false,
             degraded_notified_at: 0,
+            alerting_since: 0,
+            template: None,
             owner: None,
             created_at: 0,
             updated_at: 0,
@@ -783,6 +785,8 @@ mod tests {
                 last_alert_at BIGINT NOT NULL DEFAULT 0,
                 alerting BOOLEAN NOT NULL DEFAULT 0,
                 degraded_notified_at BIGINT NOT NULL DEFAULT 0,
+                alerting_since BIGINT NOT NULL DEFAULT 0,
+                template TEXT,
                 owner TEXT NULL,
                 created_at BIGINT NOT NULL,
                 updated_at BIGINT NOT NULL

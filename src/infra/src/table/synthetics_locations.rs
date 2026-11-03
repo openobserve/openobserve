@@ -26,7 +26,8 @@ use std::{
 };
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set, sea_query::Expr,
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    sea_query::Expr,
 };
 use tokio::sync::RwLock;
 
@@ -307,6 +308,35 @@ pub async fn clear_down_notification(id: &str) -> Result<(), errors::Error> {
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     Ok(())
+}
+
+/// The time the open down claim was taken, in microseconds; 0 when the location is not down.
+pub async fn down_notified_at(id: &str) -> Result<i64, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let at = Entity::find_by_id(id)
+        .select_only()
+        .column(Column::DownNotifiedAt)
+        .into_tuple::<i64>()
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(at.unwrap_or(0))
+}
+
+/// Clears the claim only while it still holds `since`; true when this call cleared it.
+pub async fn clear_down_notification_from_with<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    since: i64,
+) -> Result<bool, errors::Error> {
+    let res = Entity::update_many()
+        .col_expr(Column::DownNotifiedAt, Expr::value(0i64))
+        .filter(Column::Id.eq(id))
+        .filter(Column::DownNotifiedAt.eq(since))
+        .exec(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(res.rows_affected > 0)
 }
 
 pub async fn try_claim_down_notification_with<C: ConnectionTrait>(

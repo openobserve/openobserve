@@ -251,9 +251,12 @@ pub fn render_record(
         TemplateKind::Custom => {
             let msg = apply_custom_template(&template.body, ctx, is_email);
             let msg = crate::alerts::alert::stamp_platform_key(dest_type, ctx, msg);
+            let fallback = ctx.render_hints.fallback_subject.as_ref();
             let title = match &template.template_type {
-                TemplateType::Email { title } => apply_custom_template(title, ctx, is_email),
-                _ => template.name.clone(),
+                TemplateType::Email { title } if !(title.is_empty() && fallback.is_some()) => {
+                    apply_custom_template(title, ctx, is_email)
+                }
+                _ => fallback.cloned().unwrap_or_else(|| template.name.clone()),
             };
             let subject = subject.map(str::to_string).unwrap_or(title);
             Ok(match dest_type {

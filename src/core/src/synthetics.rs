@@ -74,91 +74,305 @@ pub struct CheckNotification {
     pub passing_locations: Vec<String>,
     /// Environments that did not pass, worst first.
     pub failing_environments: Vec<String>,
+    /// The check's template override.
+    pub template: Option<String>,
+    /// Start of the alert episode; keys `{check_id}:{alerting_since}`.
+    pub alerting_since: i64,
 }
 
-/// Fires once per run (when all jobs have completed) for non-passing runs.
-/// Passing runs are suppressed — operators want alerts, not confirmations.
-///
-/// The message body is built per destination type: Slack-compatible JSON for
-/// HTTP webhooks, an HTML card for email, plain text for SNS.
+/// Fires once per run for a non-passing run; a recovery is sent by the episode close instead.
 #[cfg(feature = "enterprise")]
 pub async fn notify_check_result(n: CheckNotification) {
-    // A passing run is worth sending exactly once: when it ends an incident
-    // somebody was already told about. Otherwise it is a confirmation nobody
-    // asked for.
-    //
-    // A flaky run reports as `warning`, not `passed`, so it is not caught here —
-    // the decision to send it was already made upstream against `cooldown_mins`.
-    if !n.recovery && (n.status == "passed" || n.status == "up") {
+    use crate::alerts::notifications::notify::{NotifyError, notify};
+
+    // A passing run matters only when it ends an incident, and the close sends that.
+    if n.recovery || n.status == "passed" || n.status == "up" {
         return;
     }
-
-    use config::meta::destinations::{DestinationType, Module};
-
+    let ctx = synthetics_notification_context(&n);
+    let explicit =
+        crate::alerts::notifications::org_default::load_override(&n.org_id, n.template.as_deref())
+            .await;
     for dest_name in &n.destinations {
-        match crate::alerts::destinations::get_with_template(&n.org_id, dest_name).await {
-            Ok((dest, _tpl)) => {
-                let Module::Alert {
-                    destination_type, ..
-                } = &dest.module
-                else {
-                    continue;
-                };
-
-                let msg = match destination_type {
-                    DestinationType::Email(_) => build_email_html(&n),
-                    DestinationType::Sns(_) => build_plain_text(&n),
-                    DestinationType::Http(_) | DestinationType::SlackApp(_) => build_slack_json(&n),
-                };
-
-                let subject = if n.recovery {
-                    format!("[OpenObserve Synthetics] ✅ {} has RECOVERED", n.check_name)
-                } else if n.degraded {
-                    // Not "is WARNING": the point of the message is that this needs
-                    // action before it becomes an outage. Named where we know the
-                    // condition, because the subject is the line that decides
-                    // whether anyone opens the alert — and "CERTIFICATE EXPIRING"
-                    // gets renewed where a generic "DEGRADED" gets skimmed.
-                    match n.status_reason.as_deref() {
-                        Some("cert_expiring") => format!(
-                            "[OpenObserve Synthetics] 🟡 {} — CERTIFICATE EXPIRING SOON",
-                            n.check_name
-                        ),
-                        Some("sftp_degraded") => format!(
-                            "[OpenObserve Synthetics] 🟡 {} — SFTP DEGRADED",
-                            n.check_name
-                        ),
-                        _ => format!("[OpenObserve Synthetics] 🟡 {} is DEGRADED", n.check_name),
-                    }
-                } else if n.flaky {
-                    format!("[OpenObserve Synthetics] 🔁 {} is FLAKY", n.check_name)
-                } else {
-                    format!(
-                        "[OpenObserve Synthetics] {} {} is {}",
-                        status_emoji(&n),
-                        n.check_name,
-                        n.status.to_uppercase()
-                    )
-                };
-                if let Err(e) = crate::alerts::alert::dispatch_notification(
-                    &n.org_id,
-                    destination_type,
-                    &subject,
-                    msg,
-                )
-                .await
-                {
-                    log::error!(
-                        "[synthetics] notify dest={dest_name} check={}: {e}",
-                        n.check_id
-                    );
-                }
-            }
-            Err(e) => {
-                log::error!("[synthetics] load dest={dest_name} org={}: {e}", n.org_id);
-            }
+        let mut ctx = ctx.clone();
+        match notify(&n.org_id, dest_name, &explicit, None, &mut ctx).await {
+            Ok(_) => {}
+            Err(NotifyError::Skipped(reason)) => log::debug!(
+                "[synthetics] notify dest={dest_name} check={} skipped: {}",
+                n.check_id,
+                reason.as_str()
+            ),
+            Err(e) => log::error!(
+                "[synthetics] notify dest={dest_name} check={}: {e}",
+                n.check_id
+            ),
         }
     }
+}
+
+/// Closes a check's alert episode with its state swap in one transaction, then sends the recovery.
+#[cfg(feature = "enterprise")]
+pub fn close_alert_episode(
+    close: openobserve_synthetics::alerting::EpisodeClose,
+) -> openobserve_synthetics::alerting::BoxFuture<'static, anyhow::Result<bool>> {
+    Box::pin(close_alert_episode_inner(close))
+}
+
+#[cfg(feature = "enterprise")]
+async fn close_alert_episode_inner(
+    close: openobserve_synthetics::alerting::EpisodeClose,
+) -> anyhow::Result<bool> {
+    use config::meta::alerts::notification_kind::NotificationKind;
+    use infra::table::notification_deliveries::{CLOSED_BY_PRODUCER, CLOSED_BY_RESOLVE};
+
+    use crate::alerts::notifications::delivery;
+
+    let openobserve_synthetics::alerting::EpisodeClose {
+        org_id,
+        check_id,
+        check_name,
+        check_type,
+        target,
+        episode_id,
+        run_id,
+        destinations,
+        template,
+        send_resolves,
+        swap,
+    } = close;
+    let outcomes = infra::table::synthetics_jobs::run_location_outcomes(
+        infra::db::get_orm_client_ro().await,
+        &run_id,
+    )
+    .await
+    .unwrap_or_default();
+    let n = CheckNotification {
+        org_id: org_id.clone(),
+        check_name,
+        check_id: check_id.clone(),
+        check_type,
+        target,
+        destinations: destinations.clone(),
+        run_id,
+        status: "passed".to_string(),
+        job_count: (outcomes.failing.len() + outcomes.passing.len()) as i64,
+        error: None,
+        checked_at: config::utils::time::now_micros(),
+        recovery: true,
+        consecutive_failures: 0,
+        flaky: false,
+        status_reason: None,
+        error_source: String::new(),
+        degraded: false,
+        failing_locations: outcomes.failing,
+        passing_locations: outcomes.passing,
+        failing_environments: Vec::new(),
+        template: template.clone(),
+        alerting_since: episode_id
+            .rsplit_once(':')
+            .and_then(|(_, since)| since.parse().ok())
+            .unwrap_or_default(),
+    };
+    let ctx = synthetics_notification_context(&n);
+    let explicit = if send_resolves {
+        crate::alerts::notifications::org_default::load_override(&org_id, template.as_deref()).await
+    } else {
+        Vec::new()
+    };
+    let mut rows = Vec::new();
+    let mut recorded_rows = Vec::new();
+    if send_resolves {
+        for dest in &destinations {
+            rows.push(delivery::fanout_row(&org_id, dest, &explicit, None, &ctx).await);
+        }
+        for dest in
+            delivery::recorded_destinations(&org_id, NotificationKind::Synthetics, &episode_id)
+                .await
+                .into_iter()
+                .filter(|d| !destinations.contains(d))
+        {
+            recorded_rows.push(delivery::fanout_row(&org_id, &dest, &explicit, None, &ctx).await);
+        }
+    }
+    let (current, mut outside) = delivery::split_fanout(rows);
+    let (recorded, recorded_outside) = delivery::split_fanout(recorded_rows);
+    outside.extend(recorded_outside);
+    let state_change: delivery::StateChange = Box::new(move |txn| swap(txn));
+    let closed_by = if send_resolves {
+        CLOSED_BY_RESOLVE
+    } else {
+        CLOSED_BY_PRODUCER
+    };
+    let results = delivery::resolve_episode(
+        &org_id,
+        NotificationKind::Synthetics,
+        &episode_id,
+        &check_id,
+        current,
+        recorded,
+        closed_by,
+        send_resolves,
+        state_change,
+    )
+    .await?;
+    let Some(results) = results else {
+        return Ok(false);
+    };
+    delivery::send_outside_after_close(&org_id, &outside, &explicit, None, &ctx).await;
+    for result in results.iter().filter_map(|r| r.as_ref().err()) {
+        log::warn!("[synthetics] recovery of {check_id} not delivered yet: {result}");
+    }
+    Ok(true)
+}
+
+/// The subject line each run sends today; the synthetics card keeps it as its title.
+#[cfg(feature = "enterprise")]
+fn check_title(n: &CheckNotification) -> String {
+    if n.recovery {
+        format!("[OpenObserve Synthetics] ✅ {} has RECOVERED", n.check_name)
+    } else if n.degraded {
+        // Named where the condition is known: the subject decides whether anyone opens the alert.
+        match n.status_reason.as_deref() {
+            Some("cert_expiring") => format!(
+                "[OpenObserve Synthetics] 🟡 {} — CERTIFICATE EXPIRING SOON",
+                n.check_name
+            ),
+            Some("sftp_degraded") => format!(
+                "[OpenObserve Synthetics] 🟡 {} — SFTP DEGRADED",
+                n.check_name
+            ),
+            _ => format!("[OpenObserve Synthetics] 🟡 {} is DEGRADED", n.check_name),
+        }
+    } else if n.flaky {
+        format!("[OpenObserve Synthetics] 🔁 {} is FLAKY", n.check_name)
+    } else {
+        format!(
+            "[OpenObserve Synthetics] {} {} is {}",
+            status_emoji(n),
+            n.check_name,
+            n.status.to_uppercase()
+        )
+    }
+}
+
+/// `(episode_id, event)`: firing and recovery share an episode; informational runs own one.
+#[cfg(feature = "enterprise")]
+fn episode_and_event(n: &CheckNotification) -> (String, String) {
+    let alert = format!("{}:{}", n.check_id, n.alerting_since);
+    let run = format!("{}:{}", n.check_id, n.run_id);
+    if n.recovery {
+        (alert, "resolved".to_string())
+    } else if n.degraded && n.status_reason.as_deref() == Some("cert_expiring") {
+        (run, format!("cert_expiring:{}", n.run_id))
+    } else if n.degraded {
+        (run, format!("degraded:{}", n.run_id))
+    } else if n.flaky {
+        (run, format!("flaky:{}", n.run_id))
+    } else {
+        (alert, format!("firing:{}", n.run_id))
+    }
+}
+
+/// The shared path's context for one synthetics message (Backend section 6 field mapping).
+#[cfg(feature = "enterprise")]
+pub fn synthetics_notification_context(
+    n: &CheckNotification,
+) -> crate::alerts::notifications::NotificationContext {
+    use config::meta::alerts::{level::AlertLevel, notification_kind::NotificationKind};
+
+    use crate::alerts::notifications::{
+        LegacyPayload, NotificationContext, STATUS_FIRING, STATUS_RESOLVED, context::RenderHints,
+    };
+
+    let (level, level_str) = if n.recovery {
+        (AlertLevel::Ok, "ok")
+    } else if n.degraded || n.flaky || n.status == "warning" {
+        (AlertLevel::Warning, "warning")
+    } else {
+        (AlertLevel::Critical, "critical")
+    };
+    let (episode_id, event) = episode_and_event(n);
+    let mut description = status_headline(n);
+    if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
+        description.push_str(&format!("\n{e}"));
+    }
+    let checked = crate::anomaly_detection::fmt_local_us(n.checked_at);
+    let legacy = slack_payload(n);
+    NotificationContext {
+        org_name: n.org_id.clone(),
+        stream_type: "synthetics".to_string(),
+        stream_name: n.target.clone(),
+        alert_name: n.check_name.clone(),
+        alert_level: level_str.to_string(),
+        alert_status: if n.recovery {
+            STATUS_RESOLVED
+        } else {
+            STATUS_FIRING
+        }
+        .to_string(),
+        episode_id: Some(episode_id),
+        alert_start_time: checked.clone(),
+        alert_end_time: checked.clone(),
+        alert_start_time_millis: (n.checked_at / 1000).to_string(),
+        alert_end_time_millis: (n.checked_at / 1000).to_string(),
+        alert_url: run_url(n),
+        alert_trigger_time: n.checked_at,
+        alert_trigger_time_str: checked,
+        alert_description: description,
+        context_attributes: synthetics_attributes(n),
+        level: Some(level),
+        kind: NotificationKind::Synthetics,
+        object_id: n.check_id.clone(),
+        event,
+        cluster_name: config::get_cluster_name(),
+        legacy_payload: Some(LegacyPayload::new(move || legacy.clone())),
+        render_hints: RenderHints {
+            fallback_subject: Some(check_title(n)),
+            escape_email_attributes: true,
+        },
+        ..Default::default()
+    }
+}
+
+/// The synthetics variables (Backend section B2) plus `check_title`, today's subject line.
+#[cfg(feature = "enterprise")]
+fn synthetics_attributes(n: &CheckNotification) -> Vec<(String, String)> {
+    let label = if n.recovery {
+        "recovered"
+    } else if n.degraded {
+        "degraded"
+    } else if n.flaky {
+        "flaky"
+    } else {
+        n.status.as_str()
+    };
+    [
+        ("check_id", n.check_id.clone()),
+        ("check_name", n.check_name.clone()),
+        ("check_type", n.check_type.clone()),
+        ("check_target", n.target.clone()),
+        ("check_status", n.status.clone()),
+        ("check_status_label", label.to_string()),
+        (
+            "check_status_reason",
+            n.status_reason.clone().unwrap_or_default(),
+        ),
+        ("check_locations_line", locations_line(n)),
+        ("check_location_count", n.job_count.to_string()),
+        (
+            "check_consecutive_failures",
+            n.consecutive_failures.to_string(),
+        ),
+        ("check_flaky", n.flaky.to_string()),
+        ("check_degraded", n.degraded.to_string()),
+        ("check_run_id", n.run_id.clone()),
+        ("check_url", run_url(n)),
+        ("check_error", n.error.clone().unwrap_or_default()),
+        ("check_title", check_title(n)),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v))
+    .collect()
 }
 
 #[cfg(feature = "enterprise")]
@@ -335,7 +549,7 @@ fn locations_line(n: &CheckNotification) -> String {
 /// Slack-compatible webhook payload (also renders fine in Teams/Discord-style
 /// webhooks that accept a `text` field).
 #[cfg(feature = "enterprise")]
-fn build_slack_json(n: &CheckNotification) -> String {
+fn slack_payload(n: &CheckNotification) -> serde_json::Value {
     let checked_secs = n.checked_at / 1_000_000;
     let mut lines = vec![
         format!("{} *{}*", status_emoji(n), status_headline(n)),
@@ -355,89 +569,7 @@ fn build_slack_json(n: &CheckNotification) -> String {
         "*Time:* <!date^{checked_secs}^{{date_time_secs}}|{checked_human}>"
     ));
 
-    serde_json::json!({ "text": lines.join("\n") }).to_string()
-}
-
-/// Plain text — SNS fans out to SMS/lambda/etc. where markup is noise.
-#[cfg(feature = "enterprise")]
-fn build_plain_text(n: &CheckNotification) -> String {
-    let mut lines = vec![
-        status_headline(n),
-        format!("Check: {} ({})", n.check_name, n.check_type),
-        format!("Target: {}", n.target),
-        format!("Status: {}", n.status),
-        format!("Locations: {}", locations_line(n)),
-    ];
-    if let Some(envs) = environments_line(n) {
-        lines.push(format!("Environments: {envs}"));
-    }
-    if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
-        lines.push(format!("Error: {e}"));
-    }
-    lines.push(format!("Time: {}", checked_at_utc(n.checked_at)));
-    lines.push(format!("Run details: {}", run_url(n)));
-    lines.join("\n")
-}
-
-/// HTML card for email destinations (lettre sends it as the HTML alternative).
-#[cfg(feature = "enterprise")]
-fn build_email_html(n: &CheckNotification) -> String {
-    // TODO: update with a better template for all the checks
-    let color = if n.recovery {
-        "#2e7d32"
-    } else {
-        match n.status.as_str() {
-            "warning" => "#b58105",
-            "error" => "#b45309",
-            _ => "#c62828",
-        }
-    };
-    let error_row = match n.error.as_deref().filter(|e| !e.is_empty()) {
-        Some(e) => format!(
-            r#"<tr><td style="padding:6px 12px;color:#666;">Error</td>
-                <td style="padding:6px 12px;"><code>{}</code></td></tr>"#,
-            html_escape(e)
-        ),
-        None => String::new(),
-    };
-    format!(
-        r#"<div style="font-family:sans-serif;max-width:560px;">
-  <h2 style="color:{color};margin-bottom:4px;">{emoji} {headline}</h2>
-  <table style="border-collapse:collapse;background:#f7f7f7;border-radius:6px;width:100%;">
-    <tr><td style="padding:6px 12px;color:#666;width:140px;">Check</td>
-        <td style="padding:6px 12px;">{name} ({mtype})</td></tr>
-    <tr><td style="padding:6px 12px;color:#666;">Target</td>
-        <td style="padding:6px 12px;">{target}</td></tr>
-    <tr><td style="padding:6px 12px;color:#666;">Status</td>
-        <td style="padding:6px 12px;font-weight:bold;color:{color};">{status}</td></tr>
-    <tr><td style="padding:6px 12px;color:#666;">Locations</td>
-        <td style="padding:6px 12px;">{jobs}</td></tr>
-    <tr><td style="padding:6px 12px;color:#666;">Time</td>
-        <td style="padding:6px 12px;">{checked_at}</td></tr>
-    {error_row}
-  </table>
-  <p style="margin-top:12px;">
-    <a href="{url}" style="background:{color};color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none;">View run details</a>
-  </p>
-</div>"#,
-        emoji = status_emoji(n),
-        headline = html_escape(&status_headline(n)),
-        name = html_escape(&n.check_name),
-        mtype = html_escape(&n.check_type),
-        target = html_escape(&n.target),
-        status = n.status.to_uppercase(),
-        jobs = html_escape(&locations_line(n)),
-        checked_at = checked_at_utc(n.checked_at),
-        url = run_url(n),
-    )
-}
-
-#[cfg(feature = "enterprise")]
-fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
+    serde_json::json!({ "text": lines.join("\n") })
 }
 
 // ── Org provisioning ──────────────────────────────────────────────────────────
@@ -613,12 +745,12 @@ pub async fn location_staleness_watcher() {
                 .await
                 .unwrap_or_default();
             if !loc.enabled || agents.is_empty() {
-                clear_down(&loc.id).await;
+                clear_down(&org_id, &loc).await;
                 continue;
             }
             let any_live = agents.iter().any(|a| now - a.last_seen_at <= window_us);
             if any_live {
-                clear_down(&loc.id).await;
+                clear_down(&org_id, &loc).await;
                 continue;
             }
 
@@ -663,8 +795,11 @@ pub async fn location_staleness_watcher() {
                         notify_location_down(
                             &org_id,
                             &loc,
-                            checks.len(),
-                            window_us / 1_000_000,
+                            LocationEvent::Down {
+                                affected: checks.len(),
+                                stale_secs: window_us / 1_000_000,
+                                since: now,
+                            },
                             destinations,
                         )
                         .await
@@ -701,6 +836,212 @@ async fn report_location_down(
     // The winner reports even an empty list, so the outage is logged once as on main.
     notify(destinations).await;
     !destinations.is_empty()
+}
+
+/// A private location went down at `since`, or came back from the outage that started then.
+#[cfg(feature = "enterprise")]
+enum LocationEvent {
+    Down {
+        affected: usize,
+        stale_secs: i64,
+        since: i64,
+    },
+    Up {
+        since: i64,
+    },
+}
+
+#[cfg(feature = "enterprise")]
+impl LocationEvent {
+    fn since(&self) -> i64 {
+        match self {
+            Self::Down { since, .. } | Self::Up { since } => *since,
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn notify_location_down(
+    org_id: &str,
+    loc: &infra::table::synthetics_locations::SyntheticsLocationRecord,
+    event: LocationEvent,
+    destinations: &[String],
+) {
+    use crate::alerts::notifications::notify::{NotifyError, notify};
+
+    let ctx = location_context(org_id, loc, &event);
+    for dest_name in destinations {
+        let mut ctx = ctx.clone();
+        match notify(org_id, dest_name, &[], None, &mut ctx).await {
+            Ok(_) | Err(NotifyError::Skipped(_)) => {}
+            Err(e) => log::error!(
+                "[synthetics] location-down notify dest={dest_name} location={}: {e}",
+                loc.id
+            ),
+        }
+    }
+}
+
+/// Clears a location's down claim and resolves the outage to every destination it reached.
+#[cfg(feature = "enterprise")]
+async fn clear_down(
+    org_id: &str,
+    loc: &infra::table::synthetics_locations::SyntheticsLocationRecord,
+) {
+    use config::meta::alerts::notification_kind::NotificationKind;
+    use infra::table::notification_deliveries::CLOSED_BY_RESOLVE;
+
+    use crate::alerts::notifications::delivery;
+
+    let since = match infra::table::synthetics_locations::down_notified_at(&loc.id).await {
+        Ok(0) => return,
+        Ok(since) => since,
+        Err(e) => {
+            log::error!(
+                "[synthetics] staleness watcher: read down flag for {}: {e}",
+                loc.id
+            );
+            return;
+        }
+    };
+    let event = LocationEvent::Up { since };
+    let ctx = location_context(org_id, loc, &event);
+    let episode_id = ctx.episode_id.clone().unwrap_or_default();
+    let mut rows = Vec::new();
+    for dest in
+        delivery::recorded_destinations(org_id, NotificationKind::Synthetics, &episode_id).await
+    {
+        rows.push(delivery::fanout_row(org_id, &dest, &[], None, &ctx).await);
+    }
+    let (recorded, outside) = delivery::split_fanout(rows);
+    let id = loc.id.clone();
+    let state_change: delivery::StateChange = Box::new(move |txn| {
+        Box::pin(async move {
+            Ok(
+                infra::table::synthetics_locations::clear_down_notification_from_with(
+                    txn, &id, since,
+                )
+                .await?,
+            )
+        })
+    });
+    match delivery::resolve_episode(
+        org_id,
+        NotificationKind::Synthetics,
+        &episode_id,
+        &loc.id,
+        Vec::new(),
+        recorded,
+        CLOSED_BY_RESOLVE,
+        true,
+        state_change,
+    )
+    .await
+    {
+        Ok(Some(_)) => {
+            delivery::send_outside_after_close(org_id, &outside, &[], None, &ctx).await;
+        }
+        Ok(None) => {}
+        Err(e) => log::error!(
+            "[synthetics] staleness watcher: clear down flag for {}: {e}",
+            loc.id
+        ),
+    }
+}
+
+/// Context for a private location down or up message, keyed `{location_id}:{since}`.
+#[cfg(feature = "enterprise")]
+fn location_context(
+    org_id: &str,
+    loc: &infra::table::synthetics_locations::SyntheticsLocationRecord,
+    event: &LocationEvent,
+) -> crate::alerts::notifications::NotificationContext {
+    use config::meta::alerts::{level::AlertLevel, notification_kind::NotificationKind};
+
+    use crate::alerts::notifications::{
+        LegacyPayload, NotificationContext, STATUS_FIRING, STATUS_RESOLVED, context::RenderHints,
+    };
+
+    let (subject, text, status, level, ledger_event) = match event {
+        LocationEvent::Down {
+            affected,
+            stale_secs,
+            ..
+        } => (
+            format!(
+                "[OpenObserve Synthetics] 🔴 Private location {} is DOWN",
+                loc.label
+            ),
+            format!(
+                "Private location {} ({}) is down — no live agent for over {}s.\nAffected checks: {}\nRestart the agent container or check its network path to OpenObserve.",
+                loc.label, loc.region, stale_secs, affected
+            ),
+            "down",
+            AlertLevel::Critical,
+            "down",
+        ),
+        LocationEvent::Up { .. } => (
+            format!(
+                "[OpenObserve Synthetics] ✅ Private location {} is UP",
+                loc.label
+            ),
+            format!(
+                "Private location {} ({}) is back: an agent is live again.",
+                loc.label, loc.region
+            ),
+            "up",
+            AlertLevel::Ok,
+            STATUS_RESOLVED,
+        ),
+    };
+    let legacy = serde_json::json!({ "text": text });
+    let now = config::utils::time::now_micros();
+    let at = crate::anomaly_detection::fmt_local_us(now);
+    NotificationContext {
+        org_name: org_id.to_string(),
+        stream_type: "synthetics".to_string(),
+        alert_name: loc.label.clone(),
+        alert_level: if status == "up" { "ok" } else { "critical" }.to_string(),
+        alert_status: if status == "up" {
+            STATUS_RESOLVED
+        } else {
+            STATUS_FIRING
+        }
+        .to_string(),
+        episode_id: Some(format!("{}:{}", loc.id, event.since())),
+        alert_url: locations_url(org_id),
+        alert_trigger_time: now,
+        alert_trigger_time_str: at,
+        alert_description: text,
+        context_attributes: vec![
+            ("check_name".to_string(), loc.label.clone()),
+            ("check_status".to_string(), status.to_string()),
+            ("check_status_label".to_string(), status.to_string()),
+            ("check_target".to_string(), loc.region.clone()),
+            ("check_url".to_string(), locations_url(org_id)),
+            ("check_title".to_string(), subject.clone()),
+        ],
+        level: Some(level),
+        kind: NotificationKind::Synthetics,
+        object_id: loc.id.clone(),
+        event: ledger_event.to_string(),
+        cluster_name: config::get_cluster_name(),
+        legacy_payload: Some(LegacyPayload::new(move || legacy.clone())),
+        render_hints: RenderHints {
+            fallback_subject: Some(subject),
+            escape_email_attributes: true,
+        },
+        ..Default::default()
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn locations_url(org_id: &str) -> String {
+    let cfg = config::get_config();
+    format!(
+        "{}{}/web/settings/synthetics_locations?org_identifier={org_id}",
+        cfg.common.web_url, cfg.common.base_uri
+    )
 }
 
 #[cfg(all(test, feature = "enterprise"))]
@@ -753,6 +1094,8 @@ mod tests {
             failing_locations: vec!["aws-us-east-1".into(), "aws-us-west-1".into()],
             passing_locations: vec!["aws-eu-central-1".into()],
             failing_environments: vec![],
+            template: None,
+            alerting_since: 0,
         }
     }
 
@@ -889,6 +1232,8 @@ mod tests {
             recovery: true,
             passing_locations: vec![],
             failing_environments: vec![],
+            template: None,
+            alerting_since: 0,
             failing_locations: vec![],
             ..recovered()
         };
@@ -1018,84 +1363,98 @@ mod tests {
         assert_eq!(down_notified_at(&db).await, 200);
         assert_eq!(sent.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
-}
 
-/// Sends the "location down" notification to each destination, matching the
-/// per-type message formats of `notify_check_result`.
-#[cfg(feature = "enterprise")]
-async fn notify_location_down(
-    org_id: &str,
-    loc: &infra::table::synthetics_locations::SyntheticsLocationRecord,
-    affected: usize,
-    stale_secs: i64,
-    destinations: &[String],
-) {
-    use config::meta::destinations::{DestinationType, Module};
-
-    let subject = format!(
-        "[OpenObserve Synthetics] 🔴 Private location {} is DOWN",
-        loc.label
-    );
-    let text = format!(
-        "Private location {} ({}) is down — no live agent for over {}s.\nAffected checks: {}\nRestart the agent container or check its network path to OpenObserve.",
-        loc.label, loc.region, stale_secs, affected
-    );
-
-    for dest_name in destinations {
-        match crate::alerts::destinations::get_with_template(org_id, dest_name).await {
-            Ok((dest, _tpl)) => {
-                let Module::Alert {
-                    destination_type, ..
-                } = &dest.module
-                else {
-                    continue;
-                };
-                let msg = match destination_type {
-                    DestinationType::Email(_) => format!(
-                        r#"<div style="font-family:sans-serif;max-width:560px;">
-  <h2 style="color:#c62828;margin-bottom:4px;">🔴 Private location {} is down</h2>
-  <p>No live agent for over {}s ({}).</p>
-  <p>Affected checks: <b>{}</b></p>
-  <p>Restart the agent container or check its network path to OpenObserve.</p>
-</div>"#,
-                        html_escape(&loc.label),
-                        stale_secs,
-                        html_escape(&loc.region),
-                        affected
-                    ),
-                    DestinationType::Sns(_) => text.clone(),
-                    DestinationType::Http(_) | DestinationType::SlackApp(_) => {
-                        serde_json::json!({ "text": text }).to_string()
-                    }
-                };
-                if let Err(e) = crate::alerts::alert::dispatch_notification(
-                    org_id,
-                    destination_type,
-                    &subject,
-                    msg,
-                )
-                .await
-                {
-                    log::error!(
-                        "[synthetics] location-down notify dest={dest_name} location={}: {e}",
-                        loc.id
-                    );
-                }
-            }
-            Err(e) => {
-                log::error!("[synthetics] load dest={dest_name} org={org_id}: {e}");
-            }
+    #[test]
+    fn every_subject_line_stays_byte_identical_as_the_card_title() {
+        let cases = [
+            (
+                recovered(),
+                "[OpenObserve Synthetics] ✅ checkout has RECOVERED",
+            ),
+            (
+                CheckNotification {
+                    degraded: true,
+                    status: "warning".into(),
+                    status_reason: Some("cert_expiring".into()),
+                    ..firing()
+                },
+                "[OpenObserve Synthetics] 🟡 checkout — CERTIFICATE EXPIRING SOON",
+            ),
+            (
+                CheckNotification {
+                    degraded: true,
+                    status: "warning".into(),
+                    status_reason: Some("sftp_degraded".into()),
+                    ..firing()
+                },
+                "[OpenObserve Synthetics] 🟡 checkout — SFTP DEGRADED",
+            ),
+            (
+                CheckNotification {
+                    degraded: true,
+                    status: "warning".into(),
+                    ..firing()
+                },
+                "[OpenObserve Synthetics] 🟡 checkout is DEGRADED",
+            ),
+            (
+                CheckNotification {
+                    flaky: true,
+                    status: "warning".into(),
+                    ..firing()
+                },
+                "[OpenObserve Synthetics] 🔁 checkout is FLAKY",
+            ),
+            (firing(), "[OpenObserve Synthetics] 🔴 checkout is FAILED"),
+        ];
+        for (mut n, want) in cases {
+            n.check_name = "checkout".into();
+            assert_eq!(check_title(&n), want);
+            let ctx = synthetics_notification_context(&n);
+            assert_eq!(ctx.render_hints.fallback_subject.as_deref(), Some(want));
+            assert!(
+                ctx.context_attributes
+                    .iter()
+                    .any(|(k, v)| k == "check_title" && v == want)
+            );
         }
     }
-}
 
-/// Clears a location's down flag so a future outage notifies again.
-///
-/// Every scheduler node calls this on recovery; the underlying update is
-/// idempotent, so they cannot disagree.
-#[cfg(feature = "enterprise")]
-async fn clear_down(location_id: &str) {
-    if let Err(e) = infra::table::synthetics_locations::clear_down_notification(location_id).await {
-        log::error!("[synthetics] staleness watcher: clear down flag for {location_id}: {e}");
+    #[test]
+    fn a_firing_and_its_recovery_share_the_episode_and_informational_runs_own_one() {
+        let opened = CheckNotification {
+            alerting_since: 77,
+            ..firing()
+        };
+        let (episode, event) = episode_and_event(&opened);
+        assert_eq!(episode, format!("{}:77", opened.check_id));
+        assert_eq!(event, format!("firing:{}", opened.run_id));
+        let closed = CheckNotification {
+            alerting_since: 77,
+            ..recovered()
+        };
+        assert_eq!(
+            episode_and_event(&closed),
+            (format!("{}:77", closed.check_id), "resolved".to_string())
+        );
+        let flaky = CheckNotification {
+            flaky: true,
+            ..firing()
+        };
+        let (episode, event) = episode_and_event(&flaky);
+        assert_eq!(episode, format!("{}:{}", flaky.check_id, flaky.run_id));
+        assert!(event.starts_with("flaky:"));
+    }
+
+    #[test]
+    fn a_generic_webhook_keeps_todays_text_body_and_email_escapes_the_values() {
+        let n = firing();
+        let ctx = synthetics_notification_context(&n);
+        let body = ctx.legacy_payload.as_ref().unwrap().build().to_string();
+        assert_eq!(body, slack_payload(&n).to_string());
+        assert!(body.starts_with("{\"text\":"));
+        assert_eq!(ctx.kind.as_str(), "synthetics");
+        assert!(ctx.render_hints.escape_email_attributes);
+        assert_eq!(ctx.object_id, n.check_id);
     }
 }

@@ -3418,42 +3418,6 @@ async fn send_to_destination_type(
     }
 }
 
-/// Send a pre-built message string to a single destination type.
-///
-/// Used by synthetics and downtime notifications, which build their own
-/// payload rather than going through the alert template system.
-#[cfg(feature = "enterprise")]
-pub(crate) async fn dispatch_notification(
-    org_id: &str,
-    dest_type: &DestinationType,
-    subject: &str,
-    msg: String,
-) -> Result<String, anyhow::Error> {
-    match dest_type {
-        DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
-        // Callers build one payload with no HTML/plaintext split, so both
-        // parts carry the same string — byte-identical to the MIME this path
-        // emitted before the signature took two bodies.
-        DestinationType::Email(email) => {
-            let (email, skipped) = org_member_email(org_id, email).await?;
-            send_email_notification(subject, &email, Some(msg.clone()), msg)
-                .await
-                .map(|resp| note_skipped(resp, &skipped))
-        }
-        DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
-        DestinationType::SlackApp(target) => {
-            crate::alerts::slack_publish::send_post(
-                &crate::alerts::slack_publish::QueueSink,
-                org_id,
-                target,
-                subject,
-                &msg,
-            )
-            .await
-        }
-    }
-}
-
 /// Dispatch a rendered test-send message to one destination.
 ///
 /// `title` is the already-`[TEST] `-marked title `build_test_message` stamped
@@ -3464,14 +3428,6 @@ pub(crate) async fn dispatch_notification(
 /// of re-deriving it from `rendered`, or hardcoding a literal) keeps this
 /// function agnostic to the rendered payload's shape and guarantees the SNS
 /// subject is never anything other than the actual marked title.
-///
-/// Unlike [`dispatch_notification`], this is NOT enterprise-gated: test-send
-/// (Task 15) is an OSS-visible feature, and it needs the same private
-/// `send_http_notification` / `send_email_notification` / `send_sns_notification`
-/// transports this module already owns. Kept as a distinct, narrowly-scoped
-/// function rather than removing the `#[cfg]` from `dispatch_notification`
-/// itself, so the enterprise-only synthetics and downtime call sites are
-/// untouched.
 pub(crate) async fn dispatch_test_message(
     org_id: &str,
     dest_type: &DestinationType,

@@ -2919,6 +2919,7 @@ mod tests {
             "last_alert_at",
             "alerting",
             "degraded_notified_at",
+            "alerting_since",
         ] {
             let start = checks.find(&format!("\"{col}\"")).unwrap();
             let at = start + checks[start..].find("NOT NULL").unwrap() + "NOT NULL".len();

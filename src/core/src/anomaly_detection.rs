@@ -3529,7 +3529,9 @@ pub async fn send_anomaly_alert(
     actx: o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
 ) -> anyhow::Result<bool> {
     let org_id = actx.org_id.clone();
-    let explicit = load_override(&org_id, actx.template.as_deref()).await;
+    let explicit =
+        crate::alerts::notifications::org_default::load_override(&org_id, actx.template.as_deref())
+            .await;
     let mut ctx = anomaly_notification_context(&actx);
     let sent = crate::alerts::notifications::notify::notify(
         &org_id,
@@ -3597,7 +3599,8 @@ pub async fn resolve_anomaly_episode(
     let ctx = anomaly_notification_context(&actx);
     let episode_id = ctx.episode_id.clone().unwrap_or_default();
     let explicit = if recovery.send_resolves {
-        load_override(&org_id, actx.template.as_deref()).await
+        crate::alerts::notifications::org_default::load_override(&org_id, actx.template.as_deref())
+            .await
     } else {
         Vec::new()
     };
@@ -3662,24 +3665,6 @@ pub async fn resolve_anomaly_episode(
         delivered,
         not_delivered: results.len() - delivered,
     })
-}
-
-/// The config's template override, as level 1 candidates; a missing template falls through.
-#[cfg(feature = "enterprise")]
-async fn load_override(
-    org_id: &str,
-    name: Option<&str>,
-) -> Vec<config::meta::destinations::Template> {
-    let Some(name) = name.filter(|n| !n.is_empty()) else {
-        return Vec::new();
-    };
-    match db::alerts::templates::get(org_id, name).await {
-        Ok(t) => vec![t],
-        Err(e) => {
-            log::warn!("[anomaly_detection] template override '{name}' not found: {e}");
-            Vec::new()
-        }
-    }
 }
 
 /// The shared path's context for one anomaly message (Backend section 6 field mapping).
@@ -3797,7 +3782,7 @@ fn anomaly_attributes(
 
 /// The alert convention for the standard time fields: server local time with no suffix.
 #[cfg(feature = "enterprise")]
-fn fmt_local_us(us: i64) -> String {
+pub(crate) fn fmt_local_us(us: i64) -> String {
     use chrono::TimeZone;
     chrono::Local
         .timestamp_micros(us)

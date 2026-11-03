@@ -143,6 +143,7 @@ impl TryFrom<synthetics_checks::Model> for Synthetic {
             locations,
             enabled: m.enabled,
             destinations,
+            template: m.template,
             retries: settings.retries,
             cooldown_mins: settings.cooldown_mins,
             wait_before_retry_secs: settings.wait_before_retry_secs,
@@ -943,6 +944,27 @@ pub async fn update_last_check_status<C: ConnectionTrait>(
     Ok(res.rows_affected > 0)
 }
 
+/// `(org, name)` of each check whose template override is `template`; `None` is every org.
+pub async fn names_using_template<C: ConnectionTrait>(
+    conn: &C,
+    org_id: Option<&str>,
+    template: &str,
+) -> Result<Vec<(String, String)>, errors::Error> {
+    let mut query = Entity::find()
+        .select_only()
+        .column(Column::OrgId)
+        .column(Column::Name)
+        .filter(Column::Template.eq(template));
+    if let Some(org) = org_id {
+        query = query.filter(Column::OrgId.eq(org));
+    }
+    Ok(query
+        .order_by_asc(Column::Name)
+        .into_tuple::<(String, String)>()
+        .all(conn)
+        .await?)
+}
+
 /// The alert bookkeeping a completed run needs in order to decide whether to
 /// notify. Read and written by the ack path only.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -957,6 +979,8 @@ pub struct AlertState {
     /// degraded. Degradation persists for as long as the certificate takes to
     /// expire, so it is suppressed by transition rather than by a time window.
     pub degraded_notified_at: i64,
+    /// Start of the open alert episode in microseconds; 0 when not alerting.
+    pub alerting_since: i64,
 }
 
 /// Reads the alert state without pulling the whole check (config, secrets and
@@ -971,15 +995,19 @@ pub async fn get_alert_state<C: ConnectionTrait>(
         .column(Column::LastAlertAt)
         .column(Column::Alerting)
         .column(Column::DegradedNotifiedAt)
-        .into_tuple::<(i32, i64, bool, i64)>()
+        .column(Column::AlertingSince)
+        .into_tuple::<(i32, i64, bool, i64, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
-        |(consecutive_failures, last_alert_at, alerting, degraded_notified_at)| AlertState {
-            consecutive_failures,
-            last_alert_at,
-            alerting,
-            degraded_notified_at,
+        |(consecutive_failures, last_alert_at, alerting, degraded_notified_at, alerting_since)| {
+            AlertState {
+                consecutive_failures,
+                last_alert_at,
+                alerting,
+                degraded_notified_at,
+                alerting_since,
+            }
         },
     ))
 }
@@ -1021,6 +1049,7 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
             Column::DegradedNotifiedAt,
             Expr::value(state.degraded_notified_at),
         )
+        .col_expr(Column::AlertingSince, Expr::value(state.alerting_since))
         // Watermark for the status-page rebuilder's delta read. Safe here
         // because the caller only writes when `next != prior` (job_api), so a
         // healthy check acking every minute never bumps it.
@@ -1033,6 +1062,7 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
         .filter(Column::LastAlertAt.eq(expected.last_alert_at))
         .filter(Column::Alerting.eq(expected.alerting))
         .filter(Column::DegradedNotifiedAt.eq(expected.degraded_notified_at))
+        .filter(Column::AlertingSince.eq(expected.alerting_since))
         .exec(conn)
         .await?;
     Ok(res.rows_affected > 0)
@@ -1187,6 +1217,7 @@ fn update_mutable_fields(am: &mut ActiveModel, check: &Synthetic) -> Result<(), 
     am.locations = Set(locations);
     am.enabled = Set(check.enabled);
     am.destinations = Set(destinations);
+    am.template = Set(check.template.clone());
     am.settings = Set(settings);
     am.secrets = Set(pack_secrets(check)?);
     Ok(())
@@ -1208,6 +1239,7 @@ fn build_active_model(check: &Synthetic) -> Result<ActiveModel, errors::Error> {
         locations: Set(locations),
         enabled: Set(check.enabled),
         destinations: Set(destinations),
+        template: Set(check.template.clone()),
         settings: Set(settings),
         secrets: Set(pack_secrets(check)?),
         ..Default::default()
@@ -1281,6 +1313,8 @@ pub(crate) mod tests {
             last_alert_at: 0,
             alerting: false,
             degraded_notified_at: 0,
+            alerting_since: 0,
+            template: None,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
@@ -1861,6 +1895,7 @@ pub(crate) mod tests {
         m.last_alert_at = 1_749_998_000_000_000;
         m.alerting = true;
         m.degraded_notified_at = 1_749_997_000_000_000;
+        m.alerting_since = 1_749_996_000_000_000;
 
         let mut check = Synthetic::try_from(m.clone()).unwrap();
         check.name = "renamed".to_string();
@@ -1888,6 +1923,7 @@ pub(crate) mod tests {
         );
         assert!(am.alerting.is_unchanged());
         assert!(am.degraded_notified_at.is_unchanged());
+        assert!(am.alerting_since.is_unchanged(), "it keys the open episode");
     }
 
     /// `create` mints an id unless told otherwise. The super-cluster consumer
@@ -1940,6 +1976,58 @@ pub(crate) mod tests {
         let am: ActiveModel = model.into();
         am.reset_all().insert(&db).await.unwrap();
         db
+    }
+
+    #[tokio::test]
+    async fn the_alert_state_swap_guards_and_writes_the_episode_start() {
+        let db = db_with_one_check(0).await;
+        let id = make_model().id;
+        let prior = get_alert_state(&db, &id).await.unwrap().unwrap();
+        let opened = AlertState {
+            alerting: true,
+            alerting_since: 42,
+            ..prior
+        };
+        assert!(
+            update_alert_state_if(&db, &id, prior, opened)
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_alert_state(&db, &id).await.unwrap().unwrap(), opened);
+
+        // A reader that saw another episode start loses the race and writes nothing.
+        let stale = AlertState {
+            alerting_since: 7,
+            ..opened
+        };
+        assert!(
+            !update_alert_state_if(&db, &id, stale, AlertState::default())
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_alert_state(&db, &id).await.unwrap().unwrap(), opened);
+    }
+
+    #[tokio::test]
+    async fn names_using_template_finds_the_checks_that_name_it() {
+        use sea_orm::{ActiveModelTrait, IntoActiveModel};
+
+        let db = db_with_one_check(0).await;
+        let mut am = make_model().into_active_model();
+        am.template = Set(Some("ops-card".to_string()));
+        am.update(&db).await.unwrap();
+        assert_eq!(
+            names_using_template(&db, Some("org1"), "ops-card")
+                .await
+                .unwrap(),
+            vec![("org1".to_string(), "Login Flow".to_string())]
+        );
+        assert!(
+            names_using_template(&db, Some("other"), "ops-card")
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     async fn stored_status(db: &sea_orm::DatabaseConnection, id: &str) -> i32 {

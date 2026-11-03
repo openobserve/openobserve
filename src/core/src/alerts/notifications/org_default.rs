@@ -92,6 +92,20 @@ pub async fn set_org_default_template(
     Ok(())
 }
 
+/// A producer's level 1 override by name; a missing one falls through to the next level.
+pub async fn load_override(org_id: &str, name: Option<&str>) -> Vec<Template> {
+    let Some(name) = name.filter(|n| !n.is_empty()) else {
+        return Vec::new();
+    };
+    match db::alerts::templates::get(org_id, name).await {
+        Ok(t) => vec![t],
+        Err(e) => {
+            log::warn!("[TEMPLATES] template override '{name}' in {org_id} not found: {e}");
+            Vec::new()
+        }
+    }
+}
+
 /// A `default_templates` value: an object of kind to user template name that applies to it.
 pub async fn validate_default_templates(
     org_id: &str,
@@ -322,7 +336,7 @@ pub fn choose_org_or_compiled(
         };
     }
     EffectiveTemplate {
-        template: compiled_fallback_for(org_id, kind),
+        template: compiled_fallback_for_transport(org_id, kind, dt),
         source: TemplateSource::Compiled,
         skipped,
     }
@@ -426,6 +440,25 @@ pub fn compiled_fallback_for(org_id: &str, kind: NotificationKind) -> Template {
         kind: TemplateKind::Content,
         applies_to: Vec::new(),
     }
+}
+
+/// Level 4 for one transport: downtimes keep the seeded pair (D3), other kinds their card.
+pub fn compiled_fallback_for_transport(
+    org_id: &str,
+    kind: NotificationKind,
+    dt: Option<&DestinationType>,
+) -> Template {
+    if kind != NotificationKind::Downtime {
+        return compiled_fallback_for(org_id, kind);
+    }
+    let [http, email] = crate::alerts::templates::downtime_templates();
+    let mut template = if matches!(dt, Some(DestinationType::Email(_))) {
+        email
+    } else {
+        http
+    };
+    template.org_id = org_id.to_string();
+    template
 }
 
 /// Idempotent: set the pointer (to the compiled default) for every org that
@@ -589,6 +622,36 @@ mod tests {
             Some(dt),
             skipped,
         )
+    }
+
+    #[test]
+    fn a_downtime_falls_back_to_the_seeded_pair_for_its_transport() {
+        let http = compiled_fallback_for_transport(
+            "acme",
+            NotificationKind::Downtime,
+            Some(&slack_dest()),
+        );
+        assert_eq!(http.name, "prebuilt_downtime");
+        assert_eq!(http.org_id, "acme");
+        let email = compiled_fallback_for_transport(
+            "acme",
+            NotificationKind::Downtime,
+            Some(&email_dest()),
+        );
+        assert_eq!(email.name, "prebuilt_downtime_email");
+        assert_eq!(
+            compiled_fallback_for_transport("acme", NotificationKind::Synthetics, None).name,
+            "o2_default_synthetics"
+        );
+        // D3: a user template applies to downtimes without naming a downtime variable.
+        assert!(destination_template_applies(
+            &content("ops-card"),
+            NotificationKind::Downtime
+        ));
+        assert!(!destination_template_applies(
+            &content("prebuilt_slack"),
+            NotificationKind::Downtime
+        ));
     }
 
     #[test]

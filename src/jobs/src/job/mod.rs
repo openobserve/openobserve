@@ -770,6 +770,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
             })
         },
     );
+    // A check's recovery swap and its resolve rows commit together on the delivery ledger.
+    #[cfg(feature = "enterprise")]
+    openobserve_synthetics::alerting::register_episode_closer(
+        openobserve_core::synthetics::close_alert_episode,
+    );
     // Every node: the validator, which reads the token cache, runs wherever HTTP is served.
     #[cfg(feature = "enterprise")]
     if openobserve_core::fleet::enabled() {
