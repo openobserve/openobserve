@@ -67,7 +67,7 @@ const ageOf = (us: number | null | undefined) =>
   >
     <OText variant="card-title">{{ t("infra.k8s2.overviewIncidentTitle") }}</OText>
     <div class="text-text-secondary flex items-center gap-2 text-sm">
-      <OIcon name="lock" size="sm" class="text-icon-locked shrink-0" />
+      <OIcon name="lock" size="sm" class="lock-chip shrink-0" />
       <span>{{ incidentsLockedReason }}</span>
     </div>
   </section>
@@ -128,7 +128,7 @@ const ageOf = (us: number | null | undefined) =>
   >
     <OText variant="card-title">{{ t("infra.k8s2.overviewAlertsTitle") }}</OText>
     <div class="text-text-secondary flex items-center gap-2 text-sm">
-      <OIcon name="lock" size="sm" class="text-icon-locked shrink-0" />
+      <OIcon name="lock" size="sm" class="lock-chip shrink-0" />
       <span>{{ alertsLockedReason }}</span>
     </div>
   </section>

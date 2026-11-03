@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OTooltip v-if="licenseLockedReason" :content="licenseLockedReason">
         <span class="inline-flex" data-test="alert-library-card-license-locked">
-          <OIcon name="lock" size="xs" class="text-icon-locked shrink-0" />
+          <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
         </span>
       </OTooltip>
       <OTag

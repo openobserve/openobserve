@@ -179,3 +179,16 @@
     var(--color-status-negative)
   );
 }
+
+@utility bg-gradient-lock {
+  background-image: radial-gradient(
+    circle at 30% 25%,
+    var(--color-warning-500),
+    var(--color-warning-700) 70%
+  );
+}
+
+/* Gold glow disc behind a lock glyph, so a locked entry stands out in light and dark. */
+@utility lock-chip {
+  @apply bg-gradient-lock text-text-inverse drop-shadow-warning-600/50 box-content rounded-full p-0.5 drop-shadow-md;
+}

@@ -522,7 +522,7 @@ function handleClick(event: MouseEvent): void {
           v-if="iconLeft"
           :name="iconLeft"
           size="sm"
-          :class="iconLeft === 'lock' ? 'text-icon-locked' : undefined"
+          :class="iconLeft === 'lock' ? 'lock-chip' : undefined"
         />
       </slot>
       <slot />
@@ -534,7 +534,7 @@ function handleClick(event: MouseEvent): void {
           v-if="iconRight"
           :name="iconRight"
           size="sm"
-          :class="iconRight === 'lock' ? 'text-icon-locked' : undefined"
+          :class="iconRight === 'lock' ? 'lock-chip' : undefined"
         />
       </slot>
     </span>

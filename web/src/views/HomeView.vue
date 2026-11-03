@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="lock"
                 size="xs"
-                class="text-icon-locked ms-1 shrink-0"
+                class="lock-chip ms-1 shrink-0"
                 :data-test="`home-tab-lock-${tab.id}`"
               />
               <span class="sr-only">{{ tabLockReason(tab.id) }}</span>

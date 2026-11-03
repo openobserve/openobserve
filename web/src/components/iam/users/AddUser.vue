@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template v-if="rbacLocked" #icon-left>
-              <OIcon name="lock" size="sm" class="text-icon-locked" />
+              <OIcon name="lock" size="sm" class="lock-chip" />
             </template>
           </OFormSelect>
         </OTooltip>

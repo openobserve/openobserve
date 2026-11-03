@@ -109,9 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="llm-insights-compare-locked"
             @click="openUpgradeDialog"
           >
-            <template #icon-right
-              ><OIcon name="lock" size="sm" class="text-icon-locked"
-            /></template>
+            <template #icon-right><OIcon name="lock" size="sm" class="lock-chip" /></template>
             {{ t("traces.lLMInsightsDashboard.compareEntry") }}
           </OButton>
         </template>

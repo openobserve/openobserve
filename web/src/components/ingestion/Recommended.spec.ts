@@ -399,8 +399,8 @@ describe("Recommended: Get started pick", () => {
       localStorage.clear();
       const wrapper = await mountLicensed({ [feature]: "locked" });
       expect(tab(wrapper, name).exists()).toBe(true);
-      expect(tab(wrapper, name).find(".text-icon-locked").exists()).toBe(true);
-      expect(tab(wrapper, "ingestFromLinux").find(".text-icon-locked").exists()).toBe(false);
+      expect(tab(wrapper, name).find(".lock-chip").exists()).toBe(true);
+      expect(tab(wrapper, "ingestFromLinux").find(".lock-chip").exists()).toBe(false);
       wrapper.unmount();
     });
 
@@ -411,7 +411,7 @@ describe("Recommended: Get started pick", () => {
       localStorage.setItem(`o2.onboarding.firstSource.${ORG}`, pick);
       const wrapper = await mountLicensed({ [pick === "rum" ? "rum" : "mcp"]: "locked" });
       const pinned = wrapper.find(`[data-test="ingestion-recommended-pick-tab-${name}"]`);
-      expect(pinned.find(".text-icon-locked").exists()).toBe(true);
+      expect(pinned.find(".lock-chip").exists()).toBe(true);
       wrapper.unmount();
     });
 
@@ -430,7 +430,7 @@ describe("Recommended: Get started pick", () => {
       const wrapper = await mountLicensed({});
       for (const name of ["frontendMonitoring", "recommendedMcp"]) {
         expect(tab(wrapper, name).exists()).toBe(true);
-        expect(tab(wrapper, name).find(".text-icon-locked").exists()).toBe(false);
+        expect(tab(wrapper, name).find(".lock-chip").exists()).toBe(false);
       }
       // No pick: no route name leaks as a native tooltip.
       expect(wrapper.findAll('[data-test^="ingestion-recommended-tab-"][title]')).toHaveLength(0);

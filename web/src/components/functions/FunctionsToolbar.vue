@@ -115,7 +115,7 @@
                   <OIcon
                     name="lock"
                     size="sm"
-                    class="text-icon-locked"
+                    class="lock-chip"
                     data-test="function-transform-type-js-lock"
                   />
                 </template>

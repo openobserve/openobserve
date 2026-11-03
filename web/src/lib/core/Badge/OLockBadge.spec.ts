@@ -4,9 +4,9 @@ import OLockBadge from "./OLockBadge.vue";
 import { raw } from "@/types/i18n";
 
 describe("OLockBadge", () => {
-  it("renders a gold lock", () => {
+  it("renders an amber lock badge", () => {
     const wrapper = mount(OLockBadge);
-    expect(wrapper.find(".text-icon-locked").exists()).toBe(true);
+    expect(wrapper.find(".bg-gradient-lock").exists()).toBe(true);
   });
 
   it("renders screen-reader text only when a label is given", () => {

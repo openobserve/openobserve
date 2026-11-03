@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="profilesLocked ? 'lock' : 'memory'"
                       size="xs"
                       class="shrink-0"
-                      :class="profilesLocked && 'text-icon-locked'"
+                      :class="profilesLocked && 'lock-chip'"
                   /></template>
                   {{ t("logStream.labelProfiles") }}
                 </OToggleGroupItem>

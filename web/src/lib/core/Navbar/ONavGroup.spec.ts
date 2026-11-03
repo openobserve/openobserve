@@ -1429,7 +1429,7 @@ describe("ONavGroup", () => {
       expect(item.element.tagName).toBe("A");
       expect(item.attributes("href")).toContain("/workflows");
       const lock = flyout().get('[data-test="nav-group-item-workflows-lock"]');
-      expect(lock.classes()).toContain("text-icon-locked");
+      expect(lock.classes()).toContain("lock-chip");
       expect(item.find(".sr-only").text()).toContain("Locked");
       await item.trigger("click");
       await flushPromises();

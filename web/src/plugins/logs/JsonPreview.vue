@@ -42,12 +42,7 @@
             data-test="log-correlation-btn"
           >
             <template #icon-left>
-              <OIcon
-                name="lock"
-                class="text-icon-locked"
-                size="sm"
-                data-test="log-correlation-btn-lock"
-              />
+              <OIcon name="lock" class="lock-chip" size="sm" data-test="log-correlation-btn-lock" />
             </template>
             {{ t("search.viewRelated") }}
           </OButton>
@@ -62,12 +57,7 @@
         data-test="log-correlation-btn"
       >
         <OIcon name="link" size="xs" class="me-1" />{{ t("search.viewRelated") }}
-        <OIcon
-          v-if="!correlationAccess.allowed"
-          name="lock"
-          size="xs"
-          class="text-icon-locked ms-1"
-        />
+        <OIcon v-if="!correlationAccess.allowed" name="lock" size="xs" class="lock-chip ms-1" />
         <OTooltip v-if="correlationAccess.allowed" :content="t('search.viewRelatedTooltip')" />
       </OButton>
       <!-- Stream picker and its action read as one control, sized to sit level
@@ -188,7 +178,7 @@
             </template>
             {{ t("logs.jsonPreview.sendToAiChat") }}
             <template v-if="!aiAssistantAccess.allowed" #icon-right>
-              <OIcon name="lock" size="xs" class="text-icon-locked shrink-0" />
+              <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
             </template>
           </ODropdownItem>
           <ODropdownItem
@@ -200,7 +190,7 @@
             </template>
             {{ t("regex_patterns.create_regex_pattern_field") }}
             <template v-if="!regexPatternsAccess.allowed" #icon-right>
-              <OIcon name="lock" size="xs" class="text-icon-locked shrink-0" />
+              <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
             </template>
           </ODropdownItem>
         </ODropdown>

@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="text-text-secondary mb-2 flex items-center gap-1 text-xs"
                       data-test="add-report-dashboards-locked"
                     >
-                      <OIcon name="lock" size="xs" class="text-icon-locked shrink-0" />
+                      <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
                       {{ dashboardsLockedReason }}
                     </div>
                     <!-- items-start (not items-center): keeps all selects

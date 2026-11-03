@@ -79,8 +79,8 @@ describe("ODropdownItem focusable unavailable opt-in", () => {
       },
     });
     await flushPromises();
-    expect(document.querySelector('[data-test="locked"] .text-icon-locked')).not.toBeNull();
-    expect(document.querySelector('[data-test="plain"] .text-icon-locked')).toBeNull();
+    expect(document.querySelector('[data-test="locked"] .lock-chip')).not.toBeNull();
+    expect(document.querySelector('[data-test="plain"] .lock-chip')).toBeNull();
   });
 
   it("emits enabled selections without changing existing behavior", async () => {

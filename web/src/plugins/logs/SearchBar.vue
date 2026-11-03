@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <span v-if="!toolbarToggleIconOnly">{{ t("search.showPatternsLabel") }}</span>
               <template v-if="!patternsAccess.allowed" #icon-right>
-                <OIcon name="lock" size="xs" class="text-icon-locked shrink-0" />
+                <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
               </template>
             </OToggleGroupItem>
           </OToggleGroup>
@@ -722,7 +722,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="lock"
                 size="xs"
-                class="text-icon-locked"
+                class="lock-chip"
                 data-test="search-scheduler-locked-icon"
               />
             </template>
@@ -920,7 +920,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #icon-left>
                     <OIcon
                       name="lock"
-                      class="text-icon-locked"
+                      class="lock-chip"
                       size="sm"
                       data-test="logs-search-bar-region-lock"
                     />

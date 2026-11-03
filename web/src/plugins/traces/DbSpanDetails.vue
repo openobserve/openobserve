@@ -147,7 +147,7 @@ const metadataRows = computed(() =>
             data-test="traces-db-span-details-view-trend"
           >
             <template #icon-left>
-              <OIcon name="lock" class="text-icon-locked" size="sm" />
+              <OIcon name="lock" class="lock-chip" size="sm" />
             </template>
             {{ t("traces.dbSpanDetails.viewQueryTrend") }}
           </OButton>

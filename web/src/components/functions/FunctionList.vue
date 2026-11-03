@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="inline-flex"
                 :data-test="`function-list-pipeline-lock-${pipeline.value}`"
               >
-                <OIcon name="lock" size="xs" class="text-icon-locked shrink-0" />
+                <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
               </span>
             </OTooltip>
           </li>

@@ -402,7 +402,7 @@ describe("MenuLink", async () => {
   });
 
   describe("license-locked tile screen-reader text", () => {
-    it("names the lock with the supplied label and paints it gold", () => {
+    it("names the lock with the supplied label and paints it amber", () => {
       const w = mount(MenuLink, {
         props: {
           title: "Workflows",
@@ -414,7 +414,7 @@ describe("MenuLink", async () => {
       });
       const badge = w.get('[data-test="menu-link-/workflows-license-lock"]');
       expect(badge.get(".sr-only").text()).toBe("Locked: needs Workflows");
-      expect(badge.find(".text-icon-locked").exists()).toBe(true);
+      expect(badge.classes()).toContain("bg-gradient-lock");
       w.unmount();
     });
   });

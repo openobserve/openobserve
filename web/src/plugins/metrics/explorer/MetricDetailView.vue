@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon
                     name="lock"
-                    class="text-icon-locked"
+                    class="lock-chip"
                     size="sm"
                     data-test="metrics-detail-drilldown-lock"
                   />

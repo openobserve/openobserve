@@ -251,7 +251,7 @@ const heightClasses = computed<string>(() => {
           :name="suffixIcon as any"
           size="xs"
           class="ms-auto shrink-0"
-          :class="suffixIcon === 'lock' ? 'text-icon-locked' : ''"
+          :class="suffixIcon === 'lock' ? 'lock-chip' : ''"
         />
         <span v-if="suffixIcon === 'lock' && (suffixLabel ?? tooltip)" class="sr-only">{{
           suffixLabel ?? tooltip
