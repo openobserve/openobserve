@@ -29085,7 +29085,8 @@
       "retentionDaysHelp": "0 keeps offline collectors forever"
     },
     "audit": {
-      "search": "Search the audit trail",
+      "actorPeople": "People",
+      "actorSystem": "System",
       "editedConfig": "Edited configuration",
       "revokedToken": "Revoked enrollment token",
       "enrolledCollector": "Enrolled collector",
@@ -29097,7 +29098,6 @@
       "setDesired": "Changed version",
       "autoRollback": "Rolled back automatically",
       "rolloutHalted": "Rollout halted",
-      "assignedFleetConfig": "Assigned the fleet's configuration",
       "createdFleet": "Created fleet",
       "renamedFleet": "Renamed fleet",
       "deletedFleet": "Deleted fleet",

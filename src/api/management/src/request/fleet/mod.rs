@@ -34,6 +34,8 @@ use config::meta::fleet::{
 #[cfg(feature = "enterprise")]
 use config::meta::folder::{Folder, FolderType};
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::auditor::FleetAudit;
+#[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 use openobserve_api_common::extractors::ValidatedJson;
 
@@ -186,7 +188,13 @@ pub async fn rename_collector(
             Err(e) => return MetaHttpResponse::bad_request(e),
         };
         match service::rename_collector(&org_id, &id, req.name.trim()).await {
-            Ok(collector) => MetaHttpResponse::json(collector),
+            Ok(collector) => {
+                let fleet = FleetAudit {
+                    fleet_id: collector.fleet.id.clone(),
+                    target: collector.name.clone(),
+                };
+                audited(MetaHttpResponse::json(collector), fleet)
+            }
             Err(e) => to_response(e),
         }
     }
@@ -223,13 +231,15 @@ pub async fn delete_collector(
     {
         use o2_enterprise::enterprise::fleet::service;
 
-        if let Err(refused) = collector_write(&org_id, &user_email.user_id, &id).await {
-            return refused;
-        }
-        match service::delete_collector(&org_id, &id).await {
+        let fleet = match collector_write(&org_id, &user_email.user_id, &id).await {
+            Ok(fleet) => fleet,
+            Err(refused) => return refused,
+        };
+        let res = match service::delete_collector(&org_id, &id).await {
             Ok(()) => StatusCode::NO_CONTENT.into_response(),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -265,13 +275,15 @@ pub async fn restart_collector(
     {
         use o2_enterprise::enterprise::fleet::service;
 
-        if let Err(refused) = collector_write(&org_id, &user_email.user_id, &id).await {
-            return refused;
-        }
-        match service::restart_collector(&org_id, &id).await {
+        let fleet = match collector_write(&org_id, &user_email.user_id, &id).await {
+            Ok(fleet) => fleet,
+            Err(refused) => return refused,
+        };
+        let res = match service::restart_collector(&org_id, &id).await {
             Ok(queued) => (StatusCode::ACCEPTED, axum::Json(queued)).into_response(),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -307,13 +319,15 @@ pub async fn redeliver_collector(
     {
         use o2_enterprise::enterprise::fleet::service;
 
-        if let Err(refused) = collector_write(&org_id, &user_email.user_id, &id).await {
-            return refused;
-        }
-        match service::redeliver_collector(&org_id, &id).await {
+        let fleet = match collector_write(&org_id, &user_email.user_id, &id).await {
+            Ok(fleet) => fleet,
+            Err(refused) => return refused,
+        };
+        let res = match service::redeliver_collector(&org_id, &id).await {
             Ok(redelivered) => (StatusCode::ACCEPTED, axum::Json(redelivered)).into_response(),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -424,7 +438,12 @@ pub async fn create_fleet(
         };
         match db::folders::save_folder(&org_id, folder, FolderType::Fleets, false).await {
             Ok(folder) => {
-                (StatusCode::CREATED, axum::Json(fleet_item(folder, &[]))).into_response()
+                let fleet = FleetAudit {
+                    fleet_id: folder.folder_id.clone(),
+                    target: folder.name.clone(),
+                };
+                let res = (StatusCode::CREATED, axum::Json(fleet_item(folder, &[])));
+                audited(res.into_response(), fleet)
             }
             Err(e) => folder_response(e),
         }
@@ -523,22 +542,30 @@ pub async fn rename_fleet(
         if name.is_empty() {
             return MetaHttpResponse::bad_request("name must not be empty");
         }
-        let mut folder = match db::folders::get_folder(&org_id, &fleet_id, FolderType::Fleets).await
-        {
-            Ok(folder) => folder,
-            Err(e) => return folder_response(e),
+        let fleet = FleetAudit {
+            fleet_id: fleet_id.clone(),
+            target: name.to_string(),
         };
-        folder.name = name.to_string();
-        let renamed =
-            db::folders::update_folder(&org_id, &fleet_id, FolderType::Fleets, folder).await;
-        let folder = match renamed {
-            Ok(folder) => folder,
-            Err(e) => return folder_response(e),
-        };
-        match o2_enterprise::enterprise::fleet::fleets::list_fleets(&org_id).await {
-            Ok(states) => MetaHttpResponse::json(fleet_item(folder, &states)),
-            Err(e) => to_response(e),
+        let res = async {
+            let mut folder =
+                match db::folders::get_folder(&org_id, &fleet_id, FolderType::Fleets).await {
+                    Ok(folder) => folder,
+                    Err(e) => return folder_response(e),
+                };
+            folder.name = name.to_string();
+            let renamed =
+                db::folders::update_folder(&org_id, &fleet_id, FolderType::Fleets, folder).await;
+            let folder = match renamed {
+                Ok(folder) => folder,
+                Err(e) => return folder_response(e),
+            };
+            match o2_enterprise::enterprise::fleet::fleets::list_fleets(&org_id).await {
+                Ok(states) => MetaHttpResponse::json(fleet_item(folder, &states)),
+                Err(e) => to_response(e),
+            }
         }
+        .await;
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -579,10 +606,13 @@ pub async fn delete_fleet(
         if fleet_id == config::meta::folder::DEFAULT_FOLDER {
             return MetaHttpResponse::conflict("the default fleet cannot be deleted");
         }
-        match db::folders::delete_folder(&org_id, &fleet_id, FolderType::Fleets).await {
+        // Named before the delete: afterwards the fleet has no name to record.
+        let fleet = fleet_scope(&org_id, &fleet_id).await;
+        let res = match db::folders::delete_folder(&org_id, &fleet_id, FolderType::Fleets).await {
             Ok(()) => StatusCode::NO_CONTENT.into_response(),
             Err(e) => folder_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -673,10 +703,12 @@ pub async fn put_fleet_settings(
         if let Err(e) = req.validate() {
             return MetaHttpResponse::bad_request(e);
         }
-        match settings::put_fleet_settings(&org_id, &fleet_id, req).await {
+        let fleet = fleet_scope(&org_id, &fleet_id).await;
+        let res = match settings::put_fleet_settings(&org_id, &fleet_id, req).await {
             Ok(settings) => MetaHttpResponse::json(settings),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -713,19 +745,20 @@ pub async fn set_desired(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        use o2_enterprise::enterprise::fleet::{audit, rollouts};
+
         let user_id = &user_email.user_id;
         let req = match desired_request(&org_id, user_id, &fleet_id, body).await {
             Ok(req) => req,
             Err(refused) => return refused,
         };
-        match o2_enterprise::enterprise::fleet::rollouts::set_desired(
-            &org_id, user_id, &fleet_id, req,
-        )
-        .await
-        {
+        let mut fleet = fleet_scope(&org_id, &fleet_id).await;
+        fleet.target = audit::version_target(&fleet.target, &req.config, req.version);
+        let res = match rollouts::set_desired(&org_id, user_id, &fleet_id, req).await {
             Ok(rollout) => MetaHttpResponse::json(rollout),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -858,10 +891,18 @@ pub async fn create_token(
         if let Some(refused) = fleet_write(&org_id, user_id, &req.fleet, "PUT").await {
             return refused;
         }
-        match o2_enterprise::enterprise::fleet::service::create_token(&org_id, user_id, req).await {
-            Ok(created) => (StatusCode::CREATED, axum::Json(created)).into_response(),
-            Err(e) => to_response(e),
-        }
+        let fleet = FleetAudit {
+            fleet_id: req.fleet.clone(),
+            target: req.name.clone(),
+        };
+        let res =
+            match o2_enterprise::enterprise::fleet::service::create_token(&org_id, user_id, req)
+                .await
+            {
+                Ok(created) => (StatusCode::CREATED, axum::Json(created)).into_response(),
+                Err(e) => to_response(e),
+            };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -905,7 +946,13 @@ pub async fn revoke_token(
             return refused;
         }
         match service::revoke_token(&org_id, &id).await {
-            Ok(token) => MetaHttpResponse::json(token),
+            Ok(token) => {
+                let fleet = FleetAudit {
+                    fleet_id: token.fleet.id.clone(),
+                    target: token.name.clone(),
+                };
+                audited(MetaHttpResponse::json(token), fleet)
+            }
             Err(e) => to_response(e),
         }
     }
@@ -1405,13 +1452,15 @@ pub async fn resume_rollout(
         use o2_enterprise::enterprise::fleet::rollouts;
 
         let user_id = &user_email.user_id;
-        if let Err(refused) = rollout_write(&org_id, user_id, &id).await {
-            return refused;
-        }
-        match rollouts::resume(&org_id, &id, user_id).await {
+        let fleet = match rollout_write(&org_id, user_id, &id).await {
+            Ok(fleet) => fleet,
+            Err(refused) => return refused,
+        };
+        let res = match rollouts::resume(&org_id, &id, user_id).await {
             Ok(rollout) => MetaHttpResponse::json(rollout),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1451,9 +1500,10 @@ pub async fn skip_rollout(
         use o2_enterprise::enterprise::fleet::rollouts;
 
         let user_id = &user_email.user_id;
-        if let Err(refused) = rollout_write(&org_id, user_id, &id).await {
-            return refused;
-        }
+        let fleet = match rollout_write(&org_id, user_id, &id).await {
+            Ok(fleet) => fleet,
+            Err(refused) => return refused,
+        };
         let req = match serde_json::from_value::<SkipRequest>(body) {
             Ok(req) => req,
             Err(e) => return MetaHttpResponse::bad_request(e),
@@ -1461,10 +1511,11 @@ pub async fn skip_rollout(
         if req.collector_ids.is_empty() {
             return MetaHttpResponse::bad_request("collector_ids must not be empty");
         }
-        match rollouts::skip(&org_id, &id, user_id, &req.collector_ids).await {
+        let res = match rollouts::skip(&org_id, &id, user_id, &req.collector_ids).await {
             Ok(rollout) => MetaHttpResponse::json(rollout),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1501,13 +1552,15 @@ pub async fn rollback_rollout(
         use o2_enterprise::enterprise::fleet::rollouts;
 
         let user_id = &user_email.user_id;
-        if let Err(refused) = rollout_write(&org_id, user_id, &id).await {
-            return refused;
-        }
-        match rollouts::rollback(&org_id, &id, user_id).await {
+        let fleet = match rollout_write(&org_id, user_id, &id).await {
+            Ok(fleet) => fleet,
+            Err(refused) => return refused,
+        };
+        let res = match rollouts::rollback(&org_id, &id, user_id).await {
             Ok(rollout) => MetaHttpResponse::json(rollout),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, fleet)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1607,12 +1660,12 @@ pub async fn get_pipelines(
     context_path = "/api",
     tag = "Fleet",
     operation_id = "ListFleetAudit",
-    summary = "The fleet audit trail from the audit stream: the newest 500 events of the last 30 days or of a period",
+    summary = "One page of the fleet audit trail, newest first, from the last 30 days or a period",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), AuditQuery),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::fleet::AuditList),
-        (status = 400, description = "Invalid period", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid period or filter", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
 )]
@@ -1623,18 +1676,20 @@ pub async fn list_audit(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed_on(FLEET_MANAGEMENT, &org_id, &user_email.user_id, "GET").await {
+        let user_id = &user_email.user_id;
+        if !allowed_on(FLEET_MANAGEMENT, &org_id, user_id, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        let permitted = match permitted_fleets(&org_id, &user_email.user_id).await {
+        let permitted = match permitted_fleets(&org_id, user_id).await {
             Ok(permitted) => permitted,
             Err(refused) => return refused,
         };
-        match openobserve_core::fleet::list_audit(&org_id, query, permitted.as_ref()).await {
-            Ok(mut list) => {
-                list.total = list.items.len();
-                MetaHttpResponse::json(list)
-            }
+        let fleets = match &query.fleet {
+            None => permitted,
+            Some(fleet) => Some(in_fleet(&org_id, user_id, fleet.clone(), permitted).await),
+        };
+        match openobserve_core::fleet::list_audit(&org_id, query, fleets.as_ref()).await {
+            Ok(list) => MetaHttpResponse::json(list),
             Err(e) => to_response(e),
         }
     }
@@ -1783,14 +1838,13 @@ async fn fleet_allowed(org_id: &str, user_id: &str, fleet: &str, verb: &str) -> 
     .await
 }
 
-/// Every collector write is `PUT` on the collector's current fleet.
+/// Every collector write is `PUT` on the collector's current fleet, which audits it.
 #[cfg(feature = "enterprise")]
-async fn collector_write(org_id: &str, user_id: &str, id: &str) -> Result<String, Response> {
-    use o2_enterprise::enterprise::fleet::{fleets, service::FleetError};
+async fn collector_write(org_id: &str, user_id: &str, id: &str) -> Result<FleetAudit, Response> {
+    use o2_enterprise::enterprise::fleet::{audit, service::FleetError};
 
-    let ids = [id.to_string()];
-    let fleet = match fleets::collector_fleets(org_id, &ids).await {
-        Ok(found) => found.get(id).cloned(),
+    let fleet = match audit::collector_scope(org_id, id).await {
+        Ok(found) => found,
         Err(e) => return Err(to_response(e)),
     };
     let Some(fleet) = fleet else {
@@ -1798,22 +1852,41 @@ async fn collector_write(org_id: &str, user_id: &str, id: &str) -> Result<String
             FleetError::CollectorNotFound(id.to_string()).into(),
         ));
     };
-    match fleet_write(org_id, user_id, &fleet, "PUT").await {
+    match fleet_write(org_id, user_id, &fleet.fleet_id, "PUT").await {
         Some(refused) => Err(refused),
         None => Ok(fleet),
     }
 }
 
-/// A rollout exit is `PUT` on the rollout's fleet.
+/// A rollout exit is `PUT` on the rollout's fleet, which audits it.
 #[cfg(feature = "enterprise")]
-async fn rollout_write(org_id: &str, user_id: &str, id: &str) -> Result<(), Response> {
-    let rollout = match o2_enterprise::enterprise::fleet::rollouts::get_rollout(org_id, id).await {
+async fn rollout_write(org_id: &str, user_id: &str, id: &str) -> Result<FleetAudit, Response> {
+    use o2_enterprise::enterprise::fleet::{audit, rollouts};
+
+    let rollout = match rollouts::get_rollout(org_id, id).await {
         Ok(rollout) => rollout,
         Err(e) => return Err(to_response(e)),
     };
     match fleet_write(org_id, user_id, &rollout.fleet.id, "PUT").await {
         Some(refused) => Err(refused),
-        None => Ok(()),
+        None => Ok(audit::rollout_scope(&rollout)),
+    }
+}
+
+/// The audit layer writes the event under `fleet`; an extension never reaches the client.
+#[cfg(feature = "enterprise")]
+fn audited(mut res: Response, fleet: FleetAudit) -> Response {
+    res.extensions_mut().insert(fleet);
+    res
+}
+
+/// A fleet named as it is now; a fleet not found keeps its id.
+#[cfg(feature = "enterprise")]
+async fn fleet_scope(org_id: &str, fleet_id: &str) -> FleetAudit {
+    let found = db::folders::get_folder(org_id, fleet_id, FolderType::Fleets).await;
+    FleetAudit {
+        fleet_id: fleet_id.to_string(),
+        target: found.map_or_else(|_| fleet_id.to_string(), |f| f.name),
     }
 }
 
@@ -2657,5 +2730,169 @@ mod tests {
         let empty = fleet_item(folder("f2"), &[stored]);
         assert_eq!(empty.state, Some(FleetState::default()));
         assert_eq!(empty.settings, FleetSettings::default());
+    }
+
+    /// Nothing else in this binary migrates the meta store the handlers write to.
+    async fn meta_store() {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+    }
+
+    /// Shared by the audit tests and never forgotten, since they run in parallel.
+    const AUDIT_ROOT: &str = "audit-root@fleet-audit-scope.test";
+
+    /// A fresh org with one fleet, written by a root caller, so every check passes for real.
+    async fn audit_org(label: &str) -> (String, String) {
+        meta_store().await;
+        openfga_off();
+        seed_member(
+            AUDIT_ROOT,
+            config::meta::user::UserRole::Root,
+            config::DEFAULT_ORG,
+        );
+        let org = format!("fleet-audit-{label}-{}", config::utils::time::now_micros());
+        let res = create_fleet(
+            Path(org.clone()),
+            root(),
+            ValidatedJson(serde_json::json!({"name": "edge hosts"})),
+        )
+        .await;
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let (fleet, target) = recorded(&res).expect("a created fleet is audited under itself");
+        assert_eq!(target, "edge hosts");
+        (org, fleet)
+    }
+
+    fn root() -> Headers<UserEmail> {
+        Headers(UserEmail {
+            user_id: AUDIT_ROOT.to_string(),
+        })
+    }
+
+    /// What the audit layer would record as the event's fleet and target.
+    fn recorded(res: &Response) -> Option<(String, String)> {
+        res.extensions()
+            .get::<FleetAudit>()
+            .map(|f| (f.fleet_id.clone(), f.target.clone()))
+    }
+
+    fn named(fleet: &str, target: &str) -> Option<(String, String)> {
+        Some((fleet.to_string(), target.to_string()))
+    }
+
+    #[tokio::test]
+    async fn fleet_and_token_writes_hand_their_fleet_to_the_audit_layer() {
+        let (org, edge) = audit_org("fleets").await;
+        let body = |v: serde_json::Value| ValidatedJson(v);
+        let at = || Path((org.clone(), edge.clone()));
+
+        let res = rename_fleet(at(), root(), body(serde_json::json!({"name": "edge"}))).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(recorded(&res), named(&edge, "edge"));
+        let res = put_fleet_settings(at(), root(), body(serde_json::json!({}))).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(recorded(&res), named(&edge, "edge"));
+        let desired = serde_json::json!({"config": "otel", "version": 3});
+        let res = set_desired(at(), root(), body(desired)).await;
+        assert_eq!(recorded(&res), named(&edge, "edge: otel v3"));
+
+        let token = serde_json::json!({"name": "k8s", "fleet": edge});
+        let res = create_token(Path(org.clone()), root(), body(token)).await;
+        assert_eq!(res.status(), StatusCode::CREATED);
+        assert_eq!(recorded(&res), named(&edge, "k8s"));
+        let created: serde_json::Value = serde_json::from_str(&body_text(res).await).unwrap();
+        let token_id = created["id"].as_str().unwrap().to_string();
+        let res = revoke_token(Path((org.clone(), token_id)), root()).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(recorded(&res), named(&edge, "k8s"));
+
+        let res = delete_fleet(at(), root()).await;
+        assert_eq!(
+            recorded(&res),
+            named(&edge, "edge"),
+            "named before the delete removes the name"
+        );
+    }
+
+    #[tokio::test]
+    async fn collector_writes_hand_the_collectors_fleet_to_the_audit_layer() {
+        use infra::table::entity::fleet_collectors::{ActiveModel, Entity, Model};
+        use sea_orm::EntityTrait;
+
+        let (org, edge) = audit_org("collectors").await;
+        let row = Model {
+            org_id: org.clone(),
+            id: "c1".to_string(),
+            fleet_id: edge.clone(),
+            hostname: Some("web-1".to_string()),
+            enrolled_at: 1,
+            last_seen_at: 1,
+            ..Default::default()
+        };
+        Entity::insert(ActiveModel::from(row))
+            .exec_without_returning(infra::db::get_orm_client_rw().await)
+            .await
+            .unwrap();
+        let at = || Path((org.clone(), "c1".to_string()));
+
+        let res = restart_collector(at(), root()).await;
+        assert_eq!(recorded(&res), named(&edge, "web-1"), "{}", res.status());
+        let res = redeliver_collector(at(), root()).await;
+        assert_eq!(recorded(&res), named(&edge, "web-1"), "{}", res.status());
+        let name = ValidatedJson(serde_json::json!({"name": "edge-a"}));
+        let res = rename_collector(at(), root(), name).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(recorded(&res), named(&edge, "edge-a"));
+        let res = delete_collector(at(), root()).await;
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+        assert_eq!(
+            recorded(&res),
+            named(&edge, "edge-a"),
+            "named before the delete removes the row"
+        );
+    }
+
+    #[tokio::test]
+    async fn rollout_exits_hand_the_rollouts_fleet_to_the_audit_layer() {
+        use infra::table::fleet_rollouts::{self, Model};
+
+        let (org, edge) = audit_org("rollouts").await;
+        let row = Model {
+            id: "r1".to_string(),
+            org_id: org.clone(),
+            config_id: "otel".to_string(),
+            from_version: Some(1),
+            to_version: 2,
+            fleet_id: edge.clone(),
+            strategy: "immediate".to_string(),
+            status: "halted".to_string(),
+            phases: "[]".to_string(),
+            failure: None,
+            events: "[]".to_string(),
+            started_at: 1,
+            started_by: AUDIT_ROOT.to_string(),
+            rev: 0,
+            auto_rollback: false,
+            scheduled_for: None,
+            gates: None,
+        };
+        fleet_rollouts::insert_with(infra::db::get_orm_client_rw().await, row, vec![])
+            .await
+            .unwrap();
+        let at = || Path((org.clone(), "r1".to_string()));
+        let want = named(&edge, "edge hosts: otel v2");
+
+        let res = resume_rollout(at(), root()).await;
+        assert_eq!(recorded(&res), want, "{}", res.status());
+        let skip = ValidatedJson(serde_json::json!({"collector_ids": ["c1"]}));
+        let res = skip_rollout(at(), root(), skip).await;
+        assert_eq!(recorded(&res), want, "{}", res.status());
+        let res = rollback_rollout(at(), root()).await;
+        assert_eq!(recorded(&res), want, "{}", res.status());
     }
 }

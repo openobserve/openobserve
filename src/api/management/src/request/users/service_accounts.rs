@@ -79,6 +79,7 @@ pub async fn exchange_token(
             trace_id: None,
         },
         delegated: None,
+        fleet: None,
     };
     match result {
         Ok(response) => {

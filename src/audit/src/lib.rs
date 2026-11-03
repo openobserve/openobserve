@@ -104,6 +104,7 @@ pub async fn report_with_protocol(
                 trace_id: Some(trace_id),
             },
             delegated: None,
+            fleet: None,
         })
         .await;
     }

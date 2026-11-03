@@ -31,6 +31,8 @@ use o2_enterprise::enterprise::common::auditor::AUDIT_STREAM;
 
 /// The engine ignores `step` on an instant query; any positive value works.
 const INSTANT_STEP_MICROS: i64 = 300_000_000;
+/// Absent from the audit stream's schema until the first fleet-scoped row is written.
+const AUDIT_FLEET_COLUMN: &str = "fleet_id";
 
 /// `O2_FLEET_ENABLED`, read once at startup; off stops every fleet job and refuses writes.
 pub fn enabled() -> bool {
@@ -63,10 +65,13 @@ pub async fn list_audit(
     query: AuditQuery,
     fleets: Option<&HashSet<String>>,
 ) -> Result<AuditList, anyhow::Error> {
+    let schema = infra::schema::get(META_ORG_ID, AUDIT_STREAM, StreamType::Logs).await?;
+    let fleet_column = schema.field_with_name(AUDIT_FLEET_COLUMN).is_ok();
     o2_enterprise::enterprise::fleet::audit::list_audit(
         org_id,
         query,
         fleets,
+        fleet_column,
         now_micros(),
         search_audit,
     )
@@ -132,6 +137,7 @@ async fn search_audit(
     sql: String,
     start_time: i64,
     end_time: i64,
+    from: i64,
     size: i64,
 ) -> Result<Vec<serde_json::Value>, anyhow::Error> {
     // Until the first audit row is written the stream does not exist, and a search of it errors.
@@ -142,7 +148,7 @@ async fn search_audit(
     let req = search::Request {
         query: search::Query {
             sql,
-            from: 0,
+            from,
             size,
             start_time,
             end_time,

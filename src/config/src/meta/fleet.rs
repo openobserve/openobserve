@@ -32,6 +32,8 @@ pub const DEFAULT_GATE_WINDOW_SECS: u32 = 5 * 60;
 pub const DEFAULT_GATE_PASS_PERCENT: u32 = 95;
 pub const DEFAULT_PAGE_LIMIT: usize = 100;
 pub const MAX_PAGE_LIMIT: usize = 1000;
+pub const DEFAULT_AUDIT_LIMIT: usize = 50;
+pub const MAX_AUDIT_LIMIT: usize = 500;
 
 /// Issues keyed by pipeline id; the empty key holds document-level issues.
 pub type Issues = BTreeMap<String, Vec<ConfigIssue>>;
@@ -438,11 +440,57 @@ pub struct AuditList {
     pub audit_disabled: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema, IntoParams)]
+/// One page of the trail; `limit` defaults to 50 and is capped at 500.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct AuditQuery {
+    /// Epoch milliseconds; defaults to 30 days before `to`.
     pub from: Option<i64>,
+    /// Epoch milliseconds, exclusive; defaults to now.
     pub to: Option<i64>,
+    #[serde(default)]
+    pub offset: Option<usize>,
+    #[serde(default)]
+    pub limit: Option<usize>,
+    /// Only this fleet's events, which leaves out org-wide ones.
+    #[serde(default)]
+    pub fleet: Option<String>,
+    #[serde(default)]
+    pub module: Option<AuditModule>,
+    #[serde(default)]
+    pub actor: Option<AuditActor>,
+}
+
+impl AuditQuery {
+    pub fn offset(&self) -> usize {
+        self.offset.unwrap_or(0)
+    }
+
+    pub fn limit(&self) -> usize {
+        self.limit
+            .unwrap_or(DEFAULT_AUDIT_LIMIT)
+            .clamp(1, MAX_AUDIT_LIMIT)
+    }
+}
+
+/// The part of the fleet API an event was made through; `settings` is the org's fleet settings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum AuditModule {
+    Collectors,
+    Tokens,
+    Fleets,
+    Rollouts,
+    Configs,
+    Settings,
+}
+
+/// `system` is an event the server made itself, such as a halted rollout.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum AuditActor {
+    People,
+    System,
 }
 
 /// Per-fleet overrides; `None` inherits the organization default.

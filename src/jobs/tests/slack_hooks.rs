@@ -282,6 +282,7 @@ fn audit_publishes_a_slack_record_to_the_meta_audit_stream() {
                 trace_id: None,
             },
             delegated: None,
+            fleet: None,
         })
         .await;
         let published = std::mem::take(&mut *PUBLISHED.lock().unwrap());

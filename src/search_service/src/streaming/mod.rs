@@ -307,6 +307,7 @@ pub async fn process_search_stream_request(
                                 trace_id: Some(trace_id.to_string()),
                             },
                             delegated: None,
+                            fleet: None,
                         })
                         .await;
                     }
@@ -413,6 +414,7 @@ pub async fn process_search_stream_request(
                                 trace_id: Some(trace_id.to_string()),
                             },
                             delegated: None,
+                            fleet: None,
                         })
                         .await;
                     }
@@ -494,6 +496,7 @@ pub async fn process_search_stream_request(
                                 trace_id: Some(trace_id.to_string()),
                             },
                             delegated: None,
+                            fleet: None,
                         })
                         .await;
                     }
@@ -566,6 +569,7 @@ pub async fn process_search_stream_request(
                                 trace_id: Some(trace_id.to_string()),
                             },
                             delegated: None,
+                            fleet: None,
                         })
                         .await;
                     }
@@ -630,6 +634,7 @@ pub async fn process_search_stream_request(
                             trace_id: Some(trace_id.to_string()),
                         },
                         delegated: None,
+                        fleet: None,
                     })
                     .await;
                 }
@@ -705,6 +710,7 @@ pub async fn process_search_stream_request(
                     trace_id: Some(trace_id.to_string()),
                 },
                 delegated: None,
+                fleet: None,
             })
             .await;
         }
@@ -1130,6 +1136,7 @@ pub async fn process_search_stream_request_multi(
                 trace_id: Some(trace_id.to_string()),
             },
             delegated: None,
+            fleet: None,
         })
         .await;
     }
