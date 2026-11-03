@@ -1643,6 +1643,7 @@ mod tests {
             l0_json: Set("{}".to_string()),
             created_at: Set(now),
             updated_at: Set(now),
+            template: Set(None),
         })
         .await;
         insert_active(oncall_ownership_rules::ActiveModel {

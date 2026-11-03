@@ -771,6 +771,21 @@ pub async fn init() -> Result<(), anyhow::Error> {
         },
     );
     // A check's recovery swap and its resolve rows commit together on the delivery ledger.
+    // On-call destination sends and the resolve fan out go through the shared notification path.
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::oncall::sender::register_oncall_sender(|n| {
+            Box::pin(openobserve_core::alerts::notifications::oncall::notify_destination(n))
+        });
+        o2_enterprise::enterprise::oncall::sender::register_oncall_resolver(|r| {
+            Box::pin(openobserve_core::alerts::notifications::oncall::resolve_episode(r))
+        });
+        if LOCAL_NODE.is_scheduler() {
+            tokio::spawn(
+                openobserve_core::alerts::notifications::oncall::log_mail_destination_policies(),
+            );
+        }
+    }
     #[cfg(feature = "enterprise")]
     openobserve_synthetics::alerting::register_episode_closer(
         openobserve_core::synthetics::close_alert_episode,

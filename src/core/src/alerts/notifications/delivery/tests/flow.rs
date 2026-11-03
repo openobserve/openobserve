@@ -1054,3 +1054,131 @@ fn a_synthetics_recovery_resolves_the_firing_record_and_a_muted_one_writes_no_ro
         },
     );
 }
+
+#[cfg(feature = "enterprise")]
+fn on_call(
+    response: &str,
+    destination: &str,
+    event: &str,
+) -> o2_enterprise::enterprise::oncall::sender::OnCallNotification {
+    o2_enterprise::enterprise::oncall::sender::OnCallNotification {
+        org_id: "acme".into(),
+        destination: destination.into(),
+        event: event.into(),
+        episode_id: response.into(),
+        title: "High error rate".into(),
+        text: "error rate 12%".into(),
+        priority: "P1".into(),
+        team: "checkout".into(),
+        url: "https://o2/r".into(),
+        response_id: Some(response.into()),
+        stage: event.split(':').next().unwrap_or_default().into(),
+        legacy_payload: serde_json::json!({"text": "page"}),
+        ..Default::default()
+    }
+}
+
+#[cfg(feature = "enterprise")]
+#[test]
+fn one_on_call_response_pages_acknowledges_and_resolves_once() {
+    run(
+        concat!(
+            module_path!(),
+            "::one_on_call_response_pages_acknowledges_and_resolves_once"
+        ),
+        &[],
+        || async {
+            use crate::alerts::notifications::oncall::{notify_destination, resolve_episode};
+
+            store().await;
+            let (base, seen) = mock().await;
+            register("pd-oc", http(format!("{base}/pd"), "pagerduty"));
+            register("slack-oc", http(format!("{base}/ok"), "slack"));
+            let response = svix_ksuid::Ksuid::new(None, None).to_string();
+
+            for dest in ["pd-oc", "slack-oc"] {
+                notify_destination(on_call(&response, dest, "paged:0:0"))
+                    .await
+                    .unwrap();
+            }
+            // A second escalate on the same rung reaches nobody twice.
+            notify_destination(on_call(&response, "pd-oc", "paged:0:0"))
+                .await
+                .unwrap();
+            assert_eq!(calls(&seen, "/pd").len(), 1);
+            // The next rung updates the same platform record.
+            notify_destination(on_call(&response, "pd-oc", "paged:0:300000000"))
+                .await
+                .unwrap();
+            assert_eq!(calls(&seen, "/pd").len(), 2);
+
+            // An acknowledge never reaches the platform and posts to the room.
+            notify_destination(on_call(&response, "pd-oc", "acknowledged"))
+                .await
+                .unwrap();
+            notify_destination(on_call(&response, "slack-oc", "acknowledged"))
+                .await
+                .unwrap();
+            assert_eq!(calls(&seen, "/pd").len(), 2);
+            let ack: Vec<_> = kind_rows("on_call", &response)
+                .await
+                .into_iter()
+                .filter(|r| r.event == "acknowledged")
+                .collect();
+            assert!(
+                ack.iter().any(|r| r.destination == "pd-oc"
+                    && r.skip_reason.as_deref() == Some("PlatformNoAck"))
+            );
+
+            resolve_episode(o2_enterprise::enterprise::oncall::sender::OnCallResolve {
+                message: on_call(&response, "", "resolved"),
+                destinations: vec!["slack-oc".into()],
+            })
+            .await
+            .unwrap();
+            let pd = calls(&seen, "/pd");
+            assert_eq!(pd.len(), 3, "one resolve after the two triggers");
+            let resolve = String::from_utf8_lossy(&pd[2].1).to_string();
+            assert!(
+                resolve.contains("resolve") && resolve.contains(&response),
+                "{resolve}"
+            );
+            let resolved: Vec<_> = kind_rows("on_call", &response)
+                .await
+                .into_iter()
+                .filter(|r| r.event == "resolved")
+                .collect();
+            assert_eq!(
+                resolved.len(),
+                2,
+                "the platform and the team channel, once each"
+            );
+
+            // A page after the resolve is superseded and sends nothing.
+            notify_destination(on_call(&response, "pd-oc", "paged:1:0"))
+                .await
+                .unwrap();
+            assert_eq!(calls(&seen, "/pd").len(), 3);
+        },
+    );
+}
+
+#[cfg(feature = "enterprise")]
+#[test]
+fn a_test_page_never_reaches_a_platform() {
+    run(
+        concat!(module_path!(), "::a_test_page_never_reaches_a_platform"),
+        &[],
+        || async {
+            use crate::alerts::notifications::oncall::notify_destination;
+
+            store().await;
+            let (base, seen) = mock().await;
+            register("pd-test", http(format!("{base}/pd"), "pagerduty"));
+            let mut n = on_call("test:7", "pd-test", "test");
+            n.response_id = None;
+            notify_destination(n).await.unwrap();
+            assert!(calls(&seen, "/pd").is_empty());
+        },
+    );
+}

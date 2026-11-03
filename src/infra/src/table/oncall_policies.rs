@@ -22,10 +22,15 @@ use config::{
     meta::oncall::{EscalationPolicy, PriorityRung},
     utils::time::now_micros,
 };
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+};
 
 use super::{entity::oncall_policies, ttl_cache::TtlCache};
-use crate::{db::get_orm_client_rw, errors};
+use crate::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    errors,
+};
 
 /// The team's escalation policy, for the paging path (`06` §3).
 ///
@@ -99,6 +104,7 @@ fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
             rungs,
             destinations,
             l0,
+            template: m.template,
         },
         Err(e) => {
             log::error!(
@@ -190,6 +196,7 @@ async fn insert(policy: &EscalationPolicy) -> Result<EscalationPolicy, errors::E
         rungs: Set(serde_json::to_string(&policy.rungs)?),
         destinations: Set(serde_json::to_string(&policy.destinations)?),
         l0_json: Set(serde_json::to_string(&policy.l0)?),
+        template: Set(policy.template.clone()),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -240,6 +247,58 @@ pub async fn update_rungs(
     Ok(Some(updated))
 }
 
+/// Sets or clears the team's template override; false when the team has no policy row.
+pub async fn set_template(
+    org_id: &str,
+    team_id: &str,
+    template: Option<String>,
+) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let res = oncall_policies::Entity::update_many()
+        .col_expr(
+            oncall_policies::Column::Template,
+            sea_orm::sea_query::Expr::value(template),
+        )
+        .col_expr(
+            oncall_policies::Column::UpdatedAt,
+            sea_orm::sea_query::Expr::value(now_micros()),
+        )
+        .filter(oncall_policies::Column::OrgId.eq(org_id))
+        .filter(oncall_policies::Column::TeamId.eq(team_id))
+        .exec(client)
+        .await?;
+    invalidate_and_publish(org_id, team_id).await;
+    Ok(res.rows_affected > 0)
+}
+
+/// `(org, team_id)` of each policy whose template override is `template`; `None` is every org.
+pub async fn teams_using_template(
+    org_id: Option<&str>,
+    template: &str,
+) -> Result<Vec<(String, String)>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let mut query = oncall_policies::Entity::find()
+        .select_only()
+        .column(oncall_policies::Column::OrgId)
+        .column(oncall_policies::Column::TeamId)
+        .filter(oncall_policies::Column::Template.eq(template));
+    if let Some(org) = org_id {
+        query = query.filter(oncall_policies::Column::OrgId.eq(org));
+    }
+    Ok(query.into_tuple::<(String, String)>().all(client).await?)
+}
+
+/// Every policy of every org; read once at boot for the upgrade notice.
+pub async fn list_all() -> Result<Vec<EscalationPolicy>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    Ok(oncall_policies::Entity::find()
+        .all(client)
+        .await?
+        .into_iter()
+        .map(to_policy)
+        .collect())
+}
+
 pub async fn list(org_id: &str) -> Result<Vec<EscalationPolicy>, errors::Error> {
     let client = get_orm_client_rw().await;
     Ok(oncall_policies::Entity::find()
@@ -282,6 +341,7 @@ mod tests {
             // The column defaults, 04 §3's own: one pass, then record that nobody answered.
             created_at: 10,
             updated_at: 20,
+            template: None,
         }
     }
 

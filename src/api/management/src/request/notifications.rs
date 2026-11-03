@@ -179,9 +179,10 @@ fn validate(query: &DeliveriesQuery) -> Result<(NotificationKind, String), Strin
             | NotificationKind::Incident
             | NotificationKind::Synthetics
             | NotificationKind::Downtime
+            | NotificationKind::OnCall
     ) {
         return Err(format!(
-            "kind: '{}' has no delivery rows yet; allowed: anomaly, incident, synthetics, downtime",
+            "kind: '{}' has no delivery rows yet; allowed: anomaly, incident, synthetics, downtime, on_call",
             query.kind
         ));
     }
@@ -208,6 +209,7 @@ async fn can_read(org_id: &str, user_id: &str, kind: NotificationKind, owner: &s
         NotificationKind::Incident => "incidents",
         NotificationKind::Synthetics => "synthetics",
         NotificationKind::Downtime => "downtimes",
+        NotificationKind::OnCall => "oncall_responses",
         _ => "alerts",
     };
     openobserve_core::auth::check_permissions(
@@ -258,14 +260,12 @@ mod tests {
 
     #[test]
     fn kinds_without_rows_yet_are_refused() {
-        for kind in ["alert", "on_call"] {
-            let err = validate(&q(kind, Some("x1"), None)).unwrap_err();
-            assert!(
-                err.contains("allowed: anomaly, incident, synthetics, downtime"),
-                "{kind}: {err}"
-            );
-        }
-        for kind in ["synthetics", "downtime"] {
+        let err = validate(&q("alert", Some("x1"), None)).unwrap_err();
+        assert!(
+            err.contains("allowed: anomaly, incident, synthetics, downtime, on_call"),
+            "{err}"
+        );
+        for kind in ["synthetics", "downtime", "on_call"] {
             assert!(validate(&q(kind, Some("x1"), None)).is_ok(), "{kind}");
         }
     }

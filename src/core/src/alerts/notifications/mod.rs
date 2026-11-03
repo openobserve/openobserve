@@ -29,6 +29,8 @@ pub mod format;
 pub mod jira;
 pub(crate) mod modifiers;
 pub mod notify;
+#[cfg(feature = "enterprise")]
+pub mod oncall;
 pub mod org_default;
 pub mod platform;
 pub mod preview;

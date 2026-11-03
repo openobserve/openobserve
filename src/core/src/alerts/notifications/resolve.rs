@@ -116,6 +116,10 @@ pub fn resolve_content(
         unknown_variables.append(&mut unk);
         let (url, mut unk) = substitute_raw(&link.url, ctx);
         unknown_variables.append(&mut unk);
+        // A card for another kind drops a link whose URL is empty, such as a page with no runbook.
+        if ctx.kind != NotificationKind::Alert && url.trim().is_empty() {
+            continue;
+        }
         links.push((label, url));
     }
     // Appended alert link: empty label — renderers supply the localized

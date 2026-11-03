@@ -266,6 +266,7 @@ async fn warn_about(
                 // No alert behind this one, so no runbook to follow.
                 runbook_url: None,
                 investigation: vec![],
+                event: String::new(),
             },
             recipient: recipient.clone(),
             channel: config::meta::oncall::Channel::Email,

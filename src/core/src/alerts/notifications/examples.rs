@@ -66,6 +66,17 @@ pub const SYNTHETICS_VARIABLES: [&str; 16] = [
     "check_title",
 ];
 
+pub const ONCALL_VARIABLES: [&str; 8] = [
+    "oncall_team",
+    "oncall_reason",
+    "oncall_stage",
+    "oncall_priority",
+    "oncall_recipient",
+    "oncall_response_id",
+    "oncall_ack_url",
+    "runbook_url",
+];
+
 pub const DOWNTIME_VARIABLES: [&str; 8] = [
     "downtime_name",
     "downtime_event",
@@ -114,6 +125,7 @@ pub fn variables_for(kind: NotificationKind) -> Vec<String> {
         NotificationKind::Incident => &INCIDENT_VARIABLES,
         NotificationKind::Synthetics => &SYNTHETICS_VARIABLES,
         NotificationKind::Downtime => &DOWNTIME_VARIABLES,
+        NotificationKind::OnCall => &ONCALL_VARIABLES,
         _ => &[],
     };
     COMMON_VARIABLES
@@ -132,12 +144,13 @@ pub struct VariableGroup {
 }
 
 /// The kinds whose producer sends through templates in this release; the UI hides the others.
-pub const SHIPPED_KINDS: [NotificationKind; 5] = [
+pub const SHIPPED_KINDS: [NotificationKind; 6] = [
     NotificationKind::Alert,
     NotificationKind::Incident,
     NotificationKind::Anomaly,
     NotificationKind::Synthetics,
     NotificationKind::Downtime,
+    NotificationKind::OnCall,
 ];
 
 /// `common`, then one group per shipped kind with its own variables.
@@ -158,6 +171,7 @@ pub fn variable_groups() -> Vec<VariableGroup> {
             NotificationKind::Incident => &INCIDENT_VARIABLES,
             NotificationKind::Synthetics => &SYNTHETICS_VARIABLES,
             NotificationKind::Downtime => &DOWNTIME_VARIABLES,
+            NotificationKind::OnCall => &ONCALL_VARIABLES,
             _ => &[],
         };
         groups.push(group(kind.as_str(), vars));
@@ -171,6 +185,7 @@ pub fn example_context(kind: NotificationKind, resolved: bool) -> NotificationCo
         NotificationKind::Anomaly => anomaly_example(resolved),
         NotificationKind::Incident => incident_example(resolved),
         NotificationKind::Synthetics => synthetics_example(resolved),
+        NotificationKind::OnCall => on_call_example(resolved),
         _ => {
             let level = if resolved {
                 AlertLevel::Ok
@@ -333,6 +348,48 @@ fn synthetics_example(resolved: bool) -> NotificationContext {
     ctx
 }
 
+fn on_call_example(resolved: bool) -> NotificationContext {
+    let url = "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme";
+    let level = if resolved {
+        AlertLevel::Ok
+    } else {
+        AlertLevel::Critical
+    };
+    let mut ctx = base(NotificationKind::OnCall, resolved, level);
+    ctx.alert_name = "High error rate on web-logs".into();
+    ctx.alert_url = url.into();
+    ctx.episode_id = Some("resp_31".into());
+    ctx.event = if resolved {
+        STATUS_RESOLVED.into()
+    } else {
+        "paged:1".into()
+    };
+    ctx.alert_trigger_time_str = "2026-11-02 10:05:00".into();
+    ctx.alert_description = "error rate 12.4% over the 5% threshold on checkout".into();
+    let (stage, reason, ack) = if resolved {
+        ("resolved", "the incident was resolved", "")
+    } else {
+        (
+            "1",
+            "paged by policy checkout-escalation",
+            "https://o2.acme.com/api/acme/oncall/ack/resp_31",
+        )
+    };
+    ctx.context_attributes = [
+        ("oncall_team", "checkout"),
+        ("oncall_reason", reason),
+        ("oncall_stage", stage),
+        ("oncall_priority", "P2"),
+        ("oncall_recipient", "maria@acme.com"),
+        ("oncall_response_id", "resp_31"),
+        ("oncall_ack_url", ack),
+        ("runbook_url", "https://wiki.acme.com/runbooks/checkout"),
+    ]
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .to_vec();
+    ctx
+}
+
 fn incident_example(resolved: bool) -> NotificationContext {
     let url = "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme";
     let level = if resolved {
@@ -405,6 +462,7 @@ mod tests {
     const EXAMPLE_ANOMALY: &str = include_str!("render/testdata/examples/anomaly.json");
     const EXAMPLE_INCIDENT: &str = include_str!("render/testdata/examples/incident.json");
     const EXAMPLE_SYNTHETICS: &str = include_str!("render/testdata/examples/synthetics.json");
+    const EXAMPLE_ON_CALL: &str = include_str!("render/testdata/examples/on_call.json");
 
     fn rendered(
         kind: NotificationKind,
@@ -464,6 +522,19 @@ mod tests {
     }
 
     #[test]
+    fn golden_example_on_call_keeps_todays_header_and_drops_an_unset_ack_link() {
+        let want: serde_json::Value = serde_json::from_str(EXAMPLE_ON_CALL).unwrap();
+        assert_eq!(example(NotificationKind::OnCall), want);
+        let firing = want["slack_firing"].to_string();
+        assert!(
+            firing.contains("P2 · High error rate on web-logs"),
+            "{firing}"
+        );
+        assert!(firing.contains("Acknowledge"));
+        assert!(!want["slack_resolved"].to_string().contains("Acknowledge"));
+    }
+
+    #[test]
     fn anomaly_recovery_hides_empty_fields() {
         let ctx = example_context(NotificationKind::Anomaly, true);
         let content = resolve_content(
@@ -497,6 +568,7 @@ mod tests {
             (NotificationKind::Anomaly, "anomaly.json"),
             (NotificationKind::Incident, "incident.json"),
             (NotificationKind::Synthetics, "synthetics.json"),
+            (NotificationKind::OnCall, "on_call.json"),
         ] {
             let body = serde_json::to_string_pretty(&example(kind)).unwrap() + "\n";
             std::fs::write(format!("{dir}/{file}"), body).unwrap();

@@ -359,6 +359,7 @@ pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> 
             active.rungs = Set(rungs);
             active.destinations = Set(destinations);
             active.l0_json = Set(l0_json);
+            active.template = Set(policy.template.clone());
             active.updated_at = Set(now);
             active.update(client).await?;
         }
@@ -370,6 +371,7 @@ pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> 
                 rungs: Set(rungs),
                 destinations: Set(destinations),
                 l0_json: Set(l0_json),
+                template: Set(policy.template.clone()),
                 created_at: Set(now),
                 updated_at: Set(now),
             }

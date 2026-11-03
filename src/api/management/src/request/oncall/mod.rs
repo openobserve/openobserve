@@ -183,6 +183,10 @@ pub struct SetPolicyRequest {
     /// Absent leaves it unchanged, so editing rungs cannot silently un-configure L0.
     #[serde(default)]
     pub l0: Option<config::meta::oncall::L0Policy>,
+    /// Template override for on-call messages; absent leaves it, null or "" clears it.
+    #[serde(default, deserialize_with = "double_option")]
+    #[schema(value_type = Option<String>)]
+    pub template: Option<Option<String>>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1669,6 +1673,28 @@ pub async fn set_policy(
                 }
                 other => internal_error("set_policy node versions", &other),
             };
+        }
+        if let Some(template) = body.template.clone() {
+            let template = template
+                .map(|t| t.trim().to_string())
+                .filter(|t| !t.is_empty());
+            if let Some(name) = template.as_deref()
+                && let Err(e) = openobserve_core::alerts::templates::check_binding(
+                    &org_id,
+                    name,
+                    config::meta::alerts::notification_kind::NotificationKind::OnCall,
+                )
+                .await
+            {
+                return MetaHttpResponse::bad_request(e.as_str());
+            }
+            if let Err(e) = o2_enterprise::enterprise::oncall::service::set_policy_template(
+                &org_id, &team_id, template,
+            )
+            .await
+            {
+                return to_response(e);
+            }
         }
         match o2_enterprise::enterprise::oncall::service::set_policy(
             &org_id,
@@ -6838,6 +6864,7 @@ mod tests {
             }],
             destinations: None,
             l0: None,
+            template: None,
         };
         let response = set_policy(
             Path(("acme".to_string(), "t_dm8".to_string())),
