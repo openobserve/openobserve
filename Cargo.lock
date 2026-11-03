@@ -8598,6 +8598,7 @@ dependencies = [
  "tracing",
  "urlencoding",
  "usage_reporting",
+ "utoipa",
 ]
 
 [[package]]

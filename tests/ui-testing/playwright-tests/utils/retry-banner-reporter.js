@@ -2,7 +2,7 @@
  * Retry Banner Reporter
  * ---------------------
  * In CI the reporter is `blob`, which writes nothing to stdout — so when Playwright
- * retries a failed test (retries: 3 in playwright.config.js) there is no signal in the
+ * retries a failed test (see `retries` in playwright.config.js) there is no signal in the
  * GitHub Actions logs that a retry is even happening. This reporter fixes that: it prints
  * a LOUD, unmissable banner to stdout the moment any test starts a retry attempt, and a
  * short roll-up at the end listing every test that had to be retried.

@@ -89,7 +89,11 @@ import {
   labelFreeName,
 } from "./promql/shared/legendBuilder";
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
-import { getPropsByChartTypeForSeries, getSeriesItemOpacity } from "./promqlChartSeriesProps";
+import {
+  getPropsByChartTypeForSeries,
+  getSeriesItemOpacity,
+  getShiftedLineStyle,
+} from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 import { buildSeriesMarkLine } from "./promql/shared/markLines";
 import { legendExprOf, legendFallbackOf } from "@/utils/dashboard/promql/formula";
@@ -1191,13 +1195,10 @@ export const convertPromQLData = async (
                 // Twins share their primary's colour, so the line style is what tells them apart.
                 ...(nameSuffixes[index]
                   ? {
-                      lineStyle: {
-                        ...seriesPropsBasedOnChartType?.lineStyle,
-                        type:
-                          explorerOverlays && seriesRoles[index] !== "forecast"
-                            ? "dotted"
-                            : "dashed",
-                      },
+                      lineStyle: getShiftedLineStyle(
+                        seriesPropsBasedOnChartType?.lineStyle,
+                        explorerOverlays && seriesRoles[index] !== "forecast" ? "dotted" : "dashed",
+                      ),
                     }
                   : {}),
                 ...getAreaStyleOverride(

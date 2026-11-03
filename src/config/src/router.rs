@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 38] = [
+const QUERIER_ROUTES: [(&str, usize); 43] = [
     ("config", 0),               // /config (unauthenticated bootstrap)
     ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
@@ -30,6 +30,11 @@ const QUERIER_ROUTES: [(&str, usize); 38] = [
     ("details", 5),              // /api/{org_id}/{stream_name}/traces/{trace_id}/details
     ("traces/time_range", 3),    // /api/{org_id}/{stream_name}/traces/time_range
     ("traces/time_range", 2),    // /api/{org_id}/traces/time_range
+    ("profiles/meta", 3),        // /api/{org_id}/{stream_name}/profiles/meta
+    ("profiles/tag_values", 3),  // /api/{org_id}/{stream_name}/profiles/tag_values
+    ("profiles/series", 3),      // /api/{org_id}/{stream_name}/profiles/series
+    ("profiles/merge", 3),       // /api/{org_id}/{stream_name}/profiles/merge
+    ("profiles/diff", 3),        // /api/{org_id}/{stream_name}/profiles/diff
     ("rum/lookup", 2),           // /api/{org_id}/rum/lookup
     ("clusters", 1),             // /api/clusters
     ("query_manager", 2),        // /api/{org_id}/query_manager/...
@@ -237,6 +242,12 @@ mod tests {
         ));
         // the org-level entry must not swallow the OTLP ingest route
         assert!(!is_querier_route("/api/org1/traces"));
+        for leaf in ["meta", "tag_values", "series", "merge", "diff"] {
+            assert!(is_querier_route(&format!(
+                "/api/org1/default/profiles/{leaf}"
+            )));
+        }
+        assert!(!is_querier_route("/api/org1/v1/profiles"));
     }
 
     #[test]

@@ -20,11 +20,13 @@ import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import {
   SAMPLE_LIMIT,
   buildCountSql,
+  buildP90Sql,
   buildSampleSql,
   comparisonColumns,
   compareFields,
   filterTermFor,
   populations,
+  presetSelection,
   sampleThreshold,
   type ComparisonSelection,
   type FieldComparison,
@@ -226,11 +228,115 @@ describe("buildCountSql", () => {
     if ("error" in p) throw new Error("unexpected");
     const sel1 = buildCountSql("default", p.selection);
     const base = buildCountSql("default", p.baseline!);
-    expect(sel1.sql).toBe(`SELECT count(*) AS n FROM "default" WHERE ${p.selection.where}`);
-    expect(base.sql).toBe(`SELECT count(*) AS n FROM "default" WHERE ${p.baseline!.where}`);
+    const head = `SELECT count(*) AS n, approx_distinct(trace_id) AS traces FROM "default" WHERE`;
+    expect(sel1.sql).toBe(`${head} ${p.selection.where}`);
+    expect(base.sql).toBe(`${head} ${p.baseline!.where}`);
     expect(base.sql).toContain("(service_name = 'a') AND ");
     for (const q of [sel1, base]) expect(q.endTime - q.startTime).toBeLessThanOrEqual(HOUR);
     expect([base.startTime, base.endTime]).toEqual([W0 - HOUR, W0]);
+  });
+});
+
+describe("presetSelection", () => {
+  const R0 = W0;
+  const R1 = W0 + HOUR;
+  const ctx = { rangeStartUs: R0, rangeEndUs: R1, filter: "service_name = 'a'" };
+  const pops = (preset: Parameters<typeof presetSelection>[0], p90: number | null = null) => {
+    const picked = presetSelection(preset, ctx, p90);
+    if (!picked) throw new Error("no selection");
+    const p = populations(picked.selection, picked.mode);
+    if ("error" in p) throw new Error("unexpected");
+    return { picked, p };
+  };
+
+  it("maps Errors vs rest to errors over the whole range against the non-errors in it", () => {
+    const { picked, p } = pops("errors");
+    expect(picked).toEqual({
+      mode: "outside",
+      selection: {
+        kind: "errors",
+        windowStartUs: R0,
+        windowEndUs: R1,
+        rangeStartUs: R0,
+        rangeEndUs: R1,
+        durationLoUs: null,
+        durationHiUs: null,
+        filter: "service_name = 'a'",
+      },
+    });
+    expect(p.selection.where).toBe(
+      `(service_name = 'a') AND ${win(R0, R1)} AND span_status = 'ERROR'`,
+    );
+    expect(p.baseline!.where).toBe(
+      `(service_name = 'a') AND ${win(R0, R1)} AND COALESCE(span_status, '') != 'ERROR'`,
+    );
+  });
+
+  it("maps Slowest 10% vs rest to the spans at or over p90 against the rest of the range", () => {
+    const { picked, p } = pops("slowest", 250_000);
+    expect(picked.mode).toBe("outside");
+    expect(picked.selection).toMatchObject({
+      kind: "duration",
+      windowStartUs: R0,
+      windowEndUs: R1,
+      durationLoUs: 250_000,
+      durationHiUs: null,
+    });
+    expect(p.selection.where).toBe(
+      `(service_name = 'a') AND ${win(R0, R1)} AND duration >= 250000`,
+    );
+    expect([p.baseline!.startUs, p.baseline!.endUs]).toEqual([R0, R1]);
+    expect(p.baseline!.where).toBe(
+      `(service_name = 'a') AND ${win(R0, R1)} AND NOT (${win(R0, R1)} AND duration >= 250000)`,
+    );
+  });
+
+  it.each([null, 0, Number.NaN])(
+    "offers no Slowest 10%% selection for an empty p90 (%s)",
+    (p90) => {
+      expect(presetSelection("slowest", ctx, p90)).toBeNull();
+    },
+  );
+
+  it("maps Recent vs earlier to the second half against exactly the first half", () => {
+    const { picked, p } = pops("recent");
+    const mid = W0 + HOUR / 2;
+    expect(picked.mode).toBe("before");
+    expect(picked.selection).toMatchObject({
+      kind: "rate",
+      windowStartUs: mid,
+      windowEndUs: R1,
+      rangeStartUs: R0,
+      rangeEndUs: R1,
+    });
+    expect(p.selection.where).toBe(`(service_name = 'a') AND ${win(mid, R1)}`);
+    expect([p.baseline!.startUs, p.baseline!.endUs]).toEqual([R0, mid]);
+    expect(p.baseline!.where).toBe(`(service_name = 'a') AND ${win(R0, mid)}`);
+  });
+
+  it("keeps Recent vs earlier's baseline inside the range for an odd-length range", () => {
+    const odd = presetSelection("recent", { ...ctx, rangeEndUs: R1 + 1 }, null)!;
+    const p = populations(odd.selection, odd.mode);
+    if ("error" in p) throw new Error("unexpected");
+    expect(p.baseline!.startUs).toBeGreaterThanOrEqual(R0);
+    expect(p.baseline!.endUs).toBe(odd.selection.windowStartUs);
+    expect(odd.selection.windowEndUs).toBe(R1 + 1);
+  });
+});
+
+describe("buildP90Sql", () => {
+  it("asks for the p90 duration under the current filter over the whole range", () => {
+    const q = buildP90Sql("default", { rangeStartUs: W0, rangeEndUs: W0 + HOUR, filter: "a = 1" });
+    expect(q).toEqual({
+      sql: `SELECT approx_percentile_cont(duration, 0.9) AS p90 FROM "default" WHERE (a = 1)`,
+      startTime: W0,
+      endTime: W0 + HOUR,
+    });
+  });
+
+  it("drops the WHERE for an empty filter", () => {
+    const q = buildP90Sql("default", { rangeStartUs: W0, rangeEndUs: W0 + HOUR, filter: " " });
+    expect(q.sql).toBe(`SELECT approx_percentile_cont(duration, 0.9) AS p90 FROM "default"`);
   });
 });
 

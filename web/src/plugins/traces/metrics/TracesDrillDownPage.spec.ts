@@ -23,9 +23,8 @@ import TracesDrillDownPage from "./TracesDrillDownPage.vue";
 function mountPage(props: Record<string, unknown> = {}): VueWrapper<any> {
   return mount(TracesDrillDownPage, {
     attachTo: document.body,
-    props: { open: true, title: "Volume Insights", ...props },
+    props: { open: true, title: "Drill down", ...props },
     slots: {
-      actions: '<span data-test="header-actions-content" />',
       default: '<div data-test="body-content"><input data-test="inner-input" /></div>',
     },
     global: { plugins: [i18n] },
@@ -39,14 +38,14 @@ describe("TracesDrillDownPage", () => {
     wrapper?.unmount();
   });
 
-  it("should render the standard page header with the title, the actions and the body", () => {
+  it("should render the standard page header with the title and the body", () => {
     wrapper = mountPage();
 
     const header = wrapper.findComponent(OPageHeader);
     expect(header.exists()).toBe(true);
-    expect(header.props("title")).toBe("Volume Insights");
-    expect(wrapper.find('[data-test="header-actions-content"]').exists()).toBe(true);
+    expect(header.props("title")).toBe("Drill down");
     expect(wrapper.find('[data-test="body-content"]').exists()).toBe(true);
+    expect(wrapper.attributes("data-test")).toBe("traces-drill-down-page");
   });
 
   it("should label the back button Back to results", () => {
@@ -102,7 +101,7 @@ describe("TracesDrillDownPage", () => {
 
     wrapper = mount(TracesDrillDownPage, {
       attachTo: container,
-      props: { open: true, title: "Volume Insights" },
+      props: { open: true, title: "Drill down" },
     });
 
     expect(covered.hasAttribute("inert")).toBe(true);

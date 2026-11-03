@@ -494,6 +494,7 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
         const el = document.querySelector('[data-test="dashboard-table-row-count"]');
         return el && /\d+-\d+\s+of\s+\d+/.test(el.textContent ?? "");
       },
+      undefined,
       { timeout: 15000 }
     );
     const rowCount = pm.dashboardPanelConfigs.tableRowCount;

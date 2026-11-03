@@ -181,6 +181,12 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     expect(w.text()).not.toMatch(/failing/i);
   });
 
+  it("D37 names a default set by /o2 oncall here", async () => {
+    const w = await mountDefaults([{ ...rows[0], set_from: "oncall" }]);
+    const [row] = w.findAll('[data-test-stub="otable-row"]');
+    expect(row.find('[data-col="set_by"]').text()).toBe("From /o2 oncall here");
+  });
+
   it("AC-5.5 offers Edit and Remove only on rows this org set", async () => {
     const w = await mountDefaults();
     expect(w.find('[data-test="slack-channel-edit-C1"]').exists()).toBe(true);

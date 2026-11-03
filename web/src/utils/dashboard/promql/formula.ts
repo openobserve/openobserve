@@ -16,6 +16,8 @@
 import { gt } from "@/types/i18n";
 
 export type FormulaResult = { expr: string } | { error: string };
+export type FormulaInput = { text: string; isFormula: boolean };
+type RefToken = { start: number; name: string };
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const LABEL_LIST_KEYWORDS = new Set([
@@ -27,6 +29,9 @@ const LABEL_LIST_KEYWORDS = new Set([
   "group_right",
 ]);
 const QUOTES = new Set(['"', "'", "`"]);
+const FORMULA_REF = /^F[1-9][0-9]*$/;
+const MAX_FORMULA_LENGTH = 100_000;
+const MAX_FORMULA_DEPTH = 10;
 
 const isIdentStart = (ch: string) => /[A-Za-z_:]/.test(ch);
 const isIdentPart = (ch: string) => /[A-Za-z0-9_:]/.test(ch);
@@ -55,16 +60,32 @@ const skipLabelList = (text: string, wordEnd: number): number => {
   return text[i] === "(" ? skipUntil(text, i, ")") : wordEnd;
 };
 
-const scanWord = (text: string, start: number, letters: number[]): number => {
+// An `F<n>` is a reference only when another query holds that name; otherwise it stays a metric name, as saved panels read it.
+const scanWord = (
+  text: string,
+  start: number,
+  refs: RefToken[],
+  names: ReadonlySet<string>,
+): number => {
   let end = start;
   while (end < text.length && isIdentPart(text[end])) end++;
   const word = text.slice(start, end);
   if (LABEL_LIST_KEYWORDS.has(word.toLowerCase())) return skipLabelList(text, end);
-  if (word.length === 1 && LETTERS.includes(word)) letters.push(start);
+  if (
+    (word.length === 1 && LETTERS.includes(word)) ||
+    (FORMULA_REF.test(word) && names.has(word))
+  ) {
+    refs.push({ start, name: word });
+  }
   return end;
 };
 
-const nextToken = (text: string, i: number, letters: number[]): number => {
+const nextToken = (
+  text: string,
+  i: number,
+  refs: RefToken[],
+  names: ReadonlySet<string>,
+): number => {
   const ch = text[i];
   if (QUOTES.has(ch)) return skipString(text, i);
   if (ch === "{") return skipUntil(text, i, "}");
@@ -77,66 +98,116 @@ const nextToken = (text: string, i: number, letters: number[]): number => {
     while (end < text.length && /[A-Za-z0-9_.]/.test(text[end])) end++;
     return end;
   }
-  if (isIdentStart(ch)) return scanWord(text, i, letters);
+  if (isIdentStart(ch)) return scanWord(text, i, refs, names);
   return i + 1;
 };
 
-const letterPositions = (formula: string): number[] => {
-  const letters: number[] = [];
+const refTokens = (formula: string, names: ReadonlySet<string>): RefToken[] => {
+  const refs: RefToken[] = [];
   let i = 0;
-  while (i < formula.length) i = nextToken(formula, i, letters);
-  return letters;
+  while (i < formula.length) i = nextToken(formula, i, refs, names);
+  return refs;
 };
 
 export const isFormulaQuery = (query: any): boolean => typeof query?.config?.formula === "string";
 
-/** Each query's letter: its stored `ref`, else the first letter no other query holds. */
+/** Each query's name: its stored `ref`, else the first free letter, or `F1`, `F2`, … for a formula. */
 export const queryRefs = (queries: any[]): (string | undefined)[] => {
   const used = new Set<string>(queries.map((q) => q?.config?.ref).filter(Boolean));
+  const nextFormulaRef = () => {
+    let n = 1;
+    while (used.has(`F${n}`)) n++;
+    return `F${n}`;
+  };
   return queries.map((q) => {
-    if (q?.config?.ref || isFormulaQuery(q)) return q?.config?.ref || undefined;
-    const letter = [...LETTERS].find((l) => !used.has(l));
-    if (letter) used.add(letter);
-    return letter;
+    if (q?.config?.ref) return q.config.ref;
+    // Formulas live apart from the letters, so a letter a formula is waiting on stays free for its query.
+    const ref = isFormulaQuery(q) ? nextFormulaRef() : [...LETTERS].find((l) => !used.has(l));
+    if (ref) used.add(ref);
+    return ref;
   });
 };
 
-/** Letter → final query text; a formula's own letter maps to null. */
-export const formulaInputs = (queries: any[], texts: string[]): Record<string, string | null> => {
-  const inputs: Record<string, string | null> = {};
+/** Letter → that query's final text, and whether the text is itself a formula. */
+export const formulaInputs = (queries: any[], texts: string[]): Record<string, FormulaInput> => {
+  const inputs: Record<string, FormulaInput> = {};
   queryRefs(queries).forEach((letter, i) => {
-    if (letter) inputs[letter] = isFormulaQuery(queries[i]) ? null : texts[i];
+    if (letter) inputs[letter] = { text: texts[i], isFormula: isFormulaQuery(queries[i]) };
   });
   return inputs;
 };
 
-export const formulaRefs = (formula: string): string[] => [
-  ...new Set(letterPositions(formula).map((pos) => formula[pos])),
-];
+/** The panel's query names an `F<n>` may refer to: never the formula's own, which a saved panel may use as a metric name. */
+const refNames = (names: Iterable<string | undefined>, self?: string): Set<string> =>
+  new Set([...names].filter((n): n is string => !!n && n !== self));
 
+/** The names a formula reads, given the panel's query names and the formula's own. */
+export const formulaRefs = (
+  formula: string,
+  names: Iterable<string | undefined> = [],
+  self?: string,
+): string[] => [...new Set(refTokens(formula, refNames(names, self)).map((ref) => ref.name))];
+
+/** The letters of the non-formula queries a formula reads, through any formulas it references. */
+export const formulaLeafRefs = (queries: any[], formula: string, self?: string): Set<string> => {
+  const formulaByLetter: Record<string, string> = {};
+  const names = queryRefs(queries);
+  names.forEach((letter, i) => {
+    if (letter && isFormulaQuery(queries[i])) formulaByLetter[letter] = queries[i].config.formula;
+  });
+  const leaves = new Set<string>();
+  const seen = new Set<string>();
+  const visit = (text: string, owner?: string) => {
+    for (const letter of formulaRefs(text, names, owner)) {
+      if (!(letter in formulaByLetter)) leaves.add(letter);
+      else if (!seen.has(letter)) {
+        seen.add(letter);
+        visit(formulaByLetter[letter], letter);
+      }
+    }
+  };
+  visit(formula, self);
+  return leaves;
+};
+
+/** Expands a formula into one expression, inlining referenced formulas; `self` is its own name. */
 export const substituteFormula = (
   formula: string,
-  inputsByLetter: Record<string, string | null>,
+  inputsByLetter: Record<string, FormulaInput>,
+  self?: string,
 ): FormulaResult => {
-  const positions = letterPositions(formula);
-  for (const pos of positions) {
-    const letter = formula[pos];
-    if (!(letter in inputsByLetter)) {
-      return { error: gt("dashboard.formulaUnknownLetter", { letter }) };
+  const expanded: Record<string, string> = {};
+  const names = Object.keys(inputsByLetter);
+  const expand = (text: string, path: string[]): FormulaResult => {
+    let expr = "";
+    let last = 0;
+    for (const { start, name: letter } of refTokens(text, refNames(names, path.at(-1)))) {
+      const input = inputsByLetter[letter];
+      if (!input) return { error: gt("dashboard.formulaUnknownLetter", { letter }) };
+      if (input.isFormula && !(letter in expanded)) {
+        if (path.includes(letter)) {
+          const cycle = [...path.slice(path.indexOf(letter)), letter].join(" → ");
+          return { error: gt("dashboard.formulaCycle", { cycle }) };
+        }
+        if (path.length >= MAX_FORMULA_DEPTH) {
+          return { error: gt("dashboard.formulaTooDeep", { limit: MAX_FORMULA_DEPTH }) };
+        }
+        const out = expand(input.text, [...path, letter]);
+        if ("error" in out) return out;
+        expanded[letter] = out.expr;
+      }
+      const inner = input.isFormula ? expanded[letter] : input.text;
+      // A trailing `#` comment in the input would otherwise swallow the closing parenthesis.
+      expr += `${text.slice(last, start)}(${inner}${inner.includes("#") ? "\n" : ""})`;
+      last = start + letter.length;
+      // Each nesting level can double the text, so the cap stops exponential growth early.
+      if (expr.length > MAX_FORMULA_LENGTH) {
+        return { error: gt("dashboard.formulaTooLong", { limit: MAX_FORMULA_LENGTH }) };
+      }
     }
-    if (inputsByLetter[letter] === null) {
-      return { error: gt("dashboard.formulaReferencesFormula", { letter }) };
-    }
-  }
-  let expr = "";
-  let last = 0;
-  for (const pos of positions) {
-    const text = inputsByLetter[formula[pos]] as string;
-    // A trailing `#` comment in the input would otherwise swallow the closing parenthesis.
-    expr += `${formula.slice(last, pos)}(${text}${text.includes("#") ? "\n" : ""})`;
-    last = pos + 1;
-  }
-  return { expr: expr + formula.slice(last) };
+    return { expr: expr + text.slice(last) };
+  };
+  return expand(formula, self ? [self] : []);
 };
 
 /** A query's text for naming a label-free series: as sent, with dashboard variables filled in. */

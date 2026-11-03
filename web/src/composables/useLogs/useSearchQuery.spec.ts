@@ -1337,6 +1337,16 @@ describe("useSearchQuery › free text (item 1)", () => {
     expect(getSql(getQueryReq(false))).toBe(`SELECT * FROM "fts_a" WHERE status=500 --404`);
   });
 
+  it("sends an EXPLAIN ANALYZE statement as typed without a pre-flight syntax error", () => {
+    select(ftsStream("fts_a"));
+    mockState.searchObj.meta.sqlMode = true;
+    const sql = `explain analyze verbose select * from "fts_a" limit 5`;
+    mockState.searchObj.data.query = sql;
+    const { getQueryReq } = useSearchQuery(gt);
+    expect(getSql(getQueryReq(false))).toBe(sql);
+    expect((mockState.searchObj.data as any).errorMsg).toBeFalsy();
+  });
+
   it.each([false, true])(
     "holds a -term mix it cannot build: no request, a query error that offers Run as (multi: %s)",
     (multi) => {

@@ -65,7 +65,7 @@ fn score_config_error_response(value: ScoreConfigError) -> Response {
     responses(
         (status = 200, body = inline(ListScoreConfigsResponseBody)),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "list"})),
     ),
 )]
@@ -124,7 +124,7 @@ pub async fn list_score_configs(
         (status = 400, description = "Bad Request", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "create"})),
     ),
 )]
@@ -163,7 +163,7 @@ pub async fn create_score_config(
         (status = 400, description = "Bad Request", body = ()),
         (status = 409, description = "Data type differs from the existing score config", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "update"})),
     ),
 )]
@@ -203,7 +203,7 @@ pub async fn ensure_score_config(
         (status = 200, body = inline(ScoreConfigResponseBody)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "get"})),
     ),
 )]
@@ -234,8 +234,8 @@ pub async fn get_score_config(Path((org_id, entity_id)): Path<(String, String)>)
     responses(
         (status = 200, body = inline(ListScoreConfigVersionsResponseBody)),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "list_versions"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "list"})),
     ),
 )]
 pub async fn list_score_config_versions(
@@ -269,7 +269,7 @@ pub async fn list_score_config_versions(
         (status = 200, body = inline(ScoreConfigResponseBody)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "update"})),
     ),
 )]
@@ -302,11 +302,11 @@ pub async fn update_score_config(
         ("entity_id" = String, Path, description = "Score config stable entity id"),
     ),
     responses(
-        (status = 200, description = "Deactivated", body = String),
+        (status = 200, description = "Deactivated", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 404, description = "Not Found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "delete"})),
     ),
 )]

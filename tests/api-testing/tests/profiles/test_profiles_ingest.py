@@ -517,11 +517,11 @@ def test_ing44_negative_value_kept(client: OpenObserveClient, prof_stream: str):
     assert wait_rows(client, prof_stream, 1)[0]["value"] == -5
 
 
-# Product bug: profiles never apply ZO_COLS_PER_RECORD_LIMIT; strict xfail turns red once o2-enterprise#3123 fixes it, then drop the marker.
-@pytest.mark.xfail(strict=True, reason="Known product bug o2-enterprise#3123: profiles ignore ZO_COLS_PER_RECORD_LIMIT")
 def test_ing45_too_many_columns_rejected(client: OpenObserveClient, prof_stream: str):
     b = ProfilesBuilder()
-    attrs = {f"extra.attr_{i:04d}": f"v{i}" for i in range(1010)}
+    # The server's limit; CI may raise it from the default of 1000.
+    limit = int(os.environ.get("ZO_COLS_PER_RECORD_LIMIT", "1000"))
+    attrs = {f"extra.attr_{i:06d}": f"v{i}" for i in range(limit + 10)}
     resp = ingest_json(client, prof_stream, to_json(_one_profile(b, [b.sample(["wide_leaf"], values=[1])], attrs)))
     assert resp.status_code == 400, resp.text[:500]
     assert resp.json()["code"] == 3

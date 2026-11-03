@@ -374,9 +374,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag variant="default-soft" size="sm" :data-test="`oncall-section-count-${sectionKey}`">
             {{ raw(String(sectionCounts[sectionKey] ?? 0)) }}
           </OTag>
-          <OText variant="meta">
+          <OText v-if="sectionKey !== 'ringing' || unroutedRinging === 0" variant="meta">
             {{ t(`oncall.sectionHint_${sectionKey}`) }}
           </OText>
+          <template v-else>
+            <OText v-if="routedRinging > 0" variant="meta" data-test="oncall-section-hint-routed">
+              {{ t("oncall.sectionHint_ringingRouted", { count: routedRinging }, routedRinging) }}
+            </OText>
+            <OText v-if="routedRinging > 0" variant="meta" aria-hidden="true">
+              {{ raw("·") }}
+            </OText>
+            <OText variant="meta" data-test="oncall-section-hint-unrouted">
+              {{
+                t("oncall.sectionHint_ringingUnrouted", { count: unroutedRinging }, unroutedRinging)
+              }}
+            </OText>
+          </template>
         </div>
       </template>
 
@@ -694,6 +707,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="acknowledgeRow(row)"
             >
               {{ t("oncall.acknowledge") }}
+              <OTooltip
+                :content="
+                  pageAckWords(
+                    row.latest.team_id
+                      ? (teamNameById[row.latest.team_id] ?? row.latest.team_id)
+                      : '',
+                    row.latest.subject.subject_type,
+                    t,
+                  ).ackHint
+                "
+              />
             </OButton>
             <OButton
               v-else-if="primaryAction(row) === 'resolve'"
@@ -912,6 +936,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { pageAckWords } from "@/utils/alerts/ackState";
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import {
@@ -1487,11 +1512,12 @@ const handoverByTeam = computed<Record<string, number | null>>(() => {
   for (const team of teams.value) {
     const schedule = scheduleByTeam.value[team.id];
     if (!schedule) continue;
-    // The FIRST rotation's handover. Each rotation hands over on its own
-    // cadence now, so there is no single team-wide one — and the countdown
-    // beside "you are on call" is about the shift the viewer is holding, which
-    // is the position they were resolved into.
-    const rotation = schedule.rotations?.[0];
+    // Each rotation hands over on its own cadence, so count down the one the viewer holds.
+    const heldId = (positionsByTeam.value[team.id] ?? []).find(
+      (position) => position.user_email.toLowerCase() === viewerEmail.value,
+    )?.rotation_id;
+    const rotation =
+      schedule.rotations?.find((candidate) => candidate.id === heldId) ?? schedule.rotations?.[0];
     const rule = rotation ? winningRule(rotation, nowMicros, schedule.timezone) : null;
     out[team.id] = rule ? nextHandover(rule, nowMicros, schedule.timezone) : null;
   }
@@ -1754,6 +1780,17 @@ const sectionCounts = computed<Record<string, number>>(() => {
   return counts;
 });
 
+// No team means no policy to page, so these sit in Ringing without anyone being woken.
+const unroutedRinging = computed(
+  () =>
+    rows.value.filter(
+      (row) =>
+        rowSection(row) === "ringing" &&
+        !row.escalating.some((r) => r.team_id && !r.acked_by && !isSnoozed(r)),
+    ).length,
+);
+const routedRinging = computed(() => (sectionCounts.value.ringing ?? 0) - unroutedRinging.value);
+
 /// Only the run that needs somebody gets colour. Snoozed is deliberately
 /// inert and handled and resolved are both finished, so all three stay in the
 /// calm tone.
@@ -1898,7 +1935,7 @@ async function fetchContext(force = false) {
     read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force),
     read<CoverageGaps | null>(coverageGapsQuery(orgId.value), force),
     read<OwnershipRule[]>(ownershipRulesQuery(orgId.value), force),
-    read<any[]>(destinationsQuery(orgId.value, "alert"), force),
+    read<any[]>(destinationsQuery(orgId.value, "alert", false, ["jira"]), force),
   ]);
 
   teamsAvailable.value = teamRes.status === "fulfilled";

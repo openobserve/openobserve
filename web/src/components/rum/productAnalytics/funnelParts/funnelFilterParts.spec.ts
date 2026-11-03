@@ -660,10 +660,10 @@ describe("FunnelStepsTable step menu", () => {
     return wrapper;
   };
 
-  it("its entry asks the page to open the picker for that step, after loading the fields", async () => {
+  it("its entry asks the page to open the picker for that step, and opening the menu loads no fields", async () => {
     const w = mountTable("ok");
     await w.find(dt("rum-analytics-funnel-step-1-menu")).trigger("click");
-    expect(w.emitted("load-fields")).toHaveLength(1);
+    expect(w.emitted("load-fields")).toBeUndefined();
     expect(w.find(dt("rum-analytics-funnel-step-1-break-down")).text()).toBe(
       "Break down by a property of this step",
     );

@@ -83,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="insights-button"
             variant="outline"
             size="xs"
+            :disabled="searchObj.loading"
             @click="$emit('drill-down')"
           >
             <template #icon-left>
@@ -1414,7 +1415,6 @@ export default defineComponent({
       () =>
         isSearchMode.value &&
         !searchObj.loadingStream &&
-        !searchObj.loading &&
         searchObj.data.stream.streamLists.length > 0 &&
         !!searchObj.data.stream.selectedStream?.value &&
         !searchObj.data.errorMsg?.trim()?.length &&

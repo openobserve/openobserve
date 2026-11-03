@@ -281,7 +281,9 @@ const useLogs = (t: TranslateFn) => {
       try {
         // The URL search waits on all of these, so they run side by side rather than one after another.
         if (fromUrl) prefetchSelectedStreamFields();
+        const requestOrg = store.state.selectedOrganization.identifier;
         await Promise.all([getStreamList(true, { fromUrl }), getFunctions()]);
+        if (store.state.selectedOrganization.identifier !== requestOrg) return;
         await extractFields();
       } finally {
         stopWatchingSends();
@@ -561,7 +563,9 @@ const useLogs = (t: TranslateFn) => {
   const updateStreams = async () => {
     if (searchObj.data.streamResults?.list?.length) {
       const streamType = searchObj.data.stream.streamType || "logs";
+      const requestOrg = store.state.selectedOrganization.identifier;
       const streams: any = await getStreams(streamType, false);
+      if (store.state.selectedOrganization.identifier !== requestOrg) return;
       searchObj.data.streamResults["list"] = streams.list;
 
       searchObj.data.stream.streamLists = [];

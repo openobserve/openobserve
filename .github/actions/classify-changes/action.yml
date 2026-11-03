@@ -2,8 +2,8 @@ name: Classify changed paths
 description: One shared answer to "which suites does this change need", replacing per-workflow path regexes
 inputs:
   base:
-    description: Ref to diff against; the caller must have fetched it (fetch-depth 0)
-    default: origin/${{ github.base_ref || 'main' }}
+    description: Ref to diff from, via its merge base with head; the caller must have fetched history (fetch-depth 0)
+    default: ${{ github.event.merge_group.base_sha || format('origin/{0}', github.base_ref || 'main') }}
   head:
     description: Commit to diff to
     default: ${{ github.sha }}
@@ -25,5 +25,6 @@ runs:
         BASE: ${{ inputs.base }}
         HEAD: ${{ inputs.head }}
       run: |
-        CHANGED=$(git -c core.quotepath=false diff --name-only "$BASE" "$HEAD" 2>/dev/null || true)
+        # Three-dot so a base that moved on is not counted as this change; a failed diff is empty, which runs everything.
+        CHANGED=$(git -c core.quotepath=false diff --name-only "$BASE...$HEAD" 2>/dev/null || true)
         printf '%s\n' "$CHANGED" | "$GITHUB_ACTION_PATH/classify.sh" | tee -a "$GITHUB_OUTPUT"

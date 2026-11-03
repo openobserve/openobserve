@@ -109,6 +109,31 @@ const CACHED_RUM_VIEWS = [
   "AppPerformance",
 ];
 
+const ROUTE_TABS: Readonly<Record<string, string>> = {
+  Sessions: "sessions",
+  SessionViewer: "sessions",
+  ErrorTracking: "error_tracking",
+  ErrorViewer: "error_tracking",
+  RumPerformance: "performance",
+  rumPerformanceSummary: "performance",
+  rumPerformanceWebVitals: "performance",
+  rumPerformanceErrors: "performance",
+  rumPerformanceApis: "performance",
+  SourceMaps: "source_maps",
+};
+
+// These views keep state in their URL (a record id or a Performance sub-tab) that re-pushing the tab's landing route would drop.
+const VIEW_OWNED_ROUTES = [
+  "SessionViewer",
+  "ErrorViewer",
+  "UploadSourceMaps",
+  "rumPerformanceWebVitals",
+  "rumPerformanceErrors",
+  "rumPerformanceApis",
+];
+
+const tabForRoute = (name: unknown): string | undefined => ROUTE_TABS[String(name ?? "")];
+
 const router = useRouter();
 const store = useStore();
 const showTabs = computed(() => {
@@ -171,55 +196,17 @@ onMounted(async () => {
   // The awaits above can outlast a click elsewhere; redirecting now would undo it.
   if (!router.currentRoute.value.matched.some((r: { name?: unknown }) => r.name === "RUM")) return;
 
-  const routeNameMapping: { [key: string]: string } = {
-    SessionViewer: "sessions",
-    ErrorTracking: "error_tracking",
-    RumPerformance: "performance",
-    ErrorViewer: "error_tracking",
-    Sessions: "sessions",
-    rumPerformanceSummary: "performance",
-    SourceMaps: "source_maps",
-  };
+  activeTab.value = tabForRoute(routeName.value) ?? "performance";
 
-  if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
-    activeTab.value = routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
-  } else {
-    activeTab.value = "performance";
-  }
-
-  // This is temporary fix, as we have kept sessionViewer keep-alive as false.
-  // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-  const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
-
-  if (ignoreRoutes.includes(routeName.value as string)) return;
+  if (VIEW_OWNED_ROUTES.includes(String(routeName.value))) return;
   if (keepsOwnTimeRange()) return;
   changeTab(activeTab.value);
 });
 
 onUpdated(async () => {
   if (routeName.value === "RUM") {
-    const routeNameMapping: { [key: string]: string } = {
-      SessionViewer: "sessions",
-      ErrorTracking: "error_tracking",
-      RumPerformance: "performance",
-      ErrorViewer: "error_tracking",
-      Sessions: "sessions",
-      rumPerformanceSummary: "performance",
-      SourceMaps: "source_maps",
-    };
-
-    if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
-      activeTab.value =
-        routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
-    } else {
-      activeTab.value = "performance";
-    }
-
-    // This is temporary fix, as we have kept sessionViewer keep-alive as false.
-    // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-    const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
-
-    if (!ignoreRoutes.includes(routeName.value as string)) changeTab(activeTab.value);
+    activeTab.value = tabForRoute(routeName.value) ?? "performance";
+    if (!VIEW_OWNED_ROUTES.includes(String(routeName.value))) changeTab(activeTab.value);
   }
 });
 
@@ -233,18 +220,7 @@ watch(
 );
 
 const updateTabOnRouteChange = () => {
-  const routeNameMapping: { [key: string]: string } = {
-    SessionViewer: "sessions",
-    ErrorTracking: "error_tracking",
-    RumPerformance: "performance",
-    Sessions: "sessions",
-    rumPerformanceSummary: "performance",
-    rumPerformanceWebVitals: "performance",
-    rumPerformanceErrors: "performance",
-    rumPerformanceApis: "performance",
-    SourceMaps: "source_maps",
-  };
-  const tab = routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
+  const tab = tabForRoute(routeName.value);
   if (tab !== activeTab.value && tab !== undefined) {
     activeTab.value = tab;
   }

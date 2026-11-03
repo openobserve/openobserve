@@ -29,6 +29,7 @@ beforeAll(() => {
 
 import { defineComponent, h, nextTick, reactive } from "vue";
 import OTable from "./OTable.vue";
+import { TABLE_FORBIDDEN_STATE_KEY } from "./tableForbiddenState";
 import OTableHeader from "./sub-components/OTableHeader.vue";
 import OTableBody from "./sub-components/OTableBody.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -987,8 +988,59 @@ describe("OTable", () => {
       });
       const all = wrapper.find('[data-test="o2-table-select-all"] [role="checkbox"]');
       expect(all.attributes("aria-label")).toBe("Select all rows");
-      const row = wrapper.find('[data-test="o2-table-select-0"] [role="checkbox"]');
-      expect(row.attributes("aria-label")).toMatch(/^Select row /);
+      const labels = wrapper
+        .findAll('[data-test="o2-table-select-cell"] [role="checkbox"]')
+        .map((c) => c.attributes("aria-label"));
+      expect(labels).toEqual([
+        "Select row 1, User 1",
+        "Select row 2, User 2",
+        "Select row 3, User 3",
+      ]);
+    });
+
+    it("keeps rows that share a title apart by their position", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: [
+            { priority: 2, title: "Disk full" },
+            { priority: 2, title: "Disk full" },
+            { priority: 3, title: "CPU high" },
+          ],
+          columns: [
+            { id: "priority", header: "Priority", accessorKey: "priority" },
+            { id: "title", header: "Title", accessorKey: "title" },
+          ],
+          selection: "multiple",
+        },
+      });
+      const labels = wrapper
+        .findAll('[data-test="o2-table-select-cell"] [role="checkbox"]')
+        .map((c) => c.attributes("aria-label"));
+      expect(labels).toEqual([
+        "Select row 1, Disk full",
+        "Select row 2, Disk full",
+        "Select row 3, CPU high",
+      ]);
+    });
+
+    it("names a row by position alone when it has no text cell, never by a number cell", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: [
+            { priority: 4, title: "" },
+            { priority: 4, title: "  " },
+          ],
+          columns: [
+            { id: "priority", header: "Priority", accessorKey: "priority" },
+            { id: "title", header: "Title", accessorKey: "title" },
+          ],
+          selection: "multiple",
+        },
+      });
+      const labels = wrapper
+        .findAll('[data-test="o2-table-select-cell"] [role="checkbox"]')
+        .map((c) => c.attributes("aria-label"));
+      expect(labels).toEqual(["Select row 1", "Select row 2"]);
     });
 
     it("does not render checkbox column when selection is none", () => {
@@ -1220,6 +1272,26 @@ describe("OTable", () => {
       await wrapper.setProps({ error: null, forbidden: true });
       expect(wrapper.find('[data-test="o2-table-forbidden"]').exists()).toBe(true);
       expect(isPinned(wrapper)).toBe(true);
+    });
+
+    it("shows the generic no-access state when no app state is provided", () => {
+      wrapper = mount(OTable, { props: { data: [], columns: makeColumns(), forbidden: true } });
+      const forbidden = wrapper.find('[data-test="o2-table-forbidden"]');
+      expect(forbidden.findComponent({ name: "OEmptyState" }).props("preset")).toBe("no-access");
+    });
+
+    it("renders the app's no-access state with the table's resource when one is provided", () => {
+      const AppLock = defineComponent({
+        props: { resource: { type: String, default: undefined } },
+        setup: (props) => () => h("div", { "data-test": "app-lock" }, props.resource ?? "none"),
+      });
+      wrapper = mount(OTable, {
+        props: { data: [], columns: makeColumns(), forbidden: true, forbiddenResource: "alerts" },
+        global: { provide: { [TABLE_FORBIDDEN_STATE_KEY as symbol]: AppLock } },
+      });
+      const forbidden = wrapper.find('[data-test="o2-table-forbidden"]');
+      expect(forbidden.find('[data-test="app-lock"]').text()).toBe("alerts");
+      expect(forbidden.findComponent({ name: "OEmptyState" }).exists()).toBe(false);
     });
 
     it("leaves pinning to the <thead> while rows show", () => {
@@ -1981,12 +2053,14 @@ describe("OTable", () => {
     // branch carrying the measurement wiring never renders.
   });
 
-  describe("windowed row model with row expansion", () => {
+  describe("windowed row model with row expansion", { timeout: 15000 }, () => {
+    // Just past the 200-row fallback window, so windowing is observable without mounting thousands.
+    const ROWS = 210;
     const mountWindowed = (extra: Record<string, unknown>) =>
       mount(OTable, {
         props: {
-          data: makeRows(300),
-          columns: makeColumns(),
+          data: makeRows(ROWS),
+          columns: makeColumns().slice(0, 2),
           virtualScroll: true,
           windowRowModel: true,
           pagination: "none",
@@ -2001,19 +2075,19 @@ describe("OTable", () => {
 
     it("keeps the row model windowed when expanded rows are measured", () => {
       wrapper = mountWindowed({ measureExpandedRows: true });
-      expect(rowModelSize(wrapper)).toBeLessThan(300);
+      expect(rowModelSize(wrapper)).toBeLessThan(ROWS);
     });
 
     it("still builds every row for an expandable table that does not opt in", () => {
       wrapper = mountWindowed({});
-      expect(rowModelSize(wrapper)).toBe(300);
+      expect(rowModelSize(wrapper)).toBe(ROWS);
     });
 
     it("counts every row in the footer while the row model is windowed", async () => {
       wrapper = mount(OTable, {
         props: {
-          data: makeRows(2000),
-          columns: makeColumns(),
+          data: makeRows(ROWS),
+          columns: makeColumns().slice(0, 2),
           virtualScroll: true,
           windowRowModel: true,
           pagination: "none",
@@ -2024,13 +2098,13 @@ describe("OTable", () => {
         },
       });
       await nextTick();
-      expect(rowModelSize(wrapper)).toBeLessThan(2000);
-      expect(wrapper.find('[data-test="total-rows"]').text()).toBe("2000");
+      expect(rowModelSize(wrapper)).toBeLessThan(ROWS);
+      expect(wrapper.find('[data-test="total-rows"]').text()).toBe(String(ROWS));
     });
 
     it("never windows a tree", () => {
       wrapper = mountWindowed({ measureExpandedRows: true, expansion: "tree" });
-      expect(rowModelSize(wrapper)).toBe(300);
+      expect(rowModelSize(wrapper)).toBe(ROWS);
     });
 
     it("marks the detail row so the virtualizer can measure it with its data row", async () => {

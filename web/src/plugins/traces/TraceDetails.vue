@@ -215,12 +215,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="showCloseButton"
               data-test="trace-details-close-btn"
-              variant="ghost"
+              variant="outline"
               size="icon-xs"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
-              <OTooltip :content="t('common.cancel')" />
+              <OTooltip :content="t('common.close')" />
             </OButton>
           </template>
         </OPageHeader>
@@ -392,13 +392,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="isStandaloneMode && showCloseButton"
               data-test="trace-details-close-btn"
-              variant="ghost"
+              variant="outline"
               size="icon-xs"
               class="me-1!"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
-              <OTooltip :content="t('common.cancel')" />
+              <OTooltip :content="t('common.close')" />
             </OButton>
           </div>
         </header>

@@ -98,6 +98,25 @@ describe("useStreamFields Composable", () => {
       consoleError.mockRestore();
     });
 
+    it("should not apply a stream list fetched for an org the user has left", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.streamResults = { list: [] } as any;
+      const originalOrg = store.state.selectedOrganization.identifier;
+      const fetchQuery = vi.spyOn(queryClient, "fetchQuery").mockImplementationOnce((async () => {
+        store.state.selectedOrganization.identifier = "other-org";
+        return [{ name: "usage", stream_type: "logs" }];
+      }) as any);
+
+      try {
+        await wrapper.vm.getStreamList(false);
+        expect(searchObj.data.streamResults.list).toEqual([]);
+      } finally {
+        fetchQuery.mockRestore();
+        store.state.selectedOrganization.identifier = originalOrg;
+      }
+    });
+
     it("should have loadStreamFields function", () => {
       expect(typeof wrapper.vm.loadStreamFields).toBe("function");
     });

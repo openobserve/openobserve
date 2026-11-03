@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="open"
     ref="rootRef"
     class="bg-surface-panel flex h-full w-full flex-col overflow-hidden"
+    data-test="traces-drill-down-page"
   >
     <OPageHeader
       :title="title"
@@ -27,11 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         onClick: close,
         dataTest: 'traces-drill-down-back-btn',
       }"
-    >
-      <template #actions>
-        <slot name="actions" />
-      </template>
-    </OPageHeader>
+    />
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <slot />
     </div>

@@ -336,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #actions>
           <OToggleGroup
-            :model-value="pa.funnelView.value"
+            :model-value="trend.shown.value ? 'trend' : 'steps'"
             type="single"
             :label="t('rum.analytics.funnel.viewAs')"
             label-position="left"
@@ -477,7 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
               <OSelect
                 id="rum-analytics-funnel-trend-interval"
-                :model-value="pa.funnelInterval.value"
+                :model-value="trend.selectedInterval.value"
                 :options="trend.intervalOptions.value"
                 :searchable="false"
                 size="xs"
@@ -486,7 +486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="trend.setInterval"
               />
             </span>
-            <span v-if="compareView && def.breakdown" class="ms-auto">
+            <span v-if="compareView && trend.breakdown.value" class="ms-auto">
               <OPopover
                 v-model:open="compareNoLineOpen"
                 side="bottom"
@@ -638,15 +638,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-analytics-funnel-exclusions-caption"
             >{{ exclusionsCaption }}</span
           >
+          <span
+            v-if="breakdownMissingNote"
+            class="text-text-secondary px-4 text-xs"
+            data-test="rum-analytics-funnel-breakdown-start"
+            >{{ breakdownMissingNote }}</span
+          >
           <template
             v-if="!trend.shown.value && def.breakdown && breakdown && funnelPanel.status === 'ok'"
           >
-            <span
-              v-if="breakdownMissingNote"
-              class="text-text-secondary px-4 text-xs"
-              data-test="rum-analytics-funnel-breakdown-start"
-              >{{ breakdownMissingNote }}</span
-            >
             <span
               v-if="def.breakdown === 'app'"
               class="text-text-secondary px-4 text-xs"
@@ -1543,7 +1543,7 @@ const loadFilterValues = (field: string) => {
 
 // An attribute filter that few sessions carry needs the counts for its notice, so it runs the query too.
 const noticeWanted = computed(() =>
-  (def.value.f ?? []).some((r) => isSessionFilter(r) && isFilterColumn(r.field)),
+  (def.value.f ?? []).some((r) => isSessionFilter(r) && !r.not && isFilterColumn(r.field)),
 );
 
 // Runs only while the popover or a notice needs it, and never inside the funnel query, so the funnel keeps its row pruning.

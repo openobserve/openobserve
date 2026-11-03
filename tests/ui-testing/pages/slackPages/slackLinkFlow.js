@@ -33,7 +33,8 @@ async function followLink(context, page, slack, team, r, org) {
   page.on('framenavigated', onNav);
   const unroute = await api.routeSlackAuthorize(context, { team_id: team.teamId, ...SLACK_USER });
   try {
-    await slack.link.openLink(r, org);
+    // The link page leaves for Slack on its own once `start` answers, so only the end state is asserted.
+    await page.goto(slack.link.linkUrl(r, org), { waitUntil: 'domcontentloaded' });
     await expect(slack.link.linked).toBeVisible({ timeout: 30000 });
   } finally {
     await unroute();

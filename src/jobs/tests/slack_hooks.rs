@@ -83,6 +83,17 @@ async fn setup() {
         std::env::set_var("ZO_SKIP_SSRF_CHECKS", "true");
         std::env::set_var("O2_AUDIT_ENABLED", "true");
         std::env::set_var("O2_AUDIT_BATCH_SIZE", "1");
+        // The cloud config refuses to load without these.
+        #[cfg(feature = "cloud")]
+        for key in [
+            "O2_STRIPE_SECRET_KEY",
+            "O2_STRIPE_WEBHOOK_SECRET",
+            "O2_AZURE_TENANT_ID",
+            "O2_AZURE_CLIENT_ID",
+            "O2_AZURE_CLIENT_SECRET",
+        ] {
+            std::env::set_var(key, "test");
+        }
     }
     infra::db::create_table().await.unwrap();
     infra::db_init().await.unwrap();
@@ -358,28 +369,97 @@ fn create_slack_app_destination_goes_through_the_destination_checks() {
 
 #[cfg(feature = "cloud")]
 #[test]
-fn domain_mappings_follow_the_first_match_rule() {
+fn domain_mappings_keep_the_rules_of_an_owner_that_proved_the_domain() {
+    use config::meta::organization::OrganizationType;
+    use openobserve_core::org_domain_ownership::add_domain_to_cache;
+
     run(async {
-        let settings = OrganizationSetting {
-            domain_org_mappings: vec![
+        o2_enterprise::enterprise::cloud::migrate().await.unwrap();
+        let set = |org: &'static str, rules: Vec<DomainOrgMapping>| async move {
+            let settings = OrganizationSetting {
+                domain_org_mappings: rules,
+                ..Default::default()
+            };
+            db::organization::set_org_setting(org, &settings)
+                .await
+                .unwrap();
+        };
+        for org in ["mapped", "payer", "blocked-org"] {
+            infra::table::organizations::add(org, org, OrganizationType::Custom)
+                .await
+                .unwrap();
+        }
+        // The member's billing row has a foreign key to the user who added it.
+        infra::table::users::add(infra::table::users::UserRecord {
+            email: "billing@payer.test".to_string(),
+            first_name: "billing".to_string(),
+            last_name: "group".to_string(),
+            password: "hash".to_string(),
+            salt: "salt".to_string(),
+            is_root: false,
+            password_ext: None,
+            user_type: config::meta::user::UserType::Internal,
+            created_at: 0,
+            updated_at: 0,
+            must_reset_password: false,
+            password_reset_reason: None,
+            flagged_at: None,
+            password_updated_at: None,
+        })
+        .await
+        .unwrap();
+        o2_enterprise::enterprise::cloud::billing_group::add_as_billing_member(
+            "billing@payer.test",
+            "payer",
+            "mapped",
+            None,
+        )
+        .await
+        .unwrap();
+        set(
+            "mapped",
+            vec![
                 mapping("acme.com", "mapped"),
                 mapping("ACME.io", "mapped"),
-                mapping("shared.com", "first"),
-                mapping("shared.com", "mapped"),
-                mapping("blocked.com", "blocked-org"),
+                mapping("acme.com", "mapped"),
+                mapping("unverified.com", "mapped"),
+                mapping("stolen.com", "mapped"),
+                mapping("elsewhere.com", "other"),
             ],
-            ..Default::default()
-        };
-        db::organization::set_org_setting(META_ORG_ID, &settings)
-            .await
-            .unwrap();
+        )
+        .await;
+        set(
+            "payer",
+            vec![
+                mapping("payer.com", "mapped"),
+                mapping("acme.com", "mapped"),
+            ],
+        )
+        .await;
+        set("blocked-org", vec![mapping("blocked.com", "blocked-org")]).await;
+        for (domain, owner) in [
+            ("acme.com", "mapped"),
+            ("acme.io", "mapped"),
+            ("stolen.com", "other"),
+            ("elsewhere.com", "mapped"),
+            ("payer.com", "payer"),
+            ("blocked.com", "blocked-org"),
+        ] {
+            add_domain_to_cache(domain, owner).await;
+        }
         db::org_status::broadcast_pending_deletion("blocked-org")
             .await
             .unwrap();
+
         let mapped = (hooks().domain_mappings_for_org)("mapped".to_string())
             .await
             .unwrap();
-        assert_eq!(mapped, vec!["acme.com", "acme.io"]);
+        assert_eq!(
+            mapped,
+            vec!["acme.com", "acme.io", "payer.com"],
+            "own and payer rules on proved domains, once each; unverified.com has no owner, \
+             stolen.com is another org's, elsewhere.com targets another org"
+        );
         let blocked = (hooks().domain_mappings_for_org)("blocked-org".to_string())
             .await
             .unwrap();

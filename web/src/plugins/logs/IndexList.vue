@@ -34,6 +34,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
       </OButton>
       <div class="min-w-0 flex-1">
+        <!-- A slot-less OTooltip anchors to its previous sibling, so this must not sit between OSelect and it. -->
+        <span
+          aria-live="polite"
+          data-test="log-search-index-list-stream-picker-announcement"
+          class="sr-only"
+          >{{ streamPickerAnnouncement }}</span
+        >
         <OSelect
           ref="streamSelect"
           :aria-label="t('search.selectStream')"
@@ -58,12 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #empty>{{ t("search.noResult") }}</template>
         </OSelect>
-        <span
-          aria-live="polite"
-          data-test="log-search-index-list-stream-picker-announcement"
-          class="sr-only"
-          >{{ streamPickerAnnouncement }}</span
-        >
         <OTooltip
           v-if="searchObj.data.stream.selectedStream.length > 1"
           :delay="500"

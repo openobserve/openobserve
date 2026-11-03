@@ -125,6 +125,77 @@ describe("OSelect header actions", () => {
     expect(document.activeElement).toBe(actionButton());
   });
 
+  describe("when the consumer rebuilds the header from a debounced search", () => {
+    const INTERNAL = ["_rumdata", "_rumlog"];
+    // Mirrors the logs stream picker: the value swaps on toggle, and a hidden header survives a search only if the consumer saw that search.
+    const consumerOptions = (hidden: boolean, term: string): SelectOption[] => {
+      const matches = INTERNAL.filter((name) => name.includes(term)).length;
+      const header: SelectOption = {
+        ...ACTION_HEADER,
+        value: hidden ? "group:show" : "group:hide",
+        headerAction: raw(hidden ? "Show" : "Hide"),
+        ...(hidden && term && matches ? { keepOnSearch: true } : {}),
+      };
+      const listed = hidden ? [] : INTERNAL.map((name) => ({ label: raw(name), value: name }));
+      return [OPTIONS[1], header, ...listed];
+    };
+    const openConsumer = async () => {
+      let hidden = false;
+      let term = "";
+      const rebuild = () => wrapper.setProps({ options: consumerOptions(hidden, term) });
+      await open(
+        { options: consumerOptions(false, ""), searchDebounce: 150 },
+        {
+          onSearch: (value: string) => {
+            term = value;
+            rebuild();
+          },
+          onHeaderAction: () => {
+            hidden = !hidden;
+            rebuild();
+          },
+        },
+      );
+    };
+
+    it("keeps keyboard focus on the action toggled before the search emit lands", async () => {
+      await openConsumer();
+      await search("_rum");
+      expect(rows()).toEqual(["Internal streams · 2 Hide", "_rumdata", "_rumlog"]);
+      actionButton()!.focus();
+      actionButton()!.click();
+      await flushPromises();
+      expect(actionButton()!.textContent!.trim()).toBe("Show");
+      expect(document.activeElement).toBe(actionButton());
+      expect(wrapper.emitted("search")).toEqual([["_rum"]]);
+    });
+
+    it("keeps the highlight on a header toggled from the search box before the search emit lands", async () => {
+      await openConsumer();
+      await search("_rum");
+      await press("ArrowDown");
+      expect(highlighted()).toBe("header");
+      await press("Enter");
+      expect(actionButton()!.textContent!.trim()).toBe("Show");
+      expect(highlighted()).toBe("header");
+    });
+
+    it("does not emit the search again once the debounce has already fired", async () => {
+      vi.useFakeTimers();
+      try {
+        await openConsumer();
+        await search("_rum");
+        vi.advanceTimersByTime(150);
+        await flushPromises();
+        actionButton()!.click();
+        await flushPromises();
+        expect(wrapper.emitted("search")).toEqual([["_rum"]]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   const searchInput = () =>
     document.body.querySelector<HTMLInputElement>('[data-test="unit-search"]')!;
   const press = async (key: string, init: KeyboardEventInit = {}) => {

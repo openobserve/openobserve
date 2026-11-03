@@ -74,6 +74,8 @@ export type AlertPriorityValue = 1 | 2 | 3 | 4 | 5;
 
 export type Channel =
   | "email"
+  /** A DM from the org's Slack app to the person's linked Slack account. */
+  | "slack"
   | "sms"
   | "voice"
   /** An existing alert Destination — Slack, Teams, or any HTTP endpoint. */
@@ -349,6 +351,34 @@ export interface TeamChannel {
   team_id: string;
   destinations: string[];
   source: "team" | "policy";
+  /** RO-1: only `/o2 oncall here` in Slack sets a team's Slack channel. */
+  slack_channel_set: boolean;
+  slack_channel_name: string | null;
+  /** Only while it is still one of the team's destinations (RO-1). */
+  slack_same_room_destination: string | null;
+  /** RO-2: the channel is in a workspace the Slack app serves for this org, so pages post there. */
+  slack_native: boolean;
+  /** The org has an active Slack app installation. */
+  slack_connected: boolean;
+  /** SA-8 / RO-2 text, written by the server. */
+  slack_unavailable_reason: string | null;
+  /** RO-2's "Pages can't post to #{channel}: {reason}", written by the server. */
+  slack_post_problem: string | null;
+}
+
+/** `PUT /oncall/teams/{id}/channel`. Same-room: "" unticks, omitted keeps the stored one. */
+export interface SetTeamChannelBody {
+  destinations: string[] | null;
+  slack_same_room_destination?: string;
+  /** Empties the Slack channel and the same-room destination. */
+  clear_slack?: boolean;
+}
+
+/** `POST /oncall/teams/{id}/slack/test` (RO-6): `advice` is the server's words. */
+export interface TeamSlackTestResult {
+  ok: boolean;
+  class: "ok" | "channel_problem" | "not_connected" | "no_channel";
+  advice: string;
 }
 
 export interface Unavailability {

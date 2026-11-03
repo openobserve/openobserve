@@ -320,10 +320,13 @@ pub async fn search(
                     .await;
             // Enrichment tables have no retention and must be searched in full; skip the clamp.
             if stream_type != StreamType::EnrichmentTables
-                && max_query_range > 0
-                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
+                && let Some(clamped) = config::utils::query_range::clamp_start_time(
+                    req.query.start_time,
+                    req.query.end_time,
+                    max_query_range,
+                )
             {
-                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+                req.query.start_time = clamped;
                 range_error = format!(
                     "Query duration is modified due to query range restriction of {max_query_range} hours"
                 );
@@ -1696,6 +1699,8 @@ pub async fn search_history(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("is_streaming" = Option<bool>, Query, description = "Describe the schema of a streaming query"),
+        ("cross_linking" = Option<bool>, Query, description = "Include cross-link fields"),
     ),
     request_body(content = inline(config::meta::search::Request), description = "Search query", content_type = "application/json", example = json!({
         "query": {
@@ -1714,6 +1719,10 @@ pub async fn search_history(
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn result_schema(
@@ -1807,10 +1816,13 @@ pub async fn result_schema(
                     .await;
             // Enrichment tables have no retention and must be searched in full; skip the clamp.
             if stream_type != StreamType::EnrichmentTables
-                && max_query_range > 0
-                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
+                && let Some(clamped) = config::utils::query_range::clamp_start_time(
+                    req.query.start_time,
+                    req.query.end_time,
+                    max_query_range,
+                )
             {
-                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+                req.query.start_time = clamped;
             }
         }
     }

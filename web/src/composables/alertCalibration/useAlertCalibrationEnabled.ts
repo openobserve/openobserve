@@ -17,6 +17,7 @@ import { computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
+import { isFullConfigLoaded } from "@/services/config.queries";
 
 /** Enterprise or cloud plus `alert_calibration_enabled`, the rule of the route guards, the nav gate and the settings item. */
 export function useAlertCalibrationEnabled() {
@@ -41,7 +42,7 @@ export function useLeaveIfAlertCalibrationOff(routeName: "general" | "alertList"
 
 /** Off only once `/config` has loaded, so a load still in flight never bounces the page. */
 export const isAlertCalibrationOff = (zoConfig: Record<string, unknown> | undefined): boolean =>
-  !!zoConfig?.version && !isAlertCalibrationEnabled(zoConfig);
+  isFullConfigLoaded(zoConfig) && !isAlertCalibrationEnabled(zoConfig);
 
 export function isAlertCalibrationEnabled(zoConfig: Record<string, unknown> | undefined): boolean {
   return (

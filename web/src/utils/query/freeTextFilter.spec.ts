@@ -983,10 +983,18 @@ describe("freeTextFilter", () => {
       ["-- note\nselect * from s"],
       ["/* c */ select level from s"],
       ["select count(*) from s"],
+      ["explain select * from s"],
+      ["EXPLAIN ANALYZE VERBOSE select level from s"],
+      ["-- plan\nexplain analyze select * from s"],
     ])("%s is an authored statement and flips", (raw) => {
       expect(isAuthoredStatement(raw)).toBe(true);
       expect(looksLikeSqlStatement(raw, lookup)).toBe(true);
       expect(looksLikeSqlStatement(raw)).toBe(true);
+    });
+
+    it("keeps a filter on a field named explain in filter mode", () => {
+      expect(isAuthoredStatement("explain = 'x'")).toBe(false);
+      expect(isAuthoredStatement("explain_count > 5")).toBe(false);
     });
 
     it("keeps sentence-shaped text and text that only contains select in filter mode", () => {

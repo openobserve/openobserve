@@ -594,7 +594,7 @@ pub fn slack_audit_body(mut body: serde_json::Value, slack_event: Option<&str>) 
         (status = StatusCode::TOO_MANY_REQUESTS, description = "Upstream AI rate limit exceeded", body = Object),
         (status = StatusCode::BAD_GATEWAY, description = "Upstream AI service unavailable", body = Object),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Chat", "operation": "create"}))
     )
 )]
@@ -906,7 +906,7 @@ impl TraceInfo {
         }),
     ),
     responses(
-        (status = StatusCode::OK, description = "Chat response", body = ()),
+        (status = StatusCode::OK, description = "Server-sent event stream", content_type = "text/event-stream"),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Bad Request", body = Object),
         (status = StatusCode::PRECONDITION_FAILED, description = "Paid overage consent required", body = Object),
@@ -1456,6 +1456,26 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 }
 
 /// Forwards feedback on an AI response to o2-ai, which records it.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/feedback",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "SubmitAiFeedback",
+    summary = "Submit feedback on an AI response",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = Object, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Chat", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
     let (parts, body) = in_req.into_parts();
     if let Err(resp) = require_json(&parts.headers) {
@@ -1578,7 +1598,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
         ("session_id" = String, Path, description = "Chat session ID")
     ),
     request_body(
-        content = serde_json::Value,
+        content = Object,
         description = "Confirmation payload",
         example = json!({"approved": true}),
     ),
@@ -1587,7 +1607,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
         (status = StatusCode::BAD_REQUEST, description = "Invalid session ID, malformed body, or AI agent not configured", body = Object),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
     ),
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "create"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -1706,6 +1726,7 @@ pub async fn confirm_action(
         ("org_id" = String, Path, description = "Organization name"),
         ("session_id" = String, Path, description = "Chat session ID")
     ),
+    request_body(content = Object, description = "Send {}: the handler requires a JSON content type and ignores the body", content_type = "application/json"),
     responses(
         (status = StatusCode::OK, description = "Cancellation forwarded", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Invalid session ID or AI agent not configured", body = Object),
@@ -1714,7 +1735,7 @@ pub async fn confirm_action(
         (status = StatusCode::UNSUPPORTED_MEDIA_TYPE, description = "The body is not JSON (send {})", body = Object),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
     ),
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "create"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]

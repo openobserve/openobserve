@@ -829,7 +829,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownGroup v-if="searchObj.meta.sqlMode" :label="t('search.menuGroupExplain')">
             <ODropdownItem
               data-test="logs-search-bar-explain-query-menu-btn"
-              :disabled="!searchObj.data.query || searchObj.data.query.trim() === ''"
+              :disabled="
+                !searchObj.data.query ||
+                searchObj.data.query.trim() === '' ||
+                isExplainQuery(searchObj.data.query)
+              "
               @select="openExplainDialog"
             >
               <template #icon-left>
@@ -1768,7 +1772,7 @@ import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
-import { isSqlQuery } from "@/utils/query/sqlUtils";
+import { isExplainQuery, isSqlQuery } from "@/utils/query/sqlUtils";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
 import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
@@ -3549,9 +3553,12 @@ export default defineComponent({
       clearColumnsFromUrl();
       searchObj.shouldIgnoreWatcher = true;
       searchObj.meta.sqlMode = false;
+      const viewOrg = store.state.selectedOrganization.identifier;
+      const leftViewOrg = () => store.state.selectedOrganization.identifier !== viewOrg;
       savedviewsService
-        .getViewDetail(store.state.selectedOrganization.identifier, item.view_id)
+        .getViewDetail(viewOrg, item.view_id)
         .then(async (res) => {
+          if (leftViewOrg()) return;
           if (res.status == 200) {
             store.dispatch("setSavedViewFlag", true);
             const extractedObj = res.data.data;
@@ -3701,6 +3708,7 @@ export default defineComponent({
 
                 try {
                   const streamDataList = await Promise.all(streamDataPromises);
+                  if (leftViewOrg()) return;
 
                   // Extract max_query_range from each stream's settings
                   const streamMaxQueryRanges = streamDataList
@@ -3787,6 +3795,7 @@ export default defineComponent({
                 await updatedLocalLogFilterField();
               }
               await getStreams("logs", true);
+              if (leftViewOrg()) return;
             } else {
               // ----- Here we are explicitly handling stream change -----
               resetStreamData();
@@ -3846,6 +3855,7 @@ export default defineComponent({
               await restoreBuildData(extractedObj.data.buildData ?? null);
 
               const streamData = await getStreams(searchObj.data.stream.streamType, true);
+              if (leftViewOrg()) return;
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
               searchObj.data.stream.selectedStream = [selectedStreams];
@@ -3914,6 +3924,7 @@ export default defineComponent({
             });
             markSavedViewApplied(item.view_id);
             setTimeout(async () => {
+              if (leftViewOrg()) return;
               try {
                 searchObj.loadingHistogram = false;
                 searchObj.meta.refreshHistogram = true;
@@ -3965,6 +3976,7 @@ export default defineComponent({
           }
         })
         .catch((err) => {
+          if (leftViewOrg()) return;
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
           toast({
@@ -4818,15 +4830,12 @@ export default defineComponent({
         guardJobSnapshot.value = null;
         await getJobData(false, snapshot);
       } catch (e) {
-        const status = e?.response?.status;
+        if (e?.response?.status === 403) return;
         toast({
           variant: "error",
-          message:
-            status === 403
-              ? t("search.searchJobNoPermission")
-              : e?.response?.data?.message
-                ? raw(e.response.data.message)
-                : t("search.errorAddingJob"),
+          message: e?.response?.data?.message
+            ? raw(e.response.data.message)
+            : t("search.errorAddingJob"),
         });
       }
     };
@@ -5244,6 +5253,7 @@ export default defineComponent({
       buildStreamQuery,
       updateEditorWidth,
       showExplainDialog,
+      isExplainQuery,
       openExplainDialog,
       vrlEditorNlpMode,
       shouldMoveShareToMenu,

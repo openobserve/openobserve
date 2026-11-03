@@ -198,7 +198,7 @@ pub fn remove_latest(map: &mut hashbrown::HashMap<String, SchemaCache>, key: &st
     remove_counted(map, &ORG_USER_STREAMS, key);
 }
 
-/// Whether the org has a logs, metrics or traces stream outside the internal ones; O(1).
+/// Whether the org has a logs, metrics, traces or profiles stream outside the internal ones; O(1).
 pub fn org_has_user_stream(org_id: &str) -> bool {
     ORG_USER_STREAMS.contains_key(org_id)
 }
@@ -206,7 +206,7 @@ pub fn org_has_user_stream(org_id: &str) -> bool {
 pub fn is_user_data_stream(stream_type: StreamType, stream_name: &str) -> bool {
     matches!(
         stream_type,
-        StreamType::Logs | StreamType::Metrics | StreamType::Traces
+        StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Profiles
     ) && !INTERNAL_STREAM_NAMES.contains(&stream_name)
         && !stream_name.starts_with("_o2_")
 }
@@ -1140,6 +1140,7 @@ fn user_data_org(key: &str) -> Option<&str> {
         "logs" => StreamType::Logs,
         "metrics" => StreamType::Metrics,
         "traces" => StreamType::Traces,
+        "profiles" => StreamType::Profiles,
         _ => return None,
     };
     is_user_data_stream(stream_type, stream_name).then_some(org_id)
@@ -1946,16 +1947,18 @@ mod tests {
         }
         assert!(index.is_empty());
         assert!(is_user_data_stream(StreamType::Metrics, "cpu_usage"));
+        assert!(is_user_data_stream(StreamType::Profiles, "default"));
         assert!(!is_user_data_stream(StreamType::Logs, "usage"));
         assert!(!is_user_data_stream(StreamType::EnrichmentTables, "app"));
         assert_eq!(user_data_org("acme/metrics/up/with/slash"), Some("acme"));
+        assert_eq!(user_data_org("acme/profiles/default"), Some("acme"));
     }
 
     #[test]
     fn test_user_stream_index_equals_a_recount_after_10k_random_inserts_and_removes() {
         let mut map = hashbrown::HashMap::new();
         let index = RwHashMap::default();
-        let types = ["logs", "metrics", "traces", "metadata"];
+        let types = ["logs", "metrics", "traces", "profiles", "metadata"];
         let names = ["app", "usage", "_o2_x", "default", "cpu"];
         let mut seed: u64 = 0x5eed;
         let mut next = || {

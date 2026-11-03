@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="
           rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+          !rumTokenForbidden &&
           store.state.organizationData.rumToken.rum_token != ''
         "
         variant="primary"
@@ -74,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else-if="
           rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+          !rumTokenForbidden &&
           store.state.organizationData.rumToken.rum_token == ''
         "
         variant="primary"
@@ -265,6 +267,8 @@ export default defineComponent({
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
     const confirmRUMUpdate = ref<boolean>(false);
+    // A viewer may not read the RUM token, so it may neither generate nor reset one.
+    const rumTokenForbidden = computed(() => !!store.state.organizationData.rumTokenForbidden);
     const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
     const ingestTabType = ref("recommended");
     const globalSearchQuery = ref("");
@@ -394,14 +398,23 @@ export default defineComponent({
         }
       });
 
-    // A read failure stays silent: the card falls back to its Generate action.
+    // A 403 hides the token actions; staleTime 0 keeps a cached token from outliving that 403.
     const getRUMToken = () => {
+      const org = store.state.selectedOrganization.identifier;
       return queryClient
-        .fetchQuery(rumTokensQuery(store.state.selectedOrganization.identifier))
+        .fetchQuery({ ...rumTokensQuery(org), staleTime: 0 })
         .then((res: any) => {
+          store.dispatch("setRUMTokenForbidden", false);
           store.dispatch("setRUMToken", res.data);
         })
-        .catch(() => {});
+        .catch((e: any) => {
+          const forbidden = e?.response?.status === 403;
+          store.dispatch("setRUMTokenForbidden", forbidden);
+          if (forbidden) {
+            store.dispatch("setRUMToken", { rum_token: "" });
+            queryClient.removeQueries({ queryKey: rumTokensQuery(org).queryKey });
+          }
+        });
     };
 
     const updatePasscode = () => {
@@ -482,7 +495,6 @@ export default defineComponent({
 
     const orgIdForWrites = useOrgId();
     const createRumToken = useMutation(() => createRumTokenMutation(orgIdForWrites.value));
-    // `getRUMToken` below is a bare fetchQuery, so only the mutation's invalidation stops it re-serving the old token.
     const updateRumToken = useMutation(() => updateRumTokenMutation(orgIdForWrites.value));
     const resetPasscode = useMutation(() => resetPasscodeMutation(orgIdForWrites.value));
 
@@ -648,6 +660,7 @@ export default defineComponent({
       getImageURL,
       ingestTabType,
       getRUMToken,
+      rumTokenForbidden,
       tabs,
       activeTab,
       copyToClipboardFn,

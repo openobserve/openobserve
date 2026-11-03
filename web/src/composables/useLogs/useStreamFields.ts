@@ -1011,7 +1011,9 @@ export const useStreamFields = () => {
       // commented below function as we are doing resetStreamData from all the places where getStreamList is called
       // resetStreamData();
       const streamType = searchObj.data.stream.streamType || "logs";
+      const requestOrg = store.state.selectedOrganization.identifier;
       const streamData: any = await getStreams(streamType, false);
+      if (store.state.selectedOrganization.identifier !== requestOrg) return;
       if (options.isCurrent && !options.isCurrent()) return;
       searchObj.data.streamResults = {
         ...streamData,

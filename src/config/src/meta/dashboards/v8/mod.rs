@@ -252,6 +252,12 @@ pub struct PromQLLabelFilter {
     pub label: String,
     pub op: String,
     pub value: String,
+    /// The OR group the matcher belongs to; absent means the base list every group is ANDed with.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<u32>,
+    /// Set on every matcher of a negated group.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub negate: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]

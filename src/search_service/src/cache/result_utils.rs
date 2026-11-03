@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::{json, time::parse_str_to_timestamp_micros_as_option};
+use config::{
+    TIMESTAMP_COL_NAME,
+    utils::{json, time::parse_str_to_timestamp_micros_as_option},
+};
 
 pub fn get_ts_value(ts_column: &str, record: &json::Value) -> i64 {
     match record.get(ts_column) {
@@ -37,6 +40,34 @@ pub fn get_ts_value(ts_column: &str, record: &json::Value) -> i64 {
 #[inline]
 pub fn is_timestamp_field(field: &str, ts_column: &str) -> bool {
     field == ts_column || field.trim_matches('"') == ts_column
+}
+
+/// Like [`is_timestamp_field`], but a raw `_timestamp` also matches when the query
+/// selects `_timestamp AS <ts_column>`: ORDER BY keeps the raw name, the hits carry the alias.
+pub fn is_ts_order_field(field: &str, ts_column: &str, aliases: &[(String, String)]) -> bool {
+    is_timestamp_field(field, ts_column)
+        || (field.trim_matches('"') == TIMESTAMP_COL_NAME
+            && aliases
+                .iter()
+                .any(|(original, alias)| original == TIMESTAMP_COL_NAME && alias == ts_column))
+}
+
+/// Renames ORDER BY `_timestamp` to `ts_column` when the query selects `_timestamp AS <ts_column>`.
+pub fn normalize_ts_order_by(
+    order_by: &[(String, config::meta::sql::OrderBy)],
+    ts_column: &str,
+    aliases: &[(String, String)],
+) -> Vec<(String, config::meta::sql::OrderBy)> {
+    order_by
+        .iter()
+        .map(|(field, order)| {
+            if is_ts_order_field(field, ts_column, aliases) {
+                (ts_column.to_string(), *order)
+            } else {
+                (field.clone(), *order)
+            }
+        })
+        .collect()
 }
 
 /// Checks if ORDER BY clause contains any non-timestamp columns.
@@ -139,6 +170,17 @@ mod tests {
     fn test_is_timestamp_field_exact_match() {
         assert!(is_timestamp_field("_timestamp", "_timestamp"));
         assert!(!is_timestamp_field("other", "_timestamp"));
+    }
+
+    #[test]
+    fn test_is_ts_order_field_needs_direct_alias() {
+        let aliased = vec![("_timestamp".to_string(), "ts".to_string())];
+        assert!(is_ts_order_field("_timestamp", "ts", &aliased));
+        assert!(is_ts_order_field("ts", "ts", &aliased));
+        // ORDER BY count(_timestamp) is stored as `_timestamp`; a histogram alias must not match it
+        let histogram = vec![("histogram(_timestamp)".to_string(), "key".to_string())];
+        assert!(!is_ts_order_field("_timestamp", "key", &histogram));
+        assert!(!is_ts_order_field("_timestamp", "", &aliased));
     }
 
     #[test]
