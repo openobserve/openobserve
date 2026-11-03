@@ -591,6 +591,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-workspace-empty-grid"
           />
 
+          <!-- Every card checked so far is empty but candidates remain: not a verdict, so no remedies, just Show more below. -->
+          <OEmptyState
+            v-else-if="!visibleCards.length && grid.hasMore.value"
+            size="block"
+            variant="no-results"
+            illustration="no-results"
+            :title="t('metrics.explorer.noMatchYet')"
+            :description="t('metrics.explorer.noMatchYetHint')"
+            data-test="metrics-explorer-no-match-yet"
+          />
+
           <!-- Every remedy the hint names, as an action card — but only the ones
              that would actually change anything right now: each card is gated
              on its own cause being active. "Clear all filters" is always last. -->
@@ -652,7 +663,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div v-if="grid.hasMore.value && visibleCards.length" class="flex justify-center py-4">
+          <div
+            v-if="grid.hasMore.value && !showLoading && !grid.loadError.value"
+            class="flex justify-center py-4"
+          >
             <OButton
               variant="outline"
               size="sm"
@@ -956,8 +970,9 @@ export default defineComponent({
     // suffix restated the control next to it and wrapped onto two lines doing
     // it. The exact number still appears where it is actually needed: the empty
     // state, where it explains why the grid has nothing in it.
+    // Matches, not the loaded page: unqueried candidates count, known-empty ones do not while "With data" is on.
     const resultCountLabel = computed(() => {
-      const shown = visibleCards.value.length;
+      const shown = grid.filteredCards.value.length;
       const total = grid.cards.value.length;
       return shown === total
         ? total.toLocaleString()
@@ -2091,11 +2106,14 @@ export default defineComponent({
       dateTimePickerRef.value?.setSavedDate?.(pickerSavedDate(date));
     };
 
-    const syncTimeRange = (opts?: { keepPreviews?: boolean }) => {
+    const syncTimeRange = (opts?: { keepPreviews?: boolean; keepPage?: boolean }) => {
       const consumable = dateTimePickerRef.value?.getConsumableDateTime?.();
       if (!consumable) return;
       grid.setTimeRange({ start_time: consumable.startTime, end_time: consumable.endTime }, opts);
     };
+
+    // True only around a zoom's picker refresh, which emits synchronously: the zoomed card must stay on the page.
+    let zooming = false;
 
     const onDateChange = async () => {
       // `dateTimePickerRef.refresh()` re-emits a date change, so a manual
@@ -2104,7 +2122,7 @@ export default defineComponent({
       // to a skeleton on each refresh.
       if (refreshing.value) return;
 
-      syncTimeRange();
+      syncTimeRange(zooming ? { keepPage: true } : undefined);
       // A deliberate change of window must reach the backend — repainting the
       // persisted result would hand the user back the data they just moved away
       // from.
@@ -2160,7 +2178,12 @@ export default defineComponent({
       // `refresh()` calls `saveDate()` directly, which is what emits
       // `on:date-change` -> `onDateChange` -> skipCache + sweep. This is exactly
       // why ViewDashboard.onDataZoom calls it too; the pair is the contract.
-      dateTimePickerRef.value?.refresh?.();
+      zooming = true;
+      try {
+        dateTimePickerRef.value?.refresh?.();
+      } finally {
+        zooming = false;
+      }
       track("metrics_explorer_card_zoomed", {
         window_seconds: Math.round((range.end.getTime() - range.start.getTime()) / 1000),
       });
