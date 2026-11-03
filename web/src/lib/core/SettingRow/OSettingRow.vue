@@ -20,7 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex gap-6 max-md:flex-col max-md:items-stretch max-md:gap-2"
     :class="[
       fill ? 'items-start' : 'items-center',
-      !inPair && 'border-border-default border-b px-3 py-3 last:border-b-0',
+      !inPair && !bare && 'border-border-default border-b px-3 py-3 last:border-b-0',
+      !inPair && bare && 'py-3',
       disabled && 'opacity-60',
     ]"
     data-o-setting-row
@@ -74,7 +75,11 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw } from "@/types/i18n";
 
-import { SETTING_ROW_PAIR_KEY, type SettingRowProps } from "./OSettingRow.types";
+import {
+  SETTING_ROW_BARE_KEY,
+  SETTING_ROW_PAIR_KEY,
+  type SettingRowProps,
+} from "./OSettingRow.types";
 
 import OIcon from "../Icon/OIcon.vue";
 import OSkeleton from "../../feedback/Skeleton/OSkeleton.vue";
@@ -83,5 +88,6 @@ import { FORM_CONTEXT_KEY, SETTING_ROW_ERROR_KEY } from "../../forms/Form/OForm.
 import type { SettingRowProps, SettingRowSlots } from "./OSettingRow.types";
 
 const inPair = inject(SETTING_ROW_PAIR_KEY, false);
+const bare = inject(SETTING_ROW_BARE_KEY, false);
 const requiredMark = raw(" *");
 </script>

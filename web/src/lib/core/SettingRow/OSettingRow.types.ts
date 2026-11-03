@@ -34,3 +34,9 @@ export interface SettingRowSlots {
   /** Rich help in place of the `description` text; an error still takes its place. */
   description?: () => unknown;
 }
+
+/** Provided by OSettingRowPair; a row inside one leaves the rule and padding to the pair. */
+export const SETTING_ROW_PAIR_KEY: InjectionKey<true> = Symbol("SettingRowPair");
+
+/** Provided by a form that sets rows directly on the page; a row inside one drops its rule and side padding. */
+export const SETTING_ROW_BARE_KEY: InjectionKey<true> = Symbol("SettingRowBare");

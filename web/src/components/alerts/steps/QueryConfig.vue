@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Query Mode Tabs (hidden for real-time alerts) -->
         <div
           v-if="sectionTargets"
-          class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-3 py-3"
+          class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3"
         >
           <div class="min-w-0 flex-1 basis-60">
             <div class="text-text-heading text-sm font-medium">
@@ -1023,7 +1023,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Filters section — scheduled -->
-            <div v-if="isRealTime === 'false'" ref="filtersSectionRef" class="mt-1 px-3 pb-2">
+            <div
+              v-if="isRealTime === 'false'"
+              ref="filtersSectionRef"
+              class="mt-1"
+              :class="sectionTargets ? 'pb-2' : 'px-3'"
+            >
               <div v-show="showFilters" ref="customPreviewRef">
                 <FilterGroup
                   :compact-empty="!!sectionTargets"
@@ -1052,7 +1057,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Realtime — no threshold sentence, just filters always visible -->
-            <div v-else class="mb-1 px-3">
+            <div v-else class="mb-1" :class="!sectionTargets && 'px-3'">
               <div class="flex items-center gap-2 py-1">
                 <div
                   class="filters-inline-toggle rounded-default bg-surface-panel hover:bg-tabs-hover-bg flex cursor-pointer items-center gap-1 px-2 py-0.5 transition-colors select-none"

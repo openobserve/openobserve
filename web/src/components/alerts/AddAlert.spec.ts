@@ -1212,17 +1212,35 @@ describe("AddAlert (OForm owner)", () => {
       breakpoint.lgUp!.value = true;
     });
 
-    it("keeps rare settings tucked until the user asks, even when they would fit", async () => {
+    it("opens every setting while it fits, with no link to hide them", async () => {
       wrapper = mountAlert();
       await flushPromises();
+      for (const section of ["condition", "notify", "details"] as const) {
+        expect(wrapper.vm.tiers.view(section).expanded).toBe(true);
+        expect(wrapper.find(`[data-test="add-alert-section-${section}-more"]`).exists()).toBe(
+          false,
+        );
+      }
+      expect(wrapper.vm.tiers.isVisible("template")).toBe(true);
+      expect(wrapper.vm.tiers.view("notify").addLinks).toEqual([]);
+      expect(wrapper.vm.form.getFieldValue("context_attributes") ?? []).toHaveLength(0);
+    });
+
+    it("closes a section that no longer fits and offers the link back", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.autoOpenedTiers.delete("condition");
+      wrapper.vm.tiers.collapse("condition");
+      await flushPromises();
+      const more = wrapper.find('[data-test="add-alert-section-condition-more"]');
+      expect(more.attributes("aria-expanded")).toBe("false");
+      await more.trigger("click");
       wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
       await flushPromises();
-      for (const section of ["condition", "notify", "details"] as const) {
-        expect(wrapper.vm.tiers.view(section).expanded).toBe(false);
-      }
-      expect(
-        wrapper.find('[data-test="add-alert-section-condition-more"]').attributes("aria-expanded"),
-      ).toBe("false");
+      expect(wrapper.vm.tiers.view("condition").expanded).toBe(true);
+      expect(wrapper.find('[data-test="add-alert-section-condition-more"]').text()).toBe(
+        "Show fewer",
+      );
     });
 
     it("gives Next the one primary action while creating, and Save on the last step", async () => {
@@ -1383,6 +1401,7 @@ describe("AddAlert (OForm owner)", () => {
     it("finds a setting by its old name and expands its tucked group when picked", async () => {
       wrapper = mountAlert();
       await flushPromises();
+      wrapper.vm.autoOpenedTiers.delete("notify");
       wrapper.vm.tiers.collapse("notify");
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-find-setting"]').exists()).toBe(true);

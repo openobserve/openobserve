@@ -10,6 +10,7 @@ import OFormInput from "../../forms/Input/OFormInput.vue";
 
 import { raw } from "@/types/i18n";
 
+import { SETTING_ROW_BARE_KEY, SETTING_ROW_PAIR_KEY } from "./OSettingRow.types";
 import OSettingRow from "./OSettingRow.vue";
 
 const HELP = "Shortest password accepted";
@@ -36,6 +37,17 @@ async function mountWithRevealedError() {
 }
 
 describe("OSettingRow", () => {
+  it("drops its rule and side padding inside a bare form", () => {
+    const wrapper = mount(OSettingRow, {
+      props: { label: raw("Name"), dataTest: "row" },
+      global: { provide: { [SETTING_ROW_BARE_KEY as symbol]: true } },
+    });
+    const classes = wrapper.find('[data-test="row"]').classes();
+    expect(classes).toContain("py-3");
+    expect(classes).not.toContain("border-b");
+    expect(classes).not.toContain("px-3");
+  });
+
   it("renders the label and the description", () => {
     const wrapper = mount(OSettingRow, {
       props: { label: raw("Minimum length"), description: raw("Shortest password accepted") },
