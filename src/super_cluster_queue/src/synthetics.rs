@@ -731,6 +731,11 @@ mod tests {
         apply_last_check_status(&db, "org1", "check-1", &older)
             .await
             .unwrap();
+        assert_eq!(
+            stored_streaks(&db).await,
+            newer,
+            "an older run must not apply"
+        );
         apply_last_check_status(&db, "org1", "check-1", &newer)
             .await
             .unwrap();

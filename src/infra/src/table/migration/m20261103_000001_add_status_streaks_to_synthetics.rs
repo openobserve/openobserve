@@ -47,9 +47,10 @@ impl MigrationTrait for Migration {
             .create_index(
                 Index::create()
                     .if_not_exists()
-                    .name(JOBS_COMPLETED_IDX)
-                    .table(SyntheticsJobs::Table)
-                    .col(SyntheticsJobs::CompletedAt)
+                    .name(RUNS_OPEN_IDX)
+                    .table(SyntheticsRuns::Table)
+                    .col(SyntheticsRuns::CompletedAt)
+                    .col(SyntheticsRuns::CreatedAt)
                     .to_owned(),
             )
             .await?;
@@ -60,8 +61,8 @@ impl MigrationTrait for Migration {
         manager
             .drop_index(
                 Index::drop()
-                    .name(JOBS_COMPLETED_IDX)
-                    .table(SyntheticsJobs::Table)
+                    .name(RUNS_OPEN_IDX)
+                    .table(SyntheticsRuns::Table)
                     .to_owned(),
             )
             .await?;
@@ -82,7 +83,7 @@ impl MigrationTrait for Migration {
 }
 
 const TABLE: &str = "synthetics";
-const JOBS_COMPLETED_IDX: &str = "synthetics_jobs_completed_at_idx";
+const RUNS_OPEN_IDX: &str = "synthetics_runs_completed_created_idx";
 
 #[derive(DeriveIden)]
 enum Synthetics {
@@ -93,9 +94,10 @@ enum Synthetics {
 }
 
 #[derive(DeriveIden)]
-enum SyntheticsJobs {
+enum SyntheticsRuns {
     Table,
     CompletedAt,
+    CreatedAt,
 }
 
 fn columns() -> [(&'static str, Synthetics, bool); 3] {
@@ -120,7 +122,7 @@ mod tests {
             .await
             .unwrap();
         db.execute_unprepared(
-            "CREATE TABLE synthetics_jobs (id TEXT PRIMARY KEY, completed_at BIGINT NULL)",
+            "CREATE TABLE synthetics_runs (id TEXT PRIMARY KEY, completed_at BIGINT NULL, created_at BIGINT NOT NULL)",
         )
         .await
         .unwrap();

@@ -1053,7 +1053,8 @@ pub async fn apply_replicated_streaks<C: ConnectionTrait>(
             Expr::value(config::utils::time::now_micros()),
         )
         .filter(Column::Id.eq(id))
-        .filter(Column::StatusRunTs.lt(next.run_ts))
+        // `<=` so a late run's rebuilt streaks, which keep the newest `run_ts`, still replicate.
+        .filter(Column::StatusRunTs.lte(next.run_ts))
         .exec(conn)
         .await?;
     Ok(res.rows_affected > 0)

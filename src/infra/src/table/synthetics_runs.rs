@@ -30,6 +30,8 @@ pub const STREAK_CAP: i32 = 10;
 /// How far back the stuck-run sweep looks, in microseconds.
 const STUCK_LOOKBACK_US: i64 = 86_400_000_000;
 const SWAP_ATTEMPTS: usize = 3;
+/// Completed runs a late run replays; enough to rebuild a streak capped at 10.
+const REPLAY_RUNS: i64 = 20;
 const STATUS_ERROR: i32 = 4;
 // `synthetics_jobs.status` values; a different scale from SyntheticStatus.
 const JOB_DEAD: i32 = 2;
@@ -279,15 +281,11 @@ pub async fn finalize_stuck_runs<C: ConnectionTrait + TransactionTrait>(
     let cutoff = now_us - grace_us;
     let sql = r#"
         SELECT r.id AS id FROM synthetics_runs r
-        WHERE r.completed_at IS NULL
-          AND r.id IN (
-              SELECT j.run_id FROM synthetics_jobs j
-              WHERE j.completed_at < $1 AND j.completed_at > $2
-          )
+        WHERE r.completed_at IS NULL AND r.created_at < $1 AND r.created_at > $2
+          AND EXISTS (SELECT 1 FROM synthetics_jobs j WHERE j.run_id = r.id)
           AND NOT EXISTS (
               SELECT 1 FROM synthetics_jobs j2
-              WHERE j2.run_id = r.id
-                AND (j2.status < 2 OR j2.completed_at IS NULL OR j2.completed_at >= $1)
+              WHERE j2.run_id = r.id AND (j2.status < 2 OR j2.completed_at >= $1)
           )
         LIMIT 100
     "#;
@@ -490,9 +488,14 @@ async fn write_check_row<C: ConnectionTrait>(
         let Some(cur) = synthetics_checks::lock_status_streaks(conn, synthetics_id).await? else {
             return Ok(None);
         };
-        let Some(next) = next_streaks(&cur, run_result, verdict, run_ts) else {
-            return Ok(None);
+        let next = match next_streaks(&cur, run_result, verdict, run_ts) {
+            Some(next) => next,
+            // A run that finishes after a newer one rebuilds the streaks in run order.
+            None => replay_streaks(conn, synthetics_id, &cur).await?,
         };
+        if next == cur {
+            return Ok(None);
+        }
         if synthetics_checks::swap_status_streaks(conn, synthetics_id, &cur, &next).await? {
             let changed = cur.last_check_status != next.last_check_status
                 || cur.down_runs != next.down_runs
@@ -504,6 +507,53 @@ async fn write_check_row<C: ConnectionTrait>(
     Err(errors::Error::Message(format!(
         "check {synthetics_id}: status streak swap lost {SWAP_ATTEMPTS} times"
     )))
+}
+
+/// The streaks recomputed from the latest completed runs, keeping the badge and `run_ts` of `cur`.
+async fn replay_streaks<C: ConnectionTrait>(
+    conn: &C,
+    synthetics_id: &str,
+    cur: &StatusStreaks,
+) -> Result<StatusStreaks, errors::Error> {
+    let backend = conn.get_database_backend();
+    let runs = conn
+        .query_all(Statement::from_sql_and_values(
+            backend,
+            r#"
+                SELECT id, scheduled_ts, job_count FROM synthetics_runs
+                WHERE synthetics_id = $1 AND completed_at IS NOT NULL AND scheduled_ts <= $2
+                ORDER BY scheduled_ts DESC
+                LIMIT $3
+            "#,
+            [
+                Value::from(synthetics_id.to_owned()),
+                Value::from(cur.run_ts),
+                Value::from(REPLAY_RUNS),
+            ],
+        ))
+        .await?;
+    let mut replayed = StatusStreaks::default();
+    for row in runs.iter().rev() {
+        let id: String = row.try_get("", "id")?;
+        let scheduled_ts: i64 = row.try_get("", "scheduled_ts")?;
+        let job_count: i32 = row.try_get("", "job_count")?;
+        let statuses = job_statuses(conn, &id).await?;
+        let failed = statuses.iter().filter(|s| **s == JOB_FAILED).count() as i32;
+        let healthy = statuses
+            .iter()
+            .filter(|s| **s == JOB_PASSED || **s == JOB_WARNING)
+            .count() as i32;
+        let verdict = run_verdict(job_count, failed, healthy);
+        if let Some(next) = next_streaks(&replayed, 0, verdict, scheduled_ts) {
+            replayed = next;
+        }
+    }
+    Ok(StatusStreaks {
+        last_check_status: cur.last_check_status,
+        down_runs: replayed.down_runs,
+        up_runs: replayed.up_runs,
+        run_ts: cur.run_ts,
+    })
 }
 
 /// Maps a `synthetics_jobs.status` to the SyntheticStatus DB scale; non-terminal jobs map to 0.
@@ -846,6 +896,47 @@ mod tests {
             completed_at(&db, "a").await.is_some(),
             "the late run itself still completes"
         );
+    }
+
+    #[tokio::test]
+    async fn late_up_between_two_downs_rebuilds_the_streak() {
+        let db = db().await;
+        run_with_jobs(&db, "a", 100, 1).await;
+        run_with_jobs(&db, "b", 200, 1).await;
+        run_with_jobs(&db, "c", 300, 1).await;
+        ack(&db, "a", 0, 3, 400).await.unwrap();
+        ack(&db, "c", 0, 3, 500).await.unwrap();
+        assert_eq!(check_row(&db).await.0.down_runs, 2);
+        let late = ack(&db, "b", 0, 1, 600).await.unwrap();
+        let (row, _) = check_row(&db).await;
+        assert_eq!(
+            (row.down_runs, row.up_runs),
+            (1, 0),
+            "Down, Up, Down is one Down"
+        );
+        assert_eq!(
+            (row.last_check_status, row.run_ts),
+            (3, 300),
+            "badge stays the newest run's"
+        );
+        assert_eq!(late.check_update, Some(row));
+    }
+
+    #[tokio::test]
+    async fn dead_job_without_completed_at_counts_as_terminal_for_the_sweep() {
+        let db = db().await;
+        run_with_jobs(&db, "r1", 100, 1).await;
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            "UPDATE synthetics_jobs SET status = 2, completed_at = NULL".to_owned(),
+        ))
+        .await
+        .unwrap();
+        let swept = finalize_stuck_runs(&db, 100 + 3 * MIN, 2 * MIN)
+            .await
+            .unwrap();
+        assert_eq!(swept.len(), 1);
+        assert_eq!(swept[0].run_result, 4);
     }
 
     #[tokio::test]

@@ -738,7 +738,9 @@ fn all_checks_in_error(mapped: &[&str], states: &[table::CheckStateRow]) -> bool
         states
             .iter()
             .find(|s| s.id == *id)
-            .is_some_and(|s| s.last_check_status == engine::CHECK_STATUS_ERROR)
+            // The badge is the worst job, so a quorum-Up run with one errored location is not No
+            // data.
+            .is_some_and(|s| s.last_check_status == engine::CHECK_STATUS_ERROR && s.up_runs == 0)
     })
 }
 
@@ -865,6 +867,10 @@ mod fast_pass_tests {
         assert!(all_checks_in_error(&["a", "b"], &states));
         assert!(!all_checks_in_error(&["a", "c"], &states));
         assert!(!all_checks_in_error(&["a", "missing"], &states));
+        // 2 passed + 1 errored: the badge is Error, but the verdict is Up.
+        let mut up = row("a", e);
+        up.up_runs = 1;
+        assert!(!all_checks_in_error(&["a"], &[up]));
     }
 }
 
