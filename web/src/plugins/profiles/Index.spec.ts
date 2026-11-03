@@ -1330,6 +1330,161 @@ describe("Profiles page", () => {
     expect(options().series[0].showSymbol).toBe(false);
   });
 
+  describe("changes made while the page loads", () => {
+    const deferred = <T>() => {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+    const twoServices = {
+      data: { ...profileMetaResponse.data, services: ["service-a", "service-b"] },
+    };
+    const lastMerge = () => mocks.merge.mock.calls.at(-1)!;
+
+    it("runs the stream picked while meta loads, not the first stream", async () => {
+      const meta = deferred<unknown>();
+      mocks.meta.mockReturnValueOnce(meta.promise);
+      const wrapper = mountPage();
+      await flushPromises();
+
+      await wrapper.find('[data-test="profiles-stream-select"] select').setValue("profiles-b");
+      meta.resolve(profileMetaResponse);
+      await flushPromises();
+
+      expect(
+        (wrapper.find('[data-test="profiles-stream-select"] select').element as HTMLSelectElement)
+          .value,
+      ).toBe("profiles-b");
+      expect(mocks.meta).toHaveBeenLastCalledWith(
+        orgIdentifier,
+        "profiles-b",
+        expect.objectContaining({ service_name: "service-a" }),
+      );
+      expect(lastMerge()[1]).toBe("profiles-b");
+    });
+
+    it("keeps the service picked while meta loads over the one meta would pick", async () => {
+      const meta = deferred<unknown>();
+      mocks.meta.mockReturnValueOnce(meta.promise);
+      mocks.meta.mockResolvedValue(twoServices);
+      const wrapper = mountPage();
+      await flushPromises();
+
+      wrapper
+        .findComponent('[data-test="profiles-service-select"]')
+        .vm.$emit("update:modelValue", "service-b");
+      meta.resolve(twoServices);
+      await flushPromises();
+
+      expect(
+        (wrapper.find('[data-test="profiles-service-select"] select').element as HTMLSelectElement)
+          .value,
+      ).toBe("service-b");
+      expect(lastMerge()[2]).toMatchObject({ service_name: "service-b" });
+    });
+
+    it("queries the window picked while meta loads", async () => {
+      // A seeded service and type that meta keeps, so no re-run for a new selection hides the lost window.
+      route.query = {
+        stream: "profiles-a",
+        service_name: "service-a",
+        profile_type: "cpu",
+        profile_unit: "nanoseconds",
+      };
+      const meta = deferred<unknown>();
+      mocks.meta.mockReturnValueOnce(meta.promise);
+      const wrapper = mountPage();
+      await flushPromises();
+
+      const picked = {
+        startTime: 1_600_000_000_000_000,
+        endTime: 1_600_000_060_000_000,
+        relativeTimePeriod: "",
+        valueType: "absolute",
+      };
+      wrapper
+        .findComponent({ name: "DateTimePickerDashboard" })
+        .vm.$emit("update:modelValue", picked);
+      meta.resolve(profileMetaResponse);
+      await flushPromises();
+
+      expect(lastMerge()[2]).toMatchObject({
+        start_time: picked.startTime,
+        end_time: picked.endTime,
+      });
+      expect(mocks.meta).toHaveBeenLastCalledWith(
+        orgIdentifier,
+        "profiles-a",
+        expect.objectContaining({ start_time: picked.startTime, end_time: picked.endTime }),
+      );
+    });
+
+    describe("a share link with a sub-second absolute window and the real picker", () => {
+      // The picker re-emits a window set on it rounded to whole seconds in the store's zone.
+      const mountWithRealPicker = () => {
+        const { DateTimePickerDashboard: _picker, ...stubs } = pageStubs;
+        return mount(Profiles, { global: { plugins: [i18n], provide: { store }, stubs } });
+      };
+      const openLink = async () => {
+        route.query = { stream: "profiles-a", from: "1600000000123000", to: "1600000060456000" };
+        const wrapper = mountWithRealPicker();
+        await flushPromises();
+        await nextTick();
+        await flushPromises();
+        return wrapper;
+      };
+
+      it("loads meta and runs the query once", async () => {
+        await openLink();
+        expect(mocks.meta).toHaveBeenCalledTimes(2);
+        expect(mocks.merge).toHaveBeenCalledTimes(1);
+        expect(mocks.series).toHaveBeenCalledTimes(1);
+      });
+
+      it("runs the query once when the link opens on a page already showing the picker", async () => {
+        mountWithRealPicker();
+        await flushPromises();
+        await nextTick();
+        await flushPromises();
+        mocks.merge.mockClear();
+
+        route.query = { stream: "profiles-a", from: "1600000000123000", to: "1600000060456000" };
+        await flushPromises();
+        await nextTick();
+        await flushPromises();
+
+        expect(mocks.merge).toHaveBeenCalledTimes(1);
+      });
+
+      it("does not mark Run query pending with Auto Run off", async () => {
+        store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: false };
+        const wrapper = await openLink();
+        expect(mocks.meta).toHaveBeenCalledTimes(2);
+        expect(
+          wrapper.find('[data-test="profiles-run-query"]').attributes("data-run-pending"),
+        ).toBeUndefined();
+      });
+    });
+
+    it("does not query again when the picker re-emits the same window while meta loads", async () => {
+      const meta = deferred<unknown>();
+      mocks.meta.mockReturnValueOnce(meta.promise);
+      const wrapper = mountPage();
+      await flushPromises();
+
+      wrapper.findComponent({ name: "DateTimePickerDashboard" }).vm.$emit("update:modelValue", {
+        startTime: 1,
+        endTime: 2,
+        relativeTimePeriod: "15m",
+        valueType: "relative",
+      });
+      meta.resolve(profileMetaResponse);
+      await flushPromises();
+
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("URL and share link", () => {
     const shareUrl = (wrapper: ReturnType<typeof mountPage>) =>
       new URL(String(wrapper.findComponent({ name: "ShareButton" }).props("url")));
