@@ -3002,7 +3002,7 @@ impl AlertExt for Alert {
         }
 
         outcome.success_message = success_message;
-        outcome.error_message = err_message;
+        outcome.error_message = format!("{err_message}{workflow_err_msg}");
 
         // Attempted = destinations not skipped by the ledger. An attempt in
         // which every attempted destination failed is still a hard error, so
