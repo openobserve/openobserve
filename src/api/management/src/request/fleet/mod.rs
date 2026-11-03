@@ -34,7 +34,7 @@ use config::meta::fleet::{
 #[cfg(feature = "enterprise")]
 use config::meta::folder::{Folder, FolderType};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::auditor::FleetAudit;
+use o2_enterprise::enterprise::common::auditor::AuditTarget;
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 use openobserve_api_common::extractors::ValidatedJson;
@@ -189,8 +189,8 @@ pub async fn rename_collector(
         };
         match service::rename_collector(&org_id, &id, req.name.trim()).await {
             Ok(collector) => {
-                let fleet = FleetAudit {
-                    fleet_id: collector.fleet.id.clone(),
+                let fleet = AuditTarget {
+                    fleet_id: Some(collector.fleet.id.clone()),
                     target: collector.name.clone(),
                 };
                 audited(MetaHttpResponse::json(collector), fleet)
@@ -438,8 +438,8 @@ pub async fn create_fleet(
         };
         match db::folders::save_folder(&org_id, folder, FolderType::Fleets, false).await {
             Ok(folder) => {
-                let fleet = FleetAudit {
-                    fleet_id: folder.folder_id.clone(),
+                let fleet = AuditTarget {
+                    fleet_id: Some(folder.folder_id.clone()),
                     target: folder.name.clone(),
                 };
                 let res = (StatusCode::CREATED, axum::Json(fleet_item(folder, &[])));
@@ -542,8 +542,8 @@ pub async fn rename_fleet(
         if name.is_empty() {
             return MetaHttpResponse::bad_request("name must not be empty");
         }
-        let fleet = FleetAudit {
-            fleet_id: fleet_id.clone(),
+        let fleet = AuditTarget {
+            fleet_id: Some(fleet_id.clone()),
             target: name.to_string(),
         };
         let res = async {
@@ -891,8 +891,8 @@ pub async fn create_token(
         if let Some(refused) = fleet_write(&org_id, user_id, &req.fleet, "PUT").await {
             return refused;
         }
-        let fleet = FleetAudit {
-            fleet_id: req.fleet.clone(),
+        let fleet = AuditTarget {
+            fleet_id: Some(req.fleet.clone()),
             target: req.name.clone(),
         };
         let res =
@@ -947,8 +947,8 @@ pub async fn revoke_token(
         }
         match service::revoke_token(&org_id, &id).await {
             Ok(token) => {
-                let fleet = FleetAudit {
-                    fleet_id: token.fleet.id.clone(),
+                let fleet = AuditTarget {
+                    fleet_id: Some(token.fleet.id.clone()),
                     target: token.name.clone(),
                 };
                 audited(MetaHttpResponse::json(token), fleet)
@@ -1034,7 +1034,8 @@ pub async fn create_config(
         if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::fleet::configs::create_config(
+        let named = org_target(&body.id);
+        let res = match o2_enterprise::enterprise::fleet::configs::create_config(
             &org_id,
             &user_email.user_id,
             body,
@@ -1043,7 +1044,8 @@ pub async fn create_config(
         {
             Ok(detail) => (StatusCode::CREATED, axum::Json(detail)).into_response(),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, named)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1131,10 +1133,12 @@ pub async fn delete_config(
         if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "DELETE").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::fleet::configs::delete_config(&org_id, &id).await {
+        let res = match o2_enterprise::enterprise::fleet::configs::delete_config(&org_id, &id).await
+        {
             Ok(()) => StatusCode::NO_CONTENT.into_response(),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, org_target(&id))
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1172,7 +1176,7 @@ pub async fn save_config_draft(
         if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "PUT").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::fleet::configs::save_draft(
+        let res = match o2_enterprise::enterprise::fleet::configs::save_draft(
             &org_id,
             &user_email.user_id,
             &id,
@@ -1182,7 +1186,8 @@ pub async fn save_config_draft(
         {
             Ok(saved) => MetaHttpResponse::json(saved),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, org_target(&id))
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1223,7 +1228,7 @@ pub async fn publish_config_version(
         if !allowed_on(FLEET_CONFIGS, &org_id, &user_email.user_id, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::fleet::configs::publish(
+        let res = match o2_enterprise::enterprise::fleet::configs::publish(
             &org_id,
             &user_email.user_id,
             &id,
@@ -1233,7 +1238,8 @@ pub async fn publish_config_version(
         {
             Ok(published) => (StatusCode::CREATED, axum::Json(published)).into_response(),
             Err(e) => to_response(e),
-        }
+        };
+        audited(res, org_target(&id))
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1770,7 +1776,13 @@ pub async fn update_settings(
             return MetaHttpResponse::bad_request(e);
         }
         match o2_enterprise::enterprise::fleet::settings::update_settings(&org_id, req).await {
-            Ok(settings) => MetaHttpResponse::json(settings),
+            Ok(settings) => {
+                use o2_enterprise::enterprise::fleet::audit::settings_target;
+
+                let stored = serde_json::to_value(&settings).unwrap_or_default();
+                let named = org_target(&settings_target(&stored));
+                audited(MetaHttpResponse::json(settings), named)
+            }
             Err(e) => to_response(e),
         }
     }
@@ -1840,7 +1852,7 @@ async fn fleet_allowed(org_id: &str, user_id: &str, fleet: &str, verb: &str) -> 
 
 /// Every collector write is `PUT` on the collector's current fleet, which audits it.
 #[cfg(feature = "enterprise")]
-async fn collector_write(org_id: &str, user_id: &str, id: &str) -> Result<FleetAudit, Response> {
+async fn collector_write(org_id: &str, user_id: &str, id: &str) -> Result<AuditTarget, Response> {
     use o2_enterprise::enterprise::fleet::{audit, service::FleetError};
 
     let fleet = match audit::collector_scope(org_id, id).await {
@@ -1852,7 +1864,8 @@ async fn collector_write(org_id: &str, user_id: &str, id: &str) -> Result<FleetA
             FleetError::CollectorNotFound(id.to_string()).into(),
         ));
     };
-    match fleet_write(org_id, user_id, &fleet.fleet_id, "PUT").await {
+    let fleet_id = fleet.fleet_id.as_deref().unwrap_or_default();
+    match fleet_write(org_id, user_id, fleet_id, "PUT").await {
         Some(refused) => Err(refused),
         None => Ok(fleet),
     }
@@ -1860,7 +1873,7 @@ async fn collector_write(org_id: &str, user_id: &str, id: &str) -> Result<FleetA
 
 /// A rollout exit is `PUT` on the rollout's fleet, which audits it.
 #[cfg(feature = "enterprise")]
-async fn rollout_write(org_id: &str, user_id: &str, id: &str) -> Result<FleetAudit, Response> {
+async fn rollout_write(org_id: &str, user_id: &str, id: &str) -> Result<AuditTarget, Response> {
     use o2_enterprise::enterprise::fleet::{audit, rollouts};
 
     let rollout = match rollouts::get_rollout(org_id, id).await {
@@ -1873,19 +1886,28 @@ async fn rollout_write(org_id: &str, user_id: &str, id: &str) -> Result<FleetAud
     }
 }
 
-/// The audit layer writes the event under `fleet`; an extension never reaches the client.
+/// The audit layer records the event as `named`; an extension never reaches the client.
 #[cfg(feature = "enterprise")]
-fn audited(mut res: Response, fleet: FleetAudit) -> Response {
-    res.extensions_mut().insert(fleet);
+fn audited(mut res: Response, named: AuditTarget) -> Response {
+    res.extensions_mut().insert(named);
     res
+}
+
+/// Configurations and the org's settings belong to no fleet, so every reader sees their events.
+#[cfg(feature = "enterprise")]
+fn org_target(target: &str) -> AuditTarget {
+    AuditTarget {
+        fleet_id: None,
+        target: target.to_string(),
+    }
 }
 
 /// A fleet named as it is now; a fleet not found keeps its id.
 #[cfg(feature = "enterprise")]
-async fn fleet_scope(org_id: &str, fleet_id: &str) -> FleetAudit {
+async fn fleet_scope(org_id: &str, fleet_id: &str) -> AuditTarget {
     let found = db::folders::get_folder(org_id, fleet_id, FolderType::Fleets).await;
-    FleetAudit {
-        fleet_id: fleet_id.to_string(),
+    AuditTarget {
+        fleet_id: Some(fleet_id.to_string()),
         target: found.map_or_else(|_| fleet_id.to_string(), |f| f.name),
     }
 }
@@ -2765,7 +2787,7 @@ mod tests {
         assert_eq!(res.status(), StatusCode::CREATED);
         let (fleet, target) = recorded(&res).expect("a created fleet is audited under itself");
         assert_eq!(target, "edge hosts");
-        (org, fleet)
+        (org, fleet.expect("a fleet event names its fleet"))
     }
 
     fn root() -> Headers<UserEmail> {
@@ -2775,14 +2797,18 @@ mod tests {
     }
 
     /// What the audit layer would record as the event's fleet and target.
-    fn recorded(res: &Response) -> Option<(String, String)> {
+    fn recorded(res: &Response) -> Option<(Option<String>, String)> {
         res.extensions()
-            .get::<FleetAudit>()
+            .get::<AuditTarget>()
             .map(|f| (f.fleet_id.clone(), f.target.clone()))
     }
 
-    fn named(fleet: &str, target: &str) -> Option<(String, String)> {
-        Some((fleet.to_string(), target.to_string()))
+    fn named(fleet: &str, target: &str) -> Option<(Option<String>, String)> {
+        Some((Some(fleet.to_string()), target.to_string()))
+    }
+
+    fn org_wide(target: &str) -> Option<(Option<String>, String)> {
+        Some((None, target.to_string()))
     }
 
     #[tokio::test]
@@ -2854,6 +2880,43 @@ mod tests {
             recorded(&res),
             named(&edge, "edge-a"),
             "named before the delete removes the row"
+        );
+    }
+
+    #[tokio::test]
+    async fn configuration_and_settings_writes_name_their_target_without_a_fleet() {
+        let (org, _) = audit_org("configs").await;
+        let config = || Path((org.clone(), "otel".to_string()));
+        let yaml = "receivers: {}\n";
+
+        let created = CreateConfigRequest {
+            id: "otel".to_string(),
+            description: String::new(),
+            yaml: String::new(),
+        };
+        let res = create_config(Path(org.clone()), root(), ValidatedJson(created)).await;
+        assert_eq!(res.status(), StatusCode::CREATED);
+        assert_eq!(recorded(&res), org_wide("otel"));
+        let draft = SaveDraftRequest {
+            yaml: yaml.to_string(),
+        };
+        let res = save_config_draft(config(), root(), ValidatedJson(draft)).await;
+        assert_eq!(recorded(&res), org_wide("otel"), "{}", res.status());
+        let version = PublishRequest {
+            yaml: yaml.to_string(),
+            message: String::new(),
+        };
+        let res = publish_config_version(config(), root(), ValidatedJson(version)).await;
+        assert_eq!(recorded(&res), org_wide("otel"), "{}", res.status());
+        let res = delete_config(config(), root()).await;
+        assert_eq!(recorded(&res), org_wide("otel"), "{}", res.status());
+
+        let settings = serde_json::json!({"restricted_components": ["debug"]});
+        let res = update_settings(Path(org.clone()), root(), ValidatedJson(settings)).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            recorded(&res),
+            org_wide("target version default; restricted: debug")
         );
     }
 

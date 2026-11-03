@@ -263,6 +263,8 @@ export type FleetAuditModule =
 
 /** `from`/`to` are epoch ms, `[from, to)`; the server defaults to the 30 days before `to` (now). */
 export type FleetAuditParams = {
+  /** Matches the actor or the target, ignoring case. */
+  q?: string;
   offset?: number;
   limit?: number;
   fleet?: string;

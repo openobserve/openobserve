@@ -36,7 +36,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @pagination-change="onPaginationChange"
     >
       <template #toolbar>
-        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 max-md:contents">
+        <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
+          <OSearchInput
+            :model-value="filters.q"
+            class="min-w-0 flex-1"
+            size="sm"
+            clearable
+            :debounce="300"
+            :placeholder="t('fleet.audit.search')"
+            data-test="fleet-audit-search"
+            @update:model-value="(v) => setFilters({ q: v ?? '' })"
+          />
           <OSelect
             :model-value="filters.fleet"
             width="sm"
@@ -149,6 +159,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import type { FleetAuditEvent, FleetAuditModule, FleetAuditParams } from "@/services/fleet";
@@ -156,6 +167,7 @@ import { isForbidden, useFleetAudit, useFleets } from "./useFleetApi";
 import { AUDIT_MODULES, auditKind, type AuditKind } from "./auditKind";
 
 interface AuditFilters {
+  q: string;
   fleet: string | null;
   module: FleetAuditModule | null;
   range: AuditRange;
@@ -176,6 +188,7 @@ type AuditRange = (typeof AUDIT_RANGES)[number]["value"] | "custom";
 const DEFAULT_RANGE: AuditRange = "30d";
 
 const DEFAULT_FILTERS: AuditFilters = {
+  q: "",
   fleet: null,
   module: null,
   range: DEFAULT_RANGE,
@@ -199,6 +212,7 @@ const period = computed((): Pick<FleetAuditParams, "from" | "to"> => {
 const params = computed((): FleetAuditParams => ({
   offset: (page.value - 1) * pageSize.value,
   limit: pageSize.value,
+  q: filters.value.q.trim() || undefined,
   fleet: filters.value.fleet ?? undefined,
   module: filters.value.module ?? undefined,
   ...period.value,
@@ -226,7 +240,11 @@ const fleetOptions = computed(() =>
 );
 
 const isFiltered = computed(
-  () => !!filters.value.fleet || !!filters.value.module || filters.value.range !== DEFAULT_RANGE,
+  () =>
+    !!filters.value.q.trim() ||
+    !!filters.value.fleet ||
+    !!filters.value.module ||
+    filters.value.range !== DEFAULT_RANGE,
 );
 
 function setFilters(patch: Partial<AuditFilters>) {

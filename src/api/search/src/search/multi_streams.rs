@@ -1564,7 +1564,8 @@ pub async fn report_to_audit(
                 trace_id: Some(trace_id.to_string()),
             },
             delegated: None,
-            fleet: None,
+            fleet_id: None,
+            target: None,
         })
         .await;
     }

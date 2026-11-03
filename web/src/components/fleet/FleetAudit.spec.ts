@@ -145,6 +145,20 @@ describe("FleetAudit", () => {
     expect(lastParams()).toMatchObject({ offset: 0, fleet: "prod" });
   });
 
+  it("searches the actor and target on the server from the first page", async () => {
+    vi.mocked(fleet.listAudit).mockImplementation(async (_org, params: any) => ({
+      data: { total: 120, items: [event({ target: `q:${params.q ?? "none"}` })] },
+    }));
+    await mountAudit();
+    await wrapper.find('[data-test="o2-table-next-page-btn"]').trigger("click");
+    await settle();
+    await pick("fleet-audit-search", "  web-1 ");
+    expect(lastParams()).toMatchObject({ offset: 0, q: "web-1" });
+    expect(auditText(wrapper)).toContain("q:web-1");
+    await pick("fleet-audit-search", " ");
+    expect(auditText(wrapper)).toContain("q:none");
+  });
+
   it("has no actor filter and keeps the period beside the refresh button", async () => {
     await mountAudit();
     expect(wrapper.find('[data-test="fleet-audit-actor-filter"]').exists()).toBe(false);

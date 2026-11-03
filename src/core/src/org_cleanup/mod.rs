@@ -1579,7 +1579,8 @@ async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
             _timestamp: config::utils::time::now_micros(),
             protocol: auditor::Protocol::Http,
             delegated: None,
-            fleet: None,
+            fleet_id: None,
+            target: None,
             response_meta: auditor::ResponseMeta {
                 http_method: "SYSTEM".to_string(),
                 http_path: format!("/system/org_cleanup/{from}_to_{to}"),

@@ -454,6 +454,9 @@ pub struct AuditQuery {
     pub fleet: Option<String>,
     #[serde(default)]
     pub module: Option<AuditModule>,
+    /// Matches the actor or the target, ignoring case.
+    #[serde(default)]
+    pub q: Option<String>,
 }
 
 /// The part of the fleet API an event was made through; `settings` is the org's fleet settings.

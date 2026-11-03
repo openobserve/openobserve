@@ -156,7 +156,8 @@ impl ChatAudit {
                 trace_id: Some(self.trace_id.clone()),
             },
             delegated: self.delegated.clone(),
-            fleet: None,
+            fleet_id: None,
+            target: None,
         }
     }
 

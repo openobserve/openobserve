@@ -29111,6 +29111,7 @@
       "rolledBackRollout": "Rolled back rollout",
       "movedByToken": "Moved by enrollment token",
       "object": "Object",
+      "search": "Search the audit trail",
       "allObjects": "All objects",
       "kind": {
         "fleet": "Fleet",

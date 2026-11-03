@@ -31,8 +31,6 @@ use o2_enterprise::enterprise::common::auditor::AUDIT_STREAM;
 
 /// The engine ignores `step` on an instant query; any positive value works.
 const INSTANT_STEP_MICROS: i64 = 300_000_000;
-/// Absent from the audit stream's schema until the first fleet-scoped row is written.
-const AUDIT_FLEET_COLUMN: &str = "fleet_id";
 
 /// `O2_FLEET_ENABLED`, read once at startup; off stops every fleet job and refuses writes.
 pub fn enabled() -> bool {
@@ -65,17 +63,14 @@ pub async fn list_audit(
     query: AuditQuery,
     fleets: Option<&HashSet<String>>,
 ) -> Result<AuditList, anyhow::Error> {
+    use o2_enterprise::enterprise::fleet::audit::{self, AuditColumns};
+
     let schema = infra::schema::get(META_ORG_ID, AUDIT_STREAM, StreamType::Logs).await?;
-    let fleet_column = schema.field_with_name(AUDIT_FLEET_COLUMN).is_ok();
-    o2_enterprise::enterprise::fleet::audit::list_audit(
-        org_id,
-        query,
-        fleets,
-        fleet_column,
-        now_micros(),
-        search_audit,
-    )
-    .await
+    let columns = AuditColumns {
+        fleet_id: schema.field_with_name("fleet_id").is_ok(),
+        target: schema.field_with_name("target").is_ok(),
+    };
+    audit::list_audit(org_id, query, fleets, columns, now_micros(), search_audit).await
 }
 
 /// The check `/prometheus/api/v1/query` makes per metric stream; a refused query is `None`.

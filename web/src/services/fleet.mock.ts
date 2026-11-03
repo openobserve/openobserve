@@ -794,11 +794,13 @@ export const fleetMock: FleetApi = {
   },
   listAudit: (_org, params = {}) => {
     const from = params.from ?? Date.now() - 30 * DAY;
+    const keyword = params.q?.trim().toLowerCase();
     const matching = store.audit.filter(
       (e) =>
         e.at >= from &&
         e.at < (params.to ?? Infinity) &&
-        (!params.module || auditModule(e.action) === params.module),
+        (!params.module || auditModule(e.action) === params.module) &&
+        (!keyword || [e.actor, e.target].some((s) => s.toLowerCase().includes(keyword))),
     );
     const offset = params.offset ?? 0;
     return reply({
