@@ -67,6 +67,9 @@ describe("OverviewSectionError", () => {
 
     expect(wrapper!.find('[data-test="overview-anomalies-no-access"]').exists()).toBe(true);
     expect(wrapper!.find('[data-test="access-lock-icon"]').exists()).toBe(true);
+    expect(wrapper!.text()).toContain("You don't have access");
+    expect(wrapper!.text()).not.toContain("You can't");
+    expect(wrapper!.text()).not.toContain("missing the");
   });
 
   it("covers the chip entry of a refused request whose resource has no friendly name", () => {

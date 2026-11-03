@@ -211,8 +211,14 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps, t: TranslateFn) {
 
     // No correlated log stream is an empty result, not a failure.
     if (noLogStreams.value) {
+      // The cancelled stream never completes, so its loading flag and trace id are reset here.
+      currentTraceId = null;
+      loading.value = false;
       error.value = null;
       searchResults.value = [];
+      totalHits.value = 0;
+      currentPage.value = 1;
+      took.value = 0;
       return;
     }
 

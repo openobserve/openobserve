@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { gt } from "@/types/i18n";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import { useCorrelatedLogs } from "./useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "./useCorrelatedLogs";
 
@@ -426,6 +426,38 @@ describe("useCorrelatedLogs", () => {
       expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
       expect(consoleError).not.toHaveBeenCalled();
       consoleError.mockRestore();
+    });
+
+    it("should clear the spinner and stale rows when the streams drop to none mid-fetch", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_params: any, callbacks: any) => {
+        callbacks.data(null, {
+          type: "search_response_metadata",
+          content: { results: { total: 1, took: 5 } },
+        });
+        callbacks.data(null, {
+          type: "search_response_hits",
+          content: { results: { hits: [{ _timestamp: 1 }] } },
+        });
+        return new Promise(() => {});
+      });
+      const mutableProps = reactive({ ...props });
+      const composable = useCorrelatedLogs(mutableProps, gt);
+      composable.fetchCorrelatedLogs();
+      composable.currentPage.value = 2;
+      expect(composable.loading.value).toBe(true);
+
+      mutableProps.logStreams = [];
+      await composable.fetchCorrelatedLogs();
+
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledTimes(1);
+      expect(composable.loading.value).toBe(false);
+      expect(composable.searchResults.value).toEqual([]);
+      expect(composable.totalHits.value).toBe(0);
+      expect(composable.took.value).toBe(0);
+      expect(composable.currentPage.value).toBe(1);
+
+      await composable.fetchCorrelatedLogs();
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledTimes(1);
     });
 
     it("should not flag no log stream when streams exist", () => {

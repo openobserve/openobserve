@@ -84,6 +84,9 @@ describe("CorrelatedLogsTable empty states", () => {
 
     await mountTable([{ stream_name: "app-logs", stream_type: "logs", filters: {} }]);
 
+    expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+    const [{ queryReq }] = mockFetchQueryDataWithHttpStream.mock.calls[0];
+    expect(queryReq.query.sql).toEqual([expect.stringContaining('FROM "app-logs"')]);
     expect(wrapper!.find('[data-test="empty-state"]').exists()).toBe(true);
     expect(wrapper!.find('[data-test="no-log-streams-state"]').exists()).toBe(false);
     expect(wrapper!.find('[data-test="error-state"]').exists()).toBe(false);
