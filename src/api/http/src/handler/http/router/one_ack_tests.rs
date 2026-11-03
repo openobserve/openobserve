@@ -1769,43 +1769,50 @@ async fn a_resent_incident_resolve_repairs_its_pages() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn one_ack_end_to_end() {
+    // Boxed: inline, debug builds give each step its own slot here and overflow a 2 MB thread.
     let _oncall = oncall(true).await;
-    meta_store().await;
-    seed().await;
-    the_problem_is_the_incident_when_there_is_one_else_the_firing().await;
-    every_page_action_runs_the_one_rule().await;
-    a_teamless_page_refuses_escalate_and_snooze_and_can_be_handed_off().await;
-    let f = incident_with_owner_and_impacted_pages("ak8").await;
-    an_alert_ack_acknowledges_its_incident_and_stops_every_page(&f).await;
-    a_take_over_moves_every_record(&f).await;
-    an_unack_clears_every_record(&f).await;
-    the_incident_routes_admit_a_paged_member_and_refuse_a_stranger(&f).await;
-    a_firing_joining_an_acknowledged_incident_is_acknowledged(&f).await;
-    a_refused_hand_off_keeps_the_ack_and_the_page().await;
-    a_hand_off_clears_the_ack_and_moves_the_page().await;
-    a_mute_snoozes_the_open_page().await;
-    an_impacted_page_acknowledges_the_whole_problem().await;
-    a_page_whose_alert_stopped_firing_still_stops_and_restarts().await;
-    promote_runs_the_one_rule().await;
-    a_failed_page_step_is_finished_by_the_next_press().await;
-    a_mute_says_why_a_page_was_not_snoozed().await;
-    a_failed_release_stops_the_hand_off().await;
-    a_hand_off_to_a_person_clears_the_ack().await;
-    every_surface_reaches_the_one_ack().await;
-    the_phone_and_the_link_refuse_someone_the_rule_refuses().await;
-    openfga_edit_on_any_alert_of_an_incident_admits().await;
-    a_page_whose_alert_is_gone_can_be_taken_over().await;
-    a_failed_incident_read_is_an_error().await;
-    a_press_on_a_closed_page_answers_from_the_page().await;
-    a_press_on_an_older_open_page_stops_it().await;
-    a_leftover_page_stays_stopped_on_unack_and_take_over().await;
-    a_leftover_pages_team_is_a_responder().await;
-    a_press_that_changes_nothing_says_so().await;
-    an_unack_whose_restart_lost_its_trigger_still_reports_it().await;
-    a_failed_page_read_is_an_error().await;
-    every_resolve_ends_the_acknowledgement().await;
-    a_failed_clear_is_an_error_and_a_retried_resolve_clears_it().await;
-    a_failed_incident_clear_is_finished_by_resolving_again().await;
-    a_resolve_ends_the_firings_its_page_covered_up_to_its_close().await;
-    a_resent_incident_resolve_repairs_its_pages().await;
+    Box::pin(meta_store()).await;
+    Box::pin(seed()).await;
+    Box::pin(the_problem_is_the_incident_when_there_is_one_else_the_firing()).await;
+    Box::pin(every_page_action_runs_the_one_rule()).await;
+    Box::pin(a_teamless_page_refuses_escalate_and_snooze_and_can_be_handed_off()).await;
+    let f = Box::pin(incident_with_owner_and_impacted_pages("ak8")).await;
+    Box::pin(an_alert_ack_acknowledges_its_incident_and_stops_every_page(
+        &f,
+    ))
+    .await;
+    Box::pin(a_take_over_moves_every_record(&f)).await;
+    Box::pin(an_unack_clears_every_record(&f)).await;
+    Box::pin(the_incident_routes_admit_a_paged_member_and_refuse_a_stranger(&f)).await;
+    Box::pin(a_firing_joining_an_acknowledged_incident_is_acknowledged(
+        &f,
+    ))
+    .await;
+    Box::pin(a_refused_hand_off_keeps_the_ack_and_the_page()).await;
+    Box::pin(a_hand_off_clears_the_ack_and_moves_the_page()).await;
+    Box::pin(a_mute_snoozes_the_open_page()).await;
+    Box::pin(an_impacted_page_acknowledges_the_whole_problem()).await;
+    Box::pin(a_page_whose_alert_stopped_firing_still_stops_and_restarts()).await;
+    Box::pin(promote_runs_the_one_rule()).await;
+    Box::pin(a_failed_page_step_is_finished_by_the_next_press()).await;
+    Box::pin(a_mute_says_why_a_page_was_not_snoozed()).await;
+    Box::pin(a_failed_release_stops_the_hand_off()).await;
+    Box::pin(a_hand_off_to_a_person_clears_the_ack()).await;
+    Box::pin(every_surface_reaches_the_one_ack()).await;
+    Box::pin(the_phone_and_the_link_refuse_someone_the_rule_refuses()).await;
+    Box::pin(openfga_edit_on_any_alert_of_an_incident_admits()).await;
+    Box::pin(a_page_whose_alert_is_gone_can_be_taken_over()).await;
+    Box::pin(a_failed_incident_read_is_an_error()).await;
+    Box::pin(a_press_on_a_closed_page_answers_from_the_page()).await;
+    Box::pin(a_press_on_an_older_open_page_stops_it()).await;
+    Box::pin(a_leftover_page_stays_stopped_on_unack_and_take_over()).await;
+    Box::pin(a_leftover_pages_team_is_a_responder()).await;
+    Box::pin(a_press_that_changes_nothing_says_so()).await;
+    Box::pin(an_unack_whose_restart_lost_its_trigger_still_reports_it()).await;
+    Box::pin(a_failed_page_read_is_an_error()).await;
+    Box::pin(every_resolve_ends_the_acknowledgement()).await;
+    Box::pin(a_failed_clear_is_an_error_and_a_retried_resolve_clears_it()).await;
+    Box::pin(a_failed_incident_clear_is_finished_by_resolving_again()).await;
+    Box::pin(a_resolve_ends_the_firings_its_page_covered_up_to_its_close()).await;
+    Box::pin(a_resent_incident_resolve_repairs_its_pages()).await;
 }
