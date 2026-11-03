@@ -253,7 +253,7 @@ pub(crate) async fn read_query_history_response(
     let stats_schema = read_stats_schema(org_id).await;
     let absent = stats_schema
         .as_ref()
-        .map(absent_gated_columns)
+        .map(absent_scope_columns)
         .unwrap_or_default();
     let fp_sql = build_stats_sql(
         org_id,
@@ -268,7 +268,7 @@ pub(crate) async fn read_query_history_response(
     // `_timestamp`s under the totals filters), backfill ranges and backfill-stream
     // resolution — never the metrics — so it projects the columns those consume
     // instead of dragging every stored column per row.
-    let totals_projection = stats_projection_from(
+    let totals_projection = stats_projection(
         stats_schema.as_ref(),
         &[
             "_timestamp",

@@ -104,13 +104,18 @@ async fn read_databases_window(
         ..Default::default()
     };
 
-    let totals_sql = build_stats_sql(org_id, "db_totals", &totals_filters.sql_preds(&[]));
+    let stats_schema = read_stats_schema(org_id).await;
+    let absent = stats_schema
+        .as_ref()
+        .map(absent_scope_columns)
+        .unwrap_or_default();
+    let totals_sql = build_stats_sql(org_id, "db_totals", &totals_filters.sql_preds(&absent));
     // The overview consumes only dimensions, `calling_services` inputs and the
     // merge metrics from `query_stats` rows — never `query_norm` (up to 4 KB
     // per row) nor `operation`/`stmt_class`. Projecting spares the columnar
     // read its dominant column. Schema-gated (see `stats_projection`).
     let qs_projection = stats_projection(
-        org_id,
+        stats_schema.as_ref(),
         &[
             "fingerprint",
             "db_system",
@@ -131,12 +136,11 @@ async fn read_databases_window(
             "p99_ns",
             "max_ns",
         ],
-    )
-    .await;
+    );
     let qs_sql = build_stats_sql_projected(
         org_id,
         "query_stats",
-        &filters.sql_preds(&[]),
+        &filters.sql_preds(&absent),
         &qs_projection,
     );
     // Concurrent, where they were awaited one after the other: two independent

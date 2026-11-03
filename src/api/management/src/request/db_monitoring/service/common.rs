@@ -235,10 +235,7 @@ pub(crate) fn escape_ident(s: &str) -> String {
 
 // ─── Scope filters ───────────────────────────────────────────────────────────
 
-/// The user-supplied scope. Applied twice, deliberately: escaped SQL predicates
-/// on the rollup-stream read (efficiency) AND merge-time row filtering
-/// ([`ScopeFilters::matches`]) so the UNFILTERED cached tail rows go through
-/// the exact same filter.
+/// User scope: SQL predicates on columns the rollup schema has; [`ScopeFilters::matches`] always.
 #[derive(Debug, Default, Clone)]
 pub(crate) struct ScopeFilters {
     pub system: Option<String>,
@@ -262,9 +259,6 @@ impl ScopeFilters {
         ("service_name", |f| f.service.as_ref()),
         ("trace_stream_name", |f| f.stream.as_ref()),
     ];
-
-    /// Rollup columns that never reach the schema while every row written so far is null in them.
-    const SCHEMA_GATED_COLS: [&'static str; 2] = ["db_namespace", "env"];
 
     /// True when the scope is narrower than the `(system, instance [, class])`
     /// grains that `_other` remainders exist at (design §5.2): the view then
@@ -451,15 +445,7 @@ pub(super) async fn read_stats_schema(org_id: &str) -> Option<arrow_schema::Sche
 /// schema, as a projection list. Falls back to `*` when the schema cannot be
 /// read (never fail a read over an optimization) or when nothing intersects
 /// (the stream is brand new; the read returns empty anyway).
-pub(super) async fn stats_projection(org_id: &str, wanted: &[&str]) -> String {
-    stats_projection_from(read_stats_schema(org_id).await.as_ref(), wanted)
-}
-
-/// [`stats_projection`] over an already-read schema.
-pub(super) fn stats_projection_from(
-    schema: Option<&arrow_schema::Schema>,
-    wanted: &[&str],
-) -> String {
+pub(super) fn stats_projection(schema: Option<&arrow_schema::Schema>, wanted: &[&str]) -> String {
     let Some(schema) = schema else {
         return "*".to_string();
     };
@@ -475,17 +461,19 @@ pub(super) fn stats_projection_from(
     }
 }
 
-/// The schema-gated scope columns missing from `_o2_db_stats`; none when the schema cannot be read.
+/// The scope columns missing from `_o2_db_stats`; none when the schema cannot be read.
 pub(super) async fn absent_stats_columns(org_id: &str) -> Vec<&'static str> {
     read_stats_schema(org_id)
         .await
-        .map(|schema| absent_gated_columns(&schema))
+        .map(|schema| absent_scope_columns(&schema))
         .unwrap_or_default()
 }
 
-pub(super) fn absent_gated_columns(schema: &arrow_schema::Schema) -> Vec<&'static str> {
-    ScopeFilters::SCHEMA_GATED_COLS
+/// A column null in every row so far never reaches the schema, and a predicate on it errors.
+pub(super) fn absent_scope_columns(schema: &arrow_schema::Schema) -> Vec<&'static str> {
+    ScopeFilters::COLS
         .into_iter()
+        .map(|(col, _)| col)
         .filter(|c| schema.field_with_name(c).is_err())
         .collect()
 }
@@ -2966,8 +2954,15 @@ mod tests {
             env: Some("prod".into()),
             ..Default::default()
         };
-        let schema = stats_schema(&["db_system", "db_namespace", "env"]);
-        let absent = absent_gated_columns(&schema);
+        let schema = stats_schema(&[
+            "db_system",
+            "db_instance",
+            "db_namespace",
+            "env",
+            "service_name",
+            "trace_stream_name",
+        ]);
+        let absent = absent_scope_columns(&schema);
         assert!(absent.is_empty());
         assert_eq!(
             f.sql_preds(&absent),
@@ -2983,8 +2978,13 @@ mod tests {
             env: Some("prod".into()),
             ..Default::default()
         };
-        let schema = stats_schema(&["db_system", "db_instance"]);
-        let absent = absent_gated_columns(&schema);
+        let schema = stats_schema(&[
+            "db_system",
+            "db_instance",
+            "service_name",
+            "trace_stream_name",
+        ]);
+        let absent = absent_scope_columns(&schema);
         assert_eq!(absent, vec!["db_namespace", "env"]);
         assert_eq!(f.sql_preds(&absent), "\n    AND db_system = 'postgresql'");
         let row = json!({"db_system": "postgresql"});
@@ -2992,17 +2992,33 @@ mod tests {
     }
 
     #[test]
-    fn test_absent_gated_columns_never_gates_other_columns() {
+    fn test_scope_filters_sql_preds_without_system_and_instance_columns() {
         let f = ScopeFilters {
             system: Some("postgresql".into()),
+            instance: Some("db-1".into()),
             service: Some("cart".into()),
             ..Default::default()
         };
-        let absent = absent_gated_columns(&stats_schema(&[]));
-        assert_eq!(
-            f.sql_preds(&absent),
-            "\n    AND db_system = 'postgresql'\n    AND service_name = 'cart'"
-        );
+        let schema = stats_schema(&["db_namespace", "env", "service_name", "trace_stream_name"]);
+        let absent = absent_scope_columns(&schema);
+        assert_eq!(absent, vec!["db_system", "db_instance"]);
+        assert_eq!(f.sql_preds(&absent), "\n    AND service_name = 'cart'");
+        assert!(!f.matches(&json!({"service_name": "cart"})));
+    }
+
+    #[test]
+    fn test_absent_scope_columns_covers_every_scope_column() {
+        let f = ScopeFilters {
+            system: Some("postgresql".into()),
+            instance: Some("db-1".into()),
+            namespace: Some("shop".into()),
+            env: Some("prod".into()),
+            service: Some("cart".into()),
+            stream: Some("otel".into()),
+        };
+        let absent = absent_scope_columns(&stats_schema(&[]));
+        assert_eq!(absent.len(), ScopeFilters::COLS.len());
+        assert_eq!(f.sql_preds(&absent), "");
     }
 
     #[test]
