@@ -1025,7 +1025,7 @@ mod tests {
         use axum::extract::FromRequestParts;
         use config::meta::feature::Feature;
 
-        let (mut parts, _) = axum::http::Request::post("/api/myorg/v1/logs")
+        let (mut parts, _) = axum::http::Request::post("/myorg/v1/logs")
             .header("Authorization", "Basic cm9vdEBleGFtcGxlLmNvbTpwYXNz")
             .body(())
             .unwrap()
