@@ -252,7 +252,16 @@ fn downtime_context(
             .map(|(k, v)| (k.to_string(), v))
             .collect(),
         kind: NotificationKind::Downtime,
-        event: notification_kind::NotificationEvent::Informational,
+        // Matches alert_status; platforms still skip every downtime event (D8).
+        event: match due.event {
+            NotificationEvent::Started => notification_kind::NotificationEvent::Firing,
+            NotificationEvent::Ended | NotificationEvent::Cancelled => {
+                notification_kind::NotificationEvent::Resolved
+            }
+            NotificationEvent::EndingSoon | NotificationEvent::Extended => {
+                notification_kind::NotificationEvent::Informational
+            }
+        },
         cluster_name: config::get_cluster_name(),
         render_hints: RenderHints {
             fallback_subject: Some(subject),
@@ -536,18 +545,28 @@ mod tests {
     }
 
     #[test]
-    fn a_downtime_event_is_informational_with_no_platform_key() {
+    fn a_downtime_event_follows_its_status_with_no_platform_key() {
+        use config::meta::alerts::notification_kind::{NotificationEvent as Event, PlatformAction};
+
+        use crate::alerts::notifications::custom::apply_custom_template;
+
         let vars = || variables(&row(None), NotificationEvent::Started, &window(), None, "");
         let started = downtime_context(&row(None), &due(NotificationEvent::Started), 5, vars());
         assert_eq!(started.kind.as_str(), "downtime");
-        assert_eq!(
-            started.event,
-            config::meta::alerts::notification_kind::NotificationEvent::Informational
-        );
+        assert_eq!(started.event, Event::Firing);
         assert_eq!(started.episode_id, None);
         assert_eq!(started.alert_status, "firing");
         let ended = downtime_context(&row(None), &due(NotificationEvent::Ended), 6, vars());
+        assert_eq!(ended.event, Event::Resolved);
         assert_eq!(ended.alert_status, "resolved");
+        let body = "{notification_event}";
+        assert_eq!(apply_custom_template(body, &started, false), "firing");
+        assert_eq!(apply_custom_template(body, &ended, false), "resolved");
+        for ctx in [&started, &ended] {
+            assert_eq!(ctx.kind.platform_action(ctx.event), PlatformAction::Skip);
+        }
+        let notice = downtime_context(&row(None), &due(NotificationEvent::EndingSoon), 7, vars());
+        assert_eq!(notice.event, Event::Informational);
         assert_eq!(
             started.render_hints.fallback_subject.as_deref(),
             Some("OpenObserve downtime Nightly \"deploy\" <db>: started")

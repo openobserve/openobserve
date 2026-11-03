@@ -189,6 +189,7 @@ pub fn example_context(kind: NotificationKind, resolved: bool) -> NotificationCo
         NotificationKind::Incident => incident_example(resolved),
         NotificationKind::Synthetics => synthetics_example(resolved),
         NotificationKind::OnCall => on_call_example(resolved),
+        NotificationKind::Downtime => downtime_example(resolved),
         _ => {
             let level = if resolved {
                 AlertLevel::Ok
@@ -381,6 +382,45 @@ fn on_call_example(resolved: bool) -> NotificationContext {
     ctx
 }
 
+/// A downtime start, or its end; platforms skip both (D8), so it has no key.
+fn downtime_example(resolved: bool) -> NotificationContext {
+    let url = "https://o2.acme.com/web/downtimes?org_identifier=acme";
+    let level = if resolved {
+        AlertLevel::Ok
+    } else {
+        AlertLevel::Warning
+    };
+    let mut ctx = base(NotificationKind::Downtime, resolved, level);
+    ctx.stream_type = String::new();
+    ctx.stream_name = String::new();
+    ctx.alert_name = "Nightly database upgrade".into();
+    ctx.alert_url = url.into();
+    ctx.event = event_of(resolved);
+    ctx.alert_start_time = "2026-11-02 22:00 UTC".into();
+    ctx.alert_end_time = "2026-11-03 00:00 UTC".into();
+    ctx.alert_trigger_time_str = if resolved {
+        "2026-11-03 00:00 UTC"
+    } else {
+        "2026-11-02 22:00 UTC"
+    }
+    .into();
+    ctx.alert_description = "CHG-1042 Postgres 17 upgrade".into();
+    let event = if resolved { "ended" } else { "started" };
+    ctx.context_attributes = [
+        ("downtime_name", "Nightly database upgrade"),
+        ("downtime_event", event),
+        ("downtime_reason", "CHG-1042 Postgres 17 upgrade"),
+        ("downtime_starts_at", "2026-11-02 22:00 UTC"),
+        ("downtime_ends_at", "2026-11-03 00:00 UTC"),
+        ("downtime_targets", "alerts, synthetics checks"),
+        ("downtime_counts", "4 alerts, 2 synthetics checks"),
+        ("downtime_url", url),
+    ]
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .to_vec();
+    ctx
+}
+
 fn incident_example(resolved: bool) -> NotificationContext {
     let url = "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme";
     let level = if resolved {
@@ -462,6 +502,7 @@ mod tests {
     const EXAMPLE_INCIDENT: &str = include_str!("render/testdata/examples/incident.json");
     const EXAMPLE_SYNTHETICS: &str = include_str!("render/testdata/examples/synthetics.json");
     const EXAMPLE_ON_CALL: &str = include_str!("render/testdata/examples/on_call.json");
+    const EXAMPLE_DOWNTIME: &str = include_str!("render/testdata/examples/downtime.json");
 
     fn rendered(
         kind: NotificationKind,
@@ -543,6 +584,26 @@ mod tests {
     }
 
     #[test]
+    fn golden_example_downtime_is_not_the_alert_sample() {
+        let want: serde_json::Value = serde_json::from_str(EXAMPLE_DOWNTIME).unwrap();
+        assert_eq!(example(NotificationKind::Downtime), want);
+        let all = want.to_string();
+        assert!(!all.contains("Sample CPU alert"), "{all}");
+        assert!(all.contains("Nightly database upgrade"), "{all}");
+        let ctx = example_context(NotificationKind::Downtime, false);
+        assert_eq!(ctx.episode_id, None);
+        let attr = |ctx: &NotificationContext| {
+            ctx.context_attributes
+                .iter()
+                .find(|(k, _)| k == "downtime_event")
+                .map(|(_, v)| v.clone())
+        };
+        assert_eq!(attr(&ctx).as_deref(), Some("started"));
+        let ended = example_context(NotificationKind::Downtime, true);
+        assert_eq!(attr(&ended).as_deref(), Some("ended"));
+    }
+
+    #[test]
     fn anomaly_recovery_hides_empty_fields() {
         let ctx = example_context(NotificationKind::Anomaly, true);
         let content = resolve_content(
@@ -577,6 +638,7 @@ mod tests {
             (NotificationKind::Incident, "incident.json"),
             (NotificationKind::Synthetics, "synthetics.json"),
             (NotificationKind::OnCall, "on_call.json"),
+            (NotificationKind::Downtime, "downtime.json"),
         ] {
             let body = serde_json::to_string_pretty(&example(kind)).unwrap() + "\n";
             std::fs::write(format!("{dir}/{file}"), body).unwrap();

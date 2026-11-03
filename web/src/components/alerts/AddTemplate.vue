@@ -791,10 +791,16 @@ const applyTemplateData = () => {
   }
 
   // A stored template's list is the truth; a new one infers until a ?applies_to= link presets it.
+  // A stored "All kinds" whose body infers nothing reads as inferred, as it did when saved.
   appliesToError.value = null;
   if (props.template) {
     appliesTo.value = NOTIFICATION_KINDS.filter((k) => props.template?.applies_to?.includes(k));
-    appliesToMode.value = "manual";
+    const stored =
+      next.kind === "content" ? serializeContentSpec(contentSpec.value) : props.template.body;
+    appliesToMode.value =
+      appliesTo.value.length === 0 && inferAppliesTo(stored ?? "").length === 0
+        ? "inferred"
+        : "manual";
   } else if (isKind(params.applies_to)) {
     appliesTo.value = [params.applies_to];
     appliesToMode.value = "manual";

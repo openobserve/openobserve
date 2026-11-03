@@ -1004,6 +1004,33 @@ describe("AddTemplate - applies to", () => {
     expect(w.find('[data-test="add-template-applies-to-reset"]').exists()).toBe(true);
   });
 
+  it("an existing template stored as all kinds starts in the inferred mode", async () => {
+    const w = await mountComp({
+      template: { name: "ops-card", body: '{"text":"x"}', type: "http", title: "", applies_to: [] },
+    });
+    expect(appliesTo(w).props("modelValue")).toEqual([]);
+    expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
+      String(i18n.global.t("alert_templates.appliesToInferred")),
+    );
+    expect(w.find('[data-test="add-template-applies-to-reset"]').exists()).toBe(false);
+  });
+
+  it("an existing template with a stored list starts in manual mode", async () => {
+    const w = await mountComp({
+      template: {
+        name: "ops-card",
+        body: '{"text":"x"}',
+        type: "http",
+        title: "",
+        applies_to: ["incident"],
+      },
+    });
+    expect(appliesTo(w).props("modelValue")).toEqual(["incident"]);
+    expect(w.find('[data-test="add-template-applies-to-mode"]').text()).toBe(
+      String(i18n.global.t("alert_templates.appliesToManual")),
+    );
+  });
+
   it("shows the narrowing 400 under the control and keeps the editor open", async () => {
     const message =
       "template is used for anomaly by: anomaly config 'error rate on web-logs'; remove the binding first";
