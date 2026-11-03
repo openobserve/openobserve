@@ -264,7 +264,7 @@ export interface FleetAuditList {
 }
 
 export type FleetRolloutStatus =
-  "scheduled" | "in_progress" | "halted" | "completed" | "superseded" | "rolled_back";
+  "scheduled" | "waiting" | "in_progress" | "halted" | "completed" | "superseded" | "rolled_back";
 
 export type FleetRolloutStart = { kind: "now" } | { kind: "at"; at: number };
 

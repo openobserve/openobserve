@@ -532,10 +532,16 @@ describe("toRolloutRow", () => {
     expect(failingMembers(row)).toEqual(["c2"]);
   });
 
-  it("words progress in collectors, and an empty fleet as none targeted", () => {
+  it("words progress in collectors, and an unstarted or empty rollout by its state", () => {
     const text = withRolloutText((r) => r);
     expect(text.progressText(toRolloutRow(apiRollout()))).toBe("1 of 3 running the new version");
-    expect(text.progressText({ running: 0, total: 0 })).toBe("No collectors targeted");
+    expect(text.progressText({ status: "completed", running: 0, total: 0 })).toBe(
+      "No collectors targeted",
+    );
+    expect(text.progressText({ status: "scheduled", running: 0, total: 0 })).toBe("Not started");
+    expect(text.progressText({ status: "waiting", running: 0, total: 0 })).toBe(
+      "Waiting for a collector",
+    );
   });
 
   it("words a plan as phases and a remaining tail", () => {
@@ -543,7 +549,9 @@ describe("toRolloutRow", () => {
     expect(text.planText([3, 9, 27, 61])).toBe("3 → 9 → 27 → remaining 61, 4 phases");
     expect(text.planText([3, 37])).toBe("3 → remaining 37, 2 phases");
     expect(text.planText([40])).toBe("40 collectors in one batch");
-    expect(text.planText([])).toBe("No collectors to update");
+    expect(text.planText([])).toBe(
+      "No collector is online, so the rollout waits until one connects",
+    );
   });
 });
 

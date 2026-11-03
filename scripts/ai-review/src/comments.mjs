@@ -271,15 +271,21 @@ function stripRunnerLines(text) {
   return stripForgedLines(text.replace(PASS_LIMIT_NOTE_RE, "").replace(REVIEWED_COMMIT_LINE_RE, "").replace(MERGE_CONFIDENCE_LINE_RE, "").replace(AUTO_APPROVE_LINE_RE, ""));
 }
 
-// The vendor prefix goes too, so "deepseek-v4-pro" and a bare "DeepSeek" are both caught; longest first because alternation is first-match.
+// Generic id words that would blank ordinary review prose if redacted.
+const GENERIC_ID_WORDS = new Set(["review", "flash", "preview", "latest", "chat", "mini", "lite", "fast", "turbo"]);
+// Words this repo's own tooling is named after (CLAUDE.md, .claude/, claude-code-action); redacting them breaks real file and action references.
+const REPO_TOOLING_WORDS = new Set(["claude"]);
+
+// Full ids match anywhere; a vendor or family word matches only between non-letters, so "api.anthropic.com" goes but "anthropics/" stays.
 export function redactProviderIdentity(text, { providerId, modelId }) {
-  const vendor = String(modelId ?? "").split(/[-/_]/)[0];
-  const terms = [providerId, modelId, vendor.length >= 4 ? vendor : null]
-    .filter(Boolean)
-    .sort((a, b) => b.length - a.length)
-    .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const escape = t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const ids = [providerId, modelId].map(id => String(id ?? "")).filter(Boolean);
+  const words = [...new Set(ids.flatMap(id => id.toLowerCase().split(/[^a-z]+/)))]
+    .filter(word => word.length >= 4 && !GENERIC_ID_WORDS.has(word) && !REPO_TOOLING_WORDS.has(word));
+  const terms = [...ids.map(escape), ...words.map(word => `(?<![a-z])${escape(word)}(?![a-z])`)];
   if (terms.length === 0) return text;
-  return text.replace(new RegExp(terms.join("|"), "gi"), "[redacted]");
+  const byLength = [...ids, ...words].map((t, i) => [t.length, terms[i]]).sort((a, b) => b[0] - a[0]).map(([, t]) => t);
+  return text.replace(new RegExp(byLength.join("|"), "gi"), "[redacted]");
 }
 
 function unwrapJsonBody(body) {
