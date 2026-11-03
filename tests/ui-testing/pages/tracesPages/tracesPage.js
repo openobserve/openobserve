@@ -4023,4 +4023,40 @@ export class TracesPage {
   getSqlSuggestionFixCard() {
     return this.page.locator('[data-test="traces-sql-fix-suggestion-card"]');
   }
+
+  // ===== SCOPE SELECT AND COLUMNS BUTTON =====
+
+  getScopeSelect() {
+    return this.page.locator('[data-test="traces-scope-select-trigger"]');
+  }
+
+  getScopeValue() {
+    return this.page.locator('[data-test="traces-scope-select-value"]');
+  }
+
+  // scope: all | root | entrypoint
+  async pickScope(scope) {
+    await this.getScopeSelect().click();
+    await this.page
+      .locator(`[data-test="traces-scope-select-option"][data-test-value="${scope}"]`)
+      .click();
+  }
+
+  getColumnsButton() {
+    return this.page.locator('[data-test="traces-section-header"] [data-test="o2-table-column-toggle-btn"]');
+  }
+
+  getColumnsHiddenBadge() {
+    return this.page.locator('[data-test="traces-section-header"] [data-test="o2-table-column-toggle-hidden-badge"]');
+  }
+
+  async toggleListColumn(columnId) {
+    await this.getColumnsButton().click();
+    await this.page.locator(`[data-test="o2-table-column-toggle-item-${columnId}"]`).click();
+    await this.page.keyboard.press('Escape');
+  }
+
+  getListHeaderCell(columnId) {
+    return this.page.locator(`${this.searchResultList} [data-test="o2-table-th-${columnId}"]`);
+  }
 }

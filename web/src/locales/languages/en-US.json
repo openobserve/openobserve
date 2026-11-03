@@ -17139,6 +17139,17 @@
   },
   "traces": {
     "nlNeedsSql": "This question needs SQL; open it in Logs",
+    "scope": {
+      "label": "Scope",
+      "all": "All spans",
+      "allDesc": "Every span that matches the filter",
+      "root": "Root spans",
+      "rootDesc": "Spans with no parent, where each trace starts",
+      "entrypoint": "Entrypoint spans",
+      "entrypointDesc": "Server or consumer spans, plus any root span",
+      "rootUnavailable": "This stream has no reference_parent_span_id field",
+      "sqlModeDisabled": "Put the scope condition in your SQL WHERE"
+    },
     "sqlMode": {
       "indicator": "SQL",
       "switchOffTitle": "Switch to filter mode?",

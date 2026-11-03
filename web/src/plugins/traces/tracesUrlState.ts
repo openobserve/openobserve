@@ -19,10 +19,11 @@ import {
   parseRowsParam,
   parseSharedPage,
 } from "@/composables/useLogs/useLogsUrl";
+import { isTracesScope, type TracesScope } from "@/utils/traces/tracesScope";
 
 export const TRACES_DEFAULT_ROWS_PER_PAGE = 25;
 
-export const TRACES_LIST_URL_KEYS = ["columns", "rows", "page", "show_histogram"] as const;
+export const TRACES_LIST_URL_KEYS = ["columns", "rows", "page", "show_histogram", "scope"] as const;
 
 export interface TracesListState {
   columns: string[];
@@ -31,6 +32,7 @@ export interface TracesListState {
   /** 0-based, as `searchObj.data.resultGrid.currentPage` holds it. */
   currentPage: number;
   showHistogram: boolean;
+  scope: TracesScope;
 }
 
 export interface DecodedTracesListState {
@@ -38,6 +40,7 @@ export interface DecodedTracesListState {
   rowsPerPage: number | null;
   currentPage: number | null;
   showHistogram: boolean | null;
+  scope: TracesScope | null;
 }
 
 const sameList = (a: string[], b: string[]) =>
@@ -55,6 +58,7 @@ export function encodeTracesListState(
   if (state.rowsPerPage !== TRACES_DEFAULT_ROWS_PER_PAGE) query.rows = state.rowsPerPage;
   if (state.currentPage > 0) query.page = state.currentPage + 1;
   if (!state.showHistogram) query.show_histogram = false;
+  if (state.scope !== "all") query.scope = state.scope;
   return query;
 }
 
@@ -68,5 +72,6 @@ export function decodeTracesListState(query: Record<string, unknown>): DecodedTr
     rowsPerPage: parseRowsParam(query.rows),
     currentPage: page === null ? null : page - 1,
     showHistogram: histogram === "true" ? true : histogram === "false" ? false : null,
+    scope: isTracesScope(query.scope) ? query.scope : null,
   };
 }

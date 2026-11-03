@@ -30,6 +30,7 @@ import {
 } from "@/utils/alerts/prefill/fromTraces";
 import type { AlertBuildOptions, AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { activeScopePredicate, withScope } from "@/utils/traces/tracesScope";
 import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
 
 const DURATION_PERCENTILES: TracesAlertPercentile[] = [0.5, 0.95, 0.99];
@@ -81,7 +82,10 @@ export const useTracesAlertAction = () => {
     const { type, relativeTimePeriod, startTime, endTime } = searchObj.data.datetime;
     const input: TracesPrefillInput = {
       streamName: stream,
-      filter: resolveTracesFilter(searchObj.data.editorValue, tracesParser.value, stream),
+      filter: withScope(
+        resolveTracesFilter(searchObj.data.editorValue, tracesParser.value, stream),
+        activeScopePredicate(searchObj),
+      ),
       view: searchObj.meta.searchMode === "spans" ? "spans" : "traces",
       metric,
       datetime: {

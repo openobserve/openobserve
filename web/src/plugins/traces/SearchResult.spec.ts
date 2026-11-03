@@ -163,7 +163,15 @@ const globalOptions = {
     TracesSearchResultList: {
       name: "TracesSearchResultList",
       template: '<div data-test="traces-search-result-list" class="search-list w-full"></div>',
-      props: ["hits", "loading", "searchPerformed", "showHeader", "wrap", "showPagination"],
+      props: [
+        "hits",
+        "loading",
+        "searchPerformed",
+        "showHeader",
+        "wrap",
+        "showPagination",
+        "columnVisibility",
+      ],
       emits: ["row-click", "load-more"],
     },
     TracesSqlResultTable: {
@@ -217,6 +225,60 @@ describe("SearchResult", () => {
       wrapper.unmount();
     }
     vi.clearAllMocks();
+  });
+
+  describe("Columns button", () => {
+    const columns = [
+      { id: "_timestamp", header: "Timestamp" },
+      { id: "service_name", header: "Service", hideable: true },
+      { id: "duration", header: "Duration", hideable: true },
+    ];
+    const toggle = () => wrapper.findComponent({ name: "OTableColumnToggle" });
+    const badge = () => wrapper.find('[data-test="o2-table-column-toggle-hidden-badge"]');
+
+    beforeEach(async () => {
+      localStorage.clear();
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.data.resultGrid.columns = columns as any;
+      wrapper.unmount();
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      mockSearchObj.meta.searchMode = undefined;
+      localStorage.clear();
+    });
+
+    it("sits after Wrap and lists the table's columns", () => {
+      const wrap = wrapper.find('[data-test="traces-search-result-wrap-btn"]').element;
+      const button = wrapper.find('[data-test="o2-table-column-toggle-btn"]').element;
+      expect(wrap.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(toggle().props("columns")).toEqual(columns);
+    });
+
+    it("hides a column in the list and counts it on the badge", async () => {
+      expect(badge().exists()).toBe(false);
+      toggle().vm.$emit("update:columnVisibility", { service_name: false });
+      await flushPromises();
+      const list = wrapper.findComponent({ name: "TracesSearchResultList" });
+      expect(list.props("columnVisibility")).toEqual({ service_name: false });
+      expect(badge().text()).toBe("1");
+    });
+
+    it("keeps each view's hidden columns apart, and across a remount", async () => {
+      toggle().vm.$emit("update:columnVisibility", { service_name: false });
+      await flushPromises();
+      mockSearchObj.meta.searchMode = "traces";
+      await flushPromises();
+      expect(toggle().props("columnVisibility")).toEqual({});
+
+      mockSearchObj.meta.searchMode = "spans";
+      wrapper.unmount();
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
+      expect(toggle().props("columnVisibility")).toEqual({ service_name: false });
+    });
   });
 
   describe("result count header", () => {
@@ -738,6 +800,14 @@ describe("SearchResult in a kept-alive page", () => {
       (mockSearchObj.meta as any).sqlMode = false;
       (mockSearchObj.meta as any).searchMode = undefined;
       (mockSearchObj.data as any).queryResults = original;
+    });
+
+    it("offers no Columns button over a SQL result table", async () => {
+      await showResults(`SELECT service_name, count(*) AS n FROM "default" GROUP BY service_name`, [
+        { service_name: "a", n: 1 },
+      ]);
+      expect(sqlTable().exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-column-toggle-btn"]').exists()).toBe(false);
     });
 
     it("collapses the RED charts with an info icon and counts the rows for a GROUP BY", async () => {

@@ -249,6 +249,7 @@ import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles from "@/composables/useDurationPercentiles";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { activeScopePredicate, withScope } from "@/utils/traces/tracesScope";
 import { analyzeTracesSql } from "@/utils/traces/tracesSql";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
@@ -508,11 +509,13 @@ export default defineComponent({
 
       let sql = `SELECT * FROM ${typed?.fromClause || `"${streamName}"`}`;
 
-      if (whereClause !== "") {
-        const filteredWhere = removeFieldFromWhereStr(whereClause, fieldName, !!typed);
-        if (filteredWhere.trim() !== "") {
-          sql += ` WHERE ${filteredWhere}`;
-        }
+      // Added last, so neither the field's removal nor the span_kind rewrite touches it.
+      const filteredWhere = withScope(
+        whereClause !== "" ? removeFieldFromWhereStr(whereClause, fieldName, !!typed) : "",
+        activeScopePredicate(searchObj),
+      );
+      if (filteredWhere.trim() !== "") {
+        sql += ` WHERE ${filteredWhere}`;
       }
 
       return b64EncodeUnicode(sql) || "";

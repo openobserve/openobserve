@@ -808,6 +808,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    <div
+      v-if="searchObj.meta.searchMode === 'spans' && searchObj.meta.showQuery"
+      class="border-border-default flex h-10 shrink-0 items-center gap-2 border-b px-1.5"
+      data-test="traces-search-bar-scope-row"
+    >
+      <TracesScopeSelect
+        :model-value="searchObj.meta.scope"
+        :sql-mode="!!searchObj.meta.sqlMode"
+        :has-parent-column="!!searchObj.data.stream.hasParentColumn"
+        @update:model-value="(scope) => emit('update:scope', scope)"
+      />
+    </div>
     <RecentSearchesDrawer
       ref="recentDrawerRef"
       source="traces"
@@ -851,6 +863,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { activeScopePredicate, isTracesScope, withScope } from "@/utils/traces/tracesScope";
 import {
   analyzeTracesSql,
   buildTraceSelectorSql,
@@ -893,6 +906,7 @@ import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import useTraces from "@/composables/useTraces";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import SyntaxGuide from "./SyntaxGuide.vue";
+import TracesScopeSelect from "./components/TracesScopeSelect.vue";
 import SavedViewsMenu from "@/components/savedViews/SavedViewsMenu.vue";
 import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useFavoriteSavedViews } from "@/composables/useFavoriteSavedViews";
@@ -976,6 +990,7 @@ export default defineComponent({
     UnifiedQueryEditor: defineAsyncComponent(() => import("@/components/QueryEditor.vue")),
     SqlFilterBuilder,
     SyntaxGuide,
+    TracesScopeSelect,
     RecentSearchesButton,
     RecentSearchesDrawer,
     RecentSearchesFocusDropdown,
@@ -987,6 +1002,7 @@ export default defineComponent({
     "filterBuilderGrowth",
     "cancel-query",
     "update:searchMode",
+    "update:scope",
     "error-only-toggled",
     "filters-reset",
     "onChangeTimezone",
@@ -1314,15 +1330,19 @@ export default defineComponent({
       const stream = searchObj.data.stream.selectedStream?.value ?? "";
       const text = String(searchObj.data.editorValue ?? "").trim();
       if (on) {
+        // Read before SQL mode turns on, which switches the scope off.
+        const scope = activeScopePredicate(searchObj);
         searchObj.meta.sqlMode = true;
-        // An empty editor keeps SQL mode on with nothing typed, so the template gallery shows.
-        if (stream && text && !isAuthoredStatement(text)) {
-          const filter = resolveTracesFilter(text, tracesParser.value, stream);
+        // An empty editor with no scope keeps SQL mode on with nothing typed, so the template gallery shows.
+        if (stream && (text || scope) && !isAuthoredStatement(text)) {
+          const filter = withScope(resolveTracesFilter(text, tracesParser.value, stream), scope);
           writeEditor(
             searchObj.meta.searchMode === "traces"
               ? buildTraceSelectorSql(stream, filter)
               : buildTracesSql(stream, filter),
           );
+          // The condition now lives in the WHERE, so the select steps back instead of applying it twice.
+          if (scope) searchObj.meta.scope = "all";
         }
         return;
       }
@@ -1559,7 +1579,10 @@ export default defineComponent({
       const editorText = searchObj.data.editorValue ?? "";
       redDashboardPanels.value = buildTracesRedPanels({
         streamName: stream,
-        filter: resolveTracesFilter(editorText, tracesParser.value, stream),
+        filter: withScope(
+          resolveTracesFilter(editorText, tracesParser.value, stream),
+          activeScopePredicate(searchObj),
+        ),
         filterText: editorText,
         view,
         interval,
@@ -1577,6 +1600,7 @@ export default defineComponent({
     const resetFilters = () => {
       appliedSavedView.value = null;
       searchObj.meta.sqlMode = false;
+      searchObj.meta.scope = "all";
       searchObj.data.editorValue = "";
       searchObj.data.advanceFiltersQuery = "";
       Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
@@ -1717,6 +1741,7 @@ export default defineComponent({
       return {
         version: 2,
         sqlMode: !!searchObj.meta.sqlMode,
+        scope: isTracesScope(searchObj.meta.scope) ? searchObj.meta.scope : "all",
         stream: { label: stream.selectedStream.label, value: stream.selectedStream.value },
         editorValue: searchObj.data.editorValue,
         datetime: {

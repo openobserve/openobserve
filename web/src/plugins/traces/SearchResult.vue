@@ -183,6 +183,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="wrap-text" size="sm" />
           <OTooltip :content="t('search.messageWrapContent')" />
         </OButton>
+        <!-- The toggle's root renders no DOM node, so a class on it would be dropped. -->
+        <div v-if="!matchAllFix && sqlShape === 'spans'" class="ms-1 inline-flex shrink-0">
+          <OTableColumnToggle
+            :columns="searchObj.data.resultGrid.columns"
+            :column-visibility="columnVisibility"
+            @update:column-visibility="setColumnVisibility"
+          />
+        </div>
         <div
           v-if="pagerShown"
           class="flex items-center transition-opacity"
@@ -294,6 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="searchResultListRef"
           :hits="hits"
           :wrap="searchObj.meta.resultGrid.wrapCells"
+          :column-visibility="columnVisibility"
           :scroll-el="scrollContainerRef"
           :loading="searchObj.loading || pending"
           :search-performed="searchPerformed"
@@ -377,6 +386,8 @@ import { resultText, type RegionNoun } from "@/lib/feedback/RegionStatus/regionT
 import { useSettledValue } from "@/composables/useSettledValue";
 import { formatRefreshFailed } from "@/utils/formatters";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import { allNullColumns } from "@/utils/traces/tracesSqlErrors";
 
@@ -395,6 +406,7 @@ export default defineComponent({
     TracesSqlResultTable,
     OEmptyState,
     EmptyStateActionCard,
+    OTableColumnToggle,
     TracesMetricsPlaceholder,
     TracesMetricsDashboard: defineAsyncComponent({
       // Its charts load as chunks of their own, so they load with it and the placeholder stays until they can draw.
@@ -692,6 +704,18 @@ export default defineComponent({
         ),
     );
 
+    // Each view's list keeps its own hidden columns, as each OTable keeps its own.
+    const columnToggles = {
+      spans: useExternalColumnToggle("traces-spans-list"),
+      traces: useExternalColumnToggle("traces-traces-list"),
+    };
+    const listColumnToggle = computed(() =>
+      searchObj.meta.searchMode === "spans" ? columnToggles.spans : columnToggles.traces,
+    );
+    const columnVisibility = computed(() => listColumnToggle.value.columnVisibility.value);
+    const setColumnVisibility = (visibility: Record<string, boolean>) =>
+      listColumnToggle.value.setColumnVisibility(visibility);
+
     // The count runs after the rows, so until it answers there is no total to show.
     const countPending = computed(() => searchObj.data.queryResults?.countPending === true);
     const regionBusy = computed(() => props.pending || searchObj.loading || countPending.value);
@@ -863,6 +887,8 @@ export default defineComponent({
       changeRowsPerPage,
       changeSortBy,
       rowsPerPageOptions,
+      columnVisibility,
+      setColumnVisibility,
       totalPages,
       openComparison,
       toggleWrapCells,

@@ -796,6 +796,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
+import { entrypointPredicate } from "@/utils/traces/tracesScope";
 import TraceServiceCell from "./components/TraceServiceCell.vue";
 import { useScrollEndFade } from "./useScrollEndFade";
 import { placeholderLineKey } from "@/types/serviceRef";
@@ -1919,13 +1920,6 @@ async function fetchSchemaFlags(org: string, stream: string): Promise<StreamSche
   }
 }
 
-function requestPredicate(hasParentColumn: boolean): string {
-  const kinds = "CAST(span_kind AS VARCHAR) IN ('2','5')";
-  if (!hasParentColumn) return `(${kinds})`;
-  // Any root counts, whatever its kind: a trace that starts at a client span still entered the system there.
-  return `(${kinds} OR (reference_parent_span_id IS NULL OR reference_parent_span_id = ''))`;
-}
-
 // Conditional aggregation, not WHERE, so services with no request spans still get a row.
 function redAggregates(pred: string): string {
   const requests = `COUNT(*) FILTER (WHERE ${pred})`;
@@ -1946,7 +1940,7 @@ function redAggregates(pred: string): string {
 }
 
 function catalogSql(streamName: string, flags: StreamSchemaFlags): string {
-  const requestPred = requestPredicate(flags.hasParentColumn);
+  const requestPred = entrypointPredicate(flags.hasParentColumn);
   // Spellings of one service share a registry key, so they are one row named by one of its spellings.
   const key = serviceKeySql("service_name");
   if (!flags.hasInferColumns) {
@@ -2145,7 +2139,7 @@ async function loadVersionTraffic(
 ) {
   const sql = servingHealthSql(
     stream,
-    requestPredicate(flags.hasParentColumn),
+    entrypointPredicate(flags.hasParentColumn),
     flags.hasInferColumns,
     flags.hasImageColumn,
   );

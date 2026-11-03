@@ -961,6 +961,69 @@ describe("IndexList Component", () => {
     });
   });
 
+  describe("field-values query follows the Spans view scope", () => {
+    const ENTRY =
+      "(CAST(span_kind AS VARCHAR) IN ('2','5') OR (reference_parent_span_id IS NULL OR reference_parent_span_id = ''))";
+
+    const valuesSql = async (field: string) => {
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: field });
+      await flushPromises();
+      return atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql);
+    };
+
+    beforeEach(() => {
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.meta.scope = "entrypoint";
+      mockSearchObj.data.stream.hasParentColumn = true;
+      mockSearchObj.data.editorValue = "span_kind = 'Server' AND service_name = 'a'";
+    });
+
+    afterEach(() => {
+      mockSearchObj.meta.searchMode = "traces";
+      mockSearchObj.meta.scope = "all";
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.data.stream.hasParentColumn = false;
+      mockSearchObj.data.editorValue = "";
+    });
+
+    it("adds the scope after the span_kind rewrite and the opened field's removal", async () => {
+      expect(await valuesSql("service_name")).toBe(
+        `SELECT * FROM "test_stream" WHERE (span_kind='2') AND ${ENTRY}`,
+      );
+    });
+
+    it("keeps the scope when the opened field is span_kind", async () => {
+      expect(await valuesSql("span_kind")).toBe(
+        `SELECT * FROM "test_stream" WHERE (service_name = 'a') AND ${ENTRY}`,
+      );
+    });
+
+    it("is the scope alone when the filter is empty", async () => {
+      mockSearchObj.data.editorValue = "";
+      expect(await valuesSql("service_name")).toBe(`SELECT * FROM "test_stream" WHERE ${ENTRY}`);
+    });
+
+    it("passes the scope to the duration percentiles", async () => {
+      mockSearchObj.data.editorValue = "";
+      fieldValuesApi.fetchPercentiles.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: "duration" });
+      await flushPromises();
+      expect(fieldValuesApi.fetchPercentiles.mock.calls[0][0].whereClause).toBe(ENTRY);
+    });
+
+    it("adds no scope in the Traces view or in SQL mode", async () => {
+      mockSearchObj.meta.searchMode = "traces";
+      expect(await valuesSql("service_name")).toBe(
+        `SELECT * FROM "test_stream" WHERE span_kind='2'`,
+      );
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "test_stream" WHERE a = 1`;
+      expect(await valuesSql("service_name")).toBe(`SELECT * FROM "test_stream" WHERE a = 1`);
+    });
+  });
+
   // ─── onStreamChange side-effects ──────────────────────────────────────────
 
   describe("onStreamChange side-effects", () => {

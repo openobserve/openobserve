@@ -473,6 +473,75 @@ describe("TracesMetricsDashboard", () => {
       await flushPromises();
       expect(getHeatmapSql(wrapper)).not.toContain("reference_parent_span_id");
     });
+    describe("with a scope", () => {
+      const ROOT = "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
+
+      beforeEach(() => {
+        mockSearchObj.meta.scope = "root";
+        mockSearchObj.data.stream.hasParentColumn = true;
+      });
+
+      afterEach(() => {
+        mockSearchObj.meta.scope = "all";
+        mockSearchObj.data.stream.hasParentColumn = false;
+      });
+
+      it("narrows every RED panel and the heatmap to the scope, after the filter", async () => {
+        mockSearchObj.data.editorValue = "a = 1 or b = 2";
+        await wrapper.vm.loadDashboard();
+        await flushPromises();
+        for (const title of ["Rate", "Errors"]) {
+          expect(getPanelQuery(wrapper, title)).toContain(`(a = 1 or b = 2) AND ${ROOT}`);
+        }
+        expect(getHeatmapSql(wrapper)).toContain(`(a = 1 or b = 2) AND ${ROOT}`);
+      });
+
+      it("is the scope alone over an empty filter", async () => {
+        await wrapper.vm.loadDashboard();
+        await flushPromises();
+        expect(getPanelQuery(wrapper, "Rate")).toContain(`WHERE ${ROOT}`);
+      });
+
+      it("adds no scope in the Traces view or in SQL mode", async () => {
+        mockSearchObj.meta.searchMode = "traces";
+        await wrapper.vm.loadDashboard();
+        await flushPromises();
+        expect(getPanelQuery(wrapper, "Rate")).not.toContain("reference_parent_span_id");
+        mockSearchObj.meta.searchMode = "spans";
+        mockSearchObj.meta.sqlMode = true;
+        mockSearchObj.data.editorValue = `SELECT * FROM "default" WHERE a = 1`;
+        await wrapper.vm.loadDashboard();
+        await flushPromises();
+        expect(getPanelQuery(wrapper, "Rate")).not.toContain("reference_parent_span_id");
+      });
+
+      it("gives a brush comparison the scope the charts ran with", async () => {
+        mockSearchObj.data.editorValue = "service_name = 'a'";
+        await wrapper.vm.loadDashboard();
+        await flushPromises();
+        mockSearchObj.meta.scope = "all";
+        wrapper.vm.openComparison();
+        await flushPromises();
+        expect(
+          wrapper.findComponent({ name: "TracesComparison" }).props("presetContext"),
+        ).toMatchObject({ filter: `(service_name = 'a') AND ${ROOT}` });
+      });
+
+      it("adds a chart to a dashboard with the scope the charts ran with", async () => {
+        mockSearchObj.data.editorValue = "service_name = 'a'";
+        await wrapper.vm.loadDashboard();
+        await flushPromises();
+        mockSearchObj.meta.scope = "all";
+        const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+        charts.vm.$emit("exploreAddToDashboard", getPanel(wrapper, "Rate"));
+        await flushPromises();
+        const dialog = wrapper.findComponent({ name: "AddToDashboard" });
+        expect(dialog.props("dashboardPanelData").data.queries[0].query).toContain(
+          `(service_name = 'a') AND ${ROOT}`,
+        );
+        expect(dialog.props("defaultPanelTitle")).toBe("Rate · service_name = 'a'");
+      });
+    });
   });
 
   // -------------------------------------------------------------------------

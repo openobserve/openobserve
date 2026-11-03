@@ -193,10 +193,11 @@ function spanDerivedColumns(
   ];
 }
 
-/** Marks the last non-timestamp column to absorb leftover width, which clamps every other column to its size. */
+/** Marks the last shown non-timestamp column to absorb leftover width, which clamps every other column to its size. */
 export function fillLastColumn(
   cols: OTableColumnDef<Record<string, any>>[],
   timestampCol: string,
+  columnVisibility: Record<string, boolean> = {},
 ): void {
   for (const col of cols) {
     if (!(col.meta as Record<string, unknown> | undefined)?.fillRemaining) continue;
@@ -208,7 +209,7 @@ export function fillLastColumn(
     col.meta = meta;
     delete col.minSize;
   }
-  const last = cols.at(-1);
+  const last = cols.findLast((col) => columnVisibility[col.id as string] !== false);
   if (!last || last.id === timestampCol) return;
   last.minSize = last.size;
   last.meta = { ...last.meta, autoWidth: true, fillRemaining: true };
@@ -313,6 +314,11 @@ export function useTracesTableColumns() {
       if (statusIdx === -1) cols.push(...derived);
       else cols.splice(statusIdx + 1, 0, ...derived);
     }
+
+    // The pinned timestamp column anchors the row, so only the others can be hidden.
+    cols.forEach((col) => {
+      if (col.id !== timestampCol) col.hideable = true;
+    });
 
     fillLastColumn(cols, timestampCol);
 

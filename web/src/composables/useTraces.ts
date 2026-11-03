@@ -42,6 +42,7 @@ import {
   encodeTracesListState,
   TRACES_LIST_URL_KEYS,
 } from "@/plugins/traces/tracesUrlState";
+import type { TracesScope } from "@/utils/traces/tracesScope";
 
 // Mirrors the backend's is_internal_stream(); other `_`-prefixed streams are user data.
 const INTERNAL_LOG_STREAMS = new Set([
@@ -137,6 +138,7 @@ const defaultObject = {
     showDetailTab: false,
     showTraceDetails: false,
     sqlMode: false,
+    scope: "all" as TracesScope,
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
@@ -196,6 +198,7 @@ const defaultObject = {
       selectedStream: { label: "", value: "" },
       selectedStreamFields: [],
       selectedFields: <string[]>[],
+      hasParentColumn: false,
       filterField: "",
       addToFilter: "",
       removeFilterField: "",
@@ -308,6 +311,7 @@ const useTraces = () => {
     searchObj.data.stream.streamLists = [];
     searchObj.data.stream.selectedStream = { label: "", value: "" };
     searchObj.data.stream.selectedStreamFields = [];
+    searchObj.data.stream.hasParentColumn = false;
     searchObj.data.queryResults = {};
     searchObj.data.sortedQueryResults = [];
     searchObj.data.histogram = {
@@ -322,6 +326,7 @@ const useTraces = () => {
     searchObj.data.query = "";
     searchObj.data.editorValue = "";
     searchObj.meta.sqlMode = false;
+    searchObj.meta.scope = "all";
     searchObj.meta.lastRunSignature = null;
     searchObj.meta.refreshFailedAt = null;
     searchObj.meta.chartRefreshFailed = false;
@@ -420,6 +425,7 @@ const useTraces = () => {
       rowsPerPage: Number(searchObj.meta.resultGrid.rowsPerPage),
       currentPage: searchObj.data.resultGrid.currentPage,
       showHistogram: searchObj.meta.showHistogram,
+      scope: mode === "spans" ? searchObj.meta.scope : "all",
     });
   }
 
@@ -428,6 +434,7 @@ const useTraces = () => {
     const decoded = decodeTracesListState(query);
     if (decoded.rowsPerPage !== null) searchObj.meta.resultGrid.rowsPerPage = decoded.rowsPerPage;
     if (decoded.showHistogram !== null) searchObj.meta.showHistogram = decoded.showHistogram;
+    searchObj.meta.scope = decoded.scope ?? "all";
     urlColumns = decoded.columns
       ? {
           mode: searchObj.meta.searchMode,
@@ -474,6 +481,7 @@ const useTraces = () => {
         searchObj.data.resultGrid.currentPage,
         searchObj.meta.showHistogram,
         searchObj.meta.searchMode,
+        searchObj.meta.scope,
         searchObj.data.stream.selectedFields.join("\u0000"),
       ],
       write,
