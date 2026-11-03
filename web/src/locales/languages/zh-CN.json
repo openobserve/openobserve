@@ -6026,6 +6026,7 @@
     "resetRUMTokenLabel": "重置 RUM Token",
     "generateRUMTokenLabel": "生成 RUM Token",
     "generateRUMTokenMessage": "生成 RUM 令牌以为您的组织启用 RUM。",
+    "rumTokenForbiddenMessage": "您的角色无法查看 RUM 令牌。请向管理员索取 RUM 设置片段，或索取在此处查看它所需的角色。",
     "rumPlatform": "平台",
     "rumPlatformBrowser": "浏览器",
     "rumPlatformReactNative": "React Native",
@@ -6185,7 +6186,7 @@
       },
       "installOneClick": "添加到{client}",
       "skillsLabel": "添加 {brand} 技能（可选）",
-      "skillsHint": "教您的人工智能助手如何在 {brand} 中进行查询、告警和构建仪表盘，从而更充分地利用 MCP 工具。在您的项目中运行它，它会安装到您机器上找到的每个 AI 工具中。",
+      "skillsHint": "帮助您的人工智能助手了解如何在 {brand} 中查询、告警和构建仪表盘，从而更充分地利用 MCP 工具。请在您的项目中运行它；它会将这些工具安装到您机器上发现的每个 AI 工具中。",
       "skillsRepo": "在 {host} 上查看技能"
     },
     "manageTokensBtnLabel": "管理令牌",

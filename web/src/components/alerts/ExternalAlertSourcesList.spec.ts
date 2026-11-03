@@ -103,6 +103,17 @@ describe("ExternalAlertSourcesList", () => {
     expect(table.text()).toContain("****");
   });
 
+  it("shows no URL or copy actions when the server withholds the token", async () => {
+    const { token: _token, url: _url, ...withheld } = DEFAULT_SOURCE;
+    vi.mocked(alertSources.list).mockResolvedValue({ data: { integrations: [withheld] } });
+    const wrapper = await mountAndSettle();
+    const table = wrapper.find('[data-test="alert-sources-advanced-table"]');
+    expect(table.text()).toContain("default");
+    expect(table.text()).not.toContain("****");
+    expect(wrapper.find('[data-test="alert-sources-copy-int-1"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-sources-copy-token-int-1"]').exists()).toBe(false);
+  });
+
   it("reveals the full token when reveal is toggled", async () => {
     const wrapper = await mountAndSettle();
     await (wrapper.vm as any).toggleRevealFor(DEFAULT_SOURCE);
