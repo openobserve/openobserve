@@ -369,6 +369,9 @@ where
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()
             {
+                let feature =
+                    rp::resolve_permission(&path_columns, &method, &org_id, &folder, None)
+                        .and_then(|r| r.feature);
                 return Ok(AuthExtractor {
                     auth: reject_forged_session_marker(auth_str.to_owned()),
                     method,
@@ -379,7 +382,7 @@ where
                     use_all_org: false,
                     use_self_context: false,
                     use_self_parent: false,
-                    feature: None,
+                    feature,
                 });
             }
             return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
