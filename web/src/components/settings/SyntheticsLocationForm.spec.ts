@@ -479,7 +479,13 @@ describe("SyntheticsLocationForm", () => {
   it("keeps all provider options in edit mode to label existing locations", () => {
     wrapper = createWrapper({
       isEdit: true,
-      data: { id: "gcp-us-east1", provider: "gcp", region: "us-east1", label: "GCP", enabled: true },
+      data: {
+        id: "gcp-us-east1",
+        provider: "gcp",
+        region: "us-east1",
+        label: "GCP",
+        enabled: true,
+      },
     });
     const options = wrapper.vm.providerOptions;
     expect(options).toHaveLength(4);
