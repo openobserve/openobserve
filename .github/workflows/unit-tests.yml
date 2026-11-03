@@ -333,7 +333,8 @@ jobs:
     needs: [check_changes, ui_unit_test_shards]
     if: always() && needs.check_changes.outputs.has_ui_changes == 'true'
     timeout-minutes: 20
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
 
