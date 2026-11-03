@@ -51,6 +51,14 @@ pub struct CheckStateRow {
     /// Consecutive Up run verdicts.
     pub up_runs: i32,
     pub last_triggered_at: i64,
+    /// `scheduled_ts` of the newest finalized run.
+    pub status_run_ts: i64,
+    /// `RunClass` DB integer of the newest finalized run.
+    pub last_run_class: i32,
+    /// `scheduled_ts` of the first run in the current `last_run_class`.
+    pub last_run_class_at: i64,
+    /// Seconds between scheduled runs; 0 for cron.
+    pub interval_secs: i64,
 }
 
 pub async fn get_page_by_slug<C: ConnectionTrait>(
@@ -128,22 +136,55 @@ pub async fn get_check_states<C: ConnectionTrait>(
         .column(synthetics_checks::Column::StatusUpRuns)
         .column(synthetics_checks::Column::LastTriggeredAt)
         .column(synthetics_checks::Column::UpdatedAt)
+        .column(synthetics_checks::Column::StatusRunTs)
+        .column(synthetics_checks::Column::LastRunClass)
+        .column(synthetics_checks::Column::LastRunClassAt)
+        .column(synthetics_checks::Column::Frequency)
         .filter(synthetics_checks::Column::Id.is_in(check_ids.iter().cloned()));
     if let Some(watermark) = since {
         q = q.filter(synthetics_checks::Column::UpdatedAt.gt(watermark));
     }
     let rows = q
-        .into_tuple::<(String, String, i32, i32, i32, i64, i64)>()
+        .into_tuple::<(
+            String,
+            String,
+            i32,
+            i32,
+            i32,
+            i64,
+            i64,
+            i64,
+            i32,
+            i64,
+            serde_json::Value,
+        )>()
         .all(conn)
         .await?;
     let mut max_updated = since.unwrap_or(0);
     let out = rows
         .into_iter()
         .map(
-            |(id, org_id, last_check_status, down_runs, up_runs, last_triggered_at, updated_at)| {
+            |(
+                id,
+                org_id,
+                last_check_status,
+                down_runs,
+                up_runs,
+                last_triggered_at,
+                updated_at,
+                status_run_ts,
+                last_run_class,
+                last_run_class_at,
+                frequency,
+            )| {
                 if updated_at > max_updated {
                     max_updated = updated_at;
                 }
+                let interval_secs = serde_json::from_value::<
+                    config::meta::synthetics::SyntheticFrequency,
+                >(frequency)
+                .map(|f| f.interval_secs())
+                .unwrap_or(0);
                 CheckStateRow {
                     id,
                     org_id,
@@ -151,6 +192,10 @@ pub async fn get_check_states<C: ConnectionTrait>(
                     down_runs,
                     up_runs,
                     last_triggered_at,
+                    status_run_ts,
+                    last_run_class,
+                    last_run_class_at,
+                    interval_secs,
                 }
             },
         )
@@ -355,6 +400,17 @@ pub async fn upsert_check_snooze(
     )
     .exec(conn)
     .await?;
+    Ok(())
+}
+
+/// Ends a check's org-wide snooze, so an undone false alarm can reopen at once.
+pub async fn delete_check_snooze(org_id: &str, synthetics_id: &str) -> Result<(), errors::Error> {
+    let conn = get_orm_client_rw().await;
+    status_page_check_snoozes::Entity::delete_many()
+        .filter(status_page_check_snoozes::Column::OrgId.eq(org_id))
+        .filter(status_page_check_snoozes::Column::SyntheticsId.eq(synthetics_id))
+        .exec(conn)
+        .await?;
     Ok(())
 }
 
@@ -795,6 +851,7 @@ fn action_code(action: &str) -> i32 {
         "create_domain" => 10,
         "delete_domain" => 11,
         "verify_domain" => 12,
+        "undo_false_positive" => 13,
         _ => 99,
     }
 }

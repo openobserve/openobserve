@@ -1,0 +1,80 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, it, expect } from "vitest";
+import { confirmedStatus, splitConfirms, type ExecutionSlot } from "./confirmJobs";
+
+const exec = (location: string, status: ExecutionSlot["status"], timestamp: number) => ({
+  location,
+  browser: "",
+  device: "",
+  environment: "",
+  timestamp,
+  status,
+});
+
+describe("splitConfirms", () => {
+  it("should treat a second execution in a slot as a confirm job of the failure", () => {
+    const a = exec("us-east", "fail", 1);
+    const b = exec("us-west", "pass", 2);
+    const confirm = exec("us-west", "pass", 3);
+    const { primary, confirms } = splitConfirms([confirm, a, b]);
+    expect(primary).toEqual([a, b]);
+    expect(confirms).toEqual([{ of: a, confirm }]);
+  });
+
+  it("should pair a single-location confirm job with its own location", () => {
+    const a = exec("us-east", "fail", 1);
+    const confirm = exec("us-east", "fail", 2);
+    expect(splitConfirms([a, confirm]).confirms).toEqual([{ of: a, confirm }]);
+  });
+
+  it("should pair a browser confirm job with the failure on the same device", () => {
+    const dev = (location: string, device: string, status: ExecutionSlot["status"], t: number) => ({
+      ...exec(location, status, t),
+      device,
+    });
+    const failed = dev("a", "Mobile", "fail", 1);
+    const others = [
+      dev("a", "Desktop", "pass", 1),
+      dev("b", "Desktop", "pass", 2),
+      dev("b", "Mobile", "pass", 2),
+    ];
+    const desk = dev("b", "Desktop", "pass", 3);
+    const mob = dev("b", "Mobile", "pass", 4);
+    const { confirms } = splitConfirms([failed, ...others, desk, mob]);
+    expect(confirms).toEqual([
+      { of: null, confirm: desk },
+      { of: failed, confirm: mob },
+    ]);
+  });
+
+  it("should find no confirm job in a run that tests each slot once", () => {
+    const runs = [exec("a", "fail", 1), exec("b", "pass", 2)];
+    expect(splitConfirms(runs)).toEqual({ primary: runs, confirms: [] });
+  });
+});
+
+describe("confirmedStatus", () => {
+  it("should count a failure only when its confirm job fails too", () => {
+    expect(confirmedStatus("fail", "pass")).toBe("warning");
+    expect(confirmedStatus("fail", "warning")).toBe("warning");
+    expect(confirmedStatus("fail", "fail")).toBe("fail");
+    // A confirm job that timed out keeps the original vote.
+    expect(confirmedStatus("fail", "error")).toBe("fail");
+    expect(confirmedStatus("fail")).toBe("fail");
+    expect(confirmedStatus("pass", "fail")).toBe("pass");
+  });
+});

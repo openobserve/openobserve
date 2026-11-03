@@ -169,6 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :fail-count="timelineFailCount"
                     :pass-count="timelinePassCount"
                     :mixed-count="timelineMixedCount"
+                    :not-measured-count="timelineNotMeasuredCount"
                     :start-label="timelineStartLabel"
                     :end-label="timelineEndLabel"
                   />
@@ -1159,10 +1160,12 @@ import analytics from "@/services/product_analytics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
 import {
   rollUpStatus,
+  type ExecutionStatus,
   tallyStatuses,
   type AggregateStatus,
   type StatusTally,
 } from "@/utils/synthetics/rollUpStatus";
+import { confirmedStatus, splitConfirms } from "@/utils/synthetics/confirmJobs";
 import { formatTimeWithSuffix } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -1576,6 +1579,8 @@ function toMockRun(r: SyntheticRun, idx: number): MockRun {
     browser,
     device: r.device,
     environment: r.environment,
+    errorSource: r.errorSource,
+    statusReason: r.statusReason,
     failedStep: null,
     locator: null,
     action: null,
@@ -1633,10 +1638,9 @@ const p95Label = computed(() =>
   effectiveP95Ms.value > 0 ? fmtDur(effectiveP95Ms.value) : hasKpiData.value ? fmtDur(0) : "—",
 );
 const p95Ms = computed(() => effectiveP95Ms.value);
-// Errors roll up into "failed" here (as the timeline does via rollUpStatus) so the "Errors over time" badge doesn't read 0 while error records exist.
-const failCount = computed(() =>
-  String(synthetics.kpi.value.failedRuns + synthetics.kpi.value.errorRuns),
-);
+// Failures of the site only, matching the chart it labels: an `error` run did not test the site
+// (Not measured), and the error-runs KPI card counts those on their own.
+const failCount = computed(() => String(synthetics.kpi.value.failedRuns));
 
 interface KpiCard {
   key: string;
@@ -1785,9 +1789,11 @@ interface TimelineExecution {
   location: string;
   browserEngine: string;
   device: string;
-  status: "pass" | "warning" | "fail" | "error";
+  status: ExecutionStatus;
   statusIcon: string;
   errorSnippet: string | null;
+  /** The confirm job that re-tested this failure from a second location. */
+  confirm: { location: string; status: ExecutionStatus } | null;
 }
 
 interface TimelineSegment {
@@ -1804,6 +1810,17 @@ interface TimelineSegment {
 }
 
 // ── Status timeline ──────────────────────────────────────────────────────
+/**
+ * The timeline's status for one execution. An `error` row that a config error
+ * caused is the owner's to fix, so it reads as a failure; every other `error`
+ * row did not test the site and stays `error` (Not measured).
+ */
+function executionStatus(e: MockRun): ExecutionStatus {
+  if (e.status !== "error") return e.status;
+  const misconfigured = e.errorSource === "config" && e.statusReason !== "config_reference_pending";
+  return misconfigured ? "fail" : "error";
+}
+
 function segmentsFor(runs: MockRun[]): TimelineSegment[] {
   if (runs.length === 0) return [];
 
@@ -1823,7 +1840,14 @@ function segmentsFor(runs: MockRun[]): TimelineSegment[] {
 
   return groupOrder.map((runId) => {
     const executions = groupMap.get(runId)!;
-    const statuses = executions.map((e) => e.status);
+    // A confirm job is one vote with the failure it re-tested, so it leaves the roll-up and shows
+    // under that failure instead.
+    const slots = executions.map((e) => ({ ...e, status: executionStatus(e), run: e }));
+    const { primary, confirms } = splitConfirms(slots);
+    const confirmOf = new Map(
+      confirms.filter((c) => c.of).map((c) => [c.of!.run, c.confirm] as const),
+    );
+    const statuses = primary.map((e) => confirmedStatus(e.status, confirmOf.get(e.run)?.status));
     const status = rollUpStatus(statuses);
     const tally = tallyStatuses(statuses);
 
@@ -1834,7 +1858,9 @@ function segmentsFor(runs: MockRun[]): TimelineSegment[] {
           ? "bg-badge-warning-solid-bg/80"
           : status === "all-fail"
             ? "bg-badge-error-solid-bg/80"
-            : "bg-badge-orange-solid-bg/80";
+            : status === "not-measured"
+              ? "bg-badge-default-solid-bg/50"
+              : "bg-badge-orange-solid-bg/80";
 
     const title =
       status === "all-pass"
@@ -1843,30 +1869,32 @@ function segmentsFor(runs: MockRun[]): TimelineSegment[] {
           ? t("synthetics.runs.timelineAllWarning", { count: tally.total })
           : status === "all-fail"
             ? t("synthetics.runs.timelineAllFailed", { count: tally.total })
-            : t("synthetics.runs.timelineMixed", {
-                // `passed` here is "not failed", matching the mixed-run wording
-                // ("N of M passed"). Warnings are healthy runs with a caveat, and
-                // the tooltip breaks them out separately.
-                passed: tally.passed + tally.warning,
-                failed: tally.failed,
-                total: tally.total,
-              });
+            : status === "not-measured"
+              ? t("synthetics.runs.timelineNotMeasured")
+              : t("synthetics.runs.timelineMixed", {
+                  // `passed` here is "not failed", matching the mixed-run wording
+                  // ("N of M passed"). Warnings are healthy runs with a caveat, and
+                  // the tooltip breaks them out separately.
+                  passed: tally.passed + tally.warning,
+                  failed: tally.failed,
+                  total: tally.total,
+                });
 
-    const execDetails: TimelineExecution[] = executions.map((e) => ({
-      location: locationLabel(e.location),
-      browserEngine: e.browser,
-      device: e.device,
-      status:
-        e.status === "pass"
-          ? "pass"
-          : e.status === "warning"
-            ? "warning"
-            : e.status === "error"
-              ? "error"
-              : "fail",
-      statusIcon: e.status === "pass" || e.status === "warning" ? "check_circle" : "cancel",
-      errorSnippet: e.errorPattern ? e.errorPattern.split(":")[0].substring(0, 50) : null,
-    }));
+    const execDetails: TimelineExecution[] = primary.map((slot, i) => {
+      const e = slot.run;
+      const confirm = confirmOf.get(e);
+      return {
+        location: locationLabel(e.location),
+        browserEngine: e.browser,
+        device: e.device,
+        status: statuses[i],
+        statusIcon: e.status === "pass" || e.status === "warning" ? "check_circle" : "cancel",
+        errorSnippet: e.errorPattern ? e.errorPattern.split(":")[0].substring(0, 50) : null,
+        confirm: confirm
+          ? { location: locationLabel(confirm.location), status: confirm.status }
+          : null,
+      };
+    });
 
     return {
       runId,
@@ -1913,6 +1941,9 @@ const timelineFailCount = computed(() =>
 );
 const timelinePassCount = computed(() =>
   String(timelineSegments.value.filter((s) => s.status === "all-pass").length),
+);
+const timelineNotMeasuredCount = computed(() =>
+  String(timelineSegments.value.filter((s) => s.status === "not-measured").length),
 );
 const timelineMixedCount = computed(() =>
   String(
@@ -2205,6 +2236,9 @@ interface MockRun {
   /** '' = unattributed — an unscoped check or a pre-stamp historical row. */
   environment: string;
   triggerType: string;
+  /** Who caused an `error` row: our side (Not measured) or the check's config. */
+  errorSource?: string;
+  statusReason?: string;
   failedStep: string | null;
   locator: string | null;
   action: string | null;
@@ -2652,7 +2686,7 @@ const responseChartOption = computed(() => {
         type: "line" as const,
         smooth: true,
         showSymbol: false,
-        data: byEnv.get(env)!.map((b) => [b.tsMs, b.p95Ms] as [number, number]),
+        data: byEnv.get(env)!.map((b) => [b.tsMs, b.p95Ms] as [number, number | null]),
         lineStyle: {
           color: cssVar(ENV_SERIES_TOKENS[i % ENV_SERIES_TOKENS.length], "#3b82f6"),
           width: 1.5,
@@ -2663,9 +2697,10 @@ const responseChartOption = computed(() => {
     };
   }
 
-  let seriesData: [number, number][];
+  // A null p95 is a bucket no run tested: ECharts leaves a gap there.
+  let seriesData: [number, number | null][];
   if (synthetics.buckets.value.length > 0) {
-    seriesData = synthetics.buckets.value.map((b) => [b.tsMs, b.p95Ms] as [number, number]);
+    seriesData = synthetics.buckets.value.map((b) => [b.tsMs, b.p95Ms] as [number, number | null]);
   } else {
     const rB = seedRand(31);
     const bucketCount = 24;
@@ -2729,7 +2764,8 @@ const errorChartOption = computed(() => {
         minute: "2-digit",
       });
     });
-    data = synthetics.buckets.value.map((b) => b.failedRuns + b.errorRuns);
+    // Not measured runs are not failures of the site: they stay out of this chart.
+    data = synthetics.buckets.value.map((b) => b.failedRuns);
   } else {
     const rB = seedRand(31);
     const bucketCount = 24;

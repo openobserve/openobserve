@@ -2014,7 +2014,8 @@ pub fn service_routes() -> Router {
             )
             .route(
                 "/{org_id}/status_pages/notices/{nid}/mark_false_positive",
-                post(status_pages::admin::mark_false_positive),
+                post(status_pages::admin::mark_false_positive)
+                    .delete(status_pages::admin::undo_false_positive),
             )
             .route(
                 "/{org_id}/status_pages/{id}/domains",

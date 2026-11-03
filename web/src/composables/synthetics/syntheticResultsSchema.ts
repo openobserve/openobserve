@@ -822,9 +822,11 @@ export interface RunLocationResult {
 
 export interface SyntheticBucket {
   tsMs: number;
-  avgMs: number;
-  p95Ms: number;
-  uptimePct: number;
+  /** Null when no run in the bucket tested the site: the chart draws a gap. */
+  avgMs: number | null;
+  p95Ms: number | null;
+  /** Up share of the runs that tested the site; null when none did. */
+  uptimePct: number | null;
   warningRuns: number;
   /** Count of runs with status = 'failed' (actual failures, not warnings or errors). */
   failedRuns: number;
@@ -1059,10 +1061,13 @@ export function buildHistogramSql(
     ? `\n  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}' AND status_reason = '${STATUS_REASON.flaky}') as flaky_runs,` +
       `\n  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}' AND status_reason != '' AND status_reason != '${STATUS_REASON.flaky}') as degraded_runs,`
     : "";
+  // Durations come from runs that tested the site: an `error` row (Not measured) has no real
+  // response time, and a bucket of only those is a gap, not a 0 ms point.
+  const measuredDuration = `CASE WHEN ${F.status} != '${STATUS_VALUES.error}' THEN ${F.duration} END`;
   return `SELECT
   histogram(${F.timestamp}, '${interval}') as ts,${envCol}
-  COALESCE(AVG(${F.duration}), 0) as avg_duration,
-  COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration,${retriedClause}${reasonClauses}
+  AVG(${measuredDuration}) as avg_duration,
+  approx_percentile_cont(${measuredDuration}, 0.95) as p95_duration,${retriedClause}${reasonClauses}
   COUNT(*) as total_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}') as warning_runs,
@@ -1084,7 +1089,7 @@ export function buildP95Sql(monitorId: string, environment?: string): string {
   const id = escapeSqlLiteral(monitorId);
   return `SELECT COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration
 FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}'${environmentPredicate(environment)}`;
+WHERE ${F.monitorId} = '${id}' AND ${F.status} != '${STATUS_VALUES.error}'${environmentPredicate(environment)}`;
 }
 
 // ── Query builders ────────────────────────────────────────────────────────
@@ -2238,9 +2243,9 @@ export function mapHistogram(
     const key = new Date(t).toISOString().slice(0, 19);
     buckets.set(key, {
       tsMs: t,
-      avgMs: 0,
-      p95Ms: 0,
-      uptimePct: 100,
+      avgMs: null,
+      p95Ms: null,
+      uptimePct: null,
       warningRuns: 0,
       failedRuns: 0,
       errorRuns: 0,
@@ -2250,14 +2255,15 @@ export function mapHistogram(
   for (const hit of rawHits) {
     const key = str(hit.ts);
     const tsMs = new Date(`${key}Z`).getTime();
-    const total = num(hit.total_runs);
     const passed = num(hit.passed_runs);
     const warning = num(hit.warning_runs);
+    // Uptime counts only runs that tested the site; Not measured runs change neither side.
+    const measured = num(hit.total_runs) - num(hit.error_runs);
     buckets.set(key, {
       tsMs: Number.isFinite(tsMs) ? tsMs : 0,
-      avgMs: num(hit.avg_duration),
-      p95Ms: num(hit.p95_duration),
-      uptimePct: total > 0 ? ((passed + warning) / total) * 100 : 100,
+      avgMs: measured > 0 ? num(hit.avg_duration) : null,
+      p95Ms: measured > 0 ? num(hit.p95_duration) : null,
+      uptimePct: measured > 0 ? ((passed + warning) / measured) * 100 : null,
       warningRuns: num(hit.warning_runs),
       failedRuns: num(hit.failed_runs),
       errorRuns: num(hit.error_runs),
@@ -2287,12 +2293,13 @@ export function mapHistogramSplit(
       blendedByTs.set(key, { ...hit });
       continue;
     }
-    const prevTotal = num(prev.total_runs);
-    const total = num(hit.total_runs);
+    // Weighted by the runs that tested the site, the only rows the averages cover.
+    const prevTotal = num(prev.total_runs) - num(prev.error_runs);
+    const total = num(hit.total_runs) - num(hit.error_runs);
     prev.avg_duration =
       prevTotal + total > 0
         ? (num(prev.avg_duration) * prevTotal + num(hit.avg_duration) * total) / (prevTotal + total)
-        : 0;
+        : null;
     // Percentiles do not add; the slowest part's p95 bounds the blend from above.
     prev.p95_duration = Math.max(num(prev.p95_duration), num(hit.p95_duration));
     for (const k of [

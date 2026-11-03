@@ -533,6 +533,9 @@ async fn open_notice(
             auto_check_id: Some(check_id.to_string()),
             auto_recovery_streak: 0,
             owner: None,
+            false_alarm_by: None,
+            false_alarm_at: None,
+            false_alarm_reason: None,
             created_at: now,
             updated_at: now,
         },
@@ -659,6 +662,10 @@ fn build_page_snapshot(
         let mut incident_segments = Vec::new();
         let mut maint_segments = Vec::new();
         for n in &notices {
+            // A false alarm leaves the public page: no history entry, no downtime.
+            if n.excluded_from_uptime {
+                continue;
+            }
             page_notice_ids.insert(n.id.clone());
             let impact = engine::Impact::from_i16(n.impact as i16);
             if n.state == 1 {
@@ -693,10 +700,13 @@ fn build_page_snapshot(
             // service is up, so show "no data" rather than plain Operational.
             status = engine::ComponentStatus::NoData;
         }
+        let (last_checked_at, stale_after_secs) = last_checked(&mapped, &data.states);
         current_components.push(engine::CurrentComponent {
             key: key.clone(),
             name: component.name.clone(),
             status,
+            last_checked_at,
+            stale_after_secs,
         });
         history_components.push(engine::HistoryComponent {
             key,
@@ -742,6 +752,50 @@ fn all_checks_in_error(mapped: &[&str], states: &[table::CheckStateRow]) -> bool
             // data.
             .is_some_and(|s| s.last_check_status == engine::CHECK_STATUS_ERROR && s.up_runs == 0)
     })
+}
+
+/// When a check last tested the site: the newest finalized run, unless that run did not test it.
+/// After a Not measured or Misconfigured run the last test is the run before the class began,
+/// one interval before `last_run_class_at`.
+fn tested_at(s: &table::CheckStateRow) -> Option<i64> {
+    use config::meta::synthetics::RunClass;
+    let ts = match RunClass::from_db(s.last_run_class) {
+        RunClass::Up | RunClass::Partial | RunClass::Down => s.status_run_ts,
+        RunClass::NotMeasured | RunClass::Misconfigured => {
+            if s.interval_secs == 0 {
+                return None;
+            }
+            s.last_run_class_at - s.interval_secs * 1_000_000
+        }
+        // A row from before the run class existed: trust the badge.
+        RunClass::Unknown if s.last_check_status != engine::CHECK_STATUS_ERROR => {
+            s.status_run_ts.max(s.last_triggered_at)
+        }
+        RunClass::Unknown => return None,
+    };
+    (ts > 0).then_some(ts)
+}
+
+/// A component's "Last checked" time, floored to the minute, and its stale threshold: three
+/// intervals of its slowest mapped check.
+fn last_checked(mapped: &[&str], states: &[table::CheckStateRow]) -> (Option<i64>, Option<i64>) {
+    const MINUTE_US: i64 = 60_000_000;
+    let rows: Vec<&table::CheckStateRow> = states
+        .iter()
+        .filter(|s| mapped.contains(&s.id.as_str()))
+        .collect();
+    let last = rows
+        .iter()
+        .filter_map(|s| tested_at(s))
+        .max()
+        .map(|ts| ts - ts.rem_euclid(MINUTE_US));
+    let stale_after = rows
+        .iter()
+        .map(|s| s.interval_secs)
+        .max()
+        .filter(|secs| *secs > 0)
+        .map(|secs| secs * 3);
+    (last, stale_after)
 }
 
 fn public_notice(
@@ -824,7 +878,46 @@ mod fast_pass_tests {
             down_runs: 0,
             up_runs: 0,
             last_triggered_at: 0,
+            status_run_ts: 0,
+            last_run_class: 0,
+            last_run_class_at: 0,
+            interval_secs: 60,
         }
+    }
+
+    #[test]
+    fn last_checked_is_the_newest_run_that_tested_the_site() {
+        const MIN: i64 = 60_000_000;
+        let mut up = row("a", 1);
+        up.last_run_class = 1;
+        up.status_run_ts = 10 * MIN + 42_000_000;
+        // Not measured since minute 20 on a 2 minute interval, so its last test was minute 18.
+        let mut gap = row("b", 4);
+        gap.last_run_class = 4;
+        gap.status_run_ts = 25 * MIN;
+        gap.last_run_class_at = 20 * MIN;
+        gap.interval_secs = 120;
+        let states = vec![up.clone(), gap.clone()];
+        assert_eq!(last_checked(&["a"], &states), (Some(10 * MIN), Some(180)));
+        assert_eq!(last_checked(&["a", "b"], &states), (Some(18 * MIN), Some(360)));
+        // Misconfigured did not test the site either.
+        let mut bad = gap.clone();
+        bad.last_run_class = 5;
+        assert_eq!(tested_at(&bad), Some(18 * MIN));
+    }
+
+    #[test]
+    fn last_checked_is_absent_without_a_tested_run() {
+        let mut fresh = row("a", 0);
+        fresh.interval_secs = 0;
+        assert_eq!(last_checked(&["a"], &[fresh.clone()]), (None, None));
+        // A legacy row with an error badge has no known test time.
+        let legacy = row("b", engine::CHECK_STATUS_ERROR);
+        assert_eq!(tested_at(&legacy), None);
+        let mut legacy_ok = row("c", 1);
+        legacy_ok.last_triggered_at = 7;
+        assert_eq!(tested_at(&legacy_ok), Some(7));
+        assert_eq!(last_checked(&["missing"], &[fresh]), (None, None));
     }
 
     #[test]

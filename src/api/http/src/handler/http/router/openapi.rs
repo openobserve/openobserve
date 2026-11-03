@@ -544,6 +544,7 @@ use crate::{
         openobserve_api_management::request::status_pages::admin::list_page_notices,
         openobserve_api_management::request::status_pages::admin::list_pages,
         openobserve_api_management::request::status_pages::admin::mark_false_positive,
+        openobserve_api_management::request::status_pages::admin::undo_false_positive,
         openobserve_api_management::request::status_pages::admin::preview,
         openobserve_api_management::request::status_pages::admin::rotate_slug,
         openobserve_api_management::request::status_pages::admin::set_components,

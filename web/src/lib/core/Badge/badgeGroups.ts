@@ -538,6 +538,18 @@ export const BADGE_GROUPS = {
       // Synthetics infrastructure error (backend status 4): the probe could not
       // run, which is not the same as the target failing.
       error: { variant: "error-soft", labelKey: "components.badge.serviceStatus.error" },
+      // Synthetics run classes: failing below quorum, not tested by us, or a
+      // config error the owner must fix.
+      partial: { variant: "amber-soft", labelKey: "components.badge.serviceStatus.partial" },
+      // Looked up as "not_measured"; keys are stored normalised.
+      notmeasured: {
+        variant: "default-soft",
+        labelKey: "components.badge.serviceStatus.notMeasured",
+      },
+      misconfigured: {
+        variant: "error-soft",
+        labelKey: "components.badge.serviceStatus.misconfigured",
+      },
       unknown: { variant: "default-soft", labelKey: "common.unknown" },
     },
   },

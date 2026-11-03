@@ -20041,6 +20041,9 @@
       "durationMid": "5-15s",
       "durationSlow": "> 15s",
       "failed": "Failed",
+      "misconfigured": "Misconfigured",
+      "notMeasured": "Not measured",
+      "partial": "Partial",
       "passed": "Passed",
       "warning": "Warning"
     },
@@ -20838,6 +20841,7 @@
       "tabOverview": "Overview",
       "tabSteps": "Steps",
       "timelineAllFailed": "All {count} failed",
+      "timelineNotMeasured": "Not measured",
       "timelineAllPassed": "All {count} passed",
       "timelineAllWarning": "All {count} warning",
       "timelineMixed": "{passed} passed, {failed} failed of {total}",
@@ -20971,6 +20975,7 @@
       "scheduledAt": "Scheduled At",
       "status": "Status",
       "statusDegraded": "⚠ Degraded",
+      "notMeasuredSince": "Not measured since {time}",
       "statusDown": "✗ Down",
       "statusUp": "✓ Up",
       "steps": "Steps",
@@ -21006,7 +21011,14 @@
       "scrollLeft": "Scroll timeline left",
       "scrollRight": "Scroll timeline right",
       "title": "Status Timeline",
+      "confirmFailed": "failed",
+      "confirmFrom": "Confirm from {location}: {result}",
+      "confirmNotMeasured": "not measured",
+      "confirmPassed": "passed",
+      "notMeasured": "Not measured",
+      "notMeasuredNote": "Not measured. OpenObserve could not reach the probe. Your site was not tested.",
       "tooltipFailed": "{count} failed",
+      "tooltipNotMeasured": "{count} not measured",
       "tooltipPassed": "{count} passed",
       "tooltipWarning": "{count} warning",
       "warning": "Warning"
@@ -21272,6 +21284,19 @@
       "affects": "Affects",
       "allComponents": "All components",
       "componentsUnavailable": "Components no longer on this page",
+      "falseAlarm": {
+        "action": "Mark as false alarm",
+        "badge": "False alarm",
+        "confirm": "Mark as false alarm",
+        "help": "The incident resolves now, leaves the public page and stops counting as downtime. You can undo this.",
+        "markFailed": "Failed to mark the incident as a false alarm",
+        "marked": "Marked as a false alarm",
+        "markedBy": "Marked by {by}: {reason}",
+        "reason": "Reason",
+        "restored": "False alarm mark removed",
+        "undo": "Undo false alarm",
+        "undoFailed": "Failed to remove the false alarm mark"
+      },
       "state": {
         "scheduled": "Scheduled",
         "active": "Active",
@@ -22039,7 +22064,10 @@
         "critical": "Critical",
         "offline": "Offline",
         "failed": "Failed",
-        "down": "Down"
+        "down": "Down",
+        "partial": "Failing in some locations",
+        "notMeasured": "Not measured",
+        "misconfigured": "Misconfigured"
       },
       "severity": {
         "critical": "Critical",
