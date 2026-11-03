@@ -104,7 +104,7 @@ async fn read_databases_window(
         ..Default::default()
     };
 
-    let totals_sql = build_stats_sql(org_id, "db_totals", &totals_filters.sql_preds());
+    let totals_sql = build_stats_sql(org_id, "db_totals", &totals_filters.sql_preds(&[]));
     // The overview consumes only dimensions, `calling_services` inputs and the
     // merge metrics from `query_stats` rows — never `query_norm` (up to 4 KB
     // per row) nor `operation`/`stmt_class`. Projecting spares the columnar
@@ -133,8 +133,12 @@ async fn read_databases_window(
         ],
     )
     .await;
-    let qs_sql =
-        build_stats_sql_projected(org_id, "query_stats", &filters.sql_preds(), &qs_projection);
+    let qs_sql = build_stats_sql_projected(
+        org_id,
+        "query_stats",
+        &filters.sql_preds(&[]),
+        &qs_projection,
+    );
     // Concurrent, where they were awaited one after the other: two independent
     // record families over the same summary stream have no ordering to honour.
     let (totals_rows, qs_rows) = match tokio::join!(

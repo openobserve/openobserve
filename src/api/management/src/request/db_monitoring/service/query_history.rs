@@ -250,17 +250,26 @@ pub(crate) async fn read_query_history_response(
         ..Default::default()
     };
 
+    let stats_schema = read_stats_schema(org_id).await;
+    let absent = stats_schema
+        .as_ref()
+        .map(absent_gated_columns)
+        .unwrap_or_default();
     let fp_sql = build_stats_sql(
         org_id,
         "query_stats",
-        &format!("{}{}", filters.sql_preds(), fingerprint_pred(fingerprint)),
+        &format!(
+            "{}{}",
+            filters.sql_preds(&absent),
+            fingerprint_pred(fingerprint)
+        ),
     );
     // The history `db_totals` read feeds only window existence (distinct
     // `_timestamp`s under the totals filters), backfill ranges and backfill-stream
     // resolution — never the metrics — so it projects the columns those consume
     // instead of dragging every stored column per row.
-    let totals_projection = stats_projection(
-        org_id,
+    let totals_projection = stats_projection_from(
+        stats_schema.as_ref(),
         &[
             "_timestamp",
             "window_start",
@@ -268,12 +277,11 @@ pub(crate) async fn read_query_history_response(
             "db_system",
             "db_instance",
         ],
-    )
-    .await;
+    );
     let totals_sql = build_stats_sql_projected(
         org_id,
         "db_totals",
-        &totals_filters.sql_preds(),
+        &totals_filters.sql_preds(&absent),
         &totals_projection,
     );
 
@@ -305,7 +313,7 @@ pub(crate) async fn read_query_history_response(
             "error_class",
             &format!(
                 "{}{}",
-                ec_filters.sql_preds(),
+                ec_filters.sql_preds(&absent),
                 fingerprint_pred(fingerprint)
             ),
         );

@@ -1686,6 +1686,9 @@ export default defineComponent({
       // watcher always sees both values together — no timing race.
       aiChatPayload.value = { text, autoSend: shouldAutoSend, id: Date.now() };
 
+      // An auto-sent prompt would come back as a chip after sendMessage clears the composer.
+      if (shouldAutoSend) return;
+
       // Keep legacy aiChatInputContext in sync for other callers
       aiChatInputContext.value = "";
       nextTick(() => {

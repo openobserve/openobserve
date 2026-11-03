@@ -164,7 +164,7 @@ pub(crate) async fn read_samples_body(
         stream: q.stream.clone(),
         ..Default::default()
     };
-    let totals_sql = build_stats_sql(org_id, "db_totals", &totals_filters.sql_preds());
+    let totals_sql = build_stats_sql(org_id, "db_totals", &totals_filters.sql_preds(&[]));
     let totals_rows =
         match run_stats_search(org_id, Some(user_id), totals_sql, start_time, end_time).await {
             Ok(rows) => rows,
