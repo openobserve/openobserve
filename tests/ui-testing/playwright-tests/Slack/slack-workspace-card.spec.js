@@ -17,6 +17,7 @@ test.describe('Slack workspace card', { tag: ['@slack', '@enterprise'] }, () => 
   let slackOn = false;
   let install;
   const orgs = {};
+  const orgNames = {};
   const dest = { a: `slack_pw_card_a_${api.uniq()}`, b: `slack_pw_card_b_${api.uniq()}`, c: `slack_pw_card_c_${api.uniq()}` };
 
   test.beforeAll(async ({ browser, playwright }) => {
@@ -24,7 +25,9 @@ test.describe('Slack workspace card', { tag: ['@slack', '@enterprise'] }, () => 
     const config = await api.orgConfig(apiContext, process.env.ORGNAME || 'default');
     slackOn = config.slack_enabled === true;
     if (!slackOn) return;
-    orgs.main = (await api.createOrg(apiContext, 'slack_pw_card')).id;
+    const main = await api.createOrg(apiContext, 'slack_pw_card');
+    orgs.main = main.id;
+    orgNames.main = main.name;
     orgs.other = (await api.createOrg(apiContext, 'slack_pw_card_other')).id;
     orgs.leaving = (await api.createOrg(apiContext, 'slack_pw_card_leaving')).id;
     install = await api.storedInstall(apiContext, orgs.main, TEAM);
@@ -59,7 +62,7 @@ test.describe('Slack workspace card', { tag: ['@slack', '@enterprise'] }, () => 
 
     const thisOrgRow = slack.card.connectedOrgs.locator('tbody:not([data-test="o2-table-skeleton-body"]) tr');
     await expect(thisOrgRow).toHaveCount(1);
-    await expect(thisOrgRow).toContainText(`${orgs.main} (this org)`);
+    await expect(thisOrgRow).toContainText(`${orgNames.main} (this org)`);
     await expect(thisOrgRow).toContainText('2');
     await expect(slack.card.connectedOrgs).toContainText('2 other orgs');
     await expect(slack.card.connectedOrgs).not.toContainText(orgs.other);

@@ -260,6 +260,7 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
         <OButton
           variant="primary"
           size="sm-action"
+          icon-left="sync"
           :loading="
             popup.connecting.value &&
             action.kind === 'install' &&
@@ -288,6 +289,7 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
         <OButton
           variant="primary"
           size="sm-action"
+          icon-left="link"
           :loading="connectInstallation.isPending.value"
           data-test="slack-connect-ticket"
           @click="connectWithTicket"
@@ -296,6 +298,39 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
         </OButton>
       </template>
     </OBanner>
+
+    <OCard
+      v-if="!isCloud && offered.length"
+      variant="outlined"
+      class="gap-3 p-5"
+      data-test="slack-available"
+    >
+      <div class="flex flex-col gap-1">
+        <h2 class="text-text-heading m-0 text-lg font-semibold">
+          {{ t("slackApp.connect.existingTitle") }}
+        </h2>
+        <p class="text-text-secondary m-0 text-sm">
+          {{ t("slackApp.connect.existingDescription") }}
+        </p>
+      </div>
+      <div
+        v-for="item in offered"
+        :key="item.installation_id"
+        class="border-border-default flex items-center justify-between gap-3 border-t pt-3"
+        :data-test="`slack-available-${item.installation_id}`"
+      >
+        <span class="text-text-body text-sm font-medium">{{ raw(item.team_name) }}</span>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          icon-left="link"
+          :loading="popup.connecting.value && connectingId === item.installation_id"
+          @click="runPopup({ kind: 'connect', installationId: item.installation_id })"
+        >
+          {{ t("slackApp.connect.connectExisting") }}
+        </OButton>
+      </div>
+    </OCard>
 
     <OCard variant="outlined">
       <OEmptyState
@@ -327,8 +362,9 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
           </OButton>
           <OButton
             v-else
-            variant="primary"
+            :variant="offered.length ? 'outline' : 'primary'"
             size="md"
+            icon-left="settings"
             data-test="slack-setup-app"
             @click="emit('setup')"
           >
@@ -379,38 +415,6 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
           </OBanner>
         </template>
       </OEmptyState>
-    </OCard>
-
-    <OCard
-      v-if="!isCloud && offered.length"
-      variant="outlined"
-      class="gap-3 p-5"
-      data-test="slack-available"
-    >
-      <div class="flex flex-col gap-1">
-        <h2 class="text-text-heading m-0 text-lg font-semibold">
-          {{ t("slackApp.connect.existingTitle") }}
-        </h2>
-        <p class="text-text-secondary m-0 text-sm">
-          {{ t("slackApp.connect.existingDescription") }}
-        </p>
-      </div>
-      <div
-        v-for="item in offered"
-        :key="item.installation_id"
-        class="border-border-default flex items-center justify-between gap-3 border-t pt-3"
-        :data-test="`slack-available-${item.installation_id}`"
-      >
-        <span class="text-text-body text-sm font-medium">{{ raw(item.team_name) }}</span>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          :loading="popup.connecting.value && connectingId === item.installation_id"
-          @click="runPopup({ kind: 'connect', installationId: item.installation_id })"
-        >
-          {{ t("slackApp.connect.connectExisting") }}
-        </OButton>
-      </div>
     </OCard>
   </div>
 </template>

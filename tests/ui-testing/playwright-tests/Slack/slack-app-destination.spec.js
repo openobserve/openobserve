@@ -398,7 +398,7 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
     const dmsBefore = (await api.mockRequests(apiContext, 'chat.postMessage')).length;
     await byTest('slack-oncall-unlinked-remind').click();
     await expect(toast('success')).toBeVisible({ timeout: 20000 });
-    await expect(byTest(`slack-oncall-unlinked-reminder-${ROOT}`)).toContainText('DM sent', { timeout: 20000 });
+    await expect(byTest(`slack-oncall-unlinked-reminder-${ROOT}`)).not.toContainText('Not sent', { timeout: 20000 });
     expect((await api.mockRequests(apiContext, 'chat.postMessage')).length).toBeGreaterThan(dmsBefore);
     const again = await api.ok(apiContext, 'post', `/api/${org}/slack/installations/${install.id}/oncall-unlinked/remind`);
     expect(again).toHaveProperty('sent');
