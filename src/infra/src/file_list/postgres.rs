@@ -2173,7 +2173,6 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                     Err(Error::Message(e.to_string()))
                 }
             }
-            // ON CONFLICT DO NOTHING returns 0 rows when the row already exists
             Err(e) => Err(e.into()),
             Ok(v) => Ok(v.unwrap_or(0)),
         }
