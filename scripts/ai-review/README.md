@@ -120,7 +120,9 @@ the same change only where it sits once in the base, so both the write and the s
 hunk's old lines (context and removed lines) to occur exactly once in its base file (`hunksLocatable`);
 an edit to one of two identical blocks, or a base file that cannot be read, reviews. When a new head's pinned diff has the same fingerprint, the run
 skips with `unchanged_diff` before any model call: it uses no pass, keeps the review and its merge
-confidence, and moves the `o2-review-sha` tag and the `Reviewed commit` line to the new head. The
+confidence, and moves the `o2-review-sha` tag to the new head; the `Reviewed commit` line keeps the
+commit the findings' line numbers refer to. Binary files keep their blob ids and trailing spaces count, so
+both still change the fingerprint. The
 check runs ahead of the review cap, so such a push is skipped, not refused, after the cap. A manual
 dispatch (`REVIEW_MANUAL_RUN`), `force_full` or `ignore_pass_limit` always reviews, and so does a
 diff that is not pinned to the head. In `approve` mode the skip still dismisses the earlier

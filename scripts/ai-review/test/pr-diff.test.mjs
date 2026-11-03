@@ -298,3 +298,10 @@ test("an edit to one of two identical blocks in a function cannot be located, so
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a changed binary file or trailing space on the last line changes the fingerprint", () => {
+  const bin = id => `diff --git a/m.wasm b/m.wasm\nindex 1111111..${id} 100644\nBinary files a/m.wasm and b/m.wasm differ\n`;
+  assert.notEqual(diffFingerprint(bin("2222222")), diffFingerprint(bin("3333333")));
+  const csv = tail => `diff --git a/a.csv b/a.csv\nindex 1111111..2222222 100644\n--- a/a.csv\n+++ b/a.csv\n@@ -1 +1 @@\n-x\n+secret${tail}\n`;
+  assert.notEqual(diffFingerprint(csv(" ")), diffFingerprint(csv("  ")));
+});

@@ -106,12 +106,9 @@ export function shouldSkipAsUnchangedDiff(body, fingerprint, { pinned = false, f
   return reviewedDiffFingerprint(body) === fingerprint;
 }
 
-// Costs no pass: the review stays as it was and now names the new head, so the next push compares against it too.
+// Costs no pass; the visible commit stays the reviewed one because finding line numbers refer to it, while the tag moves so the next push compares against this head.
 export function bodyAtUnchangedDiff(body, key, maxPasses) {
-  const restored = bodyAtReviewedHead(body, maxPasses);
-  const line = reviewedCommitLine(key, reviewPassCount(restored), maxPasses);
-  const relined = restored.search(REVIEWED_COMMIT_LINE_RE) !== -1 ? restored.replace(REVIEWED_COMMIT_LINE_RE, `\n\n${line}`) : restored;
-  return withReviewShaTag(relined, key);
+  return withReviewShaTag(bodyAtReviewedHead(body, maxPasses), key);
 }
 
 export function shouldSkipAsReviewed(body, key, { ignorePassLimit = false, forceFull = false, manual = false } = {}) {

@@ -58,12 +58,15 @@ export function fetchPinnedDiff(params) {
 
 // Blob ids and hunk line numbers move with the base, so a rebase keeps the fingerprint; the function context after `@@` stays, as the same lines in another function are another change.
 export function diffFingerprint(diff) {
-  const normalized = String(diff ?? "")
+  const text = String(diff ?? "");
+  // A binary file has no hunks, so its blob ids are the only record of its content.
+  const keepBlobIds = /^(Binary files .* differ|GIT binary patch)$/m.test(text);
+  const normalized = text
     .split("\n")
-    .filter(line => !/^index [0-9a-f]+\.\.[0-9a-f]+/.test(line))
+    .filter(line => keepBlobIds || !/^index [0-9a-f]+\.\.[0-9a-f]+/.test(line))
     .map(line => line.replace(/^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/, "@@"))
     .join("\n")
-    .trimEnd();
+    .replace(/\n+$/, "");
   return createHash("sha256").update(normalized).digest("hex");
 }
 

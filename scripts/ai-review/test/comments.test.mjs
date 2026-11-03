@@ -687,14 +687,13 @@ test("a partial review leaves no fingerprint, so the next push with the same dif
   assert.equal(reviewedDiffFingerprint(overOld), "", "an earlier complete review's fingerprint does not survive a partial one");
 });
 
-test("skipping an unchanged diff moves the head marker and commit line to the new head and costs no pass", () => {
+test("skipping an unchanged diff moves the head marker, keeps the reviewed commit its line numbers refer to, and costs no pass", () => {
   const body = stampedReview();
   const next = bodyAtUnchangedDiff(body, HEAD_2, 0);
   assert.equal(reviewedKey(next), HEAD_2);
   assert.equal(reviewedDiffFingerprint(next), FP_A);
   assert.equal(reviewPassCount(next), 1);
-  assert.match(next, new RegExp(`Reviewed commit \`${HEAD_2.slice(0, 7)}\``));
-  assert.doesNotMatch(next, new RegExp(HEAD_1.slice(0, 7)));
+  assert.match(next, new RegExp(`Reviewed commit \`${HEAD_1.slice(0, 7)}\``));
   assert.match(next, /Merge confidence/);
   assert.equal(shouldSkipAsReviewed(next, HEAD_2), true, "a queued run on the new head stays silent");
 });
