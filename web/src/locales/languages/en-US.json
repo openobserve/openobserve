@@ -6118,6 +6118,7 @@
     "resetRUMTokenLabel": "Reset RUM Token",
     "generateRUMTokenLabel": "Generate RUM Token",
     "generateRUMTokenMessage": "Generate RUM Token to enable RUM for your organization.",
+    "rumTokenForbiddenMessage": "Your role cannot view the RUM token. Ask an administrator for the RUM setup snippet, or for the role needed to see it here.",
     "rumPlatform": "Platform",
     "rumPlatformBrowser": "Browser",
     "rumPlatformReactNative": "React Native",
@@ -9491,6 +9492,13 @@
     "rowFields": "Row Fields",
     "valueFields": "Value Fields",
     "noData": "No Data",
+    "previewView": "Preview view",
+    "previewChart": "Chart",
+    "previewData": "Data",
+    "showRawData": "Show raw data",
+    "showChart": "Show chart",
+    "dataViewEmpty": "No rows returned",
+    "dataViewCapped": "Showing the first {shown} of {total} rows",
     "logExplorer": {
       "title": "Logs Explorer",
       "openInLogs": "Open in Logs",
@@ -13985,6 +13993,8 @@
       "noMatch": "No metrics match the current filters",
       "noMatchHint": "Try removing a label filter, clearing prefix/suffix selections, or switching from “With data” to “All”.",
       "noMatchHintFavorites": "Try removing a label filter, or switching from “With data” to “All”.",
+      "noMatchYet": "No metrics with data found yet",
+      "noMatchYetHint": "The metrics checked so far returned no data. Show more to keep looking.",
       "clearAllFilters": "Clear all filters",
       "emptyActions": {
         "clearSearch": "Clear search",
@@ -28218,6 +28228,7 @@
       "managedQuestions": "Questions: {contact}",
       "outboundQueue": "Alert messages: {count} queued, oldest {age} | Alert messages: {count} queued, oldest {age}",
       "outboundEmpty": "No alert messages queued",
+      "refusedPosts": "{count} alert post failed in the last 24 h. Last: {reason} on {destination}, | {count} alert posts failed in the last 24 h. Last: {reason} on {destination},",
       "ageSeconds": "{count} s"
     },
     "channels": {

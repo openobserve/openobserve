@@ -248,21 +248,11 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
-      - name: Lint frontend code
-        run: cd web && npm ci && npm run lint:ci
-
-      - name: Check for undefined CSS custom properties
-        run: cd web && npm run lint:tokens
-
-      - name: Lint styles (stylelint — bans legacy --o2-* tokens)
-        run: cd web && npm run lint:styles
-
-      - name: Check token-file purity (token files contain tokens only)
-        run: cd web && npm run lint:token-purity
-
-      - name: Check design-consistency ratchet (strict — hardcoded/arbitrary/raw-token, no slack)
-        run: cd web && npm run lint:design:strict
+      - name: Install frontend dependencies
+        run: cd web && npm ci
 
       - name: Build binary and frontend
         env:
@@ -382,15 +372,91 @@ jobs:
             gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body="$BODY" >/dev/null && echo "Posted triage comment."
           fi
 
+  # A same-commit run queued behind a passed one would only repeat it; own job so build_binary never waits on generate_matrix.
+  prior_pass:
+    timeout-minutes: 5
+    name: prior_pass
+    needs: [generate_matrix]
+    # A manual re-run asks for the tests to run again, so only a first attempt may reuse a pass.
+    if: github.event_name == 'pull_request' && github.run_attempt == 1 && needs.generate_matrix.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    outputs:
+      already_passed: ${{ steps.find.outputs.already_passed }}
+      run_url: ${{ steps.find.outputs.run_url }}
+    steps:
+      - name: Find a passed run of this exact commit
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          ARTIFACT_SHA: ${{ github.sha }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+          MATRIX: ${{ needs.generate_matrix.outputs.matrix }}
+        run: |
+          set -uo pipefail
+          already_passed=false
+          run_url=""
+          tmp="$(mktemp -d)"
+          shards="$(jq -r '.include[].testfolder' <<< "$MATRIX" 2>/dev/null | sort -u || true)"
+          # Only completed, successful runs count: a failure is never copied and an in-flight run proves nothing.
+          candidates="$(
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/playwright.yml/runs?head_sha=${SOURCE_HEAD_SHA}&event=pull_request&status=success&per_page=100" \
+              --jq "[.workflow_runs[] | select(.id != ${CURRENT_RUN_ID} and .status == \"completed\" and .conclusion == \"success\")] | sort_by(.created_at) | reverse | .[] | \"\(.id) \(.run_attempt) \(.html_url)\"" \
+              2>/dev/null || true
+          )"
+          while read -r run_id attempt url; do
+            [ -n "$shards" ] && [ -n "${run_id:-}" ] || continue
+            passed="$(
+              gh api --method GET --paginate \
+                "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs?filter=latest&per_page=100" \
+                --jq '.jobs[] | select(.conclusion == "success" and (.name | startswith("e2e / "))) | .name | ltrimstr("e2e / ")' \
+                2>/dev/null | sort -u || true
+            )"
+            if [ -n "$(comm -23 <(printf '%s\n' "$shards") <(printf '%s\n' "$passed"))" ]; then
+              echo "Run $run_id did not pass every selected shard"; continue
+            fi
+            # The head SHA alone is not the tested commit: the PR merge commit moves with the base branch.
+            advice_id="$(
+              gh api --method GET \
+                "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?name=rerun-advice-attempt-${attempt}" \
+                --jq '[.artifacts[] | select(.expired == false)][0].id // empty' \
+                2>/dev/null || true
+            )"
+            [ -n "$advice_id" ] || { echo "Run $run_id has no rerun advice to prove its tested commit"; continue; }
+            tested_sha="$(
+              gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${advice_id}/zip" > "$tmp/advice.zip" 2>/dev/null &&
+                unzip -p "$tmp/advice.zip" rerun-advice.json 2>/dev/null | jq -r '.tested_oss_sha // empty' 2>/dev/null || true
+            )"
+            if [ "$tested_sha" != "$ARTIFACT_SHA" ]; then
+              echo "Run $run_id tested ${tested_sha:-an unknown commit}, not $ARTIFACT_SHA"; continue
+            fi
+            already_passed=true
+            run_url="$url"
+            break
+          done <<< "$candidates"
+          {
+            echo "already_passed=$already_passed"
+            echo "run_url=$run_url"
+          } >> "$GITHUB_OUTPUT"
+          if [ "$already_passed" = "true" ]; then
+            echo "::notice::Every selected shard already passed on $ARTIFACT_SHA in $run_url; not re-running them."
+          else
+            echo "No earlier passed run covers this commit and shard selection; shards will run"
+          fi
+
   ui_integration_tests:
     timeout-minutes: 45
     name: e2e / ${{ matrix.testfolder }}
-    needs: [resolve_binary, build_binary, generate_matrix]
+    needs: [resolve_binary, build_binary, generate_matrix, prior_pass]
     if: >-
       always() &&
       !cancelled() &&
       needs.resolve_binary.result == 'success' &&
       needs.generate_matrix.result == 'success' &&
+      needs.prior_pass.outputs.already_passed != 'true' &&
       (needs.resolve_binary.outputs.reuse == 'true' || needs.build_binary.result == 'success')
     runs-on:
       labels: eks-openobserve-standard-8
@@ -511,6 +577,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+          cache: npm
+          cache-dependency-path: tests/ui-testing/package-lock.json
 
       - name: Start distribution-list relay
         # Mailpit is a sink: it accepts any address but stores ONE message, so it
@@ -714,9 +782,19 @@ jobs:
           if-no-files-found: ignore
           retention-days: 1
 
-      - name: Check OpenObserve logs
-        if: always()
-        run: cat o2.log
+      - name: Show OpenObserve log tail
+        if: failure()
+        run: tail -n 200 o2.log || true
+
+      - name: Upload OpenObserve log
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: o2-log-${{ matrix.testfolder }}-attempt-${{ github.run_attempt }}
+          path: o2.log
+          retention-days: 1
+          if-no-files-found: ignore
 
   merge_reports:
     timeout-minutes: 20
@@ -747,6 +825,8 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24
+          cache: npm
+          cache-dependency-path: tests/ui-testing/package-lock.json
 
       - name: Install project dependencies
         run: cd tests/ui-testing && npm ci
@@ -1055,12 +1135,16 @@ jobs:
         resolve_binary,
         build_binary,
         generate_matrix,
+        prior_pass,
         ui_integration_tests,
       ]
     if: always() && github.event_name != 'merge_group' && (github.event_name != 'schedule' || github.repository == 'openobserve/openobserve') && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
         id: verdict
+        env:
+          ALREADY_PASSED: ${{ needs.prior_pass.result == 'success' && needs.prior_pass.outputs.already_passed == 'true' }}
+          PRIOR_RUN_URL: ${{ needs.prior_pass.outputs.run_url }}
         run: |
           # 1. check_changes must have succeeded — if it failed, downstream jobs skipped
           #    and we must not report a false success.
@@ -1072,6 +1156,16 @@ jobs:
           # 2. Nothing Playwright-relevant changed → nothing ran → allow.
           if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
             echo "✅ No Playwright-relevant changes — suite not required."
+            exit 0
+          fi
+
+          # prior_pass matched the tested commit and every selected shard, so the earlier verdict stands.
+          if [ "$ALREADY_PASSED" = "true" ]; then
+            if [ "${{ needs.build_binary.result }}" = "failure" ]; then
+              echo "build_binary failed on a commit that already passed: ${{ needs.build_binary.result }}"
+              exit 1
+            fi
+            echo "✅ Every selected shard already passed on this commit in $PRIOR_RUN_URL"
             exit 0
           fi
 

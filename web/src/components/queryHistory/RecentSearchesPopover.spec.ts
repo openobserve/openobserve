@@ -33,7 +33,6 @@ const clipboard = vi.hoisted(() => ({ copyToClipboard: vi.fn().mockResolvedValue
 vi.mock("@/utils/clipboard", () => clipboard);
 
 import RecentSearchesPopover from "./RecentSearchesPopover.vue";
-import RecentSearchesButton from "./RecentSearchesButton.vue";
 import RecentSearchesFocusDropdown from "./RecentSearchesFocusDropdown.vue";
 import { placeCaret } from "@/test/unit/helpers/monacoCaret";
 import {
@@ -853,13 +852,7 @@ describe("long queries in the details pane", () => {
 
   it("leaves PageDown to its owner when no row is active", async () => {
     const wrapper = await mountAttached();
-    const vm = wrapper.vm as unknown as {
-      handleOutsideKey: (event: KeyboardEvent) => boolean;
-      scrollDetails: (step: 1 | -1) => boolean;
-    };
-    const event = new KeyboardEvent("keydown", { key: "PageDown", cancelable: true });
-    expect(vm.handleOutsideKey(event)).toBe(false);
-    expect(event.defaultPrevented).toBe(false);
+    const vm = wrapper.vm as unknown as { scrollDetails: (step: 1 | -1) => boolean };
     expect(vm.scrollDetails(1)).toBe(false);
   });
 
@@ -913,14 +906,6 @@ describe("when history is disabled", () => {
     delete store.state.zoConfig.query_history_enabled;
   });
 
-  it("hides the clock button", () => {
-    const wrapper = mount(RecentSearchesButton, {
-      props: { source: "logs" },
-      global: { plugins: [store] },
-    });
-    expect(wrapper.find('[data-test="recent-searches-btn"]').exists()).toBe(false);
-  });
-
   it("never opens the focus dropdown and never fetches", async () => {
     const wrapper = mount(RecentSearchesFocusDropdown, {
       props: { source: "logs", anchor: null, open: true },
@@ -948,25 +933,23 @@ describe("keyboard: arrows then Enter or Shift+Enter", () => {
     delete store.state.zoConfig.query_history_enabled;
   });
 
-  const openFromButton = async () => {
-    const wrapper = mount(RecentSearchesButton, {
-      props: { source: "logs" },
+  const openPopover = async () => {
+    const wrapper = mount(RecentSearchesPopover, {
+      props: { source: "logs", active: true },
       global: { plugins: [store], stubs: { OTimeCell: true } },
       attachTo: document.body,
     });
-    const trigger = wrapper.find('[data-test="recent-searches-btn"]');
-    await trigger.trigger("click");
-    await flushPromises();
     await vi.waitFor(() =>
       expect(document.querySelector('[data-test="recent-searches-row-e1"]')).not.toBeNull(),
     );
-    return { wrapper, trigger: trigger.element as HTMLElement };
+    const root = document.querySelector<HTMLElement>('[data-test="recent-searches-popover"]')!;
+    root.focus();
+    return { wrapper, root };
   };
 
-  it("loads the row Shift+Enter is pressed on, even when focus was left on the clock button", async () => {
-    const { wrapper, trigger } = await openFromButton();
-    trigger.focus();
-    press(trigger, "ArrowDown");
+  it("loads the row Shift+Enter is pressed on after arrowing in from the list", async () => {
+    const { wrapper, root } = await openPopover();
+    press(root, "ArrowDown");
     press(document.activeElement!, "ArrowDown");
     expect(activeTest()).toBe("recent-searches-row-e1");
 
@@ -977,9 +960,8 @@ describe("keyboard: arrows then Enter or Shift+Enter", () => {
   });
 
   it("gives the keyboard-focused row, or the hovered one, the menu's active state", async () => {
-    const { trigger } = await openFromButton();
-    trigger.focus();
-    press(trigger, "ArrowDown");
+    const { root } = await openPopover();
+    press(root, "ArrowDown");
     press(document.activeElement!, "ArrowDown");
     await nextTick();
     const row = (id: string) =>
@@ -1008,7 +990,7 @@ describe("keyboard: arrows then Enter or Shift+Enter", () => {
     }
   });
 
-  describe("Enter on a hovered row after opening from the clock button", () => {
+  describe("Enter on a hovered row with focus on the list itself", () => {
     const hoverRow = async (id: string) => {
       document
         .querySelector(`[data-test="recent-searches-row-${id}"]`)!
@@ -1026,15 +1008,14 @@ describe("keyboard: arrows then Enter or Shift+Enter", () => {
       return event;
     };
 
-    it("focuses the list itself, so Enter runs the hovered row and never reaches the page", async () => {
+    it("runs the hovered row on Enter, which never reaches the page", async () => {
       const pageSaw = vi.fn();
       document.addEventListener("keydown", pageSaw);
       try {
-        const { wrapper } = await openFromButton();
-        const list = document.querySelector('[data-test="recent-searches-popover"]')!;
-        expect(document.activeElement).toBe(list);
+        const { wrapper, root } = await openPopover();
+        expect(document.activeElement).toBe(root);
         await hoverRow("e1");
-        const event = enter(list);
+        const event = enter(root);
         await flushPromises();
         expect(event.defaultPrevented).toBe(true);
         expect(pageSaw).not.toHaveBeenCalled();
@@ -1045,37 +1026,26 @@ describe("keyboard: arrows then Enter or Shift+Enter", () => {
     });
 
     it("loads the hovered row on Shift+Enter", async () => {
-      const { wrapper } = await openFromButton();
+      const { wrapper, root } = await openPopover();
       await hoverRow("e1");
-      enter(document.querySelector('[data-test="recent-searches-popover"]')!, true);
+      enter(root, true);
       await flushPromises();
       expect(wrapper.emitted("load")?.[0]?.[0]).toMatchObject({ id: "e1" });
       expect(wrapper.emitted("run")).toBeUndefined();
     });
 
     it("does nothing on Enter when no row is hovered", async () => {
-      const { wrapper } = await openFromButton();
-      const event = enter(document.querySelector('[data-test="recent-searches-popover"]')!);
+      const { wrapper, root } = await openPopover();
+      const event = enter(root);
       await flushPromises();
       expect(event.defaultPrevented).toBe(false);
       expect(wrapper.emitted("run")).toBeUndefined();
     });
-
-    it("runs the hovered row on Enter even with focus left on the clock button", async () => {
-      const { wrapper, trigger } = await openFromButton();
-      trigger.focus();
-      await hoverRow("e1");
-      const event = enter(trigger);
-      await flushPromises();
-      expect(event.defaultPrevented).toBe(true);
-      expect(wrapper.emitted("run")?.[0]?.[0]).toMatchObject({ id: "e1" });
-    });
   });
 
   it("runs the row plain Enter is pressed on", async () => {
-    const { wrapper, trigger } = await openFromButton();
-    trigger.focus();
-    press(trigger, "ArrowDown");
+    const { wrapper, root } = await openPopover();
+    press(root, "ArrowDown");
     press(document.activeElement!, "Enter");
     await flushPromises();
     expect(wrapper.emitted("run")?.[0]?.[0]).toMatchObject({ id: "e0" });
@@ -1186,35 +1156,33 @@ describe("keyboard: arrows then Enter or Shift+Enter", () => {
     expect(wrapper.emitted("update:open")).toBeUndefined();
   });
 
-  it("keeps the clock popover open for a click in the details pane, and closes it for a click elsewhere", async () => {
-    const { wrapper } = await openFromButton();
-    document
-      .querySelector('[data-test="recent-searches-row-e0"]')!
-      .dispatchEvent(new PointerEvent("pointerenter"));
-    await flushPromises();
+  it("keeps the focus dropdown open for a click in the details pane, and closes it for a click elsewhere", async () => {
+    const { wrapper } = await mountWithEditor();
+    await hoverRow("e0");
     const copy = document.querySelector<HTMLElement>('[data-test="recent-searches-details-copy"]')!;
     copy.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     copy.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
     await flushPromises();
+    expect(wrapper.emitted("update:open")).toBeUndefined();
     expect(document.querySelector('[data-test="recent-searches-popover"]')).not.toBeNull();
 
     const elsewhere = document.createElement("button");
     document.body.appendChild(elsewhere);
     elsewhere.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     await flushPromises();
-    expect(document.querySelector('[data-test="recent-searches-popover"]')).toBeNull();
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
     wrapper.unmount();
   });
 
-  it("keeps the clock popover open while Tab takes a keyboard-selected row to its details' Copy", async () => {
-    const { wrapper, trigger } = await openFromButton();
-    trigger.focus();
-    press(trigger, "ArrowDown");
+  it("keeps the focus dropdown open while Tab takes a keyboard-selected row to its details' Copy", async () => {
+    const { wrapper } = await mountWithEditor();
+    expect((wrapper.vm as unknown as { focusFirst: () => boolean }).focusFirst()).toBe(true);
     await flushPromises();
     expect(activeTest()).toBe("recent-searches-row-e0");
     press(document.activeElement!, "Tab");
     await flushPromises();
     expect(activeTest()).toBe("recent-searches-details-copy");
+    expect(wrapper.emitted("update:open")).toBeUndefined();
     expect(document.querySelector('[data-test="recent-searches-popover"]')).not.toBeNull();
     expect(document.querySelector('[data-test="recent-searches-details-query"]')?.textContent).toBe(
       "q0",

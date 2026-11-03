@@ -581,21 +581,11 @@ impl QueryConditionExt for QueryCondition {
             let req = config::meta::search::Request {
                 query: config::meta::search::Query {
                     sql: sql.clone(),
-                    from: 0,
                     size,
                     start_time: start_time.unwrap(),
                     end_time,
-                    quick_mode: false,
-                    track_total_hits: false,
-                    uses_zo_fn: false,
                     query_fn: encode_query_fn,
-                    skip_wal: false,
-                    sampling_config: None,
-                    sampling_ratio: None,
-                    streaming_output: false,
-                    streaming_id: None,
-                    histogram_interval: 0,
-                    timezone: None,
+                    ..Default::default()
                 },
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],
@@ -920,22 +910,12 @@ async fn run_alert_count_query(
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: config::meta::alerts::level::count_query_sql(sql),
-            from: 0,
             // COUNT(*) over a subquery yields exactly one row.
             size: 1,
             start_time,
             end_time,
-            quick_mode: false,
-            track_total_hits: false,
-            uses_zo_fn: false,
             query_fn: None, // guard upstream: hybrid excludes VRL alerts
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],

@@ -434,6 +434,7 @@ class SchemaPage {
         // Drive the Monaco editor via window.monaco — clicking `.monaco-editor` is banned (§2)
         await this.page.waitForFunction(
             () => Boolean(window.monaco?.editor?.getEditors()?.length),
+            undefined,
             { timeout: 15000 },
         );
         await this.page.evaluate((text) => {

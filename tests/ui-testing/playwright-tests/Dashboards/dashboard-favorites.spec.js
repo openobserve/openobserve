@@ -30,6 +30,7 @@ test.describe("dashboard favorites testcases", {
   let pm;
   let folderName;
   let dashboardName;
+  let dashboardDeleted;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -39,6 +40,7 @@ test.describe("dashboard favorites testcases", {
     pm = undefined;
     folderName = undefined;
     dashboardName = undefined;
+    dashboardDeleted = false;
 
     await navigateToBase(page);
     // No ingestion here: favorites tests never touch the ingested stream
@@ -138,6 +140,7 @@ test.describe("dashboard favorites testcases", {
     await pm.dashboardFavorites.verifySuccessToast();
     await pm.dashboardFavorites.verifyNoErrorToast();
     await pm.dashboardFavorites.verifyDashboardNotPresent(dashboardName);
+    dashboardDeleted = true;
   });
 
   // Regression: nothing pruned the favorites setting on delete, so the row kept
@@ -152,6 +155,7 @@ test.describe("dashboard favorites testcases", {
     await pm.dashboardFavorites.deleteDashboardFromRow(dashboardName);
     await pm.dashboardFavorites.verifySuccessToast();
     await pm.dashboardFavorites.verifyDashboardNotPresent(dashboardName);
+    dashboardDeleted = true;
 
     // Favorites must not keep a ghost row for it.
     await pm.dashboardFavorites.openFavoritesFolder();
@@ -179,6 +183,7 @@ test.describe("dashboard favorites testcases", {
     await pm.dashboardFolder.openFolderByName(folderName);
     await pm.dashboardFavorites.waitForFavoritesViewExited();
     await pm.dashboardFavorites.verifyDashboardNotPresent(dashboardName);
+    dashboardDeleted = true;
   });
 
   // Regression (#13437): the rows computed short-circuited to the stored
@@ -277,8 +282,11 @@ test.describe("dashboard favorites testcases", {
     // be gone if the test deleted it itself.
     await pm.dashboardFolder.searchFolder(folderName).catch(() => {});
     await pm.dashboardFolder.openFolderByName(folderName).catch(() => {});
-    await pm.dashboardFavorites.searchDashboard(dashboardName).catch(() => {});
-    await pm.dashboardFavorites.unfavoriteIfFavorited(dashboardName).catch(() => {});
+    // A deleted dashboard has no row, so this search would only burn its full 15s timeout.
+    if (!dashboardDeleted) {
+      await pm.dashboardFavorites.searchDashboard(dashboardName).catch(() => {});
+      await pm.dashboardFavorites.unfavoriteIfFavorited(dashboardName).catch(() => {});
+    }
 
     // Best-effort cleanup: the folder may already be gone if the test deleted
     // its dashboard, and a failing test should surface its own error rather

@@ -1,0 +1,77 @@
+# Routes kept out of the OpenAPI spec. Format: METHOD /path | reason
+# Add a line only for internal, browser-only, third-party callback, agent protocol or second-mount routes.
+
+GET /.well-known/oauth-protected-resource | OAuth discovery document for MCP agents, not an API
+GET /.well-known/oauth-protected-resource/{*resource_path} | OAuth discovery document for MCP agents, not an API
+GET /api/public/ai_chats/{token} | backend of the anonymous shared-chat browser page
+GET /api/public_dashboards/{slug} | backend of the anonymous browser dashboard page
+GET /api/public_dashboards/{slug}/data | backend of the anonymous browser dashboard page
+POST /api/slack/commands | third-party callback from Slack
+POST /api/slack/events | third-party callback from Slack
+POST /api/slack/interactions | third-party callback from Slack
+POST /api/status_pages_public/{slug}/auth | browser-only password gate that sets a cookie
+GET /api/v2/{org_id}/alerts/charts/render | signed image URL embedded in notifications, not an API
+GET /api/v2/{org_id}/oncall/ack | browser-only HTML page behind an emailed link
+POST /api/v2/{org_id}/oncall/ack | browser-only form post of the HTML ack page
+POST /api/v2/{org_id}/oncall/ack/voice/{token} | third-party voice provider callback
+GET /api/{org_id}/ | wire-compatibility handshake used by log shipper agents
+HEAD /api/{org_id}/ | wire-compatibility handshake used by log shipper agents
+GET /api/{org_id}/_data_stream/{name} | wire-compatibility handshake used by log shipper agents
+HEAD /api/{org_id}/_data_stream/{name} | wire-compatibility handshake used by log shipper agents
+POST /api/{org_id}/_data_stream/{name} | wire-compatibility handshake used by log shipper agents
+GET /api/{org_id}/_ilm/policy/{name} | wire-compatibility handshake used by log shipper agents
+HEAD /api/{org_id}/_ilm/policy/{name} | wire-compatibility handshake used by log shipper agents
+GET /api/{org_id}/_index_template/{name} | wire-compatibility handshake used by log shipper agents
+HEAD /api/{org_id}/_index_template/{name} | wire-compatibility handshake used by log shipper agents
+POST /api/{org_id}/_index_template/{name} | wire-compatibility handshake used by log shipper agents
+GET /api/{org_id}/_ingest/pipeline/{name} | wire-compatibility handshake used by log shipper agents
+HEAD /api/{org_id}/_ingest/pipeline/{name} | wire-compatibility handshake used by log shipper agents
+POST /api/{org_id}/_ingest/pipeline/{name} | wire-compatibility handshake used by log shipper agents
+GET /api/{org_id}/_license | wire-compatibility handshake used by log shipper agents
+GET /api/{org_id}/_xpack | wire-compatibility handshake used by log shipper agents
+POST /api/{org_id}/billings/new_user_attribution | browser-only marketing beacon
+DELETE /api/{org_id}/mcp | MCP agent protocol session teardown
+GET /api/{org_id}/mcp | MCP agent protocol stream, POST is the published entry point
+POST /api/{org_id}/otel/v1/traces | second mount of the published POST /api/{org_id}/v1/traces
+POST /api/{org_id}/synthetics/agent/heartbeat | synthetics agent protocol
+POST /api/{org_id}/synthetics/agent/register | synthetics agent protocol
+POST /api/{org_id}/synthetics/jobs/artifact-urls | synthetics runner protocol
+POST /api/{org_id}/synthetics/jobs/upload | synthetics runner protocol
+POST /api/{org_id}/traces | second mount of the published POST /api/{org_id}/v1/traces
+GET /api/{org_id}/v1/opamp | OpAMP agent protocol
+POST /api/{org_id}/v1/opamp | OpAMP agent protocol
+POST /api/{org_id}/v1development/profiles | second mount of POST /api/{org_id}/v1/profiles
+GET /auth/invites | second mount of the published GET /api/invites
+DELETE /auth/invites/{token} | second mount of the published DELETE /api/invites/{token}
+GET /auth/login | browser-only login redirect
+GET /config/ | unauthenticated bootstrap of the browser login page
+GET /config/dex_login | browser-only SSO redirect
+GET /config/dex_refresh | browser-only SSO token refresh
+GET /config/logout | browser-only logout redirect
+GET /config/redirect | browser-only SSO redirect
+GET /config/reload | internal node config reload
+GET /debug/profile/cpu | internal debug profiling
+GET /debug/profile/memory | internal debug profiling
+GET /debug/profile/stats | internal debug profiling
+GET /docs | browser redirect to the Swagger page
+HEAD /healthz | second mount of the published GET /healthz probe
+POST /marketplace/aws/register | third-party callback from AWS Marketplace
+GET /metrics | internal Prometheus scrape endpoint of the node
+POST /node/consistent_hash | internal node management
+GET /node/drain_status | internal node management
+PUT /node/enable | internal node management
+PUT /node/flush | internal node management
+GET /node/list | internal node management
+GET /node/metrics | internal node management
+GET /node/refresh_nodes_list | internal node management
+GET /node/refresh_user_sessions | internal node management
+GET /node/reload | internal node management
+GET /node/status | internal node management
+GET /proxy/{org_id}/{*target_url} | internal proxy used by the browser UI
+GET /schedulez | internal scheduler probe for orchestration
+ANY /services/collector | HEC agent protocol
+ANY /services/collector/event | HEC agent protocol
+GET /services/collector/health | HEC agent protocol handshake
+GET /status/{slug} | browser-only HTML status page
+POST /webhook/azure | third-party callback from Azure Marketplace
+POST /webhook/stripe | third-party callback from Stripe

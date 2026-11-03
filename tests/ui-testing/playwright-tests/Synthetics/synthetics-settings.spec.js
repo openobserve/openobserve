@@ -73,13 +73,14 @@ test.describe('Synthetics settings — locations and tokens', { tag: ['@syntheti
 
   test('adds a public location from Settings', { tag: ['@P1'] }, async ({ page }, testInfo) => {
     const region = uniqueName('loc', testInfo);
-    const id = `${PROVIDER}-${region}`;
+    // The create form offers only AWS.
+    const id = `aws-${region}`;
     testLogger.info('Opening the locations settings in the meta org');
     const s = pm.syntheticsSettingsPage;
     await s.gotoLocations(META_ORG);
     testLogger.info('Adding a public location', { locationId: id });
     await s.openAddForm();
-    await s.fillLocationForm({ label: `E2E ${region}`, provider: 'custom', customProvider: PROVIDER, region });
+    await s.fillLocationForm({ label: `E2E ${region}`, provider: 'aws', region });
     await s.submitLocationForm();
     testLogger.info('Verifying the location is listed');
     await s.expectToast('Location created successfully');

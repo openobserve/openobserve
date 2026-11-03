@@ -51,8 +51,12 @@ struct LicenseResponse {
     can_update_license: bool,
 }
 
+#[derive(utoipa::ToSchema)]
 pub struct SaveLicenseRequest {
+    /// The signed license key.
+    #[schema(value_type = String)]
     key: License,
+    #[schema(ignore)]
     raw_key: String,
 }
 
@@ -223,6 +227,22 @@ fn env_key_in_use(env_key: &str, live_key: Option<&str>) -> bool {
     env_key_active(env_key) && live_key == Some(env_key)
 }
 
+#[utoipa::path(
+    get,
+    path = "/license",
+    context_path = "/api",
+    tag = "License",
+    operation_id = "GetLicense",
+    summary = "Get license information",
+    security(("Authorization" = [])),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "License", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
 
@@ -272,6 +292,23 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     MetaHttpResponse::json(res)
 }
 
+#[utoipa::path(
+    post,
+    path = "/license",
+    context_path = "/api",
+    tag = "License",
+    operation_id = "SaveLicense",
+    summary = "Store a license key",
+    security(("Authorization" = [])),
+    request_body(content = inline(SaveLicenseRequest), content_type = "application/json"),
+    responses(
+        (status = 201, description = "Stored; the body is an empty JSON string", content_type = "application/json", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "License", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn store_license(
     Headers(user_email): Headers<UserEmail>,
     axum::Json(req): axum::Json<SaveLicenseRequest>,
@@ -302,6 +339,22 @@ pub async fn store_license(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/license/refresh",
+    context_path = "/api",
+    tag = "License",
+    operation_id = "RefreshLicense",
+    summary = "Refresh license limits",
+    security(("Authorization" = [])),
+    responses(
+        (status = 200, description = "Refreshed; the body is an empty JSON string", content_type = "application/json", body = String),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "License", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> Response {
     let email = user_email.user_id;
     if check_license_permission(&email, "PUT").await.is_err() {

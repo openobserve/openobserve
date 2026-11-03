@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="recent-searches-status"
           />
           <RecentSearchesDayPicker
+            ref="dayPickerRef"
             v-model="ranOn"
             :placeholder="t('recentSearches.datePlaceholder')"
             :field-label="t('recentSearches.filterByDateRun')"
@@ -174,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   :icon-left="entry.starred ? 'star' : 'star-outline'"
-                  :class="entry.starred ? 'text-accent' : ''"
+                  :class="entry.starred ? 'text-favorite' : ''"
                   :aria-label="
                     entry.starred ? t('recentSearches.unstar') : t('recentSearches.star')
                   "
@@ -438,6 +439,7 @@ const scope = ref<"page" | "all">("page");
 const stream = ref<string | null>(null);
 const status = ref<"all" | HistoryStatus>("all");
 const ranOn = ref<string | undefined>(undefined);
+const dayPickerRef = ref<InstanceType<typeof RecentSearchesDayPicker> | null>(null);
 const starredOnly = ref(false);
 const clearOpen = ref(false);
 const includeStarred = ref(false);
@@ -469,6 +471,7 @@ const resetFilters = () => {
   stream.value = null;
   status.value = "all";
   ranOn.value = undefined;
+  dayPickerRef.value?.reset();
   starredOnly.value = false;
 };
 

@@ -15,71 +15,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OButtonGroup
-    class="border-input-border bg-input-bg hover:border-input-border-hover border"
-    :data-test="dataTest"
-  >
-    <OPopover
-      v-model:open="open"
-      side="bottom"
-      align="start"
+  <span ref="fieldRef" class="contents" @focusout="judgeLater">
+    <OInput
+      v-model="text"
+      size="sm"
+      width="sm"
+      :placeholder="placeholder"
       :aria-label="fieldLabel"
-      content-class="p-1 shadow-lg!"
-      @open-auto-focus="focusDay"
+      :error="invalid"
+      clearable
+      :data-test="dataTest"
+      @keydown.enter.prevent="commit"
+      @clear="apply(undefined)"
     >
-      <template #trigger>
-        <OButton
-          variant="ghost"
-          size="xs"
-          class="min-w-36"
+      <template #icon-right>
+        <OPopover
+          v-model:open="open"
+          side="bottom"
+          align="end"
           :aria-label="fieldLabel"
-          :data-test="`${dataTest}-trigger`"
+          content-class="p-1 shadow-lg!"
+          @open-auto-focus="focusDay"
         >
-          <span
-            :class="modelValue ? 'text-input-text' : 'text-input-placeholder'"
-            class="ms-0.5 flex-1 text-left text-sm font-normal tabular-nums"
-            :data-test="`${dataTest}-value`"
-            >{{ label }}</span
-          >
-          <template #icon-right>
-            <OIcon name="calendar-month" size="sm" class="text-input-hint ms-auto me-0.5" />
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              @pointerdown="notePress"
+              icon-left="calendar-month"
+              class="text-input-hint"
+              :aria-label="t('components.date.openCalendar')"
+              :data-test="`${dataTest}-trigger`"
+            />
           </template>
-        </OButton>
+          <div
+            ref="calendarRef"
+            class="flex justify-center px-3 py-2"
+            :data-test="`${dataTest}-calendar`"
+          >
+            <ODateRangeCalendar
+              :start-date="selectedDay"
+              :end-date="selectedDay"
+              :min-date="MIN_DAY"
+              :max-date="today"
+              @update:pending-date="pick"
+            />
+          </div>
+        </OPopover>
       </template>
-      <div
-        ref="calendarRef"
-        class="flex justify-center px-3 py-2"
-        :data-test="`${dataTest}-calendar`"
-      >
-        <ODateRangeCalendar
-          :start-date="selectedDay"
-          :end-date="selectedDay"
-          :min-date="MIN_DAY"
-          :max-date="today"
-          @update:pending-date="pick"
-        />
-      </div>
-    </OPopover>
-    <OButton
-      v-if="modelValue"
-      variant="ghost"
-      size="icon-xs-sq"
-      icon-left="close"
-      :aria-label="t('common.clearFilter')"
-      :data-test="`${dataTest}-clear`"
-      @click="emit('update:modelValue', undefined)"
-    />
-  </OButtonGroup>
+    </OInput>
+  </span>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { DateTime } from "luxon";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
 
 const MIN_DAY = "1999/01/01";
@@ -112,10 +106,67 @@ watch(open, (isOpen) => {
 });
 // The calendar speaks the app's YYYY/MM/DD; the filter keeps YYYY-MM-DD.
 const selectedDay = computed(() => props.modelValue?.replace(/-/g, "/"));
-const label = computed(() => {
-  if (!props.modelValue) return props.placeholder;
-  return raw(DateTime.fromISO(props.modelValue).toFormat("dd/MM/yyyy"));
-});
+const shown = (day?: string) => (day ? DateTime.fromISO(day).toFormat("dd/MM/yyyy") : "");
+const text = ref(shown(props.modelValue));
+const invalid = ref(false);
+const fieldRef = ref<HTMLElement | null>(null);
+// The day last sent; the parent's v-model lags a tick, so comparing to it would send a pick twice.
+const appliedDay = ref(props.modelValue);
+let pressingTrigger = false;
+watch(
+  () => props.modelValue,
+  (day) => {
+    appliedDay.value = day;
+    text.value = shown(day);
+    invalid.value = false;
+  },
+);
+
+// The field shows the applied day even when the day itself did not change, e.g. one retyped in another shape.
+const apply = (day: string | undefined) => {
+  text.value = shown(day);
+  invalid.value = false;
+  if (day === appliedDay.value) return;
+  appliedDay.value = day;
+  emit("update:modelValue", day);
+};
+
+// Typed days read day-first, the order the field shows; a day outside the calendar's range is refused.
+const parseTyped = (value: string): string | null => {
+  for (const format of ["d/M/yyyy", "d-M-yyyy", "d.M.yyyy"]) {
+    const day = DateTime.fromFormat(value, format);
+    if (!day.isValid) continue;
+    const iso = day.toISODate();
+    const last = todayText().replace(/\//g, "-");
+    return iso && iso >= MIN_DAY.replace(/\//g, "-") && iso <= last ? iso : null;
+  }
+  return null;
+};
+
+const commit = () => {
+  const value = String(text.value ?? "").trim();
+  if (!value) return apply(undefined);
+  const day = parseTyped(value);
+  if (day) apply(day);
+  else invalid.value = true;
+};
+
+// Judged once focus settles outside the text, its calendar button and the open calendar; Safari does not focus a pressed button.
+const judgeLater = () =>
+  setTimeout(() => {
+    const pressed = pressingTrigger;
+    pressingTrigger = false;
+    if (pressed || open.value || fieldRef.value?.contains(document.activeElement)) return;
+    commit();
+  });
+
+const notePress = () => {
+  pressingTrigger = true;
+};
+
+const reset = () => apply(undefined);
+
+defineExpose({ reset });
 
 // Arrow keys and Enter work only from a day cell, so open on the chosen day, else today.
 const focusDay = (event: Event) => {
@@ -127,10 +178,9 @@ const focusDay = (event: Event) => {
   day.focus();
 };
 
-// A first click on the range calendar is one complete day for this filter.
+// The calendar clears a one-day range clicked again and reports null; here that is re-picking the applied day.
 const pick = (day: string | null) => {
-  if (!day) return;
-  emit("update:modelValue", day.replace(/\//g, "-"));
+  apply(day ? day.replace(/\//g, "-") : props.modelValue);
   open.value = false;
 };
 </script>

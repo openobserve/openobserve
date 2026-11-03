@@ -156,8 +156,6 @@ export class MetricsPage {
         this.toastMessage = page.locator('[data-test="o-toast-message"]');
 
         this.historyButton = page.locator('[data-test="metrics-history-btn"]');
-        this.historyPopover = page.locator('[data-test="recent-searches-popover"]');
-        this.historyViewAll = this.historyPopover.locator('[data-test="recent-searches-view-all"]');
         this.historyDrawer = page.locator('[data-test="recent-searches-drawer"]');
         this.historySearch = this.historyDrawer.locator('[data-test="recent-searches-search"] input');
         this.historyStarredOnly = this.historyDrawer.locator('[data-test="recent-searches-starred-only"]');
@@ -2806,7 +2804,6 @@ export class MetricsPage {
 
     async openQueryHistory() {
         await this.historyButton.click();
-        await this.historyViewAll.click();
         await this.historyDrawer.waitFor({ state: 'visible', timeout: 15000 });
     }
 
