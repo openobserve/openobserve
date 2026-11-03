@@ -51,9 +51,7 @@ from .oncall_helpers import (
 
 logger = logging.getLogger(__name__)
 
-# The whole feature needs an enterprise build with `O2_ONCALL_ENABLED`; the
-# marker lets CI hold this directory separately, and the session-scoped gate
-# in conftest skips it rather than failing when the flag is off.
+# Enterprise-only: the conftest gate skips on an OSS build and fails on an enterprise one without `O2_ONCALL_ENABLED`.
 pytestmark = pytest.mark.enterprise
 
 # A column no semantic field group maps to a dimension, so no ownership rule

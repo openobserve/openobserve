@@ -642,9 +642,11 @@ pub async fn handle_otlp_request(
             }
             json_data
         };
+        let mut json_data = json_data;
         let record_refs: Vec<&json::Map<String, json::Value>> =
             json_data.iter().map(|(record, _)| record).collect();
         let min_timestamp = batch_min_timestamp(&record_refs, Utc::now().timestamp_micros());
+        drop(record_refs);
         let has_uds = matches!(
             user_defined_schema_map.get(&local_metric_name),
             Some(Some(_))
@@ -653,12 +655,12 @@ pub async fn handle_otlp_request(
             org_id,
             &local_metric_name,
             &mut metric_schema_map,
-            &record_refs,
+            &mut json_data,
+            |(record, _)| record,
             min_timestamp,
             has_uds,
         )
         .await?;
-        drop(record_refs);
 
         let alerts = stream_alerts_map.get(&cache_stream_key(
             org_id,

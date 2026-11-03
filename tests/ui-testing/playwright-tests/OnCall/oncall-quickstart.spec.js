@@ -5,7 +5,8 @@
  *   "Quick start with regions unnamed and unstaffed: Save is disabled, or it
  *    names the missing field — never a silent no-op."
  *
- * ENTERPRISE-GATED (@enterprise); skips with a reason via `isOnCallAvailable()`.
+ * ENTERPRISE-GATED (@enterprise). `isOnCallAvailable()` skips on an OSS build
+ * and fails an enterprise build that has on-call switched off.
  *
  * THE PLAN'S NOTE UNDER §11.2 IS STALE AGAINST MAIN. It records "still
  * reproduces: Save fires no request, shows no inline error and no toast" from an
@@ -169,15 +170,10 @@ test.describe('On-call Quick start', {
     const { team } = await seedEmptyScheduleTeam(page, testInfo);
     await openQuickStartOn(team.id);
 
-    const regions = pm.oncallTeamDetailPage.getPresetTab(REGIONS_PRESET);
-    if (await regions.count()) {
-      await pm.oncallTeamDetailPage.chooseQuickStartTemplate(REGIONS_PRESET);
-    } else {
-      // The catalogue is server-supplied; on a build without the regions shape
-      // the landing shape still has a required people picker, which is the same
-      // question asked of a different form.
-      testLogger.warn('Quick start has no follow_the_sun shape — using the landing shape');
-    }
+    // The catalogue is fetched after the drawer opens, so wait for the tab rather than count it.
+    await expect(pm.oncallTeamDetailPage.getPresetTab(REGIONS_PRESET),
+      'the server catalogue ships follow_the_sun, the shape whose regions carry a required name').toBeVisible({ timeout: 20000 });
+    await pm.oncallTeamDetailPage.chooseQuickStartTemplate(REGIONS_PRESET);
 
     const outcome = await pm.oncallTeamDetailPage.attemptQuickStartSave();
     testLogger.info('§11.2 Quick start save outcome', outcome);
@@ -198,14 +194,12 @@ test.describe('On-call Quick start', {
       'a Save that fires no request AND says nothing is the §11.2 defect',
     ).toBe(false);
 
-    // Whatever the screen did, nothing may have been written.
-    if (!outcome.requestSeen) {
-      const stored = await getTeamSchedule(page, team.id);
-      expect(
-        (stored?.rotations ?? []).length,
-        'a refused apply must not have created rotations',
-      ).toBe(0);
-    }
+    expect(outcome.requestSeen, 'unnamed, unstaffed regions are invalid, so nothing may reach the server').toBe(false);
+    const stored = await getTeamSchedule(page, team.id);
+    expect(
+      (stored?.rotations ?? []).length,
+      'a refused apply must not have created rotations',
+    ).toBe(0);
   });
 
   /**
@@ -231,11 +225,8 @@ test.describe('On-call Quick start', {
     const { team, members } = await seedEmptyScheduleTeam(page, testInfo);
     await openQuickStartOn(team.id);
 
-    const regions = pm.oncallTeamDetailPage.getPresetTab(REGIONS_PRESET);
-    test.skip(
-      (await regions.count()) === 0,
-      'this build\'s preset catalogue has no follow_the_sun shape, which is the only one with a required name',
-    );
+    await expect(pm.oncallTeamDetailPage.getPresetTab(REGIONS_PRESET),
+      'the server catalogue ships follow_the_sun, the shape whose regions carry a required name').toBeVisible({ timeout: 20000 });
 
     await pm.oncallTeamDetailPage.chooseQuickStartTemplate(REGIONS_PRESET);
     // Row keys for a repeated group are `<field>-<index>`, and a group_list

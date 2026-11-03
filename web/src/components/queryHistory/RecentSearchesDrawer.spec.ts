@@ -73,6 +73,8 @@ const input = (name: string) => ({
   template: `<input data-stub="${name}" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
 });
 
+const dayReset = vi.fn();
+
 const mountDrawer = (open = true) =>
   mount(RecentSearchesDrawer, {
     props: { source: "logs", open },
@@ -97,7 +99,7 @@ const mountDrawer = (open = true) =>
         },
         OSearchInput: input("search"),
         OSelect: input("select"),
-        RecentSearchesDayPicker: input("date"),
+        RecentSearchesDayPicker: { ...input("date"), methods: { reset: dayReset } },
         OSwitch: {
           props: ["modelValue"],
           emits: ["update:modelValue"],
@@ -198,6 +200,7 @@ describe("RecentSearchesDrawer", () => {
       expect((selects[0].element as HTMLInputElement).value).toBe("");
       expect((selects[1].element as HTMLInputElement).value).toBe("all");
       expect((wrapper.find('[data-stub="date"]').element as HTMLInputElement).value).toBe("");
+      expect(dayReset).toHaveBeenCalled();
       expect(
         (wrapper.find('[data-test="recent-searches-starred-only"]').element as HTMLInputElement)
           .checked,
