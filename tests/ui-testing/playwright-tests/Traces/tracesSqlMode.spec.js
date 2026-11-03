@@ -11,6 +11,7 @@ const PREFILLED = `SELECT * FROM "default" WHERE ${FILTER} ORDER BY start_time D
 const GROUPED = `SELECT service_name, count(*) AS spans FROM "default" GROUP BY service_name`;
 const BIG_TRACES = 'SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200';
 const NO_TRACE_ID = 'SELECT service_name, duration\nFROM "default"\nWHERE duration > 0';
+const TYPO = `SELECT servce_name, count(*) AS spans FROM "default" GROUP BY servce_name`;
 
 test.describe("Traces SQL mode testcases", () => {
   test.describe.configure({ mode: 'serial' });
@@ -148,5 +149,25 @@ test.describe("Traces SQL mode testcases", () => {
     );
     await expect(pm.tracesPage.getSqlSelectorProblem()).toHaveCount(0);
     await expect(pm.tracesPage.getTraceResultRows().first()).toBeVisible({ timeout: 20000 });
+  });
+
+  test("P1: An unknown column offers Did you mean, and the fix replaces it and runs", {
+    tag: ['@tracesSqlMode', '@traces', '@query', '@P1', '@all']
+  }, async () => {
+    await pm.tracesPage.toggleSqlModeFromToolbar();
+    await pm.tracesPage.setQueryEditorValue(TYPO);
+    await pm.tracesPage.expectSqlMode(true);
+    await pm.tracesPage.setTimeRange('15m');
+    await pm.tracesPage.runSearch();
+
+    await expect(pm.tracesPage.getSqlErrorState()).toBeVisible({ timeout: 20000 });
+    await expect(pm.tracesPage.getSqlErrorState()).toContainText('Field not found: servce_name');
+    await expect(pm.tracesPage.getSqlSuggestionFixCard()).toContainText('Did you mean service_name?');
+
+    await pm.tracesPage.getSqlSuggestionFixCard().click();
+
+    await pm.tracesPage.expectQueryEditorValue(GROUPED);
+    await expect(pm.tracesPage.getSqlErrorState()).toHaveCount(0);
+    await expect(pm.tracesPage.getSqlResultTable()).toBeVisible({ timeout: 20000 });
   });
 });

@@ -53,6 +53,7 @@ import {
   SPAN_DERIVED_COLUMN_IDS,
 } from "./useTracesTableColumns";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
+import { raw } from "@/types/i18n";
 
 // Default ordered field lists (mirror DEFAULT_TRACE_COLUMNS in useTraces.ts)
 const DEFAULT_SPANS_FIELDS = [
@@ -640,6 +641,13 @@ describe("useTracesTableColumns", () => {
       const [plain, nested] = buildResultColumns(["n", "attrs"]);
       expect((plain as any).accessorFn({ n: 4 })).toBe(4);
       expect((nested as any).accessorFn({ attrs: { a: 1 } })).toBe('{"a":1}');
+    });
+
+    it("adds a hint icon and tooltip to the hinted columns only", () => {
+      const [plain, hinted] = buildResultColumns(["a", "b"], { b: raw("tip") });
+      expect(plain.meta?.headerTooltip).toBeUndefined();
+      expect(String(hinted.meta?.headerTooltip)).toBe("tip");
+      expect(typeof hinted.header).toBe("function");
     });
 
     it("lets the last column fill the row", () => {

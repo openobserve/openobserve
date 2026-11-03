@@ -132,6 +132,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="info-outline" size="sm" />
           <OTooltip :content="t('traces.sqlMode.redUnavailable')" side="top" align="center" />
         </span>
+        <span
+          v-if="sqlInfo && searchObj.data.queryResults?.is_partial === true"
+          class="text-warning ms-1 inline-flex shrink-0 cursor-help"
+          tabindex="0"
+          data-test="traces-sql-partial-icon"
+        >
+          <OIcon name="warning" size="sm" />
+          <OTooltip :content="t('traces.sqlMode.partialResults')" side="top" align="center" />
+        </span>
 
         <div
           class="hidden basis-full @max-[58rem]/results:block"
@@ -234,8 +243,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <TracesMetricsPlaceholder v-else-if="pending && searchObj.meta.showHistogram" />
 
+        <OEmptyState
+          v-if="matchAllFix"
+          illustration="trace"
+          size="hero"
+          :hide-action="true"
+          data-test="traces-sql-match-all-empty"
+        >
+          <template #title>{{ t("traces.sqlMode.matchAllEmpty.title") }}</template>
+          <template #description>{{ t("traces.sqlMode.matchAllEmpty.description") }}</template>
+          <template #actions>
+            <EmptyStateActionCard
+              icon="search"
+              :label="t('traces.sqlMode.matchAllEmpty.searchOneField')"
+              :sublabel="
+                t('traces.sqlMode.matchAllEmpty.searchOneFieldDesc', { call: matchAllFix.call })
+              "
+              data-test="traces-sql-match-all-fix-card"
+              @click="$emit('run-sql', matchAllFix.sql)"
+            />
+          </template>
+          <template v-if="aiEnabled" #extra>
+            <div class="flex justify-center">
+              <OButton
+                variant="ghost"
+                size="sm"
+                data-test="traces-sql-match-all-ask-ai-btn"
+                @click="$emit('ask-ai')"
+              >
+                {{ t("queryError.askAi") }}
+              </OButton>
+            </div>
+          </template>
+        </OEmptyState>
         <TracesSqlResultTable
-          v-if="sqlShape !== 'spans'"
+          v-else-if="sqlShape !== 'spans'"
           :hits="hits"
           :columns="sqlColumns"
           :shape="sqlShape"
@@ -311,6 +353,8 @@ import {
   canAddTraceId,
   isRedEligible,
   isRowQuery,
+  matchAllToStrMatch,
+  MATCH_ALL_FALLBACK_FIELD,
   resultKeys,
   resultShape,
   type TracesSqlShape,
@@ -332,6 +376,9 @@ import { useRegionLoading } from "@/lib/feedback/RegionStatus/useRegionLoading";
 import { resultText, type RegionNoun } from "@/lib/feedback/RegionStatus/regionText";
 import { useSettledValue } from "@/composables/useSettledValue";
 import { formatRefreshFailed } from "@/utils/formatters";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import { allNullColumns } from "@/utils/traces/tracesSqlErrors";
 
 export default defineComponent({
   name: "SearchResult",
@@ -346,6 +393,8 @@ export default defineComponent({
     ORegionStatus,
     TracesSearchResultList,
     TracesSqlResultTable,
+    OEmptyState,
+    EmptyStateActionCard,
     TracesMetricsPlaceholder,
     TracesMetricsDashboard: defineAsyncComponent({
       // Its charts load as chunks of their own, so they load with it and the placeholder stays until they can draw.
@@ -400,6 +449,7 @@ export default defineComponent({
     "send-to-ai-chat",
     "open-mobile-fields",
     "add-trace-id",
+    "run-sql",
   ],
   methods: {
     toggleErrorOnly() {
@@ -591,12 +641,22 @@ export default defineComponent({
     );
     const sqlRowsOnly = computed(() => !!sqlInfo.value && !isRowQuery(sqlInfo.value));
     const sqlKeys = computed(() =>
-      sqlInfo.value ? resultKeys(hits.value, sqlInfo.value.selectNames) : [],
+      sqlInfo.value
+        ? resultKeys(hits.value, sqlInfo.value.selectNames, sqlInfo.value.selectExplicit)
+        : [],
     );
     const sqlShape = computed<TracesSqlShape>(() =>
       sqlInfo.value && hits.value.length ? resultShape(sqlKeys.value) : "spans",
     );
-    const sqlColumns = computed(() => buildResultColumns(sqlKeys.value));
+    const sqlColumns = computed(() => {
+      const hint = t("traces.sqlMode.maybeInAll", {
+        column: store.state.zoConfig?.all_fields_name || "_all",
+      });
+      const hints = Object.fromEntries(
+        allNullColumns(hits.value, sqlKeys.value).map((key) => [key, hint]),
+      );
+      return buildResultColumns(sqlKeys.value, hints);
+    });
     const offerAddTraceId = computed(
       () => sqlShape.value === "rows" && !!sqlInfo.value && canAddTraceId(sqlInfo.value),
     );
@@ -611,6 +671,14 @@ export default defineComponent({
     const searchPerformed = computed(() =>
       Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "total"),
     );
+    // match_all searches only full-text fields, so an empty result offers one field instead.
+    const matchAllFix = computed(() => {
+      const sql = searchObj.data.queryResults?.sql;
+      if (!sqlInfo.value || searchObj.loading || hits.value.length || !searchPerformed.value) {
+        return null;
+      }
+      return matchAllToStrMatch(String(sql), MATCH_ALL_FALLBACK_FIELD);
+    });
 
     const rowsPerPageOptions = [10, 25, 50, 100];
 
@@ -773,9 +841,11 @@ export default defineComponent({
       traceByIdHref,
       openTraceById,
       redAvailable,
+      sqlInfo,
       sqlRowsOnly,
       sqlShape,
       sqlColumns,
+      matchAllFix,
       offerAddTraceId,
       sqlRowsLabel,
       openTraceInNewTab,
