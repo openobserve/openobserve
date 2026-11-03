@@ -3,12 +3,7 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import OSegmentedBar from "./OSegmentedBar.vue";
-import {
-  SEGMENT_RAMP,
-  SEGMENT_SWATCH,
-  segmentFill,
-  type SegmentedBarVariant,
-} from "./OSegmentedBar.types";
+import { SEGMENT_SWATCH, type SegmentedBarVariant } from "./OSegmentedBar.types";
 import { raw } from "@/types/i18n";
 
 const find = (w: ReturnType<typeof mount>, id: string) => w.find(`[data-test="${id}"]`);
@@ -70,9 +65,6 @@ describe("OSegmentedBar", () => {
     expect(mount(OSegmentedBar, { props: { segments: [], size: "md" } }).classes()).toContain(
       "h-2.5",
     );
-    expect(mount(OSegmentedBar, { props: { segments: [], size: "lg" } }).classes()).toContain(
-      "h-3",
-    );
   });
 
   it("paints the track and packs segments flush unless gapped", () => {
@@ -83,40 +75,17 @@ describe("OSegmentedBar", () => {
       props: {
         gapped: true,
         segments: [
-          { id: "a", pct: 0.5 },
+          { id: "a", pct: 0.5, variant: "logs" },
           { id: "b", pct: 0 },
         ],
       },
     });
     expect(gapped.classes()).not.toContain("bg-border-default");
-    expect(gapped.get(".gap-0\\.5").exists()).toBe(true);
+    expect(gapped.find(".gap-0\\.5").exists()).toBe(true);
     expect(find(gapped, "o-segmented-bar-segment-a").classes()).toEqual(
-      expect.arrayContaining(["min-w-1", "shrink"]),
+      expect.arrayContaining(["min-w-1", "shrink", "bg-signal-logs"]),
     );
     expect(find(gapped, "o-segmented-bar-segment-b").classes()).toContain("hidden");
-  });
-
-  it("names a segment in its tooltip and paints it at its rank step", () => {
-    const w = mount(OSegmentedBar, {
-      props: { segments: [{ id: "a", pct: 10, variant: "blue", shade: 2, title: raw("app 10%") }] },
-    });
-    const segment = find(w, "o-segmented-bar-segment-a");
-    expect(segment.attributes("title")).toBe("app 10%");
-    expect(segment.classes()).toContain("bg-segment-blue-3");
-    expect(segment.classes().some((c) => c.startsWith("opacity-"))).toBe(false);
-  });
-
-  it("steps categorical variants through their ramp, clamped, and ignores shade elsewhere", () => {
-    expect(segmentFill("purple")).toBe("bg-segment-purple-1");
-    expect(segmentFill("teal", 4)).toBe("bg-segment-teal-5");
-    expect(segmentFill("purple", 9)).toBe("bg-segment-purple-5");
-    expect(segmentFill("blue", -1)).toBe("bg-segment-blue-1");
-    expect(segmentFill(undefined, 3)).toBe("bg-accent");
-    expect(segmentFill("danger", 2)).toBe("bg-status-negative");
-    for (const hue of Object.keys(SEGMENT_RAMP) as Array<keyof typeof SEGMENT_RAMP>) {
-      expect(SEGMENT_RAMP[hue]).toHaveLength(5);
-      expect(SEGMENT_RAMP[hue][0]).toBe(SEGMENT_SWATCH[hue]);
-    }
   });
 
   it("exposes an image role when labelled and hides itself otherwise", () => {

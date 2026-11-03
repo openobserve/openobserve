@@ -13,20 +13,70 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <OStatStrip
-    :items="items"
-    :loading="pending"
-    layout="stacked"
-    selectable
+  <ul
+    class="grid grid-cols-6 gap-3 max-xl:grid-cols-3 max-md:grid-cols-2"
     data-test="overview-headline-strip"
-    @select="(key) => emit('select', key as OverviewTarget)"
-  />
+  >
+    <li v-for="item in items" :key="item.key" class="flex min-w-0">
+      <section
+        :class="[
+          'rounded-surface flex min-w-0 flex-1 flex-col border transition-colors motion-reduce:transition-none',
+          SURFACE[item.cardTone ?? 'none'],
+          item.selectable && !item.cardTone ? 'hover:border-border-strong' : '',
+        ]"
+        :data-test="`overview-tile-card-${item.key}`"
+      >
+        <!-- a tile without a list behind it is plain text, so it never looks clickable -->
+        <component
+          :is="item.selectable ? OButton : 'div'"
+          v-bind="item.selectable ? { variant: 'cell' } : {}"
+          class="flex flex-1 flex-col"
+          :data-test="`overview-headline-${item.key}`"
+          @click="item.selectable && emit('select', item.key)"
+        >
+          <span class="flex flex-1 flex-col gap-1 p-3 text-start">
+            <span class="text-text-label text-xs">{{ item.label }}</span>
+            <OSkeleton v-if="item.loading" class="h-9 w-16" data-test="overview-tile-skeleton" />
+            <span v-else class="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+              <span
+                :class="['text-3xl font-bold tabular-nums', item.tone]"
+                data-test="overview-tile-value"
+                >{{ item.value }}</span
+              >
+              <span
+                v-if="item.unit"
+                class="text-text-secondary text-xs"
+                data-test="overview-tile-unit"
+                >{{ item.unit }}</span
+              >
+            </span>
+            <!-- the note slot keeps two lines even when empty, so all six tiles share one rhythm -->
+            <span class="mt-auto flex min-h-8 items-start gap-1 text-xs">
+              <OIcon
+                v-if="item.note && !item.loading && item.noteTone === 'positive'"
+                name="check-circle"
+                size="xs"
+                class="text-status-success-text mt-0.5"
+              />
+              <span
+                v-if="item.note && !item.loading"
+                :class="NOTE_TONE[item.noteTone] ?? item.tone"
+                data-test="overview-tile-note"
+                >{{ item.note }}</span
+              >
+            </span>
+          </span>
+        </component>
+      </section>
+    </li>
+  </ul>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { OrgOverview, OverviewSection } from "@/ts/interfaces/overview";
 import {
@@ -38,15 +88,57 @@ import {
 } from "./overviewFormat";
 import { useOverviewTime } from "./useOverviewTime";
 
-export type OverviewTarget = "firing" | "failing" | "incidents" | "pipelines" | "quiet";
+export type OverviewTarget =
+  "firing" | "failing" | "incidents" | "pipelines" | "delivery" | "quiet";
 export type IncidentsTile = "ok" | "loading" | "error" | "locked" | "unavailable" | "forbidden";
+
+type NoteTone = "positive" | "problem" | "plain";
+type TileTone = "danger" | "warning";
 
 interface Tile {
   value: string | number;
+  unit?: I18nText;
   note?: I18nText;
+  // a good-state note ("None firing") gets the success cue; a descriptive one stays plain
+  positive?: boolean;
   ok: boolean;
   loading: boolean;
 }
+
+type TileDetail = Pick<Tile, "unit" | "note" | "positive">;
+
+interface TileItem {
+  key: OverviewTarget;
+  label: I18nText;
+  value: string | number;
+  unit?: I18nText;
+  note?: I18nText;
+  noteTone: NoteTone;
+  tone: string;
+  cardTone?: TileTone;
+  loading: boolean;
+  selectable: boolean;
+}
+
+const TONE = {
+  error: "text-status-negative",
+  warning: "text-status-warning-text",
+  zero: "text-text-heading",
+  absent: "text-text-muted",
+} as const;
+
+// a tile with a problem takes a soft status surface so it reads before its number
+const SURFACE: Record<TileTone | "none", string> = {
+  none: "bg-surface-panel border-border-default",
+  danger: "bg-status-error-bg border-status-negative",
+  warning: "bg-status-warning-bg border-status-warning-text",
+};
+
+// a problem note takes its value's tone, so it is left out here and falls back to it
+const NOTE_TONE: Partial<Record<NoteTone, string>> = {
+  positive: "text-status-success-text",
+  plain: "text-text-secondary",
+};
 
 const props = defineProps<{
   overview: OrgOverview | null;
@@ -92,24 +184,27 @@ const noRulesNote = (): I18nText | undefined => {
   return alerts.total > 0 ? t("overview.cards.noEnabledRules") : t("overview.cards.noAlertRules");
 };
 
-const firingNote = (count: number): I18nText | undefined => {
+const firingDetail = (count: number): TileDetail => {
   const alerts = props.overview?.alerts.data;
-  if (count === 0) return t("overview.cards.firingNone");
+  if (count === 0) return { note: t("overview.cards.firingNone"), positive: true };
   const critical = levelCount(alerts, "critical");
   const oldest = oldestKnownFiring(alerts);
-  const age = oldest ? formatElapsed(Date.now() - microsToMs(oldest.since)) : "";
-  if (critical > 0 && age)
-    return t("overview.cards.firingCriticalOldest", { count: critical, age });
-  if (critical > 0) return t("overview.cards.firingCritical", { count: critical });
-  return age ? t("overview.cards.firingOldest", { age }) : undefined;
+  return {
+    unit: t("overview.cards.criticalUnit", { count: critical }),
+    note: oldest
+      ? t("overview.cards.oldestFiring", {
+          age: formatElapsed(Date.now() - microsToMs(oldest.since)),
+        })
+      : undefined,
+  };
 };
 
-// one tile per alert question; both read "no rules" the same way
-const alertTile = (tile: Tile, note: (count: number) => I18nText | undefined): Tile => {
+// every alert tile reads "no rules" the same way
+const alertTile = (tile: Tile, detail: (count: number) => TileDetail): Tile => {
   if (!tile.ok) return tile;
   const noRules = noRulesNote();
   if (noRules) return { ...tile, value: DASH, note: noRules };
-  return { ...tile, note: note(Number(tile.value)) };
+  return { ...tile, ...detail(Number(tile.value)) };
 };
 
 const pipelinesTile = (): Tile => {
@@ -117,7 +212,11 @@ const pipelinesTile = (): Tile => {
   const data = props.overview?.pipelines.data;
   if (!tile.ok || !data) return tile;
   if (data.total === 0) return { ...tile, value: DASH, note: t("overview.cards.noPipelines") };
-  return { ...tile, note: t("overview.cards.pipelinesOf", { enabled: data.enabled }) };
+  return {
+    ...tile,
+    note: t("overview.cards.pipelinesOf", { enabled: data.enabled }),
+    positive: data.errored === 0,
+  };
 };
 
 const quietTile = (): Tile => {
@@ -147,24 +246,41 @@ const incidentsTile = (): Tile => {
   return {
     value: total,
     note: total > 0 ? undefined : t("overview.cards.incidentsNone"),
+    positive: total === 0,
     ok,
     loading: false,
   };
 };
 
-// a count above zero carries the tone; a dash or a zero stays quiet
-const toneOf = (tile: Tile, tone: StatItem["tone"]): StatItem["tone"] =>
-  tile.ok && Number(tile.value) > 0 ? tone : "neutral";
+const hasProblem = (tile: Tile) => tile.ok && Number(tile.value) > 0;
 
-const items = computed<StatItem[]>(() => {
+// a count above zero carries the tone, a zero is plain strong ink, and only an unknown dash is muted
+const toneOf = (tile: Tile, tone: string): string => {
+  if (hasProblem(tile)) return tone;
+  return tile.ok && tile.value !== DASH ? TONE.zero : TONE.absent;
+};
+
+const noteToneOf = (tile: Tile): NoteTone => {
+  if (hasProblem(tile)) return "problem";
+  return tile.positive ? "positive" : "plain";
+};
+
+const items = computed<TileItem[]>(() => {
   const o = props.overview;
   const firing = alertTile(
     sectionTile(o?.alerts, (d) => firingCount(d)),
-    firingNote,
+    firingDetail,
   );
   const failing = alertTile(
     sectionTile(o?.alerts, (d) => d.failed_evaluation),
-    (count) => (count > 0 ? t("overview.cards.failingNote") : t("overview.cards.failingNone")),
+    (count) => ({
+      note: count > 0 ? t("overview.cards.failingNote") : t("overview.cards.failingNone"),
+      positive: count === 0,
+    }),
+  );
+  const delivery = alertTile(
+    sectionTile(o?.alerts, (d) => d.by_state.notify_failed ?? 0),
+    () => ({ note: t("overview.cards.deliveryNote") }),
   );
   const incidents = incidentsTile();
   const pipelines = pipelinesTile();
@@ -173,30 +289,33 @@ const items = computed<StatItem[]>(() => {
     key: OverviewTarget,
     label: I18nText,
     data: Tile,
-    tone: StatItem["tone"],
+    tone: string,
     selectable: boolean,
-  ): StatItem => ({
+  ): TileItem => ({
     key,
     label,
     value: data.value,
-    sub: data.note,
+    unit: data.unit,
+    note: data.note,
+    noteTone: noteToneOf(data),
     loading: data.loading,
     tone: toneOf(data, tone),
+    cardTone: hasProblem(data) ? (tone === TONE.warning ? "warning" : "danger") : undefined,
     selectable,
-    dataTest: `overview-headline-${key}`,
   });
   return [
-    tile("firing", t("overview.cards.firingAlerts"), firing, "error", firing.ok),
-    tile("failing", t("overview.cards.failingRules"), failing, "error", failing.ok),
+    tile("firing", t("overview.cards.firingAlerts"), firing, TONE.error, firing.ok),
+    tile("failing", t("overview.cards.failingRules"), failing, TONE.error, failing.ok),
     tile(
       "incidents",
       t("overview.cards.openIncidents"),
       incidents,
-      "error",
+      TONE.error,
       props.incidentsState !== "unavailable" && props.incidentsState !== "forbidden",
     ),
-    tile("pipelines", t("overview.cards.pipelineErrors"), pipelines, "error", pipelines.ok),
-    tile("quiet", t("overview.cards.quietStreams"), quiet, "warning", quiet.ok),
+    tile("pipelines", t("overview.cards.pipelineErrors"), pipelines, TONE.error, pipelines.ok),
+    tile("delivery", t("overview.cards.deliveryFailures"), delivery, TONE.error, delivery.ok),
+    tile("quiet", t("overview.cards.quietStreams"), quiet, TONE.warning, quiet.ok),
   ];
 });
 </script>

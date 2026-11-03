@@ -13,10 +13,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <OContent class="text-text-body flex h-full flex-col gap-0 overflow-y-auto pt-2.5 pb-2.5">
+  <!-- one p-3 inset and gap-3 rhythm, the same panel layout as the Kubernetes overview -->
+  <div
+    class="text-text-body flex h-full min-w-0 flex-col gap-3 overflow-y-auto p-3"
+    data-test="overview-canvas"
+  >
     <div
       v-if="pageState !== 'forbidden' && !errorIsForbidden"
-      class="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+      class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
     >
       <OverviewStatusLine v-if="showOverviewCards" :status="status" @select="onHeadlineSelect" />
       <div class="ms-auto flex items-center gap-2">
@@ -46,7 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showOverviewCards && overviewRefreshFailed"
       variant="warning"
       inline-actions
-      class="mb-3"
       data-test="overview-stale-notice"
     >
       {{ t("overview.stale.message", { time: generatedAtLabel }) }}
@@ -65,7 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OverviewHeadlineStrip
       v-if="showOverviewCards"
-      class="mb-4"
       :overview="overview"
       :pending="overviewPending"
       :failed="overviewFailed"
@@ -75,22 +77,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @select="onHeadlineSelect"
     />
 
+    <div
+      v-if="showOverviewCards"
+      class="grid grid-cols-[1.15fr_1fr] gap-3 max-lg:grid-cols-1"
+      data-test="overview-alerts-health-grid"
+    >
+      <OverviewAlertsCard
+        :section="overview?.alerts"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        :forbidden="overviewForbidden"
+        :incidents-state="incidentsTile"
+        :incidents-total="incidentsTotal"
+        @retry="() => loadOverview(true)"
+        @open="goToAlertList"
+        @create="goToAddAlert"
+        @select="onHeadlineSelect"
+      />
+      <OverviewDataHealthCard
+        :overview="overview"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        :forbidden="overviewForbidden"
+        @retry="() => loadOverview(true)"
+        @open="onHealthOpen"
+      />
+    </div>
+
     <!-- ACTIVE INCIDENTS (enterprise / cloud only) -->
     <section
       v-if="isIncidentsEnabled && incidents.length > 0"
-      class="mb-4"
       data-test="overview-incidents-section"
     >
       <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
-        <div class="text-text-heading text-sm font-medium">
+        <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
           {{ t("overview.activeIncidents") }}
           <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
-          <span
+          <OText
             v-if="incidentsTotal > incidents.length"
-            class="text-text-secondary ms-2 align-middle text-xs font-normal"
-            >{{ t("overview.showingOf", { shown: incidents.length, total: incidentsTotal }) }}</span
+            variant="meta"
+            class="text-text-secondary"
+            >{{
+              t("overview.showingOf", { shown: incidents.length, total: incidentsTotal })
+            }}</OText
           >
-        </div>
+        </OText>
         <OButton
           variant="ghost-primary"
           size="sm"
@@ -106,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="inc in incidents"
           :key="inc.id"
-          class="group bg-surface-base border-b-border-default flex items-center gap-3 border-s-[0.1875em] border-b-[0.0625em] px-3.5 py-2.5 last:border-b-0"
+          class="group bg-surface-panel border-b-border-default flex items-center gap-3 border-s-[0.1875em] border-b-[0.0625em] px-3 py-2 last:border-b-0"
           :class="incidentRowClass(inc.severity)"
         >
           <span class="flex shrink-0 items-center" :class="incidentIconClass(inc.severity)">
@@ -179,39 +210,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.activeIncidents')"
     />
 
-    <div
-      v-if="showOverviewCards"
-      class="mb-4 grid grid-cols-2 gap-4 max-lg:grid-cols-1"
-      data-test="overview-alerts-health-grid"
-    >
-      <OverviewAlertsCard
-        :section="overview?.alerts"
-        :pending="overviewPending"
-        :failed="overviewFailed"
-        :forbidden="overviewForbidden"
-        :incidents-state="incidentsTile"
-        :incidents-total="incidentsTotal"
-        @retry="() => loadOverview(true)"
-        @open="goToAlertList"
-        @create="goToAddAlert"
-        @select="onHeadlineSelect"
-      />
-      <OverviewDataHealthCard
-        :overview="overview"
-        :pending="overviewPending"
-        :failed="overviewFailed"
-        :forbidden="overviewForbidden"
-        @retry="() => loadOverview(true)"
-        @open="onHealthOpen"
-      />
-    </div>
-
     <!-- the upsell sits below the alerts grid so it never outranks live alert state -->
-    <section v-if="!incidentsAccess.allowed" class="mb-4" data-test="overview-incidents-locked">
+    <section v-if="!incidentsAccess.allowed" data-test="overview-incidents-locked">
       <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
-        <div class="text-text-heading text-sm font-medium">
+        <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
           {{ t("overview.activeIncidents") }}
-        </div>
+        </OText>
       </div>
       <div
         class="border-border-default bg-surface-subtle rounded-surface hover:border-accent focus-visible:ring-button-ghost-focus-ring flex cursor-pointer items-center gap-3 border border-[0.0625em] px-4 py-5 transition-colors focus-visible:ring-3 focus-visible:outline-none"
@@ -226,42 +230,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </section>
 
-    <section class="flex flex-col" data-test="overview-time-range-group">
+    <div
+      v-if="showOverviewCards"
+      class="grid grid-cols-[2fr_1fr] gap-3 max-lg:grid-cols-1"
+      data-test="overview-streams-limit-grid"
+    >
+      <OverviewTopStreamsCard
+        :section="overview?.streams"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        :forbidden="overviewForbidden"
+        @retry="() => loadOverview(true)"
+        @open="goToStreams"
+        @start-ingesting="goToIngestion"
+      />
+      <OverviewLimitCard
+        :limits="overview?.limits"
+        :streams="overview?.streams"
+        :pending="overviewPending"
+        :failed="overviewFailed"
+        :forbidden="overviewForbidden"
+        @retry="() => loadOverview(true)"
+      />
+    </div>
+
+    <OverviewSignalCards
+      v-if="showOverviewCards"
+      :section="overview?.streams"
+      :pending="overviewPending"
+      :failed="overviewFailed"
+      :forbidden="overviewForbidden"
+      @open="onSignalOpen"
+    />
+
+    <section class="flex flex-col gap-3" data-test="overview-time-range-group">
       <div
         v-if="showOverviewCards && pageShowsSections"
-        class="mb-3 flex flex-wrap items-baseline gap-x-2 ps-1"
+        class="flex flex-wrap items-baseline gap-x-2 ps-1"
         data-test="overview-time-range-heading"
       >
-        <h2 class="text-text-heading text-base font-medium">
+        <h2 class="text-text-heading text-base font-semibold">
           {{ t("overview.timeRange.heading") }}
         </h2>
-        <span
+        <OText
           v-if="rangeLabel"
-          class="text-text-secondary text-xs"
+          variant="meta"
+          class="text-text-secondary"
           data-test="overview-time-range-label"
-          >{{ rangeLabel }}</span
+          >{{ rangeLabel }}</OText
         >
       </div>
       <!-- SERVICES (enterprise only — needs service graph data) -->
       <section
         v-if="incidentsAccess.allowed && services.length > 0"
-        class="mb-4"
         data-test="overview-services-section"
       >
         <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
-          <div class="text-text-heading text-sm font-medium">
+          <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
             {{ t("overview.services") }}
             <OTag type="countChip" value="warning">{{ services.length }}</OTag>
-            <span
+            <OText
               v-if="servicePanelVisible && selectedService"
-              class="text-text-secondary ms-1 text-xs font-normal"
+              variant="meta"
+              class="text-text-secondary"
             >
               {{ t("overview.viewingLabel") }}
               <strong class="text-text-body font-semibold">{{
                 selectedService.label ?? selectedService.id
               }}</strong>
-            </span>
-          </div>
+            </OText>
+          </OText>
           <OButton
             variant="ghost-primary"
             size="sm"
@@ -303,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="svc in services"
               :key="svc.id"
-              class="rounded-default border-border-default bg-surface-base focus-visible:ring-button-ghost-focus-ring max-w-40 min-w-40 shrink-0 grow-0 basis-40 cursor-pointer border border-[0.0625em] px-3.5 py-3 transition-[background-color,box-shadow,outline-color] duration-150 focus-visible:ring-3 focus-visible:outline-none"
+              class="rounded-default border-border-default bg-surface-panel focus-visible:ring-button-ghost-focus-ring max-w-40 min-w-40 shrink-0 grow-0 basis-40 cursor-pointer border border-[0.0625em] px-3.5 py-3 transition-[background-color,box-shadow,outline-color] duration-150 focus-visible:ring-3 focus-visible:outline-none"
               tabindex="0"
               :class="[
                 serviceCardClass(svc),
@@ -410,15 +448,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Locked: Services shares the Incidents license gate — same bundle, no
            separate upsell story of its own. -->
-      <section
-        v-else-if="!incidentsAccess.allowed"
-        class="mb-4"
-        data-test="overview-services-locked"
-      >
+      <section v-else-if="!incidentsAccess.allowed" data-test="overview-services-locked">
         <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
-          <div class="text-text-heading text-sm font-medium">
+          <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
             {{ t("overview.services") }}
-          </div>
+          </OText>
         </div>
         <div
           class="border-border-default bg-surface-subtle rounded-surface hover:border-accent focus-visible:ring-button-ghost-focus-ring flex cursor-pointer items-center gap-3 border border-[0.0625em] px-4 py-5 transition-colors focus-visible:ring-3 focus-visible:outline-none"
@@ -459,16 +493,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div
-        :class="slimPair ? 'grid grid-cols-2 gap-x-4 max-md:grid-cols-1' : 'contents'"
+        :class="slimPair ? 'grid grid-cols-2 gap-3 max-md:grid-cols-1' : 'contents'"
         data-test="overview-time-range-pair"
       >
         <!-- ACTIVE ANOMALIES -->
-        <section v-if="anomalies.length > 0" class="mb-4" data-test="overview-anomalies-section">
+        <section v-if="anomalies.length > 0" data-test="overview-anomalies-section">
           <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
-            <div class="text-text-heading text-sm font-medium">
+            <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
               {{ t("overview.activeAnomalies") }}
               <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
-            </div>
+            </OText>
             <OButton
               variant="ghost-primary"
               size="sm"
@@ -479,12 +513,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
           <div
-            class="border-border-default rounded-surface bg-surface-base flex flex-col overflow-hidden border border-[0.0625em]"
+            class="border-border-default rounded-surface bg-surface-panel flex flex-col overflow-hidden border border-[0.0625em]"
           >
             <div
               v-for="item in anomalies"
               :key="item.id"
-              class="group border-b-border-default flex items-center gap-3 border-b-[0.0625em] px-3.5 py-2.5 last:border-b-0"
+              class="group border-b-border-default flex items-center gap-3 border-b-[0.0625em] px-3 py-2 last:border-b-0"
               :class="severityRowClass(item.severity)"
             >
               <span class="flex shrink-0 items-center" :class="severityIconClass(item.severity)">
@@ -541,16 +575,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <!-- RECENT EVENTS (alert firing feed) -->
-        <section
-          v-if="recentEvents.length > 0"
-          class="mb-4"
-          data-test="overview-recent-events-section"
-        >
+        <section v-if="recentEvents.length > 0" data-test="overview-recent-events-section">
           <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
-            <div class="text-text-heading text-sm font-medium">
+            <OText variant="card-title" class="flex flex-wrap items-center gap-1.5">
               {{ t("overview.recentEvents") }}
               <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
-            </div>
+            </OText>
             <OButton
               variant="ghost-primary"
               size="sm"
@@ -561,25 +591,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
           <div
-            class="border-border-default rounded-surface bg-surface-base flex flex-col gap-0 overflow-hidden border border-[0.0625em]"
+            class="border-border-default rounded-surface bg-surface-panel flex flex-col gap-0 overflow-hidden border border-[0.0625em]"
           >
             <div
               v-for="ev in recentEvents"
               :key="ev.id"
-              class="border-b-border-default flex items-center gap-3 border-b border-b-[0.0625em] px-3.5 py-2.5 last:border-b-0 max-sm:flex-wrap max-sm:gap-y-1"
+              class="border-b-border-default flex items-center gap-3 border-b border-b-[0.0625em] px-3 py-2 last:border-b-0 max-sm:flex-wrap max-sm:gap-y-1"
               data-test="overview-recent-events-row"
             >
               <!-- a phone puts status and age on one line and gives the name the whole second line -->
               <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0 max-sm:order-1" />
               <OTruncatedText
                 :class="[
-                  'text-text-body max-w-[12.5em] min-w-[7.5em] text-sm max-sm:order-5 max-sm:min-w-0',
+                  'text-text-secondary max-w-[12.5em] min-w-[7.5em] text-xs max-sm:order-5 max-sm:min-w-0',
                   hasEventStream(ev) ? '' : 'max-sm:hidden',
                 ]"
                 >{{ ev.service }}</OTruncatedText
               >
               <OTruncatedText
-                class="text-text-secondary flex-1 max-sm:order-4 max-sm:min-w-0"
+                class="text-text-body flex-1 text-sm font-medium max-sm:order-4 max-sm:min-w-0"
                 data-test="overview-recent-events-name"
                 >{{ ev.description }}</OTruncatedText
               >
@@ -620,29 +650,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </section>
-
-    <OverviewDataSizeCard
-      v-if="showOverviewCards"
-      class="mb-4"
-      :streams="overview?.streams"
-      :limits="overview?.limits"
-      :pending="overviewPending"
-      :failed="overviewFailed"
-      :forbidden="overviewForbidden"
-      @retry="() => loadOverview(true)"
-      @open="goToStreams"
-      @start-ingesting="goToIngestion"
-    />
-
-    <OverviewSignalCards
-      v-if="showOverviewCards"
-      class="mb-4"
-      :section="overview?.streams"
-      :pending="overviewPending"
-      :failed="overviewFailed"
-      :forbidden="overviewForbidden"
-      @open="onSignalOpen"
-    />
 
     <OEmptyState
       v-if="pageState === 'forbidden' || errorIsForbidden"
@@ -713,7 +720,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       alert-type="anomaly_detection"
       data-test="overview-alert-history-drawer"
     />
-  </OContent>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -740,6 +747,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OverviewSkeleton from "./OverviewSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
@@ -747,14 +755,14 @@ import OverviewSectionError from "./OverviewSectionError.vue";
 import OverviewSectionEmpty from "./OverviewSectionEmpty.vue";
 import HomeNoDataState from "./HomeNoDataState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OContent from "@/lib/core/Content/OContent.vue";
 import OverviewHeadlineStrip, {
   type OverviewTarget,
   type IncidentsTile,
 } from "./overview/OverviewHeadlineStrip.vue";
 import OverviewAlertsCard from "./overview/OverviewAlertsCard.vue";
 import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
-import OverviewDataSizeCard from "./overview/OverviewDataSizeCard.vue";
+import OverviewTopStreamsCard from "./overview/OverviewTopStreamsCard.vue";
+import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
 import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
 import OverviewStatusLine from "./overview/OverviewStatusLine.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -1695,7 +1703,7 @@ const onSignalOpen = (signal: OverviewSignal) => {
 };
 
 const onHeadlineSelect = (target: OverviewTarget) => {
-  if (target === "firing" || target === "failing") goToAlertList();
+  if (target === "firing" || target === "failing" || target === "delivery") goToAlertList();
   else if (target === "pipelines") goToPipelines();
   else if (target === "quiet") goToStreams();
   else if (incidentsTile.value === "locked") openUpgradeDialog();

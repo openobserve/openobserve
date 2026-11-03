@@ -38,10 +38,13 @@ const tile = (w: ReturnType<typeof mountStrip>, key: string) =>
   w.get(`[data-test="overview-headline-${key}"]`);
 
 const valueOf = (w: ReturnType<typeof mountStrip>, key: string) =>
-  tile(w, key).get('[data-test="o-stat-card-value"]');
+  tile(w, key).get('[data-test="overview-tile-value"]');
+
+const card = (w: ReturnType<typeof mountStrip>, key: string) =>
+  w.get(`[data-test="overview-tile-card-${key}"]`);
 
 const noteOf = (w: ReturnType<typeof mountStrip>, key: string) =>
-  tile(w, key).find('[data-test="o-stat-card-sub-stacked"]');
+  tile(w, key).find('[data-test="overview-tile-note"]');
 
 const withAlerts = (over: Record<string, unknown>) => {
   const base = buildOverview();
@@ -51,8 +54,8 @@ const withAlerts = (over: Record<string, unknown>) => {
   } as typeof base;
 };
 
-const ALL = ["firing", "failing", "incidents", "pipelines", "quiet"];
-const OVERVIEW_TILES = ["firing", "failing", "pipelines", "quiet"];
+const ALL = ["firing", "failing", "incidents", "pipelines", "delivery", "quiet"];
+const OVERVIEW_TILES = ["firing", "failing", "pipelines", "delivery", "quiet"];
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -64,7 +67,7 @@ afterEach(() => {
 });
 
 describe("OverviewHeadlineStrip", () => {
-  it("shows exactly the five problem tiles, in order, with no streams total", () => {
+  it("shows exactly the six problem tiles, in order, with no streams total", () => {
     const w = mountStrip();
     const keys = w
       .findAll('[data-test^="overview-headline-"]:not([data-test="overview-headline-strip"])')
@@ -89,18 +92,19 @@ describe("OverviewHeadlineStrip", () => {
     expect(valueOf(w, "failing").text()).toBe("4");
     expect(valueOf(w, "incidents").text()).toBe("6");
     expect(valueOf(w, "pipelines").text()).toBe("2");
+    expect(valueOf(w, "delivery").text()).toBe("0");
     expect(valueOf(w, "quiet").text()).toBe("3");
   });
 
   it("tones a non-zero problem count as danger and quiet streams as warning", () => {
     const w = mountStrip();
     for (const key of ["firing", "failing", "incidents", "pipelines"]) {
-      expect(valueOf(w, key).classes()).toContain("text-icon-chip-error-text");
+      expect(valueOf(w, key).classes()).toContain("text-status-negative");
     }
-    expect(valueOf(w, "quiet").classes()).toContain("text-icon-chip-warning-text");
+    expect(valueOf(w, "quiet").classes()).toContain("text-status-warning-text");
   });
 
-  it("keeps a zero quiet", () => {
+  it("draws a zero in strong ink on the plain card, and only a dash muted", () => {
     const base = buildOverview();
     const overview = {
       ...base,
@@ -110,25 +114,82 @@ describe("OverviewHeadlineStrip", () => {
     const w = mountStrip({ overview, incidentsTotal: 0 });
     for (const key of ["quiet", "pipelines", "incidents"]) {
       expect(valueOf(w, key).text()).toBe("0");
-      expect(valueOf(w, key).classes()).toContain("text-text-muted");
+      expect(valueOf(w, key).classes()).toEqual(
+        expect.arrayContaining(["text-text-heading", "font-bold", "tabular-nums"]),
+      );
+      expect(card(w, key).classes()).toContain("bg-surface-panel");
+    }
+    const dash = mountStrip({ incidentsState: "locked" });
+    expect(valueOf(dash, "incidents").classes()).toContain("text-text-muted");
+  });
+
+  it("tints a tile with a problem and colours its note like its value", () => {
+    const w = mountStrip();
+    expect(card(w, "firing").classes()).toEqual(
+      expect.arrayContaining(["bg-status-error-bg", "border-status-negative"]),
+    );
+    expect(card(w, "quiet").classes()).toEqual(
+      expect.arrayContaining(["bg-status-warning-bg", "border-status-warning-text"]),
+    );
+    expect(noteOf(w, "failing").classes()).toContain("text-status-negative");
+    expect(noteOf(w, "quiet").classes()).toContain("text-status-warning-text");
+  });
+
+  it("marks a good-state note with the success colour and a check, keeping the words", () => {
+    const overview = withAlerts({
+      by_state: {},
+      failed_evaluation: 0,
+      firing: [],
+      firing_by_level: { ok: 0, warning: 0, critical: 0, no_data: 0, unclassified: 0 },
+    });
+    const base = buildOverview();
+    const w = mountStrip({
+      overview: {
+        ...overview,
+        pipelines: { status: "ok", data: { ...base.pipelines.data!, errored: 0 } },
+      },
+      incidentsTotal: 0,
+    });
+    for (const key of ["firing", "failing", "incidents", "pipelines"]) {
+      expect(noteOf(w, key).classes()).toContain("text-status-success-text");
+      const icon = noteOf(w, key).element.previousElementSibling!;
+      expect(icon.getAttribute("aria-hidden")).toBe("true");
+    }
+    expect(noteOf(w, "firing").text()).toBe("None firing");
+    expect(noteOf(w, "delivery").classes()).toContain("text-text-secondary");
+  });
+
+  it("keeps a two-line note slot on every tile so their rhythm matches", () => {
+    const w = mountStrip({ incidentsState: "ok", incidentsTotal: 2 });
+    for (const key of ALL) {
+      expect(tile(w, key).find(".min-h-8").exists()).toBe(true);
     }
   });
 
-  it("notes the critical count and the oldest firing age together", () => {
-    expect(noteOf(mountStrip(), "firing").text()).toBe("2 critical · oldest 1h 0m");
+  it("puts the critical count beside the value and the oldest firing age below it", () => {
+    const w = mountStrip();
+    expect(tile(w, "firing").get('[data-test="overview-tile-unit"]').text()).toBe(
+      "2 at critical level",
+    );
+    expect(noteOf(w, "firing").text()).toBe("Oldest firing for 1h 0m");
+    const value = valueOf(w, "firing").element;
+    expect(value.parentElement?.classList.contains("items-baseline")).toBe(true);
   });
 
-  it("notes only the oldest age when nothing is critical", () => {
+  it("says zero at critical level when nothing is critical", () => {
     const overview = withAlerts({
       firing_by_level: { ok: 0, warning: 3, critical: 0, no_data: 0, unclassified: 0 },
     });
-    expect(noteOf(mountStrip({ overview }), "firing").text()).toBe("Oldest 1h 0m");
+    const w = mountStrip({ overview });
+    expect(tile(w, "firing").get('[data-test="overview-tile-unit"]').text()).toBe(
+      "0 at critical level",
+    );
   });
 
-  it("notes only the critical count when no firing age is known", () => {
+  it("leaves out the age note when no firing age is known", () => {
     const [first] = buildOverview().alerts.data!.firing;
     const overview = withAlerts({ firing: [{ ...first, since: 0 }] });
-    expect(noteOf(mountStrip({ overview }), "firing").text()).toBe("2 critical");
+    expect(noteOf(mountStrip({ overview }), "firing").exists()).toBe(false);
   });
 
   it("skips a firing row with an unknown since when picking the oldest age", () => {
@@ -137,7 +198,7 @@ describe("OverviewHeadlineStrip", () => {
       firing: [{ ...first, since: 0 }, second],
       firing_by_level: { ok: 0, warning: 3, critical: 0, no_data: 0, unclassified: 0 },
     });
-    expect(noteOf(mountStrip({ overview }), "firing").text()).toBe("Oldest 16m");
+    expect(noteOf(mountStrip({ overview }), "firing").text()).toBe("Oldest firing for 16m");
   });
 
   it("says none firing and none failing at zero", () => {
@@ -149,6 +210,7 @@ describe("OverviewHeadlineStrip", () => {
     });
     const w = mountStrip({ overview, incidentsTotal: 0 });
     expect(noteOf(w, "firing").text()).toBe("None firing");
+    expect(tile(w, "firing").find('[data-test="overview-tile-unit"]').exists()).toBe(false);
     expect(noteOf(w, "failing").text()).toBe("None failing");
     expect(noteOf(w, "incidents").text()).toBe("None open");
   });
@@ -166,7 +228,7 @@ describe("OverviewHeadlineStrip", () => {
       by_state: {},
     });
     const w = mountStrip({ overview });
-    for (const key of ["firing", "failing"]) {
+    for (const key of ["firing", "failing", "delivery"]) {
       expect(valueOf(w, key).text()).toBe("—");
       expect(noteOf(w, key).text()).toBe("No alert rules");
     }
@@ -219,15 +281,13 @@ describe("OverviewHeadlineStrip", () => {
 
   it("skeletons only the incidents tile while incidents load", () => {
     const w = mountStrip({ incidentsState: "loading" });
-    expect(w.findAll('[data-test="o-stat-card-value-skeleton"]').length).toBe(1);
-    expect(tile(w, "incidents").find('[data-test="o-stat-card-value-skeleton"]').exists()).toBe(
-      true,
-    );
+    expect(w.findAll('[data-test="overview-tile-skeleton"]').length).toBe(1);
+    expect(tile(w, "incidents").find('[data-test="overview-tile-skeleton"]').exists()).toBe(true);
   });
 
   it("shows a skeleton, never a zero, and no unavailable note while the first load is pending", () => {
     const w = mountStrip({ overview: null, pending: true });
-    expect(w.findAll('[data-test="o-stat-card-value-skeleton"]').length).toBe(5);
+    expect(w.findAll('[data-test="overview-tile-skeleton"]').length).toBe(5);
     expect(tile(w, "firing").text()).not.toContain("0");
     expect(tile(w, "quiet").text()).not.toContain("Could not load");
     expect(tile(w, "quiet").text()).not.toContain("—");
@@ -285,12 +345,29 @@ describe("OverviewHeadlineStrip", () => {
     expect(w.emitted("select")).toEqual([["quiet"]]);
   });
 
+  it("shows delivery failures from notify_failed with their meaning, toned as danger", () => {
+    const overview = withAlerts({ by_state: { firing: 1, notify_failed: 2 } });
+    const w = mountStrip({ overview });
+    expect(tile(w, "delivery").text()).toContain("Alert delivery failures");
+    expect(valueOf(w, "delivery").text()).toBe("2");
+    expect(valueOf(w, "delivery").classes()).toContain("text-status-negative");
+    expect(noteOf(w, "delivery").text()).toBe("Alerts that fired but could not notify");
+  });
+
+  it("lays the tiles out six across on wide screens, three on medium and two on phones", () => {
+    const classes = mountStrip().get('[data-test="overview-headline-strip"]').classes();
+    expect(classes).toEqual(
+      expect.arrayContaining(["grid-cols-6", "max-xl:grid-cols-3", "max-md:grid-cols-2"]),
+    );
+  });
+
   it("emits the tile key as a button click", async () => {
     const w = mountStrip();
     expect(tile(w, "firing").element.tagName).toBe("BUTTON");
     await tile(w, "firing").trigger("click");
     await tile(w, "failing").trigger("click");
     await tile(w, "incidents").trigger("click");
-    expect(w.emitted("select")).toEqual([["firing"], ["failing"], ["incidents"]]);
+    await tile(w, "delivery").trigger("click");
+    expect(w.emitted("select")).toEqual([["firing"], ["failing"], ["incidents"], ["delivery"]]);
   });
 });

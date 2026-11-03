@@ -683,7 +683,7 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
       const tile = '[data-test="overview-headline-incidents"]';
-      const skeleton = '[data-test="o-stat-card-value-skeleton"]';
+      const skeleton = '[data-test="overview-tile-skeleton"]';
       const orgA = wrapper.get(tile).text();
       expect(wrapper.get(tile).find(skeleton).exists()).toBe(false);
 
@@ -1439,7 +1439,7 @@ describe("OverviewTab", () => {
       expect(wrapper.get('[data-test="overview-limit-usage"]').text()).toContain("85.50 GB");
       expect(wrapper.get('[data-test="overview-limit-usage"]').text()).toContain("of 100.00 GB");
       expect(wrapper.get(tile("quiet")).text()).toContain("3");
-      expect(wrapper.get('[data-test="overview-streams-total"]').text()).toBe("2.00 GB");
+      expect(wrapper.get('[data-test="overview-storage-total"]').text()).toBe("2.00 GB");
       expect(wrapper.find('[data-test="overview-signal-logs-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="overview-stale-notice"]').exists()).toBe(false);
     });
@@ -1451,7 +1451,7 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.findAll('[data-test="o-stat-card-value-skeleton"]').length).toBe(5);
+      expect(wrapper.findAll('[data-test="overview-tile-skeleton"]').length).toBe(5);
       expect(wrapper.find('[data-test="overview-streams-loading"]').exists()).toBe(true);
     });
 
@@ -1514,10 +1514,10 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      for (const section of ["alerts", "data-health", "streams"]) {
+      for (const section of ["alerts", "data-health", "streams", "limit"]) {
         expect(wrapper.find(`[data-test="overview-${section}-error"]`).exists()).toBe(true);
       }
-      expect(wrapper.find('[data-test="overview-limit-row"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-limit-body"]').exists()).toBe(false);
       expect(wrapper.get(tile("firing")).text()).toContain("—");
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
       expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(false);
@@ -1532,7 +1532,7 @@ describe("OverviewTab", () => {
       expect(wrapper.get(tile("firing")).text()).toContain("3");
     });
 
-    it("should leave the ingest limit row out on OSS without rendering the API reason", async () => {
+    it("should show the data size alone on OSS without rendering the API reason", async () => {
       vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
         data: buildOverview({ limits: { status: "locked", reason: "enterprise only, english" } }),
       } as never);
@@ -1540,20 +1540,20 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="overview-streams-card"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="overview-limit-row"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-storage-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-limit-body"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="overview-limit-locked"]').exists()).toBe(false);
       expect(wrapper.text()).not.toContain("enterprise only, english");
     });
 
-    it("should not render the ingest limit row on cloud", async () => {
+    it("should not render the ingest limit on cloud", async () => {
       config.isCloud = "true";
 
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="overview-limit-row"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="overview-streams-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-limit-card"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-storage-card"]').exists()).toBe(true);
     });
 
     it("should show forbidden on the alerts card for a forbidden section", async () => {
@@ -1720,7 +1720,7 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      for (const section of ["alerts", "data-health", "streams"]) {
+      for (const section of ["alerts", "data-health", "streams", "limit"]) {
         expect(wrapper.find(`[data-test="overview-${section}-forbidden"]`).exists()).toBe(true);
         expect(wrapper.find(`[data-test="overview-${section}-retry-btn"]`).exists()).toBe(false);
       }
@@ -1796,15 +1796,19 @@ describe("OverviewTab", () => {
       expect(wrapper.get(msg("anomalies")).text()).toContain("No anomaly checks are set up");
     });
 
-    it("places active incidents above the alerts and data health grid", async () => {
+    it("places active incidents directly below the alerts and data health grid", async () => {
       enterprise();
       wrapper = mountOverviewTab();
       await flushPromises();
 
       const incidents = wrapper.get(msg("incidents")).element;
       const grid = wrapper.get('[data-test="overview-alerts-health-grid"]').element;
+      const streams = wrapper.get('[data-test="overview-streams-limit-grid"]').element;
       expect(
-        incidents.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING,
+        grid.compareDocumentPosition(incidents) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        incidents.compareDocumentPosition(streams) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
 
@@ -1829,14 +1833,12 @@ describe("OverviewTab", () => {
       await flushPromises();
 
       const tileSel = '[data-test="overview-headline-incidents"]';
-      expect(wrapper.get(tileSel).find('[data-test="o-stat-card-value-skeleton"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.get(tileSel).find('[data-test="overview-tile-skeleton"]').exists()).toBe(true);
       expect(wrapper.find(msg("incidents")).exists()).toBe(false);
 
       pending.resolve({ data: { incidents: [], total: 0 } });
       await flushPromises();
-      expect(wrapper.get(tileSel).find('[data-test="o-stat-card-value-skeleton"]').exists()).toBe(
+      expect(wrapper.get(tileSel).find('[data-test="overview-tile-skeleton"]').exists()).toBe(
         false,
       );
       expect(wrapper.find(msg("incidents")).exists()).toBe(true);
@@ -1990,7 +1992,7 @@ describe("OverviewTab", () => {
       wrapper.get(a).element.compareDocumentPosition(wrapper.get(b).element) &
       Node.DOCUMENT_POSITION_FOLLOWING;
 
-    it("orders status, headline, alerts and health, time range, data size, then signals", async () => {
+    it("orders status, tiles, alerts and health, streams and limit, signals, then the time range", async () => {
       givenRecentEvents();
       await mountWith(buildOverview());
 
@@ -1998,25 +2000,37 @@ describe("OverviewTab", () => {
         '[data-test="overview-status-danger"]',
         '[data-test="overview-headline-strip"]',
         '[data-test="overview-alerts-health-grid"]',
-        '[data-test="overview-time-range-group"]',
-        '[data-test="overview-streams-card"]',
+        '[data-test="overview-streams-limit-grid"]',
         '[data-test="overview-signal-cards"]',
+        '[data-test="overview-time-range-group"]',
       ];
       for (let i = 1; i < order.length; i++) {
         expect(follows(order[i - 1], order[i])).toBeTruthy();
       }
-      const dataSize = wrapper.get('[data-test="overview-streams-card"]');
-      expect(dataSize.text()).toContain("Data size by stream");
-      expect(dataSize.find('[data-test="overview-limit-row"]').exists()).toBe(true);
+      const grid = wrapper.get('[data-test="overview-streams-limit-grid"]');
+      expect(grid.find('[data-test="overview-streams-card"]').text()).toContain(
+        "Top streams by data size",
+      );
+      expect(grid.find('[data-test="overview-limit-card"]').text()).toContain(
+        "Ingest limit and storage",
+      );
     });
 
     it("stretches side-by-side cards to one height on the same gap", async () => {
       await mountWith(buildOverview());
 
-      for (const id of ["overview-alerts-health-grid"]) {
+      expect(wrapper.get('[data-test="overview-canvas"]').classes()).toEqual(
+        expect.arrayContaining(["flex", "flex-col", "gap-3", "p-3", "min-w-0"]),
+      );
+
+      const grids = {
+        "overview-alerts-health-grid": "grid-cols-[1.15fr_1fr]",
+        "overview-streams-limit-grid": "grid-cols-[2fr_1fr]",
+      };
+      for (const [id, cols] of Object.entries(grids)) {
         const classes = wrapper.get(`[data-test="${id}"]`).classes();
         expect(classes).not.toContain("items-start");
-        expect(classes).toContain("gap-4");
+        expect(classes).toEqual(expect.arrayContaining(["gap-3", cols, "max-lg:grid-cols-1"]));
       }
     });
 
@@ -2088,13 +2102,15 @@ describe("OverviewTab", () => {
       push.mockRestore();
     });
 
-    it("sends the alerts card counts where their headline tiles go", async () => {
+    it("sends the alerts card boxes and the delivery tile where their headline tiles go", async () => {
       const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
       await mountWith(buildOverview());
 
-      await wrapper.get('[data-test="overview-alerts-count-failing"]').trigger("click");
+      await wrapper.get('[data-test="overview-alerts-box-failing"]').trigger("click");
       expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alertList" }));
-      await wrapper.get('[data-test="overview-alerts-level-critical"]').trigger("click");
+      await wrapper.get('[data-test="overview-headline-delivery"]').trigger("click");
+      expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alertList" }));
+      await wrapper.get('[data-test="overview-alerts-box-critical"]').trigger("click");
       expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ name: "alertList" }));
       push.mockRestore();
     });

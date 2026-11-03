@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="
       hasIncidents ? t('overview.sections.alertsAndIncidents') : t('overview.sections.alerts')
     "
-    :link-label="view === 'empty' ? t('overview.alerts.emptyAction') : t('overview.viewAll')"
-    :link-aria-label="view === 'empty' ? undefined : t('overview.alerts.viewAllAria')"
+    :subtitle="subtitle"
+    :link-label="view === 'empty' ? t('overview.alerts.emptyAction') : t('overview.alerts.viewAll')"
     :view="view"
     @retry="emit('retry')"
     @view-all="view === 'empty' ? emit('create') : emit('open')"
@@ -32,120 +32,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="overview-alerts-empty"
       />
     </template>
-    <div class="flex flex-col gap-3">
-      <p class="flex items-baseline gap-2" data-test="overview-alerts-hero">
-        <span
+    <div class="flex flex-1 flex-col">
+      <ul
+        :class="[
+          'grid gap-2 px-3 pb-3 max-md:grid-cols-2',
+          boxes.length === 4 ? 'grid-cols-4' : 'grid-cols-3',
+        ]"
+        data-test="overview-alerts-boxes"
+      >
+        <li
+          v-for="box in boxes"
+          :key="box.key"
           :class="[
-            'text-3xl font-semibold tabular-nums',
-            levels.total > 0 ? 'text-text-heading' : 'text-text-secondary',
+            'rounded-default flex border transition-colors motion-reduce:transition-none',
+            box.count > 0 && box.tint
+              ? box.tint
+              : 'border-border-default hover:border-border-strong',
           ]"
-          data-test="overview-alerts-hero-count"
-          >{{ levels.total }}</span
+          :data-test="`overview-alerts-frame-${box.key}`"
         >
-        <span class="text-text-secondary text-sm">{{
-          t("overview.alerts.firingLabel", { count: levels.total }, levels.total)
-        }}</span>
-      </p>
-      <div class="flex flex-col gap-1">
-        <OSegmentedBar
-          :segments="severitySegments"
-          :label="severityLabel"
-          data-test="overview-alerts-severity-bar"
-        />
-        <div
-          class="-mx-1 flex flex-wrap items-center justify-between gap-x-6 text-sm"
-          data-test="overview-alerts-counts"
-        >
-          <ul class="flex flex-wrap items-center gap-x-3">
-            <li v-for="level in levelItems" :key="level.key">
-              <OButton
-                variant="row"
-                :data-test="`overview-alerts-level-${level.key}`"
-                @click="emit('select', 'firing')"
+          <OButton
+            variant="cell"
+            class="flex-1"
+            :data-test="`overview-alerts-box-${box.key}`"
+            @click="emit('select', box.target)"
+          >
+            <span class="flex flex-col gap-0.5 px-3 py-2.5 text-start">
+              <span
+                :class="[
+                  'text-xl font-bold tabular-nums',
+                  box.count > 0 ? box.tone : 'text-text-heading',
+                ]"
+                data-test="overview-alerts-box-count"
+                >{{ box.count }}</span
               >
-                <i18n-t
-                  :keypath="level.keypath"
-                  tag="span"
-                  scope="global"
-                  class="text-text-secondary px-1 font-normal"
-                >
-                  <template #count>
-                    <span
-                      :class="[
-                        'font-semibold tabular-nums',
-                        level.count > 0 ? level.tone : 'text-text-heading',
-                      ]"
-                      >{{ level.count }}</span
-                    >
-                  </template>
-                </i18n-t>
-              </OButton>
-            </li>
-          </ul>
-          <ul class="flex flex-wrap items-center gap-x-3">
-            <li v-for="item in problemItems" :key="item.key">
-              <OButton
-                variant="row"
-                :data-test="`overview-alerts-count-${item.key}`"
-                @click="emit('select', item.key)"
-              >
-                <i18n-t
-                  :keypath="item.keypath"
-                  :plural="item.count"
-                  tag="span"
-                  scope="global"
-                  class="text-text-secondary px-1 font-normal"
-                >
-                  <template #count>
-                    <span
-                      :class="[
-                        'font-semibold tabular-nums',
-                        item.count > 0 ? 'text-status-negative' : 'text-text-heading',
-                      ]"
-                      >{{ item.count }}</span
-                    >
-                  </template>
-                </i18n-t>
-              </OButton>
-            </li>
-          </ul>
-        </div>
+              <span class="text-text-label text-xs">{{ box.label }}</span>
+            </span>
+          </OButton>
+        </li>
+      </ul>
+      <div
+        v-if="rows.length === 0"
+        class="border-border-default flex flex-1 flex-col items-center justify-center gap-1 border-t p-3 py-4 text-center"
+        data-test="overview-alerts-none-firing"
+      >
+        <OIcon name="check-circle" size="md" class="text-status-success-text" />
+        <p class="text-text-heading text-sm font-medium">
+          {{ t("overview.alerts.noneFiring") }}
+        </p>
+        <p class="text-text-secondary text-xs" data-test="overview-alerts-evaluated">
+          {{ t("overview.alerts.rulesEvaluated", { count: enabledRules }, enabledRules) }}
+        </p>
       </div>
-      <div v-if="rows.length > 0" class="-mx-2" data-test="overview-alerts-firing">
+      <div v-else data-test="overview-alerts-firing">
         <div
-          class="border-border-default text-text-label grid grid-cols-[6rem_minmax(0,2fr)_minmax(0,1fr)_5rem] gap-x-4 border-b px-2 pb-1.5 text-xs max-md:hidden"
+          class="border-border-default text-text-label flex items-center justify-between gap-3 border-t px-3 py-2 text-xs"
           data-test="overview-alerts-table-header"
         >
-          <span>{{ t("overview.alerts.columns.severity") }}</span>
-          <span>{{ t("overview.alerts.columns.alert") }}</span>
-          <span>{{ t("overview.alerts.columns.stream") }}</span>
-          <span class="text-end">{{ t("overview.alerts.firingFor") }}</span>
+          <span>{{ t("overview.alerts.firingNow") }}</span>
+          <span>{{ t("overview.alerts.firingFor") }}</span>
         </div>
-        <ul class="divide-border-default flex flex-col divide-y">
-          <li v-for="(row, index) in rows" :key="`${row.stream}-${row.name}-${row.since}-${index}`">
+        <ul class="flex flex-col">
+          <li
+            v-for="(row, index) in rows"
+            :key="`${row.stream}-${row.name}-${row.since}-${index}`"
+            class="border-border-default border-t"
+          >
             <OverviewRowButton
               :data-test="`overview-alerts-firing-${row.name}`"
               @click="emit('open')"
             >
-              <span
-                class="grid w-full grid-cols-[6rem_minmax(0,2fr)_minmax(0,1fr)_5rem] items-center gap-x-4 text-start max-md:grid-cols-[auto_minmax(0,1fr)_auto] max-md:gap-y-0.5"
-              >
-                <span class="max-md:row-span-2">
-                  <OTag
-                    type="countChip"
-                    :value="rowTone(row.level)"
-                    :data-test="`overview-alerts-firing-level-${row.name}`"
-                    >{{ rowLevelLabel(row.level) }}</OTag
-                  >
+              <span class="flex min-w-0 items-center gap-3">
+                <OTag
+                  type="countChip"
+                  :value="rowTone(row.level)"
+                  class="min-w-16 shrink-0 justify-center"
+                  :data-test="`overview-alerts-firing-level-${row.name}`"
+                  >{{ rowLevelLabel(row.level) }}</OTag
+                >
+                <span class="flex min-w-0 flex-col text-start">
+                  <OTruncatedText class="text-text-body text-sm font-medium">{{
+                    raw(row.name)
+                  }}</OTruncatedText>
+                  <OTruncatedText class="text-text-secondary text-xs">{{
+                    raw(row.stream)
+                  }}</OTruncatedText>
                 </span>
-                <OTruncatedText class="text-text-heading text-sm max-md:col-span-2">{{
-                  raw(row.name)
-                }}</OTruncatedText>
-                <OTruncatedText class="text-text-secondary text-xs">{{
-                  raw(row.stream)
-                }}</OTruncatedText>
-                <span class="text-text-secondary text-end text-xs tabular-nums">{{ row.age }}</span>
               </span>
+              <span class="text-text-secondary shrink-0 text-xs tabular-nums">{{ row.age }}</span>
             </OverviewRowButton>
           </li>
         </ul>
@@ -154,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="remaining > 0"
         variant="ghost-primary"
         size="sm"
-        class="self-start"
+        class="ms-0.5 mb-2 self-start"
         data-test="overview-alerts-show-more"
         @click="emit('open')"
       >
@@ -168,11 +142,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OSegmentedBar from "@/lib/data/SegmentedBar/OSegmentedBar.vue";
-import type { SegmentedBarSegment } from "@/lib/data/SegmentedBar/OSegmentedBar.types";
-import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
   OverviewAlertLevel,
   OverviewAlertsData,
@@ -182,6 +155,7 @@ import type { IncidentsTile, OverviewTarget } from "./OverviewHeadlineStrip.vue"
 import OverviewRowButton from "./OverviewRowButton.vue";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
 import {
+  FIRING_ROWS_LIMIT,
   firingRows,
   firingTotal,
   hasKnownSince,
@@ -191,12 +165,22 @@ import {
 } from "./overviewFormat";
 import { useOverviewTime } from "./useOverviewTime";
 
-interface CountItem {
+type BoxTarget = Extract<OverviewTarget, "firing" | "failing" | "incidents">;
+
+interface CountBox {
   key: string;
-  keypath: I18nKey;
+  label: I18nText;
   count: number;
-  tone?: string;
+  tone: string;
+  // a box above zero takes a soft status surface so the problem reads before its number
+  tint?: string;
+  target: BoxTarget;
 }
+
+const TINT = {
+  danger: "bg-status-error-bg border-status-negative",
+  warning: "bg-status-warning-bg border-status-warning-text",
+} as const;
 
 const props = defineProps<{
   section?: OverviewSection<OverviewAlertsData>;
@@ -211,7 +195,7 @@ const emit = defineEmits<{
   retry: [];
   open: [];
   create: [];
-  select: [target: Extract<OverviewTarget, "firing" | "failing" | "incidents">];
+  select: [target: BoxTarget];
 }>();
 
 const { t } = useI18nTyped();
@@ -230,13 +214,29 @@ const view = computed(() => {
   return base === "ok" && props.section?.data?.total === 0 ? "empty" : base;
 });
 
+const subtitle = computed<I18nText | undefined>(() => {
+  const data = props.section?.data;
+  if (view.value !== "ok" || !data) return undefined;
+  return t("overview.alerts.subtitle", {
+    active: t("overview.alerts.rulesActive", { count: data.enabled }, data.enabled),
+    failing: t(
+      "overview.alerts.rulesFailingToEvaluate",
+      { count: data.failed_evaluation },
+      data.failed_evaluation,
+    ),
+  });
+});
+
 // the age is read at render time so each new overview snapshot restarts it from the current clock
 const rows = computed(() =>
-  firingRows(props.section?.data).map((row) => ({
-    ...row,
-    age: hasKnownSince(row.since) ? formatElapsed(Date.now() - microsToMs(row.since)) : "",
-  })),
+  firingRows(props.section?.data)
+    .slice(0, FIRING_ROWS_LIMIT)
+    .map((row) => ({
+      ...row,
+      age: hasKnownSince(row.since) ? formatElapsed(Date.now() - microsToMs(row.since)) : "",
+    })),
 );
+const enabledRules = computed(() => props.section?.data?.enabled ?? 0);
 const remaining = computed(() => Math.max(0, firingTotal(props.section?.data) - rows.value.length));
 
 // a rule in the firing list is firing whatever its configured level, so only critical and warning are named
@@ -249,67 +249,42 @@ const rowLevelLabel = (level: OverviewAlertLevel): I18nText => {
   return level === "warning" ? t("overview.level.warning") : t("overview.level.okFiring");
 };
 
-const levels = computed(() => {
+const boxes = computed<CountBox[]>(() => {
   const data = props.section?.data;
-  const total = firingTotal(data);
-  const critical = levelCount(data, "critical");
-  const warning = levelCount(data, "warning");
-  return { total, critical, warning, other: Math.max(0, total - critical - warning) };
-});
-
-const severitySegments = computed<SegmentedBarSegment[]>(() => {
-  const { total, critical, warning, other } = levels.value;
-  if (total === 0) return [];
-  const pct = (count: number) => (count / total) * 100;
-  return [
-    { id: "critical", pct: pct(critical), variant: "danger" },
-    { id: "warning", pct: pct(warning), variant: "warning" },
-    { id: "other", pct: pct(other), variant: "neutral" },
+  const list: CountBox[] = [
+    {
+      key: "critical",
+      label: t("overview.alerts.criticalLevel"),
+      count: levelCount(data, "critical"),
+      tone: "text-status-negative",
+      tint: TINT.danger,
+      target: "firing",
+    },
+    {
+      key: "warning",
+      label: t("overview.alerts.warningLevel"),
+      count: levelCount(data, "warning"),
+      tone: "text-status-warning-text",
+      tint: TINT.warning,
+      target: "firing",
+    },
   ];
-});
-
-const severityLabel = computed(() =>
-  t("overview.alerts.severityBar", {
-    critical: levels.value.critical,
-    warning: levels.value.warning,
-    other: levels.value.other,
-  }),
-);
-
-const levelItems = computed<CountItem[]>(() => [
-  {
-    key: "critical",
-    keypath: "overview.alerts.levelCount.critical",
-    count: levels.value.critical,
-    tone: "text-status-negative",
-  },
-  {
-    key: "warning",
-    keypath: "overview.alerts.levelCount.warning",
-    count: levels.value.warning,
-    tone: "text-status-warning-text",
-  },
-  {
-    key: "other",
-    keypath: "overview.alerts.levelCount.other",
-    count: levels.value.other,
-    tone: "text-text-heading",
-  },
-]);
-
-const problemItems = computed(() => {
-  const list: Array<CountItem & { key: "incidents" | "failing" }> = [];
   if (props.incidentsState === "ok") {
     list.push({
       key: "incidents",
-      keypath: "overview.alerts.openIncidents",
+      label: t("overview.cards.openIncidents"),
       count: props.incidentsTotal ?? 0,
+      tone: "text-text-heading",
+      target: "incidents",
     });
   }
   list.push({
     key: "failing",
-    keypath: "overview.alerts.failingRules",
-    count: props.section?.data?.failed_evaluation ?? 0,
+    label: t("overview.alerts.rulesFailing"),
+    count: data?.failed_evaluation ?? 0,
+    tone: "text-status-negative",
+    tint: TINT.danger,
+    target: "failing",
   });
   return list;
 });

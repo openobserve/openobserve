@@ -14,8 +14,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    v-if="cards.length > 0 || view === 'loading'"
-    class="grid grid-cols-3 gap-4 max-lg:grid-cols-1"
+    v-if="view === 'ok' || view === 'loading'"
+    class="grid grid-cols-3 gap-3 max-lg:grid-cols-1"
     data-test="overview-signal-cards"
   >
     <template v-if="view === 'loading'">
@@ -38,17 +38,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         view="ok"
         @view-all="emit('open', card.signal)"
       >
-        <div class="grid grid-cols-3 gap-3" :data-test="`overview-signal-${card.signal}-stats`">
-          <div v-for="stat in card.stats" :key="stat.key" class="flex min-w-0 flex-col gap-0.5">
-            <span class="text-text-label text-xs">{{ stat.label }}</span>
-            <span
-              class="text-text-heading text-base font-semibold tabular-nums"
+        <template #lead>
+          <span
+            :class="['size-2.5 shrink-0', SEGMENT_SWATCH[SIGNAL_VARIANT[card.signal]]]"
+            aria-hidden="true"
+            :data-test="`overview-signal-${card.signal}-swatch`"
+          />
+        </template>
+        <dl class="flex flex-col" :data-test="`overview-signal-${card.signal}-stats`">
+          <div
+            v-for="stat in card.stats"
+            :key="stat.key"
+            class="border-border-default flex items-baseline justify-between gap-3 border-t px-3 py-2"
+          >
+            <dt class="text-text-label text-xs">{{ stat.label }}</dt>
+            <dd
+              class="text-text-heading text-sm font-semibold tabular-nums"
               :data-test="`overview-signal-${card.signal}-${stat.key}`"
             >
               {{ stat.value }}
-            </span>
+            </dd>
           </div>
-        </div>
+        </dl>
       </OverviewSectionCard>
     </template>
   </div>
@@ -56,11 +67,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { SEGMENT_SWATCH } from "@/lib/data/SegmentedBar/OSegmentedBar.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatEventCount, formatSizeFromMB } from "@/utils/formatters";
 import type { OverviewSection, OverviewStreamsData } from "@/ts/interfaces/overview";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
-import { OVERVIEW_SIGNALS, sectionView, type OverviewSignal } from "./overviewFormat";
+import {
+  OVERVIEW_SIGNALS,
+  SIGNAL_VARIANT,
+  sectionView,
+  type OverviewSignal,
+} from "./overviewFormat";
 
 const COUNT_LABEL = { logs: "events", metrics: "samples", traces: "spans" } as const;
 
@@ -78,30 +95,27 @@ const { t } = useI18nTyped();
 // only the loading state draws here; the streams card already reports errors for the same section
 const view = computed(() => sectionView(props.section, props));
 
+// all three signals always show, so the row keeps three aligned cards and a missing signal reads as zero
 const cards = computed(() => {
-  if (view.value !== "ok") return [];
   const byType = props.section?.data?.by_type ?? [];
-  return OVERVIEW_SIGNALS.flatMap((signal) => {
+  return OVERVIEW_SIGNALS.map((signal) => {
     const summary = byType.find((x) => x.stream_type === signal);
-    if (!summary || summary.count <= 0) return [];
-    return [
-      {
-        signal,
-        stats: [
-          { key: "streams", label: t("overview.signals.streams"), value: raw(summary.count) },
-          {
-            key: "events",
-            label: t(`overview.signals.${COUNT_LABEL[signal]}`),
-            value: raw(formatEventCount(summary.doc_num)),
-          },
-          {
-            key: "stored",
-            label: t("overview.signals.stored"),
-            value: raw(formatSizeFromMB(summary.storage_size_mb)),
-          },
-        ],
-      },
-    ];
+    return {
+      signal,
+      stats: [
+        { key: "streams", label: t("overview.signals.streams"), value: raw(summary?.count ?? 0) },
+        {
+          key: "events",
+          label: t(`overview.signals.${COUNT_LABEL[signal]}`),
+          value: raw(formatEventCount(summary?.doc_num ?? 0)),
+        },
+        {
+          key: "stored",
+          label: t("overview.signals.stored"),
+          value: raw(formatSizeFromMB(summary?.storage_size_mb ?? 0)),
+        },
+      ],
+    };
   });
 });
 </script>

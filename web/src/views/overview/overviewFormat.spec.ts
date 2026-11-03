@@ -18,18 +18,14 @@ import {
   LIMIT_APPROACHING_PERCENT,
   LIMIT_OVER_PERCENT,
   SIGNAL_VARIANT,
-  attentionCount,
   checkState,
-  dataSizeBreakdown,
   elapsedParts,
   firingTotal,
-  groupHealthRows,
   hasKnownSince,
   levelCount,
   limitBarVariant,
   limitStatus,
   mergeTopStreams,
-  nameList,
   oldestKnownFiring,
   isUnderOnePercent,
   overviewChecks,
@@ -39,8 +35,7 @@ import {
   sectionView,
   signalSplit,
   signalTotalMb,
-  unknownCount,
-  type HealthState,
+  topStreamShares,
 } from "./overviewFormat";
 import { buildHealthyOverview, buildOverview } from "./overviewFixtures";
 import type { OverviewStreamTypeSummary } from "@/ts/interfaces/overview";
@@ -125,48 +120,52 @@ describe("top streams", () => {
   });
 });
 
-describe("dataSizeBreakdown", () => {
-  const typed = (
-    stream_type: string,
-    storage_size_mb: number,
-    top: Array<[string, number]>,
-  ): OverviewStreamTypeSummary => ({ ...summary(stream_type, top), storage_size_mb });
-
-  it("ranks the top signal streams against the signal total and shades each signal by rank", () => {
-    const result = dataSizeBreakdown([
-      typed("logs", 600, [
-        ["app", 500],
-        ["web", 100],
+describe("topStreamShares", () => {
+  it("takes the six largest streams of every type, with their share of the total", () => {
+    const byType = [
+      summary("logs", [
+        ["a", 400],
+        ["b", 300],
+        ["c", 5],
       ]),
-      typed("metrics", 1000, [
-        ["cpu", 900],
-        ["mem", 50],
+      summary("metrics", [
+        ["d", 200],
+        ["e", 100],
       ]),
-      typed("traces", 400, [["spans", 300]]),
-      typed("enrichment_tables", 9999, [["lookup", 9999]]),
-    ]);
-    expect(result.totalMb).toBe(2000);
-    expect(result.streams.map((s) => [s.key, s.pct, s.shade])).toEqual([
-      ["metrics-cpu", 45, 0],
-      ["logs-app", 25, 0],
-      ["traces-spans", 15, 0],
-      ["logs-web", 5, 1],
-      ["metrics-mem", 2.5, 1],
-    ]);
-    expect(result.otherMb).toBe(150);
-    expect(result.otherPct).toBe(7.5);
+      summary("index", [
+        ["f", 50],
+        ["g", 1],
+      ]),
+    ];
+    const rows = topStreamShares(byType, 1000);
+    expect(rows.map((r) => r.name)).toEqual(["a", "b", "d", "e", "f", "c"]);
+    expect(rows.map((r) => r.percent)).toEqual([40, 30, 20, 10, 5, 1]);
+    expect(rows[5].underOne).toBe(true);
+    expect(rows[0].underOne).toBe(false);
   });
 
-  it("never reports a negative remainder or a share past 100", () => {
-    const result = dataSizeBreakdown([typed("logs", 100, [["app", 400]])]);
-    expect(result.otherMb).toBe(0);
-    expect(result.streams[0].pct).toBe(100);
-    expect(dataSizeBreakdown([]).streams).toEqual([]);
-    expect(dataSizeBreakdown([typed("logs", 0, [["app", 0]])]).streams[0].pct).toBe(0);
+  it("scales each bar to the largest row and is zero, not NaN, for empty data", () => {
+    const rows = topStreamShares(
+      [
+        summary("logs", [
+          ["a", 400],
+          ["b", 100],
+        ]),
+      ],
+      2000,
+    );
+    expect(rows.map((r) => r.barPct)).toEqual([100, 25]);
+    const empty = topStreamShares([summary("logs", [["a", 0]])], 0);
+    expect(empty[0].barPct).toBe(0);
+    expect(empty[0].percent).toBe(0);
   });
 
-  it("totals only the three signals", () => {
-    expect(signalTotalMb([typed("logs", 10, []), typed("index", 90, [])])).toBe(10);
+  it("totals only the three signals for the data size", () => {
+    const typed = (stream_type: string, storage_size_mb: number) => ({
+      ...summary(stream_type, []),
+      storage_size_mb,
+    });
+    expect(signalTotalMb([typed("logs", 10), typed("index", 90)])).toBe(10);
   });
 });
 
@@ -220,8 +219,8 @@ describe("signalSplit", () => {
     expect(signalSplit([]).map((r) => r.sizeMb)).toEqual([0, 0, 0]);
   });
 
-  it("gives each signal the colour of its stream type tag", () => {
-    expect(SIGNAL_VARIANT).toEqual({ logs: "blue", metrics: "purple", traces: "teal" });
+  it("paints each signal with its own signal token", () => {
+    expect(SIGNAL_VARIANT).toEqual({ logs: "logs", metrics: "metrics", traces: "traces" });
   });
 });
 
@@ -417,62 +416,5 @@ describe("overviewStatus", () => {
     for (const view of ["error", "forbidden", "locked"] as const) {
       expect(checkState(view)).toBe("unavailable");
     }
-  });
-});
-
-describe("data health groups", () => {
-  const row = (key: string, tone: HealthState["tone"], notSetUp = false) => ({
-    key,
-    tone,
-    notSetUp,
-  });
-  const keys = (rows: Array<{ key: string }>) => rows.map((r) => r.key);
-
-  it("puts problems first by tier, keeps the written order within a tier, and splits the rest", () => {
-    const groups = groupHealthRows([
-      row("quiet", "warning"),
-      row("failing", "success"),
-      row("schema", "info"),
-      row("pipelines", "error"),
-      row("compaction", "neutral"),
-      row("delivery", "error"),
-      row("absent", "neutral", true),
-    ]);
-    expect(keys(groups.problems)).toEqual([
-      "pipelines",
-      "delivery",
-      "quiet",
-      "schema",
-      "compaction",
-    ]);
-    expect(keys(groups.healthy)).toEqual(["failing"]);
-    expect(keys(groups.notSetUp)).toEqual(["absent"]);
-  });
-
-  it("never calls a source that is not set up healthy", () => {
-    const groups = groupHealthRows([row("failing", "success", true)]);
-    expect(groups.healthy).toEqual([]);
-    expect(keys(groups.notSetUp)).toEqual(["failing"]);
-  });
-
-  it("counts only needs-action and warning rows as needing attention", () => {
-    const rows = [
-      row("a", "error"),
-      row("b", "warning"),
-      row("c", "info"),
-      row("d", "neutral"),
-      row("e", "success"),
-      row("f", "error", true),
-    ];
-    expect(attentionCount(rows)).toBe(2);
-    expect(unknownCount(rows)).toBe(1);
-    expect(attentionCount([])).toBe(0);
-  });
-
-  it("joins names as a list in the reader's language", () => {
-    expect(nameList(["Failing rules", "Pipeline errors"], "en-us")).toBe(
-      "Failing rules, Pipeline errors",
-    );
-    expect(nameList(["Quiet streams"], "en-us")).toBe("Quiet streams");
   });
 });

@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { localeFileMap } from "@/locales";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 import type {
   SegmentedBarSegment,
@@ -33,7 +32,9 @@ export type OverviewView = "loading" | "error" | "forbidden" | "locked" | "empty
 
 export type OverviewDestination = "alerts" | "pipelines" | "streams";
 
-export const TOP_STREAMS_LIMIT = 5;
+export const TOP_STREAMS_LIMIT = 6;
+
+export const FIRING_ROWS_LIMIT = 5;
 
 export function sectionView(
   section: OverviewSection<unknown> | null | undefined,
@@ -87,15 +88,36 @@ export function mergeTopStreams(
     .slice(0, limit);
 }
 
+export interface TopStreamShare extends TopStreamRow {
+  percent: number;
+  underOne: boolean;
+  barPct: number;
+}
+
+// the bars are scaled to the largest row so the ranking reads at a glance; the text carries the share of total
+export function topStreamShares(
+  byType: OverviewStreamTypeSummary[],
+  totalMb: number,
+  limit = TOP_STREAMS_LIMIT,
+): TopStreamShare[] {
+  const rows = mergeTopStreams(byType, limit);
+  const largest = rows[0]?.storage_size_mb ?? 0;
+  return rows.map((row) => ({
+    ...row,
+    percent: percentOf(row.storage_size_mb, totalMb),
+    underOne: isUnderOnePercent(row.storage_size_mb, totalMb),
+    barPct: largest > 0 ? (row.storage_size_mb / largest) * 100 : 0,
+  }));
+}
+
 export type OverviewSignal = "logs" | "metrics" | "traces";
 
 export const OVERVIEW_SIGNALS: OverviewSignal[] = ["logs", "metrics", "traces"];
 
-// the same colour per signal as the stream type tags, so a stream reads as its type everywhere
 export const SIGNAL_VARIANT: Record<OverviewSignal, SegmentedBarVariant> = {
-  logs: "blue",
-  metrics: "purple",
-  traces: "teal",
+  logs: "logs",
+  metrics: "metrics",
+  traces: "traces",
 };
 
 export function isSignal(streamType: string): streamType is OverviewSignal {
@@ -139,53 +161,6 @@ export function signalSplit(byType: OverviewStreamTypeSummary[]): SignalSplitRow
 
 export function signalTotalMb(byType: OverviewStreamTypeSummary[]): number {
   return signalSplit(byType).reduce((sum, row) => sum + row.sizeMb, 0);
-}
-
-export interface DataSizeSlice {
-  key: string;
-  name: string;
-  signal: OverviewSignal;
-  sizeMb: number;
-  pct: number;
-  shade: number;
-}
-
-export interface DataSizeBreakdown {
-  totalMb: number;
-  streams: DataSizeSlice[];
-  otherMb: number;
-  otherPct: number;
-}
-
-const shareOf = (part: number, total: number) =>
-  total > 0 ? Math.min(100, (part / total) * 100) : 0;
-
-// only signal streams are ranked, so every slice is a part of the same signal total the hero shows
-export function dataSizeBreakdown(
-  byType: OverviewStreamTypeSummary[],
-  limit = TOP_STREAMS_LIMIT,
-): DataSizeBreakdown {
-  const totalMb = signalTotalMb(byType);
-  const ranks: Partial<Record<OverviewSignal, number>> = {};
-  const streams = mergeTopStreams(
-    byType.filter((type) => isSignal(type.stream_type)),
-    limit,
-  ).map((row) => {
-    const signal = row.stream_type as OverviewSignal;
-    const shade = ranks[signal] ?? 0;
-    ranks[signal] = shade + 1;
-    return {
-      key: `${signal}-${row.name}`,
-      name: row.name,
-      signal,
-      sizeMb: row.storage_size_mb,
-      pct: shareOf(row.storage_size_mb, totalMb),
-      shade,
-    };
-  });
-  const shownMb = streams.reduce((sum, row) => sum + row.sizeMb, 0);
-  const otherMb = Math.max(0, totalMb - shownMb);
-  return { totalMb, streams, otherMb, otherPct: shareOf(otherMb, totalMb) };
 }
 
 export interface Elapsed {
@@ -364,49 +339,3 @@ export function overviewStatus(checks: AttentionCheck[]): OverviewStatus {
 }
 
 export type HealthTone = "error" | "warning" | "info" | "neutral" | "success";
-
-export interface HealthState {
-  tone: HealthTone;
-  notSetUp: boolean;
-}
-
-export interface HealthGroups<T> {
-  problems: T[];
-  healthy: T[];
-  notSetUp: T[];
-}
-
-// a row that could not load is unknown, not healthy, so it stays with the problems below info
-const HEALTH_TIER: Record<HealthTone, number> = {
-  error: 0,
-  warning: 1,
-  info: 2,
-  neutral: 3,
-  success: 4,
-};
-
-// a source with nothing configured is never called healthy, so it gets its own group
-export function groupHealthRows<T extends HealthState>(rows: T[]): HealthGroups<T> {
-  const problems = rows
-    .filter((row) => !row.notSetUp && row.tone !== "success")
-    .sort((a, b) => HEALTH_TIER[a.tone] - HEALTH_TIER[b.tone]);
-  return {
-    problems,
-    healthy: rows.filter((row) => !row.notSetUp && row.tone === "success"),
-    notSetUp: rows.filter((row) => row.notSetUp),
-  };
-}
-
-export function attentionCount(rows: HealthState[]): number {
-  return rows.filter((row) => !row.notSetUp && (row.tone === "error" || row.tone === "warning"))
-    .length;
-}
-
-export function unknownCount(rows: HealthState[]): number {
-  return rows.filter((row) => !row.notSetUp && row.tone === "neutral").length;
-}
-
-// `locale` is the app's i18n code, e.g. `zh-cn`; a unit list joins names without "and"
-export function nameList(names: readonly string[], locale: string): string {
-  return new Intl.ListFormat(localeFileMap[locale] ?? locale, { type: "unit" }).format(names);
-}

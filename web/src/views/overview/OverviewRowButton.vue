@@ -13,9 +13,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <OButton variant="row" block>
-    <!-- the inset gives the hover background room around the text; lists pull it back with -mx-2 so text stays on the card's edge -->
-    <span class="flex w-full min-w-0 items-center justify-between gap-3 px-2">
+  <OButton variant="row" block class="rounded-none">
+    <!-- the row runs edge to edge in its card, with the card's own inset on the text -->
+    <span class="flex w-full min-w-0 items-center justify-between gap-3 px-3 py-0.5">
       <slot />
     </span>
   </OButton>

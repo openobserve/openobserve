@@ -19,7 +19,8 @@ import { overviewKeys } from "./overview.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 import type { OrgOverview } from "@/ts/interfaces/overview";
 
-export const OVERVIEW_TOP = 5;
+// six per type so the top six streams across all types are exact; the firing list shows five of them
+export const OVERVIEW_TOP = 6;
 
 // `refresh` stays out of the key so a forced read replaces the cached entry instead of forking it.
 export const orgOverviewQuery = (org: string, opts: { refresh?: boolean } = {}) =>
