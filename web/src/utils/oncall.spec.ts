@@ -616,6 +616,35 @@ describe("pagePhrase", () => {
       ],
       ["not paged", {}, { progress: ladder() }, { kind: "notPaged" }],
       [
+        "the first rung is due but not sent yet (after an unack restarts the ladder)",
+        {},
+        { progress: ladder({ next_at: NOW - SEC }) },
+        { kind: "paging", step: 1, total: 3, who: [] },
+      ],
+      [
+        "the first rung is still to come",
+        {},
+        { progress: ladder({ next_at: NOW + 60 * SEC }) },
+        { kind: "notPaged" },
+      ],
+      [
+        "its team was deleted, with no progress loaded",
+        {},
+        { reachedStep: 2, teamDeleted: true },
+        { kind: "nobodyPaged" },
+      ],
+      [
+        "the ladder stopped (its team was deleted)",
+        {},
+        {
+          progress: ladder({
+            fired: [rung(["ana@o2.ai"]), rung(["bo@o2.ai"]), rung(["cy@o2.ai"])],
+            stopped_because: "the owning team was deleted",
+          }),
+        },
+        { kind: "nobodyPaged" },
+      ],
+      [
         "empty ladder on a list without progress, where the record says it ran out",
         { exhausted_at: NOW },
         { totalRungs: 0 },

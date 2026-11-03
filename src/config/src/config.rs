@@ -131,7 +131,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 131: org domain mapping migrations
 // 132: create oncall_chat_messages; add oncall_teams slack columns.
 // 133: add status page run streaks to synthetics.
-pub const DB_SCHEMA_VERSION: u64 = 135;
+// 134: add write_version to llm_dataset_items, so one write request is one Dataset version.
+// 135: add last_run_class and last_run_class_at to synthetics.
+// 136: add false_alarm_by, false_alarm_at and false_alarm_reason to status_page_notices.
+pub const DB_SCHEMA_VERSION: u64 = 136;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

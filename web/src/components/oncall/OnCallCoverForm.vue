@@ -130,6 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('oncall.coverWhen')"
           required
           disable-relative
+          show-error
+          :min-date="calendarDay(0)"
+          :max-date="calendarDay(MAX_AHEAD_MICROS)"
           data-test="oncall-cover-window"
         />
       </div>
@@ -181,7 +184,7 @@ export interface UpcomingShift extends Shift {
   rotationName: string;
 }
 import { formatInZone, fromZonedInputValue, toZonedInputValue } from "@/utils/oncall";
-import { makeOnCallCoverSchema } from "./OnCallCoverForm.schema";
+import { MAX_AHEAD_MICROS, makeOnCallCoverSchema } from "./OnCallCoverForm.schema";
 
 /**
  * What the cover half of this dialog holds.
@@ -438,6 +441,12 @@ function applyPreset(key: (typeof PRESETS)[number]["key"]) {
   // with no type is re-read as a relative period and resolved against `now` —
   // which threw the preset away and put the past half hour back.
   form.setFieldValue("window", { type: "absolute", ...ranges[key] });
+}
+
+/// The picker's calendar day `aheadMicros` from now, on the clock the picker shows.
+function calendarDay(aheadMicros: number): string {
+  const at = Date.now() * 1000 + aheadMicros;
+  return toZonedInputValue(at, props.viewerTimezone).slice(0, 10).replace(/-/g, "/");
 }
 
 /// `timeZoneName` is the whole point: the two ends of a handover mean nothing

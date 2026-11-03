@@ -45,6 +45,7 @@ pub mod fleet;
 #[allow(deprecated)]
 pub mod folders;
 pub mod gen_ai;
+pub mod gen_ai_health;
 pub mod ingest_rejections;
 pub mod keys;
 pub mod kv;
