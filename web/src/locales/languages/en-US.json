@@ -29169,5 +29169,23 @@
     "recentRow": "Recent search",
     "deletedQuery": "Deleted {query}",
     "undo": "Undo"
+  },
+  "notificationDeliveries": {
+    "title": "Notifications",
+    "perDestination": "Delivery per destination",
+    "event": "Event",
+    "destination": "Destination",
+    "template": "Template",
+    "status": "Status",
+    "attempt": "Attempt",
+    "attemptOf": "{n} of {max}",
+    "statusSent": "Sent",
+    "statusFailed": "Failed",
+    "statusSkipped": "Skipped",
+    "statusPending": "Pending",
+    "statusQueued": "Queued",
+    "empty": "No deliveries recorded",
+    "loadFailed": "Could not load the deliveries",
+    "forbidden": "You do not have permission to view deliveries"
   }
 }

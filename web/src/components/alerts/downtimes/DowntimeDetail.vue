@@ -301,6 +301,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
           </OTable>
+          <OCollapsible
+            v-model="deliveriesOpen"
+            :label="t('notificationDeliveries.perDestination')"
+            data-test="downtime-detail-deliveries"
+          >
+            <NotificationDeliveries
+              v-if="deliveriesOpen"
+              kind="downtime"
+              :object-id="downtime.id"
+            />
+          </OCollapsible>
         </section>
       </template>
 
@@ -408,6 +419,8 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import NotificationDeliveries from "@/components/notifications/NotificationDeliveries.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -456,6 +469,7 @@ const detailQuery = useQuery(() =>
   }),
 );
 const downtime = computed(() => detailQuery.data.value ?? null);
+const deliveriesOpen = ref(false);
 // The server decides the status, so the page reloads it when the window opens or closes.
 useListBoundaryRefetch(
   () => (downtime.value ? [downtime.value] : []),

@@ -193,6 +193,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTab name="evidence" data-test="synthetics-run-detail-tab-evidence">
             {{ t("synthetics.runDetail.evidenceSection") }}
           </OTab>
+          <OTab name="notifications" data-test="synthetics-run-detail-tab-notifications">
+            {{ t("notificationDeliveries.title") }}
+          </OTab>
         </OTabs>
 
         <div class="min-h-0 flex-1">
@@ -611,6 +614,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </OTabPanel>
+            <OTabPanel name="notifications">
+              <div class="p-3">
+                <NotificationDeliveries
+                  kind="synthetics"
+                  :object-id="monitorId"
+                  :event-suffix="runIdParam"
+                />
+              </div>
+            </OTabPanel>
           </OTabPanels>
         </div>
       </div>
@@ -699,6 +711,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import NotificationDeliveries from "@/components/notifications/NotificationDeliveries.vue";
 import {
   buildAttemptViews,
   effectiveSelector,
