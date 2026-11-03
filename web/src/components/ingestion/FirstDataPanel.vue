@@ -427,6 +427,7 @@ const StatusLine = defineComponent({
       v-if="forbidden && variant === 'full'"
       :denials="streamDenials"
       size="hero"
+      covers
       data-test="first-data-panel-no-access"
     />
     <template v-else>

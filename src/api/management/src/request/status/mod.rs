@@ -469,6 +469,25 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
 }
 
 /// Full UI configuration; `search_inspector_enabled` and `is_org_admin` are per caller and org.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/config",
+    context_path = "/api",
+    tag = "Meta",
+    operation_id = "GetOrgConfig",
+    summary = "Get the configuration for an organization",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn zo_config(
     Path(org_id): Path<String>,
     user_email: Option<Headers<UserEmail>>,

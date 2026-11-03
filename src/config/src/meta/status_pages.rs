@@ -175,14 +175,14 @@ pub enum EngineAction {
 // (R-6). `password` on the request is plaintext-in, Argon2id-at-rest, never
 // echoed back.
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct CreatePageRequest {
     pub name: String,
     #[serde(default)]
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, utoipa::ToSchema)]
 pub struct UpdatePageRequest {
     pub name: Option<String>,
     pub description: Option<String>,
@@ -261,7 +261,7 @@ pub struct ComponentView {
 /// One component in the bulk component-replace PUT. `check_ids` are the
 /// synthetics checks it maps; the handler MUST verify folder-level synthetics
 /// read on each before writing (R-1 — top build risk).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ComponentInput {
     /// Present = update in place (stable id); absent = create.
     pub id: Option<String>,
@@ -272,12 +272,12 @@ pub struct ComponentInput {
     pub check_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct SetComponentsRequest {
     pub components: Vec<ComponentInput>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct CreateNoticeRequest {
     /// 0 incident, 1 maintenance, 2 info.
     pub kind: i32,
@@ -296,7 +296,7 @@ pub struct CreateNoticeRequest {
 /// resolve path; auto-incidents are otherwise owned by the rebuilder and this
 /// must not race it (the handler rejects editing state on an auto-sourced
 /// notice — see R-4 in the design).
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, utoipa::ToSchema)]
 pub struct UpdateNoticeRequest {
     pub impact: Option<i32>,
     pub title: Option<String>,
@@ -307,12 +307,12 @@ pub struct UpdateNoticeRequest {
     pub state: Option<i32>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct NoticeUpdateRequest {
     pub body: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct MarkFalsePositiveRequest {
     /// Hours to snooze the underlying check org-wide (default 6, per mockup
     /// B1's "snooze 6h").
@@ -437,7 +437,7 @@ pub struct PreviewResponse {
     pub history: SnapshotHistory,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct CreateDomainRequest {
     pub domain: String,
 }

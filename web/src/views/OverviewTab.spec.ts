@@ -1013,7 +1013,7 @@ describe("OverviewTab", () => {
 
     it("should ask nothing when the first-data notice already probed every type empty", async () => {
       const org = store.state.selectedOrganization.identifier;
-      for (const type of ["logs", "metrics", "traces"]) {
+      for (const type of ["logs", "metrics", "traces", "profiles"]) {
         queryClient.setQueryData(streamProbeQuery(org, type).queryKey, { list: [], total: 0 });
       }
 

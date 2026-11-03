@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="name"
             :loading="loading"
             :forbidden="forbidden"
+            forbidden-resource="functions"
             pagination="client"
             :current-page="currentPage"
             @update:current-page="onPageChange"

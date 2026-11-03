@@ -377,7 +377,10 @@ export default defineComponent({
             let compressed_size = "";
             resultTotal.value = res.list.length;
             logStream.value = res.list
-              .filter((stream: any) => stream.stream_type !== "enrichment_tables")
+              // profiles ingestion runs no functions
+              .filter(
+                (stream: any) => !["enrichment_tables", "profiles"].includes(stream.stream_type),
+              )
               .map((data: any) => {
                 doc_num = "--";
                 storage_size = "--";

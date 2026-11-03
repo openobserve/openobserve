@@ -50,6 +50,10 @@ fn validate_meta_org_access(org_id: &str) -> Result<(), infra::errors::Error> {
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "Not Found", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn get_domain_management_config(Path(org_id): Path<String>) -> Response {
@@ -98,6 +102,10 @@ pub async fn get_domain_management_config(Path(org_id): Path<String>) -> Respons
         (status = 400, description = "Bad Request", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn set_domain_management_config(

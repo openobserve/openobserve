@@ -167,6 +167,18 @@ async fn validate_online_scorers(
     org_id: &str,
     scorer_refs: &[config::meta::pipeline::components::ScorerRef],
 ) -> Result<(), EvalJobError> {
+    for scorer in scorer_definitions(org_id, scorer_refs).await? {
+        ensure_scorer_is_online_compatible(&scorer)?;
+    }
+    Ok(())
+}
+
+/// The scorer versions a job's references resolve to, in reference order.
+pub async fn scorer_definitions(
+    org_id: &str,
+    scorer_refs: &[config::meta::pipeline::components::ScorerRef],
+) -> Result<Vec<table::scorers::Scorer>, EvalJobError> {
+    let mut definitions = Vec::with_capacity(scorer_refs.len());
     for scorer_ref in scorer_refs {
         let scorer = match scorer_ref.version {
             Some(version) => {
@@ -178,9 +190,9 @@ async fn validate_online_scorers(
         .ok_or_else(|| {
             EvalJobError::InvalidJob(format!("Scorer '{}' was not found", scorer_ref.id))
         })?;
-        ensure_scorer_is_online_compatible(&scorer)?;
+        definitions.push(scorer);
     }
-    Ok(())
+    Ok(definitions)
 }
 
 #[tracing::instrument(skip(job))]

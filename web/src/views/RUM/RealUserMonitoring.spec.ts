@@ -52,7 +52,12 @@ const makeRouter = () =>
             path: "performance",
             name: "RumPerformance",
             component: Stub,
-            children: [{ path: "overview", name: "rumPerformanceSummary", component: Stub }],
+            children: [
+              { path: "overview", name: "rumPerformanceSummary", component: Stub },
+              { path: "web-vitals", name: "rumPerformanceWebVitals", component: Stub },
+              { path: "errors", name: "rumPerformanceErrors", component: Stub },
+              { path: "apis", name: "rumPerformanceApis", component: Stub },
+            ],
           },
         ],
       },
@@ -143,6 +148,42 @@ describe("RealUserMonitoring tabs", () => {
     expect(
       router.currentRoute.value.query.period ?? router.currentRoute.value.query.from,
     ).toBeTruthy();
+  });
+
+  const activeTabText = () => wrapper!.find('[role="tab"][aria-selected="true"]').text();
+
+  const performanceSubTabs = [
+    ["/rum/performance/web-vitals", "rumPerformanceWebVitals"],
+    ["/rum/performance/errors", "rumPerformanceErrors"],
+    ["/rum/performance/apis", "rumPerformanceApis"],
+  ] as const;
+
+  it.each(performanceSubTabs)(
+    "a link to %s opens that Performance tab, not Overview",
+    async (path, name) => {
+      await mountAt(path);
+      expect(router.currentRoute.value.name).toBe(name);
+      expect(activeTabText()).toBe("Performance");
+    },
+  );
+
+  it.each(performanceSubTabs)(
+    "moving from Sessions to %s selects Performance and stays there",
+    async (path, name) => {
+      await mountAt("/rum/sessions");
+      expect(activeTabText()).toBe("Sessions");
+      await router.push(path);
+      await flushPromises();
+      await flushPromises();
+      expect(router.currentRoute.value.name).toBe(name);
+      expect(activeTabText()).toBe("Performance");
+    },
+  );
+
+  it("a link to the Overview tab still lands on Overview", async () => {
+    await mountAt("/rum/performance/overview");
+    expect(router.currentRoute.value.name).toBe("rumPerformanceSummary");
+    expect(activeTabText()).toBe("Performance");
   });
 
   it("still shows the no-RUM empty state when _rumdata does not exist", async () => {

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    v-if="message.groups.length"
+    v-if="message.count"
     ref="root"
     tabindex="-1"
     :role="role"
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ResourceList :resources="message.groups[0].resources" />
         </template>
       </i18n-t>
-      <template v-else>
+      <template v-else-if="message.groups.length > 1">
         <p class="text-text-body">{{ t("accessBoundary.denied.missingIntro") }}</p>
         <dl
           class="text-text-body grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1"
@@ -51,6 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </dl>
       </template>
+      <p v-if="message.askAdmin" class="text-text-body" data-test="access-denied-ask-admin">
+        {{ t("accessBoundary.denied.askAdmin") }}
+      </p>
       <div class="flex flex-wrap items-center gap-1">
         <OButton
           variant="ghost-primary"

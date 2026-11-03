@@ -15,6 +15,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
+import { inject } from "vue";
+import type { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import ViewPanel from "./ViewPanel.vue";
 import config from "@/aws-exports";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
@@ -466,6 +468,59 @@ describe("ViewPanel", () => {
       await flushPromises();
       const listener = wrapper.findComponent(PanelErrorButtons).vm.$.vnode.props?.onRefreshPanel;
       expect(listener).toBe(wrapper.vm.refreshData);
+    });
+  });
+
+  describe("variable values passed from the dashboard", () => {
+    const levelVariable = {
+      type: "query_values",
+      name: "level",
+      label: "Level",
+      query_data: { stream_type: "logs", stream: "app_logs", field: "level" },
+      value: "",
+      options: [],
+    };
+    const mountWithPassed = async (passed: Record<string, unknown>) => {
+      mockGetDashboard.mockResolvedValue({
+        title: "Test Dashboard",
+        tabs: [{ tabId: "default", panels: [] }],
+        variables: { list: [levelVariable], showDynamicFilters: false },
+      });
+      let manager: ReturnType<typeof useVariablesManager> | undefined;
+      wrapper = createWrapper(
+        { initialVariableValues: { values: [{ ...levelVariable, ...passed }] } },
+        {
+          VariablesValueSelector: {
+            template: "<div />",
+            setup: () => {
+              manager = inject<ReturnType<typeof useVariablesManager>>("variablesManager");
+              return {};
+            },
+          },
+        },
+      );
+      await flushPromises();
+      return manager?.variablesData.global.find((v) => v.name === "level");
+    };
+
+    it("loads a variable itself when the dashboard had not loaded it yet", async () => {
+      const level = await mountWithPassed({
+        value: null,
+        isLoading: true,
+        isVariablePartialLoaded: false,
+      });
+      expect(level?.isVariablePartialLoaded).toBe(false);
+    });
+
+    it("reuses a value the dashboard already loaded", async () => {
+      const level = await mountWithPassed({
+        value: "debug",
+        isLoading: false,
+        isVariableLoadingPending: false,
+        isVariablePartialLoaded: true,
+      });
+      expect(level?.value).toBe("debug");
+      expect(level?.isVariablePartialLoaded).toBe(true);
     });
   });
 
@@ -974,6 +1029,39 @@ describe("ViewPanel", () => {
 
       expect(wrapper.vm.showLegendsDialog).toBe(false);
       expect(popup.props("open")).toBe(false);
+    });
+  });
+
+  describe("Chart | Data view", () => {
+    const dataViewStub = {
+      PanelDataView: { template: '<div data-test="dashboard-viewpanel-data-view"></div>' },
+    };
+
+    afterEach(() => {
+      mockDashboardPanelData.data.type = "line";
+    });
+
+    it("overlays the raw rows on the chart when Data is picked", async () => {
+      wrapper = createWrapper({}, dataViewStub);
+      wrapper.vm.chartData = mockDashboardPanelData.data;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-test="dashboard-viewpanel-data-view"]').exists()).toBe(false);
+      await wrapper.find('[data-test="dashboard-viewpanel-preview-view-data"]').trigger("click");
+      expect(wrapper.find('[data-test="dashboard-viewpanel-data-view"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-viewpanel-panel-schema-renderer"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("offers no Data view for a table panel", async () => {
+      mockDashboardPanelData.data.type = "table";
+      wrapper = createWrapper({}, dataViewStub);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-test="dashboard-viewpanel-preview-view-toggle"]').exists()).toBe(
+        false,
+      );
     });
   });
 });

@@ -82,6 +82,7 @@ async function waitForRumSdkReady(page, timeoutMs = 30000) {
       typeof window.O2_RUM.getInternalContext === 'function' &&
       window.O2_LOGS &&
       typeof window.O2_LOGS.logger === 'object',
+    undefined,
     { timeout: timeoutMs },
   );
 }

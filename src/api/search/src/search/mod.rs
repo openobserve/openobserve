@@ -1699,6 +1699,8 @@ pub async fn search_history(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("is_streaming" = Option<bool>, Query, description = "Describe the schema of a streaming query"),
+        ("cross_linking" = Option<bool>, Query, description = "Include cross-link fields"),
     ),
     request_body(content = inline(config::meta::search::Request), description = "Search query", content_type = "application/json", example = json!({
         "query": {
@@ -1717,6 +1719,10 @@ pub async fn search_history(
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn result_schema(

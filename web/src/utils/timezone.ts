@@ -3,6 +3,7 @@
 import { DateTime } from "luxon";
 import { durationFormatter } from "@/utils/formatters";
 import { gt, raw } from "@/types/i18n";
+import { toMessages } from "@/utils/dashboard/panelDiagnostics";
 
 let moment: any;
 let momentInitialized = false;
@@ -190,11 +191,12 @@ export const getDuration = (createdAt: number) => {
 };
 
 export const getFunctionErrorMessage = (
-  message: string,
+  functionError: string | string[],
   newStartTime: number,
   newEndTime: number,
   timezone = "UTC",
 ) => {
+  const message = toMessages(functionError).join("\n");
   try {
     const startTimeFormatted = timestampToTimezoneDate(
       newStartTime / 1000,

@@ -1482,7 +1482,7 @@ fn parse_group_labels(rendered: Option<&str>) -> Vec<AlertGroupLabel> {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "List the per-group states of a multi-alert", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"enabled": false, "description": "List the per-group states of a multi-alert", "category": "alerts"}))
     )
 )]
 pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
@@ -1588,7 +1588,7 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Per-group alert state history", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"enabled": false, "description": "Per-group alert state history", "category": "alerts"}))
     )
 )]
 pub async fn list_alert_group_transitions(

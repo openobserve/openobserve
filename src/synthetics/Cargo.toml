@@ -42,6 +42,7 @@ tokio.workspace = true
 tracing.workspace = true
 urlencoding.workspace = true
 usage_reporting.workspace = true
+utoipa.workspace = true
 
 [dev-dependencies]
 sea-orm = { workspace = true, features = ["mock"] }

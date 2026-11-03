@@ -298,7 +298,7 @@ pub(crate) fn location_entry(
 
 // ── Location CRUD ─────────────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateLocationRequest {
     /// "public" (root only, visible to all orgs) | "private" (default).
     #[serde(default = "default_location_kind")]
@@ -329,7 +329,7 @@ fn default_true() -> bool {
     true
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UpdateLocationRequest {
     pub label: String,
     /// Omitted keeps the stored value; an explicit `false` disables.

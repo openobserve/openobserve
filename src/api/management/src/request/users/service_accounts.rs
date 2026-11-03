@@ -28,7 +28,37 @@ use {
     openobserve_api_common::auth::jwt::process_token,
 };
 
+// Only documents o2_dex's TokenExchangeRequest, which has no ToSchema in that crate.
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+struct TokenExchangeBody {
+    token: String,
+    token_type: TokenExchangeType,
+}
+
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+enum TokenExchangeType {
+    AccessToken,
+    IdToken,
+}
+
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/config/token",
+    tag = "Auth",
+    operation_id = "ExchangeToken",
+    summary = "Exchange an identity token for an access token",
+    security(),
+    request_body(content = inline(TokenExchangeBody), content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn exchange_token(
     Json(body): Json<o2_dex::meta::auth::TokenExchangeRequest>,
 ) -> Response {
@@ -87,6 +117,21 @@ pub async fn exchange_token(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/config/token",
+    tag = "Auth",
+    operation_id = "ExchangeToken",
+    summary = "Exchange an identity token for an access token",
+    security(),
+    request_body(content = inline(TokenExchangeBody), content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn exchange_token(Json(_body): Json<String>) -> Response {
     (StatusCode::FORBIDDEN, Json("Not allowed")).into_response()
 }
