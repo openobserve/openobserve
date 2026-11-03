@@ -696,7 +696,8 @@ export class MetricsPage {
         );
         await this.enterMetricsQuery(query);
         await this.clickApplyButton();
-        const body = await (await response).text();
+        // The UI can abort its own event stream after the last event, and Chrome keeps no body for an aborted request.
+        const body = await (await this.page.request.get((await response).url())).text();
         const series = new Set();
         const points = new Set();
         for (const line of body.split('\n')) {
