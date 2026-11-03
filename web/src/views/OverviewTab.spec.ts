@@ -976,6 +976,36 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="overview-alerts-card"]').exists()).toBe(true);
     });
 
+    it.each([
+      ["403", forbidden],
+      ["500", serverError],
+    ])(
+      "should hold the page, not a full-page hero, while /overview is in flight after every section answered %s",
+      async (_status, err) => {
+        givenEnterprise(true);
+        givenEverySectionFails(err);
+        const pending = deferred<{ data: unknown }>();
+        vi.mocked(overviewService.getOrgOverview).mockReturnValue(pending.promise as never);
+
+        wrapper = mountOverviewTab();
+        await flushPromises();
+
+        expect(wrapper.find(NO_ACCESS).exists()).toBe(false);
+        expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+        expect(wrapper.find(REFRESH_BTN).exists()).toBe(true);
+        expect(wrapper.find('[data-test="overview-headline-strip"]').exists()).toBe(true);
+        expect(refreshLastRun()).toBeNull();
+
+        pending.resolve({ data: buildHealthyOverview() });
+        await flushPromises();
+
+        expect(wrapper.find(NO_ACCESS).exists()).toBe(false);
+        expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+        expect(wrapper.find('[data-test="overview-alerts-card"]').exists()).toBe(true);
+        expect(refreshLastRun()).not.toBeNull();
+      },
+    );
+
     it("should clear the refresh button's last-run time on an org switch", async () => {
       wrapper = mountOverviewTab();
       await flushPromises();
@@ -1619,12 +1649,23 @@ describe("OverviewTab", () => {
       expect(wrapper.findComponent({ name: "ORefreshButton" }).props("tooltip")).toBeUndefined();
     });
 
-    it("should show zero counts and no all-clear claim when the overview shows no problem", async () => {
+    it("should show zero firing, failing and pipeline tiles and only the quiet streams on the status line", async () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.get('[data-test="overview-headline-firing"]').text()).toContain("0");
-      expect(wrapper.get('[data-test="overview-headline-pipelines"]').text()).toContain("0");
+      for (const key of ["firing", "failing", "pipelines"]) {
+        expect(wrapper.get(`${tile(key)} [data-test="overview-tile-value"]`).text()).toBe("0");
+      }
+      expect(wrapper.get(`${tile("quiet")} [data-test="overview-tile-value"]`).text()).toBe("3");
+      expect(wrapper.find('[data-test="overview-status-clear"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-status-danger"]').exists()).toBe(false);
+      expect(
+        wrapper
+          .get('[data-test="overview-status-warning"] [data-test="overview-status-text"]')
+          .text(),
+      ).toBe("Needs attention");
+      const items = wrapper.findAll('[data-test^="overview-status-item-"]');
+      expect(items.map((i) => i.text())).toEqual(["3 quiet streams"]);
     });
 
     it.each([
@@ -1662,8 +1703,7 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      const text = wrapper.get(`[data-test="overview-headline-${key}"]`).text();
-      expect(text).toContain(expected);
+      expect(wrapper.get(`${tile(key)} [data-test="overview-tile-value"]`).text()).toBe(expected);
     });
 
     it("should retry a single card with only the /overview request", async () => {

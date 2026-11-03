@@ -968,8 +968,13 @@ const allFailed = computed(() => attemptedSections.value.every(isFailed));
 
 type PageState =
   "content" | "partial" | "forbidden" | "error" | "not-monitored" | "no-data" | "all-clear";
+// no /overview answer yet leaves the heroes undecided, since each one weighs whether the cards loaded
+const overviewUnanswered = computed(
+  () =>
+    overviewState.loading && !overview.value && !overviewFailed.value && !overviewForbidden.value,
+);
 const pageState = computed<PageState>(() => {
-  if (isLoading.value || hasAnyData.value) return "content";
+  if (isLoading.value || hasAnyData.value || overviewUnanswered.value) return "content";
   if (allFailed.value) {
     const allForbidden = attemptedSections.value.every((k) => isForbidden(sectionFailure[k]));
     const cardsLoaded = !!overview.value && !overviewFailed.value && !overviewForbidden.value;
@@ -1104,9 +1109,9 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier);
 const loadAll = async (force = false) => {
   if (!orgId.value) return;
   isLoading.value = true;
-  // outside allSettled: a slow or failed /overview must never hold the page states
-  void loadOverview(force);
+  // the full-page heroes weigh whether the cards loaded, so they wait for /overview too
   await Promise.allSettled([
+    loadOverview(force),
     runSection("recentEvents", (current) => loadHistoryAndSplit(force, current)),
     runSection("anomalies", (current) => loadAnomalies(force, current)),
     runSection("incidents", (current) => loadIncidents(force, current)),
@@ -1115,8 +1120,8 @@ const loadAll = async (force = false) => {
   ]);
   await loadUserStreams(force);
   isLoading.value = false;
-  // the refresh button keeps the last good run, so a fresh dot never sits beside the error
-  if (!allFailed.value && pageState.value !== "error") lastFetched.value = new Date();
+  // only a full-page hero means nothing loaded; loaded cards beside failed sections are still a run
+  if (pageShowsSections.value) lastFetched.value = new Date();
 };
 
 // only the latest call may set the result or clear loading

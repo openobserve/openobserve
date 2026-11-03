@@ -23,6 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-border-default rounded-surface bg-surface-panel overflow-hidden border border-[0.0625em]"
     >
       <OEmptyState
+        v-if="kind === 'forbidden'"
+        size="slim"
+        preset="no-access"
+        :description="t('overview.state.sectionForbidden')"
+        :data-test="`overview-${testSection}-${kind}-message`"
+      />
+      <OEmptyState
+        v-else
         size="slim"
         :title="message"
         :data-test="`overview-${testSection}-${kind}-message`"
@@ -47,7 +55,6 @@ const props = defineProps<{
 const { t } = useI18nTyped();
 
 const message = computed(() => {
-  if (props.kind === "forbidden") return t("overview.state.tileForbidden");
   if (props.section === "anomalies" && props.noChecks) return t("overview.empty.anomalyNoChecks");
   return t(`overview.empty.${props.section}`);
 });

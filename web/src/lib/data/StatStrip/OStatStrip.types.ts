@@ -24,9 +24,6 @@ export type StatTone =
   | "purple"
   | "neutral";
 
-/** `inline` puts the value beside its label; `stacked` puts the label above a large value, for headline numbers. */
-export type StatLayout = "inline" | "stacked";
-
 /** Optional delta shown beside the value (e.g. "▲ 12%"). */
 export interface StatTrend {
   direction: "up" | "down" | "flat";
@@ -68,8 +65,6 @@ export interface StatItem {
    * display (not a clickable filter) — e.g. a "Total" tile. Defaults to true.
    */
   selectable?: boolean;
-  /** Skeleton this tile alone, while the strip as a whole has settled. */
-  loading?: boolean;
   /** data-test hook for the tile root. */
   dataTest?: string;
 }

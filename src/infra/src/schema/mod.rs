@@ -241,20 +241,25 @@ pub async fn get_from_db(
     })
 }
 
-/// Counts versions created at or after `since`, excluding the oldest (the stream's creation).
+/// Sums the versions created at or after `since` across `streams`, excluding each stream's oldest
+/// (its creation), under one cache read lock.
 pub async fn count_cached_versions_since(
     org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
+    streams: &[(StreamType, &str)],
     since: i64,
 ) -> usize {
-    let cache_key = format!("{org_id}/{stream_type}/{stream_name}");
     let r = STREAM_SCHEMAS.read().await;
-    r.get(&cache_key).map_or(0, |versions| {
-        let oldest = versions.iter().map(|(t, _)| *t).min();
-        let in_window = versions.iter().filter(|(t, _)| *t >= since).count();
-        in_window - usize::from(oldest.is_some_and(|t| t >= since))
-    })
+    streams
+        .iter()
+        .map(|(stream_type, stream_name)| {
+            let cache_key = format!("{org_id}/{stream_type}/{stream_name}");
+            r.get(&cache_key).map_or(0, |versions| {
+                let oldest = versions.iter().map(|(t, _)| *t).min();
+                let in_window = versions.iter().filter(|(t, _)| *t >= since).count();
+                in_window - usize::from(oldest.is_some_and(|t| t >= since))
+            })
+        })
+        .sum()
 }
 
 #[tracing::instrument(name = "infra:schema:get_versions", skip_all)]
@@ -1183,7 +1188,8 @@ mod tests {
             );
         }
         let count = |name: &'static str, since: i64| async move {
-            count_cached_versions_since("count_versions_org", StreamType::Logs, name, since).await
+            count_cached_versions_since("count_versions_org", &[(StreamType::Logs, name)], since)
+                .await
         };
         assert_eq!(count("three", 200).await, 2);
         assert_eq!(count("three", 201).await, 1);
@@ -1191,6 +1197,20 @@ mod tests {
         assert_eq!(count("one", 0).await, 0);
         assert_eq!(count("one", 300).await, 0);
         assert_eq!(count("missing", 0).await, 0);
+
+        let all = [
+            (StreamType::Logs, "three"),
+            (StreamType::Logs, "one"),
+            (StreamType::Logs, "missing"),
+        ];
+        assert_eq!(
+            count_cached_versions_since("count_versions_org", &all, 0).await,
+            2
+        );
+        assert_eq!(
+            count_cached_versions_since("count_versions_org", &[], 0).await,
+            0
+        );
     }
 
     #[tokio::test]

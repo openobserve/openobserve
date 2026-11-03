@@ -298,9 +298,11 @@ export function overviewChecks(input: OverviewChecksInput): AttentionCheck[] {
     };
   };
   const o = input.overview;
-  const hasRules = (d: OverviewAlertsData) => d.total > 0;
+  // a disabled rule watches nothing, matching the tiles' "No enabled rules" note
+  const hasRules = (d: OverviewAlertsData) => d.enabled > 0;
+  const firing = fromSection("firing", o?.alerts, (d) => firingCount(d), hasRules);
   const checks = [
-    fromSection("firing", o?.alerts, (d) => firingCount(d), hasRules),
+    firing,
     fromSection("failing", o?.alerts, (d) => d.failed_evaluation, hasRules),
     fromSection(
       "pipelines",
@@ -315,9 +317,9 @@ export function overviewChecks(input: OverviewChecksInput): AttentionCheck[] {
       (d) => d.total_streams > 0,
     ),
   ];
+  // incidents are only raised by alert rules, so they monitor exactly when an enabled rule does
   if (input.incidents) {
-    const monitors = input.incidents.state === "ok";
-    checks.push({ key: "incidents", ...input.incidents, monitors });
+    checks.push({ key: "incidents", ...input.incidents, monitors: firing.monitors });
   }
   return checks;
 }

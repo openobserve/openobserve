@@ -33,11 +33,14 @@ describe("OverviewSectionEmpty", () => {
     expect(w.find("[data-o2-empty-state], .o2-empty-state").exists()).toBe(true);
   });
 
-  it("renders the no access message for a forbidden section", () => {
+  it("explains a forbidden section in the same words as a forbidden card", () => {
     const w = mountEmpty({ kind: "forbidden" });
-    expect(w.get('[data-test="overview-incidents-forbidden-message"]').text()).toContain(
-      "No access",
+    const message = w.get('[data-test="overview-incidents-forbidden-message"]');
+    expect(message.text()).toContain("You don't have access");
+    expect(message.text()).toContain(
+      "Your role cannot see this data. Ask an org admin for access.",
     );
+    expect(message.text()).not.toContain("No access");
   });
 
   it("uses the hyphenated test id for recent events", () => {

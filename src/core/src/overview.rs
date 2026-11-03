@@ -592,12 +592,12 @@ async fn fetch_streams(org_id: &str, scope: &OverviewScope) -> Result<Vec<Stream
 }
 
 async fn count_schema_changes(org_id: &str, streams: &[Stream], since: i64) -> u64 {
-    let mut total = 0;
-    for s in streams.iter().filter(|s| is_counted_user_stream(s)) {
-        total += infra::schema::count_cached_versions_since(org_id, s.stream_type, &s.name, since)
-            .await as u64;
-    }
-    total
+    let counted: Vec<(StreamType, &str)> = streams
+        .iter()
+        .filter(|s| is_counted_user_stream(s))
+        .map(|s| (s.stream_type, s.name.as_str()))
+        .collect();
+    infra::schema::count_cached_versions_since(org_id, &counted, since).await as u64
 }
 
 async fn pending_compaction(org_id: &str, visible_types: &HashSet<String>) -> Option<i64> {

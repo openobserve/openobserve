@@ -368,13 +368,31 @@ describe("overviewStatus", () => {
     const checks = overviewChecks({ overview, ...idle });
     expect(checks.every((c) => !c.monitors)).toBe(true);
     expect(overviewStatus(checks)).toEqual({ kind: "unmonitored", items: [] });
-    expect(
-      overviewStatus(overviewChecks({ overview, ...idle, incidents: { state: "ok", count: 0 } }))
-        .kind,
-    ).toBe("clear");
+    const withIncidents = overviewChecks({
+      overview,
+      ...idle,
+      incidents: { state: "ok", count: 0 },
+    });
+    expect(withIncidents.find((c) => c.key === "incidents")?.monitors).toBe(false);
+    expect(overviewStatus(withIncidents).kind).toBe("unmonitored");
   });
 
-  it("counts any one configured source as monitoring", () => {
+  it("calls incidents with enabled rules clear", () => {
+    const base = clearOverview();
+    const overview = buildOverview({
+      ...base,
+      pipelines: { status: "ok", data: { total: 0, enabled: 0, disabled: 0, errored: 0 } },
+      streams: {
+        status: "ok",
+        data: { ...base.streams.data!, total_streams: 0, quiet_count: 0, by_type: [] },
+      },
+    });
+    const checks = overviewChecks({ overview, ...idle, incidents: { state: "ok", count: 0 } });
+    expect(checks.find((c) => c.key === "incidents")?.monitors).toBe(true);
+    expect(overviewStatus(checks).kind).toBe("clear");
+  });
+
+  it("counts any one configured source as monitoring, and disabled rules as none", () => {
     const base = clearOverview();
     const noRules = buildOverview({
       ...base,
@@ -390,7 +408,28 @@ describe("overviewStatus", () => {
       alerts: { status: "ok", data: { ...base.alerts.data!, total: 2, enabled: 0, disabled: 2 } },
     });
     const checks = overviewChecks({ overview: disabledRules, ...idle });
-    expect(checks.find((c) => c.key === "firing")?.monitors).toBe(true);
+    expect(checks.find((c) => c.key === "firing")?.monitors).toBe(false);
+    expect(checks.find((c) => c.key === "failing")?.monitors).toBe(false);
+  });
+
+  it("says nothing is monitored when every rule is disabled and nothing else is set up", () => {
+    const base = clearOverview();
+    const overview = buildOverview({
+      ...base,
+      alerts: {
+        status: "ok",
+        data: { ...base.alerts.data!, total: 3, enabled: 0, disabled: 3, by_state: {} },
+      },
+      pipelines: { status: "ok", data: { total: 0, enabled: 0, disabled: 0, errored: 0 } },
+      streams: {
+        status: "ok",
+        data: { ...base.streams.data!, total_streams: 0, quiet_count: 0, by_type: [] },
+      },
+    });
+    expect(overviewStatus(overviewChecks({ overview, ...idle }))).toEqual({
+      kind: "unmonitored",
+      items: [],
+    });
   });
 
   it("counts a notify-failed rule as firing", () => {
