@@ -185,7 +185,7 @@ const removeSelected = async (): Promise<void> => {
     <div v-if="!result" class="flex flex-col gap-3 text-sm" data-test="slack-dialog-confirm">
       <template v-if="mode === 'disconnect'">
         <i18n-t
-          keypath="slackApp.uninstall.disconnectMessage"
+          keypath="slackApp.uninstall.disconnectMessageShort"
           tag="p"
           class="m-0"
           data-test="slack-dialog-disconnect-message"

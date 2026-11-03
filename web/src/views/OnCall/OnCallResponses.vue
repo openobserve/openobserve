@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- During an incident the list IS the work surface. Opening 200 pages
            one at a time to claim them is not triage. -->
-      <template v-if="hasPages" #toolbar>
+      <template v-if="hasPages && scopeDecided" #toolbar>
         <div class="flex w-full flex-wrap items-center gap-2 max-md:contents">
           <!-- First, and always on screen, so a list narrowed to the reader's own pages never looks empty for a hidden reason. -->
           <OToggleGroup
@@ -153,53 +153,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("oncall.scopeEveryone") }}
             </OToggleGroupItem>
           </OToggleGroup>
-          <OToggleGroup
+          <!-- A select, not a toggle strip: five states beside the other filters wrapped the toolbar onto a second line. -->
+          <OSelect
             :model-value="activeFilter"
-            mobile-dropdown
+            :options="statusOptions"
+            icon-key="icon"
+            :aria-label="t('oncall.statusFilterLabel')"
+            width="sm"
             data-test="oncall-responses-filter-tabs"
-            @update:model-value="(v) => selectFilterTab(v as 'all' | SectionKey)"
+            @update:model-value="(v) => selectFilterTab(v as FilterTab)"
           >
-            <OToggleGroupItem
-              value="all"
-              size="sm"
-              icon-left="list"
-              data-test="oncall-responses-tab-all"
-            >
-              {{ t("oncall.all") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem
-              value="ringing"
-              size="sm"
-              icon-left="notifications-active"
-              data-test="oncall-responses-tab-ringing"
-            >
-              {{ t("oncall.section_ringing") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem
-              value="handled"
-              size="sm"
-              icon-left="check-circle"
-              data-test="oncall-responses-tab-handled"
-            >
-              {{ t("oncall.section_handled") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem
-              value="resolved"
-              size="sm"
-              icon-left="task-alt"
-              data-test="oncall-responses-tab-resolved"
-            >
-              {{ t("oncall.section_resolved") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem
-              value="snoozed"
-              size="sm"
-              icon-left="alarm"
-              data-test="oncall-responses-tab-snoozed"
-            >
-              {{ t("oncall.section_snoozed") }}
-            </OToggleGroupItem>
-          </OToggleGroup>
+            <template #trigger>
+              <span class="flex min-w-0 items-center gap-1.5">
+                <OIcon :name="STATUS_ICON[activeFilter]" size="sm" class="text-text-secondary" />
+                {{ t("oncall.statusTrigger", { status: statusLabel }) }}
+              </span>
+            </template>
+          </OSelect>
           <!-- Server-side, so a team's older pages past the fetch cap are not hidden by a client filter. -->
           <OSelect
             v-if="!isMobile"
@@ -220,23 +190,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             width="sm"
             data-test="oncall-responses-priority-filter"
           />
-          <!-- Only where resolved pages show: a cause is written at resolve, so it can only empty an open list. -->
-          <OSelect
-            v-if="!isMobile && sectionVisibility.resolved"
-            :model-value="causeFilter"
-            :options="causeOptions"
-            :placeholder="t('oncall.causeFilterAny')"
-            :aria-label="t('oncall.causeFilterLabel')"
-            width="sm"
-            data-test="oncall-responses-cause-filter"
-            @update:model-value="onCauseFilter"
-          />
-          <OCheckbox
-            v-if="!isMobile"
-            v-model="grouped"
-            :label="t('oncall.groupByAlert')"
-            data-test="oncall-responses-group-toggle"
-          />
           <OSearchInput
             v-model="search"
             class="min-w-40 flex-1 basis-40 max-md:min-w-24 max-md:basis-24"
@@ -244,13 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('oncall.searchResponses')"
             data-test="oncall-responses-search"
           />
-          <!-- A phone toolbar is one row, so everything that narrows the list waits behind one button. -->
-          <OPopover
-            v-if="isMobile"
-            align="end"
-            content-class="w-72"
-            :aria-label="t('oncall.filters')"
-          >
+          <!-- One toolbar row: the rarer narrowings wait behind one button, and on a phone team and priority join them. -->
+          <OPopover align="end" content-class="w-72" :aria-label="t('oncall.filters')">
             <template #trigger>
               <OButton
                 variant="outline"
@@ -263,6 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <div class="flex flex-col gap-3 p-3" data-test="oncall-responses-filters-panel">
               <OSelect
+                v-if="isMobile"
                 v-model="teamFilter"
                 :options="teamOptions"
                 :disabled="!teamsAvailable"
@@ -272,6 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="() => fetchResponses()"
               />
               <OSelect
+                v-if="isMobile"
                 v-model="priorityFilter"
                 :options="priorityOptions"
                 :aria-label="t('oncall.priorityFilterLabel')"
@@ -521,13 +471,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            pager), so it lives in its own "On call now" column instead of
            repeating here. -->
       <template #cell-responder="{ row }">
-        <OUserCell
+        <span
           v-if="row.latest.acked_by"
-          :value="row.latest.acked_by"
-          :name="displayName(row.latest.acked_by)"
-          copy
-          :copy-label="t('oncall.copyEmail')"
-        />
+          class="text-text-body block min-w-0 truncate"
+          :data-test="`oncall-responder-${row.rowKey}`"
+        >
+          {{ raw(displayName(row.latest.acked_by)) }}
+          <OTooltip :content="personTooltip(row.latest.acked_by)" />
+        </span>
         <!-- Same text color as the P2 priority tag, so an unanswered page
              reads as the same order of urgency the priority column already
              establishes. -->
@@ -549,13 +500,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            OnCallTeams.vue — so this says nothing while still loading rather
            than flash a name or a gap in and out. -->
       <template #cell-on_call_now="{ row }">
-        <OUserCell
+        <span
           v-if="positionsByTeam[row.latest.team_id ?? '']?.[0]"
-          :value="positionsByTeam[row.latest.team_id ?? '']![0].user_email"
-          :name="displayName(positionsByTeam[row.latest.team_id ?? '']![0].user_email)"
-          copy
-          :copy-label="t('oncall.copyEmail')"
-        />
+          class="text-text-body block min-w-0 truncate"
+          :data-test="`oncall-oncallnow-${row.rowKey}`"
+        >
+          {{ raw(displayName(positionsByTeam[row.latest.team_id ?? ""]![0].user_email)) }}
+          <OTooltip
+            :content="personTooltip(positionsByTeam[row.latest.team_id ?? '']![0].user_email)"
+          />
+        </span>
         <OText
           v-else-if="row.latest.team_id && positionsByTeam[row.latest.team_id] !== undefined"
           variant="meta"
@@ -627,8 +581,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <div class="mb-2 flex justify-end">
               <OButton
-                variant="ghost-primary"
+                variant="ghost"
                 size="sm"
+                :icon-left="expandedShowAllActivity ? 'visibility-off' : 'visibility'"
                 data-test="oncall-expansion-activity-toggle-all"
                 @click="expandedShowAllActivity = !expandedShowAllActivity"
               >
@@ -877,6 +832,7 @@ import {
   acknowledgeResponseMutation,
   addResponseNoteMutation,
   coverageGapsQuery,
+  myOnCallQuery,
   handoffResponseMutation,
   oncallTeamsQuery,
   ownershipRulesQuery,
@@ -892,8 +848,6 @@ import {
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
-import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef, RowRailTone, RowTone } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
@@ -904,6 +858,7 @@ import type {
   Channel,
   CoverageGaps,
   EscalationProgress,
+  MyOnCall,
   OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
@@ -915,6 +870,7 @@ import type {
   ResolutionCause,
 } from "@/ts/interfaces/oncall";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
+import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -973,6 +929,17 @@ const SECTION_ORDER = ["ringing", "snoozed", "handled", "resolved"] as const;
 
 type SectionKey = (typeof SECTION_ORDER)[number];
 
+/// "open" is every section but resolved: what still needs somebody.
+type FilterTab = "all" | "open" | SectionKey;
+
+const OPEN_SECTIONS: readonly SectionKey[] = ["ringing", "snoozed", "handled"];
+
+function tabShows(tab: FilterTab, section: SectionKey): boolean {
+  if (tab === "all") return true;
+  if (tab === "open") return OPEN_SECTIONS.includes(section);
+  return tab === section;
+}
+
 const responses = ref<OnCallResponse[]>([]);
 const teams = ref<OnCallTeam[]>([]);
 const policyByTeam = ref<Record<string, OnCallPolicy>>({});
@@ -1014,7 +981,7 @@ const savedView = useListViewState("oncall-responses", {
   /** Set once the reader picks Mine or Everyone, so the on-call default never overrides a choice. */
   mineChosen: false,
   grouped: true,
-  activeFilter: "all" as "all" | SectionKey,
+  activeFilter: "open" as FilterTab,
   causeFilter: "" as ResolutionCause | "",
   currentPage: 1,
   pageSize: 20,
@@ -1029,26 +996,31 @@ const selectedIds = ref<string[]>([]);
 const grouped = ref(savedView.grouped);
 /// `"all"` is the default tab, and "all" means all — resolved included —
 /// so the very first fetch already asks for resolved pages too.
+// "open" fetches resolved too, so "has this org ever paged anybody" is still answered by the first read.
 const includeResolved = ref(
-  savedView.activeFilter === "all" || savedView.activeFilter === "resolved",
+  savedView.activeFilter !== "ringing" &&
+    savedView.activeFilter !== "snoozed" &&
+    savedView.activeFilter !== "handled",
 );
 /// All four sections start visible, matching the default `"all"` tab.
 const sectionVisibility = ref<Record<SectionKey, boolean>>({
-  ringing: savedView.activeFilter === "all" || savedView.activeFilter === "ringing",
-  snoozed: savedView.activeFilter === "all" || savedView.activeFilter === "snoozed",
-  handled: savedView.activeFilter === "all" || savedView.activeFilter === "handled",
-  resolved: includeResolved.value,
+  ringing: tabShows(savedView.activeFilter, "ringing"),
+  snoozed: tabShows(savedView.activeFilter, "snoozed"),
+  handled: tabShows(savedView.activeFilter, "handled"),
+  resolved: tabShows(savedView.activeFilter, "resolved"),
 });
 /// The tab the toolbar shows as pressed. `"all"` is every section at once
 /// (open and resolved alike) and has no `SectionKey` of its own; picking any
 /// other tab narrows `sectionVisibility` to just that one section — and, for
 /// every tab but `"all"` and `"resolved"`, drops resolved pages out of the
 /// fetch entirely.
-const activeFilter = ref<"all" | SectionKey>(savedView.activeFilter);
+const activeFilter = ref<FilterTab>(savedView.activeFilter);
 /// Empty means every cause. Cleared whenever resolved pages leave the list,
 /// because a cause filter over open records matches nothing and would read as
 /// "there is nothing here" rather than "this filter cannot apply".
-const causeFilter = ref<ResolutionCause | "">(includeResolved.value ? savedView.causeFilter : "");
+const causeFilter = ref<ResolutionCause | "">(
+  sectionVisibility.value.resolved ? savedView.causeFilter : "",
+);
 const currentPage = ref(savedView.currentPage);
 const pageSize = ref(savedView.pageSize);
 // A view saved before the Status column was removed can still sort by it.
@@ -1099,6 +1071,44 @@ const teamOptions = computed(() => [
   ...teams.value.map((team) => ({ label: raw(team.name), value: team.id })),
 ]);
 
+const STATUS_ICON: Record<FilterTab, IconName> = {
+  all: "list",
+  open: "radio-button-unchecked",
+  ringing: "notifications-active",
+  handled: "check-circle",
+  resolved: "task-alt",
+  snoozed: "alarm",
+};
+
+/// Counted from what was fetched, so a tab's number is what picking it shows.
+const statusOptions = computed(() => {
+  const counts = sectionCounts.value;
+  const total = (keys: SectionKey[]) => keys.reduce((sum, key) => sum + (counts[key] ?? 0), 0);
+  const tabs: { value: FilterTab; label: I18nText; count: number }[] = [
+    { value: "open", label: t("oncall.filterOpen"), count: total([...OPEN_SECTIONS]) },
+    { value: "ringing", label: t("oncall.section_ringing"), count: counts.ringing },
+    { value: "handled", label: t("oncall.section_handled"), count: counts.handled },
+    { value: "snoozed", label: t("oncall.section_snoozed"), count: counts.snoozed },
+    { value: "resolved", label: t("oncall.section_resolved"), count: counts.resolved },
+    { value: "all", label: t("oncall.all"), count: total([...SECTION_ORDER]) },
+  ];
+  // A count before the list has answered would read as "nothing here".
+  const counted = setupLoaded.value && !loading.value;
+  return tabs.map((tab) => ({
+    value: tab.value,
+    icon: STATUS_ICON[tab.value],
+    label: counted
+      ? t("oncall.statusOptionCount", { label: tab.label, count: tab.count })
+      : tab.label,
+  }));
+});
+
+const statusLabel = computed<I18nText>(
+  () =>
+    statusOptions.value.find((option) => option.value === activeFilter.value)?.label ??
+    t("oncall.all"),
+);
+
 const priorityOptions = computed(() => [
   { label: t("oncall.allPriorities"), value: "all" },
   // "P1" is the same identifier on every surface — the alertPriority badge
@@ -1122,9 +1132,11 @@ const isFiltered = computed(
     activeFilter.value !== "all",
 );
 
-/// Only what the phone filter button hides: it lights up so a narrowed list never looks like the whole one.
+/// Only what the filter button hides: it lights up so a narrowed list never looks like the whole one.
 const narrowed = computed(
-  () => teamFilter.value !== "all" || priorityFilter.value !== "all" || !!causeFilter.value,
+  () =>
+    !!causeFilter.value ||
+    (isMobile.value && (teamFilter.value !== "all" || priorityFilter.value !== "all")),
 );
 
 const showChecklist = computed(
@@ -1180,8 +1192,8 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // a woken engineer nothing. Fall back only when there is no title.
     accessorFn: (row: PageRow) => row.latest.title || row.latest.subject.source_id,
     sortable: true,
-    size: 280,
-    minSize: 200,
+    size: 200,
+    minSize: 160,
     // The widest thing in the row and the one a reader scans by, so it takes
     // the table's leftover width rather than leaving it to the trailing spacer.
     meta: { isName: true, flex: true },
@@ -1193,7 +1205,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // was on at all.
     id: "team",
     header: t("oncall.team"),
-    size: 160,
+    size: 136,
     accessorFn: (row: PageRow) => {
       const teamId = row.latest.team_id;
       return teamId ? (teamNameById.value[teamId] ?? teamId) : "";
@@ -1207,7 +1219,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // scannable down the list instead of discovered by accident.
     id: "incident",
     header: t("oncall.incident"),
-    size: 160,
+    size: 144,
     accessorFn: (row: PageRow) =>
       row.latest.incident_id
         ? (incidentTitleById.value[row.latest.incident_id] ?? row.latest.incident_id)
@@ -1220,7 +1232,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // that is the ordering a responder wants, not alphabetical state.
     id: "escalation",
     header: t("oncall.escalation"),
-    size: 240,
+    size: 176,
     accessorFn: (row: PageRow) =>
       progressById.value[row.latest.id]?.fired.length ?? reachedStepFor(row.latest) ?? 0,
     sortable: true,
@@ -1228,7 +1240,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
   {
     id: "responder",
     header: t("oncall.responder"),
-    size: 184,
+    size: 148,
     accessorFn: (row: PageRow) => row.latest.acked_by ?? "",
     sortable: true,
   },
@@ -1238,7 +1250,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // answered by someone no longer holding the pager.
     id: "on_call_now",
     header: t("oncall.onCallNow"),
-    size: 184,
+    size: 148,
     accessorFn: (row: PageRow) =>
       positionsByTeam.value[row.latest.team_id ?? ""]?.[0]?.user_email ?? "",
     sortable: true,
@@ -1254,7 +1266,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // minutes, which is what the relative time already says.
     id: "last_alert_at",
     header: t("oncall.lastAlertAt"),
-    size: COL.dateAbsolute,
+    size: 120,
     accessorFn: (row: PageRow) => row.latest.opened_at,
     sortable: true,
   },
@@ -1310,13 +1322,27 @@ function setMineOnly(on: boolean) {
   savedView.mineChosen = true;
 }
 
+/// The scope toggle waits for this, so the default never flips under a reader who already sees the list.
+const scopeDecided = ref(savedView.mineChosen || route.query.mine !== undefined);
+
 // Someone holding a pager starts on their own pages, unless they already chose or a link asked.
-watch(
-  () => myTeamIds.value.size > 0,
-  (onCall) => {
-    if (onCall && !savedView.mineChosen && route.query.mine === undefined) mineOnly.value = true;
-  },
-);
+async function decideScope(force: boolean) {
+  if (scopeDecided.value) return;
+  try {
+    const mine = await read<MyOnCall>(myOnCallQuery(orgId.value), force);
+    if (mine?.on_call_now && !savedView.mineChosen) mineOnly.value = true;
+    scopeDecided.value = true;
+  } catch {
+    // Left undecided: the rotations read after the list answers the same question.
+  }
+}
+
+/// Without the my-on-call read, the rotations the list already loads say whether the reader holds a pager.
+function decideScopeFromRotations() {
+  if (scopeDecided.value) return;
+  if (myTeamIds.value.size > 0 && !savedView.mineChosen) mineOnly.value = true;
+  scopeDecided.value = true;
+}
 
 /// Inert until we know who is signed in — otherwise a stale toggle would hide
 /// every row with no visible control to turn it off.
@@ -1396,13 +1422,13 @@ function onCauseFilter(value: unknown) {
 /// a resolved-showing tab, because that is the only direction that can be
 /// missing rows — and it goes quietly, behind whatever the reader is already
 /// looking at, rather than blocking the rows already on screen.
-function selectFilterTab(tab: "all" | SectionKey) {
+function selectFilterTab(tab: FilterTab) {
   activeFilter.value = tab;
-  const showsResolved = tab === "all" || tab === "resolved";
+  const showsResolved = tabShows(tab, "resolved");
   sectionVisibility.value = {
-    ringing: tab === "all" || tab === "ringing",
-    snoozed: tab === "all" || tab === "snoozed",
-    handled: tab === "all" || tab === "handled",
+    ringing: tabShows(tab, "ringing"),
+    snoozed: tabShows(tab, "snoozed"),
+    handled: tabShows(tab, "handled"),
     resolved: showsResolved,
   };
   if (!showsResolved) {
@@ -1422,6 +1448,14 @@ const { nameOf } = useOrgUserNames();
 
 function displayName(email: string): string {
   return email.toLowerCase() === viewerEmail.value ? youLabel.value : nameOf(email);
+}
+
+/// Names can repeat across an org, so the email is always one hover away.
+function personTooltip(email: string): I18nText {
+  const name = nameOf(email);
+  return name === email
+    ? raw(email)
+    : t("oncall.personNameWithEmail", { name: raw(name), email: raw(email) });
 }
 
 /// Is this row somebody else's outage reaching this team's service?
@@ -2018,12 +2052,13 @@ const expandedResponseId = () =>
   rows.value.find((candidate) => candidate.rowKey === expandedIds.value[0])?.latest.id;
 
 async function loadAll(force = false) {
-  await fetchResponses({ force });
+  await Promise.all([fetchResponses({ force }), decideScope(force)]);
   // The probe answered "not here" — every further call would 404/403 the
   // same way, so stop asking.
   if (unavailable.value) return;
   await fetchContext(force);
   await fetchTeamContext(force);
+  decideScopeFromRotations();
   // The server creates the default ladder on first read, so a policy that answers is one that pages.
   setup.value.hasPolicy = Object.keys(policyByTeam.value).length > 0;
   // Set even when a call failed: the screen has to stop waiting either way; `teamsAvailable` says whether to trust it.

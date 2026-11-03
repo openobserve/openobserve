@@ -160,6 +160,19 @@ describe("OnCallMyDeliveries", () => {
     expect(historyRows(wrapper)[1].text()).toContain("×2");
   });
 
+  /// The subject id ends in the firing number, so two firings of one alert are still one row.
+  it("groups an alert's firings into one row", async () => {
+    answer([
+      delivery({ event_id: "ev_1", response_id: "resp_1", subject_id: "al_ckt#1", at: AT }),
+      delivery({ event_id: "ev_2", response_id: "resp_2", subject_id: "al_ckt#2", at: AT + 1 }),
+    ]);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(historyRows(wrapper)).toHaveLength(1);
+    expect(historyRows(wrapper)[0].text()).toContain("×2");
+  });
+
   /// `response_state` is the state now, so a row for something resolved says so.
   it("renders the record's current state, not its state when paged", async () => {
     answer([delivery({ response_state: "resolved" })]);
@@ -421,14 +434,49 @@ describe("OnCallMyDeliveries", () => {
     expect(wrapper.find('[data-test="oncall-my-deliveries-empty"]').exists()).toBe(true);
   });
 
-  it("dates a row with the shared time cell", async () => {
+  /// A history row is placed against a deploy or a shift by its minute, so it shows the clock time.
+  it("dates a row with its clock time, not a bare date", async () => {
     answer([delivery()]);
     const wrapper = render();
     await flushPromises();
 
-    const cell = history(wrapper).findComponent({ name: "OTimeCell" });
-    expect(cell.props("value")).toBe(AT);
-    expect(cell.props("unit")).toBe("us");
+    expect(history(wrapper).text()).toMatch(/\d{4}, \d{2}:\d{2}/);
+  });
+
+  /// Nothing to page through, so no pager under a handful of rows.
+  it("hides the pager while every row fits on one page", async () => {
+    answer([delivery()]);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(history(wrapper).findComponent({ name: "OTable" }).attributes("pagination")).toBe(
+      "none",
+    );
+  });
+
+  /// A column of empty dots says nothing, so the unread column only exists while something is unread.
+  it("leaves out the unread column when nothing is unread", async () => {
+    answer([delivery({ read: true })]);
+    const wrapper = render();
+    await flushPromises();
+
+    const columns = history(wrapper).findComponent({ name: "OTable" }).props("columns") as {
+      id: string;
+    }[];
+    expect(columns.map((c) => c.id)).toEqual([
+      "page",
+      "team",
+      "state",
+      "channels",
+      "at",
+      "actions",
+    ]);
+  });
+
+  it("names the team that the empty history's test page goes to", async () => {
+    const wrapper = render({ canTest: true, testTeamName: "Payments" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="empty-action"]').text()).toBe("Send a test page to Payments");
   });
 
   /// The empty history names the one next step: a test page, when the reader has a team to test.

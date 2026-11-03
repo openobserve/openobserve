@@ -105,9 +105,9 @@ describe("SlackConnectEmpty on Cloud (A1)", () => {
     expect(steps[0]).toContain("Opens Slack in a popup: pick a channel for alerts, then Allow");
     expect(steps[1]).toContain("Link people");
     expect(text).not.toMatch(/Acknowledge|unfurl|Phase/);
-    expect(w.find('[data-test="slack-connect-consent"]').text()).toBe(
-      "Two-way Slack also reads your direct messages with OpenObserve and replies in threads it is part of. It never reads other channel history.",
-    );
+    // A privacy fact rides behind one info icon, not a banner under the steps.
+    expect(w.find('[data-test="slack-connect-consent"]').exists()).toBe(true);
+    expect(text).not.toContain("It never reads other channel history.");
     expect(text).toContain("Needs the Manage Slack permission");
     expect(w.find('[data-test="slack-setup-app"]').exists()).toBe(false);
   });
@@ -283,9 +283,7 @@ describe("SlackConnectEmpty self-hosted (A1)", () => {
   it("explains what Set up Slack app starts, in three steps", () => {
     const w = mountEmpty({ isCloud: false });
     const text = w.text();
-    expect(text).toContain(
-      "OpenObserve creates and installs your own Slack app; nothing is shared with a third party.",
-    );
+    expect(text).not.toContain("nothing is shared with a third party");
     expect(text).toContain("What happens next · about 5 minutes");
     const steps = w.findAll('[data-test="slack-connect-step"]').map((s) => s.text());
     expect(steps).toHaveLength(3);
@@ -300,20 +298,15 @@ describe("SlackConnectEmpty self-hosted (A1)", () => {
     expect(w.find('[data-test="slack-connect-steps"]').attributes("role")).toBe("list");
   });
 
-  it("shortens the step details on a phone", () => {
-    breakpoint.mobile = true;
-    try {
-      const steps = mountEmpty({ isCloud: false })
-        .findAll('[data-test="slack-connect-step"]')
-        .map((s) => s.text());
-      expect(steps[0]).toContain("Encryption key, web URL and AI agent");
-      expect(steps[0]).not.toContain("verified before anything touches Slack");
-      expect(steps[1]).toContain("Paste one configuration token from Slack");
-      expect(steps[1]).not.toContain("builds the app for you");
-      expect(steps[2]).toContain("Allow it in Slack, then link members");
-    } finally {
-      breakpoint.mobile = false;
-    }
+  /// One short line per step at every width: the long details made the empty state a wall of text.
+  it("keeps every step detail to one short line", () => {
+    const steps = mountEmpty({ isCloud: false })
+      .findAll('[data-test="slack-connect-step"]')
+      .map((s) => s.text());
+    expect(steps[0]).toContain("Encryption key, web URL and AI agent");
+    expect(steps[0]).not.toContain("verified before anything touches Slack");
+    expect(steps[1]).not.toContain("builds the app for you");
+    expect(steps[2]).toContain("Allow it in Slack, then link members");
   });
 
   it("offers Connect this org to an existing workspace before the setup wizard", () => {
@@ -426,7 +419,7 @@ describe("SlackConnectEmpty for an org the instance workspace does not serve (M4
     const served = mountEmpty({ isCloud: false });
     await flushPromises();
     expect(served.find('[data-test="slack-not-included"]').exists()).toBe(false);
-    expect(served.text()).toContain("OpenObserve creates and installs your own Slack app");
+    expect(served.find('[data-test="slack-setup-app"]').exists()).toBe(true);
     expect(served.text()).not.toContain("For a different Slack workspace");
   });
 

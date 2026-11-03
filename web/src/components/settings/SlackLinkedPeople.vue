@@ -19,12 +19,12 @@ import { computed, ref } from "vue";
 import { useInfiniteQuery, useMutation } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -134,7 +134,11 @@ const confirmUnlink = (): void => {
           {{ t(`slackApp.people.method.${row.link_method}`) }}
         </template>
         <template #cell-user_email="{ row }">
-          <OUserCell :value="row.user_email" />
+          <OnCallPersonName
+            class="block min-w-0 truncate"
+            :email="row.user_email"
+            :data-test="`slack-people-person-${row.id}`"
+          />
         </template>
         <template #cell-created_at="{ row }">
           <OTimeCell :value="row.created_at" :timezone="timezone" :empty-label="raw('—')" />

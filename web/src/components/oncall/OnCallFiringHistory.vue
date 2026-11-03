@@ -27,8 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCardSection>
 
     <OCardSection role="body" dense>
-      <p class="text-text-secondary mb-3 text-xs">{{ t("oncall.firingHistoryHint") }}</p>
-
       <OTable
         :data="firings"
         :columns="columns"

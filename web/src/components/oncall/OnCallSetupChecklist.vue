@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`oncall-setup-bar-cta-${nextStep.key}`"
           @click="nextStep.act()"
         >
-          {{ nextStep.cta }}
+          <OIcon :name="nextStep.icon" size="sm" />{{ nextStep.cta }}
         </OButton>
         <OButton
           variant="ghost"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <div
     v-else
-    class="mx-auto flex w-full max-w-3xl flex-col gap-4 py-6"
+    class="max-lg:px-page-edge mx-auto flex w-full max-w-3xl flex-col gap-4 py-6"
     data-test="oncall-setup-checklist"
   >
     <div class="flex flex-col gap-1">
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`oncall-setup-cta-${step.key}`"
             @click="step.act()"
           >
-            {{ step.cta }}
+            <OIcon :name="step.icon" size="sm" />{{ step.cta }}
           </OButton>
         </template>
       </div>
@@ -159,6 +159,7 @@ import { useMutation } from "@tanstack/vue-query";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -219,6 +220,8 @@ interface ChecklistStep {
   doneLabel?: I18nText;
   body: I18nText;
   cta: I18nText;
+  /** The step's own verb, so each button reads as the action it takes. */
+  icon: IconName;
   done: boolean;
   state: StepState;
   act: () => void;
@@ -280,6 +283,7 @@ const steps = computed<ChecklistStep[]>(() => {
         : undefined,
       body: t("oncall.setupStep1Body"),
       cta: t("oncall.setupStep1Cta"),
+      icon: "group-add" as IconName,
       done: props.hasTeam,
       act: () => emit("create-team"),
       review: openTeams,
@@ -289,6 +293,7 @@ const steps = computed<ChecklistStep[]>(() => {
       title: t("oncall.setupStep2Title"),
       body: t("oncall.setupStep2Body"),
       cta: t("oncall.setupStep2Cta"),
+      icon: "person-add" as IconName,
       done: props.hasStaffedRotation,
       act: () => openTeamTab("schedule"),
       review: () => openTeamTab("schedule"),
@@ -298,6 +303,7 @@ const steps = computed<ChecklistStep[]>(() => {
       title: t("oncall.setupStep3Title"),
       body: t("oncall.setupStep3Body"),
       cta: t("oncall.setupStep3Cta"),
+      icon: "trending-up" as IconName,
       done: props.hasPolicy,
       act: () => openTeamTab("escalation"),
       review: () => openTeamTab("escalation"),
@@ -307,6 +313,7 @@ const steps = computed<ChecklistStep[]>(() => {
       title: t("oncall.setupStep4Title"),
       body: t("oncall.setupStep4Body"),
       cta: t("oncall.setupStep4Cta"),
+      icon: "alt-route" as IconName,
       done: props.hasRouting,
       act: openRouting,
       review: openRouting,
@@ -316,6 +323,7 @@ const steps = computed<ChecklistStep[]>(() => {
       title: t("oncall.setupStep5Title"),
       body: t("oncall.setupStep5Body"),
       cta: t("oncall.setupStep5Cta"),
+      icon: "campaign" as IconName,
       done: testLanded.value,
       act: askTestPage,
       review: askTestPage,

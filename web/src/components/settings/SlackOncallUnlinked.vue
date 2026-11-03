@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { remindOncallUnlinkedMutation, slackOncallUnlinkedQuery } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -160,7 +160,7 @@ const runRemind = async () => {
     >
       <template #cell-email="{ row }">
         <span :data-test="`slack-oncall-unlinked-person-${row.email}`">
-          <OUserCell :value="row.email" />
+          <OnCallPersonName class="block min-w-0 truncate" :email="row.email" />
         </span>
       </template>
       <template #cell-teams="{ row }">

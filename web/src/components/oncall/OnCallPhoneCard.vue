@@ -15,111 +15,119 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col gap-2 py-1" data-test="oncall-phone-card">
-    <div class="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-2">
-      <OText variant="body" class="w-16 shrink-0">{{ t("oncall.phoneTitle") }}</OText>
-
-      <OText v-if="loadFailed" variant="meta" class="flex-1" data-test="oncall-phone-load-failed">
-        {{ t("oncall.phoneLoadFailed") }}
-      </OText>
-
-      <template v-else-if="contact && state">
+  <div class="flex flex-col gap-2" data-test="oncall-phone-card">
+    <OnCallReachRow :label="t('oncall.phoneTitle')" icon="smartphone">
+      <template #value>
+        <OText v-if="loadFailed" variant="meta" data-test="oncall-phone-load-failed">
+          {{ t("oncall.phoneLoadFailed") }}
+        </OText>
         <!-- No provider is an org fact the reader may not be able to change, so it is said once with who can fix it. -->
-        <span
-          v-if="state === 'noProvider'"
-          class="flex min-w-0 flex-1 items-center gap-1"
+        <OText
+          v-else-if="state === 'noProvider'"
+          variant="meta"
           data-test="oncall-phone-no-provider"
         >
-          <OText variant="meta">{{ t("oncall.phoneNotAvailable") }}</OText>
-          <span v-if="!admin" class="inline-flex" data-test="oncall-phone-ask-admin">
-            <OIcon name="info" size="sm" class="text-text-secondary" />
-            <OTooltip :content="t('oncall.phoneAskAdmin')" />
-          </span>
-        </span>
-
-        <span
-          v-else-if="state === 'verified' || state === 'codeSent' || state === 'changed'"
-          class="flex min-w-0 flex-1 items-center gap-2"
+          {{ t("oncall.phoneNotAvailable") }}
+        </OText>
+        <OText
+          v-else-if="contact?.phone && state !== 'empty'"
+          variant="body-strong"
+          as="span"
+          data-test="oncall-phone-number"
         >
-          <OText variant="body-strong" as="span" data-test="oncall-phone-number">
-            {{ raw(contact.phone) }}
-          </OText>
-          <OTag
-            v-if="state === 'verified'"
-            variant="success-soft"
-            size="sm"
-            data-test="oncall-phone-state"
-          >
-            {{ t("oncall.phoneVerified") }}
-            <OTooltip
-              :content="
-                contact.press4_available
-                  ? t('oncall.phoneVerifiedPress4')
-                  : t('oncall.phoneVerifiedAckLink')
-              "
-            />
-          </OTag>
-          <OTag
-            v-else
-            :variant="state === 'changed' ? 'amber-soft' : 'default-soft'"
-            size="sm"
-            data-test="oncall-phone-state"
-          >
-            {{ t("oncall.phoneNotVerified") }}
-            <OTooltip v-if="state === 'changed'" :content="t('oncall.phoneChangedHint')" />
-          </OTag>
-        </span>
-
-        <span v-else class="min-w-0 flex-1" />
-
-        <span class="flex shrink-0 items-center gap-1">
-          <OButton
-            v-if="state === 'noProvider' && admin"
-            variant="outline"
-            size="xs"
-            data-test="oncall-phone-telephony-link"
-            @click="openTelephony"
-          >
-            <OIcon name="settings" size="sm" />{{ t("oncall.phoneNoProviderLink") }}
-          </OButton>
-          <OButton
-            v-if="state === 'verified' || state === 'codeSent'"
-            variant="outline"
-            size="xs"
-            data-test="oncall-phone-change"
-            @click="startChange"
-          >
-            <OIcon name="edit" size="sm" />{{ t("oncall.phoneChange") }}
-          </OButton>
-          <!-- A saved number can always be taken off, verified or not, provider or not; while editing, Cancel is the way back. -->
-          <ODropdown v-if="contact.phone && !editing" side="bottom" align="end">
-            <template #trigger>
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                icon-left="more-vert"
-                :loading="removing"
-                :aria-label="t('oncall.moreActions')"
-                data-test="oncall-phone-more"
-              />
-            </template>
-            <ODropdownItem
-              icon-left="delete"
-              variant="destructive"
-              data-test="oncall-phone-remove"
-              @select="removeOpen = true"
-            >
-              {{ t("oncall.phoneRemove") }}
-            </ODropdownItem>
-          </ODropdown>
-        </span>
+          {{ raw(contact.phone) }}
+        </OText>
+        <OText v-else-if="state === 'empty'" variant="meta">
+          {{ t("oncall.phoneAddHint") }}
+        </OText>
       </template>
-    </div>
+
+      <template v-if="contact && state && !loadFailed" #status>
+        <OTag
+          v-if="state === 'verified'"
+          variant="success-soft"
+          size="sm"
+          data-test="oncall-phone-state"
+        >
+          {{ t("oncall.phoneVerified") }}
+          <OTooltip
+            :content="
+              contact.press4_available
+                ? t('oncall.phoneVerifiedPress4')
+                : t('oncall.phoneVerifiedAckLink')
+            "
+          />
+        </OTag>
+        <OTag
+          v-else-if="state === 'codeSent' || state === 'changed'"
+          :variant="state === 'changed' ? 'amber-soft' : 'default-soft'"
+          size="sm"
+          data-test="oncall-phone-state"
+        >
+          {{ t("oncall.phoneNotVerified") }}
+          <OTooltip v-if="state === 'changed'" :content="t('oncall.phoneChangedHint')" />
+        </OTag>
+        <OTag v-else variant="default-soft" size="sm" data-test="oncall-phone-state">
+          {{ t("oncall.reachNotSetUp") }}
+        </OTag>
+      </template>
+
+      <template v-if="contact && state && !loadFailed" #action>
+        <OButton
+          v-if="state === 'noProvider' && admin"
+          variant="outline"
+          size="xs"
+          data-test="oncall-phone-telephony-link"
+          @click="openTelephony"
+        >
+          <OIcon name="settings" size="sm" />{{ t("oncall.reachSetUp") }}
+          <OTooltip :content="t('oncall.phoneSetUpHint')" />
+        </OButton>
+        <span
+          v-else-if="state === 'noProvider'"
+          class="inline-flex"
+          data-test="oncall-phone-ask-admin"
+        >
+          <OIcon name="info" size="sm" class="text-text-secondary" />
+          <OTooltip :content="t('oncall.phoneAskAdmin')" />
+        </span>
+        <OButton
+          v-if="state === 'verified' || state === 'codeSent'"
+          variant="outline"
+          size="xs"
+          data-test="oncall-phone-change"
+          @click="startChange"
+        >
+          <OIcon name="edit" size="sm" />{{ t("oncall.phoneChange") }}
+        </OButton>
+        <!-- A saved number can always be taken off, verified or not, provider or not; while editing, Cancel is the way back. -->
+        <ODropdown v-if="contact.phone && !editing" side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              icon-left="more-vert"
+              :loading="removing"
+              :aria-label="t('oncall.moreActions')"
+              data-test="oncall-phone-more"
+            />
+          </template>
+          <ODropdownItem
+            icon-left="delete"
+            variant="destructive"
+            data-test="oncall-phone-remove"
+            @select="removeOpen = true"
+          >
+            {{ t("oncall.phoneRemove") }}
+          </ODropdownItem>
+        </ODropdown>
+      </template>
+    </OnCallReachRow>
 
     <template v-if="contact && state && !loadFailed">
       <span
         v-if="state === 'empty' || state === 'changed'"
-        class="flex flex-wrap items-center gap-2 ps-19"
+        class="flex flex-wrap items-center gap-2 md:ps-31"
       >
         <OInput
           v-model="draftPhone"
@@ -157,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </span>
 
-      <span v-if="state === 'codeSent'" class="flex flex-wrap items-center gap-2 ps-19">
+      <span v-if="state === 'codeSent'" class="flex flex-wrap items-center gap-2 md:ps-31">
         <OInput
           v-model="code"
           width="xs"
@@ -192,14 +200,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <p
         v-if="error"
-        class="text-status-error-text ps-19 text-sm"
+        class="text-status-error-text text-sm md:ps-31"
         role="alert"
         data-test="oncall-phone-error"
       >
         {{ error }}
       </p>
 
-      <OText v-if="state === 'codeSent'" variant="meta" class="ps-19">
+      <OText v-if="state === 'codeSent'" variant="meta" class="md:ps-31">
         {{ t("oncall.phoneCodeSentTo", { phone: raw(contact.phone) }) }}
       </OText>
     </template>
@@ -224,6 +232,7 @@ import { useStore } from "vuex";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OnCallReachRow from "@/components/oncall/OnCallReachRow.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

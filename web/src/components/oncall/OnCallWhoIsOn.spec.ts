@@ -26,7 +26,11 @@ const stubs = {
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
   OTimeCell: { name: "OTimeCell", props: ["value"], template: `<span>{{ value }}</span>` },
-  OUserCell: { name: "OUserCell", props: ["value"], template: `<span>{{ value }}</span>` },
+  OnCallPersonName: {
+    name: "OnCallPersonName",
+    props: ["email"],
+    template: `<span>{{ email }}</span>`,
+  },
   ODescriptionList: { name: "ODescriptionList", template: "<dl><slot /></dl>" },
   ODescriptionItem: {
     name: "ODescriptionItem",

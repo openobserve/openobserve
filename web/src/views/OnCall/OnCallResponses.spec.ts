@@ -47,6 +47,7 @@ vi.mock("@/services/oncall", () => ({
     getSchedule: vi.fn(),
     escalationProgress: vi.fn(),
     getResponse: vi.fn(),
+    myOnCall: vi.fn(),
   },
 }));
 
@@ -242,7 +243,11 @@ const stubs = {
     props: ["preset", "filtered"],
     template: "<div :data-preset='preset' />",
   },
-  OSelect: { name: "OSelect", props: ["options", "disabled", "width"], template: "<select />" },
+  OSelect: {
+    name: "OSelect",
+    props: ["options", "disabled", "width", "modelValue"],
+    template: "<select />",
+  },
   OSearchInput: { name: "OSearchInput", template: "<input />" },
   OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
   // Mirrors the real OButton: `emits` declared (without it the listener also
@@ -269,6 +274,15 @@ beforeEach(() => resetListViewState());
 
 function render() {
   return mountTracked(OnCallResponses, { global: { plugins: [i18n, store], stubs } });
+}
+
+/// The default tab is "open"; the cause filter only exists on a tab that shows resolved pages.
+async function showAllTab(wrapper: any) {
+  wrapper
+    .findAllComponents({ name: "OSelect" })
+    .find((c: any) => c.attributes("data-test") === "oncall-responses-filter-tabs")
+    .vm.$emit("update:modelValue", "all");
+  await flushPromises();
 }
 
 describe("OnCallResponses", () => {
@@ -1223,6 +1237,7 @@ describe("OnCallResponses", () => {
 
   it("names every filter for a screen reader", async () => {
     const wrapper = await withPages([page()]);
+    await showAllTab(wrapper);
 
     for (const control of ["team-filter", "priority-filter", "cause-filter"]) {
       expect(
@@ -1249,7 +1264,7 @@ describe("OnCallResponses", () => {
 
     const tabs = (w: VueWrapper) =>
       w
-        .findAllComponents({ name: "OToggleGroup" })
+        .findAllComponents({ name: "OSelect" })
         .find((c) => c.attributes("data-test") === "oncall-responses-filter-tabs")!;
 
     /// An open-only tab fetches without resolved pages, so an empty answer must not take away the tabs that widen it.
@@ -1380,6 +1395,36 @@ describe("OnCallResponses", () => {
         page({ id: "b", team_id: "team_other" }, "al_pay"),
       ]);
       expect(ids(wrapper)).toEqual(["a", "b"]);
+    });
+
+    /// The default is settled before the toggle is drawn, so it never flips under a reader already looking at it.
+    it("draws the scope toggle only once the reader's own duty has answered", async () => {
+      let answer: (value: unknown) => void = () => {};
+      service.myOnCall.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)) as any);
+      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.listResponses.mockResolvedValue({
+        data: [page({ id: "a" }), page({ id: "b", team_id: "team_other" }, "al_pay")],
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find(scopeToggle).exists()).toBe(false);
+
+      answer({ data: { on_call_now: true, teams: [] } });
+      await flushPromises();
+      expect(
+        wrapper.findComponent('[data-test="oncall-responses-scope"]').props("modelValue"),
+      ).toBe("mine");
+    });
+
+    it("starts on the open pages, not every page ever sent", async () => {
+      const wrapper = await withPages([
+        page({ id: "a" }),
+        page({ id: "r", state: "resolved", closed_at: 1_700_000_100_000_000 }, "al_old"),
+      ]);
+      expect(
+        wrapper.findComponent('[data-test="oncall-responses-filter-tabs"]').props("modelValue"),
+      ).toBe("open");
+      expect(ids(wrapper)).toEqual(["a"]);
     });
 
     it("keeps a choice the reader already made over the on-call default", async () => {
@@ -1843,6 +1888,7 @@ describe("OnCallResponses", () => {
 
     it("moves the team, priority and cause filters behind one button", async () => {
       const wrapper = await withPages([page()]);
+      await showAllTab(wrapper);
 
       expect(wrapper.find('[data-test="oncall-responses-filters-btn"]').exists()).toBe(true);
       const panel = wrapper.find('[data-test="oncall-responses-filters-panel"]');
@@ -1855,6 +1901,7 @@ describe("OnCallResponses", () => {
 
     it("names the folded filters for a screen reader", async () => {
       const wrapper = await withPages([page()]);
+      await showAllTab(wrapper);
 
       for (const control of ["team-filter", "priority-filter", "cause-filter"]) {
         expect(
@@ -2114,8 +2161,7 @@ describe("OnCallResponses — filtering by cause", () => {
     wrapper.findAllComponents({ name }).find((c: any) => c.attributes("data-test") === test);
 
   const cause = (wrapper: any) => byTest(wrapper, "OSelect", "oncall-responses-cause-filter");
-  const filterTabs = (wrapper: any) =>
-    byTest(wrapper, "OToggleGroup", "oncall-responses-filter-tabs");
+  const filterTabs = (wrapper: any) => byTest(wrapper, "OSelect", "oncall-responses-filter-tabs");
 
   /// With no pages the setup checklist owns the screen and the toolbar is not
   /// rendered at all, so these tests need something in the list before there
@@ -2143,20 +2189,20 @@ describe("OnCallResponses — filtering by cause", () => {
     return wrapper;
   }
 
-  /// `"all"` (the default tab) includes resolved pages; every other tab but
-  /// `"resolved"` itself excludes them.
+  /// `"all"` includes resolved pages; every other tab but `"resolved"` itself excludes them.
   async function showResolved(wrapper: any, on = true) {
     filterTabs(wrapper)!.vm.$emit("update:modelValue", on ? "all" : "ringing");
     await flushPromises();
   }
 
   /// A cause is written at resolve, so filtering an OPEN list by one can only
-  /// ever empty it — the control would read as "there is nothing here" rather
-  /// than "this filter cannot apply". `"all"` is the default tab and already
-  /// includes resolved pages, so the filter starts out offered and disappears
-  /// only once a tab that excludes them is picked.
+  /// ever empty it. The default "open" tab hides resolved pages, so the filter
+  /// appears only once a tab that shows them is picked.
   it("is offered only while the tab includes resolved pages", async () => {
     const wrapper = await open();
+    expect(cause(wrapper)).toBeUndefined();
+
+    await showResolved(wrapper, true);
     expect(cause(wrapper)).toBeDefined();
 
     await showResolved(wrapper, false);
@@ -2196,7 +2242,7 @@ describe("OnCallResponses — filtering by cause", () => {
     await flushPromises();
 
     expect(service.listResponses).not.toHaveBeenCalled();
-    expect(cause(wrapper)!.attributes("model-value")).toBe("");
+    expect(cause(wrapper)!.props("modelValue")).toBe("");
   });
 
   /// Left behind when resolved pages go, it would narrow an open list to
@@ -2219,8 +2265,6 @@ describe("OnCallResponses — filtering by cause", () => {
     expect(cause(wrapper)).toBeUndefined();
 
     await showResolved(wrapper, true);
-    // `model-value` is not a declared prop on the OSelect stub, so it lands
-    // as a plain attribute rather than something `.props()` can see.
-    expect(cause(wrapper)!.attributes("model-value")).toBe("");
+    expect(cause(wrapper)!.props("modelValue")).toBe("");
   });
 });

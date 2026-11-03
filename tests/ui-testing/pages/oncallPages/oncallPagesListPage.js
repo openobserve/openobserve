@@ -60,6 +60,8 @@ export class OnCallPagesListPage {
       causeFilter: '[data-test="oncall-responses-cause-filter"]',
       search: '[data-test="oncall-responses-search"]',
       groupToggle: '[data-test="oncall-responses-group-toggle"]',
+      filtersBtn: '[data-test="oncall-responses-filters-btn"]',
+      filtersPanel: '[data-test="oncall-responses-filters-panel"]',
       refresh: '[data-test="oncall-responses-refresh"]',
       scopeToggle: '[data-test="oncall-responses-scope"]',
       scopeMine: '[data-test="oncall-responses-scope-mine"]',
@@ -109,7 +111,6 @@ export class OnCallPagesListPage {
   }
 
   // Built rather than stored — these carry a section key, a rowKey or an index.
-  filterTab(key) { return `[data-test="oncall-responses-tab-${key}"]`; }
   sectionHeader(key) { return `[data-test="oncall-section-header-${key}"]`; }
   sectionCount(key) { return `[data-test="oncall-section-count-${key}"]`; }
 
@@ -204,17 +205,21 @@ export class OnCallPagesListPage {
   /**
    * Narrow to one state.
    *
-   * The tabs are an OToggleGroup, not a select: there is no popover, and each
-   * item reports `data-state`, so the click is verifiable rather than assumed.
+   * The state is an OSelect ("Status: Open"), so this picks its option by the
+   * raw value on `data-test-value`, never the translated label.
    *
-   * @param {'all'|'ringing'|'handled'|'resolved'|'snoozed'} key
+   * @param {'open'|'all'|'ringing'|'handled'|'resolved'|'snoozed'} key
    */
   async selectFilterTab(key) {
-    const tab = this.page.locator(this.filterTab(key));
-    await tab.waitFor({ state: 'visible', timeout: 20000 });
-    await tab.click();
-    await expect(tab).toHaveAttribute('data-state', 'on', { timeout: 15000 });
-    await this._settleList();
+    await this._selectFilter(this.locators.filterTabs, key);
+  }
+
+  /** Cause and group-by sit behind the one Filters button; open it before reaching for either. */
+  async openFilters() {
+    const panel = this.page.locator(this.locators.filtersPanel).first();
+    if (await panel.isVisible().catch(() => false)) return;
+    await this.page.locator(this.locators.filtersBtn).first().click();
+    await panel.waitFor({ state: 'visible', timeout: 20000 });
   }
 
   /**
@@ -267,6 +272,7 @@ export class OnCallPagesListPage {
    * control is not there to click.
    */
   async filterByCause(cause) {
+    await this.openFilters();
     await this._selectFilter(this.locators.causeFilter, cause);
   }
 
@@ -290,6 +296,7 @@ export class OnCallPagesListPage {
   }
 
   async isGrouped() {
+    await this.openFilters();
     const control = this.getGroupToggleControl();
     await control.waitFor({ state: 'visible', timeout: 20000 });
     return (await control.getAttribute('data-state')) === 'checked';
@@ -694,6 +701,7 @@ export class OnCallPagesListPage {
 
   /** The cause filter exists on the list, not only on the record — §TS-15.06. */
   async expectCauseFilterVisible() {
+    await this.openFilters();
     await expect(this.page.locator(this.locators.causeFilter)).toBeVisible({ timeout: 30000 });
   }
 
