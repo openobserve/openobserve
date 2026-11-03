@@ -1267,6 +1267,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::keys::delete_bulk,
     openobserve_api_management::request::license::get_license_info,
     openobserve_api_management::request::license::refresh_license_limits,
+    openobserve_api_management::request::license::rotate_license_key,
     openobserve_api_management::request::license::store_license,
     openobserve_api_management::request::oncall::acknowledge_response,
     openobserve_api_management::request::oncall::add_member,

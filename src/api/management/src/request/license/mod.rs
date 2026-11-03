@@ -636,9 +636,13 @@ pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     operation_id = "SaveLicense",
     summary = "Store a license key",
     security(("Authorization" = [])),
+    params(
+        ("dry_run" = Option<bool>, Query, description = "Check the key and answer 200 with a preview instead of storing it (default false)"),
+    ),
     request_body(content = inline(SaveLicenseRequest), content_type = "application/json"),
     responses(
         (status = 201, description = "Stored; the body is an empty JSON string", content_type = "application/json", body = String),
+        (status = 409, description = "A newer or conflicting key is already applied", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "License", "operation": "create"})),
@@ -716,7 +720,8 @@ pub async fn store_license(
     summary = "Refresh license limits",
     security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Refreshed; the body is an empty JSON string", content_type = "application/json", body = String),
+        (status = 200, description = "Refreshed; the body reports the outcome", content_type = "application/json", body = Object),
+        (status = 409, description = "A license refresh is already running", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "License", "operation": "update"})),
@@ -736,6 +741,23 @@ pub async fn refresh_license_limits(Headers(user_email): Headers<UserEmail>) -> 
     )
 }
 
+#[utoipa::path(
+    post,
+    path = "/license/rotate_key",
+    context_path = "/api",
+    tag = "License",
+    operation_id = "RotateLicenseKey",
+    summary = "Rotate the instance key and refresh the license",
+    security(("Authorization" = [])),
+    responses(
+        (status = 200, description = "Rotated; the body reports the outcome", content_type = "application/json", body = Object),
+        (status = 409, description = "A license refresh is already running", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "License", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn rotate_license_key(Headers(user_email): Headers<UserEmail>) -> Response {
     let email = user_email.user_id;
     if check_license_permission(&email, "PUT").await.is_err() {

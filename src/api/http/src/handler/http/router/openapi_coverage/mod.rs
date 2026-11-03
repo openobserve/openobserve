@@ -99,7 +99,7 @@ const SUCCESS_CONTRACTS: &[ContractRow] = &[
         "application/x-protobuf",
         "none",
     ),
-    ("ent", "POST", "/api/license/refresh", "200", JSON, "string"),
+    ("ent", "POST", "/api/license/refresh", "200", JSON, "object"),
     (
         "all",
         "GET",
