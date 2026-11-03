@@ -25,7 +25,7 @@ import store from "@/test/unit/helpers/store";
 import type { MyDelivery } from "@/ts/interfaces/oncall";
 
 vi.mock("@/services/oncall", () => ({
-  default: { myDeliveries: vi.fn(), markDeliveriesRead: vi.fn() },
+  default: { myDeliveries: vi.fn(), markDeliveriesRead: vi.fn(), acknowledgeResponse: vi.fn() },
 }));
 
 const push = vi.fn();
@@ -46,9 +46,12 @@ const stubs = {
   },
   OEmptyState: {
     name: "OEmptyState",
-    props: ["description"],
-    template: "<div>{{ description }}</div>",
+    props: ["title", "description", "actionLabel"],
+    emits: ["action"],
+    template:
+      "<div>{{ title }} {{ description }}<button v-if='actionLabel' data-test='empty-action' @click=\"$emit('action')\">{{ actionLabel }}</button></div>",
   },
+  OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
   // `type` and `value` are declared so the state chip can be asserted on: an
   // undeclared prop lands in attrs and `props("value")` reads undefined.
   OTag: { name: "OTag", props: ["variant", "type", "value"], template: "<span><slot /></span>" },
@@ -56,8 +59,16 @@ const stubs = {
   OTimeCell: { name: "OTimeCell", props: ["value", "unit"], template: "<span />" },
   OButton: {
     name: "OButton",
+    props: ["iconLeft", "loading"],
     emits: ["click"],
     template: `<button @click="$emit('click', $event)"><slot /></button>`,
+  },
+  ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+  ODropdownItem: {
+    name: "ODropdownItem",
+    props: ["iconLeft"],
+    emits: ["select"],
+    template: `<button @click="$emit('select')"><slot /></button>`,
   },
   OCheckbox: {
     name: "OCheckbox",
@@ -99,100 +110,150 @@ function render(props: Record<string, unknown> = {}) {
   });
 }
 
-/// The delivery ledger answers "did it reach them" per RECORD. Nobody paged at
-/// 3am opens twenty records to find out whether their own phone was one of
-/// them, and until this screen that was the only way — the endpoint returned
-/// `total: 19, unread: 19` and its name appeared nowhere in `web/`.
+const history = (wrapper: ReturnType<typeof render>) =>
+  wrapper.findComponent('[data-test="oncall-my-deliveries-table"]');
+const historyRows = (wrapper: ReturnType<typeof render>) =>
+  history(wrapper).findAll('[data-test="row"]');
+const answer = (deliveries: MyDelivery[]) =>
+  service.myDeliveries.mockResolvedValue({
+    data: { total: deliveries.length, unread: 99, deliveries },
+  } as any);
+
 describe("OnCallMyDeliveries", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient.clear();
     resetListViewState();
-    service.myDeliveries.mockResolvedValue({
-      data: { total: 0, unread: 0, deliveries: [] },
-    } as any);
+    answer([]);
     service.markDeliveriesRead.mockResolvedValue({ data: { updated: 1, unread: 0 } } as any);
+    service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
   });
 
-  it("says whether a page reached the reader, per row", async () => {
-    service.myDeliveries.mockResolvedValue({
-      data: {
-        total: 2,
-        unread: 0,
-        deliveries: [
-          delivery({ event_id: "ev_ok", delivered: true }),
-          delivery({ event_id: "ev_bad", delivered: false }),
-        ],
-      },
-    } as any);
-
+  /// Only channels that were tried are drawn, each saying whether it landed.
+  it("says per channel whether the latest page reached the reader", async () => {
+    answer([
+      delivery({ event_id: "ev_ok", channel: "email", delivered: true }),
+      delivery({ event_id: "ev_bad", channel: "sms", delivered: false }),
+    ]);
     const wrapper = render();
     await flushPromises();
 
-    expect(wrapper.find('[data-test="oncall-my-delivery-landed-ev_ok"]').text()).toContain(
-      "Sent to you",
-    );
-    expect(wrapper.find('[data-test="oncall-my-delivery-landed-ev_bad"]').text()).toContain(
-      "did not reach you",
-    );
+    const row = historyRows(wrapper)[0];
+    const email = row.find('[data-test$="-email"]');
+    const sms = row.find('[data-test$="-sms"]');
+    expect(email.findComponent({ name: "OTooltip" }).props("content")).toContain("Sent to you");
+    expect(sms.findComponent({ name: "OTooltip" }).props("content")).toContain("did not reach you");
+    expect(row.find('[data-test$="-voice"]').exists()).toBe(false);
   });
 
-  /// `response_state` is the state NOW, not when the page went out. A row for
-  /// something already resolved has to say so, or somebody chases a fire that
-  /// is already out.
+  /// One alert that paged ten times is one row with a count, not ten identical rows.
+  it("groups the history by alert", async () => {
+    answer([
+      delivery({ event_id: "ev_1", response_id: "resp_1", at: AT }),
+      delivery({ event_id: "ev_2", response_id: "resp_2", at: AT + 1 }),
+      delivery({ event_id: "ev_3", response_id: "resp_3", subject_id: "al_other", at: AT + 2 }),
+    ]);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(historyRows(wrapper)).toHaveLength(2);
+    expect(historyRows(wrapper)[1].text()).toContain("×2");
+  });
+
+  /// `response_state` is the state now, so a row for something resolved says so.
   it("renders the record's current state, not its state when paged", async () => {
-    service.myDeliveries.mockResolvedValue({
-      data: {
-        total: 1,
-        unread: 0,
-        deliveries: [delivery({ response_state: "resolved" })],
-      },
-    } as any);
-
+    answer([delivery({ response_state: "resolved" })]);
     const wrapper = render();
     await flushPromises();
 
-    const tags = wrapper.findAllComponents({ name: "OTag" });
+    const tags = history(wrapper).findAllComponents({ name: "OTag" });
     expect(tags.some((tag) => tag.props("value") === "resolved")).toBe(true);
   });
 
   it("names the team rather than its id when it can", async () => {
-    service.myDeliveries.mockResolvedValue({
-      data: { total: 1, unread: 0, deliveries: [delivery()] },
-    } as any);
-
+    answer([delivery()]);
     const wrapper = render({ teamNames: { team_platform: "Platform" } });
     await flushPromises();
 
     expect(wrapper.text()).toContain("Platform");
+    expect(wrapper.text()).not.toContain("team_platform");
+  });
+
+  describe("needs you now", () => {
+    it("lists each open page once, with Acknowledge while it is still paging", async () => {
+      answer([
+        delivery({ event_id: "ev_1", response_id: "resp_1", response_state: "triggered" }),
+        delivery({
+          event_id: "ev_2",
+          response_id: "resp_1",
+          response_state: "triggered",
+          channel: "sms",
+        }),
+        delivery({ event_id: "ev_3", response_id: "resp_2", subject_id: "al_b" }),
+        delivery({ event_id: "ev_4", response_id: "resp_3", response_state: "resolved" }),
+      ]);
+      const wrapper = render();
+      await flushPromises();
+
+      const open = wrapper.findComponent('[data-test="oncall-my-needs-you-table"]');
+      expect(open.findAll('[data-test="row"]')).toHaveLength(2);
+      expect(wrapper.find('[data-test="oncall-my-needs-you-ack-resp_1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-my-needs-you-ack-resp_2"]').exists()).toBe(false);
+    });
+
+    it("acknowledges from the row and reads the inbox again", async () => {
+      answer([delivery({ response_state: "triggered" })]);
+      const wrapper = render();
+      await flushPromises();
+      const reads = service.myDeliveries.mock.calls.length;
+
+      await wrapper.find('[data-test="oncall-my-needs-you-ack-resp_1"]').trigger("click");
+      await flushPromises();
+
+      expect(service.acknowledgeResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ response_id: "resp_1" }),
+      );
+      expect(service.myDeliveries.mock.calls.length).toBe(reads + 1);
+    });
+
+    it("is absent when nothing is open", async () => {
+      answer([delivery({ response_state: "resolved" })]);
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-my-needs-you"]').exists()).toBe(false);
+    });
   });
 
   describe("the unread badge", () => {
-    it("reports the count outward, so a caller can badge it", async () => {
-      service.myDeliveries.mockResolvedValue({
-        data: { total: 9, unread: 3, deliveries: [delivery({ read: false })] },
-      } as any);
-
+    /// A resolved page has nothing left to read, so it never counts.
+    it("counts unread open pages only, and reports the count outward", async () => {
+      answer([
+        delivery({ event_id: "ev_1", response_id: "resp_1", read: false }),
+        delivery({ event_id: "ev_2", response_id: "resp_1", read: false, channel: "sms" }),
+        delivery({
+          event_id: "ev_3",
+          response_id: "resp_2",
+          read: false,
+          response_state: "resolved",
+        }),
+      ]);
       const wrapper = render();
       await flushPromises();
 
-      expect(wrapper.emitted("unread")?.at(-1)).toEqual([3]);
+      expect(wrapper.emitted("unread")?.at(-1)).toEqual([1]);
+      expect(wrapper.find('[data-test="oncall-my-deliveries-unread"]').text()).toContain("1");
     });
 
-    /// `unread` deliberately ignores the filter — it is the badge, and "3
-    /// unread" must not change because somebody ticked "unread only".
-    it("keeps the count from the response rather than counting the rows", async () => {
-      service.myDeliveries.mockResolvedValue({
-        data: { total: 1, unread: 7, deliveries: [delivery({ read: false })] },
-      } as any);
-
+    it("shows no unread dot on a resolved alert", async () => {
+      answer([delivery({ read: false, response_state: "resolved" })]);
       const wrapper = render();
       await flushPromises();
-
-      expect(wrapper.find('[data-test="oncall-my-deliveries-unread"]').text()).toContain("7");
+      expect(wrapper.find('[data-test="oncall-my-delivery-unread-ev_88"]').exists()).toBe(false);
     });
   });
 
   it("asks for unread only when the filter is on", async () => {
+    answer([delivery({ read: false })]);
     const wrapper = render();
     await flushPromises();
 
@@ -202,9 +263,25 @@ describe("OnCallMyDeliveries", () => {
     expect(service.myDeliveries.mock.calls.at(-1)![0]).toMatchObject({ unread_only: true });
   });
 
-  /// Unticking answers from the cache at once, so the slower "unread only"
-  /// answer lands last and must not narrow an inbox the reader just widened.
+  /// Resolved pages are never unread, so an all-resolved inbox has nothing to filter or mark.
+  it("offers no unread filter and no row menu when every page is resolved", async () => {
+    answer([delivery({ read: true, response_state: "resolved" })]);
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-my-deliveries-unread-toggle"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-my-delivery-more-ev_88"]').exists()).toBe(false);
+  });
+
+  /// An empty list has nothing to narrow, so it offers no filter.
+  it("offers no unread filter on an empty list", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-my-deliveries-unread-toggle"]').exists()).toBe(false);
+  });
+
+  /// Unticking answers from the cache at once, so the slower "unread only" answer must not narrow a widened inbox.
   it("ignores a slower answer for a filter the reader has already left", async () => {
+    answer([delivery({ read: false })]);
     const wrapper = render();
     await flushPromises();
     let answerUnread: (value: unknown) => void = () => {};
@@ -221,19 +298,20 @@ describe("OnCallMyDeliveries", () => {
       data: {
         total: 2,
         unread: 2,
-        deliveries: [delivery({ read: false }), delivery({ read: false })],
+        deliveries: [
+          delivery({ read: false, subject_id: "al_x" }),
+          delivery({ read: false, subject_id: "al_y" }),
+        ],
       },
     });
     await flushPromises();
 
-    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(0);
+    expect(historyRows(wrapper)).toHaveLength(1);
   });
 
   /// A refresh that fails must not empty the inbox and zero the badge.
   it("keeps the inbox on screen when a refresh fails", async () => {
-    service.myDeliveries.mockResolvedValue({
-      data: { total: 1, unread: 1, deliveries: [delivery({ read: false })] },
-    } as any);
+    answer([delivery({ read: false })]);
     const wrapper = render();
     await flushPromises();
     service.myDeliveries.mockRejectedValueOnce(new Error("boom"));
@@ -241,16 +319,13 @@ describe("OnCallMyDeliveries", () => {
     await (wrapper.vm as any).refresh();
     await flushPromises();
 
-    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
+    expect(historyRows(wrapper)).toHaveLength(1);
     expect(wrapper.emitted("unread")?.at(-1)).toEqual([1]);
   });
 
   describe("marking read", () => {
     it("clears the whole inbox in one call", async () => {
-      service.myDeliveries.mockResolvedValue({
-        data: { total: 1, unread: 1, deliveries: [delivery({ read: false })] },
-      } as any);
-
+      answer([delivery({ read: false })]);
       const wrapper = render();
       await flushPromises();
 
@@ -262,13 +337,27 @@ describe("OnCallMyDeliveries", () => {
       );
     });
 
-    /// Somebody who dismissed a page by accident at 3am has to be able to put
-    /// it back, and the server takes `read: false` for exactly that.
-    it("puts a row back to unread", async () => {
-      service.myDeliveries.mockResolvedValue({
-        data: { total: 1, unread: 0, deliveries: [delivery({ read: true })] },
-      } as any);
+    it("reads every send of an unread alert from its row menu", async () => {
+      answer([
+        delivery({ event_id: "ev_1", read: false, at: AT + 1 }),
+        delivery({ event_id: "ev_2", read: false, channel: "sms" }),
+      ]);
+      const wrapper = render();
+      await flushPromises();
 
+      const toggle = wrapper.findComponent('[data-test="oncall-my-delivery-toggle-ev_1"]');
+      expect(toggle.props("iconLeft")).toBe("check-circle");
+      await toggle.trigger("click");
+      await flushPromises();
+
+      expect(service.markDeliveriesRead).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { event_ids: ["ev_1", "ev_2"], read: true } }),
+      );
+    });
+
+    /// Somebody who dismissed a page by accident at 3am has to be able to put it back.
+    it("puts a read alert back to unread", async () => {
+      answer([delivery({ read: true })]);
       const wrapper = render();
       await flushPromises();
 
@@ -279,35 +368,11 @@ describe("OnCallMyDeliveries", () => {
         expect.objectContaining({ data: { event_ids: ["ev_88"], read: false } }),
       );
     });
-
-    /// The count travels back on the write, so the badge is right without a
-    /// second request — and right even when some ids were already read.
-    it("takes the new count from the write's own response", async () => {
-      service.myDeliveries.mockResolvedValue({
-        data: { total: 1, unread: 4, deliveries: [delivery({ read: false })] },
-      } as any);
-      service.markDeliveriesRead.mockResolvedValue({
-        data: { updated: 1, unread: 2 },
-      } as any);
-
-      const wrapper = render();
-      await flushPromises();
-      await wrapper.find('[data-test="oncall-my-delivery-toggle-ev_88"]').trigger("click");
-      await flushPromises();
-
-      expect(wrapper.emitted("unread")?.some((e) => e[0] === 2)).toBe(true);
-    });
   });
 
-  /// Both halves belong to one flow, because the second only means anything
-  /// given the first: once a revisit is served from cache, the re-read after a
-  /// write is the one that can silently be served from it too, leaving the rows
-  /// showing the state they had before the mark.
+  /// A revisit is served from cache, and the re-read after a write still reaches the server.
   it("serves a revisit from cache, and still re-reads after a write", async () => {
-    service.myDeliveries.mockResolvedValue({
-      data: { total: 1, unread: 4, deliveries: [delivery({ read: false })] },
-    } as any);
-    service.markDeliveriesRead.mockResolvedValue({ data: { updated: 1, unread: 2 } } as any);
+    answer([delivery({ read: false })]);
 
     const first = render();
     await flushPromises();
@@ -317,26 +382,19 @@ describe("OnCallMyDeliveries", () => {
     const wrapper = render();
     await flushPromises();
     expect(service.myDeliveries).toHaveBeenCalledTimes(1);
-    expect(wrapper.find('[data-test="oncall-my-deliveries-unread"]').text()).toContain("4");
 
     await wrapper.find('[data-test="oncall-my-delivery-toggle-ev_88"]').trigger("click");
     await flushPromises();
 
     expect(service.markDeliveriesRead).toHaveBeenCalledTimes(1);
-    // The write expired this scope, so the re-read reaches the server.
     expect(service.myDeliveries).toHaveBeenCalledTimes(2);
-    // 2 is only on the write's own response — the re-read still answers 4.
-    expect(wrapper.emitted("unread")?.some((e) => e[0] === 2)).toBe(true);
   });
 
   it("opens the page a row was sent for", async () => {
-    service.myDeliveries.mockResolvedValue({
-      data: { total: 1, unread: 0, deliveries: [delivery()] },
-    } as any);
-
+    answer([delivery()]);
     const wrapper = render();
     await flushPromises();
-    await wrapper.find('[data-test="row"]').trigger("click");
+    await historyRows(wrapper)[0].trigger("click");
 
     expect(push).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -348,7 +406,6 @@ describe("OnCallMyDeliveries", () => {
 
   /// A failed first load is not "nothing was sent".
   it("shows the error with a retry when the first load fails", async () => {
-    queryClient.clear();
     service.myDeliveries.mockRejectedValueOnce({ response: { status: 500, data: {} } });
     const wrapper = render();
     await flushPromises();
@@ -364,47 +421,34 @@ describe("OnCallMyDeliveries", () => {
     expect(wrapper.find('[data-test="oncall-my-deliveries-empty"]').exists()).toBe(true);
   });
 
-  /// One date format across on-call: the one every other on-call list uses.
   it("dates a row with the shared time cell", async () => {
-    queryClient.clear();
-    service.myDeliveries.mockResolvedValue({
-      data: { total: 1, unread: 0, deliveries: [delivery()] },
-    } as any);
+    answer([delivery()]);
     const wrapper = render();
     await flushPromises();
 
-    const cell = wrapper.findComponent({ name: "OTimeCell" });
+    const cell = history(wrapper).findComponent({ name: "OTimeCell" });
     expect(cell.props("value")).toBe(AT);
     expect(cell.props("unit")).toBe("us");
   });
 
-  it("says which kind of empty it is", async () => {
-    const wrapper = render();
+  /// The empty history names the one next step: a test page, when the reader has a team to test.
+  it("offers the team test page as the next step on an empty history", async () => {
+    const wrapper = render({ canTest: true });
     await flushPromises();
-    expect(wrapper.text()).toContain("Nothing has been sent to you yet");
+    expect(wrapper.text()).toContain("Nothing has paged you yet");
 
-    await wrapper.find('[data-test="oncall-my-deliveries-unread-toggle"]').trigger("click");
-    await flushPromises();
-    expect(wrapper.text()).toContain("Nothing unread");
+    await wrapper.find('[data-test="empty-action"]').trigger("click");
+    expect(wrapper.emitted("test-page")).toHaveLength(1);
   });
 
-  /// A phone's action column is one icon wide, so the label goes screen-reader-only there rather than being clipped.
-  it("keeps the row action named when a phone shows only its icon", async () => {
-    service.myDeliveries.mockResolvedValue({
-      data: { total: 1, unread: 1, deliveries: [delivery({ read: false })] },
-    } as any);
+  it("offers no next step without a team to test", async () => {
     const wrapper = render();
     await flushPromises();
-
-    const button = wrapper.find('[data-test="oncall-my-delivery-toggle-ev_88"]');
-    expect(button.find(".max-md\\:sr-only").text()).toBe("Mark read");
+    expect(wrapper.find('[data-test="empty-action"]').exists()).toBe(false);
   });
 
   describe("list view state", () => {
     const defaults = { unreadOnly: false, currentPage: 1, pageSize: 20 };
-    const rows = {
-      data: { total: 1, unread: 1, deliveries: [delivery({ event_id: "ev_1" })] },
-    } as any;
 
     it("restores page, page size and the unread-only read", async () => {
       Object.assign(useListViewState("oncall-my-deliveries", defaults), {
@@ -412,23 +456,22 @@ describe("OnCallMyDeliveries", () => {
         currentPage: 2,
         pageSize: 50,
       });
-      service.myDeliveries.mockResolvedValue(rows);
+      answer([delivery({ event_id: "ev_1" })]);
       const wrapper = render();
       await flushPromises();
 
       expect(service.myDeliveries).toHaveBeenCalledWith(
         expect.objectContaining({ unread_only: true }),
       );
-      const table = wrapper.findComponent({ name: "OTable" });
-      expect(table.props("currentPage")).toBe(2);
-      expect(table.props("pageSize")).toBe(50);
+      expect(history(wrapper).props("currentPage")).toBe(2);
+      expect(history(wrapper).props("pageSize")).toBe(50);
     });
 
     it("saves page changes", async () => {
-      service.myDeliveries.mockResolvedValue(rows);
+      answer([delivery({ event_id: "ev_1" })]);
       const wrapper = render();
       await flushPromises();
-      wrapper.findComponent({ name: "OTable" }).vm.$emit("update:currentPage", 3);
+      history(wrapper).vm.$emit("update:currentPage", 3);
       await flushPromises();
 
       const saved = useListViewState("oncall-my-deliveries", defaults) as Record<string, unknown>;

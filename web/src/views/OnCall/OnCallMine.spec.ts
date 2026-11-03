@@ -22,10 +22,21 @@ import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import OnCallMine from "@/views/OnCall/OnCallMine.vue";
 
-vi.mock("@/services/oncall", () => ({ default: { myOnCall: vi.fn() } }));
+vi.mock("@/services/oncall", () => ({
+  default: {
+    myOnCall: vi.fn(),
+    listTeams: vi.fn(),
+    whoIsOnCall: vi.fn(),
+    resolvedSchedule: vi.fn(),
+    createUnavailability: vi.fn(),
+    testPage: vi.fn(),
+  },
+}));
+vi.mock("@/services/users", () => ({
+  default: { orgUsers: vi.fn().mockResolvedValue({ data: { data: [] } }) },
+}));
 
-const back = vi.fn();
-vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn(), back }) }));
+vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 const service = vi.mocked(oncallService);
 
@@ -42,12 +53,44 @@ const stubs = {
   OContent: { name: "OContent", template: "<div><slot /></div>" },
   OEmptyState: { name: "OEmptyState", template: "<div />" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
-  OButton: { name: "OButton", template: "<button><slot /></button>" },
+  OButton: {
+    name: "OButton",
+    props: ["disabled", "loading"],
+    emits: ["click"],
+    template: "<button :disabled='disabled' @click=\"$emit('click', $event)\"><slot /></button>",
+  },
+  OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
+  ODialog: {
+    name: "ODialog",
+    props: ["open"],
+    template: "<div v-if='open'><slot /><slot name='footer' /></div>",
+  },
+  ODate: {
+    name: "ODate",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template:
+      "<input :value='modelValue' @input=\"$emit('update:modelValue', $event.target.value)\" />",
+  },
+  OTime: {
+    name: "OTime",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template:
+      "<input :value='modelValue' @input=\"$emit('update:modelValue', $event.target.value)\" />",
+  },
+  ConfirmDialog: {
+    name: "ConfirmDialog",
+    props: ["modelValue", "message"],
+    emits: ["update:ok", "update:cancel"],
+    template: "<div v-if='modelValue' data-test='confirm'>{{ message }}</div>",
+  },
   OText: { name: "OText", template: "<span><slot /></span>" },
   // Stubbed out: it reads its own endpoint, which this spec's service mock does
   // not carry, and its fetch would throw into its own catch for the wrong reason.
   OnCallMyDeliveries: {
     name: "OnCallMyDeliveries",
+    props: ["teamNames", "canTest"],
     template: "<div />",
     methods: { refresh: deliveriesRefresh },
   },
@@ -74,7 +117,11 @@ const render = () => mount(OnCallMine, { global: { plugins: [i18n, store], stubs
 describe("OnCallMine", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient.clear();
     service.myOnCall.mockResolvedValue({ data: MINE } as any);
+    service.listTeams.mockResolvedValue({ data: [] } as any);
+    service.whoIsOnCall.mockRejectedValue({ response: { status: 403 } });
+    service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
   });
 
   it("serves a revisit from cache", async () => {
@@ -90,16 +137,101 @@ describe("OnCallMine", () => {
     expect(wrapper.find('[data-test="oncall-mine-team-team_1"]').text()).toContain("Payments");
   });
 
-  /// Without a verified phone nothing below can reach the reader, so the phone leads.
-  it("shows the phone before the teams", async () => {
+  /// "Am I on call, and until when" is the question the page opens on, so the shift leads.
+  it("shows the shift before how pages reach you", async () => {
     const wrapper = render();
     await flushPromises();
 
     const html = wrapper.html();
-    expect(html.indexOf('data-test="oncall-phone-card"')).toBeGreaterThan(-1);
-    expect(html.indexOf('data-test="oncall-phone-card"')).toBeLessThan(
-      html.indexOf('data-test="oncall-mine-teams"'),
+    expect(html.indexOf('data-test="oncall-mine-teams"')).toBeGreaterThan(-1);
+    expect(html.indexOf('data-test="oncall-mine-teams"')).toBeLessThan(
+      html.indexOf('data-test="oncall-phone-card"'),
     );
+  });
+
+  it("names the seat, when the shift ends and who is next", async () => {
+    const me = store.state.userInfo.email;
+    const now = Date.now() * 1000;
+    service.whoIsOnCall.mockResolvedValue({
+      data: [{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: me }],
+    } as any);
+    service.resolvedSchedule.mockResolvedValue({
+      data: [
+        { rotation_id: "r1", from: now - 1_000_000, to: now + 3_600_000_000, user_email: me },
+        {
+          rotation_id: "r1",
+          from: now + 3_600_000_000,
+          to: now + 7_200_000_000,
+          user_email: "raj@o2.ai",
+        },
+      ],
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-mine-duty-team_1"]').text()).toBe("Primary");
+    const line = wrapper.find('[data-test="oncall-mine-shift-team_1"]').text();
+    expect(line).toContain("until");
+    expect(line).toContain("then raj@o2.ai");
+  });
+
+  /// A role that may not read the schedule sees the duty tag alone, never a wrong shift end.
+  it("hides the shift end when the schedule cannot be read", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-mine-duty-team_1"]').text()).toBe("On call");
+    expect(wrapper.find('[data-test="oncall-mine-shift-team_1"]').exists()).toBe(false);
+  });
+
+  /// Names a team the reader is not on, from the org team list, instead of its id.
+  it("hands the deliveries every team's name", async () => {
+    service.listTeams.mockResolvedValue({ data: [{ id: "team_9", name: "Search" }] } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "OnCallMyDeliveries" }).props("teamNames")).toEqual({
+      team_9: "Search",
+      team_1: "Payments",
+    });
+  });
+
+  /// Self-away needs no admin role: the server reads a missing user_email as the caller.
+  it("marks the reader away without naming them", async () => {
+    service.createUnavailability.mockResolvedValue({ data: {} } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    await wrapper.find('[data-test="oncall-mine-away"]').trigger("click");
+    await wrapper.find('[data-test="oncall-mine-away-from-date"]').setValue("2030-01-01");
+    await wrapper.find('[data-test="oncall-mine-away-from-time"]').setValue("09:00");
+    await wrapper.find('[data-test="oncall-mine-away-to-date"]').setValue("2030-01-02");
+    await wrapper.find('[data-test="oncall-mine-away-to-time"]').setValue("09:00");
+    await wrapper.find('[data-test="oncall-mine-away-save"]').trigger("click");
+    await flushPromises();
+
+    const data = service.createUnavailability.mock.calls[0][0].data;
+    expect(data.user_email).toBeUndefined();
+    expect(data.end_at).toBeGreaterThan(data.start_at);
+  });
+
+  it("sends the team test page after a confirm", async () => {
+    service.testPage.mockResolvedValue({
+      data: {
+        reached_anyone: true,
+        channels: ["email"],
+        attempts: [{ channel: "email", recipient: "a@o2.ai", reason: "", delivered: true }],
+      },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    await wrapper.find('[data-test="oncall-mine-test-page"]').trigger("click");
+    expect(service.testPage).not.toHaveBeenCalled();
+    wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+    await flushPromises();
+
+    expect(service.testPage).toHaveBeenCalledWith(expect.objectContaining({ team_id: "team_1" }));
   });
 
   it("forces both of its reads on Refresh", async () => {
@@ -188,19 +320,10 @@ describe("OnCallMine", () => {
     }
   });
 
-  /// Opened from the avatar menu or a channel chip, so Back returns there rather than to Pages.
-  it("goes back in history when there is history, else to Pages", async () => {
-    window.history.replaceState({ back: "/web/logs" }, "");
-    const fromHistory = render();
+  /// A top-level page has no back button.
+  it("has no back button", async () => {
+    const wrapper = render();
     await flushPromises();
-    fromHistory.findComponent({ name: "OPageLayout" }).props("back").onClick();
-    expect(back).toHaveBeenCalledTimes(1);
-
-    window.history.replaceState({}, "");
-    const direct = render();
-    await flushPromises();
-    expect(direct.findComponent({ name: "OPageLayout" }).props("back").to).toEqual(
-      expect.objectContaining({ name: "onCallResponses" }),
-    );
+    expect(wrapper.findComponent({ name: "OPageLayout" }).props("back")).toBeUndefined();
   });
 });

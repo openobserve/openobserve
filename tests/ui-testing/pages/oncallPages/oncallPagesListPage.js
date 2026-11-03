@@ -61,7 +61,9 @@ export class OnCallPagesListPage {
       search: '[data-test="oncall-responses-search"]',
       groupToggle: '[data-test="oncall-responses-group-toggle"]',
       refresh: '[data-test="oncall-responses-refresh"]',
-      mineButton: '[data-test="oncall-responses-mine-btn"]',
+      scopeToggle: '[data-test="oncall-responses-scope"]',
+      scopeMine: '[data-test="oncall-responses-scope-mine"]',
+      scopeEveryone: '[data-test="oncall-responses-scope-everyone"]',
       empty: '[data-test="oncall-responses-empty"]',
       error: '[data-test="oncall-responses-error"]',
       unavailable: '[data-test="oncall-responses-unavailable"]',
@@ -75,7 +77,6 @@ export class OnCallPagesListPage {
       bulkAck: '[data-test="oncall-bulk-ack"]',
       bulkResolve: '[data-test="oncall-bulk-resolve"]',
       bulkSnooze: '[data-test="oncall-bulk-snooze"]',
-      bulkCancel: '[data-test="oncall-bulk-cancel"]',
 
       // Shared OTable furniture.
       body: '[data-test="o2-table-body"]',
@@ -118,7 +119,6 @@ export class OnCallPagesListPage {
   rowIncident(rowKey) { return `[data-test="oncall-row-incident-${rowKey}"]`; }
   rowMore(rowKey) { return `[data-test="oncall-row-more-${rowKey}"]`; }
   rowTeam(rowKey) { return `[data-test="oncall-row-team-${rowKey}"]`; }
-  rowTimeline(rowKey) { return `[data-test="oncall-row-timeline-${rowKey}"]`; }
   rowLadderStarted(rowKey) { return `[data-test="oncall-ladder-started-${rowKey}"]`; }
   rowSnooze(rowKey, minutes) {
     return `[data-test="oncall-row-snooze-${rowKey}-${minutes}"]`;
@@ -304,13 +304,13 @@ export class OnCallPagesListPage {
     await this._settleList();
   }
 
-  /** Narrow to pages the signed-in user is on the hook for. Hidden when the viewer is unknown. */
-  async toggleMineOnly() {
-    const button = this.page.locator(this.locators.mineButton);
-    await button.waitFor({ state: 'visible', timeout: 20000 });
-    const before = await button.getAttribute('aria-pressed');
-    await button.click();
-    await expect(button).not.toHaveAttribute('aria-pressed', before ?? '', { timeout: 15000 });
+  /** Pick Mine or Everyone in the filter bar. Hidden when the viewer is unknown or nothing has paged yet. */
+  async setScope(scope) {
+    const item = this.page.locator(scope === 'mine' ? this.locators.scopeMine : this.locators.scopeEveryone);
+    await item.waitFor({ state: 'visible', timeout: 20000 });
+    await item.click();
+    await expect(item).toHaveAttribute('data-state', 'on', { timeout: 15000 });
+    await this._settleList();
   }
 
   // ---------------------------------------------------------------- pagination

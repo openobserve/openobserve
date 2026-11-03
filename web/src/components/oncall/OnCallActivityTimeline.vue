@@ -25,6 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <ActivityTimeline
+    ref="timelineRef"
+    :class="pinComposer ? 'h-[min(40rem,70vh)]!' : ''"
     :events="visibleEvents"
     :submitting="submitting"
     :show-scroll-buttons="showScrollButtons"
@@ -57,14 +59,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { computed } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import DOMPurify from "dompurify";
 import { useStore } from "vuex";
 import ActivityTimeline from "@/components/shared/ActivityTimeline.vue";
+import { useOnCallClock } from "@/composables/useOnCallClock";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatMicrosDuration } from "@/utils/formatters";
-import { getActivityAvatarColor, formatActivityRelativeTime } from "@/utils/activityTimeline";
-import { DEFAULT_ACTIVITY_KINDS, rungStillRetrying } from "@/utils/oncall";
+import { getActivityAvatarColor } from "@/utils/activityTimeline";
+import {
+  DEFAULT_ACTIVITY_KINDS,
+  mergeTimelineEvents,
+  rungStillRetrying,
+  timelineSentence,
+  timelineStamp,
+} from "@/utils/oncall";
 import type { OnCallResponseEvent, ResponseEventKind } from "@/ts/interfaces/oncall";
 
 interface Props {
@@ -72,9 +81,23 @@ interface Props {
   commentText: string;
   submitting?: boolean;
   showScrollButtons?: boolean;
+  /** Micros the page opened at, for the "+2m" offset beside each clock time. */
+  openedAt?: number | null;
+  /** Fixes the feed's height so the note box sits at the panel's foot with the newest event above it. */
+  pinComposer?: boolean;
+  /** The policy step a rung delay belongs to, or null when the policy no longer has it. */
+  stepOf?: (rungMicros: number) => number | null;
+  teamNameOf?: (teamId: string) => string | null;
 }
 
-const props = withDefaults(defineProps<Props>(), { submitting: false, showScrollButtons: true });
+const props = withDefaults(defineProps<Props>(), {
+  submitting: false,
+  showScrollButtons: false,
+  openedAt: null,
+  pinComposer: false,
+  stepOf: () => null,
+  teamNameOf: () => null,
+});
 
 const emit = defineEmits<{
   "update:commentText": [value: string];
@@ -95,23 +118,39 @@ const commentTextModel = computed({
   set: (value: string) => emit("update:commentText", value),
 });
 
-const currentUserId = computed(() => store.state.userInfo?.email?.split("@")[0] || "User");
+const nowMicros = useOnCallClock();
+const { nameOf } = useOrgUserNames();
+
+const currentUserId = computed(() => nameOf(String(store.state.userInfo?.email ?? "")) || "User");
 
 const HUMAN_KINDS: ResponseEventKind[] = ["ack", "handoff", "note"];
 
-const visibleEvents = computed(() =>
-  showAll.value
-    ? props.events
-    : props.events.filter((e) => DEFAULT_ACTIVITY_KINDS.includes(e.kind)),
-);
+const visibleEvents = computed(() => {
+  const merged = mergeTimelineEvents(props.events);
+  return showAll.value ? merged : merged.filter((e) => DEFAULT_ACTIVITY_KINDS.includes(e.kind));
+});
 
 const isCommentEvent = (event: OnCallResponseEvent): boolean => event.kind === "note";
 
 const getUserId = (event: OnCallResponseEvent): string =>
-  HUMAN_KINDS.includes(event.kind) ? event.actor : "System";
+  HUMAN_KINDS.includes(event.kind) ? nameOf(event.actor) : "System";
 
 const getAvatarColor = getActivityAvatarColor;
-const formatRelativeTime = formatActivityRelativeTime;
+const formatRelativeTime = (at: number): string =>
+  timelineStamp(at, props.openedAt, nowMicros.value, store.state.timezone);
+
+const timelineRef = ref<{ scrollToBottom: () => void } | null>(null);
+
+// Chat order: the newest line sits just above the note box, so a pinned feed opens scrolled to it.
+watch(
+  () => visibleEvents.value.length,
+  async () => {
+    if (!props.pinComposer) return;
+    await nextTick();
+    timelineRef.value?.scrollToBottom();
+  },
+  { immediate: true },
+);
 
 const getEventIcon = (event: OnCallResponseEvent): string => {
   switch (event.kind) {
@@ -163,10 +202,8 @@ const getEventBadgeColor = (event: OnCallResponseEvent): string => {
 const getEventBadgeText = (event: OnCallResponseEvent): string =>
   t(`oncall.eventKind_${event.kind}` as any);
 
-// Pages and promotions lead with the badge, like an incident's Alert badge;
-// everything else trails it.
-const getEventLayout = (event: OnCallResponseEvent): "no-badge" | "before" | "after" =>
-  ["page", "severity_promoted", "ack", "handoff"].includes(event.kind) ? "before" : "after";
+// The icon's colour already says the kind, so a "System" or "Page" tag on every line was noise.
+const getEventLayout = (): "no-badge" | "before" | "after" => "no-badge";
 
 const esc = (s: string) =>
   String(s)
@@ -176,17 +213,36 @@ const esc = (s: string) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-const getInlineHtml = (event: OnCallResponseEvent): string => {
-  const color = getEventBadgeColor(event);
-  const isHuman = HUMAN_KINDS.includes(event.kind);
-  let html = isHuman
-    ? esc(event.body)
-    : `<span style="font-weight: 600; color: ${color};">${esc(event.actor)}</span> ${esc(event.body)}`;
+// Names can repeat across an org, so each one carries its email on hover; tokens survive escaping where markup would not.
+const PERSON_TOKEN = /\uE000(\d+)\uE000/g;
 
-  if (event.rung_micros !== null && event.rung_micros !== undefined) {
-    html += ` <span class="text-text-secondary">(${esc(
-      t("oncall.atRung", { delay: formatMicrosDuration(event.rung_micros) }),
-    )})</span>`;
+function sentenceWithPeople(event: OnCallResponseEvent): string {
+  const people: string[] = [];
+  const tokenFor = (email: string) => {
+    people.push(email);
+    return `\uE000${people.length - 1}\uE000`;
+  };
+  const sentence = esc(
+    timelineSentence(event, { nameOf: tokenFor, teamNameOf: props.teamNameOf }, t),
+  );
+  return sentence.replace(PERSON_TOKEN, (_, index: string) => {
+    const email = people[Number(index)];
+    const name = nameOf(email);
+    if (name === email) return esc(name);
+    return `<span class="underline decoration-dotted underline-offset-2" title="${esc(`${name} · ${email}`)}">${esc(name)}</span>`;
+  });
+}
+
+const getInlineHtml = (event: OnCallResponseEvent): string => {
+  let html = sentenceWithPeople(event);
+
+  // Without the policy the delay is the only clue, and beside the clock offset it reads as a second, different time.
+  const step =
+    event.rung_micros === null || event.rung_micros === undefined
+      ? null
+      : props.stepOf(event.rung_micros);
+  if (step !== null) {
+    html += ` <span class="text-text-secondary">(${esc(t("oncall.tlStep", { n: step }))})</span>`;
   }
   if (rungStillRetrying(event, props.events)) {
     html += ` <span style="font-weight: 600; color: var(--color-error-500);">— ${esc(

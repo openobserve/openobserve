@@ -21,8 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCardSection>
 
     <OCardSection role="body" dense>
-      <p class="text-text-secondary mb-3 text-xs">{{ t("oncall.priorCausesHint") }}</p>
-
       <!-- Reserves the list's shape while the fetch is in flight, so it does
            not flash "no history yet" — the wrong answer — for a moment before
            the real one arrives. -->
@@ -62,11 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OButton
             variant="outline"
-            size="sm-action"
+            size="sm"
             :data-test="`oncall-prior-cause-open-${group.cause}`"
             @click="emit('open', group.last_response_id)"
           >
-            {{ t("oncall.openThatOne") }}
+            <OIcon name="open-in-new" size="sm" />{{ t("oncall.openThatOne") }}
           </OButton>
         </li>
       </ul>
@@ -77,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

@@ -174,11 +174,12 @@ const stubs = {
     props: [
       "hasTeam",
       "hasStaffedRotation",
+      "hasPolicy",
       "hasRouting",
-      "hasDestinations",
       "compact",
       "canConfigure",
       "firstTeamId",
+      "firstTeamName",
     ],
     // The two shapes the real component takes, so the page's layout decision is
     // visible from the outside rather than only in a prop.
@@ -470,24 +471,23 @@ describe("OnCallResponses", () => {
     expect(service.listTeams).toHaveBeenCalledTimes(2);
   });
 
-  // Incident titles and the destination check are other modules' cache entries; only Refresh forces them.
-  it("serves incident titles and the destination check from the cache, and forces both on refresh", async () => {
+  // Incident titles are another module's cache entry; only Refresh forces them.
+  it("serves incident titles from the cache, and forces them on refresh", async () => {
     incidents.get.mockResolvedValue({ data: { title: "Checkout down" } } as any);
 
     const first = await withPages([page({ incident_id: "inc_1" })]);
     expect(incidents.get).toHaveBeenCalledTimes(1);
-    expect(destinations.list).toHaveBeenCalledTimes(1);
     first.unmount();
 
     const second = await withPages([page({ incident_id: "inc_1" })]);
     expect(incidents.get).toHaveBeenCalledTimes(1);
-    expect(destinations.list).toHaveBeenCalledTimes(1);
     expect(second.text()).toContain("Checkout down");
 
     await second.find('[data-test="oncall-responses-refresh"]').trigger("click");
     await flushPromises();
     expect(incidents.get).toHaveBeenCalledTimes(2);
-    expect(destinations.list).toHaveBeenCalledTimes(2);
+    // Alert destinations do not wake anybody, so setup no longer asks for them.
+    expect(destinations.list).not.toHaveBeenCalled();
   });
 
   describe("the ringing run", () => {
@@ -733,7 +733,7 @@ describe("OnCallResponses", () => {
           .find((s) => s.attributes("data-test") === test);
 
       expect(byTest("oncall-responses-team-filter")?.props("width")).toBe("sm");
-      expect(byTest("oncall-responses-priority-filter")?.props("width")).toBe("xs");
+      expect(byTest("oncall-responses-priority-filter")?.props("width")).toBe("sm");
     });
 
     /// Claiming is only offered while something is still escalating; a page
@@ -752,16 +752,15 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(true);
     });
 
-    /// A resolved row has nothing left to do to it, so the action becomes a
-    /// way to read what happened — and it is the LABELLED one, not a menu item.
-    it("drops triage on a resolved row and offers the timeline", async () => {
+    /// Pages are forward-only, so a resolved row has no action at all.
+    it("offers nothing on a resolved row: the arrow expands it and the row opens it", async () => {
       const wrapper = await withPages([
         page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
       ]);
 
+      expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(false);
       expect(wrapper.find('[data-test^="oncall-row-resolve-"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test^="oncall-row-timeline-"]').exists()).toBe(true);
-      // Nothing is left to put behind it, so the menu is not rendered at all.
+      expect(wrapper.find('[data-test^="oncall-row-timeline-"]').exists()).toBe(false);
       expect(wrapper.find('[data-test^="oncall-row-more-"]').exists()).toBe(false);
     });
 
@@ -774,28 +773,30 @@ describe("OnCallResponses", () => {
       ]);
 
       expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test^="oncall-row-resolve-"]').exists()).toBe(true);
-      // Timeline is what is left for the menu.
-      expect(wrapper.find('[data-test^="oncall-row-more-"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test^="oncall-row-timeline-"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-row-resolve-alert:al_ckt"]').exists()).toBe(true);
     });
 
     /// The labelled action and the menu must never offer the same thing twice.
     /// One row state per test: two mounts in one test would share the cached
     /// list and the second would render the first's rows.
-    it("keeps the labelled action out of a ringing row's menu", async () => {
+    it("gives a ringing row both icons, with the phone menu mirroring them", async () => {
       const ringing = await withPages([page()]);
-      // Acknowledge is labelled, so resolve and timeline are the menu's.
-      expect(ringing.findAll('[data-test^="oncall-row-resolve-"]')).toHaveLength(1);
-      expect(ringing.findAll('[data-test^="oncall-row-timeline-"]')).toHaveLength(1);
+      expect(ringing.find('[data-test="oncall-row-ack-alert:al_ckt"]').exists()).toBe(true);
+      expect(ringing.find('[data-test="oncall-row-resolve-alert:al_ckt"]').exists()).toBe(true);
+      expect(ringing.find('[data-test="oncall-row-ack-alert:al_ckt-menu"]').exists()).toBe(true);
+      expect(ringing.find('[data-test="oncall-row-resolve-alert:al_ckt-menu"]').exists()).toBe(
+        true,
+      );
+      expect(ringing.find('[data-test^="oncall-row-timeline-"]').exists()).toBe(false);
     });
 
-    it("keeps the labelled action out of a handled row's menu", async () => {
+    it("keeps an empty slot where a row has no Acknowledge, so the icons line up", async () => {
       const handled = await withPages([
         page({ state: "acknowledged", acked_by: "engineer@example.com" }),
       ]);
-      // Resolve is labelled now — it must not also appear as an item.
-      expect(handled.findAll('[data-test^="oncall-row-resolve-"]')).toHaveLength(1);
+      const cell = handled.find('[data-test="oncall-row-resolve-alert:al_ckt"]').element
+        .parentElement!;
+      expect(cell.querySelectorAll('[aria-hidden="true"]').length).toBeGreaterThan(0);
     });
 
     /// Snoozing only makes sense while the ladder is still climbing, so a
@@ -846,13 +847,10 @@ describe("OnCallResponses", () => {
       expect(checklist.props("hasStaffedRotation")).toBe(false);
     });
 
-    /// A team, a staffed rotation and a routing rule can all exist while the
-    /// org has configured zero notification destinations — paging is still
-    /// structurally impossible, so the checklist must stay up rather than
-    /// declare setup finished.
-    it("still shows when everything but a destination is configured", async () => {
+    /// The policy step is answered by the team's own policy read, not by alert destinations.
+    it("still shows while no team's escalation policy can be read", async () => {
       service.listTeams.mockResolvedValue({ data: [team] } as any);
-      destinations.list.mockResolvedValue({ data: [] } as any);
+      service.getPolicy.mockRejectedValue({ response: { status: 500 } });
       const wrapper = render();
       await flushPromises();
 
@@ -860,19 +858,22 @@ describe("OnCallResponses", () => {
       expect(checklist.exists()).toBe(true);
       expect(checklist.props("hasTeam")).toBe(true);
       expect(checklist.props("hasRouting")).toBe(true);
-      expect(checklist.props("hasDestinations")).toBe(false);
+      expect(checklist.props("hasPolicy")).toBe(false);
     });
 
-    it("does not count a Jira destination, which a policy cannot pick", async () => {
+    /// Setup must never read as all-good from the shift chip while pages cannot reach anyone yet.
+    it("hides the shift chip while setup is unfinished", async () => {
+      const viewer = store.state.userInfo.email;
       service.listTeams.mockResolvedValue({ data: [team] } as any);
-      destinations.list.mockResolvedValue({
-        data: [{ name: "Jira OPS", destination_type_name: "jira" }],
+      service.getPolicy.mockRejectedValue({ response: { status: 500 } });
+      service.whoIsOnCall.mockResolvedValue({
+        data: [{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: viewer }],
       } as any);
       const wrapper = render();
       await flushPromises();
 
-      const checklist = wrapper.findComponent({ name: "OnCallSetupChecklist" });
-      expect(checklist.props("hasDestinations")).toBe(false);
+      expect(wrapper.findComponent({ name: "OnCallSetupChecklist" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallShiftBanner" }).exists()).toBe(false);
     });
 
     /// A server without the coverage-gap endpoint used to read as "zero gaps",
@@ -1251,6 +1252,14 @@ describe("OnCallResponses", () => {
         .findAllComponents({ name: "OToggleGroup" })
         .find((c) => c.attributes("data-test") === "oncall-responses-filter-tabs")!;
 
+    /// An open-only tab fetches without resolved pages, so an empty answer must not take away the tabs that widen it.
+    it("keeps the filter bar when an open-only tab fetches nothing", async () => {
+      Object.assign(seed(), { activeFilter: "ringing" });
+      const wrapper = await withPages([]);
+
+      expect(tabs(wrapper)?.exists()).toBe(true);
+    });
+
     /// The Status column is gone, and a view saved while sorted by it must still load.
     it("falls back to the default sort when the saved view sorted by Status", async () => {
       Object.assign(seed(), { sortBy: "state" });
@@ -1307,7 +1316,7 @@ describe("OnCallResponses", () => {
   /// every other filter the reader had set and answered the question from a
   /// different dataset on a different screen.
   describe("my on-call", () => {
-    const mineBtn = '[data-test="oncall-responses-mine-btn"]';
+    const scopeToggle = '[data-test="oncall-responses-scope"]';
 
     async function withMyShift(rows: Record<string, unknown>[]) {
       service.whoIsOnCall.mockImplementation(({ team_id }: any) =>
@@ -1333,43 +1342,67 @@ describe("OnCallResponses", () => {
       expect(data.map((row) => row.latest.id)).toEqual(["a"]);
     });
 
-    /// The profile menu's "My on-call" opens a page; this button only narrows the list, so it must not share that name.
-    it("is named as a filter, apart from the My on-call page", async () => {
-      const wrapper = await withMyShift([page({ id: "a" })]);
+    const ids = (wrapper: VueWrapper) =>
+      (wrapper.findComponent({ name: "OTable" }).props("data") as any[]).map(
+        (row) => row.latest.id,
+      );
+    async function pick(wrapper: VueWrapper, value: "mine" | "everyone") {
+      wrapper
+        .findComponent('[data-test="oncall-responses-scope"]')
+        .vm.$emit("update:modelValue", value);
+      await flushPromises();
+    }
 
-      expect(wrapper.find(mineBtn).text()).toBe("Only mine");
+    it("leads the filter bar with Mine and Everyone", async () => {
+      const wrapper = await withMyShift([page({ id: "a" })]);
+      const scope = wrapper.find(scopeToggle);
+      expect(scope.text()).toContain("Mine");
+      expect(scope.text()).toContain("Everyone");
+      expect(wrapper.find('[data-test="oncall-responses-mine-btn"]').exists()).toBe(false);
     });
 
-    it("filters in place instead of navigating", async () => {
+    /// Somebody holding the pager opens on their own pages; filtering never navigates.
+    it("starts on Mine for someone on call, and filters in place", async () => {
       const wrapper = await withMyShift([
         page({ id: "a" }),
         page({ id: "b", team_id: "team_other" }, "al_pay"),
       ]);
+      expect(ids(wrapper)).toEqual(["a"]);
 
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
-
+      await pick(wrapper, "everyone");
       expect(push).not.toHaveBeenCalled();
-      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
-      expect(data.map((row) => row.latest.id)).toEqual(["a"]);
+      expect(ids(wrapper)).toEqual(["a", "b"]);
     });
 
-    /// The strip sits above the rows and claims to describe them, so the scope
-    /// has to apply before the counts are taken.
+    it("starts on Everyone for someone not on call", async () => {
+      const wrapper = await withPages([
+        page({ id: "a" }),
+        page({ id: "b", team_id: "team_other" }, "al_pay"),
+      ]);
+      expect(ids(wrapper)).toEqual(["a", "b"]);
+    });
+
+    it("keeps a choice the reader already made over the on-call default", async () => {
+      useListViewState("oncall-responses", {}).mineChosen = true;
+      const wrapper = await withMyShift([
+        page({ id: "a" }),
+        page({ id: "b", team_id: "team_other" }, "al_pay"),
+      ]);
+      expect(ids(wrapper)).toEqual(["a", "b"]);
+    });
+
+    /// The section headings claim to describe the rows, so the scope applies before the counts.
     it("counts the narrowed list, not the whole one", async () => {
       const wrapper = await withMyShift([
         page({ id: "a" }),
         page({ id: "b", team_id: "team_other" }, "al_pay"),
       ]);
-
-      expect(sections(wrapper)).toEqual({ ringing: 2 });
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
       expect(sections(wrapper)).toEqual({ ringing: 1 });
+      await pick(wrapper, "everyone");
+      expect(sections(wrapper)).toEqual({ ringing: 2 });
     });
 
-    /// The acknowledgement outlives the shift: whoever claimed a page still
-    /// owns it after handover, even on a team they are no longer on.
+    /// The acknowledgement outlives the shift: whoever claimed a page still owns it after handover.
     it("keeps a page the viewer acknowledged on another team", async () => {
       const wrapper = await withMyShift([
         page(
@@ -1377,16 +1410,10 @@ describe("OnCallResponses", () => {
           "al_pay",
         ),
       ]);
-
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
-
-      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
-      expect(data.map((row) => row.latest.id)).toEqual(["b"]);
+      expect(ids(wrapper)).toEqual(["b"]);
     });
 
-    // The server lowercases an email on handoff but not on a self-ack, so the
-    // owner comparison cannot be case-sensitive.
+    // The server lowercases an email on handoff but not on a self-ack.
     it("matches the owner regardless of case", async () => {
       const wrapper = await withMyShift([
         page(
@@ -1394,31 +1421,18 @@ describe("OnCallResponses", () => {
           "al_pay",
         ),
       ]);
-
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
-
-      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
-      expect(data.map((row) => row.latest.id)).toEqual(["b"]);
+      expect(ids(wrapper)).toEqual(["b"]);
     });
 
-    it("is a toggle, so the second click gives the full list back", async () => {
+    it("switches both ways", async () => {
       const wrapper = await withMyShift([
         page({ id: "a" }),
         page({ id: "b", team_id: "team_other" }, "al_pay"),
       ]);
-      const rowIds = () =>
-        (wrapper.findComponent({ name: "OTable" }).props("data") as any[]).map(
-          (row) => row.latest.id,
-        );
-
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
-      expect(rowIds()).toEqual(["a"]);
-
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
-      expect(rowIds()).toEqual(["a", "b"]);
+      await pick(wrapper, "everyone");
+      expect(ids(wrapper)).toEqual(["a", "b"]);
+      await pick(wrapper, "mine");
+      expect(ids(wrapper)).toEqual(["a"]);
     });
 
     /// A toggle that can only ever empty the table is worse than no toggle.
@@ -1427,18 +1441,22 @@ describe("OnCallResponses", () => {
       store.state.userInfo = {};
       try {
         const wrapper = await withPages([page()]);
-        expect(wrapper.find(mineBtn).exists()).toBe(false);
+        expect(wrapper.find(scopeToggle).exists()).toBe(false);
       } finally {
         store.state.userInfo = original;
       }
     });
 
+    /// No filters before anything has paged: they could only narrow an empty list.
+    it("shows no filter bar while there are no pages", async () => {
+      const wrapper = await withMyShift([]);
+      expect(wrapper.find(scopeToggle).exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-responses-filter-tabs"]').exists()).toBe(false);
+    });
+
     /// Nothing of yours open is a real answer; "no pages at all" is not.
     it("offers to clear itself when it empties the list", async () => {
       const wrapper = await withMyShift([page({ id: "b", team_id: "team_other" }, "al_pay")]);
-
-      await wrapper.find(mineBtn).trigger("click");
-      await flushPromises();
 
       const empty = wrapper
         .findAllComponents({ name: "OEmptyState" })
@@ -1869,16 +1887,13 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test="oncall-row-ack-alert:al_ckt-menu"]').exists()).toBe(false);
     });
 
-    /// A closed row has no menu on a laptop; on a phone its button is gone, so the menu is the only way in.
-    it("keeps a menu on a closed row so its timeline stays reachable", async () => {
+    /// A closed row has nothing left to do on a phone either: the row itself opens the page.
+    it("gives a closed row no menu on a phone", async () => {
       const wrapper = await withPages([
         page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
       ]);
 
-      expect(wrapper.find('[data-test^="oncall-row-more-"]').exists()).toBe(true);
-      await wrapper.find('[data-test="oncall-row-timeline-alert:al_ckt-menu"]').trigger("click");
-
-      expect(push).toHaveBeenCalled();
+      expect(wrapper.find('[data-test^="oncall-row-more-"]').exists()).toBe(false);
     });
   });
 });

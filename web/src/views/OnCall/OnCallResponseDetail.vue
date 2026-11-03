@@ -4,6 +4,8 @@
     data-test="oncall-response-detail-page"
     :title="title"
     icon="notifications-active"
+    title-overflow="visible"
+    tabs-below
     :back="{
       label: t('oncall.backToResponses'),
       to: { name: 'onCallResponses', query: { org_identifier: orgId } },
@@ -47,14 +49,6 @@
             <OTruncatedText class="block">{{ raw(teamName) }}</OTruncatedText>
           </router-link>
         </template>
-        <template #firing>
-          <span class="shrink-0" data-test="oncall-response-firing">
-            #{{ response.subject.firing }}
-            <OTooltip v-if="historyLabel">
-              <template #content>{{ historyLabel }}</template>
-            </OTooltip>
-          </span>
-        </template>
         <template #opened>
           <span class="shrink-0" data-test="oncall-response-opened">{{ openedAtClock }}</span>
         </template>
@@ -66,8 +60,13 @@
     <template #title-trail>
       <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
       <template v-if="response && lgUp">
+        <span class="inline-flex" data-test="oncall-response-state-tag">
+          <OTag type="oncallResponseState" :value="response.state" size="sm" />
+          <OTooltip v-if="closedAfter" :content="closedAfter" />
+        </span>
         <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-        <span data-test="oncall-response-phrase">
+        <!-- A closed page's state tag already says it; the phrase is only news while the ladder runs. -->
+        <span v-if="isOpenState" data-test="oncall-response-phrase">
           <OnCallEscalationCell
             :response-id="response.id"
             :record="response"
@@ -76,12 +75,6 @@
             :progress-loaded="escalationLoaded"
             :reached-step="headerReachedStep"
           />
-        </span>
-        <!-- How long it has been ringing, beside the word "ringing". The two
-             were a stat tile apart, and the one people read first is the
-             one that says how bad this already is. -->
-        <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
-          {{ elapsedLabel }}
         </span>
         <!-- Why this team is looking at somebody else's outage, said where the
              state is said rather than halfway down the page. -->
@@ -97,9 +90,49 @@
       </template>
     </template>
 
+    <template v-if="response" #header-tabs>
+      <OTabs
+        v-model="activeDetailTab"
+        align="left"
+        class="flex-1"
+        mobile-arrows
+        :breakpoint="0"
+        data-test="oncall-response-tabs-strip"
+      >
+        <OTab
+          name="activity"
+          icon="forum"
+          :label="t('oncall.tabActivity')"
+          data-test="oncall-response-tab-activity"
+        />
+        <OTab
+          name="deliveries"
+          icon="send"
+          :label="t('oncall.deliveriesTitle')"
+          data-test="oncall-response-tab-deliveries"
+        />
+        <OTab
+          name="causes"
+          icon="history"
+          :label="t('oncall.tabPriorCauses')"
+          data-test="oncall-response-tab-causes"
+        />
+        <!-- Absent on a deployment with no agent, rather than a tab that opens on nothing. -->
+        <OTab
+          v-if="report"
+          name="report"
+          icon="psychology"
+          :label="t('oncall.tabReport')"
+          data-test="oncall-response-tab-report"
+        />
+      </OTabs>
+    </template>
+
     <template #actions>
       <ORefreshButton
         v-if="response"
+        layout="inline"
+        variant="outline"
         :last-run-at="lastFetchedAt"
         :loading="refreshing"
         data-test="oncall-response-refresh"
@@ -111,34 +144,34 @@
         <OButton
           v-if="canAcknowledge"
           variant="primary"
-          size="sm-action"
+          size="sm"
           :loading="acking"
           data-test="oncall-response-ack-btn"
           @click="acknowledgeRecord"
         >
-          {{ t("oncall.acknowledge") }}
+          <OIcon name="check-circle" size="sm" />{{ t("oncall.acknowledge") }}
           <OTooltip :content="ackWords.ackHint" />
         </OButton>
         <template v-if="response.state === 'acknowledged'">
           <OButton
             v-if="response.acked_by !== me"
             variant="outline"
-            size="sm-action"
+            size="sm"
             :loading="acking"
             data-test="oncall-response-take-over-btn"
             @click="takeOverRecord"
           >
-            {{ t("oncall.takeOver") }}
+            <OIcon name="how-to-reg" size="sm" />{{ t("oncall.takeOver") }}
             <OTooltip :content="t('oncall.takeOverHint')" />
           </OButton>
           <OButton
             variant="outline"
-            size="sm-action"
+            size="sm"
             :loading="acking"
             data-test="oncall-response-unack-btn"
             @click="unacknowledgeRecord"
           >
-            {{ t("oncall.unacknowledge") }}
+            <OIcon name="undo" size="sm" />{{ t("oncall.unacknowledge") }}
             <OTooltip :content="ackWords.unackHint" />
           </OButton>
         </template>
@@ -148,16 +181,18 @@
           <template #trigger>
             <OButton
               variant="outline"
-              size="sm-action"
+              size="sm"
               :loading="snoozing"
+              icon-right="expand-more"
               data-test="oncall-response-snooze-btn"
             >
-              {{ t("oncall.snooze") }}
+              <OIcon name="alarm" size="sm" />{{ t("oncall.snooze") }}
             </OButton>
           </template>
           <ODropdownItem
             v-for="opt in snoozeOptions"
             :key="opt.minutes"
+            icon-left="alarm"
             :data-test="`oncall-response-snooze-${opt.minutes}`"
             @select="snoozeRecord(opt.minutes)"
           >
@@ -165,22 +200,17 @@
           </ODropdownItem>
         </ODropdown>
 
-        <!-- Escalate keeps this yours; hand off makes it theirs. Both verbs
-             have existed server-side since the ladder did, and only one of
-             them had a button. A disabled button that does not say why is a
-             dead end — the ladder's own explanation for why there is nobody
-             left to escalate to belongs right where the button went grey. -->
         <!-- Not on an unrouted page: the server refuses it there, and Hand off is the next step. -->
         <span v-if="lgUp && canEscalate" class="inline-flex">
           <OButton
             variant="outline"
-            size="sm-action"
+            size="sm"
             :loading="escalatingNow"
             :disabled="escalation?.exhausted"
             data-test="oncall-response-escalate-btn"
             @click="escalateNow"
           >
-            {{ t("oncall.escalate") }}
+            <OIcon name="trending-up" size="sm" />{{ t("oncall.escalate") }}
           </OButton>
           <OTooltip v-if="escalation?.exhausted" :content="t('oncall.ladderExhausted')" />
         </span>
@@ -188,11 +218,11 @@
         <OButton
           v-if="lgUp"
           variant="outline"
-          size="sm-action"
+          size="sm"
           data-test="oncall-response-handoff-btn"
           @click="showHandoff = true"
         >
-          {{ t("oncall.handoff") }}
+          <OIcon name="swap-horiz" size="sm" />{{ t("oncall.handoff") }}
         </OButton>
       </template>
 
@@ -205,11 +235,11 @@
       <OButton
         v-if="response && !response.incident_id && lgUp"
         variant="outline"
-        size="sm-action"
+        size="sm"
         data-test="oncall-response-promote-btn"
         @click="promoteOpen = true"
       >
-        {{ t("oncall.promote") }}
+        <OIcon name="local-fire-department" size="sm" />{{ t("oncall.promote") }}
       </OButton>
 
       <template v-if="response && isOpenState">
@@ -220,22 +250,22 @@
         <OButton
           v-if="isImpacted"
           :variant="canAcknowledge ? 'outline' : 'primary'"
-          size="sm-action"
+          size="sm"
           :loading="confirmingRecovery"
           data-test="oncall-response-confirm-recovery-btn"
           @click="confirmRecoveryOpen = true"
         >
-          {{ t("oncall.confirmRecovery") }}
+          <OIcon name="task-alt" size="sm" />{{ t("oncall.confirmRecovery") }}
         </OButton>
         <OButton
           v-else
           :variant="canAcknowledge ? 'outline' : 'primary'"
-          size="sm-action"
+          size="sm"
           :loading="resolving"
           data-test="oncall-response-resolve-btn"
           @click="confirmResolve = true"
         >
-          {{ t("oncall.resolve") }}
+          <OIcon name="task-alt" size="sm" />{{ t("oncall.resolve") }}
         </OButton>
       </template>
 
@@ -255,6 +285,7 @@
           <ODropdownItem
             v-for="opt in snoozeOptions"
             :key="opt.minutes"
+            icon-left="alarm"
             :data-test="`oncall-response-snooze-${opt.minutes}-menu`"
             @select="snoozeRecord(opt.minutes)"
           >
@@ -264,20 +295,17 @@
         <ODropdownSeparator v-if="canSnooze" />
         <ODropdownItem
           v-if="isOpenState && canEscalate"
+          icon-left="trending-up"
           :disabled="escalation?.exhausted"
           data-test="oncall-response-escalate-btn-menu"
           @select="escalateNow"
         >
-          <span class="flex max-w-56 flex-col">
-            <span>{{ t("oncall.escalate") }}</span>
-            <!-- Touch has no tooltip, so the reason the verb is greyed out rides on the item itself. -->
-            <span v-if="escalation?.exhausted" class="text-xs whitespace-normal">
-              {{ t("oncall.ladderExhausted") }}
-            </span>
-          </span>
+          <!-- Touch has no tooltip, so a greyed-out verb says why in its own one line. -->
+          {{ escalation?.exhausted ? t("oncall.escalateNobodyLeft") : t("oncall.escalate") }}
         </ODropdownItem>
         <ODropdownItem
           v-if="isOpenState"
+          icon-left="swap-horiz"
           data-test="oncall-response-handoff-btn-menu"
           @select="showHandoff = true"
         >
@@ -285,6 +313,7 @@
         </ODropdownItem>
         <ODropdownItem
           v-if="!response.incident_id"
+          icon-left="local-fire-department"
           data-test="oncall-response-promote-btn-menu"
           @select="promoteOpen = true"
         >
@@ -304,8 +333,12 @@
           class="mb-3 flex flex-wrap items-center gap-2"
           data-test="oncall-response-meta"
         >
+          <span class="inline-flex" data-test="oncall-response-state-tag">
+            <OTag type="oncallResponseState" :value="response.state" size="sm" />
+            <OTooltip v-if="closedAfter" :content="closedAfter" />
+          </span>
           <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-          <span data-test="oncall-response-phrase">
+          <span v-if="isOpenState" data-test="oncall-response-phrase">
             <OnCallEscalationCell
               :response-id="response.id"
               :record="response"
@@ -314,9 +347,6 @@
               :progress-loaded="escalationLoaded"
               :reached-step="headerReachedStep"
             />
-          </span>
-          <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
-            {{ elapsedLabel }}
           </span>
           <OTag
             v-if="isImpacted"
@@ -410,16 +440,13 @@
           </template>
         </OBanner>
 
-        <!-- The four facts a responder reads first, read once rather than
-             assembled from the title tags and a description list further
-             down the page. -->
-        <OStatStrip :items="topStats" class="mb-4" data-test="oncall-response-stats" />
+        <OStatStrip
+          v-if="topStats.length"
+          :items="topStats"
+          class="mb-4"
+          data-test="oncall-response-stats"
+        />
 
-        <!-- Two columns rather than three tabs. Everything a responder needs
-             to decide is on one screen: the tabs cost a click each for facts
-             that were never optional, and the rail's answers — who this is
-             reaching, what fires next, why this team — are the ones people
-             opened the tabs to find. -->
         <div class="grid flex-1 grid-cols-1 gap-4 lg:grid-cols-3">
           <div class="flex flex-col gap-4 lg:col-span-2">
             <!-- Renders nothing until a verdict event exists (§G.7) — the
@@ -427,63 +454,33 @@
                  analysis panel that sits empty forever. -->
             <OnCallVerdictCard :events="events" />
 
-            <!-- Activity, deliveries and prior causes used to be a card and two
-                 collapsibles stacked on top of each other — only the first was
-                 visible without a click, and the other two hid behind their
-                 own expand toggle with no hint of what was inside. Tabs put
-                 all three labels on screen at once, so which one has the
-                 answer is a glance, not three clicks to find out. -->
-            <OCard variant="glass" class="flex-1" data-test="oncall-response-tabs">
-              <OCardSection role="header" dense class="flex-wrap items-center gap-2">
-                <OTabs v-model="activeDetailTab" dense data-test="oncall-response-tabs-strip">
-                  <OTab
-                    name="activity"
-                    :label="t('oncall.tabActivity')"
-                    data-test="oncall-response-tab-activity"
-                  />
-                  <OTab
-                    name="deliveries"
-                    :label="t('oncall.deliveriesTitle')"
-                    data-test="oncall-response-tab-deliveries"
-                  />
-                  <OTab
-                    name="causes"
-                    :label="t('oncall.tabPriorCauses')"
-                    data-test="oncall-response-tab-causes"
-                  />
-                  <!-- Absent on a deployment with no agent, rather than a tab
-                       that opens on nothing. -->
-                  <OTab
-                    v-if="report"
-                    name="report"
-                    :label="t('oncall.tabReport')"
-                    data-test="oncall-response-tab-report"
-                  />
-                </OTabs>
-                <OButton
-                  v-if="activeDetailTab === 'activity'"
-                  variant="ghost-primary"
-                  size="sm"
-                  class="ms-auto"
-                  data-test="oncall-response-activity-toggle-all"
-                  @click="showAllActivity = !showAllActivity"
-                >
-                  {{
-                    showAllActivity
-                      ? t("oncall.activityHideSystem")
-                      : t("oncall.activityShowSystemCount", { count: systemActivityCount })
-                  }}
-                </OButton>
-              </OCardSection>
-
+            <OCard variant="glass" data-test="oncall-response-tabs">
               <OCardSection role="body" dense>
                 <OTabPanels v-model="activeDetailTab">
                   <OTabPanel name="activity" data-test="oncall-response-activity">
+                    <div class="flex justify-end pt-2">
+                      <OButton
+                        variant="ghost-primary"
+                        size="sm"
+                        data-test="oncall-response-activity-toggle-all"
+                        @click="showAllActivity = !showAllActivity"
+                      >
+                        {{
+                          showAllActivity
+                            ? t("oncall.activityHideSystem")
+                            : t("oncall.activityShowSystemCount", { count: systemActivityCount })
+                        }}
+                      </OButton>
+                    </div>
                     <OnCallActivityTimeline
                       :events="events"
                       v-model:comment-text="noteBody"
                       v-model:show-all="showAllActivity"
                       :submitting="addingNote"
+                      :opened-at="response.opened_at"
+                      :step-of="stepOfRung"
+                      :team-name-of="teamNameOf"
+                      pin-composer
                       @submit="addNote"
                     />
                   </OTabPanel>
@@ -550,6 +547,7 @@
               :routing-reason="routingReason"
               :subject-stream="subjectStream"
               :incident-id="response.incident_id"
+              :incident-title="incidentTitle"
               :cause="response.cause"
               :cause-note="response.cause_note"
             />
@@ -738,11 +736,7 @@
       data-test="oncall-resolve-dialog"
     >
       <div class="flex flex-col gap-3">
-        <p class="text-text-secondary text-sm">{{ t("oncall.resolveMessage") }}</p>
-
-        <!-- Asked HERE and nowhere else. A cause collected later is a cause
-             never collected, and it is the only input the prior-causes panel
-             has. -->
+        <!-- Asked here and nowhere else: a cause collected later is never collected. -->
         <OnCallResolveCauseForm
           v-model:cause="resolveCause"
           v-model:note="resolveNote"
@@ -777,6 +771,7 @@ import { useStore } from "vuex";
 
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -850,6 +845,8 @@ import {
   whoIsOnCallQuery,
 } from "@/services/oncall.queries";
 import { oncallKeys } from "@/services/oncall.querykeys";
+import { incidentQuery } from "@/services/incidents.queries";
+import type { IncidentWithAlerts } from "@/services/incidents";
 import type {
   DeliveryLedger,
   DeliveryRecord,
@@ -1011,9 +1008,6 @@ const confirmResolve = ref(false);
 const showHandoff = ref(false);
 const escalatingNow = ref(false);
 
-// Local rather than imported from the SLO composable that also defines it:
-// on-call has no business depending on that module for an em dash.
-const ABSENT = raw("—");
 const noteBody = ref("");
 const showAllActivity = ref(true);
 /// Activity, deliveries and prior causes as tabs of one card rather than a
@@ -1060,6 +1054,9 @@ const handoffTeam = ref("");
 const handoffNote = ref("");
 const memberOptions = ref<{ label: I18nText; value: string }[]>([]);
 const teamOptions = ref<{ label: I18nText; value: string }[]>([]);
+const teamNamesById = ref<Record<string, string>>({});
+/// The incident's own title for the rail link; the id until it answers, or when the read fails.
+const incidentTitle = ref<string | null>(null);
 
 // Round numbers a half-awake person can pick without doing arithmetic.
 const snoozeOptions = [
@@ -1102,6 +1099,13 @@ const title = computed(() =>
 // not "is the ladder running" — an acknowledged page still needs resolving.
 const isOpenState = computed(() => !!response.value && isUnresolved(response.value.state));
 
+/// How long a closed page stayed open, said on hover of its state tag.
+const closedAfter = computed(() => {
+  const r = response.value;
+  if (!r?.closed_at || isOpenState.value) return null;
+  return t("oncall.resolvedAfter", { duration: formatMicrosDuration(r.closed_at - r.opened_at) });
+});
+
 /// Only an escalating page can be claimed. Once it is owned, Acknowledge and
 /// Snooze are gone and Resolve becomes the primary action.
 const canAcknowledge = computed(() => !!response.value && isEscalating(response.value.state));
@@ -1121,17 +1125,6 @@ const teamRoute = computed(() => ({
   params: { teamId: response.value?.team_id ?? "", tab: "overview" },
   query: { org_identifier: orgId.value },
 }));
-
-/// The subtitle used to spell out "first page from this subject" / "N earlier
-/// firings" inline, which made a one-line tagline read as a paragraph. The
-/// firing count alone says "this isn't the first time" (or is); the rest is a
-/// tooltip on that count instead of a trailing clause, and the same prose the
-/// About card already carries.
-const historyLabel = computed(() =>
-  firingHistory.value.length
-    ? t("oncall.historyFirings", { count: firingHistory.value.length }, firingHistory.value.length)
-    : t("oncall.historyFirstPage"),
-);
 
 /// Clock time, not "N ago" — the elapsed duration is already said once, beside
 /// the title tags, and repeating it here as "opened 2 hours ago" would just be
@@ -1173,107 +1166,72 @@ const holdSecondsLeft = computed(() => {
   return Math.max(0, Math.ceil((until - nowMicros.value) / 1_000_000));
 });
 
-/// How long this has been somebody's problem. An open page reads as elapsed;
-/// a closed one stops at the moment it closed, rather than counting forever.
-const elapsedLabel = computed(() => {
-  const r = response.value;
-  if (!r) return "";
-  const end = r.closed_at ?? nowMicros.value;
-  return formatMicrosDuration(end - r.opened_at);
-});
+/// The policy's steps for this page's priority, `null` when the policy could not be read.
+const prioritySteps = computed(
+  () =>
+    policy.value?.rungs.find((rung) => rung.priority === response.value?.priority)?.steps ?? null,
+);
 
-/// Until somebody acks, "time to ack" is a clock still running, and freezing
-/// it at a dash hid the number the SLA is measured on.
-const ackLabel = computed(() => {
-  const r = response.value;
-  const openMicros = r ? nowMicros.value - r.opened_at : null;
-  if (r && !r.acked_at && r.closed_at) return t("oncall.neverAcknowledged");
-  return r?.acked_at || !openMicros ? t("oncall.timeToAck") : t("oncall.statUnackedFor");
-});
+/// The 1-based step a rung delay belongs to, so the timeline says "step 2" rather than a delay.
+function stepOfRung(rungMicros: number): number | null {
+  return reachedStepOf(prioritySteps.value, rungMicros);
+}
 
-const ackValue = computed(() => {
-  const r = response.value;
-  const openMicros = r ? nowMicros.value - r.opened_at : null;
-  if (r?.acked_at) return timeToAck.value;
-  if (r?.closed_at) return ABSENT;
-  return openMicros ? formatMicrosDuration(openMicros) : ABSENT;
-});
+function teamNameOf(teamId: string): string | null {
+  return teamNamesById.value[teamId] ?? null;
+}
 
-const resolveLabel = computed(() => {
-  const r = response.value;
-  const openMicros = r ? nowMicros.value - r.opened_at : null;
-  return r?.closed_at || !openMicros ? t("oncall.timeToResolve") : t("oncall.statOpenFor");
-});
-
-const resolveValue = computed(() => {
-  const r = response.value;
-  const openMicros = r ? nowMicros.value - r.opened_at : null;
-  if (r?.closed_at) return timeToResolve.value;
-  return openMicros ? formatMicrosDuration(openMicros) : ABSENT;
-});
-
-/// How far up the ladder a page got, said as the rung rather than as a delay.
-///
-/// **`reached_rung_micros` is omitted when no page went out, and `0` is a real
-/// and common value** meaning it never left the first rung — so `if (micros)`
-/// is a bug here and the test is for `undefined`.
-///
-/// The number on the wire is the rung's `after_micros`, which is a delay, not
-/// an index. Matching it back against the policy's own steps is what turns it
-/// into "rung 2 of 5"; without a policy to match against, the delay is still
-/// more honest than nothing.
-const reachedRung = computed<I18nText | string>(() => {
-  const micros = response.value?.reached_rung_micros;
-  if (micros === undefined || micros === null) {
-    return holdSecondsLeft.value > 0 ? t("oncall.statWaitingForTriage") : ABSENT;
-  }
-  const steps = policy.value?.rungs.find(
-    (rung) => rung.priority === response.value?.priority,
-  )?.steps;
-  const index = steps?.findIndex((step) => step.after_micros === micros) ?? -1;
-  if (index < 0 || !steps) return raw(`+${formatMicrosDuration(micros)}`);
-  return t("oncall.statReachedRungOf", { n: index + 1, total: steps.length });
-});
-
-/// The four facts a responder reads first — read once at the top rather than
-/// pieced together from the title tags and the "who is on" card below.
+/// Only facts the header does not already say: the duration of a closed page rides the title, so it is not repeated here.
 const topStats = computed<StatItem[]>(() => {
   const r = response.value;
   if (!r) return [];
-  return [
-    {
+  const stats: StatItem[] = [];
+  if (r.acked_at) {
+    stats.push({
       key: "ack",
-      label: ackLabel.value,
-      value: ackValue.value,
+      label: t("oncall.statAckedIn"),
+      value: formatMicrosDuration(r.acked_at - r.opened_at),
       icon: "check-circle",
-      tone: r.acked_at ? "success" : "warning",
+      tone: "success",
       dataTest: "oncall-response-stat-ack",
-    },
-    {
-      key: "resolve",
-      label: resolveLabel.value,
-      value: resolveValue.value,
-      icon: "check-circle",
-      tone: r.closed_at ? "success" : "warning",
-      dataTest: "oncall-response-stat-resolve",
-    },
-    {
-      key: "rung",
-      label: r.closed_at ? t("oncall.statReachedStep") : t("oncall.statReachedRung"),
-      value: reachedRung.value,
-      icon: "trending-up",
+    });
+  } else if (!r.closed_at) {
+    stats.push({
+      key: "ack",
+      label: t("oncall.statUnackedFor"),
+      value: formatMicrosDuration(nowMicros.value - r.opened_at),
+      icon: "schedule",
       tone: "warning",
+      dataTest: "oncall-response-stat-ack",
+    });
+  }
+  const step = headerReachedStep.value;
+  const total = prioritySteps.value?.length ?? null;
+  if (step !== null && total !== null) {
+    stats.push({
+      key: "rung",
+      label: t("oncall.statPagedUpTo"),
+      value: t("oncall.statStepOf", { n: step, total }),
+      icon: "trending-up",
+      tone: "neutral",
       dataTest: "oncall-response-stat-rung",
-    },
-    {
+    });
+  }
+  if (firingHistory.value.length) {
+    stats.push({
       key: "firing",
-      label: t("oncall.firing"),
-      value: `#${r.subject.firing}`,
-      icon: "format-list-numbered",
+      label: t("oncall.statFiredBefore"),
+      value: t(
+        "oncall.statTimes",
+        { count: firingHistory.value.length },
+        firingHistory.value.length,
+      ),
+      icon: "replay",
       tone: "neutral",
       dataTest: "oncall-response-stat-firing",
-    },
-  ];
+    });
+  }
+  return stats;
 });
 
 const routingReason = computed(() => routingReasonOf(events.value));
@@ -1296,18 +1254,6 @@ const snoozedUntilLabel = computed(() => {
   const r = response.value;
   if (!r || !isSnoozed(r)) return "";
   return formatOnCallInstant(r.snoozed_until as number, nowMicros.value, store.state.timezone);
-});
-
-const timeToAck = computed(() => {
-  const r = response.value;
-  if (!r?.acked_at) return "—";
-  return formatMicrosDuration(r.acked_at - r.opened_at);
-});
-
-const timeToResolve = computed(() => {
-  const r = response.value;
-  if (!r?.closed_at) return "—";
-  return formatMicrosDuration(r.closed_at - r.opened_at);
 });
 
 /// Cache-first; a force expires the entry first, so it costs one request, not two.
@@ -1355,6 +1301,7 @@ async function fetchResponse(force = false) {
       fetchEscalation,
       fetchDeliveries,
       fetchTeamContext,
+      fetchIncidentTitle,
     ]) {
       await step();
       if (readId !== latestResponseRead) return;
@@ -1586,6 +1533,7 @@ async function fetchHandoffTargets() {
   try {
     const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), false);
     knownTeamIds.value = teams.map((tm) => tm.id);
+    teamNamesById.value = Object.fromEntries(teams.map((tm) => [tm.id, tm.name]));
     teamOptions.value = teams
       .filter((tm) => tm.id !== r.team_id)
       .map((tm) => ({ label: raw(tm.name), value: tm.id }));
@@ -1607,6 +1555,21 @@ async function fetchSubjectAlert() {
     subjectAlert.value = res.data ?? null;
   } catch {
     subjectAlert.value = null;
+  }
+}
+
+async function fetchIncidentTitle() {
+  const incidentId = response.value?.incident_id;
+  incidentTitle.value = null;
+  if (!incidentId) return;
+  try {
+    const incident = await read<IncidentWithAlerts | null>(
+      incidentQuery(orgId.value, incidentId),
+      false,
+    );
+    incidentTitle.value = incident?.title ?? null;
+  } catch {
+    // The rail falls back to the id.
   }
 }
 
@@ -1681,7 +1644,8 @@ async function fetchTeamContext() {
   const r = response.value;
   if (!r) return;
   const teamId = r.team_id;
-  if (!teamId) {
+  // A deleted team has no rotation to read; asking only retries a 404 while the card waits.
+  if (!teamId || teamDeleted.value) {
     onCallPositions.value = [];
     policy.value = null;
     smtpConfigured.value = null;

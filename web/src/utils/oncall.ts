@@ -42,8 +42,9 @@ import type {
   Contact,
   RefusalReason,
   VerificationRefusalBody,
+  TestPageResult,
 } from "@/ts/interfaces/oncall";
-import { PROMOTE_SEVERITIES } from "@/ts/interfaces/oncall";
+import { PROMOTE_SEVERITIES, RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import {
   MICROS_PER_DAY,
   MICROS_PER_HOUR,
@@ -2170,6 +2171,218 @@ export function rungStillRetrying(
       (e.rung_micros ?? null) === (page.rung_micros ?? null) &&
       e.body.startsWith(GAVE_UP_MARKER),
   );
+}
+
+/** What a timeline line needs from the page to say names instead of ids. */
+export interface TimelineContext {
+  nameOf: (email: string) => string;
+  teamNameOf: (teamId: string) => string | null;
+}
+
+/** The engine's sentence for an automatic close, which repeats the recovery line before it. */
+const AUTO_RESOLVED_BODY = "resolved: recovered automatically";
+
+/** Drops a recovery line that the automatic-resolve line right after it already says. [pure] */
+export function mergeTimelineEvents(events: OnCallResponseEvent[]): OnCallResponseEvent[] {
+  return events.filter((event, index) => {
+    if (event.kind !== "recovery") return true;
+    return !events
+      .slice(index + 1)
+      .some(
+        (later) =>
+          later.kind === "state" &&
+          later.body === AUTO_RESOLVED_BODY &&
+          (later.ladder_run ?? 1) === (event.ladder_run ?? 1),
+      );
+  });
+}
+
+const KSUID_PATTERN = /\b[0-9A-Za-z]{27}\b/g;
+const EMAIL_PATTERN = /[^\s,;:()]+@[^\s,;:()]+\.[^\s,;:()]+/g;
+
+/** Emails as names and known team ids as team names, then a capital first letter. [pure] */
+function humanizeBody(body: string, ctx: TimelineContext): string {
+  const named = body
+    .replace(EMAIL_PATTERN, (email) => ctx.nameOf(email))
+    .replace(KSUID_PATTERN, (id) => ctx.teamNameOf(id) ?? id);
+  return named.charAt(0).toUpperCase() + named.slice(1);
+}
+
+/** A team the line names by id or name; an id nobody can resolve any more belongs to a deleted team. [pure] */
+function teamLabel(idOrName: string, ctx: TimelineContext, t: TranslateFn): I18nText {
+  const name = ctx.teamNameOf(idOrName);
+  if (name) return raw(name);
+  return /^[0-9A-Za-z]{27}$/.test(idOrName) ? t("oncall.tlDeletedTeam") : raw(idOrName);
+}
+
+function namesOf(list: string, ctx: TimelineContext): string {
+  return list
+    .split(", ")
+    .map((who) => ctx.nameOf(who.trim()))
+    .join(", ");
+}
+
+function causeLabel(cause: string, t: TranslateFn): string {
+  return (RESOLUTION_CAUSES as readonly string[]).includes(cause)
+    ? String(t(`oncall.cause_${cause as (typeof RESOLUTION_CAUSES)[number]}`))
+    : cause;
+}
+
+function pageLine(body: string, ctx: TimelineContext, t: TranslateFn): I18nText | null {
+  if (body === "paged nobody") return t("oncall.tlPagedNobody");
+  let m = body.match(/^nobody matched whoever is on call in (.+)$/);
+  if (m) return t("oncall.tlSeatEmpty", { rotation: raw(m[1]) });
+  m = body.match(/^nobody matched everyone on (.+)$/);
+  if (m) return t("oncall.tlRotationEmpty", { rotation: raw(m[1]) });
+  if (body.startsWith("nobody matched")) return t("oncall.tlNobodyMatched");
+  m = body.match(/^paged (.+) \((.+) unreachable\)$/);
+  if (m) {
+    return t("oncall.tlPagedSome", {
+      who: raw(namesOf(m[1], ctx)),
+      failed: raw(namesOf(m[2], ctx)),
+    });
+  }
+  m = body.match(/^paged (.+)$/);
+  if (m) return t("oncall.tlPaged", { who: raw(namesOf(m[1], ctx)) });
+  m = body.match(/^could not reach (.+)$/);
+  if (m) return t("oncall.tlCouldNotReach", { who: raw(namesOf(m[1], ctx)) });
+  return null;
+}
+
+function stateLine(body: string, t: TranslateFn): I18nText | null {
+  if (body === AUTO_RESOLVED_BODY) return t("oncall.tlAutoResolved");
+  if (body === "resolved") return t("oncall.tlResolved");
+  let m = body.match(/^resolved — ([a-z_]+): (.+)$/);
+  if (m)
+    return t("oncall.tlResolvedCauseNote", { cause: raw(causeLabel(m[1], t)), note: raw(m[2]) });
+  m = body.match(/^resolved — ([a-z_]+)$/);
+  if (m) return t("oncall.tlResolvedCause", { cause: raw(causeLabel(m[1], t)) });
+  m = body.match(/^resolved: (.+)$/);
+  if (m) return t("oncall.tlResolvedNote", { note: raw(m[1]) });
+  return null;
+}
+
+function sysLine(body: string, ctx: TimelineContext, t: TranslateFn): I18nText | null {
+  let m = body.match(/^opened for [a-z_]+\/\S+#(\d+): /);
+  if (m) return t("oncall.tlOpened", { n: Number(m[1]) });
+  m = body.match(/^routed to (.+?) by ownership rule (.+)$/);
+  if (m) return t("oncall.tlRoutedByRule", { team: teamLabel(m[1], ctx, t), rule: raw(m[2]) });
+  m = body.match(/^routed to (.+?) by the alert's own setting$/);
+  if (m) return t("oncall.tlRoutedByAlert", { team: teamLabel(m[1], ctx, t) });
+  m = body.match(/so it went to the default team (\S+)$/);
+  if (m) {
+    const team = teamLabel(m[1], ctx, t);
+    const covers = body.match(/^no ownership rule covers (.+?); /);
+    if (covers) return t("oncall.tlDefaultTeamFor", { dims: raw(covers[1]), team });
+    return t("oncall.tlDefaultTeam", { team });
+  }
+  m = body.match(
+    /^nothing in the service graph calls (.+), so no other team is downstream of this$/,
+  );
+  if (m) return t("oncall.tlNoDownstream", { service: raw(m[1]) });
+  if (body.startsWith("triage budget expired")) return t("oncall.tlTriageTimedOut");
+  m = body.match(/^escalated on request by (.+)$/);
+  if (m) return t("oncall.tlEscalatedBy", { who: raw(ctx.nameOf(m[1])) });
+  m = body.match(/^snoozed for (\d+) min/);
+  if (m) return t("oncall.tlSnoozed", { n: Number(m[1]) });
+  return null;
+}
+
+/** One timeline event as a plain sentence; unknown wording falls back to the server's text with names swapped in. [pure] */
+export function timelineSentence(
+  event: Pick<OnCallResponseEvent, "kind" | "body">,
+  ctx: TimelineContext,
+  t: TranslateFn,
+): I18nText {
+  const body = event.body.trim();
+  let line: I18nText | null = null;
+  switch (event.kind) {
+    case "page":
+      line = pageLine(body, ctx, t);
+      break;
+    case "ack":
+      line = /acknowledged$/.test(body) ? t("oncall.tlAcked") : null;
+      break;
+    case "handoff": {
+      const m = body.match(/^.+? handed off to (.+?)(?:: (.+))?$/);
+      if (m) {
+        const to = raw(ctx.nameOf(m[1]));
+        line = m[2]
+          ? t("oncall.tlHandedOffNote", { to, note: raw(m[2]) })
+          : t("oncall.tlHandedOff", { to });
+      }
+      break;
+    }
+    case "state":
+      line = stateLine(body, t);
+      break;
+    case "recovery":
+      line = body === "the alert stopped firing" ? t("oncall.tlAlertStopped") : null;
+      break;
+    case "exhausted":
+      line = t("oncall.tlExhausted");
+      break;
+    case "sys":
+      line = sysLine(body, ctx, t);
+      break;
+    case "severity_promoted": {
+      const m = body.match(/^severity promoted (P\d) → (P\d): (.+)$/s);
+      if (m) line = t("oncall.tlPromoted", { from: raw(m[1]), to: raw(m[2]), why: raw(m[3]) });
+      break;
+    }
+  }
+  return line ?? raw(humanizeBody(body, ctx));
+}
+
+/** Clock time, plus how long after the page opened from the first minute on: "14:39 · +2m". [pure] */
+export function timelineStamp(
+  atMicros: number,
+  openedAtMicros: number | null,
+  nowMicros: number,
+  zone: string,
+): string {
+  const clock = formatOnCallInstant(atMicros, nowMicros, zone);
+  if (openedAtMicros === null) return clock;
+  const offset = atMicros - openedAtMicros;
+  if (offset < MICROS_PER_MINUTE) return clock;
+  const day = (us: number) => formatTimestampInTimezone(us, "yyyy-MM-dd", zone);
+  // The opening line carries the date; a later line on the same day only needs its clock.
+  const sameDay = day(atMicros) === day(openedAtMicros);
+  const time = sameDay ? formatTimestampInTimezone(atMicros, "HH:mm", zone) : clock;
+  return `${time} · +${formatMicrosDurationShort(offset)}`;
+}
+
+/** Whole units only, so an offset stays short beside a clock time. [pure] */
+function formatMicrosDurationShort(micros: number): string {
+  const minutes = Math.floor(micros / MICROS_PER_MINUTE);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return hours % 24 ? `${days}d ${hours % 24}h` : `${days}d`;
+}
+
+/** A test page's outcome as one toast, and whether any send actually landed. [pure] */
+export function testPageOutcome(
+  result: TestPageResult | null | undefined,
+  t: TranslateFn,
+): { landed: boolean; variant: "success" | "warning"; message: I18nText } {
+  const attempts = result?.attempts ?? [];
+  const sent = attempts.filter((attempt) => attempt.delivered).length;
+  if (result?.reached_anyone && sent > 0) {
+    return {
+      landed: true,
+      variant: sent === attempts.length ? "success" : "warning",
+      message: t("oncall.testPageSentOf", { sent, total: attempts.length }, attempts.length),
+    };
+  }
+  return {
+    landed: false,
+    variant: "warning",
+    message: t("oncall.testPageNobody", {
+      reason: raw(result?.not_sent_because) || t("oncall.wouldPageNobody"),
+    }),
+  };
 }
 
 /** What the Phone card shows; `empty` is also the form that Change reopens. */
