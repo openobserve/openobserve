@@ -1,7 +1,7 @@
 ﻿<script setup lang="ts">
 import type { IconProps, IconSlots } from "./OIcon.types";
 import { computed } from "vue";
-import { iconRegistry } from "./OIcon.icons";
+import { filledIconRegistry, iconRegistry } from "./OIcon.icons";
 
 const props = withDefaults(defineProps<IconProps>(), {
   size: "md",
@@ -15,7 +15,11 @@ const isImgIcon = computed<boolean>(() => Boolean(props.name?.startsWith("img:")
 /** The src path stripped of the `img:` prefix */
 const imgSrc = computed<string>(() => (props.name?.startsWith("img:") ? props.name.slice(4) : ""));
 
-const iconComponent = computed(() => iconRegistry[props.name as keyof typeof iconRegistry]);
+const iconComponent = computed(
+  () =>
+    (props.filled && filledIconRegistry[props.name as keyof typeof iconRegistry]) ||
+    iconRegistry[props.name as keyof typeof iconRegistry],
+);
 
 const RTL_MIRRORED_ICONS = new Set([
   "arrow-back",

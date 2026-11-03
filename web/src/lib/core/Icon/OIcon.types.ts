@@ -18,6 +18,8 @@ export interface IconProps {
   size?: "xs" | "sm" | "md" | "lg" | "xl";
   /** Accessible label. When provided the icon has role="img". When omitted it is aria-hidden. */
   label?: I18nText;
+  /** Render the filled variant when the registry has one (selected nav state). */
+  filled?: boolean;
 }
 
 export interface IconSlots {
