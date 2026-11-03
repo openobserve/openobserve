@@ -762,6 +762,7 @@
     "dragToReorder": "Sleep om te herordenen",
     "timeAmount": "Tijdshoeveelheid",
     "timeUnit": "Tijdseenheid",
+    "unitFor": "{label}-eenheid",
     "queryEditorAriaLabel": "Query-editor. Druk op Escape om naar het volgende besturingselement te gaan.",
     "queryEditorEscapeAction": "Verplaats de focus naar het volgende besturingselement",
     "inlineEdit": {
@@ -11956,6 +11957,7 @@
       "budgetLabel": "Alarmbudget",
       "budgetPerDay": "per dag",
       "budgetPerWeek": "per week",
+      "budgetPeriod": "Alarmbudgetperiode",
       "budgetRange": "Voer een getal groter dan 0 in",
       "chartsTab": "Grafieken",
       "checkEvery": "Controleer elke",
@@ -11965,6 +11967,7 @@
       "sendsToStatus": "Stuurt naar {targets} elke keer dat een anomalie wordt gedetecteerd.",
       "detectionAlreadyRunning": "De detectie loopt al; probeer het zo opnieuw.",
       "detectionCharts": "Detectieresultaten",
+      "detectionFunctionField": "Detectiefunctieveld",
       "detectionFunctionTooltip": "Wat er per tijdsbucket gemeten moet worden. count kijkt naar hoeveel records er binnenkomen; avg, min, max en sum kijken naar een numeriek veld. p50, p95 en p99 kijken naar de verdeling van dat veld — bijvoorbeeld p95 van response_time_ms signaleert een verslechterende latency voor de traagste requests, zelfs wanneer het verkeer gelijk blijft.",
       "detectionResolution": "Resolutie van de detectie",
       "detectionResolutionTooltip": "Hoe gedetailleerd elk gegevenspunt is. Bijvoorbeeld „\" 5m \"” betekent dat afwijkingen worden gedetecteerd met een resolutie van 5 minuten.”",

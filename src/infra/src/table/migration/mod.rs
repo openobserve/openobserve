@@ -248,6 +248,7 @@ mod m20261030_000001_add_suppress_repeats_to_alerts;
 mod m20261030_000001_create_org_domain_ownership_table;
 mod m20261030_000002_create_org_domain_ownership_req_table;
 mod m20261101_000001_create_oncall_slack;
+mod m20261103_000001_add_status_streaks_to_synthetics;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -767,6 +768,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261030_000001_create_org_domain_ownership_table::Migration),
             Box::new(m20261030_000002_create_org_domain_ownership_req_table::Migration),
             Box::new(m20261101_000001_create_oncall_slack::Migration),
+            Box::new(m20261103_000001_add_status_streaks_to_synthetics::Migration),
         ]
     }
 }
@@ -867,6 +869,7 @@ mod tests {
             "m20261030_000002_create_org_domain_ownership_req_table",
         ),
         (132, "m20261101_000001_create_oncall_slack"),
+        (133, "m20261103_000001_add_status_streaks_to_synthetics"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

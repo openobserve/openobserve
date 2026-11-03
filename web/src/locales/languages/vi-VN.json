@@ -762,6 +762,7 @@
     "dragToReorder": "Kéo để sắp xếp lại",
     "timeAmount": "Số lượng thời gian",
     "timeUnit": "Đơn vị thời gian",
+    "unitFor": "{label} đơn vị",
     "queryEditorAriaLabel": "Trình soạn truy vấn. Nhấn Escape để chuyển sang điều khiển tiếp theo.",
     "queryEditorEscapeAction": "Di chuyển tiêu điểm đến điều khiển tiếp theo",
     "inlineEdit": {
@@ -11956,6 +11957,7 @@
       "budgetLabel": "Ngân sách cảnh báo",
       "budgetPerDay": "mỗi ngày",
       "budgetPerWeek": "mỗi tuần",
+      "budgetPeriod": "Chu kỳ ngân sách cảnh báo",
       "budgetRange": "Nhập một số lớn hơn 0",
       "chartsTab": "Biểu đồ",
       "checkEvery": "Kiểm tra mỗi",
@@ -11965,6 +11967,7 @@
       "sendsToStatus": "Gửi đến {targets} mỗi khi phát hiện bất thường.",
       "detectionAlreadyRunning": "Quá trình phát hiện đang chạy; hãy thử lại sau ít phút.",
       "detectionCharts": "Kết quả phát hiện",
+      "detectionFunctionField": "Trường hàm phát hiện",
       "detectionFunctionTooltip": "Đo lường gì trong mỗi khung thời gian. count theo dõi số bản ghi đến; avg, min, max và sum theo dõi một trường số. p50, p95 và p99 theo dõi phân bố của trường đó — ví dụ p95 của response_time_ms phát hiện độ trễ tăng lên ở những yêu cầu chậm nhất ngay cả khi lưu lượng không đổi.",
       "detectionResolution": "Độ phân giải phát hiện",
       "detectionResolutionTooltip": "Mức độ chi tiết của mỗi điểm dữ liệu. Ví dụ: \"5m\" nghĩa là các bất thường được phát hiện ở độ phân giải 5 phút.",
