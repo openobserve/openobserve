@@ -259,8 +259,8 @@ describe("SearchBar — pinned saved views", () => {
 
   // 93px = 1px border + 58px list trigger + 1px separator + 32px create button + 1px border.
   it.each([
-    [680, false],
-    [681, true],
+    [426, false],
+    [427, true],
   ])(
     "budgets the group at its rendered 93px width (toolbar %ipx → shown: %s)",
     async (width, shown) => {
