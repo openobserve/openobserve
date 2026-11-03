@@ -81,8 +81,11 @@ const stubs = {
   // invents one lets a dialog that can never open test green.
   ODialog: {
     name: "ODialog",
-    props: ["open"],
-    template: "<div v-if='open'><slot /><slot name='footer' /></div>",
+    props: ["open", "primaryButtonLabel", "primaryButtonDisabled", "primaryButtonDataTest"],
+    emits: ["click:primary", "update:open"],
+    template: `<div v-if='open'><slot /><slot name='footer' />
+      <button v-if="primaryButtonLabel" :data-test="primaryButtonDataTest" :disabled="primaryButtonDisabled" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+    </div>`,
   },
   OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
   OCard: { name: "OCard", template: "<div><slot /></div>" },
@@ -142,6 +145,7 @@ interface RenderOpts {
   reachability?: any;
   load?: any;
   timezone?: string;
+  canConfigure?: boolean;
 }
 
 function render(arg: OnCallTeamMember[] | RenderOpts = []) {
@@ -156,9 +160,16 @@ function render(arg: OnCallTeamMember[] | RenderOpts = []) {
       onCallNow: opts.onCallNow ?? [],
       reachability: opts.reachability ?? null,
       load: opts.load ?? null,
+      canConfigure: opts.canConfigure ?? true,
     },
     global: { plugins: [i18n, store], stubs },
   });
+}
+
+/// The picker lives in the Add members dialog, so a test opens it the way a reader does.
+async function openAdd(wrapper: ReturnType<typeof render>) {
+  await wrapper.find('[data-test="oncall-members-add-open"]').trigger("click");
+  await flushPromises();
 }
 
 function member(email: string): OnCallTeamMember {
@@ -211,9 +222,11 @@ describe("OnCallMembers", () => {
     await flushPromises();
 
     await wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action");
+    await flushPromises();
 
+    // The action opens Add members on the picker, not a scroll to a toolbar field.
+    expect(wrapper.find('[data-test="oncall-members-user-select"]').exists()).toBe(true);
     expect(memberPickerFocus).toHaveBeenCalled();
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
 
   // Typing an email means a typo silently creates a member nobody can log in
@@ -221,6 +234,7 @@ describe("OnCallMembers", () => {
   it("offers the org's users instead of a free-text email", async () => {
     const wrapper = render();
     await flushPromises();
+    await openAdd(wrapper);
 
     const picker = wrapper.find('[data-test="oncall-members-user-select"]');
     expect(picker.exists()).toBe(true);
@@ -233,12 +247,14 @@ describe("OnCallMembers", () => {
   it("falls back to the bare email when a user has no name", async () => {
     const wrapper = render();
     await flushPromises();
+    await openAdd(wrapper);
     expect(wrapper.find('[data-test="oncall-members-user-select"]').text()).toContain("cara@o2.ai");
   });
 
   it("names the member picker for a screen reader", async () => {
     const wrapper = render();
     await flushPromises();
+    await openAdd(wrapper);
     expect(wrapper.find('[data-test="oncall-members-user-select"]').attributes("aria-label")).toBe(
       "People to add",
     );
@@ -249,6 +265,7 @@ describe("OnCallMembers", () => {
     users.orgUsers.mockRejectedValue(new Error("boom"));
     const wrapper = render();
     await flushPromises();
+    await openAdd(wrapper);
 
     expect(wrapper.find('[data-test="oncall-members-user-select"]').exists()).toBe(false);
     const input = wrapper.find('[data-test="oncall-members-email-input"]');
@@ -260,6 +277,7 @@ describe("OnCallMembers", () => {
   it("hides people already on the team", async () => {
     const wrapper = render([member("ana@o2.ai")]);
     await flushPromises();
+    await openAdd(wrapper);
 
     const picker = wrapper.find('[data-test="oncall-members-user-select"]');
     expect(picker.text()).not.toContain("Ana Sharma");
@@ -270,6 +288,7 @@ describe("OnCallMembers", () => {
   it("adds several people in a single request", async () => {
     const wrapper = render();
     await flushPromises();
+    await openAdd(wrapper);
 
     const picker = wrapper.find('[data-test="oncall-members-user-select"]');
     const options = picker.findAll("option");
@@ -301,6 +320,7 @@ describe("OnCallMembers", () => {
       oncall.getSchedule.mockResolvedValue({ data: { timezone: "UTC", rotations: after } } as any);
       const wrapper = render({ members: [member("ana@o2.ai")], rotations: before });
       await flushPromises();
+      await openAdd(wrapper);
       const picker = wrapper.find('[data-test="oncall-members-user-select"]');
       const bob = picker.findAll("option").find((o) => o.element.value === "bob@o2.ai")!;
       bob.element.selected = true;
@@ -546,6 +566,7 @@ describe("OnCallMembers", () => {
   it("cannot submit with nobody selected", async () => {
     const wrapper = render();
     await flushPromises();
+    await openAdd(wrapper);
     expect(
       wrapper.find('[data-test="oncall-members-add-btn"]').attributes("disabled"),
     ).toBeDefined();
@@ -557,6 +578,7 @@ describe("OnCallMembers", () => {
     users.orgUsers.mockRejectedValue(new Error("boom"));
     const wrapper = render();
     await flushPromises();
+    await openAdd(wrapper);
 
     await wrapper
       .find('[data-test="oncall-members-email-input"]')
@@ -631,6 +653,7 @@ describe("OnCallMembers", () => {
     await flushPromises();
     const second = render([]);
     await flushPromises();
+    await openAdd(second);
 
     expect(users.orgUsers).toHaveBeenCalledTimes(1);
     expect(second.find('[data-test="oncall-members-user-select"]').text()).toContain("Ana Sharma");
@@ -658,6 +681,25 @@ describe("OnCallMembers", () => {
 
   describe("absences", () => {
     const member = { id: "m1", team_id: "team_1", user_email: "ana@o2.ai" };
+
+    /// Row actions are icon buttons, so each one names itself in a tooltip and to a screen reader.
+    it("names the mark-away icon in its tooltip and accessible name", async () => {
+      const wrapper = render([member]);
+      await flushPromises();
+      const button = wrapper.find('[data-test="oncall-members-mark-away-m1"]');
+      expect(button.attributes("aria-label")).toBe("Mark away");
+      expect(button.find('[data-test="tip"]').text()).toBe("Mark away");
+    });
+
+    /// Booking your own leave needs no configuration grant; booking somebody else's does.
+    it("offers a reader who cannot configure their own row only", async () => {
+      const self = { id: "me", team_id: "team_1", user_email: "example@gmail.com" };
+      const wrapper = render({ members: [member, self], canConfigure: false });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-members-mark-away-m1"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-members-mark-away-me"]').exists()).toBe(true);
+    });
 
     it("chips a member whose absence overlaps the window", async () => {
       const now = Date.now() * 1000;

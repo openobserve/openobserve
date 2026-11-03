@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="sm-action"
+        icon-left="person-add"
         data-test="oncall-rotation-open-members"
         @click="$emit('open-members')"
       >

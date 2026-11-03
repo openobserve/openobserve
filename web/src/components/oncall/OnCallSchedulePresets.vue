@@ -4,12 +4,8 @@
   thing a distributed team asks for, and until this control it had to be
   assembled by somebody who already understood restriction windows.
 
-  A tab per shape, not a step. The names stay on one strip while the chosen
-  one's form is edited under it, because choosing between four shapes is a
-  comparison — a back button between the names and what they build made the
-  reader hold the other three in their head. The strip is the same OTabs
-  every other module heads its sub-pages with, so this reads as one more page
-  rather than a bespoke picker.
+  One radio card per shape, a select on a phone. Each shape keeps what was
+  typed into it, so switching to compare never costs the values.
 
   A drawer rather than a dialog: the coverage grid is seven columns wide and
   every layer is a row of four controls, so the width is load-bearing.
@@ -29,29 +25,43 @@
     v-model:open="open"
     size="xxl"
     :title="t('oncall.presetsTitle')"
-    :sub-title="t('oncall.presetsSubtitle')"
     data-test="oncall-presets-drawer"
   >
     <OInnerLoading v-if="loading" showing />
 
     <div v-else class="flex flex-col gap-4">
-      <!-- Every shape stays reachable: the chosen one has to be re-comparable
-           without losing the values already typed into it. -->
-      <OTabs v-model="activeId" bordered data-test="oncall-presets-tabs">
-        <OTab
+      <OSelect
+        v-if="isMobile"
+        v-model="activeId"
+        :label="t('oncall.presetsPickerLabel')"
+        :options="presetOptions"
+        data-test="oncall-presets-picker"
+      />
+      <ORadioGroup
+        v-else
+        v-model="activeId"
+        :label="t('oncall.presetsPickerLabel')"
+        orientation="vertical"
+        class="grid grid-cols-2 gap-2"
+        data-test="oncall-presets-picker"
+      >
+        <ORadio
           v-for="preset in presets"
           :key="preset.id"
-          :name="preset.id"
-          :label="raw(preset.name)"
+          :value="preset.id"
+          variant="card"
           :data-test="`oncall-preset-${preset.id}`"
-        />
-      </OTabs>
+        >
+          <template #label>
+            <span class="flex min-w-0 flex-col gap-0.5">
+              <OText variant="body-strong">{{ raw(preset.name) }}</OText>
+              <OText variant="meta">{{ raw(preset.description) }}</OText>
+            </span>
+          </template>
+        </ORadio>
+      </ORadioGroup>
 
       <div v-if="chosen" class="flex min-w-0 flex-col gap-4">
-        <!-- The tab carries the name, so the line under it carries the part a
-             name cannot: what applying this one actually builds. -->
-        <OText variant="meta">{{ raw(chosen.description) }}</OText>
-
         <!-- One row per layer, in the priority order the schedule will hold
              them. A layer's people and its hours belong on one line: they are
              read together and, until this screen, were three stacked fields
@@ -104,6 +114,7 @@
                 variant="outline"
                 size="sm-action"
                 class="ms-auto"
+                icon-left="edit"
                 :data-test="`oncall-preset-override-${row.key}`"
                 @click="overridden[row.key] = true"
               >
@@ -227,6 +238,7 @@
               variant="ghost"
               size="sm-action"
               class="ms-auto"
+              icon-left="tune"
               data-test="oncall-preset-defaults-toggle"
               @click="defaultsOpen = !defaultsOpen"
             >
@@ -287,7 +299,17 @@
 
     <template #footer>
       <div class="flex flex-wrap items-center gap-3">
-        <OText variant="meta" class="min-w-0">{{ replaceNote }}</OText>
+        <span class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <OText variant="meta" data-test="oncall-presets-replace-note">{{ replaceNote }}</OText>
+          <OText
+            v-if="blockedReason"
+            variant="meta"
+            class="text-status-warning-text"
+            data-test="oncall-presets-blocked"
+          >
+            {{ blockedReason }}
+          </OText>
+        </span>
         <div class="ms-auto flex gap-2">
           <OButton variant="outline" size="sm-action" @click="open = false">
             {{ t("oncall.cancel") }}
@@ -296,7 +318,7 @@
             variant="primary"
             size="sm-action"
             :loading="applying"
-            :disabled="!chosen"
+            :disabled="!chosen || Boolean(blockedReason)"
             data-test="oncall-presets-apply"
             @click="primaryRotationName ? (confirmReplace = true) : apply()"
           >
@@ -327,8 +349,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODate from "@/lib/forms/Date/ODate.vue";
@@ -375,6 +398,7 @@ const open = defineModel<boolean>("open", { required: true });
 
 const { t } = useI18nTyped();
 const store = useStore();
+const { isMobile } = useBreakpoint();
 
 const MINUTES_PER_DAY = 1440;
 const orgId = computed(() => store.state.selectedOrganization.identifier);
@@ -458,17 +482,26 @@ function defaultModelOf(preset: PresetDescriptor): Record<string, unknown> {
   return next;
 }
 
+/// What each shape holds while another is on screen, keyed by preset id.
+const drafts = new Map<
+  string,
+  { model: Record<string, unknown>; overridden: Record<string, boolean> }
+>();
+
 function choose(preset: PresetDescriptor) {
+  if (chosen.value) {
+    drafts.set(chosen.value.id, { model: model.value, overridden: overridden.value });
+  }
+  const draft = drafts.get(preset.id);
   chosen.value = preset;
   applyError.value = "";
   attempted.value = false;
   defaultsOpen.value = false;
-  overridden.value = {};
-  model.value = defaultModelOf(preset);
+  overridden.value = draft?.overridden ?? {};
+  model.value = draft?.model ?? defaultModelOf(preset);
 }
 
-/// The strip's v-model. Re-picking the open tab must not wipe the values
-/// already typed into it, so the setter only fires on a real change.
+/// The picker's v-model; re-picking the open shape is a no-op.
 const activeId = computed<string>({
   get: () => chosen.value?.id ?? "",
   set: (id) => {
@@ -476,6 +509,10 @@ const activeId = computed<string>({
     if (preset && preset.id !== chosen.value?.id) choose(preset);
   },
 });
+
+const presetOptions = computed<SelectOption[]>(() =>
+  presets.value.map((preset) => ({ label: raw(preset.name), value: preset.id })),
+);
 
 function groupsOf(input: PresetInput): Record<string, unknown>[] {
   return (model.value[input.field] ?? []) as Record<string, unknown>[];
@@ -834,8 +871,15 @@ const defaultsSentence = computed<I18nText>(() => {
 
 const replaceNote = computed<I18nText>(() =>
   props.primaryRotationName
-    ? t("oncall.presetsReplaceNote", { name: raw(props.primaryRotationName) })
+    ? t("oncall.presetsReplaceShort", { name: raw(props.primaryRotationName) })
     : t("oncall.presetsReplaceNone"),
+);
+
+/// A group with nobody in it pages nobody, so Save waits for every one to have people.
+const blockedReason = computed<I18nText | "">(() =>
+  rows.value.some((row) => row.memberField && controlsVisible(row) && !membersOf(row).length)
+    ? t("oncall.presetsBlockedMembers")
+    : "",
 );
 
 // ── Applying ──────────────────────────────────────────────────────────────────

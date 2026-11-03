@@ -59,6 +59,8 @@ vi.mock("@/services/oncall", () => ({
     // there is no per-rotation endpoint.
     setSchedule: vi.fn(),
     testPage: vi.fn(),
+    listUnavailability: vi.fn(),
+    createUnavailability: vi.fn(),
   },
 }));
 
@@ -85,7 +87,8 @@ const toasted = vi.mocked(toast);
 const stubs = {
   OPageLayout: {
     name: "OPageLayout",
-    template: "<div><slot name='title-trail' /><slot name='actions' /><slot /></div>",
+    template:
+      "<div><slot name='title-trail' /><slot name='actions' /><slot name='header-tabs' /><slot /></div>",
   },
   OTable: { name: "OTable", props: ["data", "columns"], template: "<div />" },
   OnCallScheduleTimeline: true,
@@ -140,6 +143,7 @@ describe("OnCallTeamDetail", () => {
     service.teamConfigRisks.mockResolvedValue({ data: null } as any);
     service.teamLoad.mockResolvedValue({ data: null } as any);
     service.listOverrides.mockResolvedValue({ data: [] } as any);
+    service.listUnavailability.mockResolvedValue({ data: [] } as any);
   });
 
   /// Overview first — what the team HAS been doing — then the chain that
@@ -1590,6 +1594,192 @@ describe("OnCallTeamDetail", () => {
         .findComponent({ name: "OnCallScheduleTimeline" })
         .props("segments") as any[];
       expect(drawn.map((s) => [s.from, s.to])).toEqual([[0, 1]]);
+    });
+  });
+
+  describe("acting on a shift bar", () => {
+    const WEEK = 604_800_000_000;
+    const DialogStub = {
+      name: "ODialog",
+      props: ["open"],
+      template: "<div v-if='open'><slot /><slot name='footer' /></div>",
+    };
+
+    async function onSchedule(extraStubs: Record<string, unknown> = {}) {
+      service.getSchedule.mockResolvedValue({
+        data: { rotations: [rotation("rot_1", "Primary")] },
+      } as any);
+      service.listMembers.mockResolvedValue({
+        data: [{ user_email: "ana@o2.ai" }, { user_email: "bo@o2.ai" }],
+      } as any);
+      const wrapper = mount(OnCallTeamDetail, {
+        global: { plugins: [i18n, store], stubs: { ...stubs, ...extraStubs } },
+      });
+      await flushPromises();
+      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await flushPromises();
+      const timeline = wrapper.findComponent({ name: "OnCallScheduleTimeline" });
+      timeline.vm.$emit("update:window", { from: 1_000, to: 3 * WEEK });
+      await flushPromises();
+      return { wrapper, timeline };
+    }
+
+    const future = (over: Record<string, unknown> = {}) => {
+      const from = Date.now() * 1000 + 3_600_000_000;
+      return { rotation_id: "rot_1", from, to: from + WEEK, user_email: "ana@o2.ai", ...over };
+    };
+
+    it("opens the cover dialog on that shift's rotation, holder and window", async () => {
+      const { wrapper, timeline } = await onSchedule();
+      const segment = future();
+      timeline.vm.$emit("shift-action", "cover", segment);
+      await flushPromises();
+
+      const cover = wrapper.findComponent({ name: "OnCallCoverForm" });
+      expect(cover.props("open")).toBe(true);
+      expect(cover.props("gap")).toEqual({ from: segment.from, to: segment.to });
+      expect(cover.props("defaultRotation")).toBe("rot_1");
+      expect(cover.props("defaultMode")).toBe("cover");
+      expect(cover.props("currentHolder")).toBe("ana@o2.ai");
+    });
+
+    /// A cover over hours that are gone pages nobody, so a running shift is covered from now.
+    it("starts a running shift's cover at now, not at the shift's start", async () => {
+      const { wrapper, timeline } = await onSchedule();
+      const before = Date.now() * 1000;
+      timeline.vm.$emit("shift-action", "cover", future({ from: 0 }));
+      await flushPromises();
+
+      const gap = wrapper.findComponent({ name: "OnCallCoverForm" }).props("gap");
+      expect(gap.from).toBeGreaterThanOrEqual(before);
+    });
+
+    it("sends the team's own people's absences to the timeline, and nobody else's", async () => {
+      const absence = (email: string) => ({
+        id: email,
+        org_id: "default",
+        user_email: email,
+        start_at: 2_000,
+        end_at: 3_000,
+        created_by: email,
+        created_at: 0,
+      });
+      service.listUnavailability.mockResolvedValue({
+        data: [absence("ana@o2.ai"), absence("stranger@o2.ai")],
+      } as any);
+      const { timeline } = await onSchedule();
+
+      expect(service.listUnavailability).toHaveBeenCalledWith(
+        expect.objectContaining({ from: 1_000, to: 3 * WEEK }),
+      );
+      expect(timeline.props("absences").map((a: any) => a.user_email)).toEqual(["ana@o2.ai"]);
+    });
+
+    /// The real form, not a stub: the swap it opens on is the clicked shift's week.
+    it("opens the real cover form on Swap with the clicked week chosen", async () => {
+      const { wrapper, timeline } = await onSchedule({
+        OnCallCoverForm: false,
+        ODialog: DialogStub,
+      });
+      const [shift] = wrapper.findComponent({ name: "OnCallCoverForm" }).props("shifts") as any[];
+      expect(timeline.props("swapRotations")).toEqual(["rot_1"]);
+
+      timeline.vm.$emit(
+        "shift-action",
+        "swap",
+        future({ from: shift.startMicros, to: shift.endMicros }),
+      );
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-swap-form"]').exists()).toBe(true);
+      expect(wrapper.findComponent('[data-test="oncall-swap-a"]').props("modelValue")).toBe(
+        `rot_1:${shift.startMicros}`,
+      );
+    });
+
+    /// The real away dialog: opened on the shift's person and window, and saved against them.
+    it("marks the shift's person away for that shift's window", async () => {
+      service.createUnavailability.mockResolvedValue({ data: {} } as any);
+      const { wrapper, timeline } = await onSchedule({ ODialog: DialogStub });
+      const segment = future({ user_email: "bo@o2.ai" });
+      const readsBefore = service.resolvedSchedule.mock.calls.length;
+
+      timeline.vm.$emit("shift-action", "away", segment);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-away-save"]').trigger("click");
+      await flushPromises();
+
+      const sent = (service.createUnavailability.mock.calls[0][0] as any).data;
+      expect(sent.user_email).toBe("bo@o2.ai");
+      // The fields hold minutes, so the round trip lands on the shift's minute.
+      expect(Math.floor(sent.start_at / 60_000_000)).toBe(Math.floor(segment.from / 60_000_000));
+      expect(Math.floor(sent.end_at / 60_000_000)).toBe(Math.floor(segment.to / 60_000_000));
+      expect(service.resolvedSchedule.mock.calls.length).toBeGreaterThan(readsBefore);
+    });
+  });
+
+  describe("the header", () => {
+    const headerStubs = {
+      ...stubs,
+      OPageLayout: {
+        name: "OPageLayout",
+        props: { tabsBelow: Boolean },
+        template:
+          "<div><slot name='title-trail' /><slot name='actions' /><div data-test='header-tabs-slot'><slot name='header-tabs' /></div><slot /></div>",
+      },
+    };
+    const mountHeader = () =>
+      mount(OnCallTeamDetail, { global: { plugins: [i18n, store], stubs: headerStubs } });
+    const rung = (priority: string, pagesAnyone: boolean) => ({
+      priority,
+      rungs: pagesAnyone ? 1 : 0,
+      pages_anyone: pagesAnyone,
+      ends_with_whole_team: false,
+      channels: [],
+    });
+
+    /// Same header as the Incident page: tabs attached below the title, grey tallies.
+    it("attaches tabs with icons to the header, with neutral counts", async () => {
+      const wrapper = mountHeader();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OPageLayout" }).props("tabsBelow")).toBe(true);
+      expect(
+        wrapper.find('[data-test="header-tabs-slot"] [data-test="oncall-team-tabs"]').exists(),
+      ).toBe(true);
+      // The header draws the one line under the tabs, so the strip draws none of its own.
+      expect(wrapper.findComponent({ name: "OTabs" }).props("bordered")).toBe(false);
+      // Every tab keeps its icon, so the strip reads like the rest of the app.
+      expect(
+        wrapper
+          .findAllComponents({ name: "OTab" })
+          .map((tab) => tab.findComponent({ name: "OIcon" }).exists()),
+      ).toEqual([true, true, true, true, true]);
+      const members = wrapper.find('[data-test="oncall-team-tab-members"]');
+      expect(members.findComponent({ name: "OTag" }).props("value")).toBe("neutral");
+    });
+
+    /// P4–P5 paging nobody is the default; only a silent P1–P3 earns the warning.
+    it("warns on the Escalation tab only when a P1–P3 pages nobody", async () => {
+      queryClient.clear();
+      service.teamOverview.mockResolvedValue({
+        data: { rungs: [rung("P1", true), rung("P4", false), rung("P5", false)] },
+      } as any);
+      const quiet = mountHeader();
+      await flushPromises();
+      expect(quiet.find('[data-test="oncall-team-tab-policy-warning"]').exists()).toBe(false);
+
+      service.teamOverview.mockResolvedValue({
+        data: { rungs: [rung("P1", true), rung("P2", false), rung("P4", false)] },
+      } as any);
+      queryClient.clear();
+      const loud = mountHeader();
+      await flushPromises();
+      const warning = loud.find('[data-test="oncall-team-tab-policy-warning"]');
+      expect(warning.exists()).toBe(true);
+      expect(warning.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "1 priority from P1–P3 pages nobody",
+      );
     });
   });
 });

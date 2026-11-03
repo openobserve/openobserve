@@ -67,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="worst.fix"
               variant="outline"
               size="xs"
+              icon-left="build"
               data-test="oncall-attention-fix-now"
               @click="emit('act', worst.fix, worst.rotation)"
             >
@@ -75,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="xs"
+              icon-left="unfold-more"
               data-test="oncall-attention-expand"
               @click="expanded = true"
             >
@@ -164,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :variant="row.bucket === 'blocking' ? 'primary' : 'outline'"
             size="xs"
             class="shrink-0"
+            icon-left="arrow-forward"
             :data-test="`oncall-attention-cta-${row.kind}`"
             @click="emit('act', row.fix, row.rotation)"
           >

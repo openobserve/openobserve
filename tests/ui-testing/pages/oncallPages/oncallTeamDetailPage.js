@@ -21,7 +21,7 @@
  *
  * Two editors, both drawers, both reached from the schedule tab:
  *   - the rotation editor  `oncall-schedule-editor` / `oncall-rotation-drawer`
- *   - Quick start          `oncall-presets-drawer`  (locale: "Quick start")
+ *   - Start from a template `oncall-presets-drawer`  (locale: "Start from a template")
  */
 
 import { expect } from '@playwright/test';
@@ -80,7 +80,8 @@ export class OnCallTeamDetailPage {
       timelineChart: '[data-test="oncall-timeline-chart"]',
       timelineEmpty: '[data-test="oncall-timeline-empty"]',
       timelineAdd: '[data-test="oncall-timeline-add"]',
-      timelinePresets: '[data-test="oncall-timeline-presets"]',
+      laneMenus: '[data-test^="oncall-lane-menu-"]',
+      laneStartOver: '[data-test^="oncall-lane-presets-"]',
       timelineGap: '[data-test="oncall-timeline-gap"]',
       timelineFillGap: '[data-test="oncall-timeline-fill-gap"]',
       timelineToday: '[data-test="oncall-timeline-today"]',
@@ -112,7 +113,7 @@ export class OnCallTeamDetailPage {
 
       // Quick start drawer (OnCallSchedulePresets).
       presetsDrawer: '[data-test="oncall-presets-drawer"]',
-      presetsTabs: '[data-test="oncall-presets-tabs"]',
+      presetsTabs: '[data-test="oncall-presets-picker"]',
       presetsApply: '[data-test="oncall-presets-apply"]',
       presetsError: '[data-test="oncall-presets-error"]',
       presetDefaults: '[data-test="oncall-preset-defaults"]',
@@ -270,7 +271,7 @@ export class OnCallTeamDetailPage {
   getPresetsTabs() { return this.page.locator(this.locators.presetsTabs); }
   /** The catalogue lands on a shape rather than an empty pane; this is that shape. */
   getActivePresetTab() {
-    return this.page.locator(`${this.locators.presetsTabs} [data-state="active"]`);
+    return this.page.locator(`${this.locators.presetsTabs} [data-state="checked"]`);
   }
   getPresetTab(presetId) { return this.page.locator(this.presetTab(presetId)); }
   getPresetRow(rowKey) { return this.page.locator(this.presetRow(rowKey)); }
@@ -383,7 +384,7 @@ export class OnCallTeamDetailPage {
     const tab = this.page.locator(this.ruleTab(index));
     await tab.waitFor({ state: 'visible', timeout: 15000 });
     await tab.click();
-    await expect(tab).toHaveAttribute('data-state', 'active', { timeout: 10000 });
+    await expect(tab).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
   }
 
   /** "+" opens the new rule's rename popover; it is closed so the tab body can be used. */
@@ -465,13 +466,22 @@ export class OnCallTeamDetailPage {
   /**
    * Open Quick start.
    *
-   * The locale calls it "Quick start" (`oncall.presetsTitle`); the component is
+   * The locale calls it "Start from a template" (`oncall.presetsTitle`); the component is
    * OnCallSchedulePresets and everything inside it is keyed `oncall-preset*`.
    * Applying one is a FULL REPLACE of the team's rotations, so on a team that
    * already has a schedule a confirmation stands between Save and the request.
    */
   async openQuickStart() {
-    await this.page.locator(this.locators.timelinePresets).click();
+    const empty = this.page.locator(this.locators.timelineEmpty);
+    const laneMenu = this.page.locator(this.locators.laneMenus).first();
+    await expect(empty.or(laneMenu)).toBeVisible({ timeout: 20000 });
+    // An empty schedule offers the template as its main road; once one exists it is the first lane's "Start over".
+    if (await empty.isVisible()) {
+      await empty.getByRole('button', { name: /Start from a template/ }).click();
+    } else {
+      await laneMenu.click();
+      await this.page.locator(this.locators.laneStartOver).first().click();
+    }
     await expect(this.page.locator(this.locators.presetsDrawer)).toBeVisible({ timeout: 20000 });
   }
 
@@ -479,7 +489,7 @@ export class OnCallTeamDetailPage {
     const tab = this.page.locator(this.presetTab(presetId));
     await tab.waitFor({ state: 'visible', timeout: 15000 });
     await tab.click();
-    await expect(tab).toHaveAttribute('data-state', 'active', { timeout: 10000 });
+    await expect(tab).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
   }
 
   /**

@@ -14,6 +14,15 @@ vi.mock("@/services/oncall", () => ({
 }));
 const service = vi.mocked(oncallService);
 
+const phone = vi.hoisted(() => ({ on: false }));
+vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/useBreakpoint")>();
+  const { computed } = await import("vue");
+  return {
+    default: () => ({ ...actual.default(), isMobile: computed(() => phone.on) }),
+  };
+});
+
 // A synthetic preset, NOT one of the four real ones: the screen's contract is
 // that any catalogue entry renders unaided, and a fixture copied from the real
 // follow_the_sun would quietly re-test the hardcoding this component forbids.
@@ -116,18 +125,6 @@ const stubs = {
     props: ["open"],
     template: "<div v-if='open'><slot /><slot name='footer' /></div>",
   },
-  OTabs: {
-    name: "OTabs",
-    props: ["modelValue"],
-    emits: ["update:modelValue"],
-    template: "<div><slot /></div>",
-  },
-  OTab: {
-    name: "OTab",
-    props: ["name", "label"],
-    emits: ["click"],
-    template: `<button @click="$emit('click')">{{ label }}</button>`,
-  },
   ConfirmDialog: {
     name: "ConfirmDialog",
     props: ["modelValue", "title", "message"],
@@ -139,8 +136,9 @@ const stubs = {
   OIcon: { name: "OIcon", template: "<i />" },
   OButton: {
     name: "OButton",
+    props: ["disabled"],
     emits: ["click"],
-    template: `<button @click="$emit('click')"><slot /></button>`,
+    template: `<button :disabled="disabled" @click="$emit('click')"><slot /></button>`,
   },
   OInput: {
     name: "OInput",
@@ -201,20 +199,23 @@ async function renderOpen(primaryRotationName = "") {
 describe("OnCallSchedulePresets", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    phone.on = false;
     service.listSchedulePresets.mockResolvedValue({ data: [preset, other] } as any);
     service.applySchedulePreset.mockResolvedValue({ data: {} } as any);
   });
 
-  /// The shapes are a comparison, so they stay on one strip — and the first is
-  /// already chosen, because an empty body charges a click for a shape nobody
-  /// had rejected yet.
-  it("puts every shape on the tab strip and opens on the first one", async () => {
+  /// The first card is already chosen: an empty body charges a click for a shape nobody had rejected yet.
+  it("puts every shape on a radio card with its description and opens on the first one", async () => {
     const wrapper = await renderOpen();
 
+    const group = wrapper.findComponent({ name: "ORadioGroup" });
+    expect(group.props("modelValue")).toBe("test_shape");
+    const cards = wrapper.findAllComponents({ name: "ORadio" });
+    expect(cards.map((card) => card.props("value"))).toEqual(["test_shape", "other_shape"]);
+    expect(cards[0].props("variant")).toBe("card");
+    expect(cards[0].text()).toContain("Test shape");
+    expect(cards[0].text()).toContain("Two layers over a catch-all");
     expect(wrapper.find('[data-test="oncall-preset-test_shape"]').exists()).toBe(true);
-    expect(wrapper.findComponent({ name: "OTabs" }).props("modelValue")).toBe("test_shape");
-    // The name is on the tab, so the line under it carries what it builds.
-    expect(wrapper.text()).toContain("Two layers over a catch-all");
     expect(wrapper.findAll('[data-test^="oncall-preset-row-"]').length).toBeGreaterThan(0);
   });
 
@@ -279,28 +280,63 @@ describe("OnCallSchedulePresets", () => {
     expect([at("groups-2", "from"), at("groups-2", "to")]).toEqual([1080, 1440]);
   });
 
-  /// Reka activates a tab on mousedown, so the strip drives the body through
-  /// its v-model rather than through a click handler of ours.
-  it("rebuilds the form when the strip picks another shape", async () => {
+  it("rebuilds the form when a card picks another shape", async () => {
     const wrapper = await renderOpen();
-    await wrapper.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "other_shape");
+    await wrapper.find('[data-test="oncall-preset-other_shape"]').trigger("click");
     await flushPromises();
 
+    expect(wrapper.findComponent({ name: "ORadioGroup" }).props("modelValue")).toBe("other_shape");
     expect(wrapper.find('[data-test="oncall-preset-row-only"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-preset-row-groups-0"]').exists()).toBe(false);
   });
 
-  /// Re-picking the tab you are already on is a no-op, not a reset — the strip
-  /// re-emits its own value on focus, and that must not empty the form.
-  it("keeps what has been typed when the open tab is picked again", async () => {
+  it("keeps what has been typed when the open card is picked again", async () => {
     const wrapper = await renderOpen();
     await wrapper.find('[data-test="oncall-preset-group-add-groups"]').trigger("click");
     expect(wrapper.find('[data-test="oncall-preset-row-groups-2"]').exists()).toBe(true);
 
-    await wrapper.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "test_shape");
+    await wrapper
+      .findComponent({ name: "ORadioGroup" })
+      .vm.$emit("update:modelValue", "test_shape");
     await flushPromises();
 
     expect(wrapper.find('[data-test="oncall-preset-row-groups-2"]').exists()).toBe(true);
+  });
+
+  /// Comparing shapes must not cost the values typed into the one left behind.
+  it("keeps each shape's typed values when switching away and back", async () => {
+    const wrapper = await renderOpen();
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-0-name"]')
+      .vm.$emit("update:modelValue", "APAC");
+    await wrapper.find('[data-test="oncall-preset-group-add-groups"]').trigger("click");
+
+    const group = wrapper.findComponent({ name: "ORadioGroup" });
+    await group.vm.$emit("update:modelValue", "other_shape");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-preset-row-only"]').exists()).toBe(true);
+
+    await group.vm.$emit("update:modelValue", "test_shape");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-preset-row-groups-2"]').exists()).toBe(true);
+    expect(
+      wrapper.findComponent('[data-test="oncall-preset-field-groups-0-name"]').props("modelValue"),
+    ).toBe("APAC");
+  });
+
+  it("picks the shape from a select on a phone", async () => {
+    phone.on = true;
+    const wrapper = await renderOpen();
+    expect(wrapper.findComponent({ name: "ORadioGroup" }).exists()).toBe(false);
+    const picker = wrapper.findComponent('[data-test="oncall-presets-picker"]');
+    expect(picker.props("options").map((o: { value: string }) => o.value)).toEqual([
+      "test_shape",
+      "other_shape",
+    ]);
+    await picker.vm.$emit("update:modelValue", "other_shape");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-preset-row-only"]').exists()).toBe(true);
+    phone.on = false;
   });
 
   it("caps add-group at the catalogue's max", async () => {
@@ -398,11 +434,8 @@ describe("OnCallSchedulePresets", () => {
     expect(wrapper.emitted("applied")).toBeFalsy();
   });
 
-  /// The other half of the same bug: a required group with nobody assigned
-  /// never reaches the network either — previously it did, and the server's
-  /// axum extraction rejected it with "missing field `members`" instead of a
-  /// sentence written for the person who left the picker on "Nobody yet".
-  it("blocks apply and flags the field when a required group has nobody assigned", async () => {
+  /// A group with nobody in it pages nobody: Save waits, and says why on one line.
+  it("disables apply with a reason while a group has nobody assigned", async () => {
     const wrapper = await renderOpen();
     await wrapper
       .findComponent('[data-test="oncall-preset-field-groups-0-name"]')
@@ -413,22 +446,34 @@ describe("OnCallSchedulePresets", () => {
     await wrapper
       .findComponent('[data-test="oncall-preset-field-groups-0-members"]')
       .vm.$emit("update:modelValue", ["a@example.com"]);
-    await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
-    await flushPromises();
 
+    const save = wrapper.find('[data-test="oncall-presets-apply"]');
+    expect(save.attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="oncall-presets-blocked"]').text()).toBe(
+      "Add people to every group to save",
+    );
+    await save.trigger("click");
+    await flushPromises();
     expect(service.applySchedulePreset).not.toHaveBeenCalled();
-    expect(wrapper.find('[data-test="oncall-presets-error"]').text()).toContain("Members");
+
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-1-members"]')
+      .vm.$emit("update:modelValue", ["b@example.com"]);
+    expect(wrapper.find('[data-test="oncall-presets-blocked"]').exists()).toBe(false);
     expect(
-      wrapper.findComponent('[data-test="oncall-preset-field-groups-1-members"]').props("error"),
-    ).toBe(true);
-    expect(wrapper.emitted("applied")).toBeFalsy();
+      wrapper.find('[data-test="oncall-presets-apply"]').attributes("disabled"),
+    ).toBeUndefined();
   });
 
-  /// When more than one field is left blank, the banner reads as a general
-  /// pointer to the form rather than naming just the first offender — but
-  /// every offending field is still marked, not only the first one found.
+  /// When more than one name is blank the message points at the form, and every offender is marked.
   it("flags every offending field and shows a general message when several are blank", async () => {
     const wrapper = await renderOpen();
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-0-members"]')
+      .vm.$emit("update:modelValue", ["a@example.com"]);
+    await wrapper
+      .findComponent('[data-test="oncall-preset-field-groups-1-members"]')
+      .vm.$emit("update:modelValue", ["b@example.com"]);
     await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
     await flushPromises();
 
@@ -438,23 +483,18 @@ describe("OnCallSchedulePresets", () => {
       wrapper.findComponent('[data-test="oncall-preset-field-groups-0-name"]').props("error"),
     ).toBe(true);
     expect(
-      wrapper.findComponent('[data-test="oncall-preset-field-groups-0-members"]').props("error"),
-    ).toBe(true);
-    expect(
       wrapper.findComponent('[data-test="oncall-preset-field-groups-1-name"]').props("error"),
-    ).toBe(true);
-    expect(
-      wrapper.findComponent('[data-test="oncall-preset-field-groups-1-members"]').props("error"),
     ).toBe(true);
   });
 
   /// The server swaps only the primary rotation's rules, so the note and the confirm name it and promise nothing wider.
   it("confirms before replacing the primary rotation's rules, and names it", async () => {
     const wrapper = await renderOpen("Day crew");
-    expect(wrapper.text()).toContain(
-      "Applying replaces the shift rules of Day crew. Its name, the other rotations, covers and absences stay.",
+    expect(wrapper.find('[data-test="oncall-presets-replace-note"]').text()).toBe(
+      "Replaces Day crew's shift rules",
     );
 
+    await nameGroups(wrapper);
     await wrapper.find('[data-test="oncall-presets-apply"]').trigger("click");
     await flushPromises();
 

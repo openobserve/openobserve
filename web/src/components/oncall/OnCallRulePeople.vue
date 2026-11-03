@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost-primary"
         size="xs"
+        icon-left="edit"
         :data-test="`oncall-rule-people-edit-${ruleIndex}`"
         @click="expanded = true"
       >
@@ -63,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="rule.members.length"
           variant="ghost-primary"
           size="xs"
+          icon-left="check"
           :data-test="`oncall-rule-people-done-${ruleIndex}`"
           @click="expanded = false"
         >
@@ -163,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm-action"
           :disabled="!addable.length"
+          icon-left="group-add"
           :data-test="`oncall-rule-people-add-all-${ruleIndex}`"
           @click="addEveryone"
         >

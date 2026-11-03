@@ -30,182 +30,256 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   nobody.
 -->
 <template>
-  <div class="relative flex flex-col gap-4" data-test="oncall-escalation-ladder">
-    <!-- Every priority, including the ones that wake nobody. A priority absent
-         from this strip is one nobody would think to check. The edit button
-         rides along on the same row rather than a title above it — this
-         strip already says what is being edited. -->
-    <!-- One line: only the chips wrap, inside their own group, so the buttons never drop below them. -->
-    <span class="flex items-start gap-2" data-test="oncall-ladder-strip">
-      <span
-        class="flex min-w-0 flex-1 flex-wrap items-center gap-2"
-        data-test="oncall-ladder-priorities"
+  <div class="relative flex flex-col gap-3" data-test="oncall-escalation-ladder">
+    <!-- Every priority, including the ones that wake nobody: a priority absent from this strip is one nobody would think to check. -->
+    <span class="flex min-w-0 flex-wrap items-center gap-2" data-test="oncall-ladder-strip">
+      <OButton
+        v-for="group in groups"
+        :key="group.key"
+        :variant="group.variant"
+        size="xs"
+        :data-test="`oncall-ladder-priority-${group.key}`"
+        @click="emit('update:selected', group.selects)"
       >
-        <OButton
-          v-for="group in groups"
-          :key="group.key"
-          :variant="group.variant"
-          size="xs"
-          :data-test="`oncall-ladder-priority-${group.key}`"
-          @click="emit('update:selected', group.selects)"
-        >
-          {{ group.label }}
-          <span class="text-2xs ms-1.5" :class="group.summaryTone">{{ group.summary }}</span>
-        </OButton>
-      </span>
-      <span class="flex shrink-0 items-center gap-2" data-test="oncall-ladder-actions">
-        <OButton
-          v-if="canConfigure"
-          variant="outline"
-          size="xs"
-          :disabled="!sendTestReady"
-          data-test="oncall-ladder-send-test"
-          @click="emit('send-test')"
-        >
-          {{ t("oncall.ladderSendTest") }}
-        </OButton>
-        <OButton variant="outline" size="xs" data-test="oncall-policy-edit" @click="emit('edit')">
-          {{ t("oncall.edit") }}
-        </OButton>
-      </span>
+        {{ group.label }}
+        <span class="text-2xs ms-1.5" :class="group.summaryTone">{{ group.summary }}</span>
+      </OButton>
     </span>
 
-    <OInnerLoading v-if="loading" showing />
-
-    <template v-else>
-      <!-- Every level of every priority aimed at the whole team, on a team that
-         HAS rotations, is only ever one thing: a policy minted before the team
-         had members, so before there were rotation ids for a level to name. -->
-      <span
-        v-if="staleDefaultLadder"
-        class="border-border-default bg-surface-subtle rounded-surface flex flex-wrap items-baseline gap-x-2 gap-y-1 border p-3"
-        data-test="oncall-ladder-stale-default"
+    <div
+      class="border-border-default rounded-surface bg-surface-base flex flex-col border"
+      data-test="oncall-ladder-card"
+    >
+      <!-- Edit and Send test sit on the header of the ladder they act on. -->
+      <div
+        class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-3"
+        data-test="oncall-ladder-header"
       >
-        <OTag variant="warning-soft" size="sm">{{ t("oncall.ladderStaleDefaultTag") }}</OTag>
-        <span class="text-text-secondary text-xs">{{ t("oncall.ladderStaleDefaultHint") }}</span>
-      </span>
-
-      <!-- L0 rides above the rail rather than on it: the agent starts when the
-         record opens, so it is not a rung with a delay of its own. The server's
-         sentence carries whether anything waits — for `parallel` nothing does. -->
-      <span
-        v-if="l0"
-        class="border-border-default bg-surface-subtle rounded-surface flex flex-wrap items-baseline gap-x-2 gap-y-1 border p-3"
-        :data-test="`oncall-ladder-l0-${l0.mode}`"
-      >
-        <OTag variant="primary-soft" size="sm">{{ l0ModeLabel }}</OTag>
-        <span class="text-text-secondary text-xs">{{ raw(l0.summary) }}</span>
-      </span>
-
-      <p
-        v-if="!preview || !preview.pages_anyone"
-        class="text-status-error-text text-sm"
-        data-test="oncall-ladder-silent"
-      >
-        {{ t("oncall.ladderPriorityPagesNobody", { priority: raw(selected) }) }}
-      </p>
-
-      <OTimeline v-else data-test="oncall-ladder-rungs">
-        <!-- Consecutive rungs aiming at the same people, with the same
-           verdict, fold into one row: four identical "whole team, 3 of 3
-           unreachable" blocks are one finding, not four events to read one
-           by one. Mirrors the fold OnCallEscalation.vue does for the fired
-           ladder — the shape repeats because the underlying question does. -->
-        <OTimelineItem
-          v-for="group in rungGroups"
-          :key="group.key"
-          :label="rungLabel(group)"
-          :title="raw(saidTargets(group.rung.targets))"
-          :subtitle="isWholeTeamRung(group.rung) ? undefined : subtitleFor(group)"
-          variant="muted"
-          :data-test="`oncall-ladder-rung-${group.firstMicros}`"
-        >
-          <!-- A whole-team target resolves to the roster this instant — the
-             count is an answer to "who", so it opens the tab that names them
-             rather than sitting there as inert text. -->
-          <template v-if="isWholeTeamRung(group.rung)" #subtitle>
-            <button
-              v-if="resolvesTo(group.rung)"
-              type="button"
-              class="hover:text-text-heading underline"
-              :data-test="`oncall-ladder-open-members-${group.firstMicros}`"
-              @click="emit('open-members')"
-            >
-              {{ resolvesTo(group.rung) }}
-            </button>
-            <template v-if="group.count > 1">
-              · {{ t("oncall.reachRungs", { count: group.count }, group.count) }}
-            </template>
-          </template>
-
-          <!-- Only when something is wrong, and as a badge: the server's reason
-             is a full sentence, which is a paragraph on a rail. The sentence
-             itself is one hover away, so nothing is hidden. -->
+        <span class="flex items-center gap-1.5" data-test="oncall-ladder-heading">
           <OTag
-            v-if="problems[group.firstMicros]"
-            variant="error-soft"
+            v-for="priority in selectedGroup?.priorities ?? [selected]"
+            :key="priority"
+            type="alertPriority"
+            :value="priority.toLowerCase()"
             size="sm"
-            class="mt-1"
-            :data-test="`oncall-ladder-rung-problem-${group.firstMicros}`"
+          />
+        </span>
+        <OnCallChannelIcons v-if="headerChannels.length" :channels="headerChannels" />
+        <span class="ms-auto flex items-center gap-2">
+          <!-- The why hangs off a wrapper: a disabled button gets no pointer events, so its own tooltip never opens. -->
+          <span
+            v-if="canConfigure && !silent"
+            class="inline-flex"
+            data-test="oncall-ladder-send-test-wrap"
           >
-            {{ problems[group.firstMicros]?.label }}
             <OTooltip
-              v-if="problems[group.firstMicros]?.tip"
+              v-if="!sendTestReady"
               side="bottom"
-              :content="problems[group.firstMicros]?.tip ?? undefined"
+              :content="t('oncall.ladderSendTestBlocked')"
             />
-          </OTag>
-        </OTimelineItem>
-
-        <!-- The ending is a rung of the same rail: it is when the ladder runs
-           out, which is the fact the delays above are read against. -->
-        <OTimelineItem
-          :label="t('oncall.ladderEnd')"
-          :title="endTitle"
-          variant="muted"
-          data-test="oncall-ladder-ends"
-        >
-          <span class="flex flex-wrap items-baseline gap-x-2">
-            <!-- The server's own sentence — never our guess at what a policy ends with. -->
-            <span class="text-text-secondary text-xs">{{ raw(preview.ends_with) }}</span>
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="outline"
+              size="sm"
+              icon-left="play-arrow"
+              :disabled="!sendTestReady"
+              data-test="oncall-ladder-send-test"
+              @click="emit('send-test')"
+            >
+              {{ t("oncall.ladderSendTestPage") }}
+            </OButton>
+          </span>
+          <OButton
+            variant="outline-primary"
+            size="sm"
+            icon-left="edit"
+            data-test="oncall-policy-edit"
+            @click="emit('edit')"
+          >
+            {{ t("oncall.edit") }}
+          </OButton>
+        </span>
+      </div>
+
+      <OInnerLoading v-if="loading" showing />
+
+      <template v-else>
+        <!-- Every level of every priority aimed at the whole team, on a team that HAS rotations, is a policy minted before it had members. -->
+        <span
+          v-if="staleDefaultLadder"
+          class="border-border-default flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b px-4 py-2"
+          data-test="oncall-ladder-stale-default"
+        >
+          <OTag variant="warning-soft" size="sm">{{ t("oncall.ladderStaleDefaultTag") }}</OTag>
+          <span class="text-text-secondary text-xs">{{ t("oncall.ladderStaleDefaultHint") }}</span>
+        </span>
+
+        <!-- Low priorities page nobody by default, so only P1–P3 say it in red. -->
+        <p
+          v-if="silent"
+          class="px-4 py-3 text-sm"
+          :class="silentIsDefault ? 'text-text-secondary' : 'text-status-error-text'"
+          data-test="oncall-ladder-silent"
+        >
+          {{
+            silentIsDefault
+              ? t("oncall.ladderNobodyPagedDefault")
+              : t("oncall.ladderPriorityPagesNobody", { priority: raw(selected) })
+          }}
+        </p>
+
+        <!-- A numbered rail with a fixed time column, so every "who" starts on the same line. -->
+        <ol v-else-if="preview" class="flex flex-col px-4 py-3" data-test="oncall-ladder-rungs">
+          <li
+            v-for="(group, index) in rungGroups"
+            :key="group.key"
+            class="relative flex items-start gap-3 pb-4"
+            :data-test="`oncall-ladder-rung-${group.firstMicros}`"
+          >
+            <span
+              class="bg-border-default absolute start-3 top-6 bottom-0 w-px"
+              aria-hidden="true"
+            />
+            <span
+              class="border-border-default bg-surface-base text-text-secondary relative flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium"
+              aria-hidden="true"
+            >
+              {{ index + 1 }}
+            </span>
+            <OText
+              variant="meta"
+              class="w-24 shrink-0 pt-0.5"
+              :data-test="`oncall-ladder-rung-time-${group.firstMicros}`"
+            >
+              {{ delayLabel(group.firstMicros) }}
+            </OText>
+            <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+              <template v-if="isWholeTeamRung(group.rung)">
+                <span>{{ t("oncall.ladderWholeTeam") }}</span>
+                <span
+                  class="flex items-center"
+                  :data-test="`oncall-ladder-people-${group.firstMicros}`"
+                >
+                  <OAvatar
+                    v-for="one in group.rung.recipients.slice(0, STACK)"
+                    :key="one.user_email"
+                    :value="one.user_email"
+                    :name="nameOf(one.user_email)"
+                    size="sm"
+                    class="ring-surface-base -ms-1 ring-2 first:ms-0"
+                  />
+                  <span
+                    v-if="group.rung.recipients.length > STACK"
+                    class="text-text-secondary ms-1 text-xs"
+                  >
+                    {{ raw(`+${group.rung.recipients.length - STACK}`) }}
+                  </span>
+                  <OTooltip side="bottom" :content="peopleNames(group.rung)" />
+                </span>
+              </template>
+              <template v-else>
+                <OTag
+                  v-for="seat in group.rung.targets.map(seatOf)"
+                  :key="seat"
+                  variant="default-outline"
+                  size="sm"
+                >
+                  {{ raw(seat) }}
+                </OTag>
+                <span
+                  v-for="one in group.rung.recipients"
+                  :key="one.user_email"
+                  class="flex min-w-0 items-center gap-1.5"
+                >
+                  <OAvatar :value="one.user_email" :name="nameOf(one.user_email)" size="sm" />
+                  <span class="truncate">{{ raw(nameOf(one.user_email)) }}</span>
+                </span>
+              </template>
+              <span v-if="group.count > 1" class="text-text-secondary text-xs">
+                {{ t("oncall.ladderRepeatsUntil", { to: durationLabel(group.lastMicros) }) }}
+              </span>
+              <!-- Only when something is wrong, as a badge; the server's sentence is one hover away. -->
+              <OTag
+                v-if="problems[group.firstMicros]"
+                variant="error-soft"
+                size="sm"
+                :data-test="`oncall-ladder-rung-problem-${group.firstMicros}`"
+              >
+                {{ problems[group.firstMicros]?.label }}
+                <OTooltip
+                  v-if="problems[group.firstMicros]?.tip"
+                  side="bottom"
+                  :content="problems[group.firstMicros]?.tip ?? undefined"
+                />
+              </OTag>
+            </span>
+            <OnCallChannelIcons
+              v-if="stepChannels(group.rung).length"
+              class="ms-auto shrink-0 pt-0.5"
+              :channels="stepChannels(group.rung)"
+            />
+          </li>
+
+          <!-- The ending is the rail's last stop: when the ladder runs out is what the delays are read against. -->
+          <li class="flex items-center gap-3" data-test="oncall-ladder-ends">
+            <span
+              class="border-border-default bg-surface-base text-text-secondary flex size-6 shrink-0 items-center justify-center rounded-full border"
+              aria-hidden="true"
+            >
+              <OIcon name="stop-circle" size="sm" />
+            </span>
+            <OText variant="meta" class="w-24 shrink-0" data-test="oncall-ladder-ends-time">
+              {{ endTime }}
+            </OText>
+            <!-- How a page can leave this team, in the server's words, on hover of the ending it qualifies. -->
+            <span class="text-text-secondary text-sm" data-test="oncall-ladder-ends-line">
+              {{ endTitle }}
+              <OTooltip
+                v-if="preview.cross_team_moves.length"
+                side="bottom"
+                :content="raw(preview.cross_team_moves.join(' '))"
+              />
+            </span>
+            <OButton
+              variant="outline"
+              size="sm"
+              icon-left="add"
               data-test="oncall-ladder-add-rung"
               @click="emit('edit')"
             >
-              {{ t("oncall.ladderAddRung") }}
+              {{ t("oncall.ladderAddStep") }}
             </OButton>
-          </span>
+          </li>
+        </ol>
 
-          <!-- How a page can leave this team at all. Both sentences are the
-             server's: "escalate to a sibling" is not a thing, and wording it
-             that way would tell somebody they still hold a page they gave away. -->
-          <span
-            v-for="(move, index) in preview.cross_team_moves"
-            :key="index"
-            class="text-text-secondary block text-xs"
-            :data-test="`oncall-ladder-move-${index}`"
-          >
-            {{ raw(move) }}
-          </span>
-        </OTimelineItem>
-      </OTimeline>
-    </template>
+        <!-- The AI's part, in one line under the ladder it runs beside. -->
+        <span
+          v-if="l0 && !silent"
+          class="border-border-default flex items-center gap-1.5 border-t px-4 py-2"
+          :data-test="`oncall-ladder-l0-${l0.mode}`"
+        >
+          <OIcon name="auto-awesome" size="sm" class="text-text-secondary" />
+          <OText variant="meta">{{ l0Line }}</OText>
+        </span>
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
-import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
-import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
+import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OText from "@/lib/core/Typography/OText.vue";
+import OnCallChannelIcons from "./OnCallChannelIcons.vue";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
+  Channel,
   EscalationPreview,
   OnCallPolicy,
   PreviewRung,
@@ -214,6 +288,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { MICROS_PER_MINUTE } from "@/ts/interfaces/oncall";
 import { channelList, rungProblem, speakTarget } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 
@@ -251,11 +326,10 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const { nameOf } = useOrgUserNames();
 
-/// The engine's own English, said the way the editor says it — one vocabulary
-/// for one concept, rather than two a click apart.
-const saidTargets = (targets: string[]) =>
-  targets.map((target) => speakTarget(target, t)).join(", ");
+/// The lowest priorities page nobody unless somebody chose otherwise, so their silence is not a finding.
+const DEFAULT_SILENT_FROM = 4;
 
 /// The one target string `speakTarget` maps to "the whole team" — checked
 /// against the engine's own words, not against `EscalationTarget.kind`, since
@@ -298,12 +372,10 @@ interface PriorityGroup {
   summaryTone: string;
   /** Which priority a click selects — the first of the run. */
   selects: string;
+  priorities: string[];
 }
 
-/// Consecutive priorities running the same ladder fold into one chip. Five
-/// chips that all describe one ladder are five things to check, and a reader
-/// comparing them has to hold four of them in their head to find the one that
-/// differs.
+/// Consecutive priorities running the same ladder fold into one chip, so five chips never describe one ladder.
 const groups = computed<PriorityGroup[]>(() => {
   const runs: TeamRungSummary[][] = [];
   let previousKey: string | null = null;
@@ -311,8 +383,7 @@ const groups = computed<PriorityGroup[]>(() => {
   for (const entry of props.priorities) {
     const key = ladderKey(entry);
     const run = runs[runs.length - 1];
-    // A null key never folds — not with its neighbour and not with itself. Nor
-    // does a gap: "P1–P4" would promise a P2 and a P3 the strip never listed.
+    // A null key never folds, and nor does a gap: "P1–P4" would promise a P2 and a P3 the strip never listed.
     const follows = run && numberOf(entry) === numberOf(run[run.length - 1]) + 1;
     if (key !== null && key === previousKey && follows) run.push(entry);
     else runs.push([entry]);
@@ -323,20 +394,23 @@ const groups = computed<PriorityGroup[]>(() => {
     const first = run[0];
     const last = run[run.length - 1];
     const isSelected = run.some((entry) => entry.priority === props.selected);
-    const silent = !first.pages_anyone;
-
+    // P4–P5 page nobody by default, so only a silent P1–P3 is drawn as a finding.
+    const silent = !first.pages_anyone && numberOf(first) < DEFAULT_SILENT_FROM;
     return {
       key: (run.length > 1 ? `${first.priority}-${last.priority}` : first.priority).toLowerCase(),
       label: run.length > 1 ? raw(`${first.priority}–${last.priority}`) : raw(first.priority),
       summary: summaryFor(first, run.length),
       variant: isSelected ? "outline-primary" : silent ? "outline-destructive" : "outline",
-      // The chip's own border and text already carry the finding when it is
-      // red; on the others the sub-label is metadata and stays quiet.
       summaryTone: silent && !isSelected ? "" : "text-text-secondary",
       selects: first.priority,
+      priorities: run.map((entry) => entry.priority),
     };
   });
 });
+
+const selectedGroup = computed(
+  () => groups.value.find((group) => group.priorities.includes(props.selected)) ?? null,
+);
 
 /// "Email, SMS · 3 steps · 20m" for one priority; a folded run keeps the channels, which the fold guarantees they share.
 function summaryFor(entry: TeamRungSummary, folded: number): I18nText {
@@ -349,10 +423,19 @@ function summaryFor(entry: TeamRungSummary, folded: number): I18nText {
   return raw(parts.join(" · "));
 }
 
-/// Kept to a few characters — this is a rail, not a column. "0m" rather than
-/// "immediately", which the design also uses and which lines the rungs up.
+const MINUTES_PER_HOUR = 60;
+
+function durationLabel(micros: number): I18nText {
+  const minutes = Math.round(micros / MICROS_PER_MINUTE);
+  return minutes < MINUTES_PER_HOUR
+    ? t("oncall.ladderMinutes", { count: minutes }, minutes)
+    : raw(formatMicrosDuration(micros));
+}
+
 function delayLabel(afterMicros: number): I18nText {
-  return afterMicros === 0 ? raw("0m") : raw(`+${formatMicrosDuration(afterMicros)}`);
+  return afterMicros === 0
+    ? t("oncall.ladderStepAtOnce")
+    : t("oncall.ladderStepAfter", { duration: durationLabel(afterMicros) });
 }
 
 interface RungGroup {
@@ -402,33 +485,14 @@ const rungGroups = computed<RungGroup[]>(() => {
   return out;
 });
 
-/// A single rung keeps its own delay; a folded run reads as the span it
-/// covers — "0m–30m" rather than four timestamps a reader would add up
-/// themselves.
-function rungLabel(group: RungGroup): I18nText {
-  if (group.count === 1) return delayLabel(group.firstMicros);
-  return raw(`${delayLabel(group.firstMicros)}–${formatMicrosDuration(group.lastMicros)}`);
+/// The seat a target names: a rotation's name for its on-call, the engine's own words otherwise.
+function seatOf(target: string): string {
+  const onCall = target.trim().match(/^whoever is on call in (.+)$/i);
+  return onCall ? onCall[1] : speakTarget(target, t);
 }
 
-/// Who it resolves to, plus — only once there is more than one rung to
-/// account for — how many rungs said the same thing, reusing the count
-/// phrasing the priority strip already uses for "3 rungs".
-function subtitleFor(group: RungGroup): I18nText | undefined {
-  const base = resolvesTo(group.rung);
-  if (group.count <= 1) return base;
-  const times = t("oncall.reachRungs", { count: group.count }, group.count);
-  return raw(base ? `${base} · ${times}` : `${times}`);
-}
-
-/// Who the rung resolves to this instant — the line the whole preview exists
-/// for. Named while it is one or two people; counted past that, where six
-/// addresses are a wall rather than an answer.
-function resolvesTo(rung: PreviewRung): I18nText | undefined {
-  const people = rung.recipients;
-  if (!people.length) return undefined;
-  return people.length <= 2
-    ? t("oncall.ladderResolvesTo", { who: raw(people.map((one) => one.user_email).join(", ")) })
-    : t("oncall.ladderResolvesToMany", { count: people.length });
+function peopleNames(rung: PreviewRung): I18nText {
+  return raw(rung.recipients.map((one) => nameOf(one.user_email)).join(", "));
 }
 
 /// The exception badge per rung, keyed by delay so the template asks once.
@@ -441,13 +505,33 @@ const problems = computed(() => {
   return out;
 });
 
-/// A ladder that hands the page to the default team has not stopped — saying
-/// it stopped would tell somebody nobody is coming when somebody is.
+/// A ladder that hands the page to the default team has not stopped, so it must not say it did.
 const endTitle = computed<I18nText>(() =>
   props.preview?.final_action === "notify_default_team"
     ? t("oncall.ladderEndsHandsOff")
-    : t("oncall.ladderEndsStops"),
+    : t("oncall.ladderEndsNobodyAnswered"),
 );
+
+/// How many faces a whole-team step shows before it counts the rest.
+const STACK = 3;
+
+/// Who a step could actually reach, by channel — the union of its people's deliverable channels.
+function stepChannels(rung: PreviewRung): Channel[] {
+  return [...new Set(rung.recipients.flatMap((one) => one.deliverable_channels))];
+}
+
+const headerChannels = computed<Channel[]>(() => {
+  const entry = props.priorities.find((p) => p.priority === props.selected);
+  return entry?.pages_anyone ? entry.channels : [];
+});
+
+/// When the ladder runs out: the last step's delay.
+const endTime = computed<I18nText>(() => {
+  const last = rungGroups.value[rungGroups.value.length - 1];
+  return delayLabel(last ? last.lastMicros : 0);
+});
+
+const silent = computed(() => !props.preview || !props.preview.pages_anyone);
 
 /// The preview's own L0 block, or nothing at all. Two ways to get nothing, and
 /// both mean the same thing on screen: an older server that does not send the
@@ -458,23 +542,17 @@ const l0 = computed(() => {
   return block?.available ? block : null;
 });
 
-/// `mode` is read as the server resolved it FOR THIS PRIORITY. The P1
-/// invariant and the P4/P5 rule are already applied, so nothing here consults
-/// `policy.l0` — one place decides what a priority's mode is.
-const l0ModeLabel = computed<I18nText>(() => {
+/// The AI's part for this priority in one line; `mode` is already resolved for it by the server.
+const l0Line = computed<I18nText>(() => {
   const mode = l0.value?.mode;
   switch (mode) {
     case undefined:
     case "parallel":
-      return t("oncall.ladderL0Parallel");
+      return t("oncall.ladderL0LineParallel");
     case "gate":
-      return t("oncall.ladderL0Gate");
+      return t("oncall.ladderL0LineGate", { seconds: l0.value?.triage_budget_seconds ?? 0 });
     case "only":
-      return t("oncall.ladderL0Only");
-    // `l0` is already `null` (so this component never renders) whenever the
-    // server resolves `off` — `available: false` draws no L0 step at all.
-    // Handled here anyway so a fifth mode cannot silently fall through as
-    // "parallel".
+      return t("oncall.ladderL0LineOnly");
     case "off":
       return t("oncall.ladderL0Off");
     default: {
@@ -483,6 +561,10 @@ const l0ModeLabel = computed<I18nText>(() => {
     }
   }
 });
+
+const silentIsDefault = computed(
+  () => Number(props.selected.replace(/\D/g, "")) >= DEFAULT_SILENT_FROM,
+);
 
 /// A team's policy is minted at create_team — before it has members, so before
 /// it has rotations, so before there are ids for a level to name. It took the

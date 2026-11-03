@@ -64,9 +64,17 @@ const stubs = {
       <template v-for="tr in tracks" :key="tr.key">
         <slot name="track-header" :track="tr" />
         <slot v-if="!tr.bands.length" name="track-empty" :track="tr" />
+        <template v-for="b in tr.bands" :key="b.key">
+          <slot name="band" :band="b" :track="tr" />
+        </template>
       </template>
       <slot name="legend" />
     </div>`,
+  },
+  OScheduleBand: {
+    name: "OScheduleBand",
+    props: ["band"],
+    template: "<span data-test='band' :data-key='band.key'>{{ band.label }}</span>",
   },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OTooltip: { name: "OTooltip", template: "<span />" },
@@ -82,7 +90,9 @@ const stubs = {
   ODropdownItem: {
     name: "ODropdownItem",
     emits: ["select"],
-    template: "<button @click=\"$emit('select')\"><slot /></button>",
+    props: ["description", "iconLeft"],
+    template:
+      "<button :data-icon='iconLeft' @click=\"$emit('select')\"><slot />{{ description }}</button>",
   },
 };
 
@@ -151,21 +161,16 @@ describe("OnCallScheduleTimeline", () => {
     expect(String(todayOf(render()).sublabel)).not.toContain("today");
   });
 
-  /// A phone row fits the range and one button, so the two rarer acts are mirrored in a menu that must emit the same events.
-  it("offers quick start and request cover from the phone menu", async () => {
+  /// One "Cover a shift" lives in the team header, and templates replace a schedule, so neither sits in the toolbar.
+  it("keeps only Add rotation in the toolbar, with a leading icon", () => {
     const wrapper = render();
 
-    await wrapper.find('[data-test="oncall-timeline-presets-menu"]').trigger("click");
-    await wrapper.find('[data-test="oncall-timeline-request-cover-menu"]').trigger("click");
-
-    expect(wrapper.emitted("presets")).toHaveLength(1);
-    expect(wrapper.emitted("request-cover")).toHaveLength(1);
-    expect(wrapper.find('[data-test="oncall-timeline-presets"]').classes()).toContain(
-      "max-md:hidden",
-    );
-    expect(wrapper.find('[data-test="oncall-timeline-more-actions"]').classes()).toContain(
-      "md:hidden",
-    );
+    expect(wrapper.find('[data-test="oncall-timeline-presets"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-timeline-request-cover"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-timeline-more-actions"]').exists()).toBe(false);
+    const add = wrapper.find('[data-test="oncall-timeline-add"]');
+    expect(add.text()).toBe("Add rotation");
+    expect(add.attributes("data-icon")).toBe("add");
   });
 
   it("draws one lane per rotation", () => {
@@ -583,91 +588,133 @@ describe("OnCallScheduleTimeline", () => {
     expect(chart.props("hoverLabel")).toBeUndefined();
   });
 
-  /// P1: the four schedule presets — follow-the-sun among them — were reached
-  /// only through an unlabelled 32px caret whose one-item menu repeated the
-  /// caret's own accessible name. Nothing on the screen said the shapes
-  /// existed, so the fastest route to a correct rota was found by accident or
-  /// not at all. The entry is now a button that says what it opens.
-  describe("the way in to the presets", () => {
-    it("names the presets on the button rather than hiding them behind a caret", async () => {
-      const wrapper = render();
-      const entry = wrapper.find('[data-test="oncall-timeline-presets"]');
-
-      expect(entry.exists()).toBe(true);
-      // VISIBLE text, not an aria-label on an icon: the stub renders slots
-      // only, so a passing assertion here means a reader can see the words.
-      expect(entry.text()).toBe("Quick start");
-
-      await entry.trigger("click");
-      expect(wrapper.emitted("presets")).toHaveLength(1);
-    });
-
-    /// The menu had one item and that item was its trigger's label, so opening
-    /// it bought the reader a second click and no new information.
-    it("keeps no one-item menu between the reader and the presets", () => {
-      const wrapper = render();
-
-      expect(wrapper.find('[data-test="oncall-timeline-add-menu"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="oncall-timeline-presets"]').element.tagName).toBe("BUTTON");
-    });
-
-    /// Beside Add rotation, at the same weight: the two are alternative ways
-    /// to build the same schedule, and the label alone is the entry point —
-    /// no icon on either, matching the plain-text buttons next to them.
-    it("stands beside Add rotation as a plain labeled button", () => {
-      const wrapper = render();
-      const add = wrapper.find('[data-test="oncall-timeline-add"]');
-      const presets = wrapper.find('[data-test="oncall-timeline-presets"]');
-
-      expect(add.text()).toBe("Add rotation");
-      expect(presets.attributes("data-icon")).toBeUndefined();
-      // Adjacent in the DOM, so they read as one pair of choices.
-      expect(add.element.nextElementSibling).toBe(presets.element);
-    });
-
-    /// A team with no rotations is the reader the presets were written for,
-    /// and it is the one screen where the header's buttons are not the first
-    /// thing looked at.
-    it("offers the presets from the empty schedule as well", async () => {
+  describe("the way in to templates", () => {
+    it("offers a template and building it yourself from the empty schedule", async () => {
       const wrapper = render({ rotations: [], segments: [] });
       const empty = wrapper.findComponent({ name: "OEmptyState" });
 
-      expect(empty.exists()).toBe(true);
       expect(empty.props("preset")).toBe("no-oncall-schedule");
-
       empty.vm.$emit("action", "presets");
       await nextTick();
       expect(wrapper.emitted("presets")).toHaveLength(1);
-
       empty.vm.$emit("action", "add");
       await nextTick();
       expect(wrapper.emitted("add")).toHaveLength(1);
     });
-  });
 
-  /// A cover is an exception to the weeks drawn below, so it belongs with the
-  /// controls that change them. It used to sit in a strip of its own above the
-  /// chart, a row away from every other act on the same schedule.
-  describe("writing a cover from the toolbar", () => {
-    it("offers it after the presets and asks the parent to open the dialog", async () => {
-      const wrapper = render();
-      const presets = wrapper.find('[data-test="oncall-timeline-presets"]');
-      const cover = wrapper.find('[data-test="oncall-timeline-request-cover"]');
+    /// A template rewrites the first rotation only, so only that lane offers it.
+    it("offers starting over from a template on the first lane only", async () => {
+      const wrapper = render({
+        rotations: [rotation("Primary"), rotation("Secondary")],
+        segments: [seg(), seg({ rotation_id: rid("Secondary") })],
+      });
+      const item = wrapper.find(`[data-test="oncall-lane-presets-${rid("Primary")}"]`);
 
-      // S14: one name for the action everywhere.
-      expect(cover.text()).toBe("Cover a shift");
-      expect(presets.element.nextElementSibling).toBe(cover.element);
-
-      await cover.trigger("click");
-      expect(wrapper.emitted("request-cover")).toHaveLength(1);
+      expect(item.text()).toBe("Start over from a template");
+      expect(item.attributes("data-icon")).toBe("restart-alt");
+      expect(wrapper.find(`[data-test="oncall-lane-presets-${rid("Secondary")}"]`).exists()).toBe(
+        false,
+      );
+      await item.trigger("click");
+      expect(wrapper.emitted("presets")).toHaveLength(1);
     });
 
-    /// A cover assigns a window to a PERSON, so on an empty roster it opens a
-    /// picker with no options — the same reason Fill gap is withheld.
-    it("is withheld when there is nobody to hand it to", () => {
-      expect(
-        render({ canCover: false }).find('[data-test="oncall-timeline-request-cover"]').exists(),
-      ).toBe(false);
+    it("gives every lane menu item a leading icon", () => {
+      const wrapper = render();
+      const items = wrapper.findAll(`[data-test^="oncall-lane-"][data-test$="${rid("Primary")}"]`);
+      const menu = items.filter((item) =>
+        ["presets", "override", "duplicate", "delete"].some((id) =>
+          item.attributes("data-test")?.startsWith(`oncall-lane-${id}-`),
+        ),
+      );
+      expect(menu).toHaveLength(4);
+      for (const item of menu) expect(item.attributes("data-icon")).toBeTruthy();
+    });
+  });
+
+  describe("the shift menu", () => {
+    const menuIds = (wrapper: any) =>
+      wrapper
+        .findAll('[data-test^="oncall-shift-menu-"]')
+        .map((b: any) => b.attributes("data-test"));
+
+    it("offers cover, swap and away on a shift, and hands the parent the segment", async () => {
+      const wrapper = render({ swapRotations: [rid("Primary")] });
+
+      expect(menuIds(wrapper)).toEqual([
+        "oncall-shift-menu-cover",
+        "oncall-shift-menu-swap",
+        "oncall-shift-menu-away",
+      ]);
+      expect(wrapper.find('[data-test="oncall-shift-menu-away"]').text()).toContain(
+        "Mark ana@o2.ai away",
+      );
+
+      await wrapper.find('[data-test="oncall-shift-menu-swap"]').trigger("click");
+      const [action, segment] = wrapper.emitted("shift-action")![0] as [string, ResolvedSegment];
+      expect(action).toBe("swap");
+      expect(segment).toMatchObject({ rotation_id: rid("Primary"), user_email: "ana@o2.ai" });
+    });
+
+    it("offers no swap for a rotation with no upcoming shifts to trade", () => {
+      expect(menuIds(render({ swapRotations: [] }))).toEqual([
+        "oncall-shift-menu-cover",
+        "oncall-shift-menu-away",
+      ]);
+    });
+
+    /// A reader without the configuration grant may still book their own absence, and nothing else.
+    it("offers only self-away to a reader who cannot configure", () => {
+      const own = render({ canCover: false, canMarkAway: false, selfEmail: "ana@o2.ai" });
+      expect(menuIds(own)).toEqual(["oncall-shift-menu-away"]);
+
+      const other = render({ canCover: false, canMarkAway: false, selfEmail: "bob@o2.ai" });
+      expect(menuIds(other)).toEqual([]);
+      expect(other.find('[data-test="band"]').exists()).toBe(true);
+    });
+
+    it("offers nothing on a shift that is already over", () => {
+      const past = seg({ from: start - 7 * DAY, to: start - 6 * DAY });
+      expect(menuIds(render({ segments: [past] }))).toEqual([]);
+    });
+
+    it("offers a cover, but no person's actions, on a gap", () => {
+      expect(menuIds(render({ segments: [seg({ user_email: null })] }))).toEqual([
+        "oncall-shift-menu-cover",
+      ]);
+    });
+  });
+
+  describe("the away lane", () => {
+    const absence = (over: Record<string, unknown> = {}) => ({
+      id: "u1",
+      org_id: "default",
+      user_email: "ana@o2.ai",
+      start_at: start + DAY,
+      end_at: start + 2 * DAY,
+      created_by: "ana@o2.ai",
+      created_at: start,
+      ...over,
+    });
+
+    it("draws absences in the window as a lane of their own, with a legend entry", () => {
+      const wrapper = render({ absences: [absence()] });
+      const away = tracksOf(wrapper).find((t: any) => t.key === "__away");
+
+      expect(String(away.label)).toBe("Away");
+      expect(away.bands).toHaveLength(1);
+      expect(String(away.bands[0].label)).toBe("ana@o2.ai away");
+      expect(wrapper.find('[data-test="oncall-lane-header-away"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-timeline-legend-away"]').exists()).toBe(true);
+    });
+
+    it("draws no away lane when nobody is away in the window", () => {
+      const wrapper = render({
+        absences: [absence({ start_at: start + 30 * DAY, end_at: start + 31 * DAY })],
+      });
+
+      expect(tracksOf(wrapper).some((t: any) => t.key === "__away")).toBe(false);
+      expect(wrapper.find('[data-test="oncall-timeline-legend-away"]').exists()).toBe(false);
     });
   });
 

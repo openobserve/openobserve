@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm-action"
         icon-right="arrow-right-alt"
         class="self-start"
+        icon-left="open-in-new"
         data-test="oncall-team-form-manage-link"
         @click="goToTeamDetail"
       >
@@ -84,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm-action"
+              icon-left="group-add"
               data-test="oncall-team-form-add-everyone"
               @click="addEveryone"
             >
