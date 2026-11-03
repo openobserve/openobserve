@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="step1Ref"
               name="name"
               :readonly="beingUpdated || anomalyEditMode"
+              :submit-on-enter="false"
               :data-test="isAnomalyMode ? 'add-anomaly-name-input' : 'add-alert-name-input'"
               :placeholder="
                 isAnomalyMode
@@ -271,15 +272,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="min-w-0 flex-1 max-lg:flex-none"
           data-test="add-alert-sections"
         >
-          <AlertFormSection id="watch" :index="1" :title="t('alerts.sections.watch.title')">
-            <OFormSection
+          <AlertFormSection
+            id="watch"
+            :index="1"
+            :title="t('alerts.sections.watch.title')"
+            :help="t('alerts.sections.watch.help')"
+          >
+            <div
               v-if="!isCompositeMode"
-              :title="t('alerts.sections.cards.source')"
+              :class="rowGroup"
+              data-row-group
               data-test="add-alert-source-card"
               data-snap-stop
             >
               <OSettingRow
-                :label="t('alerts.streamType')"
+                :label="t('alerts.sections.rows.streamTypeLabel')"
                 :description="t('alerts.sections.rows.streamType')"
                 required
               >
@@ -296,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OSettingRow>
               <OSettingRow
-                :label="t('alerts.stream_name')"
+                :label="t('alerts.sections.rows.streamLabel')"
                 :description="t('alerts.sections.rows.stream')"
                 required
                 fill
@@ -319,17 +326,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </OSettingRow>
-            </OFormSection>
+            </div>
 
-            <OFormSection
-              :title="
-                isCompositeMode
-                  ? t('alerts.sections.cards.combine')
-                  : t('alerts.sections.cards.query')
-              "
-              data-test="add-alert-query-card"
-              data-snap-stop
-            >
+            <div :class="rowGroup" data-row-group data-test="add-alert-query-card" data-snap-stop>
               <CompositeAlertForm
                 v-if="isCompositeMode"
                 :model-value="formData"
@@ -389,14 +388,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :stored-intervals="anomalyStoredIntervals"
                 :section-targets="sectionTargets"
               />
-            </OFormSection>
+            </div>
           </AlertFormSection>
 
-          <AlertFormSection id="condition" :index="2" :title="t('alerts.sections.condition.title')">
-            <OFormSection :title="t('alerts.sections.cards.trigger')" data-snap-stop>
+          <AlertFormSection
+            id="condition"
+            :index="2"
+            :title="t('alerts.sections.condition.title')"
+            :help="t('alerts.sections.condition.help')"
+          >
+            <div class="flex flex-col" data-snap-stop>
               <p
                 v-if="formData.is_real_time === 'true'"
-                class="text-text-secondary m-0 text-sm"
+                class="text-text-secondary m-0 p-3 text-sm"
                 data-test="add-alert-realtime-condition-note"
               >
                 {{ t("alerts.summary.plainEnglish.realTime") }}
@@ -465,13 +469,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 section="condition"
                 :view="tiers.view('condition')"
                 @add="onTierAdd"
-                @toggle="onTierToggle('condition')"
+                @toggle="tiers.toggle('condition')"
               />
-            </OFormSection>
+            </div>
           </AlertFormSection>
 
-          <AlertFormSection id="notify" :index="3" :title="t('alerts.sections.notify.title')">
-            <OFormSection :title="t('alerts.sections.cards.destinations')" data-snap-stop>
+          <AlertFormSection
+            id="notify"
+            :index="3"
+            :title="t('alerts.sections.notify.title')"
+            :help="t('alerts.sections.notify.help')"
+          >
+            <div class="flex flex-col" data-snap-stop>
               <div
                 v-show="!isAnomalyMode"
                 :ref="(el) => setSectionTarget('settingsNotify', el)"
@@ -495,12 +504,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @refresh:destinations="$emit('refresh:destinations')"
                 />
               </div>
-            </OFormSection>
-            <OFormSection
-              v-if="!isAnomalyMode"
-              :title="t('alerts.sections.cards.message')"
-              data-snap-stop
-            >
               <div
                 v-show="!isAnomalyMode"
                 :ref="(el) => setSectionTarget('advancedMessage', el)"
@@ -536,16 +539,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 section="notify"
                 :view="tiers.view('notify')"
                 @add="onTierAdd"
-                @toggle="onTierToggle('notify')"
+                @toggle="tiers.toggle('notify')"
               />
-            </OFormSection>
+            </div>
           </AlertFormSection>
 
-          <AlertFormSection id="schedule" :index="4" :title="t('alerts.sections.schedule.title')">
-            <OFormSection :title="t('alerts.sections.cards.schedule')" data-snap-stop>
+          <AlertFormSection
+            id="schedule"
+            :index="4"
+            :title="t('alerts.sections.schedule.title')"
+            :help="t('alerts.sections.schedule.help')"
+          >
+            <div class="flex flex-col" data-snap-stop>
               <OSettingRow
                 :label="t('alerts.sections.howItChecks')"
-                :description="t('alerts.sections.rows.howItChecks')"
                 fill
                 data-test="add-alert-how-it-checks-row"
               >
@@ -570,6 +577,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ option.label }}
                   </OToggleGroupItem>
                 </OToggleGroup>
+                <p class="text-text-secondary m-0 mt-1.5 text-xs" data-test="add-alert-type-help">
+                  {{ alertTypeHelp }}
+                </p>
               </OSettingRow>
               <div
                 v-show="!isAnomalyMode && !isCompositeMode"
@@ -595,11 +605,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-group
                 data-snap-stop
               />
-            </OFormSection>
+            </div>
           </AlertFormSection>
 
-          <AlertFormSection id="details" :index="5" :title="t('alerts.sections.details.title')">
-            <OFormSection :title="t('alerts.sections.cards.about')" data-snap-stop>
+          <AlertFormSection
+            id="details"
+            :index="5"
+            :title="t('alerts.sections.details.title')"
+            :help="t('alerts.sections.details.help')"
+          >
+            <div class="flex flex-col" data-snap-stop>
               <OSettingRow
                 v-if="!(beingUpdated || anomalyEditMode)"
                 :label="t('alerts.sections.details.name')"
@@ -685,19 +700,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 section="details"
                 :view="tiers.view('details')"
                 @add="onTierAdd"
-                @toggle="onTierToggle('details')"
+                @toggle="tiers.toggle('details')"
               />
-            </OFormSection>
-            <div
-              v-if="alertSentence"
-              class="border-border-default rounded-surface flex flex-col gap-1 border p-3"
-              data-test="add-alert-read-back"
-              data-snap-stop
-            >
-              <span class="text-text-heading text-sm font-semibold">{{
-                t("alerts.readBack.title")
-              }}</span>
-              <p class="text-text-body m-0 text-sm">{{ alertSentence }}</p>
             </div>
           </AlertFormSection>
         </OSnapScroll>
@@ -783,29 +787,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-alert-footer"
       >
         <div class="me-auto flex min-w-0 items-center gap-4">
-          <div class="flex items-center gap-2 max-md:hidden" data-test="add-alert-stepper">
-            <OButton
-              v-if="previousSection"
-              variant="outline"
-              size="sm-action"
-              icon-left="arrow-back"
-              data-test="add-alert-step-back-btn"
-              @click="goToSection(previousSection.id)"
-              >{{ t("alerts.sections.back") }}</OButton
-            >
-            <OButton
-              v-if="nextSection"
-              variant="secondary"
-              size="sm-action"
-              icon-right="arrow-forward"
-              data-test="add-alert-step-next-btn"
-              @click="goToSection(nextSection.id)"
-              >{{ t("alerts.sections.next", { title: t(nextSection.titleKey) }) }}</OButton
-            >
-            <span class="text-text-secondary text-sm" data-test="add-alert-step-position">{{
-              t("alerts.sections.eyebrow", { n: sectionPosition + 1, total: ALERT_SECTIONS.length })
-            }}</span>
-          </div>
+          <OButton
+            v-if="previousSection"
+            class="max-md:hidden"
+            variant="outline"
+            size="sm-action"
+            icon-left="arrow-back"
+            data-test="add-alert-step-back-btn"
+            @click="goToSection(previousSection.id)"
+            >{{ t("alerts.sections.back") }}</OButton
+          >
           <AlertUnsavedChanges
             v-if="isEditingAlert"
             :changes="unsavedChanges"
@@ -823,7 +814,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OButton
           data-test="add-alert-submit-btn"
-          variant="primary"
+          :variant="guidesToNext ? 'outline' : 'primary'"
           size="sm-action"
           :loading="isSubmitting || (isAnomalyMode && anomalySaving)"
           :disabled="compositeSaveDisabled"
@@ -835,6 +826,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? t("alerts.editMode.saveChanges")
                 : t("alerts.save")
           }}</OButton
+        >
+        <OButton
+          v-if="nextSection"
+          class="max-md:hidden"
+          :variant="guidesToNext ? 'primary' : 'outline'"
+          size="sm-action"
+          icon-right="arrow-forward"
+          data-test="add-alert-step-next-btn"
+          @click="goToSection(nextSection.id)"
+          >{{ t("alerts.sections.next", { title: t(nextSection.navKey) }) }}</OButton
         >
       </div>
     </OPageLayout>
@@ -905,17 +906,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { raw } from "@/types/i18n";
-import {
-  defineComponent,
-  computed,
-  watch,
-  provide,
-  ref,
-  reactive,
-  onMounted,
-  onBeforeUnmount,
-  nextTick,
-} from "vue";
+import { defineComponent, computed, watch, provide, ref, reactive, onMounted } from "vue";
 import { useStore } from "vuex";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
@@ -959,7 +950,6 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
 import alertsService from "@/services/alerts";
 import OSnapScroll from "@/lib/core/SnapScroll/OSnapScroll.vue";
-import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OSectionNav from "@/lib/navigation/SectionNav/OSectionNav.vue";
 import OCommandSearch from "@/lib/forms/CommandSearch/OCommandSearch.vue";
@@ -1061,7 +1051,6 @@ export default defineComponent({
     CompositeAlertForm,
     EditorDraftDialogs,
     OSnapScroll,
-    OFormSection,
     OSettingRow,
     OSectionNav,
     OCommandSearch,
@@ -1252,6 +1241,14 @@ export default defineComponent({
         : []),
     ]);
 
+    const alertTypeHelp = computed(() => {
+      const mode = alertForm.formData.value.is_real_time;
+      if (mode === "true") return alertForm.t("alerts.sections.typeHelp.realtime");
+      if (mode === "anomaly") return alertForm.t("alerts.sections.typeHelp.anomaly");
+      if (mode === "composite") return alertForm.t("alerts.sections.typeHelp.composite");
+      return alertForm.t("alerts.sections.typeHelp.scheduled");
+    });
+
     // Mode as the subtitle, exactly as AddPanel does it ("Add Panel" / "Edit
     // Panel"): the header then reads NAME first, what-you're-doing second, and
     // the two pages have the same shape. The containing folder is already the
@@ -1313,6 +1310,10 @@ export default defineComponent({
 
     const { lgUp } = useBreakpoint();
     const activeSection = ref<AlertSectionId>("watch");
+    const visitedSections = ref<ReadonlySet<AlertSectionId>>(new Set());
+    watch(activeSection, (_, left) => {
+      visitedSections.value = new Set([...visitedSections.value, left]);
+    });
     const sectionPosition = computed(() =>
       Math.max(
         0,
@@ -1324,6 +1325,11 @@ export default defineComponent({
       "border-border-default [[data-row-group]:not(:empty):not([style*=none])~&]:border-t";
     const previousSection = computed(() => ALERT_SECTIONS[sectionPosition.value - 1]);
     const nextSection = computed(() => ALERT_SECTIONS[sectionPosition.value + 1]);
+    // Creating walks forward, so Next holds the one primary action until the last step.
+    const guidesToNext = computed(
+      () =>
+        !alertForm.beingUpdated.value && !alertForm.anomalyEditMode.value && !!nextSection.value,
+    );
 
     // Filled by template refs after mount; until then every step renders its slices inline.
     const sectionTargets = reactive<AlertSectionTargets>({});
@@ -1388,6 +1394,7 @@ export default defineComponent({
       isAggregationEnabled: alertForm.isAggregationEnabled,
       isEditing: computed(() => alertForm.beingUpdated.value || alertForm.anomalyEditMode.value),
       changedSections: unsaved.sections,
+      visited: visitedSections,
       t: alertForm.t,
     });
 
@@ -1491,6 +1498,8 @@ export default defineComponent({
           return has(fd.priority);
         case "tags":
           return (fd.tags ?? []).length > 0;
+        case "rowTemplate":
+          return has(fd.row_template);
         default:
           return false;
       }
@@ -1536,66 +1545,6 @@ export default defineComponent({
 
     const focusNameField = () =>
       (alertForm.step1Ref.value as { focus?: () => void } | null)?.focus?.();
-
-    // A full-height step opens its tucked settings while they still fit the view; a group the user toggled is left alone.
-    const userToggledTiers = new Set<AlertSectionId>();
-    const autoOpenedTiers = new Set<AlertSectionId>();
-    const onTierToggle = (section: AlertSectionId) => {
-      userToggledTiers.add(section);
-      autoOpenedTiers.delete(section);
-      tiers.toggle(section);
-    };
-    const sectionsScroller = () => (snapScrollRef.value as { $el?: HTMLElement } | null)?.$el;
-    const overflowsView = (id: AlertSectionId, scroller: HTMLElement): boolean => {
-      const section = scroller.querySelector<HTMLElement>(`[data-snap-section="${id}"]`);
-      const body = section?.lastElementChild;
-      if (!section || !body) return false;
-      const top = section.getBoundingClientRect().top;
-      const bottoms = Array.from(body.children).map(
-        (child) => child.getBoundingClientRect().bottom,
-      );
-      return Math.max(top, ...bottoms) - top > scroller.clientHeight;
-    };
-    const closeOverflowingTiers = () => {
-      const scroller = sectionsScroller();
-      if (!scroller) return;
-      for (const id of autoOpenedTiers) {
-        if (!overflowsView(id, scroller)) continue;
-        autoOpenedTiers.delete(id);
-        tiers.collapse(id);
-      }
-    };
-    const openTuckedSettingsThatFit = async () => {
-      if (!lgUp.value || !sectionsScroller() || alertForm.isAnomalyMode.value) return;
-      for (const { id } of ALERT_SECTIONS) {
-        const view = tiers.view(id);
-        if (userToggledTiers.has(id) || !view.tucked.length || view.expanded) continue;
-        tiers.expand(id);
-        autoOpenedTiers.add(id);
-      }
-      await nextTick();
-      closeOverflowingTiers();
-    };
-    let tierResizeObserver: ResizeObserver | null = null;
-    onMounted(() => {
-      nextTick(openTuckedSettingsThatFit);
-      const content = sectionsScroller()?.firstElementChild;
-      if (content && typeof ResizeObserver !== "undefined") {
-        tierResizeObserver = new ResizeObserver(closeOverflowingTiers);
-        tierResizeObserver.observe(content);
-      }
-    });
-    onBeforeUnmount(() => tierResizeObserver?.disconnect());
-    watch(
-      () => [
-        lgUp.value,
-        alertForm.formData.value.stream_name,
-        alertForm.formData.value.is_real_time,
-        alertForm.formData.value.query_condition?.type,
-      ],
-      openTuckedSettingsThatFit,
-      { flush: "post" },
-    );
 
     // A one-click link adds the setting itself, so the click is never only a reveal.
     const onTierAdd = (id: AlertSettingId) => {
@@ -1691,6 +1640,7 @@ export default defineComponent({
       isAnomalyDataReadinessStatus,
       anomalyCanCheckDataNow,
       alertTypeOptions,
+      alertTypeHelp,
       lgUp,
       snapScrollRef,
       activeSection,
@@ -1699,6 +1649,7 @@ export default defineComponent({
       sectionPosition,
       previousSection,
       nextSection,
+      guidesToNext,
       rowGroup,
       sectionTargets,
       setSectionTarget,
@@ -1714,7 +1665,6 @@ export default defineComponent({
       RAIL_VERDICT_ICONS,
       tiers,
       onTierAdd,
-      onTierToggle,
       settingFind,
       focusNameField,
       activeFolderName,

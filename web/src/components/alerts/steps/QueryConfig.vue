@@ -49,7 +49,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Non-form widgets (tabs / editors / VRL / FilterGroup) are bridged. -->
       <div :class="['box-border w-full min-w-0', sectionTargets ? '' : 'px-3 py-2']">
         <!-- Query Mode Tabs (hidden for real-time alerts) -->
-        <div v-if="shouldShowTabs" class="mb-2 flex items-center justify-between">
+        <div
+          v-if="sectionTargets"
+          class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-3 py-3"
+        >
+          <div class="min-w-0 flex-1 basis-60">
+            <div class="text-text-heading text-sm font-medium">
+              {{ t("alerts.sections.rows.whichEvents") }}
+            </div>
+            <div class="text-text-secondary mt-0.5 text-xs" data-test="add-alert-which-events-help">
+              {{ whichEventsHelp }}
+            </div>
+          </div>
+          <div v-if="shouldShowTabs" class="flex items-center gap-2">
+            <OButton
+              v-if="localTab !== 'custom'"
+              data-test="step2-view-editor-btn"
+              variant="outline"
+              size="sm"
+              @click="viewSqlEditor = true"
+            >
+              {{ t("alerts.queryConfig.openFullEditor") }}
+            </OButton>
+            <OToggleGroup
+              :model-value="localTab"
+              @update:model-value="updateTab($event as 'sql' | 'promql' | 'custom')"
+              data-test="step2-query-tabs"
+            >
+              <OToggleGroupItem
+                v-for="tab in tabOptions"
+                :key="tab.value"
+                :value="tab.value"
+                :data-test="`query-mode-${tab.value}`"
+                size="sm"
+              >
+                <template #icon-left>
+                  <OIcon v-if="tab.value === 'custom'" name="filter-alt" size="sm" />
+                  <OIcon v-else-if="tab.value === 'sql'" name="database" size="sm" />
+                  <OIcon v-else-if="tab.value === 'promql'" name="show-chart" size="sm" />
+                </template>
+                {{ tab.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+          </div>
+        </div>
+        <div v-else-if="shouldShowTabs" class="mb-2 flex items-center justify-between">
           <OToggleGroup
             :model-value="localTab"
             @update:model-value="updateTab($event as 'sql' | 'promql' | 'custom')"
@@ -161,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OFormSelect
                               :aria-label="t('common.operator')"
                               name="trigger_condition.operator"
-                              :options="numericOperators"
+                              :options="plainOperators"
                               width="xs"
                               data-test="alert-trigger-operator-select"
                               :searchable="false"
@@ -416,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFormSelect
                           :aria-label="t('common.operator')"
                           name="trigger_condition.operator"
-                          :options="numericOperators"
+                          :options="plainOperators"
                           :searchable="false"
                           class="max-w-30 min-w-17.5"
                           @update:model-value="onTriggerOperatorChange"
@@ -542,7 +586,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OFormSelect
                               :aria-label="t('common.operator')"
                               name="trigger_condition.operator"
-                              :options="numericOperators"
+                              :options="plainOperators"
                               :searchable="false"
                               width="xs"
                               @update:model-value="onTriggerOperatorChange"
@@ -793,7 +837,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFormSelect
                           :aria-label="t('common.operator')"
                           name="trigger_condition.operator"
-                          :options="numericOperators"
+                          :options="plainOperators"
                           :searchable="false"
                           class="max-w-30 min-w-17.5"
                           @update:model-value="onTriggerOperatorChange"
@@ -834,7 +878,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSettingRow
                   :label="t('alerts.queryConfig.checkEvery')"
                   required
-                  :info="t('alerts.howOftenCheckTooltip')"
+                  :description="t('alerts.sections.rows.checkEvery')"
                   fill
                 >
                   <div class="flex flex-col gap-1">
@@ -979,17 +1023,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Filters section — scheduled -->
-            <div v-if="isRealTime === 'false'" ref="filtersSectionRef" class="mt-1 px-3">
+            <div v-if="isRealTime === 'false'" ref="filtersSectionRef" class="mt-1 px-3 pb-2">
               <div v-show="showFilters" ref="customPreviewRef">
-                <FilterBuilder
-                  ref="conditionsBuilderRef"
-                  profile="alert"
-                  :model-value="inputData.conditions"
-                  :fields="conditionFields"
-                  :load-values="conditionValueLoader"
-                  data-test="alert-conditions"
-                  @update:model-value="onConditionsChange"
-                  @update:valid="conditionsValid = $event"
+                <FilterGroup
+                  :compact-empty="!!sectionTargets"
+                  :stream-fields="columns"
+                  :stream-fields-map="streamFieldsMap"
+                  :show-sql-preview="false"
+                  :sql-query="generatedSqlQuery"
+                  :group="inputData.conditions"
+                  :depth="0"
+                  module="alerts"
+                  name-prefix="query_condition.conditions"
+                  @add-condition="updateGroup"
+                  @add-group="updateGroup"
+                  @remove-group="removeConditionGroup"
+                  @input:update="onInputUpdate"
                 />
                 <div
                   v-if="showConditionsError"
@@ -1311,7 +1360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSettingRow
                   :label="t('alerts.queryConfig.checkEvery')"
                   required
-                  :info="t('alerts.howOftenCheckTooltip')"
+                  :description="t('alerts.sections.rows.checkEvery')"
                   fill
                 >
                   <div class="flex flex-col gap-1">
@@ -1423,7 +1472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFormSelect
                           :aria-label="t('common.operator')"
                           name="trigger_condition.operator"
-                          :options="numericOperators"
+                          :options="plainOperators"
                           :searchable="false"
                           width="xs"
                           data-test="alert-trigger-operator-select"
@@ -1789,7 +1838,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFormSelect
                           :aria-label="t('common.operator')"
                           name="trigger_condition.operator"
-                          :options="numericOperators"
+                          :options="plainOperators"
                           :searchable="false"
                           @update:model-value="onTriggerOperatorChange"
                         />
@@ -2434,6 +2483,14 @@ export default defineComponent({
 
     // Numeric-only operators (no Contains/NotContains for thresholds)
     const numericOperators = ["=", "!=", ">=", ">", "<=", "<"];
+    const plainOperators = computed(() => [
+      { label: t("alerts.sections.operators.gte"), value: ">=" },
+      { label: t("alerts.sections.operators.gt"), value: ">" },
+      { label: t("alerts.sections.operators.lte"), value: "<=" },
+      { label: t("alerts.sections.operators.lt"), value: "<" },
+      { label: t("alerts.sections.operators.eq"), value: "=" },
+      { label: t("alerts.sections.operators.ne"), value: "!=" },
+    ]);
 
     // Selected function — bare mode-discriminator (drives conditional rendering
     // + the aggregation payload). Stays a ref (bridged into `_meta` for the
@@ -3242,19 +3299,26 @@ export default defineComponent({
         ];
       }
 
-      // SQL and PromQL lead: alerts are mostly written as queries, the builder is the fallback.
+      // The form opens on the builder, so it leads; writing a query is the choice to opt into.
       if (props.streamType === "metrics") {
         return [
+          { label: t("alerts.sections.filtersMode"), value: "custom" },
           { label: raw("SQL"), value: "sql" },
           { label: raw("PromQL"), value: "promql" },
-          { label: t("alerts.queryBuilder"), value: "custom" },
         ];
       }
 
       return [
+        { label: t("alerts.sections.filtersMode"), value: "custom" },
         { label: raw("SQL"), value: "sql" },
-        { label: t("alerts.queryBuilder"), value: "custom" },
       ];
+    });
+    const whichEventsHelp = computed(() => {
+      if (localTab.value === "sql") return t("alerts.sections.rows.whichEventsSql");
+      if (localTab.value === "promql") return t("alerts.sections.rows.whichEventsPromql");
+      return leafFilterCount.value > 0
+        ? t("alerts.sections.rows.whichEventsFiltered")
+        : t("alerts.sections.rows.whichEventsAll");
     });
     // Hide tabs completely for real-time alerts (only one option)
     const shouldShowTabs = computed(() => {
@@ -3941,6 +4005,7 @@ export default defineComponent({
       store,
       localTab,
       tabOptions,
+      whichEventsHelp,
       shouldShowTabs,
       updateTab,
       conditionsBuilderRef,
@@ -3987,6 +4052,7 @@ export default defineComponent({
       isEventBased,
       logFunctionOptions,
       numericOperators,
+      plainOperators,
       selectedFunction,
       conditionOperator,
       conditionValue,

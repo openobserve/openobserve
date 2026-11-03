@@ -44,14 +44,14 @@ describe("useAlertFormSections", () => {
       "schedule",
       "details",
     ]);
-    expect(items.value[0].title).toBe("What should we watch?");
+    expect(items.value[0].title).toBe("What to watch");
   });
 
   it("asks for a stream and a name until they are set", () => {
     const { items } = setup(scheduled());
     expect(byId(items.value, "watch")).toMatchObject({
       state: "attention",
-      stateLabel: "Needs a value",
+      stateLabel: "Pick a stream",
       summary: "Pick a stream",
     });
     expect(byId(items.value, "details").state).toBe("attention");
@@ -62,14 +62,14 @@ describe("useAlertFormSections", () => {
       scheduled({ stream_name: "k8s_logs", name: "errors", destinations: ["slack"] }),
     );
     expect(byId(items.value, "watch")).toMatchObject({ state: "done", summary: "k8s_logs" });
-    expect(byId(items.value, "condition").summary).toBe("Count >= 3");
-    expect(byId(items.value, "notify")).toMatchObject({ state: "done", summary: "1 destination" });
+    expect(byId(items.value, "condition").summary).toBe("3+ events");
+    expect(byId(items.value, "notify")).toMatchObject({ state: "done", summary: "slack" });
     expect(byId(items.value, "schedule").summary).toBe("Every 10 min");
   });
 
   it("says nobody is notified without marking the optional section as missing", () => {
     const { items } = setup(scheduled({ stream_name: "k8s_logs" }));
-    expect(byId(items.value, "notify")).toMatchObject({ state: "none", summary: "Nobody yet" });
+    expect(byId(items.value, "notify")).toMatchObject({ state: "none", summary: "No one yet" });
   });
 
   describe("on-call delivery", () => {
@@ -92,8 +92,37 @@ describe("useAlertFormSections", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const { items } = setup(scheduled({ stream_name: "cpu", oncall_team: "team-1" }));
-      expect(byId(items.value, "notify").summary).toBe("Nobody yet");
+      expect(byId(items.value, "notify").summary).toBe("No one yet");
     });
+  });
+
+  it("stays quiet about a section the user has not moved past", () => {
+    const { items } = useAlertFormSections({
+      fieldMeta: ref({}),
+      formData: ref(scheduled()),
+      anomalyConfig: ref({}),
+      isAnomalyMode: ref(false),
+      isAggregationEnabled: ref(false),
+      isEditing: ref(false),
+      visited: ref(new Set()),
+      t,
+    });
+    expect(byId(items.value, "watch")).toMatchObject({ state: "none", summary: "Pick a stream" });
+    expect(byId(items.value, "watch")).not.toHaveProperty("stateLabel", expect.anything());
+    expect(byId(items.value, "condition").state).toBe("none");
+  });
+
+  it("phrases each event-count operator in words", () => {
+    const summary = (operator: string) =>
+      byId(
+        setup(scheduled({ trigger_condition: { operator, threshold: 3 } })).items.value,
+        "condition",
+      ).summary;
+    expect(summary(">")).toBe("more than 3 events");
+    expect(summary("<=")).toBe("3 or fewer events");
+    expect(summary("<")).toBe("fewer than 3 events");
+    expect(summary("=")).toBe("exactly 3 events");
+    expect(summary("!=")).toBe("not 3 events");
   });
 
   it("counts invalid fields per section from the form's field meta", () => {
@@ -105,7 +134,7 @@ describe("useAlertFormSections", () => {
     expect(errorCounts.value.schedule).toBe(2);
     expect(byId(items.value, "schedule")).toMatchObject({
       state: "error",
-      stateLabel: "Needs a fix · 2",
+      stateLabel: "2 things to fix",
     });
     expect(byId(items.value, "condition").state).toBe("done");
   });
