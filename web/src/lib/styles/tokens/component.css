@@ -996,6 +996,27 @@
   --color-menu-badge-ring: var(--color-grey-900);
   /* Active and hover rail labels need a darker step than --color-accent to clear 4.5:1 on the light tile. */
   --color-nav-label-accent: var(--color-primary-700);
+  /* Desktop rail tiles and selection lens; lens colours derive from primary-600 in OKLCH so custom themes follow. */
+  --color-nav-rail-text: var(--color-grey-600);
+  --color-nav-rail-text-strong: var(--color-grey-900);
+  --color-nav-lens-rim: oklch(from var(--color-primary-600) 0.52 min(c, 0.13) h);
+  --color-nav-lens-glass: oklch(from var(--color-primary-600) 0.84 calc(c * 0.55) h / 0.85);
+  --color-nav-lens-tint: oklch(from var(--color-primary-600) 0.9 calc(c * 0.35) h);
+  --color-nav-lens-glow: oklch(from var(--color-primary-600) 0.5 c h / 0.45);
+  --color-nav-lens-sheen: rgb(255 255 255 / 0.95);
+  --color-nav-lens-icon: oklch(from var(--color-primary-600) 0.36 min(c, 0.09) h);
+  --color-nav-lens-hover: oklch(from var(--color-primary-600) 0.9 calc(c * 0.3) h / 0.5);
+  --color-gradient-nav-lens:
+    radial-gradient(120% 70% at 50% -10%, var(--color-nav-lens-sheen), transparent 62%),
+    linear-gradient(180deg, transparent 55%, var(--color-nav-lens-glow)),
+    linear-gradient(var(--color-nav-lens-glass), var(--color-nav-lens-glass));
+  /* eslint-disable local/no-hardcoded-px -- optical shadow geometry, not layout */
+  --shadow-nav-lens:
+    inset 0 0 0 1px var(--color-nav-lens-rim), inset 0 2px 1px -1px var(--color-nav-lens-sheen),
+    inset 0 -5px 9px -5px var(--color-nav-lens-glow), 0 6px 14px -6px var(--color-nav-lens-glow),
+    0 1px 2px rgb(0 0 0 / 0.08);
+  --shadow-nav-lens-matte: inset 0 0 0 1px var(--color-nav-lens-rim);
+  /* eslint-enable local/no-hardcoded-px */
 
   /* Inline progress/duration bar fill (synthetics run timings). */
   --color-progress-track-fill: var(--color-primary-400);
@@ -1340,6 +1361,12 @@
   --color-thread-accent-strong: var(--color-thread-accent-strong);
   --color-menu-badge-ring: var(--color-menu-badge-ring);
   --color-nav-label-accent: var(--color-nav-label-accent);
+  --color-nav-rail-text: var(--color-nav-rail-text);
+  --color-nav-rail-text-strong: var(--color-nav-rail-text-strong);
+  --color-nav-lens-rim: var(--color-nav-lens-rim);
+  --color-nav-lens-tint: var(--color-nav-lens-tint);
+  --color-nav-lens-icon: var(--color-nav-lens-icon);
+  --color-nav-lens-hover: var(--color-nav-lens-hover);
   --color-progress-track-fill: var(--color-progress-track-fill);
 
   /* Ingestion empty-state card icon accents */

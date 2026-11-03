@@ -130,3 +130,29 @@
     var(--color-status-negative)
   );
 }
+
+/* Rail selection lens corner: one step rounder than a control, squircle where supported. Consumers: ONavbar.vue, MenuLink.vue. */
+@utility rounded-nav-lens {
+  border-radius: 0.875rem;
+  corner-shape: squircle;
+}
+
+/* Rail selection lens material: liquid glass, matte tint and rim when transparency is reduced, system colours when forced. Consumer: ONavbar.vue. */
+@utility bg-nav-lens {
+  background-image: var(--color-gradient-nav-lens);
+  box-shadow: var(--shadow-nav-lens);
+  @media (prefers-reduced-transparency: reduce) {
+    background-image: none;
+    background-color: var(--color-nav-lens-tint);
+    box-shadow: var(--shadow-nav-lens-matte);
+  }
+  @media (forced-colors: active) {
+    forced-color-adjust: none;
+    background: Canvas;
+    box-shadow: none;
+    /* eslint-disable-next-line local/no-hardcoded-px -- outline width is optical, not layout */
+    outline: 2px solid Highlight;
+    /* eslint-disable-next-line local/no-hardcoded-px -- outline offset is optical, not layout */
+    outline-offset: -2px;
+  }
+}

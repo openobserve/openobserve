@@ -293,7 +293,7 @@ describe("design token contrast", () => {
       expect(names.length).toBeGreaterThan(900);
       const unresolved = names
         .filter((name) => resolveColor(name, scope) === null)
-        .filter((name) => !(scope.get(name) ?? "").startsWith("linear-gradient"));
+        .filter((name) => !/^(linear|radial)-gradient\(/.test(scope.get(name) ?? ""));
       expect(unresolved).toEqual([]);
     }
   });

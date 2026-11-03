@@ -389,8 +389,8 @@ describe("the real token sheets", () => {
   });
 
   describe.each([
-    ["light", 1086, 1074],
-    ["dark", 1087, 1075],
+    ["light", 1096, 1083],
+    ["dark", 1097, 1084],
   ] as const)("%s theme", (theme, total, resolved) => {
     const scope = THEMES[theme];
     const names = colorTokens(scope);
@@ -408,7 +408,7 @@ describe("the real token sheets", () => {
     it("leaves nothing unresolved except the gradient tokens", () => {
       const offenders = names
         .filter((name) => resolveColor(name, scope) === null)
-        .filter((name) => !(scope.get(name) ?? "").startsWith("linear-gradient"))
+        .filter((name) => !/^(linear|radial)-gradient\(/.test(scope.get(name) ?? ""))
         .map((name) => `${name}: ${scope.get(name)}`);
       expect(offenders).toEqual([]);
     });

@@ -15,10 +15,11 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import MenuLink from "@/components/MenuLink.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import i18n from "@/locales";
+import { RailLensKey } from "@/lib/core/Navbar/ONavbar.types";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
 
@@ -449,6 +450,33 @@ describe("MenuLink", async () => {
       expect(w.find(".menu-badge").exists()).toBe(true);
       expect(w.find('[data-test="menu-link-/logs-lock"]').exists()).toBe(false);
       w.unmount();
+    });
+  });
+
+  describe("rail lens selection", () => {
+    function mountTile(link: string) {
+      return mount(MenuLink, {
+        props: { title: "Tile", link },
+        global: {
+          plugins: [i18n, mockRouter],
+          provide: {
+            store,
+            [RailLensKey as symbol]: computed(() => true),
+          },
+        },
+      });
+    }
+
+    it("tints the whole tile on hover, never the icon box", () => {
+      const tile = mountTile("/traces");
+      expect(tile.find(".nav-menu-item").classes()).toContain("hover:bg-nav-lens-hover");
+      expect(
+        tile
+          .find(".icon-wrapper")
+          .classes()
+          .some((c) => c.includes("bg-")),
+      ).toBe(false);
+      tile.unmount();
     });
   });
 });

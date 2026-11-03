@@ -116,7 +116,7 @@ import { computed, provide, ref, watch, nextTick, onMounted, onBeforeUnmount } f
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter, type NavigationFailure, type RouteLocationNormalized } from "vue-router";
 import type { NavbarProps, NavbarEmits, NavbarSlots, RailEntry } from "./ONavbar.types";
-import { RailIndicatorActiveKey, RailNavigationMarkKey } from "./ONavbar.types";
+import { RailIndicatorActiveKey, RailLensKey, RailNavigationMarkKey } from "./ONavbar.types";
 import { groupNavLinks } from "./navGroups";
 import { isGateOpen, useNavGateContext } from "./useNavGateContext";
 import { findContentFocusTarget, findHeaderFocusTarget } from "./railFocus";
@@ -189,6 +189,9 @@ const indicatorStyle = ref<Record<string, string>>({});
 const indicatorVisible = ref(false);
 const hasValidPosition = ref(false);
 const transitionOn = ref(false);
+
+// The desktop rail draws a lens around the active tile; the drawer keeps the full-row pill.
+const lens = computed(() => !isMobile.value);
 
 let resizeObserver: ResizeObserver | null = null;
 
@@ -357,8 +360,10 @@ onBeforeUnmount(() => {
 // tinted selected pill + lighter accent in dark, where a white pill would vanish
 // on the near-black rail.
 const indicatorClass = computed(() => [
-  "pointer-events-none absolute left-0 top-0 z-0 rounded-surface border-s-2",
-  "bg-surface-base border-accent dark:bg-tabs-active-bg dark:border-accent",
+  "pointer-events-none absolute left-0 top-0 z-0",
+  lens.value
+    ? "nav-lens rounded-nav-lens bg-nav-lens"
+    : "rounded-surface border-s-2 bg-surface-base border-accent dark:bg-tabs-active-bg dark:border-accent",
   transitionOn.value &&
     "transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none",
   indicatorVisible.value ? "opacity-100" : "opacity-0",
@@ -369,6 +374,8 @@ provide(
   RailIndicatorActiveKey,
   computed(() => indicatorVisible.value),
 );
+
+provide(RailLensKey, lens);
 
 provide(RailNavigationMarkKey, markRailNavigation);
 

@@ -47,6 +47,9 @@ export const RailIndicatorActiveKey: InjectionKey<ComputedRef<boolean>> = Symbol
   "o-navbar-rail-indicator-active",
 );
 
+/** True on the desktop rail, where tiles draw the selection lens; the drawer keeps its row pill. */
+export const RailLensKey: InjectionKey<ComputedRef<boolean>> = Symbol("o-navbar-rail-lens");
+
 /** Provided by ONavbar so a teleported flyout item can mark its click as rail-started. */
 export const RailNavigationMarkKey: InjectionKey<(event: MouseEvent) => void> = Symbol(
   "o-navbar-rail-navigation-mark",
