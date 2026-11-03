@@ -377,10 +377,13 @@ const analyzeNotice = computed<AnalyzeNotice | null>(() => {
   };
 });
 
-function explainPayload(prefix: string) {
+function explainPayload(prefix: string, extra: Record<string, unknown> = {}) {
   const queryReq = getSearchQueryPayload();
   if (!queryReq?.query?.sql) return null;
-  return { ...queryReq, query: { ...queryReq.query, sql: `${prefix} ${queryReq.query.sql}` } };
+  return {
+    ...queryReq,
+    query: { ...queryReq.query, ...extra, sql: `${prefix} ${queryReq.query.sql}` },
+  };
 }
 
 async function search(
@@ -496,7 +499,8 @@ function finishAnalyze(parsed: SearchStreamResult | null) {
 
 async function runAnalyze() {
   if (analyzeBusy.value) return;
-  const payload = explainPayload("EXPLAIN ANALYZE");
+  // the backend adds the structured profile column only when asked
+  const payload = explainPayload("EXPLAIN ANALYZE", { analyze_profile: true });
   if (!payload) {
     failAnalyze(t("search.errorRunningAnalyze"));
     return;

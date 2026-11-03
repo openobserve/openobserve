@@ -340,6 +340,8 @@ describe("QueryPlanDialog", () => {
       const pending = deferred();
       wrapper = await openAndRun(pending.promise);
       expect(sentSql(1)).toBe("EXPLAIN ANALYZE SELECT * FROM logs");
+      expect(mockStreamingSearch.mock.calls[1][0].query.query.analyze_profile).toBe(true);
+      expect(mockStreamingSearch.mock.calls[0][0].query.query.analyze_profile).toBeUndefined();
       expect(find(wrapper, "query-plan-analyze-elapsed").text()).toBe("0:00");
       expect(find(wrapper, "query-plan-analyze-running").text()).toContain(
         "elapsed · results on the page took 1.84s",
