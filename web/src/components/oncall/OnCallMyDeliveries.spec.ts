@@ -250,14 +250,15 @@ describe("OnCallMyDeliveries", () => {
   });
 
   describe("the unread badge", () => {
-    /// A resolved page has nothing left to read, so it never counts.
-    it("counts unread open pages only, and reports the count outward", async () => {
+    /// The server's read state decides, resolved or not; one page on two channels is one unread.
+    it("counts unread pages, resolved included, and reports the count outward", async () => {
       answer([
         delivery({ event_id: "ev_1", response_id: "resp_1", read: false }),
         delivery({ event_id: "ev_2", response_id: "resp_1", read: false, channel: "sms" }),
         delivery({
           event_id: "ev_3",
           response_id: "resp_2",
+          subject_id: "other-alert",
           read: false,
           response_state: "resolved",
         }),
@@ -265,15 +266,17 @@ describe("OnCallMyDeliveries", () => {
       const wrapper = render();
       await flushPromises();
 
-      expect(wrapper.emitted("unread")?.at(-1)).toEqual([1]);
-      expect(wrapper.find('[data-test="oncall-my-deliveries-unread"]').text()).toContain("1");
+      expect(wrapper.emitted("unread")?.at(-1)).toEqual([2]);
+      expect(wrapper.find('[data-test="oncall-my-deliveries-unread"]').text()).toContain("2");
     });
 
-    it("shows no unread dot on a resolved alert", async () => {
+    it("shows the unread dot on an unread resolved alert", async () => {
       answer([delivery({ read: false, response_state: "resolved" })]);
       const wrapper = render();
       await flushPromises();
-      expect(wrapper.find('[data-test="oncall-my-delivery-unread-ev_88"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-my-delivery-unread-ev_88"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-my-deliveries-unread-toggle"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-my-deliveries-read-all"]').exists()).toBe(true);
     });
   });
 
@@ -288,13 +291,20 @@ describe("OnCallMyDeliveries", () => {
     expect(service.myDeliveries.mock.calls.at(-1)![0]).toMatchObject({ unread_only: true });
   });
 
-  /// Resolved pages are never unread, so an all-resolved inbox has nothing to filter or mark.
-  it("offers no unread filter and no row menu when every page is resolved", async () => {
+  /// A read, resolved page still offers "Mark unread" from its row menu, and nothing to filter.
+  it("keeps the row menu on a read resolved page", async () => {
     answer([delivery({ read: true, response_state: "resolved" })]);
     const wrapper = render();
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-my-deliveries-unread-toggle"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-my-delivery-more-ev_88"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-my-delivery-more-ev_88"]').exists()).toBe(true);
+    const toggle = wrapper.findComponent('[data-test="oncall-my-delivery-toggle-ev_88"]');
+    expect(toggle.props("iconLeft")).toBe("mail");
+    await toggle.trigger("click");
+    await flushPromises();
+    expect(service.markDeliveriesRead).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { event_ids: ["ev_88"], read: false } }),
+    );
   });
 
   /// An empty list has nothing to narrow, so it offers no filter.

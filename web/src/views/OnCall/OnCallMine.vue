@@ -98,153 +98,139 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @action="openTeams"
           />
 
-          <OTable
-            v-else
-            :data="visibleShiftRows"
-            :columns="shiftColumns"
-            row-key="team_id"
-            :frame="false"
-            :loading="!loaded"
-            :skeleton-rows="SHIFTS_SKELETON_ROWS"
-            :max-height="shiftsExpanded ? SHIFTS_MAX_HEIGHT : undefined"
-            :show-global-filter="false"
-            pagination="none"
-            table-id="oncall-mine-shifts"
-            data-test="oncall-mine-shifts-table"
-          >
-            <template #cell-team="{ row }">
-              <router-link
-                class="text-accent inline-block max-w-full text-sm font-medium hover:underline"
-                :to="teamRoute(row.team_id)"
-                :data-test="`oncall-mine-team-${row.team_id}`"
-              >
-                <OTruncatedText class="block">{{ raw(row.team_name) }}</OTruncatedText>
-              </router-link>
-            </template>
-            <!-- Null with an unresolved schedule is "we could not work it out", never "off duty". -->
-            <template #cell-seat="{ row }">
-              <span class="flex flex-wrap items-center gap-1">
-                <OTag
-                  :variant="
-                    row.on_call_now === true
-                      ? 'success-soft'
-                      : row.on_call_now === false
-                        ? 'default-soft'
-                        : 'amber-soft'
-                  "
-                  size="sm"
-                  :data-test="`oncall-mine-duty-${row.team_id}`"
-                >
-                  {{ seatLabel(row) }}
-                </OTag>
-                <span
-                  v-if="row.roles.length > 1"
-                  class="inline-flex"
-                  :data-test="`oncall-mine-no-backup-${row.team_id}`"
-                >
-                  <OIcon name="warning" size="sm" class="text-status-warning-text" />
-                  <OTooltip :content="t('oncall.mineNoBackup')" />
-                </span>
-              </span>
-            </template>
-            <template #cell-until="{ row }">
-              <span
-                v-if="untilLine(row)"
-                class="flex min-w-0 flex-col"
-                :data-test="`oncall-mine-shift-${row.team_id}`"
-              >
-                <OText variant="body" as="span">{{ untilLine(row) }}</OText>
-                <OText v-if="countdown(row)" variant="meta" as="span">
-                  {{ t("oncall.mineShiftLeft", { left: raw(countdown(row)) }) }}
-                </OText>
-              </span>
-              <OText v-else variant="meta" as="span">{{ raw("—") }}</OText>
-            </template>
-            <template #cell-then="{ row }">
-              <OnCallPersonName
-                v-if="row.on_call_now === true && row.next"
-                class="block min-w-0 truncate"
-                :email="row.next"
-                :data-test="`oncall-mine-next-${row.team_id}`"
-              />
-              <OText v-else variant="meta" as="span">{{ raw("—") }}</OText>
-            </template>
-            <template #cell-row-actions="{ row }">
-              <div class="flex items-center justify-end">
-                <!-- Only a shift the reader holds now, with a known end, has a window to hand over. -->
-                <OButton
-                  v-if="row.on_call_now === true && row.until !== null"
-                  variant="ghost"
-                  size="icon-sm"
-                  class="max-md:hidden"
-                  :loading="coverLoadingId === row.team_id"
-                  :aria-label="t('oncall.mineCoverShift')"
-                  :data-test="`oncall-mine-cover-${row.team_id}`"
-                  @click="openCover(row)"
-                >
-                  <OIcon name="person-add" size="sm" aria-hidden="true" />
-                  <OTooltip :content="t('oncall.mineCoverShift')" />
-                </OButton>
-                <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  class="max-md:hidden"
-                  :loading="testingId === row.team_id"
-                  :aria-label="t('oncall.mineTestTeam', { team: raw(row.team_name) })"
-                  :data-test="`oncall-mine-test-page-${row.team_id}`"
-                  @click="askTestPage(row.team_id)"
-                >
-                  <OIcon name="campaign" size="sm" aria-hidden="true" />
-                  <OTooltip :content="t('oncall.mineTestTeam', { team: raw(row.team_name) })" />
-                </OButton>
-                <ODropdown side="bottom" align="end">
-                  <template #trigger>
-                    <OButton
-                      variant="ghost"
-                      size="icon-sm"
-                      icon-left="more-vert"
-                      class="md:hidden"
-                      :loading="coverLoadingId === row.team_id || testingId === row.team_id"
-                      :aria-label="t('oncall.moreActions')"
-                      :data-test="`oncall-mine-row-menu-${row.team_id}`"
-                    />
-                  </template>
-                  <ODropdownItem
-                    v-if="row.on_call_now === true && row.until !== null"
-                    icon-left="person-add"
-                    :data-test="`oncall-mine-cover-${row.team_id}-menu`"
-                    @select="openCover(row)"
-                  >
-                    {{ t("oncall.mineCoverShift") }}
-                  </ODropdownItem>
-                  <ODropdownItem
-                    icon-left="campaign"
-                    :data-test="`oncall-mine-test-page-${row.team_id}-menu`"
-                    @select="askTestPage(row.team_id)"
-                  >
-                    {{ t("oncall.mineTestTeam", { team: raw(row.team_name) }) }}
-                  </ODropdownItem>
-                </ODropdown>
-              </div>
-            </template>
-          </OTable>
-          <div
-            v-if="loaded && loadError === null && shiftRows.length > SHIFTS_PREVIEW"
-            class="border-border-default flex border-t px-2 py-1"
-          >
-            <OButton
-              variant="ghost"
-              size="sm"
-              data-test="oncall-mine-shifts-toggle"
-              @click="shiftsExpanded = !shiftsExpanded"
+          <div v-else class="h-55.5 shrink-0" data-test="oncall-mine-shifts-frame">
+            <OTable
+              :data="shiftRows"
+              :columns="shiftColumns"
+              row-key="team_id"
+              :frame="false"
+              :loading="!loaded"
+              :skeleton-rows="SHIFTS_SKELETON_ROWS"
+              :show-global-filter="false"
+              pagination="none"
+              table-id="oncall-mine-shifts"
+              data-test="oncall-mine-shifts-table"
             >
-              {{
-                shiftsExpanded
-                  ? t("oncall.mineShiftsShowLess")
-                  : t("oncall.mineShiftsShowAll", { count: shiftRows.length })
-              }}
-            </OButton>
+              <template #cell-team="{ row }">
+                <router-link
+                  class="text-accent inline-block max-w-full text-sm font-medium hover:underline"
+                  :to="teamRoute(row.team_id)"
+                  :data-test="`oncall-mine-team-${row.team_id}`"
+                >
+                  <OTruncatedText class="block">{{ raw(row.team_name) }}</OTruncatedText>
+                </router-link>
+              </template>
+              <!-- Null with an unresolved schedule is "we could not work it out", never "off duty". -->
+              <template #cell-seat="{ row }">
+                <span class="flex flex-wrap items-center gap-1">
+                  <OTag
+                    :variant="
+                      row.on_call_now === true
+                        ? 'success-soft'
+                        : row.on_call_now === false
+                          ? 'default-soft'
+                          : 'amber-soft'
+                    "
+                    size="sm"
+                    :data-test="`oncall-mine-duty-${row.team_id}`"
+                  >
+                    {{ seatLabel(row) }}
+                  </OTag>
+                  <span
+                    v-if="row.roles.length > 1"
+                    class="inline-flex"
+                    :data-test="`oncall-mine-no-backup-${row.team_id}`"
+                  >
+                    <OIcon name="warning" size="sm" class="text-status-warning-text" />
+                    <OTooltip :content="t('oncall.mineNoBackup')" />
+                  </span>
+                </span>
+              </template>
+              <template #cell-until="{ row }">
+                <span
+                  v-if="untilLine(row)"
+                  class="flex min-w-0 flex-col"
+                  :data-test="`oncall-mine-shift-${row.team_id}`"
+                >
+                  <OText variant="body" as="span" class="whitespace-nowrap">
+                    {{ untilLine(row) }}
+                    <OTooltip :content="raw(fullAt(untilAt(row)))" />
+                  </OText>
+                  <OText v-if="countdown(row)" variant="meta" as="span">
+                    {{ t("oncall.mineShiftLeft", { left: raw(countdown(row)) }) }}
+                  </OText>
+                </span>
+                <OText v-else variant="meta" as="span">{{ raw("—") }}</OText>
+              </template>
+              <template #cell-then="{ row }">
+                <OnCallPersonName
+                  v-if="row.on_call_now === true && row.next"
+                  class="block min-w-0 truncate"
+                  :email="row.next"
+                  :data-test="`oncall-mine-next-${row.team_id}`"
+                />
+                <OText v-else variant="meta" as="span">{{ raw("—") }}</OText>
+              </template>
+              <template #cell-row-actions="{ row }">
+                <div class="flex items-center justify-end">
+                  <!-- Only a shift the reader holds now, with a known end, has a window to hand over. -->
+                  <OButton
+                    v-if="row.on_call_now === true && row.until !== null"
+                    variant="ghost"
+                    size="icon-sm"
+                    class="max-md:hidden"
+                    :loading="coverLoadingId === row.team_id"
+                    :aria-label="t('oncall.mineCoverShift')"
+                    :data-test="`oncall-mine-cover-${row.team_id}`"
+                    @click="openCover(row)"
+                  >
+                    <OIcon name="person-add" size="sm" aria-hidden="true" />
+                    <OTooltip :content="t('oncall.mineCoverShift')" />
+                  </OButton>
+                  <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
+                  <OButton
+                    variant="ghost"
+                    size="icon-sm"
+                    class="max-md:hidden"
+                    :loading="testingId === row.team_id"
+                    :aria-label="t('oncall.mineTestTeam', { team: raw(row.team_name) })"
+                    :data-test="`oncall-mine-test-page-${row.team_id}`"
+                    @click="askTestPage(row.team_id)"
+                  >
+                    <OIcon name="campaign" size="sm" aria-hidden="true" />
+                    <OTooltip :content="t('oncall.mineTestTeam', { team: raw(row.team_name) })" />
+                  </OButton>
+                  <ODropdown side="bottom" align="end">
+                    <template #trigger>
+                      <OButton
+                        variant="ghost"
+                        size="icon-sm"
+                        icon-left="more-vert"
+                        class="md:hidden"
+                        :loading="coverLoadingId === row.team_id || testingId === row.team_id"
+                        :aria-label="t('oncall.moreActions')"
+                        :data-test="`oncall-mine-row-menu-${row.team_id}`"
+                      />
+                    </template>
+                    <ODropdownItem
+                      v-if="row.on_call_now === true && row.until !== null"
+                      icon-left="person-add"
+                      :data-test="`oncall-mine-cover-${row.team_id}-menu`"
+                      @select="openCover(row)"
+                    >
+                      {{ t("oncall.mineCoverShift") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      icon-left="campaign"
+                      :data-test="`oncall-mine-test-page-${row.team_id}-menu`"
+                      @select="askTestPage(row.team_id)"
+                    >
+                      {{ t("oncall.mineTestTeam", { team: raw(row.team_name) }) }}
+                    </ODropdownItem>
+                  </ODropdown>
+                </div>
+              </template>
+            </OTable>
           </div>
         </section>
 
@@ -430,13 +416,9 @@ import type {
   Rotation,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { formatTimestampInTimezone } from "@/utils/date";
 import { formatMicrosDuration } from "@/utils/formatters";
-import {
-  formatOnCallInstant,
-  fromZonedInputValue,
-  isOnCallUnavailable,
-  testPageOutcome,
-} from "@/utils/oncall";
+import { fromZonedInputValue, isOnCallUnavailable, testPageOutcome } from "@/utils/oncall";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 
 /// How far ahead the shift card looks for the end of this shift and the next one.
@@ -523,16 +505,8 @@ const shiftRows = computed<ShiftRow[]>(() =>
     .sort((a, b) => untilAt(a) - untilAt(b) || a.team_name.localeCompare(b.team_name)),
 );
 
-/// Rows shown before "Show all"; a reader on many teams still sees their soonest handovers first.
-const SHIFTS_PREVIEW = 5;
-/// About ten rows under the sticky header, scrolled inside the card once expanded.
-const SHIFTS_MAX_HEIGHT = "30rem";
-const shiftsExpanded = ref(false);
-/// Most readers are on one or two teams, so the first paint is that shape rather than a tall skeleton that collapses.
-const SHIFTS_SKELETON_ROWS = 2;
-const visibleShiftRows = computed(() =>
-  shiftsExpanded.value ? shiftRows.value : shiftRows.value.slice(0, SHIFTS_PREVIEW),
-);
+/// Same as the frame's five rows, so the first paint is the loaded height.
+const SHIFTS_SKELETON_ROWS = 5;
 
 const shiftColumns = computed<OTableColumnDef<ShiftRow>[]>(() => [
   {
@@ -571,15 +545,23 @@ function seatLabel(row: ShiftRow): I18nText {
   return row.on_call_now === false ? t("oncall.mineDutyOff") : t("oncall.mineDutyUnknown");
 }
 
-function at(micros: number): string {
-  return formatOnCallInstant(micros, nowMicros.value, store.state.timezone);
+/// The lookahead is two weeks, so the cell drops the year to fit; the tooltip carries it.
+function shortAt(micros: number): string {
+  const zone = store.state.timezone;
+  const day = (us: number) => formatTimestampInTimezone(us, "yyyy-MM-dd", zone);
+  const pattern = day(micros) === day(nowMicros.value) ? "HH:mm" : "MMM d, HH:mm";
+  return formatTimestampInTimezone(micros, pattern, zone);
+}
+
+function fullAt(micros: number): string {
+  return formatTimestampInTimezone(micros, "MMM d, yyyy, HH:mm", store.state.timezone);
 }
 
 /// When the held stretch ends while on call, when the next one starts while off.
 function untilLine(row: ShiftRow): I18nText | "" {
-  if (row.on_call_now === true && row.until !== null) return raw(at(row.until));
+  if (row.on_call_now === true && row.until !== null) return raw(shortAt(row.until));
   if (row.on_call_now === false && row.nextShiftAt !== null) {
-    return t("oncall.mineNextShift", { time: raw(at(row.nextShiftAt)) });
+    return t("oncall.mineNextShift", { time: raw(shortAt(row.nextShiftAt)) });
   }
   return "";
 }

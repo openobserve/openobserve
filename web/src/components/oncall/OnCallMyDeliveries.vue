@@ -215,8 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-end">
-              <!-- A resolved page never counts as unread, so there is nothing to mark on one. -->
-              <ODropdown v-if="canMark(row)" side="bottom" align="end">
+              <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
                     variant="ghost"
@@ -326,7 +325,7 @@ const CHANNEL_ICON: Record<Channel, IconName> = {
   webhook: "webhook",
 };
 
-/** One alert's pages to the reader, newest first; a resolved page is never unread. */
+/** One alert's pages to the reader, newest first. */
 interface HistoryRow {
   key: string;
   latest: MyDelivery;
@@ -386,9 +385,7 @@ function teamName(id: string): string {
 const teamsPending = (...ids: string[]) =>
   props.teamsState === "pending" && ids.some((id) => !props.teamNames[id]);
 
-const countsAsUnread = (row: MyDelivery) => !row.read && row.response_state !== "resolved";
-
-const canMark = (row: HistoryRow) => row.unread || row.latest.response_state !== "resolved";
+const countsAsUnread = (row: MyDelivery) => !row.read;
 
 /// The open pages, one row per page with its newest send.
 const openRows = computed<MyDelivery[]>(() => {
@@ -468,20 +465,15 @@ const historyColumns = computed<OTableColumnDef<HistoryRow>[]>(() => [
   { id: "state", header: t("oncall.myDeliveriesStatus"), size: 128, sortable: false },
   { id: "channels", header: t("oncall.myDeliveriesChannels"), size: 104, sortable: false },
   { id: "at", header: t("oncall.myDeliveriesWhen"), size: 176, sortable: false },
-  // An all-resolved history has nothing to mark, so an empty Actions column would only take width.
-  ...(historyRows.value.some(canMark)
-    ? [
-        {
-          id: "actions",
-          header: t("oncall.actions"),
-          isAction: true,
-          pinned: "right" as const,
-          sortable: false,
-          size: 64,
-          meta: { align: "center" as const, actionCount: 1 },
-        },
-      ]
-    : []),
+  {
+    id: "actions",
+    header: t("oncall.actions"),
+    isAction: true,
+    pinned: "right",
+    sortable: false,
+    size: 64,
+    meta: { align: "center", actionCount: 1 },
+  },
 ]);
 
 function clock(micros: number): string {
@@ -521,7 +513,7 @@ async function fetchDeliveries(force = false) {
     );
     if (readId !== latestDeliveriesRead) return;
     rows.value = data?.deliveries ?? [];
-    // Counted here, not from the server's figure: a resolved page has nothing left to read.
+    // Pages, not sends: one page that reached the reader on three channels is one unread.
     setUnread(new Set(rows.value.filter(countsAsUnread).map((row) => row.response_id)).size);
     loadedOnce = true;
     loadError.value = null;

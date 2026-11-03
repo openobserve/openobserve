@@ -195,6 +195,46 @@ describe("OnCallMine", () => {
     expect(wrapper.find('[data-test="oncall-mine-next-team_1"]').text()).toBe("raj@o2.ai");
   });
 
+  /// The next shift fits its cell as month, day and time; the year waits in the tooltip.
+  it("names an off-duty row's next shift short, with the full date in its tooltip", async () => {
+    const me = store.state.userInfo.email;
+    const from = Date.now() * 1000 + 3 * 24 * 3_600_000_000;
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+    service.myOnCall.mockResolvedValue({
+      data: {
+        on_call_now: false,
+        teams: [{ team_id: "team_1", team_name: "Payments", on_call_now: false, on_call: [] }],
+      },
+    } as any);
+    service.resolvedSchedule.mockResolvedValue({
+      data: [{ rotation_id: "r1", from, to: from + 3_600_000_000, user_email: me }],
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    const until = wrapper.find('[data-test="oncall-mine-shift-team_1"]');
+    expect(until.text()).toMatch(/^Next: [A-Z][a-z]{2} \d{1,2}, \d{2}:\d{2}$/);
+    const tip = until.findComponent({ name: "OTooltip" }).props("content");
+    expect(tip).toMatch(/\d{4}, \d{2}:\d{2}$/);
+  });
+
+  /// The frame is five rows tall whatever lands in it, so the card never jumps between loading and loaded.
+  it("keeps the shifts frame at five rows while loading and with one row", async () => {
+    let answerMine: (value: unknown) => void = () => {};
+    service.myOnCall.mockImplementationOnce(
+      () => new Promise((resolve) => (answerMine = resolve)) as any,
+    );
+    const wrapper = render();
+    await flushPromises();
+    const frame = () => wrapper.find('[data-test="oncall-mine-shifts-frame"]');
+    expect(frame().classes()).toContain("h-55.5");
+    expect(wrapper.findComponent({ name: "OTable" }).attributes("skeleton-rows")).toBe("5");
+
+    answerMine({ data: MINE });
+    await flushPromises();
+    expect(frame().classes()).toContain("h-55.5");
+  });
+
   /// The cover form opens on the reader's own seat, from now until their shift ends.
   it("opens the cover form on the reader's own shift", async () => {
     const me = store.state.userInfo.email;
@@ -390,8 +430,8 @@ describe("OnCallMine", () => {
     expect(wrapper.findComponent({ name: "OPageLayout" }).props("back")).toBeUndefined();
   });
 
-  /// A reader on a hundred teams sees the five soonest, and the rest scroll inside the card once expanded.
-  it("shows the five soonest shifts and expands the rest inside a scrolling card", async () => {
+  /// A reader on a hundred teams gets every row, soonest first, scrolling inside a frame five rows tall.
+  it("renders every shift inside a fixed five-row scrolling frame", async () => {
     const now = Date.now() * 1000;
     const teams = Array.from({ length: 120 }, (_, i) => ({
       team_id: `team_${i}`,
@@ -419,21 +459,22 @@ describe("OnCallMine", () => {
     });
     await flushPromises();
 
+    const frame = () => wrapper.find('[data-test="oncall-mine-shifts-frame"]');
+    expect(frame().classes()).toContain("h-55.5");
     const shown = () =>
       wrapper.findAll('[data-test^="oncall-mine-team-"]').map((link) => link.text());
-    await vi.waitFor(() => expect(shown()).toHaveLength(5));
-    expect(shown()).toEqual(["Team 119", "Team 118", "Team 117", "Team 116", "Team 115"]);
-    const scroller = () => wrapper.find('[data-test="o2-table-scroll-container"]');
-    expect((scroller().element as HTMLElement).style.maxHeight).toBe("");
-
-    const toggle = wrapper.find('[data-test="oncall-mine-shifts-toggle"]');
-    expect(toggle.text()).toBe("Show all 120");
-    await toggle.trigger("click");
-    expect(shown()).toHaveLength(120);
-    expect((scroller().element as HTMLElement).style.maxHeight).toBe("30rem");
-    expect(scroller().classes()).toContain("overflow-y-auto");
-
-    await wrapper.find('[data-test="oncall-mine-shifts-toggle"]').trigger("click");
-    expect(shown()).toHaveLength(5);
+    await vi.waitFor(() => expect(shown()).toHaveLength(120));
+    expect(shown().slice(0, 5)).toEqual([
+      "Team 119",
+      "Team 118",
+      "Team 117",
+      "Team 116",
+      "Team 115",
+    ]);
+    const scroller = wrapper.find('[data-test="o2-table-scroll-container"]');
+    expect(scroller.classes()).toContain("overflow-y-auto");
+    expect(frame().find('[data-test="o2-table-scroll-container"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-mine-shifts-toggle"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Show all");
   });
 });
