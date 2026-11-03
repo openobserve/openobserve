@@ -24,6 +24,15 @@ use infra::table::online_eval_jobs::{
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+// Only documents ScorerRef's hand-written serde: a bare id tracks the latest version.
+#[derive(ToSchema)]
+#[serde(untagged)]
+#[allow(dead_code)]
+pub enum ScorerRefForm {
+    Latest(String),
+    Pinned { id: String, version: Option<i32> },
+}
+
 /// HTTP request body for creating or updating an Online Eval Job.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -37,8 +46,10 @@ pub struct EvalJobRequestBody {
     #[schema(value_type = String)]
     pub target_scope: TargetScope,
     pub filter_condition: serde_json::Value,
+    #[schema(value_type = Vec<ScorerRefForm>)]
     pub scorers: Vec<ScorerRef>,
     #[serde(default)]
+    #[schema(value_type = Option<Object>)]
     pub input_mapping: Option<JobInputMapping>,
     #[serde(default)]
     #[schema(value_type = Vec<Object>)]
@@ -47,10 +58,10 @@ pub struct EvalJobRequestBody {
     #[schema(value_type = Object)]
     pub span_selector_bindings: SpanSelectorBindings,
     #[serde(default)]
-    #[schema(value_type = Object)]
+    #[schema(value_type = Option<Object>)]
     pub trace_config: Option<TraceEvalConfig>,
     #[serde(default)]
-    #[schema(value_type = Object)]
+    #[schema(value_type = Option<Object>)]
     pub session_config: Option<SessionEvalConfig>,
     #[schema(value_type = String)]
     pub sampling_mode: SamplingMode,
@@ -70,15 +81,17 @@ pub struct EvalJobResponseBody {
     #[schema(value_type = String)]
     pub target_scope: TargetScope,
     pub filter_condition: serde_json::Value,
+    #[schema(value_type = Vec<ScorerRefForm>)]
     pub scorers: Vec<ScorerRef>,
+    #[schema(value_type = Option<Object>)]
     pub input_mapping: Option<JobInputMapping>,
     #[schema(value_type = Vec<Object>)]
     pub span_selectors: Vec<SpanSelector>,
     #[schema(value_type = Object)]
     pub span_selector_bindings: SpanSelectorBindings,
-    #[schema(value_type = Object)]
+    #[schema(value_type = Option<Object>)]
     pub trace_config: Option<TraceEvalConfig>,
-    #[schema(value_type = Object)]
+    #[schema(value_type = Option<Object>)]
     pub session_config: Option<SessionEvalConfig>,
     #[schema(value_type = String)]
     pub sampling_mode: SamplingMode,

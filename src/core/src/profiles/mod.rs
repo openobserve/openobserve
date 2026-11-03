@@ -430,6 +430,7 @@ async fn buffer_records(
                 Authz::new(stream_name),
             )
             .await;
+            crate::onboarding::on_user_stream_created(org_id, StreamType::Profiles, stream_name);
         }
         stream_schema_map.insert(stream_name.to_string(), SchemaCache::new(schema));
     }

@@ -41,6 +41,9 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     context_path = "/api",
     tag = "AI",
     operation_id = "CreateAiToolset",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Create an AI toolset",
     description = "Creates a new AI toolset (MCP server, CLI tool, skill, or generic config). \
                    The `data` field is encrypted at rest using per-org envelope encryption. \
@@ -50,12 +53,13 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         description = "Toolset configuration",
         content_type = "application/json",
     ),
+    security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Toolset created", content_type = "application/json"),
+        (status = 200, description = "Toolset created", content_type = "application/json", body = Object),
         (status = 400, description = "Invalid request", content_type = "application/json"),
         (status = 409, description = "Toolset with this name already exists", content_type = "application/json"),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "create"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn create(
     Path(org_id): Path<String>,
@@ -121,12 +125,13 @@ pub async fn create(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Toolset id (KSUID)"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Toolset details", content_type = "application/json"),
+        (status = 200, description = "Toolset details", content_type = "application/json", body = Object),
         (status = 404, description = "Toolset not found", content_type = "application/json"),
         (status = 403, description = "Feature not supported", content_type = "application/json"),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "get"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn get(Path(path): Path<(String, String)>) -> Response {
     let (org_id, id) = path;
@@ -166,11 +171,12 @@ pub struct ListQuery {
         ("kind"   = Option<String>, Query, description = "Exact filter on kind: mcp | cli | skill | generic"),
         ("limit"  = Option<i64>,   Query, description = "Maximum number of results"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (status = 200, description = "List of toolsets", content_type = "application/json"),
+        (status = 200, description = "List of toolsets", content_type = "application/json", body = Object),
         (status = 403, description = "Feature not supported", content_type = "application/json"),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "list"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn list(Path(org_id): Path<String>, Query(params): Query<ListQuery>) -> Response {
     let filter = infra::table::org_ai_toolsets::ListFilter {
@@ -214,12 +220,13 @@ pub async fn list(Path(org_id): Path<String>, Query(params): Query<ListQuery>) -
         description = "Fields to update",
         content_type = "application/json",
     ),
+    security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Toolset updated", content_type = "application/json"),
+        (status = 200, description = "Toolset updated", content_type = "application/json", body = Object),
         (status = 400, description = "Invalid request", content_type = "application/json"),
         (status = 404, description = "Toolset not found", content_type = "application/json"),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn update(
     Path(path): Path<(String, String)>,
@@ -282,12 +289,13 @@ pub async fn update(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Toolset id (KSUID)"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Toolset deleted", content_type = "application/json"),
+        (status = 200, description = "Toolset deleted", content_type = "application/json", body = Object),
         (status = 404, description = "Toolset not found", content_type = "application/json"),
         (status = 403, description = "Feature not supported", content_type = "application/json"),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "delete"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn delete(Path(path): Path<(String, String)>) -> Response {
     let (org_id, id) = path;

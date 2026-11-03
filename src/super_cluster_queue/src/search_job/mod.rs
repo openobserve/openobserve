@@ -193,7 +193,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             match existing {
                 Some(_) => {
                     log::info!("updating existing workflow draft for {org_id}/{id}");
-                    match infra::table::workflows::update_draft(draft.clone()).await {
+                    match infra::table::workflows::update_draft(&org_id, draft.clone()).await {
                         Ok(_) => {}
                         Err(e) => {
                             log::error!(
@@ -220,10 +220,19 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         MessageType::WorkflowDraftDelete => {
             let id: String = json::from_slice(&msg.value.unwrap())?;
             log::info!("received workflow draft delete for {id}");
-            match infra::table::workflows::delete_draft(&id).await {
-                Ok(_) => {}
+            match infra::table::workflows::get_draft_org_id(&id).await {
+                Ok(Some(org_id)) => {
+                    if let Err(e) = infra::table::workflows::delete_draft(&org_id, &id).await {
+                        log::error!(
+                            "error while deleting workflow draft from db {org_id}/{id} : {e}"
+                        );
+                    }
+                }
+                Ok(None) => {
+                    log::debug!("workflow draft {id} not found, nothing to delete");
+                }
                 Err(e) => {
-                    log::error!("error while deleting workflow draft from db {id} : {e}");
+                    log::error!("error while looking up workflow draft {id} for delete : {e}");
                 }
             }
             log::info!("successfully handled workflow draft delete for {id}");

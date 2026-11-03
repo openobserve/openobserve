@@ -33,7 +33,7 @@ export const INTERNAL_STREAM_NAMES = [
 export const INTERNAL_STREAM_PREFIXES = ["_o2_"] as const;
 
 /** RUM streams (_rumdata, _rumlog, _sessionreplay) are logs, so they count as user data. */
-export const USER_DATA_STREAM_TYPES = ["logs", "metrics", "traces"] as const;
+export const USER_DATA_STREAM_TYPES = ["logs", "metrics", "traces", "profiles"] as const;
 
 export type UserDataStreamType = (typeof USER_DATA_STREAM_TYPES)[number];
 
@@ -47,7 +47,7 @@ export function isUserDataStreamType(streamType: string): streamType is UserData
   return (USER_DATA_STREAM_TYPES as readonly string[]).includes(streamType);
 }
 
-/** True only for a logs, metrics or traces stream that O2 does not write itself. */
+/** True only for a logs, metrics, traces or profiles stream that O2 does not write itself. */
 export function isUserDataStream(name: string, streamType: string): boolean {
   return isUserDataStreamType(streamType) && !isInternalStreamName(name);
 }
