@@ -460,7 +460,9 @@ fn default_toggle_ingestion_logs() -> bool {
 fn default_enable_streaming_aggregation() -> bool {
     #[cfg(feature = "enterprise")]
     {
-        config::get_config().search.feature_query_streaming_aggs
+        config::get_config()
+            .memory
+            .datafusion_streaming_aggs_enabled
     }
     #[cfg(not(feature = "enterprise"))]
     {

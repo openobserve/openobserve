@@ -49,7 +49,11 @@ impl StreamingAggregationContext {
         request: &Request,
         is_complete_cache_hit: Arc<Mutex<bool>>,
     ) -> Result<Option<Self>, Error> {
-        if !request.streaming_output || !config::get_config().search.feature_query_streaming_aggs {
+        if !request.streaming_output
+            || !config::get_config()
+                .memory
+                .datafusion_streaming_aggs_enabled
+        {
             return Ok(None);
         }
 

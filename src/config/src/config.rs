@@ -1947,8 +1947,6 @@ pub struct Search {
         help = "For top-n group by queries, a file with up to N distinct groups returns all of them, making its contribution to the merged result exact. Files with more groups keep only the limit-derived top-k and the merged top-n becomes approximate; raise to trade speed for accuracy."
     )]
     pub inverted_index_topn_max_group_num: usize,
-    #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
-    pub feature_query_streaming_aggs: bool,
     #[env_config(
         name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
         default = true,
@@ -3386,6 +3384,9 @@ pub struct Memory {
         help = "Maximum memory size in MB for the file stat cache. Higher values allow caching more file statistics but increase memory usage."
     )]
     pub datafusion_file_stat_cache_max_size: usize,
+    // forced off when the disk cache is off: the aggregation results live there
+    #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
+    pub datafusion_streaming_aggs_enabled: bool,
     #[env_config(
         name = "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_ENTRIES",
         default = 10000,
@@ -4871,7 +4872,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // disable disk cache for local disk storage
     if cfg.common.is_local_storage
         && !cfg.common.result_cache_enabled
-        && !cfg.search.feature_query_streaming_aggs
+        && !cfg.memory.datafusion_streaming_aggs_enabled
     {
         cfg.disk_cache.enabled = false;
     }
@@ -4879,7 +4880,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // disable result cache if disk cache is disabled
     if !cfg.disk_cache.enabled {
         cfg.common.result_cache_enabled = false;
-        cfg.search.feature_query_streaming_aggs = false;
+        cfg.memory.datafusion_streaming_aggs_enabled = false;
     }
 
     let disks = sysinfo::disk::get_disk_usage();

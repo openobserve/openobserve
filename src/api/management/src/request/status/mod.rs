@@ -642,7 +642,7 @@ pub async fn zo_config(
         ingestion_url: cfg.common.ingestion_url.to_string(),
         web_url: cfg.common.web_url.to_string(),
         #[cfg(feature = "enterprise")]
-        streaming_aggregation_enabled: cfg.search.feature_query_streaming_aggs,
+        streaming_aggregation_enabled: cfg.memory.datafusion_streaming_aggs_enabled,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
