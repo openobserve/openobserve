@@ -93,7 +93,7 @@ const moreLabel = computed(() =>
       <OButton
         variant="ghost-primary"
         size="sm"
-        :icon-left="view.expanded ? 'expand-less' : 'add'"
+        :icon-left="view.expanded ? 'expand-less' : 'expand-more'"
         :aria-expanded="view.expanded"
         :data-test="`add-alert-section-${section}-more`"
         @click="emit('toggle')"

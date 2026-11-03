@@ -448,21 +448,21 @@ describe("QueryConfig.vue", () => {
       await setQCProps({ streamType: "metrics" });
       const tabOptions = wrapper.vm.tabOptions;
       expect(tabOptions.length).toBe(3);
-      expect(tabOptions.map((t: any) => t.value)).toEqual(["sql", "promql", "custom"]);
+      expect(tabOptions.map((t: any) => t.value)).toEqual(["custom", "sql", "promql"]);
     });
 
-    it("should show SQL then the builder for logs stream type", async () => {
+    it("should show the builder then SQL for logs stream type", async () => {
       await setQCProps({ streamType: "logs" });
       const tabOptions = wrapper.vm.tabOptions;
       expect(tabOptions.length).toBe(2);
-      expect(tabOptions.map((t: any) => t.value)).toEqual(["sql", "custom"]);
+      expect(tabOptions.map((t: any) => t.value)).toEqual(["custom", "sql"]);
     });
 
-    it("should show SQL then the builder for traces stream type", async () => {
+    it("should show the builder then SQL for traces stream type", async () => {
       await setQCProps({ streamType: "traces" });
       const tabOptions = wrapper.vm.tabOptions;
       expect(tabOptions.length).toBe(2);
-      expect(tabOptions.map((t: any) => t.value)).toEqual(["sql", "custom"]);
+      expect(tabOptions.map((t: any) => t.value)).toEqual(["custom", "sql"]);
     });
 
     it("should show only custom tab for real-time alerts", async () => {

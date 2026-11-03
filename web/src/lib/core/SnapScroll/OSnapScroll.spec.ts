@@ -62,6 +62,55 @@ describe("OSnapScroll", () => {
     expect(scrollTo).toHaveBeenCalledTimes(2);
   });
 
+  it("stops at the end of a section taller than the view before moving on", () => {
+    wrapper = mountScroll();
+    const { root, scrollTo } = layOut(wrapper);
+    Object.defineProperty(root.querySelector("#one"), "offsetHeight", {
+      configurable: true,
+      value: 700,
+    });
+    wheel(root, 40, 1000);
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 200, behavior: "smooth" });
+
+    root.scrollTop = 200;
+    wheel(root, 40, 2000);
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 400, behavior: "smooth" });
+
+    root.scrollTop = 400;
+    wheel(root, -40, 3000);
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 200, behavior: "smooth" });
+  });
+
+  it("spends no wheel gesture on a stop right at the section start", () => {
+    wrapper = mount(OSnapScroll, {
+      attachTo: document.body,
+      props: { snap: true },
+      slots: {
+        default: () => [
+          h("section", { "data-snap-section": "one", id: "one" }, [
+            h("div", { "data-snap-stop": "", id: "near" }),
+            h("div", { "data-snap-stop": "", id: "far" }),
+          ]),
+        ],
+      },
+    });
+    const root = wrapper.find('[data-test="o-snap-scroll"]').element as HTMLElement;
+    Object.defineProperty(root, "clientHeight", { configurable: true, value: 500 });
+    Object.defineProperty(root, "scrollHeight", { configurable: true, value: 1200 });
+    root.getBoundingClientRect = () => rect(0);
+    const place = (id: string, top: number, height: number) => {
+      const el = root.querySelector<HTMLElement>(`#${id}`)!;
+      el.getBoundingClientRect = () => rect(top - root.scrollTop);
+      Object.defineProperty(el, "offsetHeight", { configurable: true, value: height });
+    };
+    place("one", 0, 1200);
+    place("near", 9, 100);
+    place("far", 300, 100);
+    root.scrollTo = vi.fn() as unknown as typeof root.scrollTo;
+    wheel(root, 40, 1000);
+    expect(root.scrollTo).toHaveBeenCalledWith({ top: 300, behavior: "smooth" });
+  });
+
   it("pages up to the previous section start", () => {
     wrapper = mountScroll();
     const { root, scrollTo } = layOut(wrapper, 400);

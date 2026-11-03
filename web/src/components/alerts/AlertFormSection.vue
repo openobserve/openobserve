@@ -16,22 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import OButton from "@/lib/core/Button/OButton.vue";
 import { ALERT_SECTIONS, type AlertSectionId } from "./alertFormSections";
 
-withDefaults(
-  defineProps<{
-    id: AlertSectionId;
-    /** 1-based position among the editor's sections. */
-    index: number;
-    title: I18nText;
-    /** Title of the following section; omit on the last one. */
-    nextTitle?: I18nText;
-  }>(),
-  { nextTitle: undefined },
-);
-
-const emit = defineEmits<{ (e: "next"): void }>();
+defineProps<{
+  id: AlertSectionId;
+  /** 1-based position among the editor's sections. */
+  index: number;
+  title: I18nText;
+  /** One sentence under the title. */
+  help: I18nText;
+}>();
 
 const { t } = useI18nTyped();
 const total = ALERT_SECTIONS.length;
@@ -41,36 +35,30 @@ const total = ALERT_SECTIONS.length;
   <section
     :data-snap-section="id"
     :data-test="`add-alert-section-${id}`"
-    class="border-border-default flex flex-col border-b last:border-b-0 [&_[data-snap-stop]]:scroll-mt-18"
+    class="flex flex-col [&_[data-snap-stop]]:scroll-mt-28"
   >
     <header
-      class="bg-surface-base border-border-default sticky top-0 z-1 flex flex-col gap-0.5 border-b px-6 py-3 max-lg:static max-lg:z-auto max-md:px-4"
+      class="bg-surface-base sticky top-0 z-1 flex flex-col gap-1 px-6 pt-6 pb-4 max-lg:static max-lg:z-auto max-lg:pt-4 max-md:px-4"
     >
       <span class="text-text-secondary text-xs" :data-test="`add-alert-section-${id}-eyebrow`">
         {{ t("alerts.sections.eyebrow", { n: index, total }) }}
       </span>
       <h2
-        class="text-text-heading m-0 text-xl font-semibold focus:outline-none"
+        class="text-text-heading m-0 text-2xl font-semibold focus:outline-none"
         tabindex="-1"
         data-snap-heading
         :data-test="`add-alert-section-${id}-title`"
       >
         {{ title }}
       </h2>
+      <p class="text-text-secondary m-0 text-sm" :data-test="`add-alert-section-${id}-help`">
+        {{ help }}
+      </p>
     </header>
-    <div class="flex flex-1 flex-col gap-4 px-6 py-4 max-md:px-4">
-      <slot />
-    </div>
-    <div v-if="nextTitle" class="px-6 pb-4 max-md:px-4">
-      <OButton
-        variant="ghost-primary"
-        size="sm"
-        icon-right="arrow-downward"
-        :data-test="`add-alert-section-${id}-next`"
-        @click="emit('next')"
-      >
-        {{ t("alerts.sections.next", { title: nextTitle }) }}
-      </OButton>
+    <div class="flex flex-1 flex-col px-6 pb-6 max-md:px-4">
+      <div class="rounded-surface bg-surface-overlay border-border-default border px-3 py-1">
+        <slot />
+      </div>
     </div>
   </section>
 </template>

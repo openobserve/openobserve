@@ -112,6 +112,25 @@ function whoText(alert: ReadBackAlert | ReadBackCompositeAlert, t: TranslateFn):
   return t("alerts.readBack.targets", { targets });
 }
 
+/** An event-count test in words: "3+ events", "fewer than 3 events". */
+export function eventCountText(
+  tc: ReadBackAlert["trigger_condition"] | undefined,
+  t: TranslateFn,
+): I18nText {
+  const threshold = tc?.threshold ?? "";
+  const operator = tc?.operator ?? "";
+  if (operator === "=" || operator === "==") {
+    return t(
+      "alerts.summary.plainEnglish.conditionExactly",
+      { threshold },
+      num(threshold) === 1 ? 1 : 2,
+    );
+  }
+  return CONDITION_KEYS[operator]
+    ? t(CONDITION_KEYS[operator], { threshold })
+    : t("alerts.summary.plainEnglish.conditionOther", { threshold, operator });
+}
+
 function whatText(alert: ReadBackAlert, t: TranslateFn, aggregationEnabled: boolean): I18nText {
   const qc = alert.query_condition ?? {};
   const tc = alert.trigger_condition ?? {};
@@ -153,21 +172,7 @@ function whatText(alert: ReadBackAlert, t: TranslateFn, aggregationEnabled: bool
       window,
     });
   }
-  const threshold = tc.threshold ?? "";
-  const condition =
-    tc.operator === "=" || tc.operator === "=="
-      ? t(
-          "alerts.summary.plainEnglish.conditionExactly",
-          { threshold },
-          num(threshold) === 1 ? 1 : 2,
-        )
-      : CONDITION_KEYS[tc.operator ?? ""]
-        ? t(CONDITION_KEYS[tc.operator ?? ""], { threshold })
-        : t("alerts.summary.plainEnglish.conditionOther", {
-            threshold,
-            operator: tc.operator ?? "",
-          });
-  return t("alerts.readBack.eventsIn", { condition, window });
+  return t("alerts.readBack.eventsIn", { condition: eventCountText(tc, t), window });
 }
 
 function scheduleText(alert: ReadBackAlert, t: TranslateFn): I18nText {

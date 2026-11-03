@@ -28,7 +28,7 @@ describe("ALERT_SETTING_TIERS", () => {
     const ids = ALERT_SETTING_TIERS.map((d) => d.id);
     expect(new Set(ids).size).toBe(ids.length);
     const count = (tier: string) => ALERT_SETTING_TIERS.filter((d) => d.tier === tier).length;
-    expect([count("shown"), count("one"), count("tucked")]).toEqual([4, 3, 9]);
+    expect([count("shown"), count("one"), count("tucked")]).toEqual([3, 3, 9]);
   });
 
   it("puts every one-click setting in a labelled row", () => {
@@ -104,12 +104,14 @@ describe("isTierVisible", () => {
 describe("moreLinkLabel", () => {
   it("lists every name up to five", () => {
     const names = ["warning", "hold for", "group by", "compare with past"].map(raw);
-    expect(moreLinkLabel(names, t)).toBe("4 more: warning, hold for, group by, compare with past");
+    expect(moreLinkLabel(names, t)).toBe(
+      "More options: warning, hold for, group by, compare with past",
+    );
   });
 
   it("past five, names the first three and counts the rest", () => {
     const names = ["a", "b", "c", "d", "e", "f"].map(raw);
-    expect(moreLinkLabel(names, t)).toBe("6 more: a, b, c and 3 more");
+    expect(moreLinkLabel(names, t)).toBe("More options: a, b, c and 3 more");
   });
 });
 
