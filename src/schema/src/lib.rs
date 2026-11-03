@@ -968,6 +968,20 @@ pub fn check_schema_for_defined_schema_fields(
                 }
             }
         }
+        StreamType::Profiles => {
+            fields.insert("stack".to_string());
+            fields.insert("value".to_string());
+            fields.insert("profile_type".to_string());
+            fields.insert("profile_unit".to_string());
+            fields.insert("service_name".to_string());
+            fields.insert("otel_scope_name".to_string());
+            fields.insert("service_instance_id".to_string());
+            fields.insert("host_name".to_string());
+            fields.insert("process_pid".to_string());
+            fields.insert("profile_duration_nanos".to_string());
+            fields.insert("trace_id".to_string());
+            fields.insert("span_id".to_string());
+        }
         _ => {}
     }
     fields
@@ -1301,6 +1315,33 @@ mod tests {
         assert!(result.contains("service_name"));
         assert!(result.contains("duration"));
         assert!(result.contains("my_field"));
+    }
+
+    #[test]
+    fn test_check_schema_for_defined_schema_fields_profiles_adds_query_columns() {
+        let schema = Schema::new(vec![] as Vec<Field>);
+        let input = vec!["k8s_pod_name".to_string()];
+        let result = check_schema_for_defined_schema_fields(StreamType::Profiles, &schema, input);
+        let mut fields = result.iter().map(String::as_str).collect::<Vec<_>>();
+        fields.sort_unstable();
+        assert_eq!(
+            fields,
+            [
+                "host_name",
+                "k8s_pod_name",
+                "otel_scope_name",
+                "process_pid",
+                "profile_duration_nanos",
+                "profile_type",
+                "profile_unit",
+                "service_instance_id",
+                "service_name",
+                "span_id",
+                "stack",
+                "trace_id",
+                "value",
+            ]
+        );
     }
 
     #[test]
