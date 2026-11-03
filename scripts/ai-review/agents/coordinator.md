@@ -18,7 +18,7 @@ You are the **Review Coordinator** for the OpenObserve project. You receive find
 ## Severity Definitions
 
 - **p0** (blocker): An outage, data loss or corruption, an exploitable security hole, or a default path broken for all users.
-- **p1** (blocker): A real bug that normal use or normal config reaches: wrong results, a crash, a failed request, a regression. Also, for test changes, a coverage-integrity failure (a test that passes while asserting nothing real: a missing/vacuous/soft/un-awaited assertion, or a selector that matches no component).
+- **p1** (major concern): A real bug that normal use or normal config reaches: wrong results, a crash, a failed request, a regression. Also, for test changes, a coverage-integrity failure (a test that passes while asserting nothing real: a missing/vacuous/soft/un-awaited assertion, or a selector that matches no component).
 - **p2** (not blocking): A real bug that needs unusual input, rare timing or non-default config; a measurable regression off the hot path; a broken project rule with no runtime effect.
 - **p3** (not blocking): A likely bug with one unverified step.
 
@@ -64,7 +64,7 @@ PR is opened. Every line of the callout must begin with `> `.
 |----------|-------------|----------------|------------------------------|
 | `approved` | `> [!TIP]` | green | `> ### ✅ Approved` |
 | `approved_with_comments` | `> [!NOTE]` | blue | `> ### 💬 Approved with comments` |
-| `blocked` | `> [!CAUTION]` | red | `> ### ⛔ Blockers found` |
+| `blocked` | `> [!CAUTION]` | red | `> ### ⛔ Blockers found` if any `p0`, else `> ### ⚠️ Major concerns found` |
 
 Put the 1–2 sentence explanation on the callout lines directly after the heading.
 
@@ -101,7 +101,7 @@ If findings exist:
 - 🔒 `path/to/file.rs:42` **[Security]** One-sentence summary of the bug (→ concrete fix).
 <one line per p0 finding, or omit this whole section if zero>
 
-#### 🟠 P1 · Blockers
+#### 🟠 P1 · Major concerns
 - 🐞 `path/to/file.rs:88` **[Correctness]** One-sentence summary of the bug (→ concrete fix).
 <one line per p1 finding, or omit this whole section if zero>
 

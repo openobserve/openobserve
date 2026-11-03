@@ -114,6 +114,13 @@ test("severityRank orders p0 first and treats legacy words like their mapped lev
 const xmlFinding = (severity, summary, extra = "") => `<finding><category>security</category><severity>${severity}</severity><file>src/a.rs</file><line>3</line><summary>${summary}</summary><description>d</description><suggestion>s</suggestion>${extra}</finding>`;
 const reviewer = (findings, agentName = "Security Reviewer") => ({ agentName, findings: parseFindings(findings.join("\n")) });
 
+test("the fallback calls P1-only findings major concerns, still blocking", () => {
+  const review = buildFallbackReview([reviewer([xmlFinding("p1", "high"), xmlFinding("p2", "mid")])], "full", [], "<!-- ai-code-review -->");
+  assert.match(review, /> \[!CAUTION\]\n> ### ⚠️ Major concerns found\n/);
+  assert.ok(review.includes("#### 🟠 P1 · Major concerns"));
+  assert.equal(review.includes("Blockers"), false);
+});
+
 test("findings are normalized when parsed, and one with no severity is dropped", () => {
   const findings = parseFindings([xmlFinding("Critical", "a"), xmlFinding("P1", "b"), xmlFinding("", "c")].join(""));
   assert.deepEqual(findings.map(f => [f.summary, f.severity]), [["a", "p0"], ["b", "p1"]]);
@@ -128,8 +135,8 @@ test("the fallback groups into P0 to P3 in order, with the caps applied", () => 
   ])];
   const review = buildFallbackReview(results, "full", [], "<!-- ai-code-review -->");
   const at = text => review.indexOf(text);
-  assert.ok(at("#### 🔴 P0 · Blockers") < at("#### 🟠 P1 · Blockers"));
-  assert.ok(at("#### 🟠 P1 · Blockers") < at("#### 🟡 P2 · Should fix"));
+  assert.ok(at("#### 🔴 P0 · Blockers") < at("#### 🟠 P1 · Major concerns"));
+  assert.ok(at("#### 🟠 P1 · Major concerns") < at("#### 🟡 P2 · Should fix"));
   assert.ok(at("#### 🟡 P2 · Should fix") < at("#### 🔵 P3 · Worth a look"));
   assert.match(review, /> \[!CAUTION\]\n> ### ⛔ Blockers found\n> Automated review .*un-judged\./);
   assert.match(review, /\*\*🔴 P0: 1 · 🟠 P1: 1 · 🟡 P2: 3 · 🔵 P3: 2\*\*/);
@@ -469,7 +476,7 @@ test("an approved callout over a visible blocker section or count never approves
   assert.equal(isApprovedReview(`${clean}\n\n**Merge confidence: 🟢 High** — no blockers; all reviewers finished`), true);
   const blocked = [
     `${clean}\n\n#### 🔴 P0 · Blockers\n- \`a.rs:1\` **[Security]** Leaks a token.`,
-    `${clean}\n\n<details open>\n\n#### 🟠 P1 · Blockers\n- \`a.rs:1\` **[Correctness]** Crashes.\n</details>`,
+    `${clean}\n\n<details open>\n\n#### 🟠 P1 · Major concerns\n- \`a.rs:1\` **[Correctness]** Crashes.\n</details>`,
     `${head}**🔴 P0: 1 · 🟠 P1: 0 · 🟡 P2: 0 · 🔵 P3: 0**`,
     `${head}**🔴 P0: 0 · 🟠 P1: 2 · 🟡 P2: 0 · 🔵 P3: 0**`,
     `${head}**🔴 1 blocker · 🟡 0 warnings**`,
