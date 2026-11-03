@@ -2414,6 +2414,10 @@ fn oncall_routes(router: Router) -> Router {
             post(oncall::snooze_response),
         )
         .route(
+            "/{org_id}/oncall/responses/{response_id}/unsnooze",
+            post(oncall::unsnooze_response),
+        )
+        .route(
             "/{org_id}/oncall/responses/{response_id}/handoff",
             post(oncall::handoff_response),
         )

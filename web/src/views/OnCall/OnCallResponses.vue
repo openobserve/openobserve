@@ -795,7 +795,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Grouped rather than four loose items: they are one decision
                    ("quiet it") asked at four lengths. -->
-              <ODropdownGroup v-if="canAcknowledge(row)" :label="t('oncall.snoozeFor')">
+              <ODropdownItem
+                v-if="canAcknowledge(row) && snoozedFirings(row).length"
+                :data-test="`oncall-row-unsnooze-${row.rowKey}`"
+                @select="unsnoozeRow(row)"
+              >
+                <template #icon-left>
+                  <OIcon name="play-circle-filled" size="sm" />
+                </template>
+                {{ t("oncall.unsnooze") }}
+              </ODropdownItem>
+              <ODropdownGroup
+                v-if="canAcknowledge(row) && snoozedFirings(row).length < row.escalating.length"
+                :label="t('oncall.snoozeFor')"
+              >
                 <ODropdownItem
                   v-for="option in snoozeOptions"
                   :key="option.minutes"
@@ -951,6 +964,7 @@ import {
   responseProgressQuery,
   responseQuery,
   snoozeResponseMutation,
+  unsnoozeResponseMutation,
   teamPolicyQuery,
   teamScheduleQuery,
   whoIsOnCallQuery,
@@ -1594,6 +1608,7 @@ function menuActions(row: PageRow): RowAction[] {
 /// One list writes to many rows, so the id rides in the variables, not the setup.
 const ackWrite = useMutation(() => acknowledgeResponseMutation(orgId.value));
 const snoozeWrite = useMutation(() => snoozeResponseMutation(orgId.value));
+const unsnoozeWrite = useMutation(() => unsnoozeResponseMutation(orgId.value));
 const resolveWrite = useMutation(() => resolveResponseMutation(orgId.value));
 const handoffWrite = useMutation(() => handoffResponseMutation(orgId.value));
 const noteWrite = useMutation(() => addResponseNoteMutation(orgId.value));
@@ -1621,6 +1636,28 @@ async function snoozeRow(row: PageRow, minutes: number) {
     await Promise.allSettled(
       row.escalating.map((r) => snoozeWrite.mutateAsync({ responseId: r.id, minutes })),
     );
+    await fetchResponses();
+  } finally {
+    busyId.value = "";
+  }
+}
+
+function snoozedFirings(row: PageRow): OnCallResponse[] {
+  return row.escalating.filter((r) => isSnoozed(r));
+}
+
+/// Ends the snooze on every quiet firing the row stands for, so they all continue now.
+async function unsnoozeRow(row: PageRow) {
+  busyId.value = row.rowKey;
+  try {
+    const results = await Promise.allSettled(
+      snoozedFirings(row).map((r) => unsnoozeWrite.mutateAsync(r.id)),
+    );
+    if (results.some((r) => r.status === "rejected")) {
+      toast({ variant: "error", message: t("oncall.unsnoozeFailed") });
+    } else {
+      toast({ variant: "success", message: t("oncall.unsnoozed") });
+    }
     await fetchResponses();
   } finally {
     busyId.value = "";
