@@ -1161,6 +1161,85 @@ describe("useMetricsExplorerGrid", () => {
       // ...and it had to spend past the two empty batches to get there.
       expect(grid.pageSlice.value.length).toBeGreaterThan(target);
     });
+
+    describe("the one-shot auto-advance", () => {
+      const walked = INITIAL_PAGE_SIZE + SHOW_MORE_MAX_BATCHES * PAGE_SIZE_INCREMENT;
+
+      /** Resolves every visible card as empty, then lets the auto-advance it triggers run to quiescence. */
+      const emptyVisibleAndDrain = async (grid: any, asked: number[]) => {
+        for (const card of [...grid.pagedCards.value]) {
+          let settled = false;
+          const preview = grid.requestPreview(card).finally(() => (settled = true));
+          for (let round = 0; round < 100 && !settled; round++) {
+            await flush();
+            answerAll(() => NO_SERIES, asked);
+          }
+          await preview;
+        }
+        await drainWalk(grid, () => NO_SERIES, asked);
+      };
+
+      const walkedGrid = async () => {
+        getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
+        const grid = createGrid(t);
+        grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
+        await grid.loadStreams();
+        await emptyVisibleAndDrain(grid, []);
+        expect(grid.pagedCards.value).toHaveLength(0);
+        expect(grid.pageSlice.value).toHaveLength(walked);
+        return grid;
+      };
+
+      it("a reload of the same metrics does not walk again", async () => {
+        const grid = await walkedGrid();
+        const before = grid.cards.value;
+
+        await grid.loadStreams(true);
+        expect(grid.cards.value).not.toBe(before);
+
+        const asked: number[] = [];
+        await drainWalk(grid, () => NO_SERIES, asked);
+        expect(asked).toEqual([]);
+        expect(grid.pageSlice.value).toHaveLength(walked);
+      });
+
+      it("a new time window earns the look-ahead again", async () => {
+        const grid = await walkedGrid();
+
+        grid.setTimeRange({ start_time: NOW_US - 24 * HOUR_US, end_time: NOW_US });
+        expect(grid.pagedCards.value).toHaveLength(walked);
+
+        const asked: number[] = [];
+        await emptyVisibleAndDrain(grid, asked);
+        expect(Math.max(...asked)).toBe(walked + SHOW_MORE_MAX_BATCHES * PAGE_SIZE_INCREMENT - 1);
+        expect(grid.pageSlice.value).toHaveLength(
+          walked + SHOW_MORE_MAX_BATCHES * PAGE_SIZE_INCREMENT,
+        );
+      });
+
+      it("a list change mid-walk stops the remaining batches for the old list", async () => {
+        getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
+        const grid = createGrid(t);
+        grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
+        await grid.loadStreams();
+
+        const done = grid.showMore();
+        for (let round = 0; round < 20 && !inFlight.length; round++) await flush();
+        const firstBatch = inFlight.map((q) => Number(q.query.match(/metric_(\d+)_total/)![1]));
+        expect(Math.min(...firstBatch)).toBe(INITIAL_PAGE_SIZE);
+        expect(Math.max(...firstBatch)).toBe(INITIAL_PAGE_SIZE + PAGE_SIZE_INCREMENT - 1);
+
+        grid.searchTerm.value = "metric_04";
+        const asked: number[] = [];
+        await drainWalk(grid, () => NO_SERIES, asked);
+        await done;
+
+        const oldList = asked.filter((i) => i < 400);
+        expect(oldList.length).toBeGreaterThan(0);
+        expect(Math.max(...oldList)).toBe(INITIAL_PAGE_SIZE + PAGE_SIZE_INCREMENT - 1);
+        expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
+      });
+    });
   });
   describe("an org switch must not be polluted by the previous org", () => {
     it("drops a stream response that lands after the switch", async () => {

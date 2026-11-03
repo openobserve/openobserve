@@ -323,14 +323,18 @@ describe("MetricsExplorer wiring", () => {
       grid.pagedCards.value = many(8, "disk");
       grid.hasMore.value = true;
       const wrapper = mountExplorer();
-      expect(wrapper.find('[data-test="metrics-explorer-count"]').text()).toBe("41 of 3,621");
+      expect(wrapper.find('[data-test="metrics-explorer-count"]').text()).toBe(
+        `${(41).toLocaleString()} of ${(3621).toLocaleString()}`,
+      );
     });
 
     it("keeps the bare total when everything matches", () => {
       grid.cards.value = many(12, "m");
       grid.filteredCards.value = grid.cards.value;
       const wrapper = mountExplorer();
-      expect(wrapper.find('[data-test="metrics-explorer-count"]').text()).toBe("12");
+      expect(wrapper.find('[data-test="metrics-explorer-count"]').text()).toBe(
+        (12).toLocaleString(),
+      );
     });
 
     it("offers Show more instead of a final no-match while candidates remain", () => {
