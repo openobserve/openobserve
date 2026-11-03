@@ -82,3 +82,50 @@ export const licenseDeniedFeatures = (error: unknown): string[] | null => {
     .map((key) => key.trim())
     .filter(Boolean);
 };
+
+interface FeatureDefinition {
+  display_name?: string;
+  gate?: boolean;
+  plumbing?: boolean;
+}
+
+export interface LicenseFeatureSource {
+  features?: string[] | null;
+  feature_definition?: { features?: Record<string, FeatureDefinition> } | null;
+}
+
+/** A license's features as unlocked / missing / free / added keys, or null for a pre-entitlement license. */
+export const splitLicenseFeatures = (
+  license: LicenseFeatureSource | null | undefined,
+  states: FeatureStates,
+) => {
+  if (!license?.features) return null;
+  const definition = license.feature_definition?.features;
+  const gated = definition
+    ? Object.keys(definition).filter((key) => definition[key].gate && !definition[key].plumbing)
+    : Object.keys(states).filter((key) => states[key] === "locked");
+  // The backend reads a list of only "all" as every feature, so the page does the same.
+  const listsOnlyAll =
+    license.features.length > 0 && license.features.every((key) => key === "all");
+  const unlocked = (listsOnlyAll ? [...gated] : [...license.features]).sort();
+  // A listed key counts as paid even when ungated, so "unlocked of paid" never exceeds the total.
+  const paid = new Set([...gated, ...unlocked]);
+  const missing = [...paid].filter((key) => !unlocked.includes(key)).sort();
+  const freeCandidates = definition
+    ? Object.keys(definition).filter((key) => !definition[key].gate || definition[key].plumbing)
+    : Object.keys(states).filter((key) => states[key] === "enabled");
+  const free = freeCandidates
+    .filter((key) => !unlocked.includes(key) && featureState(states, key) !== "hidden")
+    .sort();
+  // Unlocked is excluded too so a listed key missing from its own definition never shows twice.
+  const added = definition
+    ? Object.keys(states)
+        .filter((key) => !(key in definition) && !unlocked.includes(key))
+        .filter((key) => featureState(states, key) !== "hidden")
+        .sort()
+    : [];
+  const addedLocked = added.filter((key) => featureState(states, key) === "locked");
+  return { unlocked, missing, free, added, addedLocked, paid: paid.size };
+};
+
+export type LicenseFeatureSplit = ReturnType<typeof splitLicenseFeatures>;

@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default shrink-0 border-b"
       />
       <ConstrainedPage
-        :size="activeSection === 'password_policy' ? 'full' : 'lg'"
+        :size="['password_policy', 'license'].includes(activeSection) ? 'full' : 'lg'"
         align="left"
         :padded="false"
         class="min-h-0 flex-1 px-4 py-3"
