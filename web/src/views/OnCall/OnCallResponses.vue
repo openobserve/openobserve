@@ -1044,11 +1044,7 @@ const { canConfigure } = useOnCallPermissions();
 /// columns and the actions never have to branch on the mode.
 type PageRow = OnCallResponseGroup & { rowKey: string };
 
-/**
- * How many open pages get their escalation ladder loaded: the batch route's cap.
- * The rows past it still show their state, and the list says so rather than
- * leaving a blank cell that would read as "nothing has fired".
- */
+/** The batch routes' cap on ids per request; rows past it on the ladder read are flagged, not left blank. */
 const ESCALATION_DETAIL_LIMIT = 200;
 
 /**
@@ -2021,8 +2017,17 @@ async function fetchRowContext(force = false) {
     .filter((r) => isEscalating(r.state))
     .sort((a, b) => a.opened_at - b.opened_at);
   const wanted = open.slice(0, ESCALATION_DETAIL_LIMIT).map((r) => r.id);
+  const teamChunks: string[][] = [];
+  for (let i = 0; i < teamIds.length; i += ESCALATION_DETAIL_LIMIT) {
+    teamChunks.push(teamIds.slice(i, i + ESCALATION_DETAIL_LIMIT));
+  }
+  if (!teamChunks.length) teamChunks.push([]);
   const [context, progress] = await Promise.allSettled([
-    read<OnCallTeamContext[]>(teamContextQuery(orgId.value, teamIds, true), force),
+    Promise.allSettled(
+      teamChunks.map((ids, i) =>
+        read<OnCallTeamContext[]>(teamContextQuery(orgId.value, ids, i === 0), force),
+      ),
+    ).then((reads) => reads.flatMap((r) => (r.status === "fulfilled" ? r.value : []))),
     wanted.length
       ? read<EscalationProgressEntry[]>(responsesProgressQuery(orgId.value, wanted), force)
       : Promise.resolve([]),

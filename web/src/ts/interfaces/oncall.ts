@@ -1233,10 +1233,7 @@ export interface MyOnCall {
   teams: MyOnCallTeam[];
 }
 
-/**
- * One team in `GET /oncall/teams/context`, as its three per-team routes answer
- * it. A field the server could not read is absent, not empty.
- */
+/** One team in `GET /oncall/teams/context`; a field the server could not read is absent, not empty. */
 export interface OnCallTeamContext {
   team_id: string;
   policy?: OnCallPolicy;

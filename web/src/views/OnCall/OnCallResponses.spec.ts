@@ -727,7 +727,6 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test="oncall-escalation-capped"]').exists()).toBe(true);
     });
 
-    /// Rows past the cap have no progress: the record's own step, or no claim, never "Not paged yet".
     /// Rows the server left out have no progress: the record's own step, or no claim, never "Not paged yet".
     it("says what it can for rows without an answer, without claiming they were not paged", async () => {
       answerTeams(() => ({
@@ -1674,6 +1673,21 @@ describe("OnCallResponses", () => {
         include_mine: true,
       });
       expect(service.whoIsOnCall).not.toHaveBeenCalled();
+    });
+
+    it("splits row teams past the route's cap across context reads, asking for the viewer's once", async () => {
+      answerTeams((id) => ({ ...emptyTeam, on_call: [position(`${id}@o2.ai`)] }));
+      const many = Array.from({ length: 205 }, (_, i) =>
+        page({ id: `resp_${i}`, team_id: `team_${i}` }, `al_${i}`),
+      );
+      const wrapper = await withPages(many);
+
+      const calls = service.teamContext.mock.calls.map(([args]: any) => args);
+      expect(calls.map((c: any) => [c.team_ids.length, c.include_mine])).toEqual([
+        [200, true],
+        [5, false],
+      ]);
+      expect(shownOnCall(wrapper)).toContain("team_204@o2.ai");
     });
 
     it("shows the on-call cell from the context answer", async () => {

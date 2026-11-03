@@ -53,7 +53,7 @@ const SETTINGS: &str = "settings";
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 const MAX_BATCH_IDS: usize = 200;
 
-/// Reads a batch route keeps in flight, so 200 ids do not take 200 pool connections at once.
+/// Ids a batch route works on at once; a team-context id runs three reads, so 48 at most.
 #[cfg(feature = "enterprise")]
 const BATCH_READ_CONCURRENCY: usize = 16;
 
