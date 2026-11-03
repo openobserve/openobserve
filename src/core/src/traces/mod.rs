@@ -1911,6 +1911,9 @@ async fn write_traces(
     let mut triggers: TriggerAlertData =
         Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
     let mut evaluated_alerts = HashSet::new();
+    // An org with an alert downtime classifies every matching row, so a muted row hides none.
+    let mut mute_split = cur_stream_alerts
+        .and_then(|_| crate::ingestion::realtime_mute::RealtimeMuteSplit::for_org(org_id));
     // End get stream alert
 
     // Start check for schema
@@ -1969,7 +1972,7 @@ async fn write_traces(
     for (timestamp, record_val) in json_data {
         // Start check for alert trigger
         if let Some(alerts) = cur_stream_alerts
-            && triggers.len() < alerts.len()
+            && (mute_split.is_some() || triggers.len() < alerts.len())
         {
             let alert_end_time = now_micros();
             for alert in alerts {
@@ -1981,7 +1984,7 @@ async fn write_traces(
                     alert.get_unique_key()
                 );
                 // check if alert already evaluated
-                if evaluated_alerts.contains(&key) {
+                if mute_split.is_none() && evaluated_alerts.contains(&key) {
                     continue;
                 }
 
@@ -1990,8 +1993,17 @@ async fn write_traces(
                     .await
                     .map(|res| res.data)
                 {
-                    triggers.push((alert.clone(), data));
-                    evaluated_alerts.insert(key);
+                    match mute_split.as_mut() {
+                        Some(split) => split.push(&key, alert, data, None).await,
+                        None => {
+                            triggers.push((
+                                alert.clone(),
+                                data,
+                                crate::ingestion::RealtimeMute::Unchecked,
+                            ));
+                            evaluated_alerts.insert(key);
+                        }
+                    }
                 }
             }
         }
@@ -2034,6 +2046,9 @@ async fn write_traces(
         std::io::Error::other(e)
     })?;
 
+    if let Some(split) = mute_split {
+        triggers.extend(split.finish().await);
+    }
     // only one trigger per request; notification/db work must not block ingestion
     if !triggers.is_empty() {
         tokio::spawn(evaluate_trigger(triggers));

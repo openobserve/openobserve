@@ -480,6 +480,9 @@ async fn write_logs(
     let mut triggers: TriggerAlertData =
         Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
     let mut evaluated_alerts = HashSet::new();
+    // An org with an alert downtime classifies every matching row, so a muted row hides none.
+    let mut mute_split = cur_stream_alerts
+        .and_then(|_| crate::ingestion::realtime_mute::RealtimeMuteSplit::for_org(org_id));
     // End get stream alert
 
     // start check for schema
@@ -598,7 +601,7 @@ async fn write_logs(
 
         // start check for alert trigger
         if let Some(alerts) = cur_stream_alerts
-            && triggers.len() < alerts.len()
+            && (mute_split.is_some() || triggers.len() < alerts.len())
         {
             let end_time = now_micros();
             for alert in alerts {
@@ -611,7 +614,7 @@ async fn write_logs(
                 );
                 // For one alert, only one trigger per request
                 // Trigger for this alert is already added.
-                if evaluated_alerts.contains(&key) {
+                if mute_split.is_none() && evaluated_alerts.contains(&key) {
                     continue;
                 }
                 match alert
@@ -619,8 +622,18 @@ async fn write_logs(
                     .await
                 {
                     Ok(trigger_results) if trigger_results.data.is_some() => {
-                        triggers.push((alert.clone(), trigger_results.data.unwrap()));
-                        evaluated_alerts.insert(key);
+                        let rows = trigger_results.data.unwrap();
+                        match mute_split.as_mut() {
+                            Some(split) => split.push(&key, alert, rows, None).await,
+                            None => {
+                                triggers.push((
+                                    alert.clone(),
+                                    rows,
+                                    crate::ingestion::RealtimeMute::Unchecked,
+                                ));
+                                evaluated_alerts.insert(key);
+                            }
+                        }
                     }
                     Ok(_) => {
                         // the data doesn't satisfy the alert condition
@@ -685,6 +698,9 @@ async fn write_logs(
         .await?
     };
 
+    if let Some(split) = mute_split {
+        triggers.extend(split.finish().await);
+    }
     // only one trigger per request
     if !triggers.is_empty() {
         tokio::spawn(evaluate_trigger(triggers));
