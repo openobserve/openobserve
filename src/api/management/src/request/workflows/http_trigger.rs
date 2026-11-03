@@ -105,6 +105,7 @@ struct NotConfiguredBody {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn get_http_trigger(
@@ -159,6 +160,7 @@ pub async fn get_http_trigger(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn put_http_trigger(
@@ -219,6 +221,7 @@ pub async fn put_http_trigger(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn delete_http_trigger(Path((org_id, id)): Path<(String, String)>) -> Response {
@@ -255,6 +258,7 @@ pub async fn delete_http_trigger(Path((org_id, id)): Path<(String, String)>) -> 
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn rotate_http_credential(
@@ -295,6 +299,7 @@ pub async fn rotate_http_credential(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn revoke_http_credential(
@@ -331,6 +336,7 @@ pub async fn revoke_http_credential(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn reveal_http_credential_secret(
@@ -383,6 +389,7 @@ pub async fn reveal_http_credential_secret(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Workflows", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false})),
     )
 )]
 pub async fn test_http_trigger(
