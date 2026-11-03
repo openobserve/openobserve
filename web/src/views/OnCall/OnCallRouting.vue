@@ -100,34 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <div v-else class="flex min-h-0 flex-1 flex-col" data-test="oncall-routing-content">
-      <OTabs
-        :model-value="tab"
-        bordered
-        class="shrink-0"
-        data-test="oncall-routing-tabs"
-        @update:model-value="setTab"
-      >
-        <OTab name="rules" data-test="oncall-routing-tab-rules">
-          <OIcon name="alt-route" size="sm" class="shrink-0" />
-          <span>{{ t("oncall.routingTabRules") }}</span>
-          <OTag type="countChip" :value="tab === 'rules' ? 'primary' : 'neutral'">
-            {{ rules.length }}
-          </OTag>
-        </OTab>
-        <OTab name="signals" data-test="oncall-routing-tab-signals">
-          <OIcon name="warning-amber" size="sm" class="shrink-0" />
-          <span>{{ t("oncall.routingTabNeedsOwnerPlain") }}</span>
-          <OTag
-            v-if="openSignalCount"
-            type="countChip"
-            :value="tab === 'signals' ? 'primary' : 'warning'"
-            data-test="oncall-routing-tab-signals-count"
-          >
-            {{ openSignalCount }}
-          </OTag>
-        </OTab>
-      </OTabs>
-
       <OnCallOwnershipRules
         v-if="tab === 'rules'"
         :rules="rules"
@@ -146,13 +118,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @clear-search="clearSearch"
       >
         <template #toolbar>
-          <OSearchInput
-            v-model="search"
-            class="min-w-48 flex-1 max-md:min-w-24"
-            clearable
-            :placeholder="t('oncall.routingSearchRules')"
-            data-test="oncall-routing-search"
-          />
+          <div class="flex w-full min-w-0 flex-wrap items-center gap-2 max-md:contents">
+            <OToggleGroup
+              :model-value="tab"
+              type="single"
+              mobile-dropdown
+              data-test="oncall-routing-tabs"
+              @update:model-value="setTab"
+            >
+              <OToggleGroupItem value="rules" size="sm" data-test="oncall-routing-tab-rules">
+                {{ t("oncall.ownershipRules") }}
+                <OTag variant="default-soft" size="sm">{{ rules.length }}</OTag>
+              </OToggleGroupItem>
+              <OToggleGroupItem value="signals" size="sm" data-test="oncall-routing-tab-signals">
+                {{ t("oncall.routingTabNeedsRule") }}
+                <OTag
+                  :variant="openSignalCount ? 'error-soft' : 'default-soft'"
+                  size="sm"
+                  data-test="oncall-routing-tab-signals-count"
+                >
+                  {{ openSignalCount }}
+                </OTag>
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <OSearchInput
+              v-model="search"
+              class="min-w-48 flex-1 max-md:min-w-24"
+              clearable
+              :placeholder="t('oncall.routingSearchRules')"
+              data-test="oncall-routing-search"
+            />
+          </div>
         </template>
         <template #toolbar-trailing>
           <ORefreshButton
@@ -181,6 +177,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #toolbar>
           <div class="flex w-full min-w-0 flex-wrap items-center gap-2 max-md:contents">
+            <OToggleGroup
+              :model-value="tab"
+              type="single"
+              mobile-dropdown
+              data-test="oncall-routing-tabs"
+              @update:model-value="setTab"
+            >
+              <OToggleGroupItem value="rules" size="sm" data-test="oncall-routing-tab-rules">
+                {{ t("oncall.ownershipRules") }}
+                <OTag variant="default-soft" size="sm">{{ rules.length }}</OTag>
+              </OToggleGroupItem>
+              <OToggleGroupItem value="signals" size="sm" data-test="oncall-routing-tab-signals">
+                {{ t("oncall.routingTabNeedsRule") }}
+                <OTag
+                  :variant="openSignalCount ? 'error-soft' : 'default-soft'"
+                  size="sm"
+                  data-test="oncall-routing-tab-signals-count"
+                >
+                  {{ openSignalCount }}
+                </OTag>
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <div class="bg-border-default h-4 w-px shrink-0 max-md:hidden" />
+
             <!-- Server-side: `landing` splits the two emergencies; `include_dismissed` swaps the worklist for the record. -->
             <OToggleGroup
               :model-value="signalFilters.landing || 'both'"
@@ -364,14 +384,11 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { useMutation } from "@tanstack/vue-query";

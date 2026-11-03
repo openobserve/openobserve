@@ -137,13 +137,6 @@ const stubs = {
     methods: { openDialog: openDefaultDialog },
     template: "<div />",
   },
-  OTabs: {
-    name: "OTabs",
-    props: ["modelValue", "bordered"],
-    emits: ["update:modelValue"],
-    template: "<div><slot /></div>",
-  },
-  OTab: { name: "OTab", props: ["name", "label"], template: "<button>{{ label }}</button>" },
   OToggleGroup: {
     name: "OToggleGroup",
     props: ["modelValue"],
@@ -237,7 +230,9 @@ const simulator = (w: Wrapper) => w.findComponent({ name: "OnCallRoutingSimulato
 /// The queue lives behind the second tab, so a test about it starts by asking
 /// for that list.
 async function showSignals(w: Wrapper) {
-  w.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "signals");
+  w.findAllComponents({ name: "OToggleGroup" })
+    .find((c) => c.attributes("data-test") === "oncall-routing-tabs")!
+    .vm.$emit("update:modelValue", "signals");
   await flushPromises();
 }
 
@@ -639,6 +634,32 @@ describe("OnCallRouting", () => {
     expect(unrouted(wrapper).props("error")).toBeFalsy();
   });
 
+  it("switches tables from the real toolbar toggle and shows each list's count", async () => {
+    service.unroutedSignals.mockResolvedValue({
+      data: [
+        { id: "s1", dimensions: { service: "api" } },
+        { id: "s2", dimensions: { service: "web" } },
+      ],
+    } as any);
+    const { OToggleGroup: _g, OToggleGroupItem: _i, OTag: _t, ...rest } = stubs;
+    const wrapper = mount(OnCallRouting, { global: { plugins: [i18n, store], stubs: rest } });
+    await flushPromises();
+
+    const signalsTab = wrapper.find('[data-test="oncall-routing-tab-signals"]');
+    expect(wrapper.find('[data-test="oncall-routing-tab-rules"]').attributes("data-state")).toBe(
+      "on",
+    );
+    expect(wrapper.find('[data-test="oncall-routing-tab-signals-count"]').text()).toBe("2");
+
+    await signalsTab.trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-tab-signals"]').attributes("data-state")).toBe(
+      "on",
+    );
+    expect(unrouted(wrapper).exists()).toBe(true);
+    expect(rulesPanel(wrapper).exists()).toBe(false);
+  });
+
   // One search box per tab; switching tabs clears it, since a rules query means nothing against the queue.
   it("hands the toolbar search to the open table, and clears it when the tab changes", async () => {
     const wrapper = render();
@@ -706,7 +727,7 @@ describe("OnCallRouting", () => {
     await flushPromises();
     await showSignals(wrapper);
 
-    wrapper.findAllComponents({ name: "OToggleGroup" })[0].vm.$emit("update:modelValue", "nobody");
+    wrapper.findAllComponents({ name: "OToggleGroup" })[1].vm.$emit("update:modelValue", "nobody");
     await flushPromises();
 
     wrapper.findComponent({ name: "OCheckbox" }).vm.$emit("update:modelValue", true);
@@ -729,7 +750,7 @@ describe("OnCallRouting", () => {
     service.unroutedSignals.mockImplementationOnce(
       () => new Promise((resolve) => (answerNobody = resolve)),
     );
-    const landing = wrapper.findAllComponents({ name: "OToggleGroup" })[0];
+    const landing = wrapper.findAllComponents({ name: "OToggleGroup" })[1];
 
     landing.vm.$emit("update:modelValue", "nobody");
     await flushPromises();

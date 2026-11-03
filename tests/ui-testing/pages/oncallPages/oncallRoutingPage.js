@@ -217,7 +217,7 @@ export class OnCallRoutingPage {
   /**
    * @param {'rules'|'signals'} key
    *
-   * OTabs, so the switch is assertable via `data-state="active"` — and the tab
+   * An OToggleGroup, so the switch is assertable via `data-state="on"` — and the tab
    * decides which controls exist: "New rule" only on `rules`, the landing
    * filters only on `signals`.
    */
@@ -225,7 +225,7 @@ export class OnCallRoutingPage {
     const tab = this.page.locator(key === 'rules' ? this.locators.tabRules : this.locators.tabSignals);
     await tab.waitFor({ state: 'visible', timeout: 20000 });
     await tab.click();
-    await expect(tab).toHaveAttribute('data-state', 'active', { timeout: 15000 });
+    await expect(tab).toHaveAttribute('data-state', 'on', { timeout: 15000 });
     await settleRows(this.page, { rowSelector: ROUTING_ROWS[key] });
   }
 
