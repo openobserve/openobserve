@@ -38,6 +38,6 @@ export function buildCodingAgentPrompt(org: string, stream: string): string {
   return (
     `Instrument this app for OpenObserve with the openobserve-instrument skill (${INSTRUMENT_SKILL_URL}).\n` +
     `Use the .env in the project root, org ${org}, stream ${stream}.\n` +
-    `Run one sample request, then check the data.`
+    `Run one sample request, then tell me to check this OpenObserve page.`
   );
 }

@@ -53,7 +53,8 @@ const props = withDefaults(
     guideRoute?: string;
     guideName?: string;
     docUrl?: string;
-    snippetKind?: "command" | "config";
+    /** What the user copies to send data; names the copy button and the idle and fix text. */
+    snippetKind?: "command" | "config" | "prompt";
     /** The tool whose config holds the password, named in the invalid-credentials fix. */
     configTool?: string;
     /** The guide's host or cluster input, when the user typed one. */
@@ -62,6 +63,8 @@ const props = withDefaults(
     display?: "bar" | "pill";
     /** Replaces the generic waiting pill text in `pill` display. */
     waitingLabel?: I18nText;
+    /** Elapsed time without data before the bar reads rejections and shows a diagnosis. */
+    diagnosisAfterMs?: number;
   }>(),
   {
     signal: undefined,
@@ -77,6 +80,7 @@ const props = withDefaults(
     sourceLabel: undefined,
     display: "bar",
     waitingLabel: undefined,
+    diagnosisAfterMs: FIRST_EVENT_BUDGET.diagnosisAtMs,
   },
 );
 
@@ -100,6 +104,7 @@ const watcher = useFirstEventWatch(toRef(props, "org"), toRef(props, "signal"), 
   filter: toRef(props, "filter"),
   match: toRef(props, "match"),
   autoDiagnosis: computed(() => props.display !== "pill"),
+  diagnosisAtMs: toRef(props, "diagnosisAfterMs"),
 });
 const { state, result, diagnosis, startedAtMs, scope, troubleshooting, targetExists, deciding } =
   watcher;
@@ -253,14 +258,21 @@ const idleStream = computed(() =>
   props.targetStream && props.match !== "keyword" ? raw(props.targetStream) : undefined,
 );
 const idleKey = computed<I18nKey>(() => {
-  const config = props.snippetKind === "config";
+  const kind = props.snippetKind;
   if (!targetExists.value) {
-    return config ? "ingestion.firstEvent.idleNewConfig" : "ingestion.firstEvent.idleNew";
+    if (kind === "config") return "ingestion.firstEvent.idleNewConfig";
+    return kind === "prompt"
+      ? "ingestion.firstEvent.idleNewPrompt"
+      : "ingestion.firstEvent.idleNew";
   }
   if (!idleStream.value) {
-    return config ? "ingestion.firstEvent.idleMatchesConfig" : "ingestion.firstEvent.idleMatches";
+    if (kind === "config") return "ingestion.firstEvent.idleMatchesConfig";
+    return kind === "prompt"
+      ? "ingestion.firstEvent.idleMatchesPrompt"
+      : "ingestion.firstEvent.idleMatches";
   }
-  return config ? "ingestion.firstEvent.idleInConfig" : "ingestion.firstEvent.idleIn";
+  if (kind === "config") return "ingestion.firstEvent.idleInConfig";
+  return kind === "prompt" ? "ingestion.firstEvent.idleInPrompt" : "ingestion.firstEvent.idleIn";
 });
 
 const metaText = computed(() => {
@@ -331,6 +343,11 @@ const invalidCredentialsFix = (token: I18nText | undefined): I18nText => {
           tool: raw(props.configTool),
         });
   }
+  if (props.snippetKind === "prompt") {
+    return token
+      ? t("ingestion.firstEvent.fixInvalidCredentialsPrompt", { token })
+      : t("ingestion.firstEvent.fixInvalidCredentialsPromptUnnamed");
+  }
   return token
     ? t("ingestion.firstEvent.fixInvalidCredentials", { token })
     : t("ingestion.firstEvent.fixInvalidCredentialsUnnamed");
@@ -357,11 +374,12 @@ const noRequestsWindow = computed(() =>
     : t("ingestion.firstEvent.windowLast2"),
 );
 
-const copyLabel = computed(() =>
-  props.snippetKind === "config"
-    ? t("ingestion.firstEvent.copyConfig")
-    : t("ingestion.firstEvent.copyCommand"),
-);
+const copyLabel = computed(() => {
+  if (props.snippetKind === "config") return t("ingestion.firstEvent.copyConfig");
+  return props.snippetKind === "prompt"
+    ? t("ingestion.firstEvent.copyPrompt")
+    : t("ingestion.firstEvent.copyCommand");
+});
 
 const aiEnabled = computed(
   () => config.isEnterprise === "true" && !!store.state.zoConfig?.ai_enabled,
@@ -390,9 +408,14 @@ const hint = computed((): I18nText | undefined => {
   if (state.value === "rejected" || state.value === "no-requests") {
     return t("ingestion.firstEvent.hintStillChecking", { seconds: cadenceSeconds.value });
   }
-  return elapsedMs.value < FIRST_EVENT_BUDGET.diagnosisAtMs && !diagnosis.value
+  if (elapsedMs.value >= props.diagnosisAfterMs || diagnosis.value) {
+    return t("ingestion.firstEvent.hintWaitingLate");
+  }
+  return props.diagnosisAfterMs === FIRST_EVENT_BUDGET.diagnosisAtMs
     ? t("ingestion.firstEvent.hintWaiting")
-    : t("ingestion.firstEvent.hintWaitingLate");
+    : t("ingestion.firstEvent.hintWaitingAfter", {
+        elapsed: formatElapsed(props.diagnosisAfterMs),
+      });
 });
 
 const secondsSinceSignup = (): number => {
@@ -451,7 +474,7 @@ const goTo = (name: string) => {
   router.push({ name, query: { org_identifier: props.org } }).catch(() => {});
 };
 
-defineExpose({ start: watcher.start, probeNow: watcher.probeNow });
+defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
 </script>
 
 <template>

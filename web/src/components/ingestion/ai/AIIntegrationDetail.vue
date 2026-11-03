@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
@@ -44,6 +44,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const { aiContent, endpoint } = useIngestion();
 const route = useRoute();
+const router = useRouter();
 
 const category = computed<AICategory | undefined>(() =>
   aiCategories.find((c) => c.slug === props.categorySlug),
@@ -93,7 +94,8 @@ const richContent = computed(() =>
 
 // "With a coding agent" / "Step by step". `?tab=agent` (e.g. from the LLM
 // Insights empty state) opens the coding-agent tab; anything else opens the
-// stepped card, which stays the default.
+// stepped card, which stays the default. Switching tabs writes `?tab=` back, so
+// a reload or a shared link opens the same tab.
 const tabFromQuery = (tab: unknown) =>
   tab === CODING_AGENT_TAB ? CODING_AGENT_TAB : STEP_BY_STEP_TAB;
 const activeTab = ref<string | number>(tabFromQuery(route?.query?.tab));
@@ -103,6 +105,10 @@ watch(
     activeTab.value = tabFromQuery(tab);
   },
 );
+watch(activeTab, (tab) => {
+  if (!route || route.query.tab === tab) return;
+  router.replace({ query: { ...route.query, tab: String(tab) } }).catch(() => {});
+});
 
 // The stream the prompt names: the card's own stream default, else "default".
 const agentDefaultStream = computed(
