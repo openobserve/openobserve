@@ -25,6 +25,11 @@ import mockOverview from "@/test/unit/mockData/overview";
 // Data payloads are wired up per-test in beforeEach so each `it()` owns its
 // own state; the factories below stay data-free to survive vi.mock hoisting.
 
+const upgradeDialogOpen = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/useEnterpriseUpgradeDialog", () => ({
+  useEnterpriseUpgradeDialog: () => ({ open: upgradeDialogOpen }),
+}));
+
 vi.mock("@/services/alerts", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -738,6 +743,50 @@ describe("OverviewTab", () => {
       expect(alertsService.getHistory).toHaveBeenCalled();
       expect(anomalyService.list).toHaveBeenCalled();
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+    });
+  });
+
+  describe("services under a traces license lock", () => {
+    const SERVICES_LOCKED = '[data-test="overview-services-locked"]';
+
+    beforeEach(() => {
+      config.isEnterprise = "true";
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        incidents_enabled: true,
+        features: { traces: "locked" },
+      });
+    });
+
+    it("locks Services with the reason and never requests the topology", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).not.toHaveBeenCalled();
+      expect(wrapper.find(SERVICES_LOCKED).text()).toContain("Locked: needs");
+      expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(false);
+    });
+
+    it("does not open the upgrade dialog from the locked Services row", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const row = wrapper.find(SERVICES_LOCKED).find(".rounded-default");
+      await row.trigger("click");
+
+      expect(row.classes()).not.toContain("cursor-pointer");
+
+      expect(upgradeDialogOpen).not.toHaveBeenCalled();
+    });
+
+    it("does not claim all clear for what the license kept it from checking", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const hero = wrapper.find(EMPTY_STATE);
+      expect(hero.text()).toContain(i18n.global.t("overview.allClearPartial"));
+      expect(hero.text()).toContain(i18n.global.t("overview.areaServices"));
+      expect(hero.text()).not.toContain(i18n.global.t("overview.allClear"));
     });
   });
 
