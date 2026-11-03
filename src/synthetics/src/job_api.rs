@@ -1720,6 +1720,14 @@ pub(crate) fn merged_alert_input(
 /// dispatch or the stuck-run sweep. No ack runs the alert for it, and a Not measured run must
 /// still count toward its gap notice.
 pub(crate) async fn alert_for_swept_run(done: &synthetics_runs::RunFinalized) {
+    // An up run with a warning and no confirm job keeps its flaky or degraded reason only on the
+    // ack, so the merged vote would read it as passed and close an open incident.
+    if !done.had_confirm
+        && done.run_class == config::meta::synthetics::RunClass::Up
+        && done.run_result != config::meta::synthetics::SyntheticStatus::Passed.to_db()
+    {
+        return;
+    }
     let conn = get_orm_client_rw().await;
     let Ok(Some(synthetic)) =
         synthetics_checks::get_cached(conn, &done.org_id, &done.synthetics_id).await

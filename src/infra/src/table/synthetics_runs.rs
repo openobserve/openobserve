@@ -118,7 +118,7 @@ pub struct RunFinalized {
     pub gap_retry: bool,
     /// `Some` only when the badge, a streak or the run class changed.
     pub check_update: Option<StatusStreaks>,
-    /// Locations that vote, one per original job: `job_count` without confirm jobs.
+    /// Distinct locations of the original jobs; `job_count` without confirm jobs when unknown.
     pub voters: i32,
     /// Locations whose vote is a failure after confirm pairs merge, sorted, each once.
     pub failed_locations: Vec<String>,
@@ -234,6 +234,15 @@ pub fn tally(job_count: i32, jobs: &[JobOutcome]) -> Tally {
     }
     let voters = job_count - confirms.len() as i32;
     let verdict = run_verdict(voters, failed, healthy);
+    // A check with environments has one job per environment and location, so coverage counts
+    // distinct locations, as `failed_locations` does.
+    let mut locations: Vec<&str> = jobs
+        .iter()
+        .filter(|j| j.confirm_of.is_none() && !j.location.is_empty())
+        .map(|j| j.location.as_str())
+        .collect();
+    locations.sort_unstable();
+    locations.dedup();
     let class = match verdict {
         _ if failed + healthy == 0 && config > 0 => RunClass::Misconfigured,
         _ if failed + healthy == 0 => RunClass::NotMeasured,
@@ -250,7 +259,11 @@ pub fn tally(job_count: i32, jobs: &[JobOutcome]) -> Tally {
         confirmed_flaky,
         has_confirm: !confirms.is_empty(),
         gap_cause: jobs.iter().any(JobOutcome::is_gap_cause),
-        voters,
+        voters: if locations.is_empty() {
+            voters
+        } else {
+            locations.len() as i32
+        },
         failed_locations: {
             failed_locations.sort();
             failed_locations
@@ -1477,6 +1490,15 @@ mod tests {
             ],
         );
         assert!(t.failed_locations.is_empty());
+        // Two environments at one location: one location, not two.
+        let t = tally(
+            2,
+            &[
+                at(job("a", JOB_FAILED), "aws-us-east-1"),
+                at(job("b", JOB_FAILED), "aws-us-east-1"),
+            ],
+        );
+        assert_eq!((t.voters, t.failed_locations.len()), (1, 1));
     }
 
     #[test]
