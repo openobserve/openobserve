@@ -762,6 +762,7 @@
     "dragToReorder": "Faites glisser pour réorganiser",
     "timeAmount": "Durée",
     "timeUnit": "Unité de temps",
+    "unitFor": "Unité de {label}",
     "queryEditorAriaLabel": "Éditeur de requête. Appuyez sur Échap pour passer au contrôle suivant.",
     "queryEditorEscapeAction": "Déplacer le focus vers le contrôle suivant",
     "inlineEdit": {
@@ -11956,6 +11957,7 @@
       "budgetLabel": "Budget d'alertes",
       "budgetPerDay": "par jour",
       "budgetPerWeek": "par semaine",
+      "budgetPeriod": "Période du budget d'alerte",
       "budgetRange": "Saisissez un nombre supérieur à 0",
       "chartsTab": "Graphiques",
       "checkEvery": "Vérifiez chaque",
@@ -11965,6 +11967,7 @@
       "sendsToStatus": "Envoie à {targets} chaque fois qu'une anomalie est détectée.",
       "detectionAlreadyRunning": "La détection est déjà en cours ; réessayez dans un instant.",
       "detectionCharts": "Résultats de détection",
+      "detectionFunctionField": "Champ de la fonction de détection",
       "detectionFunctionTooltip": "Ce qu'il faut mesurer dans chaque intervalle de temps. count observe le nombre d'enregistrements qui arrivent ; avg, min, max et sum observent un champ numérique. p50, p95 et p99 observent la distribution de ce champ — par ex. le p95 de response_time_ms détecte une dégradation de la latence pour les requêtes les plus lentes même lorsque le trafic reste stable.",
       "detectionResolution": "Résolution de détection",
       "detectionResolutionTooltip": "Le degré de précision de chaque point de données. Par exemple, « 5 m » signifie que des anomalies sont détectées à une résolution de 5 minutes.",

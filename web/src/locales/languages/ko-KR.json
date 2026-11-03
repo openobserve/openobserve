@@ -762,6 +762,7 @@
     "dragToReorder": "드래그하여 순서 변경",
     "timeAmount": "시간 값",
     "timeUnit": "시간 단위",
+    "unitFor": "{label} 단위",
     "queryEditorAriaLabel": "쿼리 편집기입니다. 다음 컨트롤로 이동하려면 Escape를 누르세요.",
     "queryEditorEscapeAction": "포커스를 다음 컨트롤로 이동",
     "inlineEdit": {
@@ -11956,6 +11957,7 @@
       "budgetLabel": "알림 예산",
       "budgetPerDay": "1일당",
       "budgetPerWeek": "1주당",
+      "budgetPeriod": "알림 예산 기간",
       "budgetRange": "0보다 큰 숫자를 입력하세요",
       "chartsTab": "차트",
       "checkEvery": "확인 주기",
@@ -11965,6 +11967,7 @@
       "sendsToStatus": "이상 징후가 감지될 때마다 {targets}(으)로 전송합니다.",
       "detectionAlreadyRunning": "감지가 이미 실행 중입니다. 잠시 후 다시 시도하세요.",
       "detectionCharts": "탐지 결과",
+      "detectionFunctionField": "탐지 함수 필드",
       "detectionFunctionTooltip": "각 시간 버킷에서 측정할 항목입니다. count는 도착하는 레코드 수를 관찰하고, avg, min, max, sum은 숫자 필드를 관찰합니다. p50, p95, p99는 해당 필드의 분포를 관찰합니다. 예를 들어 response_time_ms의 p95는 트래픽이 일정하게 유지되더라도 가장 느린 요청의 지연이 악화되는 것을 잡아냅니다.",
       "detectionResolution": "감지 해상도",
       "detectionResolutionTooltip": "각 데이터 포인트가 얼마나 세분화되었는지.예를 들어 “5m”은 5분 해상도에서 이상 징후가 감지되었음을 의미합니다.",

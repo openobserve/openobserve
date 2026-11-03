@@ -111,12 +111,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`alert-variables-${index + 1}`"
                     >
                       <OFormInput
+                        :aria-label="t('common.name')"
                         data-test="alert-variables-key-input"
                         :name="`context_attributes[${index}].key`"
                         :placeholder="t('common.name')"
                         class="min-w-35"
                       />
                       <OFormInput
+                        :aria-label="t('common.value')"
                         data-test="alert-variables-value-input"
                         :name="`context_attributes[${index}].value`"
                         :placeholder="t('common.value')"
@@ -213,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormTagInput
                 name="tags"
                 :placeholder="t('alerts.placeholders.addTag')"
+                :aria-label="t('alerts.tags')"
                 data-test="alert-tags-input"
               />
             </OSettingRow>
@@ -226,6 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSettingRow :label="t('alerts.description')" fill>
                 <OFormTextarea
                   name="description"
+                  :aria-label="t('alerts.description')"
                   data-test="add-alert-description-textarea"
                   :placeholder="t('alerts.placeholders.typeSomething')"
                   :rows="4"
@@ -266,6 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </div>
                   <OFormTextarea
+                    :aria-label="t('alerts.row')"
                     data-test="add-alert-row-input-textarea"
                     name="row_template"
                     :placeholder="rowTemplatePlaceholder"

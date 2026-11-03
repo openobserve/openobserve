@@ -762,6 +762,7 @@
     "dragToReorder": "Zum Neuanordnen ziehen",
     "timeAmount": "Zeitdauer",
     "timeUnit": "Zeiteinheit",
+    "unitFor": "{label} Einheit",
     "queryEditorAriaLabel": "Abfrage-Editor. Drücken Sie Escape, um zum nächsten Steuerelement zu wechseln.",
     "queryEditorEscapeAction": "Fokus zum nächsten Steuerelement verschieben",
     "inlineEdit": {
@@ -11956,6 +11957,7 @@
       "budgetLabel": "Alarmbudget",
       "budgetPerDay": "pro Tag",
       "budgetPerWeek": "pro Woche",
+      "budgetPeriod": "Alarm-Budgetzeitraum",
       "budgetRange": "Geben Sie eine Zahl größer als 0 ein",
       "chartsTab": "Diagramme",
       "checkEvery": "Prüfen alle",
@@ -11965,6 +11967,7 @@
       "sendsToStatus": "Sendet bei jeder erkannten Anomalie an {targets}.",
       "detectionAlreadyRunning": "Die Erkennung läuft bereits; versuchen Sie es in Kürze erneut.",
       "detectionCharts": "Erkennungsergebnisse",
+      "detectionFunctionField": "Feld der Erkennungsfunktion",
       "detectionFunctionTooltip": "Was in jedem Zeit-Bucket gemessen werden soll. count beobachtet, wie viele Datensätze eintreffen; avg, min, max und sum beobachten ein numerisches Feld. p50, p95 und p99 beobachten die Verteilung dieses Feldes – z. B. erkennt p95 von response_time_ms eine sich verschlechternde Latenz bei den langsamsten Anfragen, selbst wenn der Datenverkehr konstant bleibt.",
       "detectionResolution": "Auflösung der Erkennung",
       "detectionResolutionTooltip": "Wie detailliert jeder Datenpunkt ist. Beispielsweise bedeutet „5 m“, dass Anomalien mit einer Auflösung von 5 Minuten erkannt werden.",

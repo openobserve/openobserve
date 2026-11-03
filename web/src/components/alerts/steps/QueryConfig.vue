@@ -870,7 +870,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Unit dropdown: minutes / hours / cron -->
                       <OSelect
-                        :aria-label="t('common.timeUnit')"
+                        :aria-label="
+                          t('common.unitFor', { label: t('alerts.queryConfig.checkEvery') })
+                        "
                         class="max-w-25 min-w-20"
                         :model-value="frequencyMode"
                         data-test="alert-check-every-unit-select"
@@ -1334,7 +1336,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </template>
                       <OSelect
-                        :aria-label="t('common.timeUnit')"
+                        :aria-label="
+                          t('common.unitFor', { label: t('alerts.queryConfig.checkEvery') })
+                        "
                         class="max-w-25 min-w-20"
                         :model-value="frequencyMode"
                         data-test="alert-check-every-unit-select"
