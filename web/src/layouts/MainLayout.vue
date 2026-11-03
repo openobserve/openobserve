@@ -968,9 +968,7 @@ export default defineComponent({
     const splitterModel = ref(100);
     const selectedLanguage: any = langList.find((l) => l.code == getLocale()) || langList[0];
 
-    // Insert / remove the AI Observability menu entry based on the live config
-    // flag. Position: directly after Traces. Idempotent — safe to call from
-    // multiple lifecycle hooks.
+    // Idempotent: called from several lifecycle hooks, so it must not double-insert.
     const updateAIObservabilityMenu = () => {
       const existingIndex = linksList.value.findIndex(
         (link: any) => link.name === "aiObservability",
@@ -978,9 +976,11 @@ export default defineComponent({
 
       if (isAiObservabilityMenuVisible.value) {
         if (existingIndex !== -1) return;
-        const anchorIndex = linksList.value.findIndex(
-          (link: any) => link.name === "profiles" || link.name === "traces",
-        );
+        const indexOfLink = (name: string) =>
+          linksList.value.findIndex((l: any) => l.name === name);
+        // Profiles sits after Traces, so it must be tried first or the match lands before it.
+        const profilesIndex = indexOfLink("profiles");
+        const anchorIndex = profilesIndex !== -1 ? profilesIndex : indexOfLink("traces");
         const insertAt = anchorIndex === -1 ? linksList.value.length : anchorIndex + 1;
         linksList.value.splice(insertAt, 0, {
           title: t("menu.aiObservability"),
