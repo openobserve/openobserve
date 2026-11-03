@@ -36,7 +36,7 @@ pub const MAX_PAGE_LIMIT: usize = 1000;
 /// Issues keyed by pipeline id; the empty key holds document-level issues.
 pub type Issues = BTreeMap<String, Vec<ConfigIssue>>;
 
-/// Derived when read from `last_seen` and the reported health, never stored (§4.7).
+/// Derived when read from `last_seen` and the reported health, never stored.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum CollectorStatus {
@@ -46,7 +46,7 @@ pub enum CollectorStatus {
     Offline,
 }
 
-/// Derived when read from the assignment and the collector's reports (§8.1).
+/// Derived when read from the assignment and the collector's reports.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DeliveryState {
@@ -169,7 +169,7 @@ pub struct CollectorAssignment {
     pub revision: i64,
 }
 
-/// The facts the delivery state is derived from (§9.7).
+/// The facts the delivery state is derived from.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct DeliveryEvidence {
     /// The last `RemoteConfigStatus` status, e.g. `APPLIED` or `FAILED`.
@@ -445,7 +445,7 @@ pub struct AuditQuery {
     pub to: Option<i64>,
 }
 
-/// Per-fleet overrides; `None` inherits the organization default (§4.8).
+/// Per-fleet overrides; `None` inherits the organization default.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FleetSettings {
@@ -523,7 +523,7 @@ impl FleetSettings {
     }
 }
 
-/// The verification gate: wait `observe_secs`, then measure over `window_secs` (§9.4).
+/// The verification gate: wait `observe_secs`, then measure over `window_secs`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GateSettings {
@@ -645,7 +645,7 @@ pub enum RolloutStart {
     At { at: i64 },
 }
 
-/// Phase sizes are counts of collectors, never percentages (§9.2).
+/// Phase sizes are counts of collectors, never percentages.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Batching {
@@ -692,6 +692,7 @@ pub struct PlanPreview {
 #[serde(rename_all = "snake_case")]
 pub enum RolloutStatus {
     Scheduled,
+    Waiting,
     InProgress,
     Halted,
     Completed,
@@ -701,11 +702,14 @@ pub enum RolloutStatus {
 
 impl RolloutStatus {
     pub fn is_active(self) -> bool {
-        matches!(self, Self::Scheduled | Self::InProgress | Self::Halted)
+        matches!(
+            self,
+            Self::Scheduled | Self::Waiting | Self::InProgress | Self::Halted
+        )
     }
 }
 
-/// The evidence class of a halt (§9.5); only the first two may roll back automatically.
+/// The evidence class of a halt; only the first two may roll back automatically.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HaltClass {
@@ -735,7 +739,6 @@ pub struct RolloutHalt {
     pub reason: String,
     /// Epoch milliseconds.
     pub at: i64,
-    /// The exits this halt offers (§9.6).
     pub exits: Vec<HaltExit>,
 }
 
@@ -1197,6 +1200,7 @@ mod tests {
         assert_eq!(back, rollout());
         for (status, text) in [
             (RolloutStatus::Scheduled, "scheduled"),
+            (RolloutStatus::Waiting, "waiting"),
             (RolloutStatus::InProgress, "in_progress"),
             (RolloutStatus::Superseded, "superseded"),
             (RolloutStatus::RolledBack, "rolled_back"),

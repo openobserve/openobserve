@@ -2008,6 +2008,7 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       scheduled: { variant: "default-soft", labelKey: "fleet.badge.scheduled" },
+      waiting: { variant: "warning-soft", labelKey: "fleet.badge.waiting" },
       inprogress: { variant: "primary-soft", labelKey: "fleet.badge.inProgress" },
       completed: { variant: "success-soft", labelKey: "fleet.badge.completed" },
       halted: { variant: "error-soft", labelKey: "fleet.badge.halted" },

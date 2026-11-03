@@ -484,8 +484,9 @@ describe("fleet queries", () => {
     expect(interval(detail, { ...halted, auto_rollback: false })).toBe(false);
   });
 
-  it("refetches a scheduled rollout every minute and never a superseded one", () => {
+  it("refetches a scheduled or waiting rollout every minute and never a superseded one", () => {
     const scheduled = { status: "scheduled", total: 3, attempted: 0 };
+    expect(interval(fleetRolloutsQuery("acme"), [{ status: "waiting", total: 0 }])).toBe(60_000);
     const superseded = { status: "superseded", total: 3, attempted: 1, accepted: 1 };
     expect(interval(fleetRolloutsQuery("acme"), [scheduled])).toBe(60_000);
     expect(interval(fleetRolloutQuery("acme", "r1"), scheduled)).toBe(60_000);
@@ -511,6 +512,7 @@ describe("fleet queries", () => {
     expect(interval(opts, at("in_progress"))).toBe(5000);
     expect(interval(opts, at("halted"))).toBe(5000);
     expect(interval(opts, at("scheduled"))).toBe(60_000);
+    expect(interval(opts, at("waiting"))).toBe(60_000);
   });
 
   it("polls the collectors list while a row's delivery is in flight or a rollout moves", () => {
