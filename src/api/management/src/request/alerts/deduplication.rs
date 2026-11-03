@@ -57,6 +57,10 @@ pub struct SemanticGroupModification {
         (status = 200, description = "Success", body = Vec<FieldAlias>),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+    )
 )]
 pub async fn get_semantic_groups(Path(org_id): Path<String>) -> Response {
     // Use system_settings which has proper caching and cluster watch
@@ -85,6 +89,10 @@ pub async fn get_semantic_groups(Path(org_id): Path<String>) -> Response {
     responses(
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"}))
+    )
 )]
 pub async fn get_semantic_groups(_org_id: Path<String>) -> Response {
     axum::response::Response::builder()
@@ -119,7 +127,8 @@ pub async fn get_semantic_groups(_org_id: Path<String>) -> Response {
         (status = 500, description = "Internal server error"),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"}))
     )
 )]
 pub async fn preview_semantic_groups_diff(
@@ -203,7 +212,8 @@ pub async fn preview_semantic_groups_diff(
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"}))
     )
 )]
 pub async fn preview_semantic_groups_diff(
@@ -243,7 +253,8 @@ pub async fn preview_semantic_groups_diff(
         (status = 500, description = "Internal server error"),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 pub async fn save_semantic_groups(
@@ -339,7 +350,8 @@ pub async fn save_semantic_groups(
         (status = 403, description = "Forbidden - Enterprise feature"),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"}))
     )
 )]
 pub async fn save_semantic_groups(

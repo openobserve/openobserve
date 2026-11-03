@@ -1089,6 +1089,15 @@ use crate::{
         (name = "Sourcemaps", description = "Source map upload and stack trace translation"),
         (name = "Status Pages", description = "Public status pages, notices and custom domains"),
         (name = "Templates", description = "Alert notification templates"),
+        (name = "SLOs", description = "Service level objectives and their alert previews"),
+        (name = "Folders", description = "Folders that group dashboards, alerts and other resources"),
+        (name = "GenAI Settings", description = "Gen-AI agent registry and agent mapping settings"),
+        (name = "Ingestion", description = "Ingestion diagnostics such as recently rejected records"),
+        (name = "Search Jobs", description = "Asynchronous search jobs and their results"),
+        (name = "Rum", description = "Real user monitoring data ingestion"),
+        (name = "Playground", description = "LLM playground runs, scores and shared snapshots (enterprise)"),
+        (name = "Prompts", description = "Versioned LLM prompts and their labels (enterprise)"),
+        (name = "RemoteTasks", description = "Remote tasks, their drafts, secrets and signing keys (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -1456,7 +1465,7 @@ impl Modify for SecurityAddon {
         #[cfg(feature = "enterprise")]
         {
             let enterprise = EnterpriseExperimentApiDoc::openapi();
-            openapi.paths.paths.extend(enterprise.paths.paths);
+            overlay_paths(&mut openapi.paths, enterprise.paths);
             if let (Some(components), Some(enterprise_components)) =
                 (openapi.components.as_mut(), enterprise.components)
             {
@@ -1467,7 +1476,7 @@ impl Modify for SecurityAddon {
         #[cfg(feature = "cloud")]
         {
             let cloud = CloudQuotaApiDoc::openapi();
-            openapi.paths.paths.extend(cloud.paths.paths);
+            overlay_paths(&mut openapi.paths, cloud.paths);
             if let (Some(components), Some(cloud_components)) =
                 (openapi.components.as_mut(), cloud.components)
             {
@@ -1580,6 +1589,17 @@ pub async fn openapi_info() -> OpenapiInfo {
     tag_operations
 }
 
+/// Lays `extra` over `paths` per method: its operations win, the base keeps methods `extra` lacks.
+#[cfg(any(feature = "enterprise", feature = "cloud"))]
+fn overlay_paths(paths: &mut utoipa::openapi::Paths, extra: utoipa::openapi::Paths) {
+    for (path, mut item) in extra.paths {
+        if let Some(base) = paths.paths.remove(&path) {
+            item.merge_operations(base);
+        }
+        paths.paths.insert(path, item);
+    }
+}
+
 #[cfg(all(test, feature = "enterprise"))]
 mod experiment_tests {
     use super::*;
@@ -1592,9 +1612,9 @@ mod experiment_tests {
         let anomaly_cases = [
             (anomaly.to_string(), "get"),
             (anomaly.to_string(), "post"),
-            (format!("{anomaly}/{{anomaly_id}}"), "delete"),
-            (format!("{anomaly}/{{anomaly_id}}/train"), "post"),
-            (format!("{anomaly}/{{anomaly_id}}/detect"), "post"),
+            (format!("{anomaly}/{{config_id}}"), "delete"),
+            (format!("{anomaly}/{{config_id}}/train"), "post"),
+            (format!("{anomaly}/{{config_id}}/detect"), "post"),
             (format!("{anomaly}/history"), "get"),
         ];
         for (path, method) in &anomaly_cases {
@@ -1606,13 +1626,13 @@ mod experiment_tests {
             let ext = &paths[path.as_str()]["get"]["x-o2-mcp"];
             assert_eq!(ext["category"], "db_monitoring", "{path}");
         }
-        let delete = &paths[format!("{anomaly}/{{anomaly_id}}").as_str()]["delete"];
+        let delete = &paths[format!("{anomaly}/{{config_id}}").as_str()]["delete"];
         assert_eq!(delete["x-o2-mcp"]["requires_confirmation"], true);
-        let history = &paths[format!("{anomaly}/{{anomaly_id}}/history").as_str()]["get"];
+        let history = &paths[format!("{anomaly}/{{config_id}}/history").as_str()]["get"];
         assert_eq!(history["x-o2-mcp"]["enabled"], false);
         for path in [
             anomaly.to_string(),
-            format!("{anomaly}/{{anomaly_id}}/history"),
+            format!("{anomaly}/{{config_id}}/history"),
         ] {
             let body =
                 &paths[path.as_str()]["get"]["responses"]["200"]["content"]["application/json"];
@@ -1707,22 +1727,16 @@ mod tests {
         ("/api/{org_id}/anomaly_detection", "get"),
         ("/api/{org_id}/anomaly_detection", "post"),
         ("/api/{org_id}/anomaly_detection/history", "get"),
-        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "get"),
-        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "put"),
-        ("/api/{org_id}/anomaly_detection/{anomaly_id}", "delete"),
-        ("/api/{org_id}/anomaly_detection/{anomaly_id}/train", "post"),
+        ("/api/{org_id}/anomaly_detection/{config_id}", "get"),
+        ("/api/{org_id}/anomaly_detection/{config_id}", "put"),
+        ("/api/{org_id}/anomaly_detection/{config_id}", "delete"),
+        ("/api/{org_id}/anomaly_detection/{config_id}/train", "post"),
         (
-            "/api/{org_id}/anomaly_detection/{anomaly_id}/train",
+            "/api/{org_id}/anomaly_detection/{config_id}/train",
             "delete",
         ),
-        (
-            "/api/{org_id}/anomaly_detection/{anomaly_id}/detect",
-            "post",
-        ),
-        (
-            "/api/{org_id}/anomaly_detection/{anomaly_id}/history",
-            "get",
-        ),
+        ("/api/{org_id}/anomaly_detection/{config_id}/detect", "post"),
+        ("/api/{org_id}/anomaly_detection/{config_id}/history", "get"),
         ("/api/{org_id}/workflows", "get"),
         ("/api/{org_id}/workflows", "post"),
         ("/api/v2/{org_id}/workflows/move", "patch"),
@@ -2295,8 +2309,8 @@ mod tests {
         for (path, method) in [
             ("/api/{org_id}/roles/bulk", "delete"),
             ("/api/{org_id}/groups/bulk", "delete"),
-            ("/api/{org_id}/users/{user_email}/roles", "get"),
-            ("/api/{org_id}/users/{user_email}/groups", "get"),
+            ("/api/{org_id}/users/{user_id}/roles", "get"),
+            ("/api/{org_id}/users/{user_id}/groups", "get"),
         ] {
             let op = &spec["paths"][path][method];
             assert!(op.is_object(), "{method} {path} missing");
@@ -2624,10 +2638,10 @@ mod tests {
     #[test]
     fn anomaly_detection_documents_the_statuses_its_handlers_return() {
         let base = "/api/{org_id}/anomaly_detection";
-        let by_id = "/api/{org_id}/anomaly_detection/{anomaly_id}";
-        let train = "/api/{org_id}/anomaly_detection/{anomaly_id}/train";
-        let detect = "/api/{org_id}/anomaly_detection/{anomaly_id}/detect";
-        let history = "/api/{org_id}/anomaly_detection/{anomaly_id}/history";
+        let by_id = "/api/{org_id}/anomaly_detection/{config_id}";
+        let train = "/api/{org_id}/anomaly_detection/{config_id}/train";
+        let detect = "/api/{org_id}/anomaly_detection/{config_id}/detect";
+        let history = "/api/{org_id}/anomaly_detection/{config_id}/history";
         let bulk_history = "/api/{org_id}/anomaly_detection/history";
         assert_documented_statuses(&[
             (base, "get", &["200", "403", "500"]),
@@ -2830,7 +2844,15 @@ mod tests {
             let ok = &spec["paths"][path]["get"]["responses"]["200"];
             let schema = &ok["content"]["application/json"]["schema"];
             assert_eq!(schema["type"], "array", "{path}: {ok}");
-            assert_eq!(schema["items"]["type"], "object", "{path}: {ok}");
+            let name = schema["items"]["$ref"]
+                .as_str()
+                .and_then(|r| r.strip_prefix("#/components/schemas/"))
+                .unwrap_or_else(|| panic!("{path}: {ok}"));
+            let item = &spec["components"]["schemas"][name];
+            assert!(
+                item["type"] == "object" || item["allOf"].is_array(),
+                "{path}: {item}"
+            );
         }
     }
 

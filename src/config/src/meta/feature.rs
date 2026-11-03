@@ -18,7 +18,17 @@ use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
 /// Product features as tags; the snake_case name is the gate-definition and license key.
 #[derive(
-    Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, Serialize, EnumIter,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    EnumString,
+    IntoStaticStr,
+    Serialize,
+    EnumIter,
+    utoipa::ToSchema,
 )]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
@@ -104,7 +114,7 @@ impl Feature {
     }
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(Clone, Copy, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum FeatureState {
     Enabled,

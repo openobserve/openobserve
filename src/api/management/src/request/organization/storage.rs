@@ -26,9 +26,11 @@ pub struct SetupOrgStorageRequest {
     data: serde_json::Value,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 struct GetOrgStorageResponse {
+    #[schema(value_type = Option<String>)]
     provider: Option<ProviderType>,
+    #[schema(value_type = Option<Object>)]
     data: serde_json::Value,
     created_at: i64,
     updated_at: i64,
@@ -161,7 +163,7 @@ pub async fn save(
         (
             status = 200,
             description = "Storage details",
-            body = Object,
+            body = GetOrgStorageResponse,
             content_type = "application/json",
         ),
     ),
