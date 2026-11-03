@@ -91,6 +91,7 @@ fn create_app_router_builds_with_workflow_hook_routes() {
 #[test]
 fn prepare_secret_encrypts_under_the_org_dek() {
     run(ENV, async {
+        write_heartbeat().await;
         let seeded = seed_token_trigger("prepsecret", "prepsecret").await;
         let rw = get_orm_client_rw().await;
         let row = triggers::list_credentials(rw, &seeded.trigger_id)
