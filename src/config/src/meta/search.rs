@@ -151,24 +151,32 @@ impl std::fmt::Display for RequestEncoding {
     }
 }
 
+// `Default` turns every option off; callers still set `sql`, the time range and `size`.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchQuery)]
 pub struct Query {
     pub sql: String,
+    // Unix microseconds; `Default` leaves both ends at 0, so always set the range.
     pub start_time: i64,
     pub end_time: i64,
     #[serde(default)]
     pub from: i64,
+    // Row cap without a SQL LIMIT; `<= 0` means `query_default_limit`, but `Default` sets 10.
     #[serde(default = "default_size")]
     pub size: i64,
+    /// For `SELECT *` on streams wider than `quick_mode_num_fields`, reads only some columns.
     #[serde(default)]
     pub quick_mode: bool,
+    /// Also counts every matching row, which bypasses the result cache and streaming output.
     #[serde(default)]
     pub track_total_hits: bool,
+    /// Set when the SQL calls a saved VRL function, which makes the result hits get flattened.
     #[serde(default)]
     pub uses_zo_fn: bool,
+    /// Base64-encoded VRL program applied to the result hits.
     #[serde(default)]
     pub query_fn: Option<String>,
+    /// Not read by the search path; skipping the WAL is controlled by `feature_query_skip_wal`.
     #[serde(default)]
     pub skip_wal: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -178,11 +186,12 @@ pub struct Query {
     /// Takes precedence over sampling_config if both are provided
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sampling_ratio: Option<f64>,
-    // streaming output
+    /// Set with `streaming_id` by the streaming search endpoints; other callers leave both unset.
     #[serde(default)]
     pub streaming_output: bool,
     #[serde(default)]
     pub streaming_id: Option<String>,
+    /// Seconds; 0 derives it from the time range.
     #[serde(default)]
     pub histogram_interval: i64,
     /// Default fixed-offset timezone (e.g. "+08:00") applied to histogram() buckets
