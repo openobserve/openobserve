@@ -92,6 +92,10 @@ jobs:
       - name: Install Protoc
         run: bash ./.github/protoc.sh
 
+      # The EKS runner image has no libclang, which bindgen needs to build custom-labels.
+      - name: Install libclang
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+
       - name: Simulate building frontend code
         run: mkdir -p web/dist && touch web/dist/index.html
 
