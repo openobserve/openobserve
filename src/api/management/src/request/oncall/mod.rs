@@ -1674,34 +1674,38 @@ pub async fn set_policy(
                 other => internal_error("set_policy node versions", &other),
             };
         }
-        if let Some(template) = body.template.clone() {
-            let template = template
-                .map(|t| t.trim().to_string())
-                .filter(|t| !t.is_empty());
-            if let Some(name) = template.as_deref()
-                && let Err(e) = openobserve_core::alerts::templates::check_binding(
-                    &org_id,
-                    name,
-                    config::meta::alerts::notification_kind::NotificationKind::OnCall,
-                )
-                .await
-            {
-                return MetaHttpResponse::bad_request(e.as_str());
-            }
-            if let Err(e) = o2_enterprise::enterprise::oncall::service::set_policy_template(
-                &org_id, &team_id, template,
+        // Checked before any write, written after the policy, so a refused policy leaves no half.
+        let template = body
+            .template
+            .clone()
+            .map(|t| t.map(|t| t.trim().to_string()).filter(|t| !t.is_empty()));
+        if let Some(Some(name)) = template.as_ref()
+            && let Err(e) = openobserve_core::alerts::templates::check_binding(
+                &org_id,
+                name,
+                config::meta::alerts::notification_kind::NotificationKind::OnCall,
             )
             .await
-            {
-                return to_response(e);
-            }
+        {
+            return MetaHttpResponse::bad_request(e.as_str());
         }
-        match o2_enterprise::enterprise::oncall::service::set_policy(
+        let policy = match o2_enterprise::enterprise::oncall::service::set_policy(
             &org_id,
             &team_id,
             body.rungs,
             body.destinations,
             body.l0,
+        )
+        .await
+        {
+            Ok(policy) => policy,
+            Err(e) => return to_response(e),
+        };
+        let Some(template) = template else {
+            return MetaHttpResponse::json(policy);
+        };
+        match o2_enterprise::enterprise::oncall::service::set_policy_template(
+            &org_id, &team_id, template,
         )
         .await
         {

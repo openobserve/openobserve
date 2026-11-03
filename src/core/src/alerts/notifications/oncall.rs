@@ -20,7 +20,7 @@ use o2_enterprise::enterprise::oncall::sender::{OnCallNotification, OnCallSendEr
 
 use super::{
     LegacyPayload, NotificationContext, STATUS_FIRING,
-    notify::{NotifyError, SkipReason, notify},
+    notify::{NotifyError, notify},
 };
 
 /// Sends one on-call message to one destination through the shared path.
@@ -44,7 +44,16 @@ pub async fn log_mail_destination_policies() {
     };
     for policy in policies {
         let mut mail = Vec::new();
-        for name in &policy.destinations {
+        // The team's own channel pages too, so its destinations count as well (D9).
+        let channel = infra::table::oncall_teams::get_channel(&policy.org_id, &policy.team_id)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        let mut names: Vec<&String> = policy.destinations.iter().chain(channel.iter()).collect();
+        names.sort();
+        names.dedup();
+        for name in names {
             if let Ok(Some(dest)) = infra::table::destinations::get(&policy.org_id, name).await
                 && let Module::Alert {
                     destination_type: DestinationType::Email(_) | DestinationType::Sns(_),
@@ -119,7 +128,8 @@ pub fn on_call_context(n: &OnCallNotification) -> NotificationContext {
 /// A Retryable error is retried by the engine; a platform skip is neither delivered nor failed.
 fn send_result(result: Result<(), NotifyError>) -> Result<(), OnCallSendError> {
     match result {
-        Ok(()) | Err(NotifyError::Skipped(SkipReason::PlatformNotForKind)) => Ok(()),
+        Ok(()) => Ok(()),
+        // A skip is not a delivery, so a send that only reached platforms reports nothing sent.
         Err(NotifyError::Skipped(reason)) => Err(OnCallSendError::Skipped(reason.as_str().into())),
         Err(e) if e.is_retryable() => Err(OnCallSendError::Retryable(e.to_string())),
         Err(e) => Err(OnCallSendError::Permanent(e.to_string())),
@@ -132,7 +142,7 @@ mod tests {
 
     use super::*;
     use crate::alerts::notifications::{
-        notify::{Route, route},
+        notify::{Route, SkipReason, route},
         org_default::{EffectiveTemplate, TemplateSource, compiled_fallback_for},
     };
 
@@ -245,10 +255,10 @@ mod tests {
     #[test]
     fn send_results_map_to_what_the_engine_retries() {
         assert_eq!(send_result(Ok(())), Ok(()));
-        assert_eq!(
+        assert!(matches!(
             send_result(Err(NotifyError::Skipped(SkipReason::PlatformNotForKind))),
-            Ok(())
-        );
+            Err(OnCallSendError::Skipped(_))
+        ));
         assert!(matches!(
             send_result(Err(NotifyError::Skipped(SkipReason::NoOrgMemberRecipient))),
             Err(OnCallSendError::Skipped(_))
