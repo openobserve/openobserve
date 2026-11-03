@@ -270,7 +270,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     runs-on:
       labels: ubicloud-standard-8
     permissions:
@@ -309,18 +309,25 @@ jobs:
           path: web/node_modules
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
 
-      - name: Run this shard with coverage
+      - name: Run this shard
         working-directory: web
         env:
           UI_SHARD_BALANCE: '1'
+          SHARD: ${{ matrix.shard }}/8
+          # The PR run already gated coverage; the queue only needs pass/fail.
+          NO_COVERAGE: ${{ github.event_name == 'merge_group' }}
         run: |
-          npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=default --reporter=blob \
-            --coverage.reportOnFailure --coverage.reporter=json \
-            --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
-            --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
+          if [ "$NO_COVERAGE" = "true" ]; then
+            npx vitest run --shard="$SHARD" --reporter=default --reporter=./scripts/vitest-retry-annotations.mjs
+          else
+            npx vitest run --coverage --shard="$SHARD" --reporter=default --reporter=./scripts/vitest-retry-annotations.mjs --reporter=blob \
+              --coverage.reportOnFailure --coverage.reporter=json \
+              --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
+              --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
+          fi
 
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && github.event_name != 'merge_group'
         with:
           name: ui-unit-blob-${{ matrix.shard }}
           path: web/.vitest-reports
@@ -333,7 +340,9 @@ jobs:
     needs: [check_changes, ui_unit_test_shards]
     if: always() && needs.check_changes.outputs.has_ui_changes == 'true'
     timeout-minutes: 20
-    runs-on: ubuntu-latest
+    # Ubicloud, like the shards: their node_modules cache is invisible to GitHub-hosted runners.
+    runs-on:
+      labels: ubicloud-standard-4
     permissions:
       contents: read
 
@@ -343,9 +352,13 @@ jobs:
           [ "${{ needs.ui_unit_test_shards.result }}" = "success" ] || { echo "shards: ${{ needs.ui_unit_test_shards.result }}"; exit 1; }
 
       - name: Clone the current repo
+        if: github.event_name != 'merge_group'
         uses: actions/checkout@v5
 
+      - uses: ./.github/actions/github-auth
+        if: github.event_name != 'merge_group'
       - name: Setup Node.js
+        if: github.event_name != 'merge_group'
         uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -353,6 +366,7 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Restore node_modules
+        if: github.event_name != 'merge_group'
         id: nm
         uses: actions/cache/restore@v4
         with:
@@ -360,18 +374,20 @@ jobs:
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
 
       - name: Install dependencies
-        if: steps.nm.outputs.cache-hit != 'true'
+        if: github.event_name != 'merge_group' && steps.nm.outputs.cache-hit != 'true'
         working-directory: web
         timeout-minutes: 5
         run: npm ci
 
       - uses: actions/download-artifact@v4
+        if: github.event_name != 'merge_group'
         with:
           pattern: ui-unit-blob-*
           path: web/.vitest-reports
           merge-multiple: true
 
       - name: Merge shard coverage and check thresholds
+        if: github.event_name != 'merge_group'
         working-directory: web
         run: ./coverage.sh merge
 
