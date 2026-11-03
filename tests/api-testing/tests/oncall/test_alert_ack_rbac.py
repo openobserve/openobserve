@@ -70,7 +70,7 @@ def editor(client: OpenObserveClient, oncall_org: str, oncall: OnCallClient) -> 
 
 @pytest.fixture(scope="module")
 def member(client: OpenObserveClient, oncall_org: str, oncall: OnCallClient) -> tuple[str, OpenObserveClient]:
-    return _non_admin(client, oncall_org, oncall, "user")
+    return _non_admin(client, oncall_org, oncall, "viewer")
 
 
 @pytest.fixture(scope="module")
@@ -131,5 +131,6 @@ def test_an_ack_on_the_page_acks_the_alert(oncall: OnCallClient, admin):
     assert oncall.acknowledge(page["id"]).status_code == 200
 
     acks = wait_until(lambda: _acks(oncall, alert_id), timeout=30, interval=2, msg="the page ack reached the alert")
-    assert acks[0]["ack_source"] == "oncall"
+    # The source records how the person acked (an API call here), not that it was a page.
+    assert acks[0]["ack_source"] == "api"
     assert acks[0]["acked_by"] == oncall._c.email

@@ -60,7 +60,7 @@ use crate::{
     request_body(content = String, description = "prometheus WriteRequest", content_type = "application/x-protobuf"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
-        (status = 400, description = "Not a protobuf body or the payload cannot be ingested", content_type = "application/json", body = ()),
+        (status = 400, description = "Not a protobuf body, the payload cannot be ingested, or part of it was not written", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -80,11 +80,19 @@ pub async fn remote_write(
         .unwrap_or("");
     if content_type == "application/x-protobuf" {
         match metrics::prom::remote_write(&org_id, body, user).await {
-            Ok(_) => StatusCode::OK.into_response(),
+            Ok(outcome) => remote_write_response(outcome),
             Err(e) => MetaHttpResponse::bad_request(e),
         }
     } else {
         MetaHttpResponse::bad_request("Bad Request")
+    }
+}
+
+fn remote_write_response(outcome: metrics::prom::RemoteWriteOutcome) -> Response {
+    let headers = outcome.written.response_headers();
+    match outcome.rejected {
+        None => (StatusCode::OK, headers).into_response(),
+        Some(reason) => (headers, MetaHttpResponse::bad_request(reason)).into_response(),
     }
 }
 
@@ -1960,6 +1968,42 @@ mod tests {
             .unwrap();
         let body = String::from_utf8_lossy(&body);
         assert!(body.contains("public_dashboard"), "{body}");
+    }
+
+    #[tokio::test]
+    async fn a_partial_remote_write_is_a_400_that_still_reports_what_was_written() {
+        let written = metrics::prom::WrittenCounts {
+            samples: 2,
+            histograms: 0,
+            exemplars: 1,
+        };
+        let resp = remote_write_response(written.into());
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers()["x-prometheus-remote-write-samples-written"],
+            "2"
+        );
+
+        let resp = remote_write_response(metrics::prom::RemoteWriteOutcome {
+            written,
+            rejected: Some(
+                "not written (samples: 1, histograms: 0, exemplars: 0): too long".into(),
+            ),
+        });
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            resp.headers()["x-prometheus-remote-write-samples-written"],
+            "2"
+        );
+        assert_eq!(
+            resp.headers()["x-prometheus-remote-write-exemplars-written"],
+            "1"
+        );
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(body.contains("samples: 1"), "{body}");
     }
 
     #[test]

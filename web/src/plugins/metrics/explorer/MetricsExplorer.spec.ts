@@ -34,9 +34,11 @@ const grid = vi.hoisted(() => {
     cards: { value: [] },
     sortedCards: { value: [] },
     pagedCards: { value: [] },
+    filteredCards: { value: [] },
     pageSlice: { value: [] },
     previews: { value: {} },
     hasMore: { value: false },
+    showingMore: { value: false },
     remainingCount: { value: 0 },
     loading: { value: false },
     loadError: { value: "" },
@@ -301,6 +303,60 @@ describe("MetricsExplorer wiring", () => {
 
       expect(grid.removeLabelFilter).toHaveBeenCalled();
       expect(grid.requestPreview).toHaveBeenCalledWith(CARD, { skipCache: true });
+    });
+  });
+
+  describe("the result count and an all-empty page", () => {
+    const many = (n: number, prefix: string) =>
+      Array.from({ length: n }, (_, i) => ({ ...CARD, name: `${prefix}_${i}` }));
+
+    afterEach(() => {
+      grid.cards.value = [];
+      grid.filteredCards.value = [];
+      grid.hasMore.value = false;
+      grid.emptyHiddenCount.value = 0;
+    });
+
+    it("counts every match, not just the cards loaded so far", () => {
+      grid.cards.value = many(3621, "m");
+      grid.filteredCards.value = many(41, "disk");
+      grid.pagedCards.value = many(8, "disk");
+      grid.hasMore.value = true;
+      const wrapper = mountExplorer();
+      expect(wrapper.find('[data-test="metrics-explorer-count"]').text()).toBe(
+        `${(41).toLocaleString()} of ${(3621).toLocaleString()}`,
+      );
+    });
+
+    it("keeps the bare total when everything matches", () => {
+      grid.cards.value = many(12, "m");
+      grid.filteredCards.value = grid.cards.value;
+      const wrapper = mountExplorer();
+      expect(wrapper.find('[data-test="metrics-explorer-count"]').text()).toBe(
+        (12).toLocaleString(),
+      );
+    });
+
+    it("offers Show more instead of a final no-match while candidates remain", () => {
+      grid.cards.value = many(3621, "m");
+      grid.filteredCards.value = many(33, "disk");
+      grid.pagedCards.value = [];
+      grid.hasMore.value = true;
+      grid.emptyHiddenCount.value = 8;
+      const wrapper = mountExplorer();
+      expect(wrapper.find('[data-test="metrics-explorer-no-match-yet"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-no-match"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-show-more"]').exists()).toBe(true);
+    });
+
+    it("shows the final no-match once nothing is left to check", () => {
+      grid.cards.value = many(3621, "m");
+      grid.pagedCards.value = [];
+      grid.hasMore.value = false;
+      const wrapper = mountExplorer();
+      expect(wrapper.find('[data-test="metrics-explorer-no-match"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-no-match-yet"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-show-more"]').exists()).toBe(false);
     });
   });
 
@@ -861,6 +917,34 @@ describe("MetricsExplorer wiring", () => {
       // toolbar would show the zoomed range while every card kept old data.
       // ViewDashboard.onDataZoom calls the same pair.
       expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the grid's page for the zoom's date change, and only for that one", () => {
+      const wrapper = mountExplorer();
+      const vm = wrapper.vm as any;
+      vm.dateTimePickerRef = {
+        setCustomDate: vi.fn(),
+        refresh: () => vm.onDateChange(),
+        getConsumableDateTime: () => ({ startTime: 10, endTime: 20 }),
+      };
+      grid.setTimeRange.mockClear();
+
+      zoomOn(wrapper, {
+        start: new Date("2026-07-16T10:00:00.000Z").getTime(),
+        end: new Date("2026-07-16T10:30:00.000Z").getTime(),
+      });
+      expect(grid.setTimeRange).toHaveBeenCalledTimes(1);
+      expect(grid.setTimeRange).toHaveBeenLastCalledWith(
+        { start_time: 10, end_time: 20 },
+        { keepPage: true },
+      );
+
+      vm.onDateChange();
+      expect(grid.setTimeRange).toHaveBeenCalledTimes(2);
+      expect(grid.setTimeRange).toHaveBeenLastCalledWith(
+        { start_time: 10, end_time: 20 },
+        undefined,
+      );
     });
 
     it("widens a click-without-drag (start === end) into a real window", () => {

@@ -478,10 +478,9 @@ test.describe('On-call covers, swaps and absences', {
     const t0 = nowMicros();
     const beforeA = (await holdersAt(page, a.team.id, t0)).Primary;
     const beforeB = (await holdersAt(page, b.team.id, t0)).Primary;
-    test.skip(
-      beforeA !== beforeB,
-      'this case needs one person on call on both teams; the anchors resolved to two',
-    );
+    expect(beforeA, 'the first team must have somebody on call to mark away').toBeTruthy();
+    expect(beforeB, 'the same roster half a shift past its anchor must put the same person on call on both teams')
+      .toBe(beforeA);
 
     const created = await createAbsence(page, {
       userEmail: beforeA, fromMicros: t0 - HOUR, toMicros: t0 + 2 * HOUR,

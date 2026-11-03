@@ -2137,7 +2137,8 @@ impl PostgresFileList {
         ensure_file_list_partition(&pool, table, &date_key).await?;
 
         DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
-        let ret: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar(
+        // fetch_optional: Ok(None) when ON CONFLICT DO NOTHING skips the insert (row exists)
+        let ret: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar::<_, i64>(
             format!(
                 r#"
 INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened, updated_at)
@@ -2163,7 +2164,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
             .bind(meta.bloom_ver)
             .bind(meta.flattened)
             .bind(now_ts)
-            .fetch_one(&pool).await;
+            .fetch_optional(&pool).await;
         match ret {
             Err(sqlx::Error::Database(e)) => {
                 if e.is_unique_violation() {
