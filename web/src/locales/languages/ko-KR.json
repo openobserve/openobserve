@@ -6026,6 +6026,7 @@
     "resetRUMTokenLabel": "RUM 토큰 초기화",
     "generateRUMTokenLabel": "RUM 토큰 생성",
     "generateRUMTokenMessage": "RUM 토큰을 생성하여 조직에 RUM을 활성화하십시오.",
+    "rumTokenForbiddenMessage": "현재 역할로는 RUM 토큰을 볼 수 없습니다. 관리자에게 RUM 설정 스니펫을 요청하거나, 여기에서 확인하는 데 필요한 역할을 요청하세요.",
     "rumPlatform": "플랫폼",
     "rumPlatformBrowser": "브라우저",
     "rumPlatformReactNative": "React Native",
@@ -6185,7 +6186,7 @@
       },
       "installOneClick": "{client}에 추가",
       "skillsLabel": "{brand} 스킬 추가(선택 사항)",
-      "skillsHint": "{brand}에서 쿼리하고, 알림을 설정하고, 대시보드를 구축하는 방법을 AI 어시스턴트에게 가르쳐 주므로 MCP 도구를 더 효과적으로 활용할 수 있습니다. 프로젝트에서 실행하면 컴퓨터에서 찾은 모든 AI 도구에 설치됩니다.",
+      "skillsHint": "AI 어시스턴트가 {brand}에서 쿼리하고 알림을 설정하고 대시보드를 구축하는 방법을 알려 주어 MCP 도구를 더 효과적으로 활용할 수 있게 합니다. 프로젝트에서 실행하세요. 컴퓨터에서 찾은 모든 AI 도구에 이 도구들을 설치합니다.",
       "skillsRepo": "{host}에서 스킬 보기"
     },
     "manageTokensBtnLabel": "토큰 관리",

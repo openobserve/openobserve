@@ -6026,6 +6026,7 @@
     "resetRUMTokenLabel": "Reset RUM Token",
     "generateRUMTokenLabel": "Generate RUM Token",
     "generateRUMTokenMessage": "Generate RUM Token to enable RUM for your organization.",
+    "rumTokenForbiddenMessage": "Your role cannot view the RUM token. Ask an administrator for the RUM setup snippet, or for the role needed to see it here.",
     "rumPlatform": "Platform",
     "rumPlatformBrowser": "Browser",
     "rumPlatformReactNative": "React Native",
