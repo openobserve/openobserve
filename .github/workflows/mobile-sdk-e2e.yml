@@ -354,7 +354,8 @@ jobs:
       - name: Install Protoc
         run: bash ./.github/protoc.sh
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        # web/package-lock.json needs npm 11, so npm ci fails on Node 20's npm 10.
+        with: { node-version: "24" }
       - name: Build binary + web UI (embedded)
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
@@ -404,7 +405,8 @@ jobs:
       - name: Install Protoc (macOS)
         run: brew install protobuf || true
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        # web/package-lock.json needs npm 11, so npm ci fails on Node 20's npm 10.
+        with: { node-version: "24" }
       - name: Build binary + web UI (embedded)
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
