@@ -6,6 +6,13 @@ ent ActivateRemoteTaskSigningCandidate
 all AddPanel
 oss AddUserToOrg
 all AssumeServiceAccount
+ent AutoObserveCoverage
+ent AutoObserveCoverageHistory
+ent AutoObserveDeleteMark
+ent AutoObserveEntityTypes
+ent AutoObserveListMarks
+ent AutoObservePutMark
+ent AutoObserveSuggestions
 all CancelAlertMute
 ent CancelAnomalyTraining
 all CancelDowntime
