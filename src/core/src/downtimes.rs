@@ -231,14 +231,13 @@ pub async fn create_for_alert(
     insert_new(org, user_id, req, Some(source)).await
 }
 
-/// The org cap's message when one more row would pass it (V-40).
-pub fn cap_reached(org: &str) -> Option<String> {
-    let limit = get_o2_config().downtimes.max_per_org;
-    (db::downtimes::list_cached(org).len() >= limit).then(|| {
-        format!(
-            "This organization already has {limit} downtimes, the most allowed. Delete ended ones first."
-        )
-    })
+/// The org cap's message when one more active or upcoming row would pass it (V-40).
+pub fn cap_reached(org: &str, now: i64) -> Option<String> {
+    cap_message(
+        &db::downtimes::list_cached(org),
+        get_o2_config().downtimes.max_per_org,
+        now,
+    )
 }
 
 /// The stored row, read from the primary like every write.
@@ -267,6 +266,9 @@ pub async fn update(
     let now = now_micros();
     let mut after = edited(&before, req, user_id, now);
     after.notifications = notifications;
+    if takes_room_on_edit(&before, &after, now) {
+        check_room(org, now)?;
+    }
     let plan = remeasure_plan(Some(&before), &after).await?;
     set_if_unchanged(&after, before.updated_at, &plan).await?;
     if !before.same_coverage(&after) {
@@ -405,7 +407,7 @@ pub async fn extend(
     }
     let follow_up = follow_up(&before, window.end, new_end, user_id, now);
     checked_request(org, user_id, request_of(&follow_up), Some(&before), false).await?;
-    check_room(org)?;
+    check_room(org, now)?;
     let plan = remeasure_plan(None, &follow_up).await?;
     if !db::downtimes::set_if_parent_unchanged(
         &follow_up,
@@ -871,8 +873,34 @@ async fn resolve_folder(org: &str, folder_id: &str) -> Result<String, DowntimeEr
     }
 }
 
-fn check_room(org: &str) -> Result<(), DowntimeError> {
-    cap_reached(org).map_or(Ok(()), |m| Err(DowntimeError::BadRequest(m)))
+fn check_room(org: &str, now: i64) -> Result<(), DowntimeError> {
+    cap_reached(org, now).map_or(Ok(()), |m| Err(DowntimeError::BadRequest(m)))
+}
+
+/// Ended and cancelled rows stay stored for their retention but leave room under the cap. [pure]
+fn cap_message(rows: &[Downtime], limit: usize, now: i64) -> Option<String> {
+    let counted = rows
+        .iter()
+        .filter(|row| counts_toward_cap(row, now))
+        .count();
+    (counted >= limit).then(|| {
+        format!(
+            "This organization already has {limit} active or upcoming downtimes, the most allowed."
+        )
+    })
+}
+
+/// Whether `row` takes a place under the per-org cap at `now`. [pure]
+fn counts_toward_cap(row: &Downtime, now: i64) -> bool {
+    matches!(
+        schedule::status(&row.schedule, row.cancelled_at, now),
+        DowntimeStatus::Scheduled | DowntimeStatus::Active
+    )
+}
+
+/// Whether an edit moves a row that left the cap back under it, so it needs room. [pure]
+fn takes_room_on_edit(before: &Downtime, after: &Downtime, now: i64) -> bool {
+    !counts_toward_cap(before, now) && counts_toward_cap(after, now)
 }
 
 /// A new row; `source` is set only for a quick mute from an alert route.
@@ -884,8 +912,8 @@ async fn insert_new(
 ) -> Result<Downtime, DowntimeError> {
     let folder_id = resolve_folder(org, &req.folder_id).await?;
     let req = checked_request(org, user_id, req, None, true).await?;
-    check_room(org)?;
     let now = now_micros();
+    check_room(org, now)?;
     let mut downtime = created(org, folder_id, &req, user_id, now);
     downtime.notifications = with_continues(req.notifications.clone(), None);
     downtime.origin_region = origin_region();
@@ -1725,6 +1753,55 @@ mod tests {
             Err(DowntimeError::Conflict(_))
         ));
         assert!(check_deletable(&d, 13 * HOUR).is_ok());
+    }
+
+    #[test]
+    fn only_active_and_upcoming_rows_count_toward_the_cap() {
+        let now = 11 * HOUR;
+        let cancelled = |start: i64, at: i64| Downtime {
+            cancelled_at: Some(at),
+            ..row(vec![TargetModule::Alerts], start, start + 2 * HOUR)
+        };
+        let scheduled = row(vec![TargetModule::Alerts], 20 * HOUR, 22 * HOUR);
+        let active = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        let ended = row(vec![TargetModule::Alerts], HOUR, 2 * HOUR);
+        let never_ran = cancelled(20 * HOUR, 9 * HOUR);
+        let ended_early = cancelled(10 * HOUR, 10 * HOUR + HOUR / 2);
+        let cases = [
+            (vec![scheduled.clone(), active.clone()], 2, true),
+            (vec![scheduled.clone(), active.clone()], 3, false),
+            (vec![ended, never_ran, ended_early, active], 2, false),
+            (vec![scheduled], 1, true),
+        ];
+        for (rows, limit, full) in cases {
+            assert_eq!(
+                cap_message(&rows, limit, now).is_some(),
+                full,
+                "limit {limit}"
+            );
+        }
+        assert_eq!(
+            cap_message(&[], 0, now).as_deref(),
+            Some("This organization already has 0 active or upcoming downtimes, the most allowed.")
+        );
+    }
+
+    #[test]
+    fn an_edit_needs_room_only_when_it_brings_an_ended_row_back() {
+        let now = 11 * HOUR;
+        let ended = row(vec![TargetModule::Alerts], HOUR, 2 * HOUR);
+        let upcoming = row(vec![TargetModule::Alerts], 20 * HOUR, 22 * HOUR);
+        let active = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        let cases = [
+            (&ended, &upcoming, true),
+            (&ended, &active, true),
+            (&ended, &ended, false),
+            (&upcoming, &active, false),
+            (&active, &ended, false),
+        ];
+        for (i, (before, after, needs)) in cases.into_iter().enumerate() {
+            assert_eq!(takes_room_on_edit(before, after, now), needs, "case {i}");
+        }
     }
 
     #[test]
