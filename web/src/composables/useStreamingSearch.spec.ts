@@ -197,6 +197,28 @@ let onDataSpy: any;
         expect(mockHandlers.data).toHaveBeenCalledTimes(1);
       });
 
+    it("should bypass the result cache for an enrichment table search", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        body: new MockReadableStream() as any,
+      });
+
+      await httpStreaming.fetchQueryDataWithHttpStream(
+        {
+          ...mockData,
+          traceId: "enrichment-trace",
+          pageType: "enrichment_tables",
+        },
+        mockHandlers,
+      );
+      await flushPromises();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${store.state.API_ENDPOINT}/api/test-org/_search_stream?type=enrichment_tables&search_type=ui&use_cache=false`,
+        expect.anything(),
+      );
+    });
+
       it("should throw an error when the stream connection fails", async () => {
         const onErrorSpy = vi.spyOn(httpStreaming, "onError");
       

@@ -2856,7 +2856,9 @@ describe("usePanelDataLoader", () => {
       delete mockZoConfig.timestamp_column;
     });
 
-    const loadPanel = async (fields: {
+    const RealAbortController = globalThis.AbortController;
+
+    const createPanelLoader = (fields: {
       stream: string;
       stream_type: string;
     }) => {
@@ -2880,6 +2882,14 @@ describe("usePanelDataLoader", () => {
         ref(null),
         ref(false),
       );
+      return { loader, selectedTimeObj };
+    };
+
+    const loadPanel = async (fields: {
+      stream: string;
+      stream_type: string;
+    }) => {
+      const { loader, selectedTimeObj } = createPanelLoader(fields);
       await loader.loadData();
       return selectedTimeObj.value;
     };
@@ -2901,6 +2911,36 @@ describe("usePanelDataLoader", () => {
       const { start_time, end_time } = streamPayloads[0].queryReq.query;
       expect(start_time).toBe(tableStartUs - 1_000_000);
       expect(end_time).toBeGreaterThanOrEqual((Date.now() - 60_000) * 1000);
+    });
+
+    it("lets only the newest load search when two wait on the table lookup", async () => {
+      const tableStartUs = Date.UTC(2020, 0, 1) * 1000;
+      const stream = {
+        stats: { doc_time_min: tableStartUs, doc_time_max: tableStartUs },
+      };
+      const releases: ((value: typeof stream) => void)[] = [];
+      mockGetStream.mockImplementation(
+        () => new Promise((resolve) => releases.push(resolve)),
+      );
+      // The shared mock never flips signal.aborted, which is what supersedes a run.
+      globalThis.AbortController = RealAbortController;
+      const { loader } = createPanelLoader({
+        stream: "geo",
+        stream_type: "enrichment_tables",
+      });
+
+      const staleLoad = loader.loadData();
+      await vi.waitFor(() => expect(releases).toHaveLength(1));
+      const newestLoad = loader.loadData();
+      await vi.waitFor(() => expect(releases).toHaveLength(2));
+
+      releases[0](stream);
+      await staleLoad;
+      expect(streamPayloads).toHaveLength(0);
+
+      releases[1](stream);
+      await newestLoad;
+      expect(streamPayloads).toHaveLength(1);
     });
 
     it("keeps the dashboard range for a logs panel", async () => {

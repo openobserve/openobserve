@@ -810,7 +810,7 @@ describe("ImportDashboard.vue", () => {
     expect(wrapper.vm.splitterModel).toBe(60);
     
     // Test stream type options
-    expect(wrapper.vm.streamTypeOptions).toEqual(["logs", "metrics", "traces", "enrichment_tables"]);
+    expect(wrapper.vm.streamTypeOptions).toEqual(["logs", "metrics", "traces"]);
   });
 
   it("should test activeTab state changes affect template rendering", async () => {
