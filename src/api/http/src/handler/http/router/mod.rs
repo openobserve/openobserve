@@ -2606,7 +2606,7 @@ fn fleet_router() -> Router {
         .route_layer(middleware::from_fn(fleet_gate))
 }
 
-/// §17: with `O2_FLEET_ENABLED` off, auth refuses fleet tokens first (401); writes get 503.
+/// With `O2_FLEET_ENABLED` off, auth refuses fleet tokens first (401); writes get 503.
 #[cfg(feature = "enterprise")]
 async fn fleet_gate(request: Request, next: Next) -> Response {
     if openobserve_core::fleet::enabled() || request.method() == Method::GET && !is_opamp(&request)
