@@ -119,7 +119,7 @@ If findings exist:
 
 | | |
 |---|---|
-| **Risk tier** | [trivial \| lite \| full] |
+| **Risk tier** | [trivial \| lite \| full \| test-only \| ci-only] |
 | **Reviewers** | [exactly the agents listed in `<reviewers_ran>`, each with its glyph] |
 
 </details>
@@ -143,7 +143,7 @@ If NO issues across all reviewers:
 
 | | |
 |---|---|
-| **Risk tier** | [trivial \| lite \| full] |
+| **Risk tier** | [trivial \| lite \| full \| test-only \| ci-only] |
 | **Reviewers** | [exactly the agents listed in `<reviewers_ran>`, each with its glyph] |
 
 </details>
