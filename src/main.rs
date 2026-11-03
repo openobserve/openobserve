@@ -144,10 +144,19 @@ async fn run() -> Result<(), anyhow::Error> {
         bytes_to_human_readable(cfg.limit.disk_free as f64),
     );
     log::info!(
-        "Caches info: Disk max size {}, MEM max size {}, Datafusion pool size: {}",
+        "Caches info: Disk max size {}",
         bytes_to_human_readable((cfg.disk_cache.max_size * cfg.disk_cache.bucket_num) as f64),
-        bytes_to_human_readable((cfg.memory_cache.max_size * cfg.memory_cache.bucket_num) as f64),
-        bytes_to_human_readable(cfg.memory_cache.datafusion_max_size as f64),
+    );
+    let memory_budget = config::memory_budget(&cfg, &config::cluster::LOCAL_NODE.role);
+    log::info!(
+        "Memory budget: {}; total {} of MEM total {} (the DataFusion pool is per query)",
+        memory_budget
+            .iter()
+            .map(|(name, size)| format!("{name} {}", bytes_to_human_readable(*size as f64)))
+            .collect::<Vec<_>>()
+            .join(", "),
+        bytes_to_human_readable(memory_budget.iter().map(|(_, size)| size).sum::<usize>() as f64),
+        bytes_to_human_readable(cfg.limit.mem_total as f64),
     );
 
     // install ring as the default crypto provider if TLS is enabled

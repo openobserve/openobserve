@@ -29,11 +29,6 @@ use super::{PartitionedMetrics, labels::LoadedLabelsObserver, with_hash_label};
 // so lock contention stays low on large queriers; clamped to a sane range.
 const MIN_SHARDS: usize = 32;
 const MAX_SHARDS: usize = 256;
-// Auto budget when ZO_METRICS_LABEL_CACHE_MAX_SIZE is 0: 5% of total memory,
-// clamped to [100 MB, 1 GiB] (a typical series costs ~1KB per label set).
-const AUTO_MEM_PERCENT: usize = 5;
-const AUTO_MIN_BYTES: usize = 8 * 1024 * 1024;
-const AUTO_MAX_BYTES: usize = 1024 * 1024 * 1024;
 // Fixed per-entry overhead: key + LRU node bookkeeping + Arc header.
 const ENTRY_OVERHEAD: usize = 96;
 // Fixed per-label overhead: Arc counters + the two String headers + the
@@ -65,15 +60,10 @@ struct Shard {
 
 static LABEL_CACHE: Lazy<LabelCache> = Lazy::new(|| {
     let cfg = config::get_config();
-    let max_bytes = if cfg.limit.metrics_label_cache_max_size > 0 {
-        cfg.limit.metrics_label_cache_max_size * 1024 * 1024
-    } else {
-        (cfg.limit.mem_total * AUTO_MEM_PERCENT / 100).clamp(AUTO_MIN_BYTES, AUTO_MAX_BYTES)
-    };
     let shard_count = (cfg.limit.cpu_num * 4)
         .next_power_of_two()
         .clamp(MIN_SHARDS, MAX_SHARDS);
-    LabelCache::new(max_bytes, shard_count)
+    LabelCache::new(cfg.limit.metrics_label_cache_max_size, shard_count)
 });
 
 /// The series a query still has to recover from a label scan after the cache

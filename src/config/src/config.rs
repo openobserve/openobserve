@@ -2853,7 +2853,7 @@ pub struct Limit {
     #[env_config(name = "ZO_METRICS_RESULT_CACHE_MAX_SIZE", default = 0)]
     pub metrics_result_cache_max_size: usize,
     // Memory budget in MB for the PromQL series label cache. 0 (default)
-    // means auto: 5% of total memory, clamped to [100, 1024] MB.
+    // means auto: 5% of total memory, clamped to [8, 1024] MB.
     #[env_config(name = "ZO_METRICS_LABEL_CACHE_MAX_SIZE", default = 0)]
     pub metrics_label_cache_max_size: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
@@ -4656,7 +4656,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         if local_node_role == [cluster::Role::Compactor] {
             cfg.memory_cache.datafusion_max_size = mem_total / cfg.limit.file_merge_thread_num;
         } else if cfg.common.local_mode {
-            cfg.memory_cache.datafusion_max_size = (mem_total - cfg.memory_cache.max_size) / 2; // 25%
+            cfg.memory_cache.datafusion_max_size = (mem_total - cfg.memory_cache.max_size) / 2; // 37.5%
         } else {
             cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size; // 50%
         }
@@ -4753,6 +4753,12 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.metrics_result_cache_max_size =
             cfg.limit.metrics_result_cache_max_size.max(32) * (SIZE_IN_MB as usize);
     }
+    if cfg.limit.metrics_label_cache_max_size == 0 {
+        cfg.limit.metrics_label_cache_max_size =
+            (cfg.limit.mem_total * 5 / 100).clamp(8 * 1024 * 1024, 1024 * 1024 * 1024);
+    } else {
+        cfg.limit.metrics_label_cache_max_size *= SIZE_IN_MB as usize;
+    }
     cfg.search.metrics_blocks_cache_max_size = metrics_blocks_cache_size_mb(
         cfg.search.metrics_blocks_cache_max_size,
         cfg.limit.mem_total,
@@ -4766,6 +4772,64 @@ fn metrics_blocks_cache_size_mb(configured: usize, mem_total: usize) -> usize {
         1..=9 => 0,
         size => size,
     }
+}
+
+/// Byte caps of the in-memory caches and buffers that can fill on a node with these roles.
+pub fn memory_budget(cfg: &Config, roles: &[cluster::Role]) -> Vec<(&'static str, usize)> {
+    let mut budget = Vec::new();
+    if roles.contains(&cluster::Role::Ingester) || roles.contains(&cluster::Role::All) {
+        budget.push(("ZO_MEM_TABLE_MAX_SIZE", cfg.limit.mem_table_max_size));
+    }
+    if cfg.memory_cache.enabled {
+        budget.push((
+            "ZO_MEMORY_CACHE_MAX_SIZE",
+            cfg.memory_cache.max_size * cfg.memory_cache.bucket_num,
+        ));
+    }
+    budget.extend([
+        (
+            "ZO_MEMORY_CACHE_DATAFUSION_MAX_SIZE",
+            cfg.memory_cache.datafusion_max_size,
+        ),
+        (
+            "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE",
+            cfg.search.inverted_index_footer_cache_max_size,
+        ),
+        (
+            "ZO_BLOOM_FOOTER_CACHE_MAX_SIZE",
+            cfg.search.bloom_footer_cache_max_size,
+        ),
+        (
+            "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_SIZE",
+            cfg.limit.datafusion_file_stat_cache_max_size,
+        ),
+        (
+            "ZO_METRICS_LABEL_CACHE_MAX_SIZE",
+            cfg.limit.metrics_label_cache_max_size,
+        ),
+        (
+            "ZO_METRICS_BLOCKS_CACHE_MAX_SIZE",
+            cfg.search.metrics_blocks_cache_max_size * SIZE_IN_MB as usize,
+        ),
+        (
+            "ZO_METRICS_RESULT_CACHE_MAX_SIZE",
+            cfg.limit.metrics_result_cache_max_size,
+        ),
+    ]);
+    if cfg.search.inverted_index_result_cache_enabled {
+        budget.push((
+            "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
+            cfg.search.inverted_index_result_cache_max_entries
+                * cfg.search.inverted_index_result_cache_max_entry_size,
+        ));
+    }
+    if cfg.common.queue_store == "memory" {
+        budget.push((
+            "ZO_MEMORY_QUEUE_MAX_SIZE_MB",
+            cfg.common.memory_queue_max_size,
+        ));
+    }
+    budget
 }
 
 /// Strip the Windows extended-length prefix (`\\?\`) from a canonicalized path
@@ -6296,6 +6360,77 @@ mod tests {
         cfg.limit.mem_table_bucket_num = 3;
         check_memory_config(&mut cfg).unwrap();
         assert_eq!(cfg.limit.mem_table_bucket_num, 3);
+    }
+
+    #[test]
+    fn test_check_memory_config_resolves_metrics_label_cache_size() {
+        let mut cfg = Config::default();
+        cfg.common.node_role = "all".to_string();
+        cfg.limit.cpu_num = 8;
+        cfg.limit.metrics_label_cache_max_size = 0;
+        check_memory_config(&mut cfg).unwrap();
+        assert_eq!(
+            cfg.limit.metrics_label_cache_max_size,
+            (cfg.limit.mem_total * 5 / 100).clamp(8 * 1024 * 1024, 1024 * 1024 * 1024)
+        );
+
+        let mut cfg = Config::default();
+        cfg.common.node_role = "all".to_string();
+        cfg.limit.cpu_num = 8;
+        cfg.limit.metrics_label_cache_max_size = 300;
+        check_memory_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.metrics_label_cache_max_size, 300 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_memory_budget() {
+        let mb = 1024 * 1024;
+        let mut cfg = Config::default();
+        cfg.limit.mem_table_max_size = 8000 * mb;
+        cfg.memory_cache.enabled = false;
+        cfg.memory_cache.max_size = 500 * mb;
+        cfg.memory_cache.bucket_num = 4;
+        cfg.memory_cache.datafusion_max_size = 6000 * mb;
+        cfg.search.inverted_index_footer_cache_max_size = 50 * mb;
+        cfg.search.bloom_footer_cache_max_size = 10 * mb;
+        cfg.limit.datafusion_file_stat_cache_max_size = 40 * mb;
+        cfg.limit.metrics_label_cache_max_size = 30 * mb;
+        cfg.search.metrics_blocks_cache_max_size = 200;
+        cfg.limit.metrics_result_cache_max_size = 32 * mb;
+        cfg.search.inverted_index_result_cache_enabled = false;
+        cfg.search.inverted_index_result_cache_max_entries = 1000;
+        cfg.search.inverted_index_result_cache_max_entry_size = 1024;
+        cfg.common.queue_store = "nats".to_string();
+        cfg.common.memory_queue_max_size = 64 * mb;
+
+        let always = [
+            ("ZO_MEMORY_CACHE_DATAFUSION_MAX_SIZE", 6000 * mb),
+            ("ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE", 50 * mb),
+            ("ZO_BLOOM_FOOTER_CACHE_MAX_SIZE", 10 * mb),
+            ("ZO_DATAFUSION_FILE_STAT_CACHE_MAX_SIZE", 40 * mb),
+            ("ZO_METRICS_LABEL_CACHE_MAX_SIZE", 30 * mb),
+            ("ZO_METRICS_BLOCKS_CACHE_MAX_SIZE", 200 * mb),
+            ("ZO_METRICS_RESULT_CACHE_MAX_SIZE", 32 * mb),
+        ];
+        assert_eq!(
+            memory_budget(&cfg, &[cluster::Role::Querier]),
+            always.to_vec()
+        );
+
+        // the memtable only grows on nodes that ingest
+        let mut expected = vec![("ZO_MEM_TABLE_MAX_SIZE", 8000 * mb)];
+        expected.extend(always);
+        assert_eq!(memory_budget(&cfg, &[cluster::Role::Ingester]), expected);
+        assert_eq!(memory_budget(&cfg, &[cluster::Role::All]), expected);
+
+        cfg.memory_cache.enabled = true;
+        cfg.search.inverted_index_result_cache_enabled = true;
+        cfg.common.queue_store = "memory".to_string();
+        let mut expected = vec![("ZO_MEMORY_CACHE_MAX_SIZE", 2000 * mb)];
+        expected.extend(always);
+        expected.push(("ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES", 1000 * 1024));
+        expected.push(("ZO_MEMORY_QUEUE_MAX_SIZE_MB", 64 * mb));
+        assert_eq!(memory_budget(&cfg, &[cluster::Role::Querier]), expected);
     }
 
     #[test]
