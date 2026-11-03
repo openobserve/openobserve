@@ -112,6 +112,63 @@ describe("SearchBar — adding a filter term to the query", () => {
     expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("");
   });
 
+  describe("a field whose name ends another field's name", () => {
+    const base = `SELECT * FROM "qa" WHERE db_operation_name = 'SELECT'`;
+
+    beforeEach(() => {
+      wrapper.vm.searchObj.meta.sqlMode = true;
+    });
+
+    it("adds an include and an exclude in SQL mode without touching the longer field", async () => {
+      wrapper.vm.searchObj.data.query = base;
+      expect(await addFilterTerm("operation_name = 'GET /'")).toBe(
+        `${base} AND operation_name = 'GET /'`,
+      );
+
+      wrapper.vm.searchObj.data.query = base;
+      expect(await addFilterTerm("operation_name != 'GET /'")).toBe(
+        `${base} AND operation_name != 'GET /'`,
+      );
+    });
+
+    it("adds a multi-value group in SQL mode without touching the longer field's group", async () => {
+      const group = "(db_operation_name = 'SELECT' OR db_operation_name = 'INSERT')";
+      const added = "(operation_name = 'GET /' OR operation_name = 'POST /')";
+      wrapper.vm.searchObj.data.query = `SELECT * FROM "qa" WHERE ${group}`;
+
+      expect(await addFilterTerm(added)).toBe(`SELECT * FROM "qa" WHERE ${group} AND ${added}`);
+    });
+
+    it("still replaces the exact field's condition, plain or stream-qualified", async () => {
+      wrapper.vm.searchObj.data.query = `${base} AND operation_name = 'POST /'`;
+      expect(await addFilterTerm("operation_name = 'GET /'")).toBe(
+        `${base} AND operation_name = 'GET /'`,
+      );
+
+      wrapper.vm.searchObj.data.query = `${base} AND "qa".operation_name = 'POST /'`;
+      expect(await addFilterTerm(`"qa".operation_name = 'GET /'`)).toBe(
+        `${base} AND "qa".operation_name = 'GET /'`,
+      );
+    });
+
+    it("still replaces a quoted exact field and leaves a quoted longer field alone", async () => {
+      wrapper.vm.searchObj.data.query = `${base} AND "db_operation_name" != 'INSERT' AND "operation_name" = 'POST /' AND operation_name = 'PUT /'`;
+
+      expect(await addFilterTerm("operation_name = 'GET /'")).toBe(
+        `${base} AND "db_operation_name" != 'INSERT' AND operation_name = 'GET /' AND operation_name = 'GET /'`,
+      );
+    });
+
+    it("keeps the longer field in non-SQL mode", async () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.query = "db_operation_name = 'SELECT'";
+
+      expect(await addFilterTerm("operation_name = 'GET /'")).toBe(
+        "db_operation_name = 'SELECT' and operation_name = 'GET /'",
+      );
+    });
+  });
+
   describe("free text (item 1 AC6.9)", () => {
     const stream = (name: string, fts: boolean) => ({
       name,
