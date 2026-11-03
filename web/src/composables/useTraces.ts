@@ -43,6 +43,18 @@ import {
   TRACES_LIST_URL_KEYS,
 } from "@/plugins/traces/tracesUrlState";
 import type { TracesScope } from "@/utils/traces/tracesScope";
+import {
+  DEFAULT_GROUPS_SORT,
+  type GroupsSort,
+  type GroupsQueryInput,
+} from "@/utils/traces/tracesGroups";
+
+/** What the last Run handed the Groups table; null while the span list is shown. */
+export interface TracesGroupsRequest extends GroupsQueryInput {
+  startTime: number;
+  endTime: number;
+  runId: number;
+}
 
 // Mirrors the backend's is_internal_stream(); other `_`-prefixed streams are user data.
 const INTERNAL_LOG_STREAMS = new Set([
@@ -139,6 +151,8 @@ const defaultObject = {
     showTraceDetails: false,
     sqlMode: false,
     scope: "all" as TracesScope,
+    groupBy: "",
+    groupsSort: { ...DEFAULT_GROUPS_SORT } as GroupsSort,
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
@@ -226,6 +240,7 @@ const defaultObject = {
     queryPayload: <any>{},
     transforms: <any>[],
     queryResults: <any>[],
+    groupsRequest: null as TracesGroupsRequest | null,
     sortedQueryResults: <any>[],
     streamResults: <any>[],
     histogram: <any>{},
@@ -327,6 +342,9 @@ const useTraces = () => {
     searchObj.data.editorValue = "";
     searchObj.meta.sqlMode = false;
     searchObj.meta.scope = "all";
+    searchObj.meta.groupBy = "";
+    searchObj.meta.groupsSort = { ...DEFAULT_GROUPS_SORT };
+    searchObj.data.groupsRequest = null;
     searchObj.meta.lastRunSignature = null;
     searchObj.meta.refreshFailedAt = null;
     searchObj.meta.chartRefreshFailed = false;
@@ -426,6 +444,8 @@ const useTraces = () => {
       currentPage: searchObj.data.resultGrid.currentPage,
       showHistogram: searchObj.meta.showHistogram,
       scope: mode === "spans" ? searchObj.meta.scope : "all",
+      groupBy: mode === "spans" && !searchObj.meta.sqlMode ? searchObj.meta.groupBy : "",
+      groupsSort: searchObj.meta.groupsSort,
     });
   }
 
@@ -435,6 +455,8 @@ const useTraces = () => {
     if (decoded.rowsPerPage !== null) searchObj.meta.resultGrid.rowsPerPage = decoded.rowsPerPage;
     if (decoded.showHistogram !== null) searchObj.meta.showHistogram = decoded.showHistogram;
     searchObj.meta.scope = decoded.scope ?? "all";
+    searchObj.meta.groupBy = decoded.groupBy ?? "";
+    searchObj.meta.groupsSort = decoded.groupsSort ?? { ...DEFAULT_GROUPS_SORT };
     urlColumns = decoded.columns
       ? {
           mode: searchObj.meta.searchMode,
@@ -482,6 +504,8 @@ const useTraces = () => {
         searchObj.meta.showHistogram,
         searchObj.meta.searchMode,
         searchObj.meta.scope,
+        searchObj.meta.groupBy,
+        searchObj.meta.groupsSort,
         searchObj.data.stream.selectedFields.join("\u0000"),
       ],
       write,

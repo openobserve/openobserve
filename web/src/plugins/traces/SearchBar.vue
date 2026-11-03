@@ -819,6 +819,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :has-parent-column="!!searchObj.data.stream.hasParentColumn"
         @update:model-value="(scope) => emit('update:scope', scope)"
       />
+      <TracesGroupBySelect
+        :model-value="searchObj.meta.groupBy"
+        :sql-mode="!!searchObj.meta.sqlMode"
+        :fields="groupByFields"
+        @update:model-value="(field) => emit('update:groupBy', field)"
+      />
     </div>
     <RecentSearchesDrawer
       ref="recentDrawerRef"
@@ -907,6 +913,7 @@ import useTraces from "@/composables/useTraces";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import TracesScopeSelect from "./components/TracesScopeSelect.vue";
+import TracesGroupBySelect from "./components/TracesGroupBySelect.vue";
 import SavedViewsMenu from "@/components/savedViews/SavedViewsMenu.vue";
 import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useFavoriteSavedViews } from "@/composables/useFavoriteSavedViews";
@@ -991,6 +998,7 @@ export default defineComponent({
     SqlFilterBuilder,
     SyntaxGuide,
     TracesScopeSelect,
+    TracesGroupBySelect,
     RecentSearchesButton,
     RecentSearchesDrawer,
     RecentSearchesFocusDropdown,
@@ -1003,6 +1011,7 @@ export default defineComponent({
     "cancel-query",
     "update:searchMode",
     "update:scope",
+    "update:groupBy",
     "error-only-toggled",
     "filters-reset",
     "onChangeTimezone",
@@ -1601,6 +1610,8 @@ export default defineComponent({
       appliedSavedView.value = null;
       searchObj.meta.sqlMode = false;
       searchObj.meta.scope = "all";
+      searchObj.meta.groupBy = "";
+      searchObj.data.groupsRequest = null;
       searchObj.data.editorValue = "";
       searchObj.data.advanceFiltersQuery = "";
       Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
@@ -1670,6 +1681,26 @@ export default defineComponent({
     };
 
     const _traceStreamFields = computed(() => searchObj.data.stream.selectedStreamFields ?? []);
+
+    // Field grouping adds header rows (label: true) between the fields; they name no column.
+    const groupByFields = computed(() => [
+      ...new Set(
+        _traceStreamFields.value
+          .filter((field: any) => !field.label && field.name)
+          .map((field: any) => String(field.name)),
+      ),
+    ]);
+
+    // Group by is chip mode only, so however SQL mode turns on, the Groups view ends.
+    watch(
+      () => searchObj.meta.sqlMode,
+      (on) => {
+        if (!on) return;
+        searchObj.meta.groupBy = "";
+        searchObj.data.groupsRequest = null;
+      },
+      { flush: "sync" },
+    );
     const _traceFieldValues = computed(() => props.fieldValues ?? {});
     const _traceSqlMode = computed(() => !!searchObj.meta.sqlMode);
     // The typewriter keeps typing while hidden, so "Select a stream first" must not start before the stream list could pick one.
@@ -1742,6 +1773,7 @@ export default defineComponent({
         version: 2,
         sqlMode: !!searchObj.meta.sqlMode,
         scope: isTracesScope(searchObj.meta.scope) ? searchObj.meta.scope : "all",
+        groupBy: searchObj.meta.groupBy ?? "",
         stream: { label: stream.selectedStream.label, value: stream.selectedStream.value },
         editorValue: searchObj.data.editorValue,
         datetime: {
@@ -1972,6 +2004,7 @@ export default defineComponent({
       t,
       router,
       store,
+      groupByFields,
       searchObj,
       queryEditorRef,
       nlpMode,

@@ -183,6 +183,7 @@ const makeSearchObj = () =>
       showTraceDetails: false,
       sqlMode: false,
       scope: "all" as "all" | "root" | "entrypoint",
+      groupBy: "",
       searchMode: "traces" as "traces" | "spans" | "service-graph" | "services-catalog",
       queryEditorPlaceholderFlag: true,
       metricsRangeFilters: new Map<string, { panelTitle: string; start: number; end: number }>(),
@@ -1313,6 +1314,17 @@ describe("SearchBar", () => {
       await wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]').trigger("click");
 
       expect(searchObjInstance.meta.metricsRangeFilters.size).toBe(0);
+    });
+
+    it("returns Group by to None", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      searchObjInstance.meta.groupBy = "service_name";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]').trigger("click");
+
+      expect(searchObjInstance.meta.groupBy).toBe("");
     });
 
     it("returns the scope to All spans", async () => {
@@ -2506,6 +2518,7 @@ describe("SearchBar", () => {
       version: 2,
       sqlMode: false,
       scope: "all",
+      groupBy: "",
       stream: { label: "default", value: "default" },
       editorValue: "span_status = 'ERROR'",
       datetime: { type: "relative", relativeTimePeriod: "1h", startTime: 10, endTime: 20 },
@@ -2634,6 +2647,20 @@ describe("SearchBar", () => {
         view_name: "checkout errors",
         view_type: "traces",
         data: expectedData(),
+      });
+    });
+
+    it("saves the Spans view's Group by with the view", async () => {
+      searchObjInstance.meta.groupBy = "service_name";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      (wrapper.vm as any).newViewName = "grouped view";
+      await (wrapper.vm as any).saveAsNewView();
+
+      expect(mockSavedViewsPost.mock.calls[0][1].data).toEqual({
+        ...expectedData(),
+        groupBy: "service_name",
       });
     });
 
@@ -3407,6 +3434,30 @@ describe("SearchBar", () => {
       searchObjInstance.meta.sqlMode = false;
     });
 
+    it("holds the Group by select after Scope, listing the stream's fields", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const groupBy = wrapper.findComponent({ name: "TracesGroupBySelect" });
+      expect(groupBy.props()).toMatchObject({
+        modelValue: "",
+        sqlMode: false,
+        fields: ["timestamp", "trace_id", "span_id", "service_name"],
+      });
+      const position = select().element.compareDocumentPosition(groupBy.element);
+      expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("asks the page to apply a picked Group by", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      wrapper
+        .findComponent({ name: "TracesGroupBySelect" })
+        .vm.$emit("update:modelValue", "service_name");
+      expect(wrapper.emitted("update:groupBy")).toEqual([["service_name"]]);
+    });
+
     it("asks the page to apply a picked scope", async () => {
       searchObjInstance.meta.searchMode = "spans";
       wrapper = mountSearchBar();
@@ -3528,6 +3579,38 @@ describe("SearchBar", () => {
       await (wrapper.vm as any).setSqlMode(true);
       expect(searchObjInstance.meta.sqlMode).toBe(true);
       expect(searchObjInstance.data.editorValue).toBe("");
+    });
+
+    it("sets Group by back to None when SQL mode turns on", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      searchObjInstance.meta.groupBy = "service_name";
+      searchObjInstance.data.editorValue = "service_name = 'api'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await (wrapper.vm as any).setSqlMode(true);
+      expect(searchObjInstance.meta.groupBy).toBe("");
+    });
+
+    it("drops the shown Groups table when SQL mode turns on, so turning it off shows no stale table", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      searchObjInstance.meta.groupBy = "service_name";
+      searchObjInstance.data.groupsRequest = { key: "service_name" } as any;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await (wrapper.vm as any).setSqlMode(true);
+      await (wrapper.vm as any).setSqlMode(false);
+      expect(searchObjInstance.data.groupsRequest).toBeNull();
+    });
+
+    it("Reset Filters drops the shown Groups table with Group by", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      searchObjInstance.meta.groupBy = "service_name";
+      searchObjInstance.data.groupsRequest = { key: "service_name" } as any;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      (wrapper.vm as any).resetFilters();
+      expect(searchObjInstance.meta.groupBy).toBe("");
+      expect(searchObjInstance.data.groupsRequest).toBeNull();
     });
 
     describe("with a scope", () => {

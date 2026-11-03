@@ -25,6 +25,8 @@ const defaults = () => ({
   currentPage: 0,
   showHistogram: true,
   scope: "all" as const,
+  groupBy: "",
+  groupsSort: { by: "errors" as const, order: "desc" as const },
 });
 
 describe("encodeTracesListState", () => {
@@ -50,6 +52,26 @@ describe("encodeTracesListState", () => {
     expect(encodeTracesListState({ ...defaults(), scope: "all" })).toEqual({});
   });
 
+  it("writes the Groups view, its key and a non-default sort", () => {
+    expect(encodeTracesListState({ ...defaults(), groupBy: "service_name" })).toEqual({
+      view: "groups",
+      group_by: "service_name",
+    });
+    expect(
+      encodeTracesListState({
+        ...defaults(),
+        groupBy: "service_name",
+        groupsSort: { by: "p95", order: "asc" },
+      }),
+    ).toEqual({ view: "groups", group_by: "service_name", group_sort: "p95:asc" });
+  });
+
+  it("writes no Groups sort while no key is grouped", () => {
+    expect(
+      encodeTracesListState({ ...defaults(), groupsSort: { by: "p95", order: "asc" } }),
+    ).toEqual({});
+  });
+
   it("treats a reordered column list as a change", () => {
     const query = encodeTracesListState({
       ...defaults(),
@@ -68,6 +90,8 @@ describe("decodeTracesListState", () => {
       currentPage: 4,
       showHistogram: false,
       scope: "entrypoint" as const,
+      groupBy: "http.method",
+      groupsSort: { by: "error_pct" as const, order: "asc" as const },
     };
     const query = encodeTracesListState(state);
     // Router query values arrive as strings.
@@ -78,6 +102,8 @@ describe("decodeTracesListState", () => {
       currentPage: 4,
       showHistogram: false,
       scope: "entrypoint",
+      groupBy: "http.method",
+      groupsSort: { by: "error_pct", order: "asc" },
     });
   });
 
@@ -89,7 +115,22 @@ describe("decodeTracesListState", () => {
       currentPage: null,
       showHistogram: null,
       scope: null,
+      groupBy: null,
+      groupsSort: null,
     });
+  });
+
+  it("reads group_by only from a Groups view link", () => {
+    expect(decodeTracesListState({ group_by: "service_name" }).groupBy).toBeNull();
+    expect(decodeTracesListState({ view: "groups", group_by: "" }).groupBy).toBeNull();
+  });
+
+  it("reads group_sort only from a Groups view link, so a later Group by starts on Errors", () => {
+    expect(decodeTracesListState({ tab: "spans", group_sort: "p95:asc" }).groupsSort).toBeNull();
+    expect(
+      decodeTracesListState({ view: "groups", group_by: "service_name", group_sort: "p95:asc" })
+        .groupsSort,
+    ).toEqual({ by: "p95", order: "asc" });
   });
 
   it("reads a link without scope as All spans", () => {
@@ -108,6 +149,9 @@ describe("decodeTracesListState", () => {
         columns: "not-base64!",
         show_histogram: "x",
         scope: "children",
+        view: "groups",
+        group_by: "service_name",
+        group_sort: "duration:asc",
       }),
     ).toEqual({
       columns: null,
@@ -115,6 +159,8 @@ describe("decodeTracesListState", () => {
       currentPage: null,
       showHistogram: null,
       scope: null,
+      groupBy: "service_name",
+      groupsSort: null,
     });
   });
 });

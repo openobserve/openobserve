@@ -4059,4 +4059,53 @@ export class TracesPage {
   getListHeaderCell(columnId) {
     return this.page.locator(`${this.searchResultList} [data-test="o2-table-th-${columnId}"]`);
   }
+
+  // ===== GROUP BY AND GROUPS TABLE =====
+
+  getGroupBySelect() {
+    return this.page.locator('[data-test="traces-group-by-select-trigger"]');
+  }
+
+  getGroupByValue() {
+    return this.page.locator('[data-test="traces-group-by-select-value"]');
+  }
+
+  // field: a stream field name, or null for None
+  async pickGroupBy(field) {
+    await this.getGroupBySelect().click();
+    if (field === null) {
+      await this.page.locator('[data-test="traces-group-by-select-option"]').first().click();
+      return;
+    }
+    await this.page.locator('[data-test="traces-group-by-select-search"]').fill(field);
+    await this.page
+      .locator(`[data-test="traces-group-by-select-option"][data-test-value="${field}"]`)
+      .click();
+  }
+
+  getGroupsTable() {
+    return this.page.locator('[data-test="traces-groups"]');
+  }
+
+  getGroupsValues() {
+    return this.page.locator('[data-test="traces-groups"] [data-test="traces-groups-value"]');
+  }
+
+  getGroupsRowByValue(value) {
+    return this.page
+      .locator('[data-test="traces-groups"] tr[data-test^="o2-table-row-"]')
+      .filter({ has: this.page.locator('[data-test="traces-groups-value"]', { hasText: value }) })
+      .first();
+  }
+
+  async openGroupsRowMenu(value) {
+    await this.getGroupsRowByValue(value)
+      .locator('td[data-test="o2-table-cell-spans"]')
+      .click({ button: 'right' });
+  }
+
+  getGroupsMenuItem(item) {
+    // item: include-term | exclude-term | open-traces
+    return this.page.locator(`[data-test="traces-groups-context-${item}"]`);
+  }
 }

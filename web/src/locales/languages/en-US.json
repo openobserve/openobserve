@@ -17138,6 +17138,25 @@
     "searchTypeOthers": "Others"
   },
   "traces": {
+    "groups": {
+      "label": "Group by",
+      "none": "None",
+      "sqlModeDisabled": "Write GROUP BY in SQL mode",
+      "spans": "Spans",
+      "errors": "Errors",
+      "errorPct": "Error %",
+      "p50": "p50",
+      "p95": "p95",
+      "p95Tooltip": "Approximate",
+      "p99": "p99",
+      "rate": "Rate",
+      "rateTooltip": "Spans over the selected time range",
+      "noValue": "(no value)",
+      "showingOf": "Showing {shown} of ~{total} values",
+      "openTraces": "Open traces",
+      "empty": "No spans match this filter in the selected time range",
+      "loadFailed": "Could not load the groups"
+    },
     "nlNeedsSql": "This question needs SQL; open it in Logs",
     "scope": {
       "label": "Scope",

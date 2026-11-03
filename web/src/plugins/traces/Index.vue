@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
               @update:scope="onScopeChange"
+              @update:groupBy="onGroupByChange"
               @apply-saved-view="onApplySavedView"
               @recent-restore="onRecentRestore"
               @service-graph-refresh="serviceGraphRef?.refresh()"
@@ -465,6 +466,7 @@ interface TracesSavedView {
   version?: number;
   sqlMode?: boolean;
   scope?: TracesScope;
+  groupBy?: string;
   stream: { label: string; value: string };
   editorValue: string;
   datetime: { type: string; relativeTimePeriod: string; startTime: number; endTime: number };
@@ -655,6 +657,8 @@ let submittedFilter = "";
 let submittedSql = "";
 // The Spans view scope condition page 1 ran with, so paging and the count keep it.
 let submittedScope = "";
+// Bumped per grouped run, so a Run with unchanged inputs still reloads the Groups table.
+let groupsRunId = 0;
 // The last Run's Traces view SQL that cannot pick traces, with the fix to offer.
 const traceSqlProblem = ref<{
   sql: string;
@@ -1212,6 +1216,23 @@ async function getQueryData(
       currentSearchTraceId = null;
     }
 
+    if (!isPagination) searchObj.data.groupsRequest = null;
+    if (!isPagination && isGroupsRun()) {
+      searchObj.data.groupsRequest = {
+        stream: selectedStreamName.value,
+        key: searchObj.meta.groupBy,
+        filter: combinedFilter,
+        scope: submittedScope,
+        startTime: queryReq.query.start_time,
+        endTime: queryReq.query.end_time,
+        runId: ++groupsRunId,
+      };
+      searchObj.loading = false;
+      // The Groups table loads its own rows; the count chips above it still come from the count.
+      refreshResultCount();
+      return;
+    }
+
     // Generate a unique ID for this search request
     const searchTraceId = getUUID().replace(/-/g, "");
     currentSearchTraceId = searchTraceId;
@@ -1480,6 +1501,12 @@ async function getQueryData(
     searchObj.data.errorDetail = "";
     if (boundTraceId) noteTracesPageLoad(boundTraceId, "error");
   }
+}
+
+function isGroupsRun() {
+  return (
+    searchObj.meta.searchMode === "spans" && !searchObj.meta.sqlMode && !!searchObj.meta.groupBy
+  );
 }
 
 function resetTraceRowSelection() {
@@ -2233,6 +2260,14 @@ const onScopeChange = (scope: TracesScope) => {
   getQueryData();
 };
 
+// Like the scope, a new Group by runs at once; None returns to the span list.
+const onGroupByChange = (field: string) => {
+  searchObj.meta.groupBy = field;
+  pendingUrlPage = null;
+  searchObj.data.resultGrid.currentPage = 0;
+  getQueryData();
+};
+
 watch(
   () => [router.currentRoute.value.name, router.currentRoute.value.query.tab] as const,
   ([routeName, tab]) => {
@@ -2745,6 +2780,7 @@ const onApplySavedView = async (view: TracesSavedView) => {
       ...view,
       sqlMode: v2 && view.sqlMode === true,
       scope: v2 && isTracesScope(view.scope) ? view.scope : "all",
+      groupBy: v2 && typeof view.groupBy === "string" ? view.groupBy : "",
     },
     true,
   );
@@ -2780,6 +2816,11 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
   searchObj.meta.sqlMode = view.sqlMode ?? isAuthoredStatement(view.editorValue ?? "");
   // A recent search records no scope, so it keeps the current one.
   if (view.scope) searchObj.meta.scope = view.scope;
+  if (view.groupBy !== undefined) {
+    searchObj.meta.groupBy = view.groupBy;
+    // A load without a run must not leave a table for another grouping on screen.
+    if (searchObj.data.groupsRequest?.key !== view.groupBy) searchObj.data.groupsRequest = null;
+  }
   searchObj.data.editorValue = view.editorValue;
   searchBarRef.value?.setEditorValue?.(view.editorValue);
   searchObj.meta.resultGrid.sortBy = view.sortBy;
@@ -2824,6 +2865,8 @@ const onRecentRestore = (entry: QueryHistoryEntry, when: RestoreTime, run: boole
         endTime: window?.type === "absolute" ? window.endUs : current.endTime,
       },
       searchMode: restore.searchMode === "spans" ? "spans" : "traces",
+      // A recent search is recorded only from a span or trace list run, so it restores the list.
+      groupBy: "",
       sortBy: searchObj.meta.resultGrid.sortBy,
       sortOrder: searchObj.meta.resultGrid.sortOrder,
       selectedFields: [...(searchObj.data.stream.selectedFields ?? [])],
