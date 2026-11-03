@@ -29,7 +29,11 @@ use axum::{http, response::Response as HttpResponse};
 use bytes::Bytes;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
-    meta::{otlp::OtlpRequestType, self_reporting::usage::UsageType, stream::StreamType},
+    meta::{
+        otlp::OtlpRequestType,
+        self_reporting::usage::UsageType,
+        stream::{StreamParams, StreamType},
+    },
     metrics,
     utils::{
         json,
@@ -60,8 +64,8 @@ use crate::{
         stream::SchemaRecords,
     },
     ingestion::{
-        check_ingestion_allowed, get_stream_partition_keys, get_thread_id, get_write_partition_key,
-        refactor_map, write_file,
+        check_ingestion_allowed, get_stream_partition_keys, get_thread_id,
+        get_uds_and_original_data_streams, get_write_partition_key, refactor_map, write_file,
     },
 };
 
@@ -342,6 +346,25 @@ pub async fn handle_otlp_request(
     #[cfg(feature = "vectorscan")]
     apply_redaction(org_id, &stream_name, &mut all_records).await;
 
+    let mut user_defined_schema_map = HashMap::with_capacity(1);
+    get_uds_and_original_data_streams(
+        &[StreamParams::new(
+            org_id,
+            &stream_name,
+            StreamType::Profiles,
+        )],
+        &mut user_defined_schema_map,
+        &mut HashMap::new(),
+        &mut HashMap::new(),
+    )
+    .await;
+    if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
+        all_records = all_records
+            .into_iter()
+            .map(|record| refactor_map(record, fields))
+            .collect();
+    }
+
     if !all_records.is_empty() {
         buffer_records(
             org_id,
@@ -392,11 +415,11 @@ pub async fn handle_otlp_request(
     Ok(export_service_response(partial_success))
 }
 
-/// Pack the batch into the UDS, check the stream schema, then partition rows.
+/// Flatten the batch, run one schema check for the stream, then partition rows.
 async fn buffer_records(
     org_id: &str,
     stream_name: &str,
-    mut records: Vec<json::Map<String, json::Value>>,
+    records: Vec<json::Map<String, json::Value>>,
     partition_keys: &Vec<config::meta::stream::StreamPartition>,
     partition_time_level: config::meta::stream::PartitionTimeLevel,
     write_buf: &mut HashMap<String, SchemaRecords>,
@@ -435,26 +458,17 @@ async fn buffer_records(
         stream_schema_map.insert(stream_name.to_string(), SchemaCache::new(schema));
     }
 
-    let packed = apply_user_defined_schema(&stream_schema_map[stream_name], &mut records);
-    check_profiles_schema(
+    let record_refs: Vec<&json::Map<String, json::Value>> = records.iter().collect();
+    let (_schema_evolution, _infer_schema) = check_for_schema(
         org_id,
         stream_name,
+        StreamType::Profiles,
         stream_schema_map,
-        &records,
+        record_refs,
         min_timestamp,
+        false,
     )
     .await?;
-    // a check that turns the UDS on projects the schema, which would drop the unpacked columns
-    if !packed && apply_user_defined_schema(&stream_schema_map[stream_name], &mut records) {
-        check_profiles_schema(
-            org_id,
-            stream_name,
-            stream_schema_map,
-            &records,
-            min_timestamp,
-        )
-        .await?;
-    }
 
     let schema = stream_schema_map
         .get(stream_name)
@@ -508,45 +522,6 @@ fn new_stream_schema(
         schema.fields().len(),
     )?;
     Ok(schema)
-}
-
-/// Packs columns outside the stream's user-defined schema into `_all`; false when it has none.
-fn apply_user_defined_schema(
-    schema: &SchemaCache,
-    records: &mut [json::Map<String, json::Value>],
-) -> bool {
-    let Some(settings) = infra::schema::unwrap_stream_settings(schema.schema()) else {
-        return false;
-    };
-    if settings.defined_schema_fields.is_empty() {
-        return false;
-    }
-    let mut fields: HashSet<String> = settings.defined_schema_fields.into_iter().collect();
-    fields.insert(TIMESTAMP_COL_NAME.to_string());
-    for record in records.iter_mut() {
-        *record = refactor_map(std::mem::take(record), &fields);
-    }
-    true
-}
-
-async fn check_profiles_schema(
-    org_id: &str,
-    stream_name: &str,
-    stream_schema_map: &mut HashMap<String, SchemaCache>,
-    records: &[json::Map<String, json::Value>],
-    min_timestamp: i64,
-) -> Result<(), anyhow::Error> {
-    check_for_schema(
-        org_id,
-        stream_name,
-        StreamType::Profiles,
-        stream_schema_map,
-        records.iter().collect(),
-        min_timestamp,
-        false,
-    )
-    .await?;
-    Ok(())
 }
 
 /// Redacts flattened profile records before they are buffered for the WAL.
@@ -2833,43 +2808,5 @@ mod tests {
                 .unwrap()
                 .contains("rejected")
         );
-    }
-
-    #[test]
-    fn apply_user_defined_schema_packs_only_on_a_uds_schema() {
-        let record = || {
-            let json::Value::Object(record) = json::json!({
-                "_timestamp": 1,
-                "stack": "a;b",
-                "k8s_node_name": "node-1",
-            }) else {
-                unreachable!()
-            };
-            record
-        };
-        let settings = config::meta::stream::StreamSettings {
-            defined_schema_fields: vec!["stack".to_string()],
-            ..Default::default()
-        };
-        let uds = SchemaCache::new(arrow_schema::Schema::empty().with_metadata(
-            std::collections::HashMap::from([(
-                "settings".to_string(),
-                json::to_string(&settings).unwrap(),
-            )]),
-        ));
-
-        let mut plain = vec![record()];
-        assert!(!apply_user_defined_schema(
-            &SchemaCache::new(arrow_schema::Schema::empty()),
-            &mut plain
-        ));
-        assert!(plain[0].contains_key("k8s_node_name"));
-
-        let mut packed = vec![record()];
-        assert!(apply_user_defined_schema(&uds, &mut packed));
-        assert!(packed[0].contains_key("stack") && packed[0].contains_key("_timestamp"));
-        assert!(!packed[0].contains_key("k8s_node_name"));
-        let all = packed[0][&get_config().common.column_all].as_str().unwrap();
-        assert!(all.contains("node-1"));
     }
 }

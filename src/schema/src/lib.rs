@@ -289,19 +289,32 @@ async fn persist_stream_settings(
     mut settings: StreamSettings,
 ) -> std::result::Result<SavedStreamSettings, StreamSettingsError> {
     let cfg = get_config();
+    let schema_fields = schema
+        .fields()
+        .iter()
+        .map(|field| field.name())
+        .collect::<HashSet<_>>();
     let previous_settings = unwrap_stream_settings(schema);
 
     normalize_stream_settings(&mut settings);
 
     if !settings.defined_schema_fields.is_empty() {
-        settings.defined_schema_fields = saved_defined_schema_fields(
+        let fields = check_schema_for_defined_schema_fields(
             stream_type,
             schema,
             std::mem::take(&mut settings.defined_schema_fields),
         );
+        let mut fields = fields.into_iter().collect::<Vec<_>>();
+        fields.sort_unstable();
+        fields.retain(|field| schema_fields.contains(field));
+        settings.defined_schema_fields = fields;
     }
 
-    let uds_user_fields = uds_user_field_count(stream_type, &settings.defined_schema_fields);
+    let uds_user_fields = settings
+        .defined_schema_fields
+        .iter()
+        .filter(|field| !is_uds_internal_column(field))
+        .count();
     if uds_user_fields > cfg.limit.user_defined_schema_max_fields {
         return Err(StreamSettingsError::BadRequest(format!(
             "user defined schema fields count exceeds the limit: {}",
@@ -436,37 +449,6 @@ async fn persist_stream_settings(
         settings,
         previous_settings,
     })
-}
-
-fn saved_defined_schema_fields(
-    stream_type: StreamType,
-    schema: &Schema,
-    fields: Vec<String>,
-) -> Vec<String> {
-    let mut fields = check_schema_for_defined_schema_fields(stream_type, schema, fields)
-        .into_iter()
-        .collect::<Vec<_>>();
-    fields.sort_unstable();
-    // ingest keeps only the saved list, and a profiles query column may arrive later
-    fields.retain(|field| {
-        schema.field_with_name(field).is_ok() || is_profiles_required_column(stream_type, field)
-    });
-    fields
-}
-
-// profiles query columns are saved before they arrive, so they take no slot of the user limit
-fn uds_user_field_count(stream_type: StreamType, fields: &[String]) -> usize {
-    fields
-        .iter()
-        .filter(|field| {
-            !is_uds_internal_column(field) && !is_profiles_required_column(stream_type, field)
-        })
-        .count()
-}
-
-fn is_profiles_required_column(stream_type: StreamType, field: &str) -> bool {
-    matches!(stream_type, StreamType::Profiles)
-        && config::meta::profiles::uds_required_columns().any(|name| name == field)
 }
 
 /// Make stream settings internally consistent before validation and persistence.
@@ -987,7 +969,18 @@ pub fn check_schema_for_defined_schema_fields(
             }
         }
         StreamType::Profiles => {
-            fields.extend(config::meta::profiles::uds_required_columns().map(str::to_string));
+            fields.insert("stack".to_string());
+            fields.insert("value".to_string());
+            fields.insert("profile_type".to_string());
+            fields.insert("profile_unit".to_string());
+            fields.insert("service_name".to_string());
+            fields.insert("otel_scope_name".to_string());
+            fields.insert("service_instance_id".to_string());
+            fields.insert("host_name".to_string());
+            fields.insert("process_pid".to_string());
+            fields.insert("profile_duration_nanos".to_string());
+            fields.insert("trace_id".to_string());
+            fields.insert("span_id".to_string());
         }
         _ => {}
     }
@@ -1325,6 +1318,33 @@ mod tests {
     }
 
     #[test]
+    fn test_check_schema_for_defined_schema_fields_profiles_adds_query_columns() {
+        let schema = Schema::new(vec![] as Vec<Field>);
+        let input = vec!["k8s_pod_name".to_string()];
+        let result = check_schema_for_defined_schema_fields(StreamType::Profiles, &schema, input);
+        let mut fields = result.iter().map(String::as_str).collect::<Vec<_>>();
+        fields.sort_unstable();
+        assert_eq!(
+            fields,
+            [
+                "host_name",
+                "k8s_pod_name",
+                "otel_scope_name",
+                "process_pid",
+                "profile_duration_nanos",
+                "profile_type",
+                "profile_unit",
+                "service_instance_id",
+                "service_name",
+                "span_id",
+                "stack",
+                "trace_id",
+                "value",
+            ]
+        );
+    }
+
+    #[test]
     fn test_check_schema_for_defined_schema_fields_traces_includes_gen_ai_fields() {
         let schema = Schema::new(vec![
             Field::new("gen_ai_prompt", DataType::Utf8, true),
@@ -1336,74 +1356,6 @@ mod tests {
         assert!(result.contains("llm_model"));
         // "other_field" has no gen_ai_ or llm_ prefix → not auto-included
         assert!(!result.contains("other_field"));
-    }
-
-    #[test]
-    fn test_saved_defined_schema_fields_keeps_absent_profiles_query_columns() {
-        let schema = Schema::new(vec![
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-            Field::new("k8s_pod_name", DataType::Utf8, true),
-        ]);
-        let requested = ["k8s_pod_name", "typo_field"].map(str::to_string).to_vec();
-
-        let profiles =
-            saved_defined_schema_fields(StreamType::Profiles, &schema, requested.clone());
-        assert!(profiles.contains(&"k8s_pod_name".to_string()));
-        assert!(profiles.contains(&"trace_id".to_string()));
-        assert!(!profiles.contains(&"typo_field".to_string()));
-
-        let traces = saved_defined_schema_fields(StreamType::Traces, &schema, requested);
-        assert_eq!(traces, ["k8s_pod_name"]);
-    }
-
-    #[test]
-    fn test_uds_user_field_count_skips_profiles_query_columns() {
-        let fields = [TIMESTAMP_COL_NAME, "stack", "trace_id", "k8s_pod_name"]
-            .map(str::to_string)
-            .to_vec();
-        assert_eq!(uds_user_field_count(StreamType::Profiles, &fields), 1);
-        assert_eq!(uds_user_field_count(StreamType::Traces, &fields), 3);
-    }
-
-    #[test]
-    fn test_generate_schema_for_defined_schema_fields_profiles_keeps_query_columns() {
-        let mut fields = vec![
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-            Field::new("stack", DataType::Utf8, true),
-            Field::new("value", DataType::Int64, true),
-            Field::new("profile_type", DataType::Utf8, true),
-            Field::new("service_name", DataType::Utf8, true),
-            Field::new("k8s_pod_name", DataType::Utf8, true),
-        ];
-        fields.extend((0..20).map(|i| Field::new(format!("attr{i}"), DataType::Utf8, true)));
-        let schema = SchemaCache::new(Schema::new(fields));
-
-        let result = generate_schema_for_defined_schema_fields(
-            StreamType::Profiles,
-            &schema,
-            &["k8s_pod_name".to_string()],
-            false,
-            false,
-            false,
-        );
-        let names = result
-            .schema()
-            .fields()
-            .iter()
-            .map(|field| field.name().as_str())
-            .collect::<HashSet<_>>();
-
-        for field in [
-            TIMESTAMP_COL_NAME,
-            "stack",
-            "value",
-            "profile_type",
-            "service_name",
-            "k8s_pod_name",
-        ] {
-            assert!(names.contains(field), "missing {field}");
-        }
-        assert!(!names.contains("attr0"));
     }
 
     #[tokio::test]
