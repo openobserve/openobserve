@@ -227,8 +227,7 @@ async function save(value: SaveAsPromptForm) {
       if (currentGeneration !== generation) return;
       if (target.status !== "active" || target.type !== content.type)
         throw new Error(t("aiObservability.promptManagement.selectActivePrompt"));
-      const base = await llmPromptsService.getVersion(orgId, target.entityId, target.latestVersion);
-      if (currentGeneration !== generation) return;
+      // baseVersion and baseHash are exclusive; ifHead turns a concurrent append into a conflict.
       const result = await createVersion.mutateAsync({
         entityId: target.entityId,
         input: {
@@ -236,8 +235,7 @@ async function save(value: SaveAsPromptForm) {
           config: content.config,
           commitMessage: value.commitMessage.trim(),
           source,
-          baseVersion: base.version,
-          baseHash: base.contentHash,
+          baseVersion: target.latestVersion,
         },
         ifHead: target.latestVersion,
         idempotencyKey: crypto.randomUUID(),

@@ -210,6 +210,12 @@ describe("useManagementRoutes", () => {
       });
     });
 
+    // `/providers` exists only with online evaluations on, so the shell reads this meta.
+    it("marks llmProviders as needing online evaluations", () => {
+      const llmRoute = routes[0].children.find((child: any) => child.name === "llmProviders");
+      expect(llmRoute.meta.requiresOnlineEvals).toBe(true);
+    });
+
     it("should have genAiAgentMapping route in OSS builds too, and redirect when locked", () => {
       const genAiRoute = routes[0].children.find(
         (child: any) => child.name === "genAiAgentMapping",

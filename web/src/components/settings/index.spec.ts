@@ -15,9 +15,11 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { nextTick, reactive } from "vue";
 import SettingsIndex from "./index.vue";
 import i18n from "@/locales";
-import { createRouter, createWebHistory } from "vue-router";
+import { createMemoryHistory, createRouter, createWebHistory } from "vue-router";
+import awsConfig from "@/aws-exports";
 
 // Mock external dependencies
 vi.mock("@/aws-exports", () => ({
@@ -591,5 +593,90 @@ describe("SettingsIndex", () => {
         );
       });
     });
+  });
+});
+
+// `/providers` exists only with online evaluations on, so the rail hides it and deep links disable.
+describe("SettingsIndex — LLM providers with online evaluations off", () => {
+  const LlmProvidersPage = { template: "<div data-test='llm-providers-page'></div>" };
+  // SettingsIndex is a route component; its own <router-view> renders the section.
+  const App = { template: "<router-view />" };
+
+  async function mountOnLlmProviders(onlineEvalsEnabled: boolean | undefined, version?: string) {
+    vi.mocked(awsConfig).isEnterprise = "true";
+    const store = {
+      state: reactive({
+        theme: "light",
+        selectedOrganization: { identifier: "test-org" },
+        organizationData: { organizationSettings: { org_storage_enabled: false } },
+        zoConfig: {
+          ...(version === undefined ? {} : { version }),
+          ...(onlineEvalsEnabled === undefined ? {} : { online_evals_enabled: onlineEvalsEnabled }),
+        } as Record<string, unknown>,
+      }),
+    };
+    const settingsRouter = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        {
+          path: "/settings",
+          component: SettingsIndex,
+          children: [
+            { path: "general", name: "general", component: { template: "<div />" } },
+            {
+              path: "llm_providers",
+              name: "llmProviders",
+              component: LlmProvidersPage,
+              meta: { requiresOnlineEvals: true },
+            },
+          ],
+        },
+      ],
+    });
+    await settingsRouter.push("/settings/llm_providers");
+    await settingsRouter.isReady();
+    const wrapper = mount(App, {
+      global: {
+        plugins: [i18n, settingsRouter],
+        provide: { store },
+        stubs: {
+          OPageLayout: { template: "<div><slot name='sidebar' /><slot /></div>" },
+          SectionRail: { template: "<div />", props: ["groups", "activeKey", "title"] },
+          OEmptyState: { template: "<div />", props: ["size", "icon", "title", "description"] },
+        },
+      },
+    });
+    const llmProvidersItemVisible = () =>
+      (
+        wrapper.findComponent(SettingsIndex).vm.sectionGroups as Array<{
+          items: Array<{ key: string; visible?: boolean }>;
+        }>
+      )
+        .flatMap((g) => g.items)
+        .find((i) => i.key === "llm_providers")?.visible;
+    return { wrapper, store, llmProvidersItemVisible };
+  }
+
+  it("hides the rail entry and renders the disabled state on a deep link when the flag is false", async () => {
+    const { wrapper, llmProvidersItemVisible } = await mountOnLlmProviders(false, "v1");
+    expect(llmProvidersItemVisible()).toBe(false);
+    expect(wrapper.find('[data-test="online-evals-disabled"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="llm-providers-page"]').exists()).toBe(false);
+  });
+
+  it("lists the entry and renders the page when the flag is true", async () => {
+    const { wrapper, llmProvidersItemVisible } = await mountOnLlmProviders(true, "v1");
+    expect(llmProvidersItemVisible()).toBe(true);
+    expect(wrapper.find('[data-test="llm-providers-page"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="online-evals-disabled"]').exists()).toBe(false);
+  });
+
+  it("keeps the page while /config is in flight, then switches once it reports evaluations off", async () => {
+    const { wrapper, store } = await mountOnLlmProviders(undefined);
+    expect(wrapper.find('[data-test="llm-providers-page"]').exists()).toBe(true);
+    store.state.zoConfig = { version: "v1", online_evals_enabled: false };
+    await nextTick();
+    expect(wrapper.find('[data-test="online-evals-disabled"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="llm-providers-page"]').exists()).toBe(false);
   });
 });
