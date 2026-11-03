@@ -22,7 +22,7 @@ import ExperimentRowDetailDrawer from "./ExperimentRowDetailDrawer.vue";
 
 const detail: ExperimentRowDetail = {
   experimentId: "experiment-1",
-  snapshot: { datasetId: "dataset-1", datasetVersion: 7 },
+  snapshot: { datasetId: "dataset-1", datasetVersion: 7, datasetWriteVersion: 3 },
   navigation: {
     rowIndex: 1,
     totalRows: 3,
