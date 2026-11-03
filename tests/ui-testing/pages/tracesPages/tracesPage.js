@@ -3415,13 +3415,16 @@ export class TracesPage {
 
   async createAlertFromChartMenu(title) {
     const panel = this.metricsPanelLocator(title);
-    await panel.hover();
     if (title === 'Duration') {
+      await panel.hover();
       await this.page.locator('[data-test="traces-duration-actions-btn"]').click();
       await this.page.locator('[data-test="traces-duration-create-alert"]').click();
       return;
     }
-    await panel.locator('[data-test="panel-explore-actions-btn"]').click();
+    // Hovering the chart body opens its tooltip, which then covers this button.
+    const actionsBtn = panel.locator('[data-test="panel-explore-actions-btn"]');
+    await actionsBtn.hover();
+    await actionsBtn.click();
     await this.page.locator('[data-test="panel-explore-create-alert"]').click();
   }
 
