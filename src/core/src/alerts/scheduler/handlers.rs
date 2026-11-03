@@ -2522,13 +2522,7 @@ async fn trigger_rca_for_alert_firing(
 
     let cfg = get_o2_config();
     // Must agree with the condition `analysis_at_start` used to mark these records `Pending`.
-    if !cfg.incidents.rca_enabled
-        || !cfg.ai.enabled
-        || !cfg.ai.has_agent_target()
-        || !o2_enterprise::enterprise::license::check_features(&[
-            config::meta::feature::Feature::AiAssistant,
-        ])
-    {
+    if !cfg.incidents.rca_enabled || !crate::alerts::incidents::rca_agent_available() {
         release_alert_firing_hold(&alert.org_id, &opened).await;
         return;
     }
