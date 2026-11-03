@@ -454,8 +454,6 @@ pub struct AuditQuery {
     pub fleet: Option<String>,
     #[serde(default)]
     pub module: Option<AuditModule>,
-    #[serde(default)]
-    pub actor: Option<AuditActor>,
 }
 
 /// The part of the fleet API an event was made through; `settings` is the org's fleet settings.
@@ -468,14 +466,6 @@ pub enum AuditModule {
     Rollouts,
     Configs,
     Settings,
-}
-
-/// `system` is an event the server made itself, such as a halted rollout.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum AuditActor {
-    People,
-    System,
 }
 
 /// Per-fleet overrides; `None` inherits the organization default.

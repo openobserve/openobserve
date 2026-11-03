@@ -109,7 +109,6 @@ describe("FleetAudit", () => {
     expect(params.to).toBeUndefined();
     expect(params).not.toHaveProperty("fleet");
     expect(params).not.toHaveProperty("module");
-    expect(params).not.toHaveProperty("actor");
     expect(auditText(wrapper)).toContain("edge-minimal v1");
     expect(auditText(wrapper)).toContain("ana@acme.io");
   });
@@ -146,24 +145,12 @@ describe("FleetAudit", () => {
     expect(lastParams()).toMatchObject({ offset: 0, fleet: "prod" });
   });
 
-  const echoParams = () =>
-    vi.mocked(fleet.listAudit).mockImplementation(async (_org, params: any) => ({
-      data: {
-        total: 1,
-        items: [
-          event({ target: `actor:${params.actor ?? "any"} module:${params.module ?? "any"}` }),
-        ],
-      },
-    }));
-
-  it("sends the actor filter and drops it for everyone", async () => {
-    echoParams();
+  it("has no actor filter and keeps the period beside the refresh button", async () => {
     await mountAudit();
-    await pick("fleet-audit-actor-filter", "system");
-    expect(lastParams()).toMatchObject({ offset: 0, actor: "system" });
-    expect(auditText(wrapper)).toContain("actor:system");
-    await pick("fleet-audit-actor-filter", "all");
-    expect(auditText(wrapper)).toContain("actor:any");
+    expect(wrapper.find('[data-test="fleet-audit-actor-filter"]').exists()).toBe(false);
+    const trailing = wrapper.find('[data-test="fleet-audit-toolbar-trailing"]');
+    expect(trailing.find('[data-test="fleet-audit-range"]').exists()).toBe(true);
+    expect(trailing.find('[data-test="fleet-audit-refresh"]').exists()).toBe(true);
   });
 
   it("narrows the period to a shorter preset", async () => {

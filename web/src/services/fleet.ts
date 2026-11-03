@@ -261,16 +261,12 @@ export interface FleetAuditEvent {
 export type FleetAuditModule =
   "collectors" | "tokens" | "fleets" | "rollouts" | "configs" | "settings";
 
-/** `system` is an event the server made itself. */
-export type FleetAuditActor = "people" | "system";
-
 /** `from`/`to` are epoch ms, `[from, to)`; the server defaults to the 30 days before `to` (now). */
 export type FleetAuditParams = {
   offset?: number;
   limit?: number;
   fleet?: string;
   module?: FleetAuditModule;
-  actor?: FleetAuditActor;
   from?: number;
   to?: number;
 };

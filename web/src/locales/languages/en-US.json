@@ -29087,8 +29087,6 @@
       "retentionDaysHelp": "0 keeps offline collectors forever"
     },
     "audit": {
-      "actorPeople": "People",
-      "actorSystem": "System",
       "editedConfig": "Edited configuration",
       "revokedToken": "Revoked enrollment token",
       "enrolledCollector": "Enrolled collector",

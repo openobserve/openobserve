@@ -798,8 +798,7 @@ export const fleetMock: FleetApi = {
       (e) =>
         e.at >= from &&
         e.at < (params.to ?? Infinity) &&
-        (!params.module || auditModule(e.action) === params.module) &&
-        (!params.actor || (e.actor === "system") === (params.actor === "system")),
+        (!params.module || auditModule(e.action) === params.module),
     );
     const offset = params.offset ?? 0;
     return reply({

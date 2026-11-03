@@ -59,22 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (v) => setFilters({ module: (v as FleetAuditModule | null) ?? null })
             "
           />
-          <OToggleGroup
-            :model-value="filters.actor"
-            mobile-dropdown
-            data-test="fleet-audit-actor-filter"
-            @update:model-value="(v) => v && setFilters({ actor: v as ActorFilter })"
-          >
-            <OToggleGroupItem value="all" size="sm" data-test="fleet-audit-actor-all">
-              {{ t("fleet.common.all") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem value="people" size="sm" data-test="fleet-audit-actor-people">
-              {{ t("fleet.audit.actorPeople") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem value="system" size="sm" data-test="fleet-audit-actor-system">
-              {{ t("fleet.audit.actorSystem") }}
-            </OToggleGroupItem>
-          </OToggleGroup>
+        </div>
+      </template>
+      <template #toolbar-trailing>
+        <div class="flex items-center gap-2" data-test="fleet-audit-toolbar-trailing">
           <OToggleGroup
             :model-value="filters.range"
             mobile-dropdown
@@ -105,17 +93,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="fleet-audit-date-picker"
             @on:date-change="onCustomRange"
           />
+          <ORefreshButton
+            layout="inline"
+            variant="outline"
+            :last-run-at="audit.lastUpdatedAt.value || null"
+            :loading="audit.fetching.value"
+            data-test="fleet-audit-refresh"
+            @click="audit.refetch()"
+          />
         </div>
-      </template>
-      <template #toolbar-trailing>
-        <ORefreshButton
-          layout="inline"
-          variant="outline"
-          :last-run-at="audit.lastUpdatedAt.value || null"
-          :loading="audit.fetching.value"
-          data-test="fleet-audit-refresh"
-          @click="audit.refetch()"
-        />
       </template>
       <template #cell-at="{ row }">
         <OTimeCell :value="row.at" unit="ms" mode="relative" />
@@ -165,21 +151,13 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
-import type {
-  FleetAuditActor,
-  FleetAuditEvent,
-  FleetAuditModule,
-  FleetAuditParams,
-} from "@/services/fleet";
+import type { FleetAuditEvent, FleetAuditModule, FleetAuditParams } from "@/services/fleet";
 import { isForbidden, useFleetAudit, useFleets } from "./useFleetApi";
 import { AUDIT_MODULES, auditKind, type AuditKind } from "./auditKind";
-
-type ActorFilter = "all" | FleetAuditActor;
 
 interface AuditFilters {
   fleet: string | null;
   module: FleetAuditModule | null;
-  actor: ActorFilter;
   range: AuditRange;
 }
 
@@ -200,7 +178,6 @@ const DEFAULT_RANGE: AuditRange = "30d";
 const DEFAULT_FILTERS: AuditFilters = {
   fleet: null,
   module: null,
-  actor: "all",
   range: DEFAULT_RANGE,
 };
 
@@ -224,7 +201,6 @@ const params = computed((): FleetAuditParams => ({
   limit: pageSize.value,
   fleet: filters.value.fleet ?? undefined,
   module: filters.value.module ?? undefined,
-  actor: filters.value.actor === "all" ? undefined : filters.value.actor,
   ...period.value,
 }));
 
@@ -250,11 +226,7 @@ const fleetOptions = computed(() =>
 );
 
 const isFiltered = computed(
-  () =>
-    !!filters.value.fleet ||
-    !!filters.value.module ||
-    filters.value.actor !== "all" ||
-    filters.value.range !== DEFAULT_RANGE,
+  () => !!filters.value.fleet || !!filters.value.module || filters.value.range !== DEFAULT_RANGE,
 );
 
 function setFilters(patch: Partial<AuditFilters>) {

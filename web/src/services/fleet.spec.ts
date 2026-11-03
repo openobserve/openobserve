@@ -268,7 +268,7 @@ describe("fleet service", () => {
   });
 
   it("listAudit() calls GET /api/{org}/fleet/audit with the page and filters as params", () => {
-    const params = { offset: 50, limit: 50, fleet: "prod", module: "configs", actor: "people" };
+    const params = { offset: 50, limit: 50, fleet: "prod", module: "configs" };
     fleet.listAudit("acme", { ...params, from: 1, to: 2 } as any);
     expect(mockClient.get).toHaveBeenCalledWith("/api/acme/fleet/audit", {
       params: { ...params, from: 1, to: 2 },
