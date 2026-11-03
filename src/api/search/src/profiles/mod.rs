@@ -438,21 +438,10 @@ pub(crate) async fn run_profiles_sql(
     let request = Request {
         query: Query {
             sql,
-            from: 0,
             size,
             start_time: params.start_time,
             end_time: params.end_time,
-            quick_mode: false,
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: RequestEncoding::Empty,
         regions: vec![],
