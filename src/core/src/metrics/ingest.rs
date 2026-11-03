@@ -122,6 +122,12 @@ impl StreamKeyChecks {
     }
 }
 
+/// One stream's realtime alert work, sent only after its records are written.
+pub(super) struct StreamTriggers {
+    triggers: TriggerAlertData,
+    mute_split: Option<crate::ingestion::realtime_mute::RealtimeMuteSplit>,
+}
+
 /// Runs each stream's pipelines over its buffered records, grouping the output by destination.
 pub(super) async fn run_pipelines<T: Clone>(
     org_id: &str,
@@ -306,12 +312,6 @@ pub(super) async fn apply_redaction<T>(
     for ((record, _), (_, redacted)) in records.iter_mut().zip(rows) {
         *record = redacted;
     }
-}
-
-/// One stream's realtime alert work, sent only after its records are written.
-pub(super) struct StreamTriggers {
-    triggers: TriggerAlertData,
-    mute_split: Option<crate::ingestion::realtime_mute::RealtimeMuteSplit>,
 }
 
 /// Buffers one stream's records into write partitions, running its realtime alerts on each first.

@@ -20,19 +20,13 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LazyLock};
 
 use config::{
-    meta::{
-        alerts::{alert::Alert, level::PAYLOAD_SAMPLE_ROWS},
-        downtimes::ActiveDowntime,
-    },
+    meta::{alerts::alert::Alert, downtimes::ActiveDowntime},
     utils::json::{Map, Value},
 };
 #[cfg(feature = "enterprise")]
 use dashmap::DashMap;
 
 use super::{RealtimeMute, TriggerAlertData};
-
-/// The most rows a delivered metrics notification carries.
-const ROW_CAP: usize = PAYLOAD_SAMPLE_ROWS as usize;
 
 /// Matches the downtime cache's full reload, so settings are as fresh as the downtimes.
 #[cfg(feature = "enterprise")]
@@ -43,7 +37,7 @@ const SEMANTIC_GROUPS_TTL_MICROS: i64 = 60 * 1_000_000;
 static SEMANTIC_GROUPS: LazyLock<DashMap<String, (i64, SemanticGroups)>> =
     LazyLock::new(DashMap::new);
 
-/// Service discovery ran once per realtime floor before the split, so it is cached for one floor.
+/// Discovery answers from the row's fields, so the answer is cached per alert and field set.
 #[cfg(feature = "enterprise")]
 static FALLBACK_SERVICES: LazyLock<DashMap<String, (i64, Option<String>)>> =
     LazyLock::new(DashMap::new);
@@ -53,34 +47,99 @@ type SemanticGroups = Arc<Vec<config::meta::correlation::FieldAlias>>;
 type Row = Map<String, Value>;
 type Dims = HashMap<String, String>;
 
-/// A group's first row decides every row of the group, as in a scheduled run.
-#[derive(Clone)]
-enum Group {
-    Empty,
-    Decided(Option<ActiveDowntime>),
+/// Per request: every matching row of every real-time alert, classified as it arrives.
+pub struct RealtimeMuteSplit {
+    org: String,
+    now: i64,
+    row_cap: usize,
+    alerts: HashMap<String, AlertEntry>,
+    order: Vec<String>,
+    full: usize,
 }
 
-/// The rows of one alert in one request, split by their downtime decision.
-pub(crate) struct RowSplit {
-    cap: usize,
-    unmuted: Vec<Row>,
-    /// Rows with no identity share one decision, made at [Self::finish].
-    empty: Vec<Row>,
-    muted: Option<ActiveDowntime>,
-    muted_ids: HashSet<String>,
-    any_identity: bool,
-    groups: HashMap<String, Group>,
-    /// Plain rows with the same identity get the same answer, so the cache scan runs once each.
-    decided: HashMap<Vec<(String, String)>, Option<ActiveDowntime>>,
-    seen: HashSet<u64>,
+impl RealtimeMuteSplit {
+    /// `None` unless the org has an alert downtime; `row_cap` is the most rows one alert delivers.
+    pub fn for_org(org: &str, row_cap: usize) -> Option<Self> {
+        crate::alerts::downtimes::any_for(org, config::meta::downtimes::TargetModule::Alerts).then(
+            || Self {
+                org: org.to_string(),
+                now: config::utils::time::now_micros(),
+                row_cap,
+                alerts: HashMap::new(),
+                order: Vec::new(),
+                full: 0,
+            },
+        )
+    }
+
+    pub fn seen(&self, key: &str, signature: u64) -> bool {
+        self.alerts
+            .get(key)
+            .is_some_and(|entry| entry.rows.seen(signature))
+    }
+
+    /// Lets the caller skip evaluating an alert whose verdict is already Deliver.
+    pub fn is_full(&self, key: &str) -> bool {
+        self.alerts
+            .get(key)
+            .is_some_and(|entry| entry.rows.is_full())
+    }
+
+    /// A muted alert never fills, so the caller stops evaluating rows only when this reaches its
+    /// alert count.
+    pub fn full_alerts(&self) -> usize {
+        self.full
+    }
+
+    /// Files the matching rows of `alert`, keyed as the caller keys its alerts.
+    pub async fn push(&mut self, key: &str, alert: &Alert, rows: Vec<Row>, signature: Option<u64>) {
+        if !self.alerts.contains_key(key) {
+            let entry = AlertEntry {
+                alert: alert.clone(),
+                #[cfg(feature = "enterprise")]
+                scope: scope(&self.org, self.now, alert).await,
+                rows: RowSplit::with_cap(self.row_cap),
+            };
+            self.alerts.insert(key.to_string(), entry);
+            self.order.push(key.to_string());
+        }
+        let entry = self.alerts.get_mut(key).expect("inserted above");
+        let was_full = entry.rows.is_full();
+        for row in rows {
+            push_row(&self.org, self.now, entry, row, signature);
+        }
+        if !was_full && entry.rows.is_full() {
+            self.full += 1;
+        }
+    }
+
+    /// Spawned by the ingest path after the write, since the verdicts may read service discovery.
+    pub async fn evaluate(self) {
+        let triggers = self.finish().await;
+        if !triggers.is_empty() {
+            super::evaluate_trigger(triggers).await;
+        }
+    }
+
+    /// The alerts with a verdict, ready for `evaluate_trigger`.
+    pub async fn finish(mut self) -> TriggerAlertData {
+        let mut out = Vec::with_capacity(self.order.len());
+        for key in self.order {
+            let Some(entry) = self.alerts.remove(&key) else {
+                continue;
+            };
+            out.extend(finish_entry(&self.org, self.now, &key, entry).await);
+        }
+        out
+    }
 }
 
-/// What a request's rows of one alert come to.
-#[derive(Debug, PartialEq)]
-pub(crate) enum Verdict {
-    Deliver(Vec<Row>),
-    Suppress(ActiveDowntime),
-    Nothing,
+struct AlertEntry {
+    alert: Alert,
+    /// `None` leaves the rows unmuted, as `realtime_downtime` does without an id or folder.
+    #[cfg(feature = "enterprise")]
+    scope: Option<Scope>,
+    rows: RowSplit,
 }
 
 /// What a row needs to be classified: the alert's id, folder and identity rules.
@@ -92,27 +151,19 @@ struct Scope {
     group_by: Option<Vec<String>>,
 }
 
-struct AlertEntry {
-    alert: Alert,
-    /// `None` leaves the rows unmuted, as `realtime_downtime` does without an id or folder.
-    #[cfg(feature = "enterprise")]
-    scope: Option<Scope>,
-    rows: RowSplit,
-}
-
-/// Per request: every matching row of every real-time alert, classified as it arrives.
-pub struct RealtimeMuteSplit {
-    org: String,
-    now: i64,
-    row_cap: usize,
-    alerts: HashMap<String, AlertEntry>,
-    order: Vec<String>,
-}
-
-impl Default for RowSplit {
-    fn default() -> Self {
-        Self::with_cap(ROW_CAP)
-    }
+/// The rows of one alert in one request, split by their downtime decision.
+pub(crate) struct RowSplit {
+    cap: usize,
+    unmuted: Vec<Row>,
+    /// Rows with no identity by group key, decided at [Self::finish] as each group is scheduled.
+    empty: HashMap<Option<String>, Vec<Row>>,
+    muted: Option<ActiveDowntime>,
+    muted_ids: HashSet<String>,
+    any_identity: bool,
+    groups: HashMap<String, Group>,
+    /// Plain rows with the same identity get the same answer, so the cache scan runs once each.
+    decided: HashMap<Vec<(String, String)>, Option<ActiveDowntime>>,
+    seen: HashSet<u64>,
 }
 
 impl RowSplit {
@@ -120,7 +171,7 @@ impl RowSplit {
         Self {
             cap,
             unmuted: Vec::new(),
-            empty: Vec::new(),
+            empty: HashMap::new(),
             muted: None,
             muted_ids: HashSet::new(),
             any_identity: false,
@@ -156,21 +207,22 @@ impl RowSplit {
         {
             return;
         }
-        let decision = match group {
-            Some(key) => match self.groups.get(&key) {
+        let decision = match &group {
+            Some(key) => match self.groups.get(key) {
                 Some(group) => group.clone(),
                 None => {
-                    let group = self.classify(&row, false, dims_of, active_for);
-                    self.groups.insert(key, group.clone());
-                    group
+                    let decided = self.classify(&row, false, dims_of, active_for);
+                    self.groups.insert(key.clone(), decided.clone());
+                    decided
                 }
             },
             None => self.classify(&row, true, dims_of, active_for),
         };
         match decision {
             Group::Empty => {
-                if self.empty.len() < self.cap {
-                    self.empty.push(row);
+                let rows = self.empty.entry(group).or_default();
+                if rows.len() < self.cap {
+                    rows.push(row);
                 }
             }
             Group::Decided(None) => self.unmuted.push(row),
@@ -218,22 +270,26 @@ impl RowSplit {
     /// Only when no row had an identity, as `downtime_identities_by_key` decides it.
     #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
     pub(crate) fn fallback_row(&self) -> Option<&Row> {
-        (!self.any_identity).then(|| self.empty.first()).flatten()
+        if self.any_identity {
+            return None;
+        }
+        self.empty.values().find_map(|rows| rows.first())
     }
 
-    /// Decides the empty bucket with `empty_identity`, then the whole alert.
+    /// Decides each empty group with `empty_identity` and its group key, then the whole alert.
     pub(crate) fn finish(
         mut self,
         empty_identity: Dims,
-        active_for: impl FnOnce(&Dims) -> Option<ActiveDowntime>,
+        mut active_for: impl FnMut(&Dims, Option<&str>) -> Option<ActiveDowntime>,
     ) -> Verdict {
-        if !self.empty.is_empty() {
-            let empty = std::mem::take(&mut self.empty);
-            match active_for(&empty_identity) {
+        let mut empty: Vec<_> = std::mem::take(&mut self.empty).into_iter().collect();
+        empty.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        for (group, rows) in empty {
+            match active_for(&empty_identity, group.as_deref()) {
                 Some(downtime) => self.mute(downtime),
                 None => {
                     let room = self.cap.saturating_sub(self.unmuted.len());
-                    self.unmuted.extend(empty.into_iter().take(room));
+                    self.unmuted.extend(rows.into_iter().take(room));
                 }
             }
         }
@@ -247,70 +303,19 @@ impl RowSplit {
     }
 }
 
-impl RealtimeMuteSplit {
-    /// `None` unless the org has an alert downtime; `row_cap` is the most rows one alert delivers.
-    pub fn for_org(org: &str, row_cap: usize) -> Option<Self> {
-        crate::alerts::downtimes::any_for(org, config::meta::downtimes::TargetModule::Alerts).then(
-            || Self {
-                org: org.to_string(),
-                now: config::utils::time::now_micros(),
-                row_cap,
-                alerts: HashMap::new(),
-                order: Vec::new(),
-            },
-        )
-    }
+/// A group's first row decides every row of the group, as in a scheduled run.
+#[derive(Clone)]
+enum Group {
+    Empty,
+    Decided(Option<ActiveDowntime>),
+}
 
-    pub fn seen(&self, key: &str, signature: u64) -> bool {
-        self.alerts
-            .get(key)
-            .is_some_and(|entry| entry.rows.seen(signature))
-    }
-
-    /// Lets the caller skip evaluating an alert whose verdict is already Deliver.
-    pub fn is_full(&self, key: &str) -> bool {
-        self.alerts
-            .get(key)
-            .is_some_and(|entry| entry.rows.is_full())
-    }
-
-    /// Files the matching rows of `alert`, keyed as the caller keys its alerts.
-    pub async fn push(&mut self, key: &str, alert: &Alert, rows: Vec<Row>, signature: Option<u64>) {
-        if !self.alerts.contains_key(key) {
-            let entry = AlertEntry {
-                alert: alert.clone(),
-                #[cfg(feature = "enterprise")]
-                scope: scope(&self.org, self.now, alert).await,
-                rows: RowSplit::with_cap(self.row_cap),
-            };
-            self.alerts.insert(key.to_string(), entry);
-            self.order.push(key.to_string());
-        }
-        let entry = self.alerts.get_mut(key).expect("inserted above");
-        for row in rows {
-            push_row(&self.org, self.now, entry, row, signature);
-        }
-    }
-
-    /// Spawned by the ingest path after the write, since the verdicts may read service discovery.
-    pub async fn evaluate(self) {
-        let triggers = self.finish().await;
-        if !triggers.is_empty() {
-            super::evaluate_trigger(triggers).await;
-        }
-    }
-
-    /// The alerts with a verdict, ready for `evaluate_trigger`.
-    pub async fn finish(mut self) -> TriggerAlertData {
-        let mut out = Vec::with_capacity(self.order.len());
-        for key in self.order {
-            let Some(entry) = self.alerts.remove(&key) else {
-                continue;
-            };
-            out.extend(finish_entry(&self.org, self.now, &key, entry).await);
-        }
-        out
-    }
+/// What a request's rows of one alert come to.
+#[derive(Debug, PartialEq)]
+pub(crate) enum Verdict {
+    Deliver(Vec<Row>),
+    Suppress(ActiveDowntime),
+    Nothing,
 }
 
 #[cfg(feature = "enterprise")]
@@ -338,15 +343,35 @@ async fn semantic_groups(org: &str, now: i64) -> SemanticGroups {
 #[cfg(feature = "enterprise")]
 async fn fallback_service(org: &str, key: &str, now: i64, row: &Row) -> Option<String> {
     let floor = config::meta::alerts::TriggerCondition::min_silence_micros();
-    if let Some(cached) = FALLBACK_SERVICES.get(key)
+    let cache_key = format!("{key}/{:x}", fields_hash(row));
+    if let Some(cached) = FALLBACK_SERVICES.get(&cache_key)
         && now.saturating_sub(cached.0) < floor
     {
         return cached.1.clone();
     }
     FALLBACK_SERVICES.retain(|_, (at, _)| now.saturating_sub(*at) < floor);
     let service = crate::alerts::incidents::correlated_service_for_routing(org, row).await;
-    FALLBACK_SERVICES.insert(key.to_string(), (now, service.clone()));
+    FALLBACK_SERVICES.insert(cache_key, (now, service.clone()));
     service
+}
+
+/// The scalar fields discovery reads, in key order, so equal rows hash equal.
+#[cfg(feature = "enterprise")]
+fn fields_hash(row: &Row) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut fields: Vec<(&String, String)> = row
+        .iter()
+        .filter_map(|(k, v)| match v {
+            Value::String(s) => Some((k, s.clone())),
+            Value::Number(n) => Some((k, n.to_string())),
+            Value::Bool(b) => Some((k, b.to_string())),
+            _ => None,
+        })
+        .collect();
+    fields.sort_unstable();
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    fields.hash(&mut hasher);
+    hasher.finish()
 }
 
 #[cfg(feature = "enterprise")]
@@ -413,7 +438,7 @@ fn push_row(_org: &str, _now: i64, entry: &mut AlertEntry, row: Row, signature: 
 async fn finish_entry(org: &str, now: i64, key: &str, entry: AlertEntry) -> TriggerAlertData {
     let AlertEntry { alert, scope, rows } = entry;
     let Some(scope) = scope else {
-        return into_trigger(alert, rows.finish(Dims::new(), |_| None));
+        return into_trigger(alert, rows.finish(Dims::new(), |_, _| None));
     };
     let mut empty_identity = Dims::new();
     if let Some(row) = rows.fallback_row()
@@ -421,13 +446,13 @@ async fn finish_entry(org: &str, now: i64, key: &str, entry: AlertEntry) -> Trig
     {
         empty_identity.insert(config::meta::oncall::SERVICE_DIMENSION.to_string(), service);
     }
-    // The empty bucket mixes groups, so it is decided per alert, as the fallback is.
-    let verdict = rows.finish(empty_identity, |dims| {
-        crate::alerts::downtimes::active_for_alert(
+    let verdict = rows.finish(empty_identity, |dims, group_key| {
+        crate::alerts::downtimes::active_for_alert_key(
             org,
             &scope.alert_id,
             &scope.folder_id,
             dims,
+            group_key,
             now,
         )
     });
@@ -436,7 +461,7 @@ async fn finish_entry(org: &str, now: i64, key: &str, entry: AlertEntry) -> Trig
 
 #[cfg(not(feature = "enterprise"))]
 async fn finish_entry(_org: &str, _now: i64, _key: &str, entry: AlertEntry) -> TriggerAlertData {
-    into_trigger(entry.alert, entry.rows.finish(Dims::new(), |_| None))
+    into_trigger(entry.alert, entry.rows.finish(Dims::new(), |_, _| None))
 }
 
 fn into_trigger(alert: Alert, verdict: Verdict) -> TriggerAlertData {
@@ -450,7 +475,11 @@ fn into_trigger(alert: Alert, verdict: Verdict) -> TriggerAlertData {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::alerts::level::PAYLOAD_SAMPLE_ROWS;
+
     use super::*;
+
+    const ROW_CAP: usize = PAYLOAD_SAMPLE_ROWS as usize;
 
     fn row(service: &str) -> Row {
         let mut row = Row::new();
@@ -483,12 +512,19 @@ mod tests {
         Some(downtime("dt-all"))
     }
 
+    /// The answer for a plain alert, which ignores the group key.
+    fn plain(
+        active: fn(&Dims) -> Option<ActiveDowntime>,
+    ) -> impl FnMut(&Dims, Option<&str>) -> Option<ActiveDowntime> {
+        move |dims, _| active(dims)
+    }
+
     fn split(
         rows: &[&str],
         groups: Option<&[&str]>,
         active: fn(&Dims) -> Option<ActiveDowntime>,
     ) -> RowSplit {
-        let mut split = RowSplit::default();
+        let mut split = RowSplit::with_cap(ROW_CAP);
         for (i, service) in rows.iter().enumerate() {
             let group = groups.map(|g| g[i].to_string());
             split.push(row(service), group, None, dims_of, active);
@@ -509,14 +545,14 @@ mod tests {
     #[test]
     fn a_muted_row_never_hides_an_unmuted_one_in_either_order() {
         for rows in [["a", "b"], ["b", "a"]] {
-            let verdict = split(&rows, None, mutes_a).finish(Dims::new(), mutes_a);
+            let verdict = split(&rows, None, mutes_a).finish(Dims::new(), plain(mutes_a));
             assert_eq!(delivered(&verdict), ["b"]);
         }
     }
 
     #[test]
     fn only_muted_rows_suppress_with_the_downtime() {
-        let verdict = split(&["a", "a"], None, mutes_a).finish(Dims::new(), mutes_a);
+        let verdict = split(&["a", "a"], None, mutes_a).finish(Dims::new(), plain(mutes_a));
         match verdict {
             Verdict::Suppress(downtime) => assert_eq!(downtime.id, "dt-a"),
             other => panic!("expected a suppression, got {other:?}"),
@@ -527,31 +563,35 @@ mod tests {
     fn muted_rows_past_the_cap_never_push_out_an_unmuted_row() {
         let mut rows = vec!["a"; 150];
         rows.push("b");
-        let verdict = split(&rows, None, mutes_a).finish(Dims::new(), mutes_a);
+        let verdict = split(&rows, None, mutes_a).finish(Dims::new(), plain(mutes_a));
         assert_eq!(delivered(&verdict), ["b"]);
     }
 
     #[test]
     fn a_metric_series_seen_once_is_not_taken_again() {
-        let mut split = RowSplit::default();
+        let mut split = RowSplit::with_cap(ROW_CAP);
         for signature in [1, 1, 2] {
             split.push(row("b"), None, Some(signature), dims_of, mutes_a);
         }
         assert!(split.seen(1) && split.seen(2) && !split.seen(3));
-        assert_eq!(delivered(&split.finish(Dims::new(), mutes_a)).len(), 2);
+        assert_eq!(
+            delivered(&split.finish(Dims::new(), plain(mutes_a))).len(),
+            2
+        );
     }
 
     #[test]
     fn a_multi_alert_group_takes_the_decision_of_its_first_row() {
         // Group keys: rows 1 and 3 are group "ga" (service a), row 2 is group "gb".
         let verdict = split(&["a", "b", "a"], Some(&["ga", "gb", "ga"]), mutes_a)
-            .finish(Dims::new(), mutes_a);
+            .finish(Dims::new(), plain(mutes_a));
         assert_eq!(delivered(&verdict), ["b"]);
         let reversed = split(&["b", "a", "a"], Some(&["gb", "ga", "ga"]), mutes_a)
-            .finish(Dims::new(), mutes_a);
+            .finish(Dims::new(), plain(mutes_a));
         assert_eq!(delivered(&reversed), ["b"]);
         // A later row of a group follows its first row even with other dims.
-        let verdict = split(&["b", "a"], Some(&["g", "g"]), mutes_a).finish(Dims::new(), mutes_a);
+        let verdict =
+            split(&["b", "a"], Some(&["g", "g"]), mutes_a).finish(Dims::new(), plain(mutes_a));
         assert_eq!(delivered(&verdict), ["b", "a"]);
     }
 
@@ -562,7 +602,7 @@ mod tests {
         assert!(split_rows.fallback_row().is_some());
         let fallback = Dims::from([("service".to_string(), "a".to_string())]);
         assert!(matches!(
-            split_rows.finish(fallback, mutes_a),
+            split_rows.finish(fallback, plain(mutes_a)),
             Verdict::Suppress(_)
         ));
     }
@@ -573,7 +613,7 @@ mod tests {
         rows.push("b");
         let split_rows = split(&rows, None, mutes_a);
         assert!(split_rows.fallback_row().is_none(), "row b has an identity");
-        let verdict = split_rows.finish(Dims::new(), mutes_a);
+        let verdict = split_rows.finish(Dims::new(), plain(mutes_a));
         assert_eq!(
             delivered(&verdict).len(),
             ROW_CAP,
@@ -585,7 +625,7 @@ mod tests {
     fn empty_rows_past_the_cap_suppress_when_the_downtime_covers_them() {
         let mut rows = vec![""; 150];
         rows.push("b");
-        let verdict = split(&rows, None, mutes_all).finish(Dims::new(), mutes_all);
+        let verdict = split(&rows, None, mutes_all).finish(Dims::new(), plain(mutes_all));
         assert!(matches!(verdict, Verdict::Suppress(_)));
     }
 
@@ -595,8 +635,20 @@ mod tests {
         assert!(split_rows.fallback_row().is_some());
         let fallback = Dims::from([("service".to_string(), "a".to_string())]);
         assert!(matches!(
-            split_rows.finish(fallback, mutes_a),
+            split_rows.finish(fallback, plain(mutes_a)),
             Verdict::Suppress(_)
         ));
+    }
+
+    #[test]
+    fn empty_rows_of_a_multi_alert_are_decided_per_group_key() {
+        let split_rows = split(&["", ""], Some(&["g1", "g2"]), mutes_a);
+        let verdict = split_rows.finish(Dims::new(), |_, group| {
+            (group == Some("g1")).then(|| downtime("dt-g1"))
+        });
+        assert_eq!(delivered(&verdict), [""]);
+        let all_muted = split(&["", ""], Some(&["g1", "g2"]), mutes_a)
+            .finish(Dims::new(), |_, group| group.map(downtime));
+        assert!(matches!(all_muted, Verdict::Suppress(_)));
     }
 }

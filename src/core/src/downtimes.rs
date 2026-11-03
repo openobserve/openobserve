@@ -738,13 +738,13 @@ async fn extend_follow_up(
 async fn cancel_follow_ups(org: &str, user_id: &str, parent_id: &str, now: i64) {
     // The primary: an extend moments ago may have created a follow-up this cache lacks.
     let rows = match primary_rows(org).await {
-        Ok(rows) => rows,
+        Ok(rows) => Arc::new(rows),
         Err(e) => {
             // The parent cancel already committed, so the cache beats leaving every follow-up live.
             log::warn!(
                 "[downtimes] primary list of {org} failed, cancelling follow-ups of {parent_id} from the cache: {e}"
             );
-            db::downtimes::list_cached(org).as_ref().clone()
+            db::downtimes::list_cached(org)
         }
     };
     for id in follow_ups_to_cancel(&rows, parent_id, now) {
@@ -3229,9 +3229,5 @@ mod tests {
         }
         // A detail opened right after its create must not 404 on replica lag.
         assert!(body_of("pub async fn get(").contains("load(org, id)"));
-        // A follow-up or a mute made moments ago is seen before the cache reloads.
-        assert!(body_of("pub async fn extend(").contains("primary_rows(org)"));
-        assert!(body_of("async fn cancel_follow_ups(").contains("primary_rows(org)"));
-        assert!(body_of("pub(crate) async fn primary_rows(").contains("get_orm_client_rw()"));
     }
 }

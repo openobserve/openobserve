@@ -16,8 +16,8 @@
 //! Applies downtime rows replicated from another region, so each region decides locally.
 
 use std::{
-    collections::HashMap,
-    sync::{LazyLock, Mutex, PoisonError},
+    collections::{HashMap, HashSet},
+    sync::{LazyLock, Mutex, MutexGuard, PoisonError},
 };
 
 use config::{
@@ -47,6 +47,9 @@ const FOLDER_WAIT_MICROS: i64 = 10 * 60 * 1_000_000;
 
 /// `org/id` -> when this node first saw the row wait for its folder, so a backlog still waits.
 static FOLDER_WAITS: LazyLock<Mutex<HashMap<String, i64>>> = LazyLock::new(Default::default);
+
+/// `org/id` of rows this node filed under `default` after the wait, so their later edits skip it.
+static FILED_UNDER_DEFAULT: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
 
 /// The re-measure plan of a put, injected so a test plans against its own database.
 type PlanFuture<'a> = std::pin::Pin<
@@ -116,9 +119,13 @@ async fn apply(msg: DowntimeMessage, enabled: bool) -> Result<()> {
     match msg {
         DowntimeMessage::Put { org, mut downtime } => {
             downtime.org = org;
-            downtime.folder_id = local_folder_id(&downtime).await?;
+            let wait_key = format!("{}/{}", downtime.org, downtime.id);
+            downtime.folder_id = local_folder_id(&downtime, &wait_key).await?;
             let client = infra::db::get_orm_client_rw().await;
-            let Some(written) = apply_put(client, &downtime, &planner(enabled)).await? else {
+            let written = apply_put(client, &downtime, &planner(enabled)).await?;
+            // Written or stale: either way a later put of this row starts a fresh wait.
+            locked(&FOLDER_WAITS).remove(&wait_key);
+            let Some(written) = written else {
                 return Ok(());
             };
             if !enabled {
@@ -243,7 +250,7 @@ async fn apply_put<'a, C: ConnectionTrait + TransactionTrait>(
     planner: &(dyn Fn(Option<Downtime>, Downtime) -> PlanFuture<'a> + Sync),
 ) -> Result<Option<WrittenPut>> {
     for _ in 0..WRITE_ATTEMPTS {
-        let Some(planned) = plan_put(conn, downtime).await? else {
+        let Some(planned) = plan_put(conn, downtime, true).await? else {
             return Ok(None);
         };
         let plan = remeasure_plan(&planned, planner).await?;
@@ -258,7 +265,11 @@ async fn apply_put<'a, C: ConnectionTrait + TransactionTrait>(
 }
 
 /// Orders the put against the stored row; `None` if the stored row wins.
-async fn plan_put<C: ConnectionTrait>(conn: &C, downtime: &Downtime) -> Result<Option<PlannedPut>> {
+async fn plan_put<C: ConnectionTrait>(
+    conn: &C,
+    downtime: &Downtime,
+    log: bool,
+) -> Result<Option<PlannedPut>> {
     let stored = table::downtimes::version_with(conn, &downtime.org, &downtime.id).await?;
     // The live row only; a tombstone's cancel state never decides (rule 2 of put_order).
     let before = table::downtimes::get_with(conn, &downtime.org, &downtime.id).await?;
@@ -270,7 +281,9 @@ async fn plan_put<C: ConnectionTrait>(conn: &C, downtime: &Downtime) -> Result<O
     let order = stored.map_or(PutOrder::Apply, |stored| {
         put_order(stored, cancels, downtime.version, downtime.updated_at)
     });
-    log_order(order, downtime, stored);
+    if log {
+        log_order(order, downtime, stored);
+    }
     if !order.applies() {
         return Ok(None);
     }
@@ -391,39 +404,35 @@ async fn remeasure_plan<'a>(
 }
 
 /// The local folder of a replicated row, waiting for a folder that has not replicated yet.
-async fn local_folder_id(downtime: &Downtime) -> Result<String> {
+async fn local_folder_id(downtime: &Downtime, wait_key: &str) -> Result<String> {
     let known =
         table::folders::get_pk_by_name(&downtime.org, &downtime.folder_id, FolderType::Downtimes)
             .await?
             .is_some();
-    let first_seen_key = format!("{}/{}", downtime.org, downtime.id);
-    let (stored_in_default, waited) = if known || downtime.folder_id == DEFAULT_FOLDER {
+    if known {
+        locked(&FILED_UNDER_DEFAULT).remove(wait_key);
+    }
+    let (filed_under_default, waited) = if known || downtime.folder_id == DEFAULT_FOLDER {
         (false, 0)
     } else {
         let client = infra::db::get_orm_client_rw().await;
-        let Some(planned) = plan_put(client, downtime).await? else {
+        // Quiet: `apply_put` plans again and logs the order once.
+        let Some(planned) = plan_put(client, downtime, false).await? else {
             // `apply_put` drops a stale put before any write, so its folder does not matter.
             return Ok(downtime.folder_id.clone());
         };
-        let stored_in_default = planned
+        // A row the origin keeps in `default` may be moving into a new folder, so only ours skip.
+        let filed_under_default = planned
             .before
-            .is_some_and(|before| before.folder_id == DEFAULT_FOLDER);
+            .is_some_and(|before| before.folder_id == DEFAULT_FOLDER)
+            && locked(&FILED_UNDER_DEFAULT).contains(wait_key);
         let now = now_micros();
-        let first_seen = *FOLDER_WAITS
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .entry(first_seen_key.clone())
+        let first_seen = *locked(&FOLDER_WAITS)
+            .entry(wait_key.to_owned())
             .or_insert(now);
-        (stored_in_default, now.saturating_sub(first_seen))
+        (filed_under_default, now.saturating_sub(first_seen))
     };
-    let action = folder_action(&downtime.folder_id, known, stored_in_default, waited);
-    if action != FolderAction::Missing {
-        FOLDER_WAITS
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .remove(&first_seen_key);
-    }
-    match action {
+    match folder_action(&downtime.folder_id, known, filed_under_default, waited) {
         FolderAction::Use => Ok(downtime.folder_id.clone()),
         FolderAction::Missing => Err(Error::Message(format!(
             "[DOWNTIMES] folder {} of downtime {}/{} is not in this region yet",
@@ -437,6 +446,7 @@ async fn local_folder_id(downtime: &Downtime) -> Result<String> {
                     downtime.org,
                     downtime.id
                 );
+                locked(&FILED_UNDER_DEFAULT).insert(wait_key.to_owned());
             }
             table::folders::get_or_create(&downtime.org, default_folder(), FolderType::Downtimes)
                 .await?;
@@ -448,13 +458,13 @@ async fn local_folder_id(downtime: &Downtime) -> Result<String> {
 fn folder_action(
     folder_id: &str,
     known: bool,
-    stored_in_default: bool,
+    filed_under_default: bool,
     waited_micros: i64,
 ) -> FolderAction {
     if known {
         FolderAction::Use
     } else if folder_id == DEFAULT_FOLDER
-        || stored_in_default
+        || filed_under_default
         || waited_micros >= FOLDER_WAIT_MICROS
     {
         FolderAction::UseDefault
@@ -481,6 +491,11 @@ fn default_folder() -> Folder {
         description: DEFAULT_FOLDER.to_owned(),
         icon: None,
     }
+}
+
+/// The maps hold only timestamps and ids, so a panic elsewhere leaves them usable.
+fn locked<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 #[cfg(test)]
@@ -934,7 +949,7 @@ mod tests {
         let db = db().await;
         put(&db, &versioned(1, 10)).await.unwrap();
         let incoming = versioned(2, 20);
-        let planned = plan_put(&db, &incoming).await.unwrap().unwrap();
+        let planned = plan_put(&db, &incoming, true).await.unwrap().unwrap();
 
         table::downtimes::delete_with(&db, "acme", "d1")
             .await
@@ -957,7 +972,7 @@ mod tests {
         let db = db().await;
         put(&db, &versioned(1, 10)).await.unwrap();
         let incoming = versioned(2, 20);
-        let planned = plan_put(&db, &incoming).await.unwrap().unwrap();
+        let planned = plan_put(&db, &incoming, true).await.unwrap().unwrap();
 
         let mut local = versioned(3, 30);
         local.name = "local edit".to_string();
@@ -982,7 +997,7 @@ mod tests {
     async fn a_put_planned_against_a_missing_row_loses_to_a_delete_that_lands_first() {
         let db = db().await;
         let incoming = versioned(1, 10);
-        let planned = plan_put(&db, &incoming).await.unwrap().unwrap();
+        let planned = plan_put(&db, &incoming, true).await.unwrap().unwrap();
 
         assert!(apply_delete(&db, "acme", "d1", 2, 20).await.unwrap());
         assert!(

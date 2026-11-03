@@ -1976,7 +1976,10 @@ async fn write_traces(
     for (timestamp, record_val) in json_data {
         // Start check for alert trigger
         if let Some(alerts) = cur_stream_alerts
-            && (mute_split.is_some() || triggers.len() < alerts.len())
+            && match &mute_split {
+                Some(split) => split.full_alerts() < alerts.len(),
+                None => triggers.len() < alerts.len(),
+            }
         {
             let alert_end_time = now_micros();
             for alert in alerts {
