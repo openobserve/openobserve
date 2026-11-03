@@ -16,7 +16,7 @@ name: Playwright E2E Crosscheck
 #       · PR base is a release line (not main) with a same-named ENT branch → build against THAT branch
 #       · no ENT counterpart                      → build against ENT main, testing the PR merged into
 #                                                   OSS main (refs/pull/N/merge; branch head if not mergeable)
-#     then POLL and mirror pass/fail. A lost test runner is re-run once before it is reported.
+#     then POLL and mirror pass/fail. Only a lost test runner is re-run, up to twice, before it is reported.
 #
 # A single STICKY comment per PR (found by a hidden marker) reports running → passed / failed, lists the
 # failing specs, and links the sister ENT PR/branch + the ENT run. A build failure is attributed by the
@@ -41,8 +41,8 @@ on:
 
 # PR-scoped: a new push/label supersedes the previous gate attempt for the same PR.
 concurrency:
-  # A non-approval review does nothing, so it must not cancel a running gate.
-  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && format('-{0}', github.run_id) || '' }}
+  # A non-approval review or a label the gate ignores (e.g. auto-requeue-*) does nothing, so it must not cancel a running gate.
+  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ ((github.event_name == 'pull_request_review' && github.event.review.state != 'approved') || ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'ready-for-ci' && github.event.label.name != 'skip-ent-e2e')) && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -68,7 +68,12 @@ jobs:
           ACTION: ${{ github.event_name == 'pull_request' && github.event.action || '' }}
           LABEL: ${{ github.event.label.name }}
         run: |
-          # Any label change cancels the running gate, so it must start a replacement; without approval only label events and ready_for_review do.
+          # Other labels run in their own concurrency group and must not dispatch; the gate's own labels cancel it, so they start a replacement.
+          if { [ "$ACTION" = "labeled" ] || [ "$ACTION" = "unlabeled" ]; } && [ "$LABEL" != "ready-for-ci" ] && [ "$LABEL" != "skip-ent-e2e" ]; then
+            echo "Label '$LABEL' does not affect the gate; nothing to do."
+            echo "dispatch=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "$ACTION" = "labeled" ] || [ "$ACTION" = "unlabeled" ] || [ "$ACTION" = "ready_for_review" ]; then
             echo "Triggered by $ACTION; approval not required."
             echo "dispatch=true" >> "$GITHUB_OUTPUT"
@@ -88,8 +93,8 @@ jobs:
     runs-on: ubuntu-latest
     # ~5 min to find the ENT run + up to ~75 min to poll. Generous on purpose: normal is ~20 min,
     # but a cold Rust cache can push the ENT build+run toward its own timeouts — don't false-fail
-    # the gate ("timed out") while ENT is still legitimately running. A lost runner adds one re-run.
-    timeout-minutes: 150
+    # the gate ("timed out") while ENT is still legitimately running. Two lost-runner re-runs add 40 min each.
+    timeout-minutes: 170
     steps:
       - name: Triage — relevant paths? opted out?
         id: triage
@@ -157,6 +162,7 @@ jobs:
           # place — pass AND fail — instead of spamming a fresh comment each run.
           sticky() {
             local body="$1" cid
+            if [ -n "${META:-}" ]; then body="$body"$'\n\n'"$META"; fi
             cid=$(gh api "repos/openobserve/openobserve/issues/$PR/comments" --paginate \
               -q "[.[] | select(.body|contains(\"$MARKER\")) | .id][0]" 2>/dev/null || echo "")
             if [ -n "$cid" ] && [ "$cid" != "null" ]; then
@@ -164,6 +170,10 @@ jobs:
             else
               gh api -X POST "repos/openobserve/openobserve/issues/$PR/comments" -f body="$body" >/dev/null 2>&1 || true
             fi
+          }
+          sticky_body() {
+            gh api "repos/openobserve/openobserve/issues/$PR/comments" --paginate \
+              -q "[.[] | select(.body|contains(\"$MARKER\")) | .body][0] // \"\"" 2>/dev/null || true
           }
 
           # Sister ENT resolution. An OPEN same-named ENT PR is the live counterpart — let ITS checks
@@ -198,58 +208,83 @@ jobs:
           fi
 
           # Against ENT main, test the PR merged into OSS main: a stale branch would miss OSS code ENT main already uses.
-          OSS_REF="$HEAD_REF"
+          OSS_REF="$HEAD_REF"; TESTED_SHA="$HEAD_SHA"
           if [ "$ENT_CODE_REF" = "main" ] && [ "$BASE_REF" = "main" ]; then
-            MERGEABLE=""
+            MERGEABLE=""; MERGE_SHA=""
             for _ in 1 2 3 4 5; do
-              MERGEABLE=$(gh api "repos/openobserve/openobserve/pulls/$PR" -q '.mergeable' 2>/dev/null || echo "")
+              read -r MERGEABLE MERGE_SHA < <(gh api "repos/openobserve/openobserve/pulls/$PR" -q '"\(.mergeable) \(.merge_commit_sha // "")"' 2>/dev/null || echo "")
               if [ "$MERGEABLE" = "true" ] || [ "$MERGEABLE" = "false" ]; then break; fi
               sleep 6
             done
-            if [ "$MERGEABLE" = "true" ]; then
-              OSS_REF="refs/pull/$PR/merge"
+            if [ "$MERGEABLE" = "true" ] && [ -n "$MERGE_SHA" ]; then
+              OSS_REF="refs/pull/$PR/merge"; TESTED_SHA="$MERGE_SHA"
               SISTER_NOTE="$SISTER_NOTE Tested as this PR merged into OSS \`main\`."
             else
               echo "::warning::PR #$PR is not cleanly mergeable into main (mergeable=$MERGEABLE) — testing the branch head as-is."
             fi
           fi
 
-          # Stamp the time BEFORE dispatch so correlation can reject stale prior runs for this PR.
-          DISPATCH_TS=$(date -u +%s)
-          echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF, code=$ENT_CODE_REF, oss=$OSS_REF) for OSS PR #$PR ($HEAD_REF)…"
-          gh workflow run "$WF" --repo "$REPO" --ref "$ENT_REF" \
-            -f oss_branch="$OSS_REF" \
-            -f oss_pr="$PR" \
-            -f oss_sha="$HEAD_SHA" \
-            -f enterprise_ref="$ENT_CODE_REF"
-
-          # Correlate by PR-scoped run-name ("Playwright E2E Crosscheck — OSS PR #<PR> ("; the "(" boundary keeps
-          # #12 from matching #123) AND createdAt >= dispatch time (minus 60s clock-skew), so a stale
-          # prior run for this PR is never picked. Take the NEWEST qualifying run.
           MATCH="OSS PR #$PR ("
-          MIN_TS=$((DISPATCH_TS - 60))
           RUN_ID=""
-          sleep 8   # let the dispatched run register before the first lookup
-          for i in $(seq 1 30); do            # ~5 min to appear
-            RUN_ID=$(gh run list --repo "$REPO" --workflow "$WF" -L 40 \
-              --json databaseId,displayTitle,createdAt \
-              -q "[.[] | select(.displayTitle | contains(\"$MATCH\")) | select((.createdAt|fromdateiso8601) >= $MIN_TS)] | sort_by(.createdAt) | last | .databaseId" 2>/dev/null || echo "")
-            if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then break; fi
-            sleep 10
-          done
-          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+          # Approval and label changes restart this gate; the sticky records the run already started for this exact head and merge commit.
+          PRIOR=$(sticky_body | grep -o 'ent-run: [^>]*' | head -n 1 || true)
+          read -r P_ID P_HEAD P_TESTED P_OSS P_ENT _ <<<"${PRIOR#ent-run: }"
+          if [ -n "$P_ID" ] && [ "$P_HEAD $P_TESTED $P_OSS $P_ENT" = "$HEAD_SHA $TESTED_SHA $OSS_REF $ENT_CODE_REF" ]; then
+            P_STATE=$(gh api "repos/$REPO/actions/runs/$P_ID" 2>/dev/null | jq -r --arg m "$MATCH" 'if (.display_title // "" | contains($m)) | not then "none" elif .status != "completed" then "running" elif .conclusion == "success" then "success" else "none" end' 2>/dev/null || echo none)
+            if [ "$P_STATE" = "success" ] || [ "$P_STATE" = "running" ]; then
+              RUN_ID="$P_ID"
+              echo "::notice::ENT run $RUN_ID already covers head $HEAD_SHA tested as $TESTED_SHA ($P_STATE) — not dispatching."
+            fi
+          fi
+
+          if [ -z "$RUN_ID" ]; then
+            # Stamp the time BEFORE dispatch so correlation can reject stale prior runs for this PR.
+            DISPATCH_TS=$(date -u +%s)
+            echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF, code=$ENT_CODE_REF, oss=$OSS_REF) for OSS PR #$PR ($HEAD_REF)…"
+            gh workflow run "$WF" --repo "$REPO" --ref "$ENT_REF" \
+              -f oss_branch="$OSS_REF" \
+              -f oss_pr="$PR" \
+              -f oss_sha="$HEAD_SHA" \
+              -f enterprise_ref="$ENT_CODE_REF"
+
+            # Correlate by PR-scoped run-name ("Playwright E2E Crosscheck — OSS PR #<PR> ("; the "(" boundary keeps
+            # #12 from matching #123) AND createdAt >= dispatch time (minus 60s clock-skew), so a stale
+            # prior run for this PR is never picked. Take the NEWEST qualifying run.
+            MIN_TS=$((DISPATCH_TS - 60))
+            sleep 8   # let the dispatched run register before the first lookup
+            for i in $(seq 1 30); do            # ~5 min to appear
+              RUN_ID=$(gh run list --repo "$REPO" --workflow "$WF" -L 40 \
+                --json databaseId,displayTitle,createdAt \
+                -q "[.[] | select(.displayTitle | contains(\"$MATCH\")) | select((.createdAt|fromdateiso8601) >= $MIN_TS)] | sort_by(.createdAt) | last | .databaseId" 2>/dev/null || echo "")
+              if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then break; fi
+              sleep 10
+            done
+            if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
           sticky "### 🚫 Playwright E2E Crosscheck — could not start
 
           $MARKER
           Dispatching the enterprise e2e engine failed or the run never appeared (check \`ORG_ADMIN_TOKEN\` / \`ENT_GATE_REF=$ENT_REF\`). The gate stays red until it runs — re-push or re-label to retry.
 
           $SISTER_NOTE"
-            echo "::error::Could not locate the dispatched ENT run within 5 min — failing the gate (unverified)."
-            exit 1
+              echo "::error::Could not locate the dispatched ENT run within 5 min — failing the gate (unverified)."
+              exit 1
+            fi
           fi
 
           RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
+          META="<!-- ent-run: $RUN_ID $HEAD_SHA $TESTED_SHA $OSS_REF $ENT_CODE_REF -->"
           echo "::notice::Tracking ENT run: $RUN_URL"
+
+          report_pass() {
+          sticky "### ✅ Playwright E2E Crosscheck — passed
+
+          $MARKER
+          The enterprise-only e2e specs passed against this PR. $SISTER_NOTE
+
+          [ENT run]($RUN_URL)"
+            echo "::notice::✅ Enterprise e2e specs passed against this PR."
+          }
+          if [ "${P_STATE:-}" = "success" ] && [ "$RUN_ID" = "$P_ID" ]; then report_pass; exit 0; fi
 
           sticky "### 🔄 Playwright E2E Crosscheck — running
 
@@ -259,12 +294,12 @@ jobs:
 
           [ENT run]($RUN_URL)"
 
-          # A lost runner is infra, not the PR: re-run the failed ENT job once before reporting it.
-          ATTEMPT=1
+          # A lost runner is infra, not the PR: re-run only the lost ENT jobs, up to 3 attempts of the run in all.
+          MAX_ATTEMPTS=3; RETRIES=0
+          POLLS=300                             # 300 * 15s = 75 min — covers a cold-cache ENT build+run worst case
           while :; do
-            # Poll to completion (~75 min budget — covers a cold-cache ENT build+run worst case).
             STATUS=""; CONCL=""
-            for i in $(seq 1 300); do           # 300 * 15s = 75 min
+            for i in $(seq 1 "$POLLS"); do
               read -r STATUS CONCL < <(gh run view "$RUN_ID" --repo "$REPO" \
                 --json status,conclusion -q '.status + " " + (.conclusion // "")' 2>/dev/null || echo "unknown ")
               if [ "$STATUS" = "completed" ]; then break; fi
@@ -281,22 +316,28 @@ jobs:
               exit 1
             fi
 
-            if [ "$CONCL" = "success" ]; then
-          sticky "### ✅ Playwright E2E Crosscheck — passed
+            if [ "$CONCL" = "success" ]; then report_pass; exit 0; fi
+
+            # Only a newer engine run for this PR supersedes this one; a run cancelled any other way never finished the specs.
+            if [ "$CONCL" = "cancelled" ] || [ "$CONCL" = "skipped" ] || [ -z "$CONCL" ]; then
+              RUN_CREATED=$(gh api "repos/$REPO/actions/runs/$RUN_ID" -q '.created_at' 2>/dev/null || echo "")
+              NEWER=0
+              if [ -n "$RUN_CREATED" ]; then
+                NEWER=$(gh run list --repo "$REPO" --workflow "$WF" -L 40 --json databaseId,displayTitle,createdAt \
+                  -q "[.[] | select(.displayTitle | contains(\"$MATCH\")) | select(.databaseId != $RUN_ID and .createdAt > \"$RUN_CREATED\")] | length" 2>/dev/null || echo 0)
+              fi
+              if [ "${NEWER:-0}" != "0" ]; then
+                echo "::notice::ENT run concluded '$CONCL' and a newer ENT run exists for this PR — superseded, deferring to it."
+                exit 0
+              fi
+          sticky "### 🚫 Playwright E2E Crosscheck — enterprise run was cancelled, re-run needed
 
           $MARKER
-          The enterprise-only e2e specs passed against this PR. $SISTER_NOTE
+          The [enterprise e2e run]($RUN_URL) was cancelled (conclusion: \`${CONCL:-none}\`) and no newer enterprise run replaced it, so the specs did not finish. Re-run the failed job of this check.
 
-          [ENT run]($RUN_URL)"
-              echo "::notice::✅ Enterprise e2e specs passed against this PR."
-              exit 0
-            fi
-
-            # cancelled/skipped/empty ≈ a newer push superseded this run (engine cancel-in-progress).
-            # NOT a failure — the newer run is authoritative and updates the sticky itself. Defer.
-            if [ "$CONCL" = "cancelled" ] || [ "$CONCL" = "skipped" ] || [ -z "$CONCL" ]; then
-              echo "::notice::ENT run concluded '$CONCL' (likely superseded by a newer push) — deferring, not failing."
-              exit 0
+          $SISTER_NOTE"
+              echo "::error::ENT run concluded '${CONCL:-none}' with no newer ENT run for this PR — failing the gate (unverified)."
+              exit 1
             fi
 
             # Genuine failure — distinguish an enterprise BUILD failure (compile) from SPEC failures,
@@ -306,25 +347,41 @@ jobs:
             TEST_JOBS=$(gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/jobs?filter=all&per_page=100" --jq '.jobs[]' 2>/dev/null | jq -s '[.[]|select(.name=="ent_gate_tests" or (.name|startswith("ent_gate_tests (")))] | group_by(.name) | map(max_by(.run_attempt)) | (map(select(.name|startswith("ent_gate_tests (")))) as $s | if ($s|length) > 0 then $s else . end' 2>/dev/null || echo '[]')
             TEST_CONCL=$(jq -r '[.[].conclusion]|if index("failure") then "failure" elif length > 0 then .[0] // "" else "" end' <<<"$TEST_JOBS")
             # A test job that failed with no failed step lost its runner; one with a failed step had spec failures.
+            LOST_IDS=$(jq -r '.[]|select(.conclusion=="failure" and ([.steps[]?|select(.conclusion=="failure")]|length)==0)|.id' <<<"$TEST_JOBS")
             TEST_LOST=$(jq '[.[]|select(.conclusion=="failure" and ([.steps[]?|select(.conclusion=="failure")]|length)==0)]|length' <<<"$TEST_JOBS")
             TEST_SPEC_FAILED=$(jq '[.[]|select(.conclusion=="failure" and ([.steps[]?|select(.conclusion=="failure")]|length)>0)]|length' <<<"$TEST_JOBS")
             TEST_LOST=${TEST_LOST:-0}; TEST_SPEC_FAILED=${TEST_SPEC_FAILED:-0}
+            RUN_ATTEMPT=$(gh api "repos/$REPO/actions/runs/$RUN_ID" -q '.run_attempt' 2>/dev/null || echo "$MAX_ATTEMPTS")
 
-            if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_LOST" != "0" ] && [ "$ATTEMPT" = "1" ]; then
-              ATTEMPT=2
-              echo "::warning::ENT test runner was lost — re-running the failed ENT job once."
-              if gh run rerun "$RUN_ID" --repo "$REPO" --failed; then
+            # A re-run would repeat the jobs with spec failures too, so only a lost-runner-only failure is retried.
+            if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_LOST" != "0" ] && [ "$TEST_SPEC_FAILED" = "0" ] \
+              && [ "$RUN_ATTEMPT" -lt "$MAX_ATTEMPTS" ] && [ "$RETRIES" -lt $((MAX_ATTEMPTS - 1)) ]; then
+              RETRIES=$((RETRIES + 1))
+              echo "::warning::ENT test runner lost in $TEST_LOST job(s) — re-running them (attempt $((RUN_ATTEMPT + 1)) of $MAX_ATTEMPTS)."
+              # The jobs API re-runs one job; a run can't take a second job re-run while the first is going, and with no spec failures --failed holds only lost jobs.
+              if [ "$TEST_LOST" = "1" ]; then
+                RERUN=(gh api -X POST "repos/$REPO/actions/jobs/$LOST_IDS/rerun")
+              else
+                RERUN=(gh run rerun "$RUN_ID" --repo "$REPO" --failed)
+              fi
+              if "${RERUN[@]}" >/dev/null; then
           sticky "### 🔄 Playwright E2E Crosscheck — runner lost, re-running
 
           $MARKER
-          The enterprise test runner stopped before the specs finished (infra, not this PR), so the failed job is being re-run automatically.
+          The enterprise test runner stopped before the specs finished (infra, not this PR), so the lost job is being re-run automatically (attempt $((RUN_ATTEMPT + 1)) of $MAX_ATTEMPTS).
           $SISTER_NOTE
 
           [ENT run]($RUN_URL)"
-                sleep 20
+                # The poll must not read the finished attempt as the re-run's result.
+                for _ in $(seq 1 12); do
+                  NOW_ATTEMPT=$(gh api "repos/$REPO/actions/runs/$RUN_ID" -q '.run_attempt' 2>/dev/null || echo "$RUN_ATTEMPT")
+                  if [ "$NOW_ATTEMPT" -gt "$RUN_ATTEMPT" ]; then break; fi
+                  sleep 5
+                done
+                POLLS=160                       # 160 * 15s = 40 min — a re-run reuses the build, so it is one shard's run
                 continue
               fi
-              echo "::warning::Could not re-run the ENT job — reporting the lost runner."
+              echo "::warning::Could not re-run the lost ENT job(s) — reporting the lost runner."
             fi
             break
           done
@@ -342,7 +399,7 @@ jobs:
           sticky "### ⚠️ Playwright E2E Crosscheck — runner lost, re-run needed
 
           $MARKER
-          The enterprise test runner stopped before the specs finished (infra, not this PR), and the automatic re-run didn't get past it. Re-run the failed job of this check.
+          The enterprise test runner stopped before the specs finished (infra, not this PR), and the automatic re-runs didn't get past it. Re-run the failed job of this check.
 
           $SISTER_NOTE · [ENT run]($RUN_URL)"
           elif [ "$TEST_CONCL" = "failure" ]; then
