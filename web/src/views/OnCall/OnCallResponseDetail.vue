@@ -495,6 +495,12 @@
                       :total="deliveriesTotal"
                       :loading="deliveriesLoading"
                     />
+                    <div class="pt-4" data-test="oncall-response-destination-deliveries">
+                      <div class="text-text-secondary pb-1 text-xs font-semibold">
+                        {{ t("notificationDeliveries.perDestination") }}
+                      </div>
+                      <NotificationDeliveries kind="on_call" :object-id="responseId" />
+                    </div>
                   </OTabPanel>
 
                   <!-- The history behind the rail's one-line summary. -->
@@ -783,6 +789,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import OnCallAboutPage from "@/components/oncall/OnCallAboutPage.vue";
 import OnCallDeliveryLedger from "@/components/oncall/OnCallDeliveryLedger.vue";
+import NotificationDeliveries from "@/components/notifications/NotificationDeliveries.vue";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
 import OnCallReachAlarm from "@/components/oncall/OnCallReachAlarm.vue";
 import OnCallWhatFired from "@/components/oncall/OnCallWhatFired.vue";

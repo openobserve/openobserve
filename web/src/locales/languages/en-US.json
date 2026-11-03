@@ -26781,7 +26781,8 @@
     "testPageConfirmNoChannel": "Send a test page for {priority} to {names}? It does not escalate.",
     "testPageSentOf": "Sent {sent} of {total} message | Sent {sent} of {total} messages",
     "ladderSendTest": "Send test",
-    "scopeNotSeenYet": "Not seen in your data yet"
+    "scopeNotSeenYet": "Not seen in your data yet",
+    "policyMailBanner": "Email and SNS destinations receive pages from this version: {names}."
   },
   "paidUsage": {
     "consentTitle": "Turn on paid AI usage?",
