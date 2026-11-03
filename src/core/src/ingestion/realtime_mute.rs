@@ -142,6 +142,7 @@ impl RowSplit {
 
     /// The row the service-discovery fallback reads: the first matching row, and only when no
     /// row had an identity, as `downtime_identities_by_key` decides for a scheduled run.
+    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
     pub(crate) fn fallback_row(&self) -> Option<&Row> {
         (!self.any_identity).then(|| self.empty.first()).flatten()
     }
