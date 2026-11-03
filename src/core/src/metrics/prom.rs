@@ -785,7 +785,7 @@ fn metadata_search_request(sql: String, start: i64, end: i64) -> config::meta::s
         search_type: None,
         search_event_context: None,
         use_cache: default_use_cache(),
-        use_inverted_index: true,
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,

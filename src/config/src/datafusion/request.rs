@@ -31,7 +31,7 @@ pub struct Request {
     pub streaming_id: Option<String>,
     pub local_mode: Option<bool>,
     pub use_cache: bool,
-    pub use_inverted_index: bool,
+    pub use_index: bool,
     pub overwrite_cache: bool,
     pub histogram_interval: i64,
     /// Issued by the AI Chat API's history reader, the only reader allowed on
@@ -57,7 +57,7 @@ impl Default for Request {
             streaming_id: None,
             local_mode: None,
             use_cache: default_use_cache(),
-            use_inverted_index: true,
+            use_index: true,
             overwrite_cache: false,
             histogram_interval: 0,
             chat_history_reader: false,
@@ -91,7 +91,7 @@ impl Request {
             streaming_id: None,
             local_mode: None,
             use_cache: default_use_cache(),
-            use_inverted_index: true,
+            use_index: true,
             overwrite_cache,
             histogram_interval,
             chat_history_reader: false,
@@ -115,8 +115,8 @@ impl Request {
         self.use_cache = use_cache;
     }
 
-    pub fn set_use_inverted_index(&mut self, use_inverted_index: bool) {
-        self.use_inverted_index = use_inverted_index;
+    pub fn set_use_index(&mut self, use_index: bool) {
+        self.use_index = use_index;
     }
 
     /// Mark the request as the AI Chat API's history reader when — and only
@@ -141,7 +141,7 @@ impl From<FlightSearchRequest> for Request {
             streaming_id: None,
             local_mode: req.super_cluster_info.local_mode,
             use_cache: req.search_info.use_cache,
-            use_inverted_index: !req.index_info.skip_inverted_index,
+            use_index: !req.index_info.skip_index,
             overwrite_cache: req.search_info.clear_cache,
             histogram_interval: req.search_info.histogram_interval,
             // Never carried across nodes.
@@ -241,15 +241,15 @@ mod tests {
         assert_eq!(req.local_mode, Some(true));
         assert!(!req.streaming_output);
         assert!(req.streaming_id.is_none());
-        assert!(req.use_inverted_index);
+        assert!(req.use_index);
     }
 
     #[test]
-    fn test_from_flight_request_maps_skip_inverted_index() {
+    fn test_from_flight_request_maps_skip_index() {
         let mut flight = make_flight_request();
-        flight.index_info.skip_inverted_index = true;
-        assert!(!Request::from(flight).use_inverted_index);
-        assert!(Request::default().use_inverted_index);
+        flight.index_info.skip_index = true;
+        assert!(!Request::from(flight).use_index);
+        assert!(Request::default().use_index);
     }
 
     #[test]

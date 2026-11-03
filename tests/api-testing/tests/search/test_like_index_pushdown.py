@@ -3,7 +3,7 @@
 A LIKE on a full-text-search field is answered by the `_all` field as a superset
 and re-checked by the original predicate; on a secondary index field it is the
 same exact substring lookup as `str_match()`. Either way the rows must equal a plain scan, which
-`SELECT /*+ NO_INDEX */` and the `use_inverted_index=false` request field force.
+`SELECT /*+ NO_INDEX */` and the `use_index=false` request field force.
 """
 from __future__ import annotations
 
@@ -43,10 +43,10 @@ QUERIES = [
 ]
 
 
-def _count(client: OpenObserveClient, sql: str, *, use_inverted_index: bool = True) -> int:
+def _count(client: OpenObserveClient, sql: str, *, use_index: bool = True) -> int:
     start, end = time_window(minutes=60)
     body = search_payload(sql, start_time=start, end_time=end, size=1)
-    body["use_inverted_index"] = use_inverted_index
+    body["use_index"] = use_index
     resp = client.post("_search?type=logs", json=body, raise_for_status=True)
     hits = resp.json().get("hits", [])
     return int(hits[0]["n"]) if hits else 0
@@ -87,4 +87,4 @@ def test_like_matches_scan_with_and_without_index(
 
     assert _count(client, sql) == expected
     assert _count(client, no_index_sql) == expected
-    assert _count(client, sql, use_inverted_index=False) == expected
+    assert _count(client, sql, use_index=False) == expected

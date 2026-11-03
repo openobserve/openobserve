@@ -85,7 +85,7 @@ pub fn generate_remote_scan_rules(
 
     // the NO_INDEX hint lives in the SQL, the followers only see the request
     let mut req = req.clone();
-    req.set_use_inverted_index(sql.use_inverted_index(&req));
+    req.set_use_index(sql.use_index(&req));
 
     // rewrite physical plan
     Arc::new(RemoteScanRule::new(

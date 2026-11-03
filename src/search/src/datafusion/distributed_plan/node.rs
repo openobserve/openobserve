@@ -88,7 +88,7 @@ impl RemoteScanNodes {
         let index_info = IndexInfo {
             equal_keys: self.equal_keys.get(table_name).unwrap_or(&vec![]).clone(),
             index_optimize_mode: None, // set in LeaderIndexOptimizerule
-            skip_inverted_index: !self.req.use_inverted_index,
+            skip_index: !self.req.use_index,
         };
 
         let super_cluster_info = SuperClusterInfo {
@@ -256,10 +256,10 @@ mod tests {
     }
 
     #[test]
-    fn test_get_remote_node_carries_use_inverted_index() {
-        for use_inverted_index in [true, false] {
+    fn test_get_remote_node_carries_use_index() {
+        for use_index in [true, false] {
             let req = Request {
-                use_inverted_index,
+                use_index,
                 ..Default::default()
             };
             let nodes = RemoteScanNodes::new(
@@ -272,9 +272,9 @@ mod tests {
                 None,
             );
             let info = nodes.get_remote_node(&TableReference::from("logs"));
-            assert_eq!(info.index_info.skip_inverted_index, !use_inverted_index);
+            assert_eq!(info.index_info.skip_index, !use_index);
             let flight = Request::from(info.get_flight_search_request(0));
-            assert_eq!(flight.use_inverted_index, use_inverted_index);
+            assert_eq!(flight.use_index, use_index);
         }
     }
 

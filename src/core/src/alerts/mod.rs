@@ -547,7 +547,7 @@ impl QueryConditionExt for QueryCondition {
                 uses_zo_fn: false,
                 query_fn: self.vrl_function.clone(),
                 skip_wal: false,
-                use_inverted_index: true,
+                use_index: true,
                 index_type: "".to_string(),
                 per_query_response: false, // Will return results in single array
             };
@@ -605,7 +605,7 @@ impl QueryConditionExt for QueryCondition {
                 search_type,
                 search_event_context,
                 use_cache: false,
-                use_inverted_index: true,
+                use_index: true,
                 clear_cache: false,
                 local_mode: None,
                 agent_options: None,
@@ -946,7 +946,7 @@ async fn run_alert_count_query(
         search_type,
         search_event_context,
         use_cache: false,
-        use_inverted_index: true,
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,

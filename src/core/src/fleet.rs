@@ -155,7 +155,7 @@ async fn search_audit(
         search_type: Some(search::SearchEventType::Other),
         search_event_context: None,
         use_cache: false,
-        use_inverted_index: true,
+        use_index: true,
         clear_cache: false,
         local_mode: None,
         agent_options: None,

@@ -262,7 +262,7 @@ pub fn generate_physical_optimizer_rules(
     }
 
     // should after remote scan
-    if sql.use_inverted_index(req) {
+    if sql.use_index(req) {
         let mut index_fields: HashMap<TableReference, HashSet<String>> = HashMap::new();
         for (stream_name, schema) in sql.schemas.iter() {
             let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
@@ -659,14 +659,14 @@ mod tests {
     }
 
     #[test]
-    fn test_leader_index_rule_follows_use_inverted_index() {
+    fn test_leader_index_rule_follows_use_index() {
         let has_leader_index_rule = |req: &Request, sql: &Sql| {
             generate_physical_optimizer_rules(req, sql, vec![])
                 .iter()
                 .any(|rule| rule.name() == "LeaderIndexOptimizerRule")
         };
         let no_index_req = Request {
-            use_inverted_index: false,
+            use_index: false,
             ..Default::default()
         };
         let hinted_sql = Sql {

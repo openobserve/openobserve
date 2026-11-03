@@ -90,7 +90,7 @@ pub(super) fn optimizer_physical_plan(
     );
     let original_plan = Arc::clone(&plan);
     // a skipped rule leaves no condition and cannot optimize, which also drops the leader's mode
-    let plan = if index_info.skip_inverted_index {
+    let plan = if index_info.skip_index {
         plan
     } else {
         index_rule.optimize(plan, ctx.state().config_options())?
@@ -249,10 +249,7 @@ mod tests {
         ));
     }
 
-    async fn plan_with_index(
-        sql: &str,
-        use_inverted_index: bool,
-    ) -> (Arc<dyn ExecutionPlan>, IndexPlan) {
+    async fn plan_with_index(sql: &str, use_index: bool) -> (Arc<dyn ExecutionPlan>, IndexPlan) {
         let schema = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("service", DataType::Utf8, false),
@@ -279,7 +276,7 @@ mod tests {
                 ..Default::default()
             },
             &IndexInfo {
-                skip_inverted_index: !use_inverted_index,
+                skip_index: !use_index,
                 ..Default::default()
             },
         )

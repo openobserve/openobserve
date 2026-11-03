@@ -362,8 +362,8 @@ impl Sql {
     }
 
     /// The request flag and the SQL hint both have to allow the inverted index.
-    pub fn use_inverted_index(&self, req: &Request) -> bool {
-        req.use_inverted_index && !self.no_index_hint
+    pub fn use_index(&self, req: &Request) -> bool {
+        req.use_index && !self.no_index_hint
     }
 
     pub fn get_first_stream_key(&self) -> String {

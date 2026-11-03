@@ -3544,7 +3544,7 @@ pub struct IndexInfo {
     pub index_optimize_mode: ::core::option::Option<IdxOptimizeMode>,
     /// negated so a peer that omits it keeps the index
     #[prost(bool, tag = "6")]
-    pub skip_inverted_index: bool,
+    pub skip_index: bool,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SuperClusterInfo {
