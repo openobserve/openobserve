@@ -22,11 +22,12 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum EvalJobHealth {
     Healthy,
-    /// More than 20% of at least 5 recent scorer runs failed.
+    /// More than 20% of at least 5 recent scorer runs failed, or nothing ran recently and the
+    /// lookback's newest outcome is an error.
     Degraded,
     /// The newest scorer outcome is a `provider_auth` error.
     WaitingForCredentials,
-    /// No scorer ran in the recent window.
+    /// No scorer ran in the 24-hour lookback.
     NoRecentRuns,
 }
 

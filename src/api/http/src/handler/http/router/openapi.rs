@@ -315,6 +315,8 @@ use crate::{
         gen_ai::get_agent_mapping,
         gen_ai::list_scored_agents,
         gen_ai::save_agent_mapping,
+        openobserve_api_management::request::gen_ai_health::get_data_health,
+        openobserve_api_management::request::model_pricing::list_unpriced,
         openobserve_api_management::request::alerts::deduplication::get_semantic_groups,
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
@@ -607,6 +609,18 @@ use crate::{
             config::meta::gen_ai::GenAiAgentMappingConfig,
             gen_ai::GenAiAgentListItem,
             gen_ai::GenAiAgentListResponse,
+            openobserve_api_management::request::gen_ai_health::DataHealthResponse,
+            openobserve_api_management::request::gen_ai_health::HealthCheck,
+            openobserve_api_management::request::gen_ai_health::ModelUsage,
+            openobserve_api_management::request::gen_ai_health::CheckId,
+            openobserve_api_management::request::gen_ai_health::CheckStatus,
+            openobserve_api_management::request::model_pricing::UnpricedModelsResponse,
+            openobserve_api_management::request::model_pricing::UnpricedModel,
+            openobserve_api_management::request::model_pricing::UnpricedModelMatch,
+            openobserve_api_management::request::gen_ai_health::UnpricedModelRow,
+            config::meta::model_pricing::CostStatus,
+            config::meta::model_pricing::PricingSource,
+            config::meta::model_pricing::PricingTierDefinition,
             config::meta::dashboards::Dashboard,
             config::meta::dashboards::v1::AxisItem,
             config::meta::dashboards::v1::Dashboard,
@@ -1050,6 +1064,7 @@ use crate::{
         (name = "Domain Management", description = "Allowed email domains for sign-in (enterprise)"),
         (name = "EvalJobs", description = "Online evaluation jobs (enterprise)"),
         (name = "Experiments", description = "LLM evaluation experiments (enterprise)"),
+        (name = "GenAI Settings", description = "GenAI agent mapping, the agent list and AI data health"),
         (name = "Groups", description = "User group management"),
         (name = "Keys", description = "Cipher key management (enterprise)"),
         (name = "LLM", description = "LLM model pricing definitions"),
@@ -2153,6 +2168,34 @@ mod tests {
         );
         let schemas = spec["components"]["schemas"].as_object().unwrap();
         for name in ["RecentRejections", "IngestRejection", "RejectionReason"] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
+    fn unpriced_models_path_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/llm/models/unpriced"]["get"];
+        assert_eq!(op["operationId"], "ListUnpricedModels", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/UnpricedModelsResponse"
+        );
+        for code in ["403", "429"] {
+            assert!(op["responses"][code].is_object(), "{code}");
+            assert!(
+                spec["paths"]["/api/{org_id}/gen_ai/data_health"]["get"]["responses"][code]
+                    .is_object(),
+                "data_health {code}"
+            );
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "UnpricedModelsResponse",
+            "UnpricedModel",
+            "UnpricedModelMatch",
+            "UnpricedModelRow",
+        ] {
             assert!(schemas.contains_key(name), "schema {name} missing");
         }
     }
