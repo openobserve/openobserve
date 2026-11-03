@@ -58,6 +58,10 @@ interface PlaygroundPromptBasis {
   model: string | null;
   /** `config.tools` exactly as stored, `null` included. */
   tools: unknown;
+  /** For a prompt naming no model: the provider default the bench filled in, so
+   *  saving back writes null for it whatever the provider's default is by then.
+   *  Null until seeded; absent on drafts stored before it was recorded. */
+  seededModel?: string | null;
 }
 
 export interface PlaygroundVariant {
@@ -354,8 +358,21 @@ export function variantSettingsFromPrompt(
     tools: promptTools(config.tools),
     responseSchema:
       config.responseFormat == null ? null : JSON.stringify(config.responseFormat, null, 2),
-    promptBasis: { model: config.model ?? null, tools: config.tools ?? null },
+    promptBasis:
+      config.model == null
+        ? { model: null, tools: config.tools ?? null, seededModel: null }
+        : { model: config.model, tools: config.tools ?? null },
   };
+}
+
+/** Fills a blank model with the provider's default, remembering it when it
+ *  stands in for a prompt that named none. */
+export function seedModel(variant: PlaygroundVariant, model: string): void {
+  if (variant.model || !model) return;
+  variant.model = model;
+  if (variant.promptBasis && variant.promptBasis.model == null) {
+    variant.promptBasis.seededModel = model;
+  }
 }
 
 /** The typed temperature, or undefined when the field is blank or not a number. */
@@ -399,12 +416,14 @@ function parseJsonOrNull(value: string): unknown | null {
   }
 }
 
-/** The prompt config Save as Prompt writes, returning untouched settings as stored. */
+/** The prompt config Save as Prompt writes, returning untouched settings as stored.
+ *  `defaultModel` only serves drafts stored before the seeded model was recorded. */
 export function promptConfigFor(variant: PlaygroundVariant, defaultModel = ""): PromptConfig {
   const basis = variant.promptBasis;
   const temperature = temperatureValue(variant);
   const carried = variant.params ?? null;
-  const seededModel = basis !== undefined && basis.model == null && variant.model === defaultModel;
+  const seeded = basis?.seededModel === undefined ? defaultModel : basis.seededModel;
+  const seededModel = basis !== undefined && basis.model == null && variant.model === seeded;
   return {
     model: variant.model && !seededModel ? variant.model : null,
     params:

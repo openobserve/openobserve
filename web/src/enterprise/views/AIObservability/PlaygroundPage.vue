@@ -361,6 +361,7 @@ import {
   renderTemplate,
   runParams,
   scorerEvidence,
+  seedModel,
   settledResults,
   snapshotPayload,
   starterDraft,
@@ -607,7 +608,7 @@ function seedDefaultProvider() {
       : null;
     const selected = supporting ?? preferred;
     variant.providerId = selected.id;
-    if (!variant.model) variant.model = providerDefaultModel(selected);
+    seedModel(variant, providerDefaultModel(selected));
   }
 }
 

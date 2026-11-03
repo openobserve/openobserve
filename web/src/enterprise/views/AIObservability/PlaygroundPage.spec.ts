@@ -142,6 +142,7 @@ function vm(wrapper: Awaited<ReturnType<typeof mountPage>>) {
     clearSample: () => void;
     openSaveAsPrompt: (variantId: string) => void;
     savePromptConfig: PromptConfig;
+    restoreDraft: (entry: unknown) => void;
   };
 }
 
@@ -562,6 +563,25 @@ describe("PlaygroundPage", () => {
       const page = vm(await mountPage());
       expect(page.draft.variants[0].model).toBe("gpt-4o-mini");
 
+      page.openSaveAsPrompt(page.draft.variants[0].id);
+
+      expect(page.savePromptConfig).toEqual(bare);
+    });
+
+    it("keeps the seeded model out of a restored draft after the provider default changed", async () => {
+      const bare: PromptConfig = { model: null, params: null, tools: null, responseFormat: null };
+      openPrompt(bare);
+      const first = await mountPage();
+      const stored = JSON.parse(JSON.stringify(vm(first).draft));
+      first.unmount();
+      delete routeQuery.from;
+      providersList.mockResolvedValue([
+        { ...PROVIDER, availableModels: ["gpt-4o-mini", "gpt-4.1"], defaultModel: "gpt-4.1" },
+      ]);
+      const page = vm(await mountPage());
+
+      page.restoreDraft({ id: "d1", summary: "triage", models: [], savedAt: 0, draft: stored });
+      expect(page.draft.variants[0].model).toBe("gpt-4o-mini");
       page.openSaveAsPrompt(page.draft.variants[0].id);
 
       expect(page.savePromptConfig).toEqual(bare);

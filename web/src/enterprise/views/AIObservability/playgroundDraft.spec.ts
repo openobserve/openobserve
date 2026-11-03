@@ -18,6 +18,7 @@ import {
   renderedMessages,
   runParams,
   scorerEvidence,
+  seedModel,
   snapshotPayload,
   starterDraft,
   variantLabel,
@@ -315,9 +316,61 @@ describe("prompt config round trip", () => {
     expect(variant.temperature).toBe("");
     // What seeding the default provider does to the bench.
     variant.providerId = "p1";
+    seedModel(variant, "gpt-4o-mini");
+
+    expect(variant.model).toBe("gpt-4o-mini");
+    expect(promptConfigFor(variant, "gpt-4o-mini")).toEqual(bare);
+  });
+
+  it("leaves the seeded model out even after the provider's default changes", () => {
+    const variant = opened(bare);
+    seedModel(variant, "gpt-4o-mini");
+
+    expect(promptConfigFor(variant, "gpt-4.1").model).toBeNull();
+    // Providers not loaded yet, or the provider was deleted.
+    expect(promptConfigFor(variant).model).toBeNull();
+  });
+
+  it("leaves the seeded model out of a draft stored and restored as JSON", () => {
+    const variant = opened(bare);
+    seedModel(variant, "gpt-4o-mini");
+    const restored = JSON.parse(JSON.stringify(variant)) as PlaygroundVariant;
+
+    expect(promptConfigFor(restored, "gpt-4.1")).toEqual(bare);
+  });
+
+  it("saves a model the user picked over the seeded one", () => {
+    const variant = opened(bare);
+    seedModel(variant, "gpt-4o-mini");
+    variant.model = "gpt-4.1";
+
+    expect(promptConfigFor(variant, "gpt-4o-mini").model).toBe("gpt-4.1");
+  });
+
+  it("saves the current default picked for a prompt that was never seeded", () => {
+    const variant = opened(bare);
     variant.model = "gpt-4o-mini";
 
-    expect(promptConfigFor(variant, "gpt-4o-mini")).toEqual(bare);
+    expect(promptConfigFor(variant, "gpt-4o-mini").model).toBe("gpt-4o-mini");
+  });
+
+  it("does not seed over a model the prompt names", () => {
+    const variant = opened(tuned);
+    seedModel(variant, "gpt-4o-mini");
+
+    expect(variant.model).toBe("gpt-4o");
+    expect(promptConfigFor(variant, "gpt-4o-mini").model).toBe("gpt-4o");
+  });
+
+  // Drafts stored before the seeded model was recorded carry no `seededModel`.
+  it("treats the current default as seeded in a draft that never recorded one", () => {
+    const legacy = opened(bare);
+    delete legacy.promptBasis?.seededModel;
+    legacy.model = "gpt-4o-mini";
+    const restored = JSON.parse(JSON.stringify(legacy)) as PlaygroundVariant;
+
+    expect(promptConfigFor(restored, "gpt-4o-mini").model).toBeNull();
+    expect(promptConfigFor(restored, "gpt-4.1").model).toBe("gpt-4o-mini");
   });
 
   it("writes back what the user edited and nothing else", () => {
