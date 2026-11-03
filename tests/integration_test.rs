@@ -549,6 +549,7 @@ mod tests {
         e2e_post_trace().await;
         e2e_post_metrics().await;
         e2e_post_hec().await;
+        e2e_firehose_and_pubsub_status().await;
         // e2e_post_kinesis_data().await;
 
         // streams
@@ -5057,6 +5058,99 @@ mod tests {
         )
         .await;
         assert!(status.is_success());
+    }
+
+    async fn post_firehose(app: &Router, stream: &str, record: &str) -> (StatusCode, json::Value) {
+        let mut headers = HeaderMap::new();
+        let basic = setup().1.trim_start_matches("Basic ");
+        headers.insert(
+            "X-Amz-Firehose-Access-Key",
+            HeaderValue::from_str(basic).unwrap(),
+        );
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        let body = json!({
+            "requestId": "r1",
+            "timestamp": Utc::now().timestamp_millis(),
+            "records": [{"data": config::utils::base64::encode(record)}],
+        });
+        let (status, body) = make_request(
+            app,
+            Method::POST,
+            &format!("/aws/e2e/{stream}/_kinesis_firehose"),
+            Some(headers),
+            Some(body.to_string()),
+        )
+        .await;
+        (status, json::from_slice(&body).unwrap())
+    }
+
+    async fn post_pubsub(app: &Router, stream: &str, data: &str) -> (StatusCode, json::Value) {
+        let basic = setup().1.trim_start_matches("Basic ");
+        let api_key: String = url::form_urlencoded::byte_serialize(basic.as_bytes()).collect();
+        let now = Utc::now().to_rfc3339();
+        let body = json!({
+            "message": {
+                "attributes": {"logging.googleapis.com/timestamp": now},
+                "data": config::utils::base64::encode(data),
+                "messageId": "m1",
+                "message_id": "m1",
+                "publishTime": now,
+                "publish_time": now,
+            },
+            "subscription": "projects/p/subscriptions/s",
+        });
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        let (status, body) = make_request(
+            app,
+            Method::POST,
+            &format!("/gcp/e2e/{stream}/_sub?API-Key={api_key}"),
+            Some(headers),
+            Some(body.to_string()),
+        )
+        .await;
+        (status, json::from_slice(&body).unwrap())
+    }
+
+    async fn e2e_firehose_and_pubsub_status() {
+        let app = init_test_router().merge(other_service_routes());
+
+        let (status, _) = post_firehose(&app, "firehose_status", r#"{"a":1}"#).await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, _) = post_pubsub(&app, "pubsub_status", r#"{"a":1}"#).await;
+        assert_eq!(status, StatusCode::OK);
+
+        // a message that is not an object stores no row, so Pub/Sub must redeliver it
+        let (status, body) = post_pubsub(&app, "pubsub_status", "123").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+
+        // only PostgreSQL rejects a stream key over 256 characters
+        if get_config().common.meta_store != "postgres" {
+            return;
+        }
+        let long_stream = "a".repeat(250);
+        let (status, body) = post_firehose(&app, &long_stream, r#"{"a":1}"#).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+        assert!(
+            body["errorMessage"]
+                .as_str()
+                .unwrap()
+                .contains("Stream name too long")
+        );
+        let (status, body) = post_pubsub(&app, &long_stream, r#"{"a":1}"#).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+        assert!(
+            body["message"]
+                .as_str()
+                .unwrap()
+                .contains("Stream name too long")
+        );
     }
 
     async fn e2e_post_multi() {

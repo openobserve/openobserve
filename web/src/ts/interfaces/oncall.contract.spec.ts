@@ -167,7 +167,13 @@ const RESPONSE_EVENT_KINDS = [
 ] as const satisfies readonly ResponseEventKind[];
 const _c1: Complete<ResponseEventKind, typeof RESPONSE_EVENT_KINDS> = true;
 
-const CHANNELS = ["email", "sms", "voice", "webhook"] as const satisfies readonly Channel[];
+const CHANNELS = [
+  "email",
+  "slack",
+  "sms",
+  "voice",
+  "webhook",
+] as const satisfies readonly Channel[];
 const _c2: Complete<Channel, typeof CHANNELS> = true;
 
 const RESPONSE_STATES = [
@@ -336,6 +342,9 @@ const SKIPPED: Record<string, string> = {
   // entry at all — it carries no serde attribute, so it never parses as a
   // wire enum in the first place.)
   ChannelPostStage: "engine-internal broadcast bookkeeping",
+  ChatMessageKind: "Slack message row bookkeeping, stored as an integer; no endpoint serializes it",
+  ChatMessageStatus:
+    "Slack message row bookkeeping, stored as an integer; no endpoint serializes it",
   // C8 doctrine: the preset catalogue is rendered FROM the response so a
   // fifth preset appears with no UI change — hardcoding ids would re-create
   // exactly what that forbids.

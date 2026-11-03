@@ -23,7 +23,7 @@ export type SlackLinkMethod = "oidc" | "email" | "admin_bulk";
 
 export type SlackAnswerMode = "thread" | "private";
 
-export type SlackSetFrom = "settings" | "install" | "destination";
+export type SlackSetFrom = "settings" | "install" | "destination" | "oncall";
 
 export type SlackDisabledReason = "edition" | "flag" | "master_key" | "super_cluster";
 
@@ -560,6 +560,8 @@ export interface SlackMyLink {
 
 export interface SlackMyLinksResponse {
   links: SlackMyLink[];
+  /** An active workspace serves this org; `links` are only its links. */
+  slack_serves_org: boolean;
 }
 
 /** One row of the admin link list (`links::AdminLinkView`): it never names another org. */

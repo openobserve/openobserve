@@ -70,6 +70,7 @@ const settings = {
     setting_value: any,
     setting_category?: string,
     description?: string,
+    options?: { silentForbidden?: boolean },
   ) => {
     const payload: any = {
       setting_key,
@@ -77,7 +78,7 @@ const settings = {
     };
     if (setting_category) payload.setting_category = setting_category;
     if (description) payload.description = description;
-    return http().post(`/api/${org_identifier}/settings/v2`, payload);
+    return http().post(`/api/${org_identifier}/settings/v2`, payload, options);
   },
 
   /**

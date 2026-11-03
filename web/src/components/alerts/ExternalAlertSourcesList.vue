@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-secondary text-xs">{{ row.lastEventLabel }}</span>
           </template>
           <template #cell-url="{ row }">
-            <div v-if="row.integration" class="flex items-center gap-1">
+            <div v-if="row.integration?.token" class="flex items-center gap-1">
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
@@ -702,15 +702,15 @@ export default defineComponent({
       copyToClipboard(this.fullUrlFor(integration), this.t);
     },
     copyTokenFor(integration: AlertSourceIntegration) {
-      copyToClipboard(integration.token, this.t);
+      copyToClipboard(integration.token ?? "", this.t);
     },
     fullUrlFor(integration: AlertSourceIntegration): string {
-      return `${this.ingestionBaseUrl}${integration.url}`;
+      return `${this.ingestionBaseUrl}${integration.url ?? ""}`;
     },
     displayedUrlFor(integration: AlertSourceIntegration): string {
       const full = this.fullUrlFor(integration);
       if (this.isRevealed(integration)) return full;
-      const token = integration.token;
+      const token = integration.token ?? "";
       const masked = `${token.slice(0, 6)}****${token.slice(-4)}`;
       return full.replace(token, masked);
     },

@@ -29,8 +29,9 @@ pub const MAX_REFRESH_SECS: i32 = 30 * 86_400;
 pub const MIN_REFRESH_SECS: i32 = 60;
 
 /// Draft configures the share without exposing it; Public serves it and is the default.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
+#[schema(as = PublicDashboardVisibility)]
 pub enum Visibility {
     Draft,
     #[default]
@@ -54,8 +55,9 @@ impl Visibility {
 }
 
 /// One window a link offers: rolling and refreshed on read, or fixed and built once.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[schema(as = PublicDashboardTimeRange)]
 pub enum TimeRange {
     Relative {
         secs: i64,
@@ -107,14 +109,14 @@ impl TimeRange {
 }
 
 /// The ranges a link offers; with more than one, viewers can switch between them.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TimeRangePolicy {
     pub ranges: Vec<TimeRange>,
     pub default: TimeRange,
 }
 
 /// Admin body to create or update a link; variables stay frozen at the author's values.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PublicDashboardConfig {
     /// Label that tells a dashboard's links apart; empty is allowed.
     #[serde(default)]
@@ -123,6 +125,7 @@ pub struct PublicDashboardConfig {
     pub visibility: Visibility,
     pub time_range: TimeRangePolicy,
     #[serde(default)]
+    #[schema(value_type = Object)]
     pub frozen_variables: BTreeMap<String, serde_json::Value>,
     #[serde(default = "default_refresh_secs")]
     pub refresh_secs: i32,
@@ -131,7 +134,7 @@ pub struct PublicDashboardConfig {
 }
 
 /// Admin body to take over a link; a publisher other than the one the caller saw is a 409.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TakeOverRequest {
     pub expected_publisher: String,
 }
@@ -273,7 +276,7 @@ pub struct LinkStatusReport {
 }
 
 /// The org's settings as the settings API has them; a null `max_links` is the env default.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OrgPublicDashboardSettings {
     pub enabled: bool,
     #[serde(default)]

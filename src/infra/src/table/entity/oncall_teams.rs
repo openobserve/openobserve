@@ -16,6 +16,12 @@ pub struct Model {
     /// channel. Not the same answer, which is why this is nullable rather than
     /// defaulted to an empty array.
     pub channel_destinations: Option<String>,
+    pub slack_enterprise_id: Option<String>,
+    pub slack_workspace_id: Option<String>,
+    pub slack_channel_id: Option<String>,
+    pub slack_channel_name: Option<String>,
+    /// Name of the team's webhook destination that posts to the same Slack room.
+    pub slack_same_room_destination: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }

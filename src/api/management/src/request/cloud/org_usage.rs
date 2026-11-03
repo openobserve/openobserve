@@ -20,9 +20,16 @@ use axum::{
 use hashbrown::HashMap;
 use o2_enterprise::enterprise::cloud::billings::MeteringProvider;
 
-use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse, models::billings::GetOrgUsageResponseBody,
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+
+// Only documents get_org_usage's body; the metering type lives in o2-enterprise without ToSchema.
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+struct OrgUsageBody {
+    /// Upcoming and past metering details; null for an org without Stripe billing.
+    #[schema(required = true, value_type = Option<Object>)]
+    price_details: Option<serde_json::Value>,
+}
 
 /// GetUsageData
 #[utoipa::path(
@@ -41,10 +48,14 @@ use crate::{
         ("usage_date" = String, Path, description = "Organization usage query range"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = inline(GetOrgUsageResponseBody)),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(OrgUsageBody)),
         (status = 404, description = "Organization usage not found", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Billings", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_org_usage(
     Path((org_id, query_range)): Path<(String, String)>,

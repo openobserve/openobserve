@@ -29,6 +29,7 @@ beforeAll(() => {
 
 import { defineComponent, h, nextTick, reactive } from "vue";
 import OTable from "./OTable.vue";
+import { TABLE_FORBIDDEN_STATE_KEY } from "./tableForbiddenState";
 import OTableHeader from "./sub-components/OTableHeader.vue";
 import OTableBody from "./sub-components/OTableBody.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -1271,6 +1272,26 @@ describe("OTable", () => {
       await wrapper.setProps({ error: null, forbidden: true });
       expect(wrapper.find('[data-test="o2-table-forbidden"]').exists()).toBe(true);
       expect(isPinned(wrapper)).toBe(true);
+    });
+
+    it("shows the generic no-access state when no app state is provided", () => {
+      wrapper = mount(OTable, { props: { data: [], columns: makeColumns(), forbidden: true } });
+      const forbidden = wrapper.find('[data-test="o2-table-forbidden"]');
+      expect(forbidden.findComponent({ name: "OEmptyState" }).props("preset")).toBe("no-access");
+    });
+
+    it("renders the app's no-access state with the table's resource when one is provided", () => {
+      const AppLock = defineComponent({
+        props: { resource: { type: String, default: undefined } },
+        setup: (props) => () => h("div", { "data-test": "app-lock" }, props.resource ?? "none"),
+      });
+      wrapper = mount(OTable, {
+        props: { data: [], columns: makeColumns(), forbidden: true, forbiddenResource: "alerts" },
+        global: { provide: { [TABLE_FORBIDDEN_STATE_KEY as symbol]: AppLock } },
+      });
+      const forbidden = wrapper.find('[data-test="o2-table-forbidden"]');
+      expect(forbidden.find('[data-test="app-lock"]').text()).toBe("alerts");
+      expect(forbidden.findComponent({ name: "OEmptyState" }).exists()).toBe(false);
     });
 
     it("leaves pinning to the <thead> while rows show", () => {
