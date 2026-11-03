@@ -44,6 +44,7 @@ vi.mock("@/utils/zincutils", () => ({
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { isRef } from "vue";
 import { useLLMInsights } from "./useLLMInsights";
+import { llmCallUsageSum } from "../config/llmInsightsPanels";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -176,6 +177,45 @@ describe("useLLMInsights — fetchAll fires 2 parallel queries", () => {
     expect(sql).toContain("histogram(_timestamp)");
     // No interval literal like histogram(_timestamp, '15 minutes').
     expect(sql).not.toMatch(/histogram\(_timestamp,/);
+  });
+
+  // An agent span repeats its children's usage; the KPI totals must sum only
+  // LLM-call spans (same rule as the backend's trace/session totals).
+  it("sums tokens and cost only over LLM-call spans", () => {
+    const { fetchAll } = useLLMInsights();
+    fetchAll("default", 100, 200);
+
+    const calls = mockFetchQueryDataWithHttpStream.mock.calls;
+    const sql: string = calls.find(([p]) => p.queryReq.query.sql.includes("GROUP BY ts"))![0]
+      .queryReq.query.sql;
+    expect(sql).not.toMatch(/SUM\(\s*gen_ai_usage_/i);
+    expect(sql).toContain(
+      `COALESCE(${llmCallUsageSum("gen_ai_usage_total_tokens")}, 0) as total_tokens`,
+    );
+    expect(sql).toContain(`COALESCE(${llmCallUsageSum("gen_ai_usage_cost")}, 0) as total_cost`);
+  });
+
+  // Many SDKs tag only the agent span with the agent's identity, so an
+  // agent-scoped bucket may match no LLM-call span; it then sums what matched.
+  it("agent-scoped totals fall back to the matched spans when no LLM call matched", () => {
+    const { fetchAll } = useLLMInsights();
+    fetchAll("default", 100, 200, {
+      name: "support-agent",
+      source_stream: "default",
+      source_stream_type: "traces",
+    });
+
+    const sql: string = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]) =>
+      p.queryReq.query.sql.includes("GROUP BY ts"),
+    )![0].queryReq.query.sql;
+    for (const [column, alias] of [
+      ["gen_ai_usage_total_tokens", "total_tokens"],
+      ["gen_ai_usage_cost", "total_cost"],
+    ]) {
+      expect(sql).toContain(
+        `COALESCE(NULLIF(${llmCallUsageSum(column)}, 0), SUM(${column}), 0) as ${alias}`,
+      );
+    }
   });
 });
 
