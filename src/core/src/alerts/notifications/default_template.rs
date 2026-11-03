@@ -26,7 +26,10 @@
 use config::{
     DEFAULT_ORG,
     meta::{
-        alerts::content_spec::{ChartSpec, ContentField, ContentSpec, RowsSpec},
+        alerts::{
+            content_spec::{ChartSpec, ContentField, ContentSpec, RowsSpec},
+            notification_kind::NotificationKind,
+        },
         destinations::{Template, TemplateKind, TemplateType},
     },
 };
@@ -73,6 +76,76 @@ pub fn compiled_default_content() -> ContentSpec {
     }
 }
 
+/// The compiled default for `kind`; kinds whose stage has not shipped use the alert card.
+pub fn compiled_content_for(kind: NotificationKind) -> ContentSpec {
+    match kind {
+        NotificationKind::Incident => compiled_incident_content(),
+        NotificationKind::Anomaly => compiled_anomaly_content(),
+        _ => compiled_default_content(),
+    }
+}
+
+/// The reserved name that `compiled_content_for(kind)` is seeded under.
+pub fn compiled_name_for(kind: NotificationKind) -> &'static str {
+    match kind {
+        NotificationKind::Incident | NotificationKind::Anomaly => kind.compiled_default_name(),
+        _ => DEFAULT_CONTENT_TEMPLATE_NAME,
+    }
+}
+
+pub fn compiled_anomaly_content() -> ContentSpec {
+    ContentSpec {
+        title: "Anomaly {alert_status}: {anomaly_name} on {stream_name}".into(),
+        title_overrides: Default::default(),
+        body: "{alert_description}".into(),
+        fields: vec![
+            field("Worst value", "{worst_actual_value}"),
+            field("Expected", "{worst_expected}"),
+            field("Window", "{window_start} to {window_end}"),
+            field("Score", "{score} vs {threshold}"),
+        ],
+        rows: RowsSpec {
+            enabled: false,
+            max: 5,
+            columns: None,
+            format: None,
+        },
+        links: vec![],
+        chart: ChartSpec { enabled: false },
+    }
+}
+
+pub fn compiled_incident_content() -> ContentSpec {
+    ContentSpec {
+        title: "Incident {incident_severity}: {incident_title}".into(),
+        title_overrides: Default::default(),
+        body: "Incident **{incident_event}** for service **{incident_service}**.\n\n{alert_description}"
+            .into(),
+        fields: vec![
+            field("Event", "{incident_event}"),
+            field("Severity", "{incident_severity}"),
+            field("Service", "{incident_service}"),
+            field("Alert", "{alert_name}"),
+        ],
+        rows: RowsSpec {
+            enabled: true,
+            max: 5,
+            columns: None,
+            format: None,
+        },
+        links: vec![],
+        chart: ChartSpec { enabled: false },
+    }
+}
+
+fn field(label: &str, value: &str) -> ContentField {
+    ContentField {
+        label: label.into(),
+        value: value.into(),
+        show_when: None,
+    }
+}
+
 /// True for template names the system reserves and manages: the
 /// `prebuilt_*` family, plus `o2_default_content`. Users can never
 /// create/update/delete these (root-only, same enforcement path as
@@ -80,31 +153,50 @@ pub fn compiled_default_content() -> ContentSpec {
 pub fn is_reserved_template_name(name: &str) -> bool {
     config::prebuilt_loader::is_prebuilt_template_name(name)
         || name == DEFAULT_CONTENT_TEMPLATE_NAME
+        || name == NotificationKind::Incident.compiled_default_name()
+        || name == NotificationKind::Anomaly.compiled_default_name()
         || crate::alerts::templates::is_downtime_template_name(name)
 }
 
-/// Create-if-missing (and overwrite under the same `should_apply_prebuilt`
-/// rule as the prebuilt loop) the seeded DB copy of the compiled default in
-/// DEFAULT_ORG. Called from `ensure_system_templates`, inside the same
-/// dist_lock + revision gate, after the prebuilt loop.
+/// Seed the read only DEFAULT_ORG copies of the compiled defaults under `should_apply_prebuilt`.
 pub(crate) async fn ensure_default_content_template(
     shipped_rev: u32,
     applied_rev: u32,
 ) -> Result<(), anyhow::Error> {
-    let spec = compiled_default_content();
-    let body = serde_json::to_string(&spec)?;
+    for kind in [
+        NotificationKind::Alert,
+        NotificationKind::Incident,
+        NotificationKind::Anomaly,
+    ] {
+        ensure_compiled_row(
+            compiled_name_for(kind),
+            &compiled_content_for(kind),
+            shipped_rev,
+            applied_rev,
+        )
+        .await?;
+    }
+    Ok(())
+}
 
+async fn ensure_compiled_row(
+    name: &str,
+    spec: &ContentSpec,
+    shipped_rev: u32,
+    applied_rev: u32,
+) -> Result<(), anyhow::Error> {
+    let body = serde_json::to_string(spec)?;
     let mut template = Template {
         id: None,
         org_id: DEFAULT_ORG.to_string(),
-        name: DEFAULT_CONTENT_TEMPLATE_NAME.to_string(),
+        name: name.to_string(),
         is_default: false,
         template_type: TemplateType::Http,
         body: body.clone(),
         kind: TemplateKind::Content,
     };
 
-    match db::alerts::templates::get(DEFAULT_ORG, DEFAULT_CONTENT_TEMPLATE_NAME).await {
+    match db::alerts::templates::get(DEFAULT_ORG, name).await {
         Ok(existing) => {
             let drifted = existing.body != body || existing.template_type != TemplateType::Http;
             if super::super::templates::should_apply_prebuilt(shipped_rev, applied_rev, drifted)
@@ -112,20 +204,16 @@ pub(crate) async fn ensure_default_content_template(
             {
                 template.id = existing.id;
                 db::alerts::templates::set(template).await?;
-                log::info!(
-                    "[TEMPLATES] Updated system template '{DEFAULT_CONTENT_TEMPLATE_NAME}' in {DEFAULT_ORG}"
-                );
+                log::info!("[TEMPLATES] Updated system template '{name}' in {DEFAULT_ORG}");
             }
         }
         Err(TemplateError::NotFound) => {
             db::alerts::templates::set(template).await?;
-            log::info!(
-                "[TEMPLATES] Created system template '{DEFAULT_CONTENT_TEMPLATE_NAME}' in {DEFAULT_ORG}"
-            );
+            log::info!("[TEMPLATES] Created system template '{name}' in {DEFAULT_ORG}");
         }
         Err(e) => {
             log::error!(
-                "[TEMPLATES] Error checking system template '{DEFAULT_CONTENT_TEMPLATE_NAME}' in {DEFAULT_ORG}: {e}"
+                "[TEMPLATES] Error checking system template '{name}' in {DEFAULT_ORG}: {e}"
             );
         }
     }
@@ -144,8 +232,14 @@ mod tests {
 
     #[test]
     fn compiled_default_parses_and_renders_everywhere() {
-        let spec = compiled_default_content();
-        assert!(!spec.title.is_empty());
+        for kind in NotificationKind::ALL {
+            let spec = compiled_content_for(kind);
+            assert!(!spec.title.is_empty());
+            renders_everywhere(&spec);
+        }
+    }
+
+    fn renders_everywhere(spec: &ContentSpec) {
         let ctx = synthetic_context(None);
         // Every channel format must render the compiled-in default without
         // error — this is the terminal fallback (see module doc comment),
@@ -162,7 +256,7 @@ mod tests {
             ChannelFormat::ServiceNow,
             ChannelFormat::Sns,
         ] {
-            let content = resolve_content(&spec, &ctx, f.channel_family());
+            let content = resolve_content(spec, &ctx, f.channel_family());
             assert!(render(f, &content, &ctx).is_ok(), "{f:?}");
         }
     }
@@ -189,6 +283,8 @@ mod tests {
     #[test]
     fn o2_default_content_is_reserved() {
         assert!(is_reserved_template_name("o2_default_content"));
+        assert!(is_reserved_template_name("o2_default_anomaly"));
+        assert!(is_reserved_template_name("o2_default_incident"));
         assert!(is_reserved_template_name("prebuilt_slack"));
         assert!(!is_reserved_template_name("my_template"));
     }

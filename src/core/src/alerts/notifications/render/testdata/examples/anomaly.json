@@ -1,0 +1,191 @@
+{
+  "slack_firing": {
+    "attachments": [
+      {
+        "color": "#E01E5A",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/alerts/anomaly/edit/a1b2c3?org_identifier=acme|Anomaly firing: error rate on web-logs on web-logs>*"
+            }
+          },
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)"
+            }
+          },
+          {
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Worst value*\n342.00"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Expected*\n98.00"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Window*\n2026-11-02 09:50 UTC to 2026-11-02 10:05 UTC"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Score*\n0.91 vs 0.80"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "color": "#E01E5A",
+        "blocks": [
+          {
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "View in OpenObserve"
+                },
+                "url": "https://o2.acme.com/web/alerts/anomaly/edit/a1b2c3?org_identifier=acme",
+                "style": "primary"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "slack_resolved": {
+    "attachments": [
+      {
+        "color": "#2EB67D",
+        "blocks": [
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/alerts/anomaly/edit/a1b2c3?org_identifier=acme|Anomaly resolved: error rate on web-logs on web-logs>*"
+            }
+          },
+          {
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "a full detection run found no anomalies in window 2026-11-02 10:25 UTC–2026-11-02 10:40 UTC"
+            }
+          },
+          {
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Window*\n2026-11-02 10:25 UTC to 2026-11-02 10:40 UTC"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Score*\n0.00 vs 0.80"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "color": "#2EB67D",
+        "blocks": [
+          {
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "View in OpenObserve"
+                },
+                "url": "https://o2.acme.com/web/alerts/anomaly/edit/a1b2c3?org_identifier=acme",
+                "style": "primary"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "webhook_firing": {
+    "version": 1,
+    "title": "Anomaly firing: error rate on web-logs on web-logs",
+    "body_markdown": "3 anomalies in window 2026\\-11\\-02 09\\:50 UTC–2026\\-11\\-02 10\\:05 UTC \\| worst value\\: 342\\.00 \\(expected \\~98\\.00 for this hour\\) \\| score 0\\.91 vs threshold 0\\.80 \\(score 14\\.0\\% over its bar\\)",
+    "fields": {
+      "Worst value": "342.00",
+      "Expected": "98.00",
+      "Window": "2026-11-02 09:50 UTC to 2026-11-02 10:05 UTC",
+      "Score": "0.91 vs 0.80"
+    },
+    "rows": [],
+    "links": [
+      {
+        "label": "",
+        "url": "https://o2.acme.com/web/alerts/anomaly/edit/a1b2c3?org_identifier=acme"
+      }
+    ],
+    "severity": "critical",
+    "chart_url": null,
+    "context": {
+      "org_name": "acme",
+      "stream_type": "logs",
+      "stream_name": "web-logs",
+      "alert_name": "error rate on web-logs",
+      "alert_type": null,
+      "alert_period": null,
+      "alert_operator": null,
+      "alert_threshold": null,
+      "alert_count": null,
+      "alert_agg_value": null,
+      "alert_level": "critical",
+      "alert_status": "firing",
+      "episode_id": "a1b2c3",
+      "recovery_reason": null,
+      "alert_priority": null,
+      "alert_tags": null,
+      "alert_threshold_crit": null,
+      "alert_threshold_warn": null,
+      "alert_warning_threshold": null,
+      "alert_start_time": "N/A",
+      "alert_end_time": "N/A",
+      "alert_url": "https://o2.acme.com/web/alerts/anomaly/edit/a1b2c3?org_identifier=acme",
+      "alert_trigger_time_str": "2026-11-02 10:05:00",
+      "alert_time": "2026-11-02 10:05:00",
+      "alert_description": "3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC | worst value: 342.00 (expected ~98.00 for this hour) | score 0.91 vs threshold 0.80 (score 14.0% over its bar)",
+      "kind": "anomaly",
+      "notification_kind": "anomaly",
+      "notification_event": "firing",
+      "cluster_name": "o2-acme",
+      "alert_start_time_millis": "N/A",
+      "alert_end_time_millis": "N/A",
+      "alert_trigger_time": "0",
+      "alert_trigger_time_millis": "0",
+      "alert_trigger_time_seconds": "0",
+      "alert_promql_operator": null,
+      "alert_promql_value": null,
+      "anomaly_id": "a1b2c3",
+      "anomaly_name": "error rate on web-logs",
+      "anomaly_kind": "value",
+      "anomaly_count": "3",
+      "max_deviation_percent": "14.0",
+      "deviation_kind": "score_over_threshold",
+      "worst_actual_value": "342.00",
+      "worst_expected": "98.00",
+      "score": "0.91",
+      "threshold": "0.80",
+      "window_start": "2026-11-02 09:50 UTC",
+      "window_end": "2026-11-02 10:05 UTC",
+      "anomaly_url": "https://o2.acme.com/web/alerts/anomaly/edit/a1b2c3?org_identifier=acme"
+    }
+  }
+}

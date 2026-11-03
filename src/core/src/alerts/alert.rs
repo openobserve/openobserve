@@ -29,7 +29,6 @@ use config::{
         },
         destinations::{
             AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateKind,
-            TemplateType,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         search::{SearchEventContext, SearchEventType},
@@ -75,7 +74,7 @@ use crate::auth::{check_folder_write_permissions, check_permissions};
 use crate::{
     alerts::{
         QueryConditionExt, build_sql,
-        destinations::{self, note_skipped, org_member_split},
+        destinations::{self, note_skipped},
         notifications::{
             NotificationContext, RenderedMessage, apply_custom_template, build_row_columns, chart,
             custom::{VarValue, process_variable_replace},
@@ -87,6 +86,7 @@ use crate::{
             render,
             render::slack as slack_render,
             resolve_content,
+            send::{self, org_member_email},
         },
     },
     auth::is_ofga_unsupported,
@@ -3249,39 +3249,6 @@ async fn build_chart_asset(
     Some((url, payload))
 }
 
-/// Carry the episode id into a platform's own correlation field, so the resolve
-/// this module sends later can find what the firing opened.
-///
-/// A body we cannot parse is left alone and logged: saving the alert already
-/// refused this combination, so reaching here means the template changed after
-/// the fact, and dropping the firing would be the worse failure.
-fn stamp_platform_key(
-    dest_type: &DestinationType,
-    ctx: &NotificationContext,
-    msg: String,
-) -> String {
-    let (Some(platform), Some(episode_id)) = (platform_of(dest_type), ctx.episode_id.as_deref())
-    else {
-        return msg;
-    };
-    let empty = hashbrown::HashMap::new();
-    let metadata = match dest_type {
-        DestinationType::Http(endpoint) => &endpoint.metadata,
-        _ => &empty,
-    };
-    match platform::stamp_key(platform, &msg, episode_id, metadata) {
-        Ok(stamped) => stamped,
-        Err(e) => {
-            log::warn!(
-                "[ALERT] {} payload has no place for {}: {e} — it will not be resolvable",
-                ctx.alert_name,
-                platform.key_field()
-            );
-            msg
-        }
-    }
-}
-
 /// `ctx` is the notification-wide context; this function swaps in the
 /// destination's metadata before rendering (§5.1).
 async fn send_to_destination(
@@ -3308,114 +3275,14 @@ async fn send_to_destination(
         )
         .await;
     }
-    send_to_destination_type(&alert.org_id, &alert.name, dest_type, template, ctx).await
-}
-
-/// Transport for every destination type except the Slack app, which needs the alert itself.
-async fn send_to_destination_type(
-    org_id: &str,
-    sns_subject: &str,
-    dest_type: &DestinationType,
-    template: &Template,
-    ctx: &mut NotificationContext,
-) -> Result<String, anyhow::Error> {
-    // Jira builds its own text and keeps one issue per alert, so no template is rendered for it.
-    if let DestinationType::Http(endpoint) = dest_type
-        && jira::is_jira(endpoint)
-    {
-        return jira::send(endpoint, ctx).await;
-    }
-    let is_email = matches!(dest_type, DestinationType::Email(_));
-    let empty_meta = hashbrown::HashMap::new();
-    let metadata: &hashbrown::HashMap<String, String> = match dest_type {
-        DestinationType::Http(endpoint) => &endpoint.metadata,
-        _ => &empty_meta,
-    };
-    ctx.metadata = metadata
-        .iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
-
-    match template.kind {
-        TemplateKind::Custom => {
-            // Unchanged legacy path — byte-identical output.
-            let msg = apply_custom_template(&template.body, ctx, is_email);
-            let msg = stamp_platform_key(dest_type, ctx, msg);
-            let email_subject = if let TemplateType::Email { title } = &template.template_type {
-                apply_custom_template(title, ctx, is_email)
-            } else {
-                template.name.clone()
-            };
-            match dest_type {
-                DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
-                DestinationType::Email(email) => {
-                    let (email, skipped) = org_member_email(org_id, email).await?;
-                    send_email_notification(&email_subject, &email, None, msg)
-                        .await
-                        .map(|resp| note_skipped(resp, &skipped))
-                }
-                DestinationType::Sns(aws_sns) => {
-                    send_sns_notification(sns_subject, aws_sns, msg).await
-                }
-                DestinationType::SlackApp(_) => Err(anyhow::anyhow!(
-                    "a Slack app destination is sent through slack_publish"
-                )),
-            }
-        }
-        TemplateKind::Content => {
-            let spec = db::alerts::templates::get_parsed_content(template)
-                .map_err(|e| anyhow::anyhow!("Invalid content template {}: {e}", template.name))?;
-            let format = derive_channel_format(dest_type);
-            let content = resolve_content(&spec, ctx, format.channel_family());
-            let rendered = render(format, &content, ctx)
-                .map_err(|e| anyhow::anyhow!("Renderer failed: {e}"))?;
-
-            match (rendered, dest_type) {
-                (RenderedMessage::Http { body }, DestinationType::Http(endpoint)) => {
-                    // Discord with a rendered chart: upload the PNG in the
-                    // same webhook POST (the embed references it as
-                    // `attachment://`).
-                    if matches!(format, ChannelFormat::Discord)
-                        && let Some(png) = ctx.chart_png.clone()
-                    {
-                        send_discord_with_attachment(endpoint, body, png).await
-                    } else {
-                        let body = stamp_platform_key(dest_type, ctx, body);
-                        send_http_notification(endpoint, body).await
-                    }
-                }
-                (
-                    RenderedMessage::Email {
-                        subject,
-                        html,
-                        text,
-                    },
-                    DestinationType::Email(email),
-                ) => {
-                    let (email, skipped) = org_member_email(org_id, email).await?;
-                    send_email_notification_with_inline_png(
-                        &subject,
-                        &email,
-                        Some(text),
-                        html,
-                        ctx.chart_png.clone(),
-                    )
-                    .await
-                    .map(|resp| note_skipped(resp, &skipped))
-                }
-                (
-                    RenderedMessage::Sns {
-                        subject: _,
-                        message,
-                    },
-                    DestinationType::Sns(aws_sns),
-                ) => send_sns_notification(sns_subject, aws_sns, message).await,
-                (rendered, dest_type) => Err(anyhow::anyhow!(
-                    "Rendered message {rendered:?} does not match destination type {dest_type:?}"
-                )),
-            }
-        }
-    }
+    send::send_to_destination(
+        &alert.org_id,
+        send::Subject::Alert(&alert.name),
+        dest_type,
+        template,
+        ctx,
+    )
+    .await
 }
 
 /// Render `ctx` with the alert's template, else the destination's, else the org default, and send
@@ -3449,9 +3316,9 @@ pub(crate) async fn send_templated_to_destination(
         )
         .await;
     }
-    send_to_destination_type(
+    send::send_to_destination(
         org_id,
-        sns_subject,
+        send::Subject::Alert(sns_subject),
         &destination_type,
         effective.template(),
         ctx,
@@ -3551,38 +3418,22 @@ pub(crate) async fn dispatch_test_message(
     }
 }
 
-/// Narrows an email destination to org members and returns the skipped ones. [strong]
-async fn org_member_email(
-    org_id: &str,
-    email: &Email,
-) -> Result<(Email, Vec<String>), anyhow::Error> {
-    let (kept, skipped) = org_member_split(org_id, &email.recipients).await?;
-    Ok((members_to_send(kept, &skipped)?, skipped))
-}
-
-/// Email to the kept members, or an error naming the skipped when none is left. [pure]
-fn members_to_send(kept: Vec<String>, skipped: &[String]) -> Result<Email, anyhow::Error> {
-    if kept.is_empty() && !skipped.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Email not sent: no recipient is part of this org (skipped: {})",
-            skipped.join(", ")
-        ));
-    }
-    Ok(Email { recipients: kept })
-}
-
-async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
+pub(crate) async fn send_http_notification(
+    endpoint: &Endpoint,
+    msg: String,
+) -> Result<String, anyhow::Error> {
     // A plain body posted at a Jira site root does nothing, so senders without a Jira branch fail.
     if jira::is_jira(endpoint) {
-        return Err(anyhow::anyhow!(jira::UNSUPPORTED_SENDER));
+        return Err(send::SendError::Blocked(jira::UNSUPPORTED_SENDER.to_string()).into());
     }
     // Block SSRF: validate the destination URL (including DNS resolution) before
     // making any outbound request. The client is built through `build_safe_destination_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.
     if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
-        return Err(anyhow::anyhow!(
+        return Err(send::SendError::Blocked(format!(
             "Destination URL blocked by SSRF guard: {e}"
-        ));
+        ))
+        .into());
     }
 
     let builder = if endpoint.skip_tls_verify {
@@ -3798,15 +3649,16 @@ fn html_with_inline_png(html_body: String, png: &[u8]) -> MultiPart {
 /// image as `attachment://` ([`render::discord::CHART_ATTACHMENT_NAME`]), so
 /// no URL fetch is involved anywhere — true zero-storage delivery. Same SSRF
 /// guard discipline as `send_http_notification`.
-async fn send_discord_with_attachment(
+pub(crate) async fn send_discord_with_attachment(
     endpoint: &Endpoint,
     msg: String,
     png: std::sync::Arc<Vec<u8>>,
 ) -> Result<String, anyhow::Error> {
     if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
-        return Err(anyhow::anyhow!(
+        return Err(send::SendError::Blocked(format!(
             "Destination URL blocked by SSRF guard: {e}"
-        ));
+        ))
+        .into());
     }
     let builder = if endpoint.skip_tls_verify {
         reqwest::Client::builder().danger_accept_invalid_certs(true)
@@ -3851,12 +3703,15 @@ fn send_outcome(
     match (status.is_success(), hide_body) {
         (true, false) => Ok(format!("sent status: {status}, body: {body}")),
         (true, true) => Ok(format!("sent status: {status}")),
-        (false, false) => Err(anyhow::anyhow!("sent error status: {status}, err: {body}")),
-        (false, true) => Err(anyhow::anyhow!("sent error status: {status}")),
+        (false, hide) => Err(send::SendError::Rejected {
+            status,
+            body: (!hide).then(|| body.to_string()),
+        }
+        .into()),
     }
 }
 
-async fn send_sns_notification(
+pub(crate) async fn send_sns_notification(
     alert_name: &str,
     aws_sns: &AwsSns,
     msg: String,
@@ -4510,6 +4365,7 @@ async fn build_notification_context(
         level,
         chart_url: None,
         chart_png: None,
+        ..Default::default()
     }
 }
 pub fn get_row_column_map(rows: &[Map<String, Value>]) -> HashMap<String, HashSet<String>> {
@@ -5520,28 +5376,6 @@ mod tests {
         assert!(both.contains("multipart/alternative"));
         assert!(both.contains("text/plain"));
         assert!(both.contains("text/html"));
-    }
-
-    #[test]
-    fn test_members_to_send() {
-        let to = |list: &[&str]| list.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        type Expected = Result<Vec<String>, String>;
-        let cases: Vec<(Vec<String>, Vec<String>, Expected)> = vec![
-            (to(&["a@x.com"]), vec![], Ok(to(&["a@x.com"]))),
-            (to(&["a@x.com"]), to(&["gone@x.com"]), Ok(to(&["a@x.com"]))),
-            (vec![], vec![], Ok(vec![])),
-            (
-                vec![],
-                to(&["gone@x.com", "left@x.com"]),
-                Err("Email not sent: no recipient is part of this org (skipped: gone@x.com, left@x.com)".to_string()),
-            ),
-        ];
-        for (kept, skipped, expected) in cases {
-            let got = members_to_send(kept, &skipped)
-                .map(|email| email.recipients)
-                .map_err(|e| e.to_string());
-            assert_eq!(got, expected, "skipped {skipped:?}");
-        }
     }
 
     #[test]

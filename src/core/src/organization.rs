@@ -705,6 +705,15 @@ pub async fn create_org(
                     org.identifier
                 );
             }
+            if let Err(e) =
+                crate::alerts::notifications::org_default::init_default_templates(&org.identifier)
+                    .await
+            {
+                log::warn!(
+                    "Failed to set default_templates for org '{}': {e}",
+                    org.identifier
+                );
+            }
             #[cfg(feature = "cloud")]
             enqueue_cloud_event(CloudEvent {
                 org_id: org.identifier.clone(),

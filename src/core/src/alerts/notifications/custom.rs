@@ -88,6 +88,9 @@ pub(crate) fn apply_custom_template_plain(
             ctx.episode_id.as_deref().unwrap_or_default(),
         )
         .replace("{recovery_reason}", &ctx.recovery_reason)
+        .replace("{notification_kind}", ctx.kind.as_str())
+        .replace("{notification_event}", ctx.event.as_str())
+        .replace("{cluster_name}", &ctx.cluster_name)
         // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
         // incident notifications build custom JSON and workflows carry
         // hard-coded metadata; neither is wired here in v1. Unset priority and
@@ -564,6 +567,7 @@ mod golden {
             chart_png: None,
             alert_id: String::new(),
             incident_id: String::new(),
+            ..Default::default()
         }
     }
 

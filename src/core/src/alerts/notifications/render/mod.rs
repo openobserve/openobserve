@@ -395,6 +395,7 @@ mod tests {
             chart_png: None,
             alert_id: String::new(),
             incident_id: String::new(),
+            ..Default::default()
         }
     }
 

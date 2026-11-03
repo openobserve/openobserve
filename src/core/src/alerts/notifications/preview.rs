@@ -21,7 +21,9 @@
 //! [`render`] functions Task 9's `send_notification` calls, never a
 //! reimplementation. See `preview_uses_production_renderer` below.
 
-use config::meta::alerts::{content_spec::ContentSpec, level::AlertLevel};
+use config::meta::alerts::{
+    content_spec::ContentSpec, level::AlertLevel, notification_kind::NotificationKind,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -44,6 +46,9 @@ pub struct PreviewRequest {
     /// Reserved for the Phase-1b alert-driven sample source; ignored in 1a.
     #[serde(default)]
     pub sample: Option<serde_json::Value>,
+    /// Which producer's sample to render with; absent means alert.
+    #[serde(default)]
+    pub kind: NotificationKind,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -53,6 +58,8 @@ pub struct PreviewResponse {
     /// FE card rendering schema.
     pub preview_model: PreviewModel,
     pub unknown_variables: Vec<String>,
+    /// Every variable a template of the requested kind can use.
+    pub variables: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -203,6 +210,7 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
         chart_png: None,
         alert_id: String::new(),
         incident_id: String::new(),
+        ..Default::default()
     }
 }
 
@@ -220,7 +228,16 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
         .validate()
         .map_err(PreviewError::InvalidContent)?;
 
-    let ctx = synthetic_context(level);
+    let ctx = match req.kind {
+        NotificationKind::Alert => synthetic_context(level),
+        kind => {
+            let mut ctx = super::examples::example_context(kind, level == Some(AlertLevel::Ok));
+            if level.is_some() {
+                ctx.level = level;
+            }
+            ctx
+        }
+    };
 
     let content = resolve_content(&req.definition, &ctx, format.channel_family());
     let rendered =
@@ -277,6 +294,7 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
         payload,
         preview_model,
         unknown_variables: content.unknown_variables,
+        variables: super::examples::variables_for(req.kind),
     })
 }
 
@@ -311,6 +329,7 @@ mod tests {
             channel: "slack".into(),
             severity: Some("critical".into()),
             sample: None,
+            kind: Default::default(),
         };
         let err = preview(&req).expect_err("hostile link previewed cleanly");
         assert!(
@@ -326,6 +345,7 @@ mod tests {
             channel: "slack".into(),
             severity: Some("critical".into()),
             sample: None,
+            kind: Default::default(),
         };
         let resp = preview(&req).unwrap();
         // Same payload the send path would produce for the same spec +
@@ -357,6 +377,7 @@ mod tests {
             channel: "slack".into(),
             severity: Some("critical".into()),
             sample: None,
+            kind: Default::default(),
         })
         .unwrap();
         assert!(
@@ -372,6 +393,7 @@ mod tests {
             channel: "slack".into(),
             severity: None,
             sample: None,
+            kind: Default::default(),
         })
         .unwrap();
         assert!(
@@ -392,6 +414,7 @@ mod tests {
             channel: "webhook".into(),
             severity: None,
             sample: None,
+            kind: Default::default(),
         })
         .unwrap();
         assert_eq!(resp.unknown_variables, vec!["alert_time_zzz"]);
@@ -406,6 +429,7 @@ mod tests {
             channel: "slack".into(),
             severity: Some("criticall".into()),
             sample: None,
+            kind: Default::default(),
         })
         .unwrap_err();
         assert!(matches!(err, PreviewError::UnknownSeverity(ref s) if s == "criticall"));
@@ -421,6 +445,7 @@ mod tests {
                 channel: "slack".into(),
                 severity: ok,
                 sample: None,
+                kind: Default::default(),
             })
             .expect("documented severity values must be accepted");
             payloads.push(resp.payload);
