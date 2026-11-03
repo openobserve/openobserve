@@ -27,6 +27,10 @@ use crate::datafusion::distributed_plan::{
     distribute_analyze_exec::DistributeAnalyzeExec, remote_scan_exec::RemoteScanExec,
 };
 
+/// Session config extension that asks EXPLAIN ANALYZE for the structured `profile` column.
+#[derive(Debug)]
+pub struct AnalyzeProfile;
+
 // replace the AnalyzeExec to DistributeAnalyzeExec
 pub fn optimize_distribute_analyze(
     plan: Arc<dyn ExecutionPlan>,
