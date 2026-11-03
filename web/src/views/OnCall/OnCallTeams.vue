@@ -100,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`oncall-team-default-badge-${row.id}`"
           >
             {{ t("oncall.defaultTeamBadge") }}
+            <OTooltip side="bottom" :content="t('oncall.defaultTeamBadgeTip')" />
           </OTag>
         </span>
       </template>
@@ -154,89 +155,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
 
-      <!-- Delete was the only control here, so the most destructive act was
-           the most discoverable one and editing was a whole-row click nothing
-           announced. Safe actions first, destructive last. -->
+      <!-- Edit is the one inline icon; setting the default and deleting are rarer and share the ⋯ menu. -->
       <template #cell-actions="{ row }">
-        <OButton
-          v-if="canConfigure && row.id !== defaultTeamId"
-          variant="ghost"
-          size="icon-sm"
-          icon-left="star-outline"
-          class="max-md:hidden"
-          :loading="settingDefaultTeamId === row.id"
-          :aria-label="t('oncall.setDefaultTeam')"
-          :data-test="`oncall-team-set-default-${row.id}`"
-          @click.stop="setDefaultTeam(row)"
-        >
-          <OTooltip side="bottom" :content="t('oncall.setDefaultTeam')" />
-        </OButton>
-        <div v-else-if="canConfigure" class="h-8 w-8 shrink-0 max-md:hidden" />
-        <OButton
-          v-if="canConfigure"
-          variant="ghost"
-          size="icon-sm"
-          icon-left="edit"
-          class="max-md:hidden"
-          :aria-label="t('oncall.editTeam')"
-          :data-test="`oncall-team-edit-${row.id}`"
-          @click.stop="openEdit(row)"
-        >
-          <OTooltip side="bottom" :content="t('oncall.editTeam')" />
-        </OButton>
-        <!-- The server refuses to delete the default team, so its row offers no Delete, as the phone menu already does. -->
-        <OButton
-          v-if="canConfigure && row.id !== defaultTeamId"
-          variant="ghost"
-          size="icon-sm"
-          icon-left="delete-outline"
-          class="max-md:hidden"
-          :aria-label="t('oncall.deleteTeam')"
-          :data-test="`oncall-team-delete-${row.id}`"
-          @click.stop="teamToDelete = row"
-        >
-          <OTooltip side="bottom" :content="t('oncall.deleteTeam')" />
-        </OButton>
-        <ODropdown v-if="canConfigure" side="bottom" align="end">
-          <template #trigger>
-            <OButton
-              icon-left="more-vert"
-              variant="ghost"
-              size="icon-xs-sq"
-              class="md:hidden"
-              :loading="settingDefaultTeamId === row.id"
-              :aria-label="t('oncall.moreActions')"
-              data-test="oncall-teams-row-more-actions"
-              @click.stop
-            />
-          </template>
-          <ODropdownItem
-            v-if="row.id !== defaultTeamId"
-            icon-left="star-outline"
-            class="md:hidden"
-            :data-test="`oncall-team-set-default-${row.id}-menu`"
-            @select="setDefaultTeam(row)"
-          >
-            <span>{{ t("oncall.setDefaultTeam") }}</span>
-          </ODropdownItem>
-          <ODropdownItem
+        <div class="flex items-center justify-end">
+          <OButton
+            v-if="canConfigure"
+            variant="ghost"
+            size="icon-sm"
             icon-left="edit"
-            class="md:hidden"
-            :data-test="`oncall-team-edit-${row.id}-menu`"
-            @select="openEdit(row)"
+            class="max-md:hidden"
+            :aria-label="t('oncall.editTeam')"
+            :data-test="`oncall-team-edit-${row.id}`"
+            @click.stop="openEdit(row)"
           >
-            <span>{{ t("oncall.editTeam") }}</span>
-          </ODropdownItem>
-          <ODropdownItem
-            icon-left="delete-outline"
-            variant="destructive"
-            class="md:hidden"
-            :data-test="`oncall-team-delete-${row.id}-menu`"
-            @select="teamToDelete = row"
-          >
-            <span>{{ t("oncall.deleteTeam") }}</span>
-          </ODropdownItem>
-        </ODropdown>
+            <OTooltip side="bottom" :content="t('oncall.editTeam')" />
+          </OButton>
+          <ODropdown v-if="canConfigure" side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                icon-left="more-horiz"
+                variant="ghost"
+                size="icon-sm"
+                :loading="settingDefaultTeamId === row.id"
+                :aria-label="t('oncall.moreActions')"
+                data-test="oncall-teams-row-more-actions"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              icon-left="edit"
+              class="md:hidden"
+              :data-test="`oncall-team-edit-${row.id}-menu`"
+              @select="openEdit(row)"
+            >
+              <span>{{ t("oncall.editTeam") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="row.id !== defaultTeamId"
+              icon-left="flag"
+              :data-test="`oncall-team-set-default-${row.id}`"
+              @select="setDefaultTeam(row)"
+            >
+              <span>{{ t("oncall.setDefaultTeam") }}</span>
+            </ODropdownItem>
+            <!-- The server refuses to delete the default team, so its Delete stays visible but says why it is off. -->
+            <ODropdownItem
+              icon-left="delete-outline"
+              variant="destructive"
+              :disabled="row.id === defaultTeamId"
+              :description="
+                row.id === defaultTeamId ? t('oncall.deleteDefaultTeamBlocked') : undefined
+              "
+              :data-test="`oncall-team-delete-${row.id}`"
+              @select="teamToDelete = row"
+            >
+              <span>{{ t("oncall.deleteTeam") }}</span>
+            </ODropdownItem>
+          </ODropdown>
+        </div>
       </template>
 
       <template #error>
@@ -491,7 +467,8 @@ const columns = computed<OTableColumnDef<OnCallTeam>[]>(() => {
       header: t("oncall.actions"),
       isAction: true,
       sortable: false,
-      meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+      pinned: "right",
+      meta: { align: "center", actionCount: 2 },
     },
   ];
 });

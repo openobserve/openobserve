@@ -7,12 +7,21 @@
     :open="props.open"
     size="xxl"
     :title="t('oncall.escalationEditing')"
-    :sub-title="t('oncall.policyHint')"
     bleed
     data-test="oncall-policy-editor"
     :close-guard="guardClose"
     @update:open="(v: boolean) => emit('update:open', v)"
   >
+    <template #header-left>
+      <OIcon
+        name="info-outline"
+        size="sm"
+        class="text-icon-color cursor-pointer"
+        data-test="oncall-policy-editor-info"
+      >
+        <OTooltip side="bottom" :content="t('oncall.policyHint')" />
+      </OIcon>
+    </template>
     <!-- `bleed` because the chip bar spans the full width and supplies its own
          inset; everything below keeps the drawer's standard one. -->
     <!-- Same chips as the read view, so editing feels like the ladder
@@ -20,7 +29,9 @@
          time: five stacked ladders was a page nobody could scan. Sticky,
          because a long ladder scrolls the only thing saying which priority
          you are editing off the top. -->
+    <!-- Hidden on AI triage, which lists every priority itself; there the chips would select nothing. -->
     <div
+      v-if="policyTab !== 'triage'"
       class="bg-dialog-bg border-dialog-header-border px-dialog-content-px py-dialog-content-py sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b"
       data-test="oncall-policy-priority-bar"
     >
@@ -57,6 +68,7 @@
           <OButton
             variant="outline"
             size="xs"
+            icon-left="build"
             data-test="oncall-policy-destinations-fix"
             @click="policyTab = 'delivery'"
           >
@@ -66,11 +78,7 @@
       </OBanner>
 
       <div class="flex flex-col">
-        <OTabs
-          v-model="policyTab"
-          class="border-border-default border-b px-2"
-          data-test="oncall-policy-tabs"
-        >
+        <OTabs v-model="policyTab" bordered data-test="oncall-policy-tabs">
           <OTab name="policy" data-test="oncall-policy-tab-policy">
             {{ t("oncall.policyMainTabPolicy") }}
           </OTab>
@@ -255,16 +263,18 @@
                         :key="i"
                       >
                         <span v-if="line?.people.length" class="flex items-center gap-2">
-                          <span class="flex -space-x-1">
-                            <OAvatar
-                              v-for="email in line.people.slice(0, AVATARS_SHOWN)"
-                              :key="email"
-                              :value="email"
-                              class="ring-surface-base ring-2"
-                            />
-                          </span>
+                          <OAvatarGroup
+                            :people="
+                              line.people.map((email) => ({ value: email, name: nameOf(email) }))
+                            "
+                            :max="AVATARS_SHOWN"
+                          />
                           <OText variant="meta">
-                            {{ t("oncall.policyTodayIs", { who: raw(line.people.join(", ")) }) }}
+                            {{
+                              t("oncall.policyTodayIs", {
+                                who: raw(line.people.map(nameOf).join(", ")),
+                              })
+                            }}
                           </OText>
                         </span>
 
@@ -275,14 +285,12 @@
                           :data-test="`oncall-policy-open-members-${current.priority}-${stepIndex}`"
                           @click="openMembers"
                         >
-                          <span class="flex -space-x-1">
-                            <OAvatar
-                              v-for="member in teamMembers.slice(0, AVATARS_SHOWN)"
-                              :key="member"
-                              :value="member"
-                              class="ring-surface-base ring-2"
-                            />
-                          </span>
+                          <OAvatarGroup
+                            :people="
+                              teamMembers.map((email) => ({ value: email, name: nameOf(email) }))
+                            "
+                            :max="AVATARS_SHOWN"
+                          />
                           <OText variant="meta" class="hover:underline">
                             {{
                               t(
@@ -444,6 +452,7 @@
                     <OButton
                       variant="ghost-primary"
                       size="xs"
+                      icon-left="open-in-new"
                       data-test="oncall-policy-telephony-link"
                       @click="openTelephony"
                     >
@@ -517,6 +526,7 @@
                   v-if="channelFromTeam"
                   variant="ghost"
                   size="sm-action"
+                  icon-left="close"
                   data-test="oncall-team-channel-clear"
                   @click="usePolicyChannel"
                 >
@@ -554,8 +564,6 @@
                  editing steps must never silently rewrite the gate. -->
           <OTabPanel name="triage" data-test="oncall-policy-triage">
             <div class="flex flex-col gap-3 px-4 pt-3 pb-4">
-              <OText variant="meta">{{ t("oncall.l0Hint") }}</OText>
-
               <OnCallL0Editor
                 :l0="l0Draft ?? props.policy?.l0 ?? null"
                 @update:l0="onL0Update"
@@ -605,10 +613,13 @@ import OnCallTeamSlackChannel from "@/components/oncall/OnCallTeamSlackChannel.v
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import { stableStringify } from "@/utils/drafts/editorDraftStore";
-import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
+import OAvatarGroup from "@/lib/core/Avatar/OAvatarGroup.vue";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -697,6 +708,7 @@ interface PolicyDraftData {
 }
 
 const { t } = useI18nTyped();
+const { nameOf } = useOrgUserNames();
 const store = useStore();
 const router = useRouter();
 const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
@@ -1207,9 +1219,8 @@ watch(
   (open) => {
     if (!open) return;
     reset();
-    // Every visit starts on Delivery — a re-open landing on whichever tab was
-    // last showing would carry a stale AI triage view into an unrelated edit.
-    policyTab.value = "delivery";
+    // Every visit starts on the ladder it was opened to edit, never on a stale tab.
+    policyTab.value = "policy";
     // A policy need not carry a rung for every priority, so an unrepresented
     // one falls back to a chip that exists rather than an empty body.
     const wanted = props.priority ?? selected.value;

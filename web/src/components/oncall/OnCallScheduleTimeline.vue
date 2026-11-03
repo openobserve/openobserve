@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="xs"
         :disabled="offsetDays === 0"
+        icon-left="event"
         data-test="oncall-timeline-today"
         @click="offsetDays = 0"
       >
@@ -99,81 +100,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm-action"
+          icon-left="add"
           data-test="oncall-timeline-add"
           @click="emit('add')"
         >
           {{ t("oncall.addRotation") }}
         </OButton>
-
-        <!-- Beside Add, not under it, and SAYING SO: hand-building
-             follow-the-sun out of restriction windows is the thing a preset
-             saves you from, so the choice belongs where the adding is decided.
-             It spent a while as a caret opening a one-item menu that repeated
-             the caret's own accessible name — a reader who never opened it
-             never learnt the shapes existed, which is the whole value of the
-             feature hidden behind an icon-sized guess. The label IS the
-             entry point. -->
-        <OButton
-          variant="outline"
-          size="sm-action"
-          class="max-md:hidden"
-          data-test="oncall-timeline-presets"
-          @click="emit('presets')"
-        >
-          {{ t("oncall.presetsTitle") }}
-        </OButton>
-
-        <!-- A cover is an exception to the weeks drawn below, so it is offered
-             beside the controls that change them rather than from a strip
-             above the chart, where it read as a heading's action and sat a row
-             away from everything else the reader can do to this schedule. -->
-        <OButton
-          v-if="canCover"
-          variant="outline"
-          size="sm-action"
-          class="max-md:hidden"
-          data-test="oncall-timeline-request-cover"
-          @click="emit('request-cover')"
-        >
-          {{ t("oncall.requestCover") }}
-        </OButton>
-
-        <!-- A phone row fits the range and one button; the two rarer acts share a menu rather than a second row. -->
-        <ODropdown side="bottom" align="end">
-          <template #trigger>
-            <OButton
-              icon-left="more-vert"
-              variant="outline"
-              size="icon-sm"
-              class="ms-auto md:hidden"
-              :aria-label="t('oncall.moreActions')"
-              data-test="oncall-timeline-more-actions"
-            />
-          </template>
-          <ODropdownItem
-            class="md:hidden"
-            data-test="oncall-timeline-presets-menu"
-            @select="emit('presets')"
-          >
-            <span>{{ t("oncall.presetsTitle") }}</span>
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="canCover"
-            class="md:hidden"
-            data-test="oncall-timeline-request-cover-menu"
-            @select="emit('request-cover')"
-          >
-            <span>{{ t("oncall.requestCover") }}</span>
-          </ODropdownItem>
-        </ODropdown>
       </span>
     </div>
 
     <OInnerLoading v-if="loading" showing />
 
-    <!-- A team with no rotations is exactly the reader the presets were built
-         for, so the empty state offers both roads rather than only the one
-         that starts with a blank rotation form. -->
+    <!-- The only place a template is the main road: a team with nothing to replace. -->
     <OEmptyState
       v-else-if="!tracks.length"
       size="block"
@@ -197,6 +135,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            this rotation is, when it turns over, and how many people carry it. -->
       <template #track-header="{ track }">
         <div
+          v-if="track.key === AWAY_TRACK"
+          class="flex flex-wrap items-center gap-x-2 gap-y-1"
+          data-test="oncall-lane-header-away"
+        >
+          <span class="bg-badge-warning-solid-bg size-2 shrink-0 rounded-full" aria-hidden="true" />
+          <OText variant="section">{{ track.label }}</OText>
+        </div>
+        <div
+          v-else
           class="flex flex-wrap items-center gap-x-2 gap-y-1"
           :data-test="`oncall-lane-header-${track.key}`"
         >
@@ -250,19 +197,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`oncall-lane-menu-${track.key}`"
                 />
               </template>
+              <!-- A template rewrites the first rotation only, so only its lane offers one; the drawer names what it replaces. -->
               <ODropdownItem
+                v-if="laneOf(track).index === 0"
+                icon-left="restart-alt"
+                :data-test="`oncall-lane-presets-${track.key}`"
+                @select="emit('presets')"
+              >
+                {{ t("oncall.presetsStartOver") }}
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="person-add"
                 :data-test="`oncall-lane-override-${track.key}`"
                 @select="emit('override', laneOf(track).id)"
               >
                 {{ t("oncall.railOverride") }}
               </ODropdownItem>
               <ODropdownItem
+                icon-left="content-copy"
                 :data-test="`oncall-lane-duplicate-${track.key}`"
                 @select="emit('duplicate', laneOf(track).id)"
               >
                 {{ t("oncall.railDuplicate") }}
               </ODropdownItem>
               <ODropdownItem
+                icon-left="delete-outline"
                 variant="destructive"
                 :data-test="`oncall-lane-delete-${track.key}`"
                 @select="emit('delete', laneOf(track).id)"
@@ -288,12 +247,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="primary"
             size="xs"
             class="ms-auto"
+            icon-left="person-add"
             :data-test="`oncall-lane-assign-${track.key}`"
             @click="emit('assign-people', laneOf(track).id)"
           >
             {{ t("oncall.laneEmptyAssign") }}
           </OButton>
         </div>
+      </template>
+
+      <template #band="{ band }">
+        <ODropdown v-if="shiftActions(band.key).length" align="start">
+          <template #trigger>
+            <OScheduleBand :band="band" role="button" aria-haspopup="menu" class="cursor-pointer" />
+          </template>
+          <ODropdownItem
+            v-for="action in shiftActions(band.key)"
+            :key="action.id"
+            :icon-left="action.icon"
+            :data-test="`oncall-shift-menu-${action.id}`"
+            @select="onShiftAction(action.id, band.key)"
+          >
+            {{ action.label }}
+          </ODropdownItem>
+        </ODropdown>
+        <OScheduleBand v-else :band="band" />
       </template>
 
       <!-- Three entries, and every one of them means something. The old key
@@ -320,6 +298,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             {{ t("oncall.legendNobody") }}
           </span>
+          <span
+            v-if="awayTrack"
+            class="text-text-secondary flex items-center gap-1.5 text-xs"
+            data-test="oncall-timeline-legend-away"
+          >
+            <span class="bg-badge-warning-solid-bg size-2 rounded-full" aria-hidden="true" />
+            {{ t("oncall.timelineAwayLane") }}
+          </span>
 
           <!-- The gap is the only thing on this chart worth acting on, so it is
                the only legend entry that carries its own sentence and a way to
@@ -336,6 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="xs"
               class="ms-auto"
+              icon-left="person-add"
               data-test="oncall-timeline-fill-gap"
               @click="emit('fill-gap', firstGap)"
             >
@@ -370,7 +357,9 @@ import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import type { ResolvedSegment, Rotation, TimeWindow } from "@/ts/interfaces/oncall";
+import OScheduleBand from "@/lib/data/ScheduleTimeline/OScheduleBand.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { ResolvedSegment, Rotation, TimeWindow, Unavailability } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -384,6 +373,8 @@ import {
 } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
+
+export type ShiftAction = "cover" | "swap" | "away";
 
 const props = withDefaults(
   defineProps<{
@@ -401,6 +392,13 @@ const props = withDefaults(
      * know still shows them.
      */
     canCover?: boolean;
+    /** Absences overlapping the window, already narrowed to this team's people. */
+    absences?: Unavailability[];
+    /** May book anybody's absence; without it a reader may still book their own. */
+    canMarkAway?: boolean;
+    selfEmail?: string;
+    /** Rotations with upcoming shifts to trade; a shift of any other offers no swap. */
+    swapRotations?: string[];
   }>(),
   {
     rotations: () => [],
@@ -408,6 +406,10 @@ const props = withDefaults(
     timezone: "UTC",
     loading: false,
     canCover: true,
+    absences: () => [],
+    canMarkAway: true,
+    selfEmail: "",
+    swapRotations: () => [],
   },
 );
 
@@ -415,9 +417,7 @@ const emit = defineEmits<{
   (e: "fill-gap", gap: ResolvedSegment): void;
   (e: "add"): void;
   (e: "presets"): void;
-  /// A cover on no rotation in particular — the dialog asks which. The
-  /// per-lane `override` names one because the menu it hangs off already has.
-  (e: "request-cover"): void;
+  (e: "shift-action", action: ShiftAction, segment: ResolvedSegment): void;
   /// Carries the rotation's **id**, not its name: a name is renameable and two
   /// rotations may share one, so a name cannot say which row was meant.
   (e: "edit" | "duplicate" | "override" | "delete" | "assign-people", rotationId: string): void;
@@ -672,7 +672,11 @@ function emptyLine(track: ScheduleTrack): I18nText {
   return t("oncall.laneEmptyNeverWins");
 }
 
-const tracks = computed<ScheduleTrack[]>(() =>
+const bandKeyOf = (lane: Lane, segment: ResolvedSegment) => `${lane.name}-${segment.from}`;
+
+const AWAY_TRACK = "__away";
+
+const rotationTracks = computed<ScheduleTrack[]>(() =>
   lanes.value.map((lane) => ({
     key: lane.id,
     label: raw(lane.name),
@@ -704,7 +708,7 @@ const tracks = computed<ScheduleTrack[]>(() =>
         }
 
         return {
-          key: `${lane.name}-${segment.from}`,
+          key: bandKeyOf(lane, segment),
           offset: share(start),
           width: (end - start) / span.value,
           label,
@@ -730,6 +734,82 @@ const tracks = computed<ScheduleTrack[]>(() =>
       }),
   })),
 );
+
+const bandRange = (start: number, end: number) => ({
+  from: raw(fmt(start, { weekday: "short", hour: "2-digit", minute: "2-digit" })),
+  to: raw(fmt(end, { weekday: "short", hour: "2-digit", minute: "2-digit" })),
+});
+
+/// Its own lane rather than marks on the rotation lanes: an absence is a person's, and a person can sit in several rotations.
+const awayTrack = computed<ScheduleTrack | null>(() => {
+  const bands = props.absences
+    .filter((absence) => absence.end_at > from.value && absence.start_at < to.value)
+    .map<ScheduleBand>((absence) => {
+      const start = Math.max(absence.start_at, from.value);
+      const end = Math.min(absence.end_at, to.value);
+      const who = nameOf(absence.user_email);
+      return {
+        key: `away-${absence.id}`,
+        offset: share(start),
+        width: (end - start) / span.value,
+        label: t("oncall.timelineAwayBand", { who: raw(who) }),
+        ariaLabel: t("oncall.timelineAwayAria", {
+          who: raw(absence.user_email),
+          ...bandRange(start, end),
+        }),
+        tone: "partial",
+      };
+    });
+  return bands.length ? { key: AWAY_TRACK, label: t("oncall.timelineAwayLane"), bands } : null;
+});
+
+const tracks = computed<ScheduleTrack[]>(() =>
+  awayTrack.value ? [...rotationTracks.value, awayTrack.value] : rotationTracks.value,
+);
+
+/// The segment behind each drawn band, so a click on one can act on its rotation, person and window.
+const segmentByBand = computed(() => {
+  const map = new Map<string, ResolvedSegment>();
+  for (const lane of lanes.value) {
+    for (const segment of props.segments) {
+      if (segment.rotation_id === lane.id) map.set(bandKeyOf(lane, segment), segment);
+    }
+  }
+  return map;
+});
+
+interface ShiftMenuItem {
+  id: ShiftAction;
+  icon: IconName;
+  label: I18nText;
+}
+
+/// Only what this reader can do to this shift; a shift that is already over offers nothing.
+function shiftActions(bandKey: string): ShiftMenuItem[] {
+  const segment = segmentByBand.value.get(bandKey);
+  if (!segment || segment.to <= nowMicros.value) return [];
+  const who = segment.user_email ?? "";
+  const items: ShiftMenuItem[] = [];
+  if (props.canCover) {
+    items.push({ id: "cover", icon: "person-add", label: t("oncall.shiftMenuCover") });
+  }
+  if (who && props.canCover && props.swapRotations.includes(segment.rotation_id)) {
+    items.push({ id: "swap", icon: "swap-horiz", label: t("oncall.shiftMenuSwap") });
+  }
+  if (who && (props.canMarkAway || who.toLowerCase() === props.selfEmail.toLowerCase())) {
+    items.push({
+      id: "away",
+      icon: "event-busy",
+      label: t("oncall.shiftMenuAway", { name: raw(nameOf(who)) }),
+    });
+  }
+  return items;
+}
+
+function onShiftAction(action: ShiftAction, bandKey: string) {
+  const segment = segmentByBand.value.get(bandKey);
+  if (segment) emit("shift-action", action, segment);
+}
 
 /// One tick per day boundary, skipped on the fortnight view where fourteen
 /// labels collide into a smear.

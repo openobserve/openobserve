@@ -119,7 +119,7 @@ describe("OnCallCoverList", () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain("Not specified");
-    expect(wrapper.find('[data-test="oncall-cover-empty"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-cover-list"]').exists()).toBe(true);
   });
 
   /// Overlaps are legal and the NEWEST wins, so the row on top of an
@@ -321,7 +321,7 @@ describe("OnCallCoverList", () => {
   /// The chip answers "which rotation is this standing over", which is not a
   /// question a one-rotation team can ask. It shows the rotation's NAME from
   /// its stored id — printing the id would be an identifier nobody can look up.
-  it("names the rotation only where the team staffs more than one", async () => {
+  it("names the rotation a cover stands over, by its name", async () => {
     service.listOverrides.mockResolvedValue({
       data: [cover({ rotation_id: "rot_secondary" })],
     } as any);
@@ -330,10 +330,6 @@ describe("OnCallCoverList", () => {
       { id: "rot_primary", name: "Primary", shift_rules: [] },
       { id: "rot_secondary", name: "Secondary", shift_rules: [] },
     ];
-    const one = render({ rotations: [rotations[0]] });
-    await flushPromises();
-    expect(one.text()).not.toContain("Secondary");
-
     const two = render({ rotations });
     await flushPromises();
     expect(two.text()).toContain("Secondary");
@@ -341,12 +337,33 @@ describe("OnCallCoverList", () => {
 
   /// A cover list that cannot load is not worth an error over the calendar it
   /// sits under: the calendar still answers who is on call.
-  it("degrades to empty rather than shouting when the read fails", async () => {
+  it("degrades to nothing rather than shouting when the read fails", async () => {
     service.listOverrides.mockRejectedValue(new Error("boom"));
 
     const wrapper = render();
     await flushPromises();
 
-    expect(wrapper.find('[data-test="oncall-cover-empty"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-cover-list"]').exists()).toBe(false);
+  });
+
+  /// The timeline and its legend already show there are no covers, so an empty list says nothing at all.
+  it("renders nothing when there are no covers in the window", async () => {
+    service.listOverrides.mockResolvedValue({ data: [] } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-cover-list"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("No covers in this window.");
+  });
+
+  it("heads the list with its count, and no explanation sentence", async () => {
+    service.listOverrides.mockResolvedValue({
+      data: [cover({ id: "ov_1" }), cover({ id: "ov_2" })],
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-cover-list-title"]').text()).toBe("Covers (2)");
+    expect(wrapper.text()).not.toContain("A cover wins over every rotation");
   });
 });

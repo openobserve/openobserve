@@ -72,7 +72,6 @@ export class OnCallCoveragePage {
       // the cover list
       coverList: '[data-test="oncall-cover-list"]',
       coverTable: '[data-test="oncall-cover-table"]',
-      coverEmpty: '[data-test="oncall-cover-empty"]',
       coverRemoveDialog: '[data-test="oncall-cover-remove-dialog"]',
 
       // the schedule bar and its plain-words answer
@@ -100,6 +99,7 @@ export class OnCallCoveragePage {
   coverRemove(coverId) { return `[data-test="oncall-cover-remove-${coverId}"]`; }
   laneHeader(rotationId) { return `[data-test="oncall-lane-header-${rotationId}"]`; }
   markAway(memberRowId) { return `[data-test="oncall-members-mark-away-${memberRowId}"]`; }
+  clearAway(memberRowId) { return `[data-test="oncall-members-clear-away-${memberRowId}"]`; }
   awayTag(memberRowId) { return `[data-test="oncall-members-away-${memberRowId}"]`; }
 
   /**

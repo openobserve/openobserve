@@ -1331,6 +1331,12 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
     expect(drawerRules(wrapper)[0].ends_at).toBe(ANCHOR + 2 * hour);
     expect(wrapper.find('[data-test="oncall-schedule-rule-summary-0"]').text()).toContain("stops");
     expect(wrapper.find('[data-test="oncall-schedule-rule-tab-icon-0"]').exists()).toBe(true);
+    expect(
+      wrapper
+        .find('[data-test="oncall-schedule-rule-tab-icon-0"]')
+        .findComponent({ name: "OTooltip" })
+        .props("content"),
+    ).toBe("Stopped");
     await save(wrapper);
     expect(savedRotations()[0].shift_rules[0].ends_at).toBe(ANCHOR + 2 * hour);
   });
@@ -1555,8 +1561,11 @@ describe("OnCallScheduleEditor — explaining several shift rules", () => {
       expect(wrapper.find(`[data-test="oncall-schedule-rule-never-used-${index}"]`).text()).toBe(
         "Never used: Follow-the-sun catch-all covers all its hours and wins over it.",
       );
-      expect(wrapper.find(`[data-test="oncall-schedule-rule-tab-icon-${index}"]`).exists()).toBe(
-        true,
+      const icon = wrapper.find(`[data-test="oncall-schedule-rule-tab-icon-${index}"]`);
+      expect(icon.exists()).toBe(true);
+      // The icon alone said nothing; its tooltip names the problem.
+      expect(icon.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "Never used — another rule always wins",
       );
     }
     expect(

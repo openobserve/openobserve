@@ -200,11 +200,10 @@
                still the only way to add the first one. Matches the
                dashboard tab strip's own add-tab placement: snug against the
                last tab, not stretched off to the row's far edge. -->
-          <div class="flex items-center">
+          <div class="border-card-glass-border flex items-stretch border-b border-solid">
             <OTabs
               v-if="active.shift_rules.length"
               v-model="activeRuleTab"
-              bordered
               class="max-w-[calc(100%_-_2.5rem)]"
               data-test="oncall-schedule-rule-tabs"
             >
@@ -221,7 +220,9 @@
                   size="sm"
                   class="shrink-0"
                   :data-test="`oncall-schedule-rule-tab-icon-${ruleIndex}`"
-                />
+                >
+                  <OTooltip side="bottom" :content="ruleTabHint(rule, ruleIndex)" />
+                </OIcon>
                 <span class="truncate">{{
                   raw(
                     rule.name?.trim()
@@ -252,7 +253,7 @@
             <OButton
               variant="ghost"
               size="icon"
-              class="ms-1"
+              class="ms-1 self-center"
               icon-left="add"
               :aria-label="t('oncall.addShiftRule')"
               data-test="oncall-schedule-rule-add"
@@ -911,6 +912,14 @@ function ruleTabIcon(rule: ShiftRule, index: number): string | undefined {
   if (ruleUsage(index)?.kind === "never-used") return "warning-amber";
   if (isRetired(rule)) return "pause-circle-filled";
   return undefined;
+}
+
+/// What the tab's status icon means, in the order `ruleTabIcon` picks it.
+function ruleTabHint(rule: ShiftRule, index: number): I18nText {
+  if (!rule.members.length) return t("oncall.ruleTabNoPeople");
+  if (priorityClashFor(rule)) return t("oncall.ruleTabClash");
+  if (ruleUsage(index)?.kind === "never-used") return t("oncall.ruleTabNeverUsed");
+  return t("oncall.ruleTabStopped");
 }
 
 // Missing people are said out loud once the picker was used or the server stored the rule empty.

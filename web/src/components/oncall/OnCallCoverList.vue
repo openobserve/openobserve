@@ -27,38 +27,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   descending: the row at the top of an overlapping pair is the one in force.
 -->
 <template>
-  <div
-    class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-2 border px-4 py-3"
-    data-test="oncall-cover-list"
-  >
-    <span class="flex flex-wrap items-baseline gap-x-2">
-      <OText variant="panel-title">{{ t("oncall.coverListTitle") }}</OText>
-      <OText variant="meta">{{ t("oncall.coverListHint") }}</OText>
-    </span>
+  <!-- Nothing at all without covers: the timeline and its legend already say there are none. -->
+  <section v-if="covers.length" class="flex flex-col gap-2" data-test="oncall-cover-list">
+    <OText variant="section" as="h3" data-test="oncall-cover-list-title">
+      {{ t("oncall.coverListCount", { count: covers.length }) }}
+    </OText>
 
     <OTable
-      v-if="covers.length || loading"
       :data="covers"
       :columns="columns"
       row-key="id"
       :frame="false"
-      :loading="loading"
       :loading-reset-key="teamId"
       pagination="client"
       :show-global-filter="false"
+      :column-visibility="{ reason: false }"
       table-id="oncall-team-covers"
       data-test="oncall-cover-table"
     >
       <template #cell-who="{ row }">
-        <span class="flex flex-wrap items-center gap-1">
-          <OUserCell :value="row.user_email" />
-          <!-- Which rotation it stands over. Only when the team staffs more
-               than one — otherwise it is the answer to a question nobody on
-               this team can ask. -->
-          <OTag v-if="rotations.length > 1" variant="default-soft" size="xs">
-            {{ rotationName(row.rotation_id) }}
-          </OTag>
-        </span>
+        <OUserCell :value="row.user_email" />
       </template>
 
       <!-- Optional on the wire, and legitimately so: "cover tonight" is a real
@@ -66,6 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-coveringFor="{ row }">
         <OUserCell v-if="row.covering_for" :value="row.covering_for" />
         <OText v-else variant="meta">{{ t("oncall.coverForNobodyNamed") }}</OText>
+      </template>
+
+      <template #cell-rotation="{ row }">
+        <OText variant="meta">{{ rotationName(row.rotation_id) }}</OText>
       </template>
 
       <template #cell-window="{ row }">
@@ -78,50 +70,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-actions="{ row }">
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="delete-outline"
-          :aria-label="t('oncall.coverRemove')"
-          :data-test="`oncall-cover-remove-${row.id}`"
-          @click.stop="openRemove(row)"
-        />
+        <div class="flex items-center justify-end">
+          <OButton
+            variant="ghost-destructive"
+            size="icon-sm"
+            icon-left="delete-outline"
+            :aria-label="t('oncall.coverRemove')"
+            :data-test="`oncall-cover-remove-${row.id}`"
+            @click.stop="openRemove(row)"
+          >
+            <OTooltip side="bottom" :content="t('oncall.coverRemove')" />
+          </OButton>
+        </div>
       </template>
     </OTable>
+  </section>
 
-    <OText v-else variant="meta" data-test="oncall-cover-empty">
-      {{ t("oncall.coverListEmpty") }}
+  <!-- Deleting a cover puts the rotation back in charge of that window, and
+       who that is is not always obvious from the row. The confirm says the
+       window rather than only the name. -->
+  <ODialog
+    :open="!!toRemove"
+    :title="t('oncall.coverRemoveTitle')"
+    :primary-button-label="t('oncall.coverRemove')"
+    :secondary-button-label="t('oncall.cancel')"
+    primary-button-variant="destructive"
+    :primary-button-loading="removing"
+    data-test="oncall-cover-remove-dialog"
+    @update:open="(v: boolean) => !v && (toRemove = null)"
+    @click:primary="removeCover"
+    @click:secondary="toRemove = null"
+  >
+    <OText v-if="shownRemove">
+      <i18n-t keypath="oncall.coverRemoveBody" tag="span">
+        <template #who>
+          <span
+            data-test="oncall-cover-remove-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ shownRemove.user_email }}</span
+          >
+        </template>
+        <template #range>{{ windowOf(shownRemove) }}</template>
+      </i18n-t>
     </OText>
-
-    <!-- Deleting a cover puts the rotation back in charge of that window, and
-         who that is is not always obvious from the row. The confirm says the
-         window rather than only the name. -->
-    <ODialog
-      :open="!!toRemove"
-      :title="t('oncall.coverRemoveTitle')"
-      :primary-button-label="t('oncall.coverRemove')"
-      :secondary-button-label="t('oncall.cancel')"
-      primary-button-variant="destructive"
-      :primary-button-loading="removing"
-      data-test="oncall-cover-remove-dialog"
-      @update:open="(v: boolean) => !v && (toRemove = null)"
-      @click:primary="removeCover"
-      @click:secondary="toRemove = null"
-    >
-      <OText v-if="shownRemove">
-        <i18n-t keypath="oncall.coverRemoveBody" tag="span">
-          <template #who>
-            <span
-              data-test="oncall-cover-remove-name"
-              class="text-text-heading font-semibold break-all"
-              >{{ shownRemove.user_email }}</span
-            >
-          </template>
-          <template #range>{{ windowOf(shownRemove) }}</template>
-        </i18n-t>
-      </OText>
-    </ODialog>
-  </div>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
@@ -130,7 +122,6 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import { queryClient } from "@/composables/query/queryClient";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -138,6 +129,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { deleteOverrideMutation, teamOverridesQuery } from "@/services/oncall.queries";
 import type { Override, Rotation } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -208,6 +200,11 @@ const columns = computed<OTableColumnDef<Override>[]>(() => [
     accessorFn: (row: Override) => row.covering_for ?? "",
   },
   {
+    id: "rotation",
+    header: t("oncall.coverRotationColumn"),
+    accessorFn: (row: Override) => row.rotation_id,
+  },
+  {
     id: "window",
     header: t("oncall.coverWhen"),
     accessorFn: (row: Override) => row.start_at,
@@ -223,8 +220,8 @@ const columns = computed<OTableColumnDef<Override>[]>(() => [
     header: t("oncall.actions"),
     isAction: true,
     sortable: false,
-    size: 80,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+    pinned: "right",
+    meta: { align: "center", actionCount: 1 },
   },
 ]);
 

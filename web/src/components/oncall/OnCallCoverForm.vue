@@ -242,6 +242,12 @@ const props = withDefaults(
      * stored, because a cover over a position nothing staffs pages nobody.
      */
     rotations?: Rotation[];
+    /** Pre-selects the rotation being covered, e.g. from a clicked shift. */
+    defaultRotation?: string;
+    /** Which errand the dialog opens on. */
+    defaultMode?: "cover" | "swap";
+    /** Pre-selects the swap's first shift: the one of this rotation running at `at`. */
+    swapFrom?: { rotationId: string; at: number } | null;
   }>(),
   {
     open: false,
@@ -255,6 +261,9 @@ const props = withDefaults(
     defaultUser: "",
     shifts: () => [],
     rotations: () => [],
+    defaultRotation: "",
+    defaultMode: "cover",
+    swapFrom: null,
   },
 );
 
@@ -308,10 +317,9 @@ watch(
   (open) => {
     if (!open) return;
     resetForm();
-    // A gap is a hole to fill, never a week to trade — opening on Swap would
-    // answer a question the caller did not ask.
-    mode.value = "cover";
-    swapA.value = "";
+    // Swap only when asked for: a gap is a hole to fill, never a week to trade.
+    mode.value = props.defaultMode === "swap" && props.shifts.length ? "swap" : "cover";
+    swapA.value = mode.value === "swap" ? swapFromKey() : "";
     swapB.value = "";
   },
 );
@@ -359,7 +367,10 @@ function initialValues(): OnCallCoverFormValues {
   const now = Date.now() * 1000;
   return {
     user_email: prefilledUser.value,
-    rotation_id: props.rotations[0]?.id ?? "",
+    rotation_id:
+      props.rotations.find((rotation) => rotation.id === props.defaultRotation)?.id ??
+      props.rotations[0]?.id ??
+      "",
     // A cover is arranged for hours that have not happened yet, so the window
     // opens on some. Left undefined, the picker fell back to its log-search
     // default — the past half hour — and emitted it on mount, so a dialog
@@ -533,6 +544,15 @@ const shiftOptions = computed(() =>
     value: shiftKey(shift),
   })),
 );
+
+function swapFromKey(): string {
+  const from = props.swapFrom;
+  if (!from) return "";
+  const shift = props.shifts.find(
+    (s) => s.rotationId === from.rotationId && s.startMicros <= from.at && s.endMicros > from.at,
+  );
+  return shift ? shiftKey(shift) : "";
+}
 
 const swapPair = computed(() => {
   const first = shiftByKey.value.get(swapA.value);

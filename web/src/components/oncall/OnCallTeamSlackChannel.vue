@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm-action"
           :loading="testWrite.isPending.value"
+          icon-left="send"
           data-test="oncall-team-slack-test"
           @click="sendTest"
         >
@@ -42,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="sm-action"
           :disabled="saving"
+          icon-left="close"
           data-test="oncall-team-slack-clear"
           @click="emit('save', { clear_slack: true })"
         >
