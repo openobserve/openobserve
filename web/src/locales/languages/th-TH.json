@@ -762,6 +762,7 @@
     "dragToReorder": "ลากเพื่อจัดลำดับใหม่",
     "timeAmount": "จำนวนเวลา",
     "timeUnit": "หน่วยเวลา",
+    "unitFor": "หน่วย {label}",
     "queryEditorAriaLabel": "Query editor. Press Escape to move to the next control.",
     "queryEditorEscapeAction": "Move focus to the next control",
     "inlineEdit": {
@@ -11954,6 +11955,7 @@
       "budgetLabel": "Alert budget",
       "budgetPerDay": "per day",
       "budgetPerWeek": "per week",
+      "budgetPeriod": "ระยะเวลางบประมาณการแจ้งเตือน",
       "budgetRange": "Enter a number greater than 0",
       "chartsTab": "Charts",
       "checkEvery": "Check Every",
@@ -11963,6 +11965,7 @@
       "sendsToStatus": "Sends to {targets} each time an anomaly is detected.",
       "detectionAlreadyRunning": "Detection is already running; try again shortly.",
       "detectionCharts": "Detection results",
+      "detectionFunctionField": "ฟิลด์ฟังก์ชันตรวจจับ",
       "detectionFunctionTooltip": "What to measure in each time bucket. count watches how many records arrive; avg, min, max and sum watch a numeric field. p50, p95 and p99 watch that field's distribution — e.g. p95 of response_time_ms catches latency getting worse for the slowest requests even when traffic stays flat.",
       "detectionResolution": "Detection Resolution",
       "detectionResolutionTooltip": "How granular each data point is. E.g. \"5m\" means anomalies are detected at 5-minute resolution.",

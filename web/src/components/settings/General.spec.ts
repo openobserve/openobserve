@@ -312,6 +312,12 @@ describe("General", () => {
   });
 
   describe("Form inputs", () => {
+    it("gives the max series input an accessible name", () => {
+      const wrapper = createWrapper();
+      const input = wrapper.find('[data-test="general-settings-max-series-per-query"]');
+      expect(input.find("input").attributes("aria-label")).toBe("Max Series Per Query");
+    });
+
     it("should keep the scrape interval and max series inputs (data-tests preserved)", () => {
       const wrapper = createWrapper();
       expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(true);

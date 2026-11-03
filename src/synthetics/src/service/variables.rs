@@ -2919,6 +2919,9 @@ mod tests {
             "last_alert_at",
             "alerting",
             "degraded_notified_at",
+            "status_down_runs",
+            "status_up_runs",
+            "status_run_ts",
         ] {
             let start = checks.find(&format!("\"{col}\"")).unwrap();
             let at = start + checks[start..].find("NOT NULL").unwrap() + "NOT NULL".len();

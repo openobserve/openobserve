@@ -39,7 +39,8 @@ export const hasFieldCondition = (queryStr: string, fieldName: string): boolean 
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
-  const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
+  // The lookbehind stops `operation_name` from matching inside `db_operation_name`.
+  const condPat = `(?<!\\w)(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
 
   const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
   if (multiRegex.test(queryStr)) return true;
@@ -80,7 +81,8 @@ export const replaceExistingFieldCondition = (
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
-  const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
+  // The lookbehind stops `operation_name` from matching inside `db_operation_name`.
+  const condPat = `(?<!\\w)(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
   const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");

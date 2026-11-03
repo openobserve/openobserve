@@ -1871,7 +1871,8 @@ const replaceExistingFieldCondition = (
   const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
   const fieldPat = `(?:"${esc}"|${esc})`;
-  const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
+  // The lookbehind stops `operation_name` from matching inside `db_operation_name`.
+  const condPat = `(?<!\\w)(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
   const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");

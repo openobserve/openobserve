@@ -470,6 +470,44 @@ describe("ScheduledPipeline Component", () => {
         "SELECT max(_timestamp), count(*) FROM \"stream1\" WHERE level='error' GROUP BY histogram(_timestamp)",
       );
     });
+
+    it.each([
+      ["an include", "operation_name='GET /'"],
+      ["a multi-value exclude", "(operation_name!='GET /' and operation_name!='POST /')"],
+    ])("adds %s next to a field whose name ends with the same name", async (_, filter) => {
+      const base = `SELECT * FROM "qa" WHERE db_operation_name='SELECT'`;
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi.fn().mockReturnValue(base),
+        setValue: vi.fn(),
+      };
+      child.pipelineEditorRef = mockEditorRef;
+      child.tab = "sql";
+
+      await child.handleSidebarEvent("add-field", filter);
+
+      expect(mockEditorRef.setValue).toHaveBeenCalledWith(`${base} AND ${filter}`);
+    });
+
+    it("still replaces the exact field's value next to the longer field", async () => {
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi
+          .fn()
+          .mockReturnValue(
+            `SELECT * FROM "qa" WHERE db_operation_name='SELECT' AND operation_name='POST /'`,
+          ),
+        setValue: vi.fn(),
+      };
+      child.pipelineEditorRef = mockEditorRef;
+      child.tab = "sql";
+
+      await child.handleSidebarEvent("add-field", "operation_name='GET /'");
+
+      expect(mockEditorRef.setValue).toHaveBeenCalledWith(
+        `SELECT * FROM "qa" WHERE db_operation_name='SELECT' AND operation_name='GET /'`,
+      );
+    });
   });
 
   describe("Function Management", () => {
