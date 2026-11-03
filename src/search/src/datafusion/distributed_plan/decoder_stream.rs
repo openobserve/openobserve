@@ -72,14 +72,10 @@ impl FlightDecoderStream {
             }
             CustomMessage::PeakMemory(peak_memory) => {
                 self.query_context
-                    .node_profile
-                    .record_peak_memory(peak_memory);
-                self.query_context
                     .peak_memory
                     .fetch_max(peak_memory, Ordering::Relaxed);
             }
             CustomMessage::PartialErr(err) => {
-                self.query_context.node_profile.record_error(&err);
                 if !err.is_empty() {
                     let mut guard = self.query_context.partial_err.lock();
                     if guard.is_empty() {
@@ -128,7 +124,6 @@ impl Stream for FlightDecoderStream {
                     break;
                 }
                 Some(Err(e)) => {
-                    self.query_context.node_profile.record_error(&e.to_string());
                     log::error!(
                         "[trace_id {}] flight->search: response node: {}, name: {}, is_super: {}, is_querier: {}, err: {e:?}, took: {} ms",
                         self.query_context.trace_id,
@@ -145,7 +140,6 @@ impl Stream for FlightDecoderStream {
                 // translate data
                 Some(Ok(data)) => match data {
                     FlightMessage::RecordBatch(batch) => {
-                        self.query_context.node_profile.record_batch();
                         self.query_context.num_rows += batch.num_rows();
                         self.query_context.req_id += 1;
                         let took = self.query_context.req_last_time.elapsed().as_millis();

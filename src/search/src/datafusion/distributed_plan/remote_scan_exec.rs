@@ -355,12 +355,7 @@ async fn get_remote_batch(
     }
 
     let mut recorder = if remote_scan_node.search_infos.analyze_profile {
-        let files = remote_scan_node
-            .search_infos
-            .file_id_list
-            .get(partition)
-            .map_or(0, Vec::len);
-        NodeProfileRecorder::start(node_profiles, partition, node.as_ref(), files)
+        NodeProfileRecorder::start(node_profiles, partition, node.as_ref())
     } else {
         NodeProfileRecorder::default()
     };
@@ -409,7 +404,6 @@ async fn get_remote_batch(
     {
         Ok((client, request)) => (client, request),
         Err(e) => {
-            recorder.record_error(e.message());
             return Ok(get_empty_stream(empty_stream.with_error(e)));
         }
     };
@@ -422,7 +416,6 @@ async fn get_remote_batch(
     let stream = match client.do_get(request).with_context(context.clone()).await {
         Ok(stream) => stream,
         Err(e) => {
-            recorder.record_error(e.message());
             if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found(&e) {
                 return Ok(get_empty_stream(empty_stream.with_error(e)));
             }

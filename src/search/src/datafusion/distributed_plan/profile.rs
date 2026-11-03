@@ -13,14 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, fmt, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 
 use config::{
     meta::{cluster::NodeInfo, search::ScanStats},
     utils::time::now_micros,
 };
 use datafusion::physical_plan::{
-    DisplayFormatType, ExecutionPlan, ExecutionPlanProperties,
+    ExecutionPlan, ExecutionPlanProperties, displayable,
     metrics::{MetricValue, MetricsSet},
 };
 use flight::{
@@ -43,12 +43,7 @@ pub struct NodeProfileRecorder {
 }
 
 impl NodeProfileRecorder {
-    pub fn start(
-        profiles: NodeProfiles,
-        partition: usize,
-        node: &dyn NodeInfo,
-        assigned_files: usize,
-    ) -> Self {
+    pub fn start(profiles: NodeProfiles, partition: usize, node: &dyn NodeInfo) -> Self {
         let role = match (node.is_querier(), node.is_ingester()) {
             (true, true) => "querier,ingester",
             (true, false) => "querier",
@@ -62,34 +57,11 @@ impl NodeProfileRecorder {
                 node_name: node.get_name(),
                 node_address: node.get_grpc_addr(),
                 role: role.to_string(),
-                region: node.get_region(),
                 cluster: node.get_cluster(),
                 start_us: now_micros(),
-                assigned_files,
                 ..Default::default()
             },
         }
-    }
-
-    pub fn record_batch(&mut self) {
-        if self.profile.first_batch_us == 0 {
-            self.profile.first_batch_us = now_micros();
-        }
-    }
-
-    pub fn record_peak_memory(&mut self, peak_memory: usize) {
-        self.profile.peak_memory = self.profile.peak_memory.max(peak_memory as u64);
-    }
-
-    pub fn record_error(&mut self, err: &str) {
-        let error = &mut self.profile.error;
-        if err.is_empty() || error.contains(err) {
-            return;
-        }
-        if !error.is_empty() {
-            error.push('\n');
-        }
-        error.push_str(err);
     }
 
     /// Takes the node's own plan out of `metrics`; forwarded entries never carry one.
@@ -108,7 +80,6 @@ impl NodeProfileRecorder {
         p.output_rows = metrics.output_rows.value() as u64;
         p.output_batches = metrics.batches_received.value() as u64;
         p.output_bytes = metrics.bytes_received.value() as u64;
-        p.fetch_ns = metrics.fetch_time.value() as u64;
         p.decode_ns = metrics.decode_time.value() as u64;
         p.scan_stats = Some(scan_stats);
     }
@@ -124,20 +95,16 @@ impl Drop for NodeProfileRecorder {
     }
 }
 
-struct OneLine<'a>(&'a dyn ExecutionPlan);
-
-impl fmt::Display for OneLine<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt_as(DisplayFormatType::Default, f)
-    }
-}
-
 /// Profile of an executed plan; a remote scan carries its nodes' plans, as its local children never
 /// ran.
 pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
     let mut node = ProfileNode {
         name: plan.name().to_string(),
-        detail: OneLine(plan).to_string().replace('\n', " "),
+        detail: displayable(plan)
+            .one_line()
+            .to_string()
+            .trim_end()
+            .replace('\n', " "),
         partitions: plan.output_partitioning().partition_count(),
         metrics: plan
             .metrics()
@@ -169,7 +136,6 @@ fn convert_metrics(metrics: &MetricsSet) -> Vec<ProfileMetric> {
         match out.iter_mut().find(|m| m.name == name) {
             Some(m) => {
                 m.value += value;
-                m.max = m.max.max(value);
                 if let Some(t) = total {
                     *m.total.get_or_insert(0) += t;
                 }
@@ -179,7 +145,6 @@ fn convert_metrics(metrics: &MetricsSet) -> Vec<ProfileMetric> {
                 kind,
                 value,
                 total,
-                max: value,
             }),
         }
     }
@@ -275,16 +240,10 @@ mod tests {
     #[test]
     fn test_recorder_publishes_one_node_on_drop() {
         let profiles = NodeProfiles::default();
-        let mut recorder = NodeProfileRecorder::start(profiles.clone(), 2, &TestNode, 7);
+        let mut recorder = NodeProfileRecorder::start(profiles.clone(), 2, &TestNode);
         let metrics = RemoteScanMetrics::new(2, &ExecutionPlanMetricsSet::new());
-        for rows in [3, 4] {
-            metrics.record_output(&batch(rows));
-            recorder.record_batch();
-        }
-        recorder.record_peak_memory(10);
-        recorder.record_peak_memory(4);
-        recorder.record_error("boom");
-        recorder.record_error("boom");
+        metrics.record_output(&batch(3));
+        metrics.record_output(&batch(4));
         let mut cluster_metrics = vec![
             Metrics::default(),
             Metrics {
@@ -309,32 +268,28 @@ mod tests {
         let p = profiles.lock().get(&2).cloned().unwrap();
         assert_eq!(p.node_name, "q-0");
         assert_eq!(p.role, "querier");
-        assert_eq!(p.assigned_files, 7);
         assert_eq!(p.output_rows, 7);
         assert_eq!(p.output_batches, 2);
-        assert!(p.first_batch_us >= p.start_us && p.end_us >= p.first_batch_us);
+        assert!(p.end_us >= p.start_us);
         assert_eq!(p.scan_stats.unwrap().files, 5);
-        assert_eq!(p.peak_memory, 10);
-        assert_eq!(p.error, "boom");
         assert_eq!(p.plan.unwrap().name, "FilterExec");
         assert!(cluster_metrics[1].profile.is_none());
     }
 
     #[test]
-    fn test_recorder_publishes_skipped_and_failed_nodes() {
+    fn test_recorder_publishes_skipped_and_unfinished_nodes() {
         let profiles = NodeProfiles::default();
-        NodeProfileRecorder::start(profiles.clone(), 0, &TestNode, 0).mark_skipped();
-        NodeProfileRecorder::start(profiles.clone(), 1, &TestNode, 3).record_error("down");
-        NodeProfileRecorder::default().record_error("ignored");
+        NodeProfileRecorder::start(profiles.clone(), 0, &TestNode).mark_skipped();
+        drop(NodeProfileRecorder::start(profiles.clone(), 1, &TestNode));
+        NodeProfileRecorder::default().mark_skipped();
         let profiles = profiles.lock();
         assert_eq!(profiles.len(), 2);
         assert!(profiles[&0].skipped);
-        assert!(!profiles[&1].skipped);
-        assert_eq!(profiles[&1].error, "down");
+        assert!(!profiles[&1].skipped && profiles[&1].scan_stats.is_none());
     }
 
     #[test]
-    fn test_convert_metrics_sums_partitions_and_keeps_max() {
+    fn test_convert_metrics_sums_partitions() {
         let set = ExecutionPlanMetricsSet::new();
         MetricBuilder::new(&set).output_rows(0).add(10);
         MetricBuilder::new(&set).output_rows(1).add(30);
@@ -345,7 +300,6 @@ mod tests {
         let rows = metrics.iter().find(|m| m.name == "output_rows").unwrap();
         assert_eq!(rows.kind, MetricKind::Count);
         assert_eq!(rows.value, 40);
-        assert_eq!(rows.max, 30);
         let time = metrics
             .iter()
             .find(|m| m.name == "elapsed_compute")
@@ -379,7 +333,6 @@ mod tests {
             remote.node_profiles.clone(),
             0,
             &TestNode,
-            0,
         ));
         let profile = build_profile(&remote);
         assert_eq!(profile.name, "RemoteScanExec");

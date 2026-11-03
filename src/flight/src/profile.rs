@@ -18,12 +18,9 @@
 use config::meta::search::ScanStats;
 use serde::{Deserialize, Serialize};
 
-pub const PROFILE_VERSION: u32 = 1;
-
 /// The profile of one EXPLAIN ANALYZE run, as returned to the client.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct QueryProfile {
-    pub version: u32,
     pub node_name: String,
     pub node_address: String,
     pub start_us: i64,
@@ -46,7 +43,7 @@ pub struct ProfileNode {
     pub remote: Vec<RemoteNodeProfile>,
 }
 
-/// A metric summed across partitions; `max` is the largest single partition.
+/// A metric summed across partitions.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct ProfileMetric {
     pub name: String,
@@ -54,7 +51,6 @@ pub struct ProfileMetric {
     pub value: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub total: Option<u64>,
-    pub max: u64,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -79,20 +75,14 @@ pub struct RemoteNodeProfile {
     pub node_name: String,
     pub node_address: String,
     pub role: String,
-    pub region: String,
     pub cluster: String,
     pub start_us: i64,
-    pub first_batch_us: i64,
     pub end_us: i64,
     pub output_rows: u64,
     pub output_batches: u64,
     pub output_bytes: u64,
-    pub fetch_ns: u64,
     pub decode_ns: u64,
-    pub assigned_files: usize,
     pub skipped: bool,
-    pub error: String,
-    pub peak_memory: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scan_stats: Option<ScanStats>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -112,7 +102,6 @@ mod tests {
                 kind: MetricKind::Count,
                 value: 1,
                 total: None,
-                max: 1,
             }],
             ..Default::default()
         };
@@ -121,7 +110,7 @@ mod tests {
         let back: ProfileNode = serde_json::from_str(&json).unwrap();
         assert_eq!(back.metrics, node.metrics);
         let m: ProfileMetric =
-            serde_json::from_str(r#"{"name":"x","kind":"future_kind","value":1,"max":1}"#).unwrap();
+            serde_json::from_str(r#"{"name":"x","kind":"future_kind","value":1}"#).unwrap();
         assert_eq!(m.kind, MetricKind::Other);
     }
 }

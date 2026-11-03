@@ -32,10 +32,7 @@ use datafusion::{
         stream::RecordBatchStreamAdapter,
     },
 };
-use flight::{
-    common::Metrics,
-    profile::{PROFILE_VERSION, QueryProfile},
-};
+use flight::{common::Metrics, profile::QueryProfile};
 use futures::StreamExt;
 
 use crate::datafusion::{
@@ -265,7 +262,6 @@ fn create_output_batch(
 
 fn profile_json(input: &dyn ExecutionPlan, total_rows: usize, start_us: i64) -> Result<String> {
     let profile = QueryProfile {
-        version: PROFILE_VERSION,
         node_name: LOCAL_NODE.get_name(),
         node_address: LOCAL_NODE.get_grpc_addr(),
         start_us,
@@ -360,7 +356,6 @@ mod tests {
         assert!(profile.is_valid(0));
         assert!((1..profile.len()).all(|i| profile.is_null(i)));
         let parsed: QueryProfile = serde_json::from_str(profile.value(0)).unwrap();
-        assert_eq!(parsed.version, PROFILE_VERSION);
         assert_eq!(parsed.plan.name, "EmptyExec");
         assert!(parsed.end_us >= parsed.start_us);
     }
