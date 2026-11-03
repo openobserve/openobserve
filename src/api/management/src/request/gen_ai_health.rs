@@ -406,52 +406,19 @@ pub(crate) fn priced_now(resolved: Option<&DefinitionMatch>) -> bool {
     resolved.is_some_and(|r| r.match_kind == MatchKind::Exact)
 }
 
-/// `pred` without the spans of `models`; spans with no model name stay in.
-fn exclude_models(pred: Pred, model_column: &str, models: &[String]) -> Pred {
-    match pred {
-        Pred::Sql(p) if !models.is_empty() => {
-            let list = models
-                .iter()
-                .map(|m| quote_str(m))
-                .collect::<Vec<_>>()
-                .join(", ");
-            Pred::Sql(format!(
-                "{p} AND ({model_column} IS NULL OR {model_column} NOT IN ({list}))"
-            ))
-        }
-        other => other,
-    }
-}
-
-/// The unpriced check's filter minus the models that have a price now. Their older spans
-/// keep the $0 ingest recorded, but there is nothing left to fix, so the check passes once
-/// every model it found is priced.
-// ponytail: resolves the MAX_UNPRICED_ROWS models with the most unpriced tokens; a priced
-// model past that stays counted until it moves up.
-async fn unpriced_check_pred(
-    org_id: &str,
-    user_id: &str,
-    stream: &str,
-    base: &str,
-    cols: &Columns,
-    window: &Window,
-    pred: Pred,
-) -> Result<Pred, anyhow::Error> {
-    let (Pred::Sql(p), Some(model_column)) = (&pred, cols.model_column()) else {
-        return Ok(pred);
-    };
-    let sql = unpriced_models_sql(stream, base, p, cols, MAX_UNPRICED_ROWS);
-    let hits = run_sql(org_id, user_id, sql, window, MAX_UNPRICED_ROWS).await?;
-    let entries = db::model_pricing::get_org_pricing_entries(org_id);
-    let now = now_micros();
-    let priced: Vec<String> = hits
-        .iter()
-        .filter_map(model_from)
-        .filter(|m| {
-            priced_now(db::model_pricing::find_pricing_sync_at(&entries, m, Some(now)).as_ref())
-        })
-        .collect();
-    Ok(exclude_models(pred, model_column, &priced))
+/// Whether every model behind the unpriced spans has a price now: the check then passes, while
+/// its counts keep the spans recorded at $0, which the cost tile still reads as a lower bound.
+/// Spans without a model name, or models past the listed rows, keep it failing.
+fn every_model_priced_now(
+    model_hits: &[json::Value],
+    model_count: i64,
+    priced: impl Fn(&str) -> bool,
+) -> bool {
+    !model_hits.is_empty()
+        && model_count <= model_hits.len() as i64
+        && model_hits
+            .iter()
+            .all(|h| model_from(h).is_some_and(|m| priced(&m)))
 }
 
 /// The uncapped totals behind a capped per-model breakdown of the spans matching `filter`:
@@ -642,7 +609,13 @@ fn follow_up_sql(
         vec![]
     };
     let unpriced = match (&preds[0], checks[0].affected > 0) {
-        (Pred::Sql(p), true) => Some(unpriced_models_sql(stream, base, p, cols, MAX_MODELS)),
+        (Pred::Sql(p), true) => Some(unpriced_models_sql(
+            stream,
+            base,
+            p,
+            cols,
+            MAX_UNPRICED_ROWS,
+        )),
         _ => None,
     };
     (samples, unpriced)
@@ -666,25 +639,12 @@ async fn populate_samples(
         return Ok(());
     };
     let pricing_enabled = config::get_config().common.model_pricing_enabled;
-    let unpriced = unpriced_check_pred(
-        org_id,
-        user_id,
-        &query.stream_name,
-        &base,
-        &cols,
-        window,
-        check_pred(CheckId::UnpricedModels, &cols, pricing_enabled),
-    )
-    .await?;
     let jobs = checks
         .iter()
         .enumerate()
-        .filter(|(_, check)| check.affected > 0)
+        .filter(|(_, check)| check.status != CheckStatus::Pass)
         .map(|(i, check)| {
-            let pred = match check.id {
-                CheckId::UnpricedModels => unpriced.clone(),
-                id => check_pred(id, &cols, pricing_enabled),
-            };
+            let pred = check_pred(check.id, &cols, pricing_enabled);
             let sql = samples_sql(&query.stream_name, &base, &pred);
             async move {
                 (
@@ -715,21 +675,10 @@ async fn compute_checks(
     };
     let stream = &query.stream_name;
     let pricing_enabled = config::get_config().common.model_pricing_enabled;
-    let mut preds: Vec<Pred> = CHECK_IDS
+    let preds: Vec<Pred> = CHECK_IDS
         .iter()
         .map(|&id| check_pred(id, &cols, pricing_enabled))
         .collect();
-    // CHECK_IDS[0] is the unpriced check; its counts, models and samples skip priced models.
-    preds[0] = unpriced_check_pred(
-        org_id,
-        user_id,
-        stream,
-        &base,
-        &cols,
-        window,
-        preds[0].clone(),
-    )
-    .await?;
 
     let rows = run_sql(
         org_id,
@@ -771,7 +720,7 @@ async fn compute_checks(
         let Some(sql) = unpriced_sql else {
             return Ok(None);
         };
-        run_sql(org_id, user_id, sql, window, MAX_MODELS)
+        run_sql(org_id, user_id, sql, window, MAX_UNPRICED_ROWS)
             .await
             .map(Some)
     };
@@ -781,7 +730,16 @@ async fn compute_checks(
         checks[i].samples = Some(distinct_trace_ids(&hits?));
     }
     if let Some(model_hits) = unpriced? {
-        set_unpriced_breakdown(&mut checks[0], &model_hits, Some(&row));
+        let listed = &model_hits[..model_hits.len().min(MAX_MODELS)];
+        set_unpriced_breakdown(&mut checks[0], listed, Some(&row));
+        let entries = db::model_pricing::get_org_pricing_entries(org_id);
+        let now = now_micros();
+        let model_count = checks[0].model_count.unwrap_or(0);
+        if every_model_priced_now(&model_hits, model_count, |m| {
+            priced_now(db::model_pricing::find_pricing_sync_at(&entries, m, Some(now)).as_ref())
+        }) {
+            checks[0].status = CheckStatus::Pass;
+        }
     }
 
     // Worst first, so the strip and the skill lead with what matters.
@@ -1292,14 +1250,33 @@ mod tests {
     }
 
     #[test]
-    fn priced_models_drop_out_of_the_unpriced_check() {
-        let p = Pred::Sql("s = 'unpriced'".into());
-        assert_eq!(exclude_models(p.clone(), "m", &[]), p);
-        assert_eq!(
-            exclude_models(p, "m", &["a".into(), "o'k".into()]),
-            Pred::Sql("s = 'unpriced' AND (m IS NULL OR m NOT IN ('a', 'o''k'))".into())
-        );
-        assert_eq!(exclude_models(Pred::Never, "m", &["a".into()]), Pred::Never);
+    fn the_unpriced_check_passes_only_once_every_found_model_is_priced() {
+        let hits = |models: &[Option<&str>]| -> Vec<json::Value> {
+            models
+                .iter()
+                .map(|m| json::json!({"model": m, "spans": 1, "tokens": 1}))
+                .collect()
+        };
+        let priced = |m: &str| m != "open";
+        assert!(every_model_priced_now(
+            &hits(&[Some("a"), Some("b")]),
+            2,
+            priced
+        ));
+        assert!(!every_model_priced_now(
+            &hits(&[Some("a"), Some("open")]),
+            2,
+            priced
+        ));
+        // Spans without a model name can never be priced.
+        assert!(!every_model_priced_now(
+            &hits(&[Some("a"), None]),
+            2,
+            priced
+        ));
+        // Models past the listed rows are unknown.
+        assert!(!every_model_priced_now(&hits(&[Some("a")]), 2, priced));
+        assert!(!every_model_priced_now(&[], 0, priced));
         assert!(!priced_now(None));
     }
 
@@ -1663,6 +1640,31 @@ mod tests {
         let mut keys: Vec<_> = cache.keys().cloned().collect();
         keys.sort();
         assert_eq!(keys, ["late", "mid", "next"]);
+    }
+
+    #[test]
+    fn an_insert_drops_every_expired_entry_and_keeps_every_live_one() {
+        let now = 10 * CACHE_TTL_MICROS;
+        let mut cache = HashMap::new();
+        insert_bounded(&mut cache, "live".into(), resp(now - 1), 4);
+        insert_bounded(
+            &mut cache,
+            "staler".into(),
+            resp(now - CACHE_TTL_MICROS - 5),
+            4,
+        );
+        insert_bounded(
+            &mut cache,
+            "stale".into(),
+            resp(now - CACHE_TTL_MICROS - 3),
+            4,
+        );
+        assert_eq!(cache.len(), 3);
+        // Not full, so only the TTL sweep can remove anything.
+        insert_bounded(&mut cache, "next".into(), resp(now), 4);
+        let mut keys: Vec<_> = cache.keys().cloned().collect();
+        keys.sort();
+        assert_eq!(keys, ["live", "next"]);
     }
 
     #[tokio::test]
