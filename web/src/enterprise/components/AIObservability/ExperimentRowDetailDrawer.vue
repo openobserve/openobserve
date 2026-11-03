@@ -363,7 +363,7 @@ const activeTrial = computed(() =>
 const snapshotLabel = computed(() =>
   props.detail
     ? t("aiObservability.experiments.rowDetail.snapshot", {
-        version: props.detail.snapshot.datasetVersion,
+        version: props.detail.snapshot.datasetWriteVersion,
       })
     : raw(""),
 );

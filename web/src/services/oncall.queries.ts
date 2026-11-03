@@ -721,6 +721,13 @@ export const snoozeResponseMutation = (org: string) =>
     meta: { invalidates: responseWriteScopes(org), silentError: true },
   });
 
+export const unsnoozeResponseMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (responseId: string) =>
+      oncallService.unsnoozeResponse({ org_identifier: org, response_id: responseId }),
+    meta: { invalidates: responseWriteScopes(org), silentError: true },
+  });
+
 export const resolveResponseMutation = (org: string) =>
   mutationOptions({
     mutationFn: ({

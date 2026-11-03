@@ -133,6 +133,7 @@ const columns = computed<OTableColumnDef<RolloutRow>[]>(() => [
 function railTone(row: RolloutRow): RowRailTone | null {
   if (row.status === "halted") return "error";
   if (row.status === "in_progress") return "primary";
+  if (row.status === "waiting") return "warning";
   return null;
 }
 

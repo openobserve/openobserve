@@ -172,6 +172,7 @@ import {
   fromZonedInputValue,
   offsetAnchor,
   resolvableTimezones,
+  shiftsBackToNow,
   SHIFT_PRESETS,
 } from "@/utils/oncall";
 import OnCallRotationPreview from "./OnCallRotationPreview.vue";
@@ -446,18 +447,21 @@ async function amendStaffedRotations(
     shift_micros: shift,
     anchor_micros: anchor,
   });
+  // Primary counts from the shift containing now, so the first member picked is on call from now; rotation `index` sits `index` shifts behind.
+  const back = shiftsBackToNow(rule(anchorMicros), Date.now() * 1000, timezone);
+  const anchorFor = (index: number) => offsetAnchor(rule(anchorMicros), back + index, timezone);
   const fallback: Rotation[] = [
     {
       id: mintRotationId(),
       name: DEFAULT_ROTATION_NAME,
-      shift_rules: [rule(anchorMicros)],
+      shift_rules: [rule(anchorFor(0))],
     },
     ...(wantSecondary
       ? [
           {
             id: mintRotationId(),
             name: SECONDARY_ROTATION_NAME,
-            shift_rules: [rule(offsetAnchor(rule(anchorMicros), 1, timezone))],
+            shift_rules: [rule(anchorFor(1))],
           },
         ]
       : []),
@@ -478,7 +482,7 @@ async function amendStaffedRotations(
       shift_rules: (rotation.shift_rules ?? []).map((r) => ({
         ...r,
         shift_micros: shift,
-        anchor_micros: offsetAnchor(rule(anchorMicros), index, timezone),
+        anchor_micros: anchorFor(index),
       })),
       // A human has now chosen the timezone, the handover and the cadence, so
       // this is no longer the rotation nobody chose. The marker is the

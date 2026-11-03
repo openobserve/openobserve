@@ -399,10 +399,9 @@ import type { RadioValue } from "@/lib/forms/Radio/ORadio.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, {
-  type ScoreConfig,
-  type ScoreDataType,
-} from "@/services/online-evals.service";
+import { type ScoreConfig, type ScoreDataType } from "@/services/online-evals.service";
+import { saveScoreConfigMutation } from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { dataTypeOf, entityId, valueOf } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
 import { makeScoreConfigSchema, type ScoreConfigForm } from "./ScoreConfigDialog.schema";
@@ -419,6 +418,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const saveScoreConfig = useMutation(() => saveScoreConfigMutation(props.orgId));
 
 // Drawer open state — starts open (parent mounts this only when creating/editing
 // a score config). Any dismiss path (× / Escape / overlay) flows through
@@ -608,14 +608,11 @@ async function save(value: ScoreConfigForm) {
       healthyThreshold: buildHealthyThreshold(value),
     };
 
-    if (props.mode === "edit" && props.row) {
-      await onlineEvalsService.scoreConfigs.update(props.orgId, entityId(props.row), basePayload);
-    } else {
-      await onlineEvalsService.scoreConfigs.create(props.orgId, {
-        ...basePayload,
-        dataType: value.dataType,
-      });
-    }
+    await saveScoreConfig.mutateAsync(
+      props.mode === "edit" && props.row
+        ? { id: entityId(props.row), payload: basePayload }
+        : { payload: { ...basePayload, dataType: value.dataType } },
+    );
     toast({
       variant: "success",
       message: t("onlineEvals.saved", { label: t("onlineEvals.singular.scoreConfigs") }),

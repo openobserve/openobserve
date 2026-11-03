@@ -43,6 +43,7 @@ vi.mock("@/services/oncall", () => ({
     acknowledgeResponse: vi.fn(),
     resolveResponse: vi.fn(),
     snoozeResponse: vi.fn(),
+    unsnoozeResponse: vi.fn(),
     getPolicy: vi.fn(),
     getSchedule: vi.fn(),
     escalationProgress: vi.fn(),
@@ -367,6 +368,29 @@ describe("OnCallResponses", () => {
     ]);
   });
 
+  // C13: the table pages only the visible tab, so a later page cannot hide its rows.
+  it("hands the table only the rows of the visible tab", async () => {
+    const wrapper = await withPages([
+      page({ id: "a", acked_by: "engineer@example.com", state: "acknowledged" }),
+      page({ id: "c" }, "al_ord"),
+    ]);
+    const table = () => wrapper.findComponent({ name: "OTable" });
+    expect(table().props("data")).toHaveLength(2);
+
+    wrapper
+      .findAllComponents({ name: "OToggleGroup" })
+      .find((c) => c.attributes("data-test") === "oncall-responses-filter-tabs")!
+      .vm.$emit("update:modelValue", "ringing");
+    await flushPromises();
+
+    expect(
+      table()
+        .props("data")
+        .map((row: any) => row.latest.id),
+    ).toEqual(["c"]);
+    expect(sections(wrapper)).toEqual({ ringing: 1 });
+  });
+
   /// Snoozed rows recede rather than shouting; the loud treatment is reserved
   /// for something you must act on now.
   it("mutes a snoozed row", async () => {
@@ -569,6 +593,45 @@ describe("OnCallResponses", () => {
       expect(text).not.toContain("nobody has acknowledged — these are still paging");
       expect(text).toContain(
         "nobody has acknowledged — 1 of these is still paging·2 have no team, so they are not paging",
+      );
+    });
+
+    /// R11: a page whose ladder stopped has a team but pages nobody, so it is not counted as paging.
+    it("does not count a page whose ladder stopped as still paging", async () => {
+      service.escalationProgress.mockImplementation((({ response_id }: { response_id: string }) =>
+        Promise.resolve({
+          data: {
+            fired: [{ after_micros: 0, at: 1, targets: [], reached: ["ana@o2.ai"] }],
+            next_targets: [],
+            next_at: null,
+            exhausted: false,
+            stopped_because: response_id === "b" ? "the owning team was deleted" : undefined,
+          },
+        })) as any);
+      const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
+
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).toContain(
+        "nobody has acknowledged — 1 of these is still paging·1 is not being paged",
+      );
+      expect(wrapper.find('[data-test="oncall-escalation-cell-b"]').text()).toContain(
+        "Nobody is being paged",
+      );
+    });
+
+    /// F4: a deleted team pages nobody, so a page past the progress cap is counted and phrased as such.
+    it("counts and phrases a page whose team was deleted as not paged, without its progress", async () => {
+      service.escalationProgress.mockRejectedValue({ response: { status: 500, data: {} } });
+      const wrapper = await withPages([
+        page({ id: "a" }),
+        page({ id: "b", team_id: "team_gone" }, "al_pay"),
+      ]);
+
+      expect(wrapper.find(ringingHeader).text()).toContain(
+        "nobody has acknowledged — 1 of these is still paging·1 is not being paged",
+      );
+      expect(wrapper.find('[data-test="oncall-escalation-cell-b"]').text()).toContain(
+        "Nobody is being paged",
       );
     });
 
@@ -798,6 +861,29 @@ describe("OnCallResponses", () => {
       expect(handled.findAll('[data-test^="oncall-row-resolve-"]')).toHaveLength(1);
     });
 
+    it("offers unsnooze instead of snooze on a snoozed row", async () => {
+      const wrapper = await withPages([page({ snoozed_until: (Date.now() + 60_000) * 1000 })]);
+      service.unsnoozeResponse.mockResolvedValue({ data: {} } as any);
+
+      expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(false);
+      await wrapper.find('[data-test^="oncall-row-unsnooze-"]').trigger("click");
+      await flushPromises();
+
+      expect(service.unsnoozeResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ response_id: "resp_1" }),
+      );
+    });
+
+    it("keeps snooze for the awake firing of a row whose other firing is snoozed", async () => {
+      const wrapper = await withPages([
+        page({ id: "a", snoozed_until: (Date.now() + 60_000) * 1000 }),
+        page({ id: "b" }),
+      ]);
+
+      expect(wrapper.find('[data-test^="oncall-row-unsnooze-"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(true);
+    });
+
     /// Snoozing only makes sense while the ladder is still climbing, so a
     /// handled row's menu must not offer it.
     it("offers no snooze once nothing is escalating", async () => {
@@ -1005,6 +1091,32 @@ describe("OnCallResponses", () => {
       expect(checklist.exists()).toBe(true);
       expect(checklist.props("compact")).toBe(true);
       expect(wrapper.find('[data-test="oncall-responses-table"]').exists()).toBe(true);
+    });
+
+    // C4: a server-side filter that matches nothing is a filtered empty list, not an unpaged org.
+    it.each([
+      ["team", "oncall-responses-team-filter", "team_1"],
+      ["cause", "oncall-responses-cause-filter", "genuine_defect"],
+    ])("keeps the list when the %s filter matches nothing", async (_, test, value) => {
+      service.listResponses.mockImplementation(((params: any) =>
+        Promise.resolve({ data: params.team_id || params.cause ? [] : [page()] })) as any);
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-setup-banner"]').exists()).toBe(true);
+
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find((c: any) => c.attributes("data-test") === test)!
+        .vm.$emit("update:modelValue", value);
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-responses-table"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OEmptyState" }).props("filtered")).toBe(true);
+
+      wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "clear-filters");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
     });
   });
 

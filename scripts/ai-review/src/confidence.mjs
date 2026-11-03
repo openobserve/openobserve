@@ -25,8 +25,13 @@ export function reviewerFinished(r) {
   return !r.skipped && !r.error && r.parsed === true;
 }
 
+// A reviewer interrupted at its soft deadline answered in haste, so its output counts as findings but not as a finished review.
+export function reviewerCompleted(r) {
+  return reviewerFinished(r) && !r.wrappedUp;
+}
+
 export function unfinishedReviewers(ranResults) {
-  return ranResults.filter(r => !reviewerFinished(r)).map(r => r.agentName);
+  return ranResults.filter(r => !reviewerCompleted(r)).map(r => r.agentName);
 }
 
 function plural(count, noun) {
@@ -76,6 +81,10 @@ export function mergeConfidenceLine({ level, reasons }) {
 
 export function staleConfidenceLine(shortHead) {
   return `**Merge confidence: ${CONFIDENCE_LABEL.low}** — \`${shortHead}\` has not been reviewed`;
+}
+
+export function notRunConfidenceLine(shortHead) {
+  return `**Merge confidence: ${CONFIDENCE_LABEL.low}** — the review did not run because of a CI configuration error; \`${shortHead}\` has not been reviewed`;
 }
 
 export function reviewingConfidenceLine(shortHead) {

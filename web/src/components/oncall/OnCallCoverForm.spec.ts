@@ -247,6 +247,18 @@ describe("OnCallCoverForm — which clock the times are on", () => {
     expect(teamLine.text()).toContain("UTC");
   });
 
+  // C8: a cover looks ahead, so the calendar runs from today to the 730-day limit, on the picker's clock.
+  it("offers today up to 730 days ahead, and says a refusal under the picker", () => {
+    const wrapper = renderCover({ viewerTimezone: IST });
+    const day = (micros: number) => toZonedInputValue(micros, IST).slice(0, 10).replace(/-/g, "/");
+    const now = Date.now() * 1000;
+
+    const picker = wrapper.findComponent({ name: "OFormDateTimeRange" });
+    expect(picker.attributes("min-date")).toBe(day(now));
+    expect(picker.attributes("max-date")).toBe(day(now + 730 * MICROS_PER_DAY));
+    expect(picker.attributes()).toHaveProperty("show-error");
+  });
+
   /// One clock, said once. A reader on the team's own timezone has nothing to
   /// reconcile, and repeating the same range twice reads as two windows.
   it("says it once when the reader is already on the team's clock", async () => {

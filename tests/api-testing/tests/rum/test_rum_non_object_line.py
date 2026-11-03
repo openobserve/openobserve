@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 NOT_AN_OBJECT = "each line must be a JSON object"
 HOUR_US = 60 * 60 * 1000 * 1000
 NON_OBJECT_LINES = ["[]", '[{"type":"view"}]', '"text"', "123", "true", "null"]
+# #16229: /logs accepts a whole-body JSON array of objects; /rum stays strict NDJSON.
+ACCEPTED_ARRAY_LINES = {"logs": {"[]", '[{"type":"view"}]'}, "rum": set()}
 SERVICE = "e2e-rum-15056"
 
 
@@ -119,6 +121,9 @@ def test_non_object_line_gets_400_instead_of_dropped_connection(client: OpenObse
         logger.info(
             "RUM non-object line route=%s line=%s status=%s dropped=%s", route, line, result.status, result.dropped
         )
+        if line in ACCEPTED_ARRAY_LINES[route]:
+            assert result.status == 202, f"#16229: a whole-body array on /{route} must be accepted: {result.body}"
+            continue
         _assert_refused_as_not_an_object(result, f"a /{route} line of {line}")
 
 

@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :top-n-subset="topNSubset"
               :error-count="errorCount"
               exact-percentiles
+              :slowest-schema-speeds="showsSlowestSchemaSpeeds"
               data-test="dbm-databases-coverage"
             />
           </DbmTableToolbar>
@@ -205,9 +206,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
               <OTag type="dbSystem" :value="row.db_system" size="xs" />
-              <template v-if="row.db_namespace">
+              <template v-if="namedSchemaCount(row) === 1">
                 <span class="opacity-45">·</span>
-                <OTruncatedText>{{ row.db_namespace }}</OTruncatedText>
+                <OTruncatedText>{{ row.namedSchemas?.[0] }}</OTruncatedText>
+              </template>
+              <template v-else-if="namedSchemaCount(row) > 1">
+                <span class="opacity-45">·</span>
+                <span class="shrink-0" data-test="dbm-databases-schema-count">
+                  {{
+                    t(
+                      "dbm.databases.schemaCount",
+                      { count: namedSchemaCount(row) },
+                      namedSchemaCount(row),
+                    )
+                  }}
+                </span>
               </template>
               <!-- The receiver can reach it, no application asked it anything.
                    That is a finding, not an absence — an idle replica is what
@@ -441,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // silently drop the page from the cache and bring back the refetch-on-return.
 defineOptions({ name: "DbmDatabasesPage" });
 
-import { computed, ref, watch, shallowRef } from "vue";
+import { computed, onActivated, ref, watch, shallowRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -478,13 +491,22 @@ import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
 import { useDbmOwnFilterSync } from "@/composables/dbm/useDbmScopeFilters";
 import { createDbmContextProvider } from "@/composables/contextProviders";
-import { buildDatabaseBreakdown, type DbmBreakdown } from "@/utils/dbm/breakdown";
+import { buildDatabaseBreakdown, rowNamespace, type DbmBreakdown } from "@/utils/dbm/breakdown";
 import {
   isBreakdownRow,
+  schemaShortfall,
   showsShortfall,
-  toBreakdownRows,
+  toSchemaRows,
   type DbmBreakdownRow,
 } from "@/utils/dbm/breakdownRows";
+import {
+  drowningInstanceKeys,
+  foldByInstance,
+  hasWorstOfPercentiles,
+  instanceKey,
+  isCriticalServer,
+  serverRowKey,
+} from "@/utils/dbm/instanceRows";
 import {
   computeQps,
   errorRate,
@@ -501,7 +523,6 @@ import type { DbmInstanceMetricSet, DbmRowMetrics } from "@/utils/dbm/instanceMe
 import { unionFleetRows, type DbmServerInstanceRef } from "@/utils/dbm/fleetRows";
 import { healthScalar, healthSortValue } from "@/utils/dbm/healthScalar";
 import { APP_SOURCE_QUALIFIER } from "@/utils/dbm/overlapMetrics";
-import { detectDrowningDatabases, isCriticalErrorRate, totalsKey } from "@/utils/dbm/insights";
 import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
 import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
 import { buildDbmPrefill } from "@/utils/alerts/prefill/fromDbm";
@@ -553,16 +574,32 @@ const permissionOk = ref(true);
 // still return staging merged with prod — a filter that lies is worse than no
 // filter. Top queries is the grain that genuinely accepts `env`.
 const systemFilter = ref<string | null>((route.query.system as string) ?? null);
+// Client-side: the endpoint takes no namespace, and every schema is already in the response.
+const namespaceFilter = ref<string | null>((route.query.namespace as string) ?? null);
+
+// A schema row's hand-off scopes the page it opened; the tabs carrying it back must not filter this one.
+let handedOffSchema: string | null = null;
+const returnsWithHandedOffSchema = () =>
+  handedOffSchema !== null && route.query.namespace === handedOffSchema;
 
 // This page is kept alive, so the seeds above run ONCE per session — a filter
 // set (or cleared) on a sibling tab would otherwise never reach these refs,
 // leaving the chips and the next read disagreeing with the URL. Re-read on
 // activation, the same moment the range sync uses.
 useDbmOwnFilterSync(
-  () => route.query,
-  { system: systemFilter },
+  () =>
+    returnsWithHandedOffSchema()
+      ? { ...route.query, namespace: namespaceFilter.value ?? undefined }
+      : route.query,
+  { system: systemFilter, namespace: namespaceFilter },
   () => void load(),
 );
+// Registered after the re-seed above, which still needs the hand-off to tell it apart.
+onActivated(() => {
+  const returned = returnsWithHandedOffSchema();
+  handedOffSchema = null;
+  if (returned) void syncUrl();
+});
 /** Kept so the empty state can say "we haven't finished counting" rather than "no data". */
 const neverAggregated = ref(false);
 /**
@@ -586,6 +623,10 @@ const failedMetricStreams = ref<string[]>([]);
  * when it lands without refetching them.
  */
 const clientHits = shallowRef<DbTotalsRow[]>([]);
+/** The previous window's rows, so a Schema filter change re-derives drowning without a refetch. */
+const baselineHits = shallowRef<DbTotalsRow[]>([]);
+const baselineReadFailed = ref(false);
+/** Drowning servers, by `instanceKey`. */
 const drowningKeys = ref<Set<string>>(new Set());
 
 /** At most this many service chips per row before the cell collapses the rest. */
@@ -594,8 +635,12 @@ const MAX_VISIBLE_SERVICES = 3;
 interface DatabaseRow extends Partial<DbTotalsRow> {
   db_system: string;
   db_instance: string;
-  /** OTable needs a stable identity; the grain is (system, instance, namespace). */
+  /** OTable needs a stable identity; the grain is (system, instance). */
   rowKey: string;
+  /** The per-schema rows this server row was folded from — its schema children. */
+  schemas?: DbTotalsRow[];
+  /** The named schemas among them, heaviest first. */
+  namedSchemas?: string[];
   share: number;
   errorRate: number | null;
   /**
@@ -700,7 +745,8 @@ const summaryStats = computed<StatItem[]>(() => {
 });
 
 const isFiltered = computed(
-  () => !!search.value || !!systemFilter.value || statFilter.value !== null,
+  () =>
+    !!search.value || !!systemFilter.value || !!namespaceFilter.value || statFilter.value !== null,
 );
 
 // Every filter change publishes the scope to the URL BEFORE reloading — the
@@ -708,6 +754,20 @@ const isFiltered = computed(
 const filterEntry = createDbmFilterEntry(() => {
   syncUrl();
   load();
+});
+
+// The Schema filter narrows rows already in memory, so a refetch would only reset the open rows.
+const schemaFilterEntry = createDbmFilterEntry(async () => {
+  // The shell re-keys the badges on the URL, and drops a count published before it did.
+  await syncUrl();
+  if (error.value) {
+    load();
+    return;
+  }
+  if (loading.value) return;
+  breakdowns.value = {};
+  deriveRows();
+  fillOpenBreakdowns();
 });
 
 /**
@@ -723,6 +783,14 @@ const dimensionFilters = computed<DbmScopeFilter[]>(() => [
     options: optionsFrom(rows.value.map((r) => r.db_system)),
     model: systemFilter,
   }),
+  // From the unfolded response, so the selected schema stays among the options.
+  schemaFilterEntry({
+    key: "namespace",
+    dimension: t("dbm.filters.dimension.namespace"),
+    placeholder: t("dbm.filters.allNamespaces"),
+    options: optionsFrom(clientHits.value.map((r) => r.db_namespace)),
+    model: namespaceFilter,
+  }),
 ]);
 
 /**
@@ -736,11 +804,18 @@ const visibleRows = computed(() => {
     statFilter.value === "failed" ? rows.value.filter((row) => (row.errors ?? 0) > 0) : rows.value;
   if (!needle) return scoped;
   return scoped.filter((row) =>
-    [row.db_instance, row.db_namespace, row.db_system, ...(row.calling_services ?? [])]
+    [
+      row.db_instance,
+      row.db_system,
+      ...(row.schemas ?? []).map((schema) => schema.db_namespace),
+      ...(row.calling_services ?? []),
+    ]
       .filter(Boolean)
       .some((field) => String(field).toLowerCase().includes(needle)),
   );
 });
+
+const showsSlowestSchemaSpeeds = computed(() => hasWorstOfPercentiles(visibleRows.value));
 
 // ── the in-place breakdown ──────────────────────────────────────────────────
 //
@@ -800,8 +875,9 @@ const treeRows = computed<TableRow[]>(() =>
       // chevron onto a fetch that can only ever come back empty.
       children: row.trafficless
         ? []
-        : toBreakdownRows(
+        : toSchemaRows(
             state && { breakdown: state.breakdown, loading: state.loading, failed: !!state.error },
+            row.schemas ?? [],
             row.rowKey,
           ),
     };
@@ -921,23 +997,20 @@ const onSortChange = ({ column, order }: { column: string; order: "asc" | "desc"
   sortOrder.value = order;
 };
 
-/**
- * Whether this database's split falls short of its own total. Only an open
- * database can have one — OTable renders the warning row between a parent and
- * its children, which is exactly where the gap is readable.
- *
- * `showsShortfall` owns the rule, and the case it excludes is the one that made
- * this caveat repeat verbatim under all four databases: nothing attributed puts
- * every row's shortfall at exactly 1, and the `empty` placeholder child already
- * says that better.
- */
-const hasShortfall = (row: TableRow): boolean => {
-  if (isBreakdownRow(row)) return false;
+// Zero attribution is left to the `empty` placeholder, so one 100% caveat never repeats under every row.
+const shortfallOf = (row: TableRow): number | null => {
+  if (isBreakdownRow(row)) return schemaShortfall(row);
+  // Schema children are exact totals that add up to the server, so its gap shows on each schema row.
+  if (namedSchemaCount(row) > 0) return null;
   const state = breakdowns.value[row.rowKey];
   return showsShortfall(
     state && { breakdown: state.breakdown, loading: state.loading, failed: !!state.error },
-  );
+  )
+    ? breakdownFor(row).breakdown.shortfall
+    : null;
 };
+
+const hasShortfall = (row: TableRow): boolean => shortfallOf(row) !== null;
 
 /**
  * What the shortfall means for the rows below it, with the number attached. A
@@ -945,11 +1018,7 @@ const hasShortfall = (row: TableRow): boolean => {
  * reads — the rule the coverage line above the table already follows.
  */
 const shortfallLine = (row: TableRow): I18nText =>
-  isBreakdownRow(row)
-    ? raw("")
-    : t("dbm.breakdown.shortfall", {
-        percent: formatPercent(breakdownFor(row).breakdown.shortfall ?? 0, 0),
-      });
+  t("dbm.breakdown.shortfall", { percent: formatPercent(shortfallOf(row) ?? 0, 0) });
 
 /**
  * What the placeholder child says. The failure keeps the server's own wording
@@ -979,15 +1048,7 @@ const statusLine = (row: DbmBreakdownRow): I18nText => {
 const instanceBreakdowns = shallowRef<Record<string, QueryStatsRow[]> | null>(null);
 const breakdownFailed = ref(false);
 
-/**
- * File one database's split from what the last load returned.
- *
- * The row's own exact total rides along so the aggregation can report its
- * shortfall rather than presenting a sum that silently does not reconcile. The
- * split is keyed by INSTANCE, and that is the grain it always had: the
- * per-row request scoped on `instance` alone, so two namespace rows on one
- * instance received the same response then and read the same entry now.
- */
+// The row's exact total rides along so the split reports its shortfall instead of a sum that does not add up.
 const fileBreakdown = (row: DatabaseRow) => {
   const section = instanceBreakdowns.value;
   if (!section || breakdownFailed.value) {
@@ -1007,7 +1068,12 @@ const fileBreakdown = (row: DatabaseRow) => {
       // An instance with no rows in the split is an EMPTY breakdown, not a
       // failure: nothing was attributable, which the `empty` placeholder
       // already says better than an error would.
-      breakdown: buildDatabaseBreakdown(section[row.db_instance] ?? [], row.total_time_ns),
+      breakdown: buildDatabaseBreakdown(
+        (section[row.db_instance] ?? []).filter(
+          (entry) => !namespaceFilter.value || rowNamespace(entry) === namespaceFilter.value,
+        ),
+        row.total_time_ns,
+      ),
       loading: false,
       error: null,
     },
@@ -1073,13 +1139,14 @@ watch(serverKnownInstances, () => {
  * an idle replica.
  */
 const applyInstanceMetrics = () => {
-  const hits = clientHits.value;
+  const hits = foldByInstance(clientHits.value, namespaceFilter.value);
   const total = hits.reduce((acc, row) => acc + (row.total_time_ns ?? 0), 0);
   // With no metrics the union is the identity over the client rows, which is
   // exactly the page as it shipped.
   rows.value = unionFleetRows(hits, instanceMetrics.value, {
     failedStreams: failedMetricStreams.value,
     system: systemFilter.value,
+    namespace: namespaceFilter.value,
     // The instances the SERVER vantage knows, from data the shell already
     // fetched for the tab badges. This is what keeps the overview honest for
     // the user who wired up collector recipes but has no APM: their fleet is
@@ -1090,13 +1157,21 @@ const applyInstanceMetrics = () => {
     const idle = row.trafficless;
     return {
       ...row,
+      rowKey: idle ? row.rowKey : serverRowKey(row),
       share: !idle && total > 0 ? (row.total_time_ns ?? 0) / total : 0,
       errorRate: idle ? null : errorRate(row.errors, row.calls),
-      drowning: !idle && drowningKeys.value.has(totalsKey(row as DbTotalsRow)),
-      critical: !idle && isCriticalErrorRate(row.errors, row.calls),
+      drowning: !idle && drowningKeys.value.has(instanceKey(row)),
+      critical: !idle && isCriticalServer(row),
       chips: idle ? [] : databaseChips(row as DbTotalsRow),
     };
   });
+};
+
+const deriveRows = () => {
+  drowningKeys.value = baselineReadFailed.value
+    ? new Set()
+    : drowningInstanceKeys(clientHits.value, baselineHits.value, namespaceFilter.value);
+  applyInstanceMetrics();
 };
 
 const { getStreams } = useStreams(t);
@@ -1193,17 +1268,12 @@ const load = () =>
       topNSubset.value = data.top_n_subset;
       neverAggregated.value = data.freshness?.data_through === 0;
 
-      const drowning = data.baseline_read_failed
-        ? new Set<string>()
-        : new Set(
-            detectDrowningDatabases(hits, data.baseline_hits ?? []).map((d) => totalsKey(d.row)),
-          );
-
       clientHits.value = hits;
-      drowningKeys.value = drowning;
+      baselineHits.value = data.baseline_hits ?? [];
+      baselineReadFailed.value = !!data.baseline_read_failed;
       instanceBreakdowns.value = data.breakdown ?? null;
       breakdownFailed.value = !!data.breakdown_read_failed;
-      applyInstanceMetrics();
+      deriveRows();
       // Rows that were open before the reload need their split re-filed for
       // the new window; the watcher only fires when the open SET changes.
       fillOpenBreakdowns();
@@ -1281,6 +1351,10 @@ const databaseChips = (row: DbTotalsRow): DbmRowChip[] =>
  */
 const missing = (value: number | null | undefined): boolean =>
   value === null || value === undefined;
+
+/** How many named schemas a server row was folded from; 0 on a child row. */
+const namedSchemaCount = (row: TableRow): number =>
+  isBreakdownRow(row) ? 0 : (row.namedSchemas?.length ?? 0);
 
 /** The placeholder standing in for a split that has not arrived — no figures. */
 const isStatusRow = (row: TableRow): boolean => isBreakdownRow(row) && row.kind === "status";
@@ -1413,14 +1487,7 @@ const onRowAction = (id: string, row: DatabaseRow) => {
   );
 };
 
-/**
- * Columns. Sorting is client-side over the complete set, so every numeric
- * column can be sorted honestly — unlike the Top queries table, where the
- * server owns the order and only whitelisted keys may claim to be sortable.
- *
- * The percentile headers say what they mean. These are exact per-database
- * figures, so unlike the query grain they need no qualifier.
- */
+// Percentiles cannot be pooled, so a server spanning several schemas shows its worst schema's.
 const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   {
     id: "instance",
@@ -1615,6 +1682,7 @@ const defaultColumnVisibility = {};
 
 const clearScope = () => {
   systemFilter.value = null;
+  namespaceFilter.value = null;
   statFilter.value = null;
   // Clear the SEARCH too, the way every sibling tab's clear does
   // (TableHealthPage, SamplesPage, QueriesPage). Leaving it set makes "clear"
@@ -1642,7 +1710,7 @@ const clearScope = () => {
  * from `route.query`, leaving them in the URL means a "cleared" section is
  * still filtered the moment the reader switches tabs.
  */
-const syncUrl = ({ clearAllScope = false }: { clearAllScope?: boolean } = {}) => {
+const syncUrl = ({ clearAllScope = false }: { clearAllScope?: boolean } = {}) =>
   router
     .replace({
       name: route.name as string,
@@ -1650,6 +1718,7 @@ const syncUrl = ({ clearAllScope = false }: { clearAllScope?: boolean } = {}) =>
         ...route.query,
         ...queryParams.value,
         system: systemFilter.value ?? undefined,
+        namespace: namespaceFilter.value ?? undefined,
         ...(clearAllScope
           ? {
               instance: undefined,
@@ -1662,7 +1731,6 @@ const syncUrl = ({ clearAllScope = false }: { clearAllScope?: boolean } = {}) =>
       },
     })
     .catch(() => {});
-};
 
 /**
  * Every cause resolves to an action, including `not-instrumented` — the default
@@ -1688,6 +1756,13 @@ const onEmptyAction = (cause: DbmEmptyCauseId) => {
   }
 };
 
+/** A server row hands off the overview's Schema filter, never the one schema it happens to hold. */
+const handOffSchema = (schema?: string | null): string | null => {
+  const namespace = schema ?? namespaceFilter.value;
+  handedOffSchema = namespace !== namespaceFilter.value ? namespace : null;
+  return namespace;
+};
+
 /**
  * The overview's job is to hand off — a row click carries its scope along, so
  * the Top queries tab opens already filtered to the database the user clicked
@@ -1695,12 +1770,12 @@ const onEmptyAction = (cause: DbmEmptyCauseId) => {
  *
  * `target` is what a breakdown leaf adds: the schema and service the reader
  * picked, so every node of the split is a filter into the query grain rather
- * than a dead end. Its schema wins over the row's, because the leaf is the
+ * than a dead end. Its schema wins over the Schema filter's, because the leaf is the
  * narrower and more recent statement of what the reader wants.
  */
 /** The Metrics tab, scoped to this database — window and filters carry. */
 const openMetrics = (row: DatabaseRow, namespaceOverride?: string | null) => {
-  const namespace = namespaceOverride ?? row.db_namespace;
+  const namespace = handOffSchema(namespaceOverride);
   router
     .push({
       name: "dbmMetrics",
@@ -1710,7 +1785,7 @@ const openMetrics = (row: DatabaseRow, namespaceOverride?: string | null) => {
         ...queryParams.value,
         system: row.db_system,
         instance: row.db_instance,
-        ...(namespace ? { namespace } : {}),
+        namespace: namespace ?? undefined,
       },
     })
     .catch(() => {});
@@ -1720,7 +1795,7 @@ const openQueries = (
   row: DatabaseRow,
   target?: { namespace: string | null; service: string | null },
 ) => {
-  const namespace = target?.namespace ?? row.db_namespace;
+  const namespace = handOffSchema(target?.namespace);
   router
     .push({
       name: "dbmQueries",
@@ -1730,7 +1805,7 @@ const openQueries = (
         ...queryParams.value,
         system: row.db_system,
         instance: row.db_instance,
-        ...(namespace ? { namespace } : {}),
+        namespace: namespace ?? undefined,
         ...(target?.service ? { service: target.service } : {}),
       },
     })
@@ -1775,6 +1850,7 @@ const dbmContext = createDbmContextProvider(
       endTime: current.value.endTime,
       period: range.value.relativeTimePeriod,
       system: systemFilter.value,
+      namespace: namespaceFilter.value,
     },
   }),
   store,
