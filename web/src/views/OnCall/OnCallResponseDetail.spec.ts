@@ -53,6 +53,10 @@ vi.mock("@/services/oncall", () => ({
   },
 }));
 
+vi.mock("@/services/incidents", () => ({ default: { get: vi.fn() } }));
+import incidentsService from "@/services/incidents";
+const incidentsGet = vi.mocked(incidentsService).get;
+
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 import analytics from "@/services/product_analytics";
 
@@ -104,7 +108,7 @@ const stubs = {
     // `title-trail` carries the state tags and `subtitle` the team/firing/
     // opened line, both of which are assertions of their own.
     template:
-      "<div><slot name='subtitle' /><slot name='title-trail' /><slot name='actions' /><slot /></div>",
+      "<div><slot name='subtitle' /><slot name='title-trail' /><slot name='actions' /><div data-test='stub-header-tabs'><slot name='header-tabs' /></div><slot /></div>",
   },
   OTooltip: {
     name: "OTooltip",
@@ -184,6 +188,7 @@ const stubs = {
       "closedAt",
       "ackedBy",
       "teamDeleted",
+      "loading",
     ],
     template: "<div />",
   },
@@ -198,6 +203,7 @@ const stubs = {
       "routingReason",
       "subjectStream",
       "incidentId",
+      "incidentTitle",
       "cause",
       "causeNote",
       "teamDeleted",
@@ -1104,26 +1110,10 @@ describe("OnCallResponseDetail", () => {
       });
     });
 
-    /// The trailing clause used to spell out "first page from this subject" /
-    /// "N earlier firings" inline; it is now a tooltip on the count instead —
-    /// still reachable, no longer read every time.
-    it("shows which firing this is, with the history behind a tooltip", async () => {
+    /// Which firing this is was jargon in the tagline; how often it fired before rides the stat strip instead.
+    it("keeps the firing number out of the tagline", async () => {
       const wrapper = await renderWith();
-      const firing = wrapper.find('[data-test="oncall-response-firing"]');
-
-      expect(firing.text()).toContain("#2");
-      expect(firing.text()).toContain("First page from this subject");
-    });
-
-    it("shows the earlier-firings count in the same tooltip once there is history", async () => {
-      service.responseHistory.mockResolvedValue({
-        data: [{ id: "resp_0", state: "resolved", opened_at: 1, acked_by: null, cause: null }],
-      } as any);
-      const wrapper = await renderWith();
-
-      expect(wrapper.find('[data-test="oncall-response-firing"]').text()).toContain(
-        "1 earlier firing",
-      );
+      expect(wrapper.find('[data-test="oncall-response-firing"]').exists()).toBe(false);
     });
 
     /// The elapsed duration already rides the title tags — "opened" repeats it
@@ -1137,13 +1127,21 @@ describe("OnCallResponseDetail", () => {
   });
 
   describe("top stats and what fired", () => {
-    it("puts the firing count on the stat strip", async () => {
-      const wrapper = await renderWith({
-        subject: { subject_type: "alert", source_id: "al_ckt", firing: 2 },
-      });
-      const stats = wrapper.findComponent({ name: "OStatStrip" }).props("items");
+    it("says how often it fired before, and only when it did", async () => {
+      const first = await renderWith();
+      const none = first.findComponent({ name: "OStatStrip" });
+      expect(none.exists() ? none.props("items").some((s: any) => s.key === "firing") : false).toBe(
+        false,
+      );
+      first.unmount();
 
-      expect(stats.find((s: any) => s.key === "firing").value).toBe("#2");
+      queryClient.clear();
+      service.responseHistory.mockResolvedValue({
+        data: [{ id: "resp_0", state: "resolved", opened_at: 1, acked_by: null, cause: null }],
+      } as any);
+      const wrapper = await renderWith();
+      const stats = wrapper.findComponent({ name: "OStatStrip" }).props("items");
+      expect(stats.find((s: any) => s.key === "firing").value).toBe("1 time");
     });
 
     /// The escalation panel used to live in this rail; the section is gone
@@ -1310,25 +1308,18 @@ describe("OnCallResponseDetail", () => {
     });
   });
 
-  /// The rail read "— —" on exactly the page that needs it: an open record
-  /// has no ack or resolve duration yet. Each row now says its own version of
-  /// what is actually true, on the stat strip at the top of the page.
-  it("says what the clocks are doing instead of a dash", async () => {
+  /// An open page counts how long it has waited; the time it has been open already rides the title.
+  it("says what the clock is doing instead of a dash", async () => {
     const wrapper = await renderWith();
     const stats = wrapper.findComponent({ name: "OStatStrip" }).props("items");
     const ack = stats.find((s: any) => s.key === "ack");
-    const resolve = stats.find((s: any) => s.key === "resolve");
 
     expect(ack.label).toBe("Unacknowledged for");
     expect(ack.value).not.toBe("—");
-
-    expect(resolve.label).toBe("Open for");
-    expect(resolve.value).not.toBe("—");
+    expect(stats.some((s: any) => s.key === "resolve")).toBe(false);
   });
 
-  /// Once it is answered the reading freezes into the metric it was always
-  /// labelled as — the running clock belongs to the open state only.
-  it("reverts to the settled durations once the page is answered", async () => {
+  it("freezes into the time it took once the page is answered", async () => {
     const wrapper = await renderWith({
       state: "acknowledged",
       acked_by: "engineer@example.com",
@@ -1339,7 +1330,7 @@ describe("OnCallResponseDetail", () => {
       .props("items")
       .find((s: any) => s.key === "ack");
 
-    expect(ack.label).toBe("Time to ack");
+    expect(ack.label).toBe("Acknowledged in");
     expect(ack.value).toContain("1h");
     expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("ackedBy")).toBe(
       "engineer@example.com",
@@ -1436,7 +1427,7 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
       } as any);
 
       const wrapper = await renderWith({ priority: 2, reached_rung_micros: 300_000_000 });
-      expect(reachedRung(wrapper)).toBe("2 of 3");
+      expect(reachedRung(wrapper)).toBe("step 2 of 3");
     });
 
     it("treats never leaving the first rung as a rung, not as nothing", async () => {
@@ -1453,19 +1444,19 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
       } as any);
 
       const wrapper = await renderWith({ priority: 2, reached_rung_micros: 0 });
-      expect(reachedRung(wrapper)).toBe("1 of 1");
+      expect(reachedRung(wrapper)).toBe("step 1 of 1");
     });
 
-    it("reads a dash only when no page went out at all", async () => {
-      const wrapper = await renderWith({ priority: 2 });
-      expect(reachedRung(wrapper)).toBe("—");
-    });
-
-    /// With no policy to match against, the delay is still more honest than
-    /// nothing — the reader learns the ladder got 5m deep.
-    it("falls back to the delay when the ladder cannot be matched", async () => {
-      const wrapper = await renderWith({ priority: 2, reached_rung_micros: 300_000_000 });
-      expect(reachedRung(wrapper)).toBe("+5m");
+    /// No step, or a step the ladder no longer has, is no fact to state, so the tile goes rather than reading a delay.
+    it("leaves the tile out when no step can be named", async () => {
+      const none = await renderWith({ priority: 2 });
+      expect(none.findComponent({ name: "OStatStrip" }).exists()).toBe(true);
+      expect(
+        none
+          .findComponent({ name: "OStatStrip" })
+          .props("items")
+          .some((s: any) => s.key === "rung"),
+      ).toBe(false);
     });
   });
 
@@ -1587,7 +1578,7 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
 
       const item = wrapper.find('[data-test="oncall-response-escalate-btn-menu"]');
       expect(item.attributes("disabled")).toBeDefined();
-      expect(item.text()).toContain("nobody left to escalate to");
+      expect(item.text()).toContain("nobody left to page");
     });
 
     it("drops the menu when a closed page is already tied to an incident", async () => {
@@ -1601,12 +1592,12 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
     });
 
     /// The title row has no room for both the alert's name and its tags, so the tags open the body instead.
-    it("leads the body with the state and elapsed time", async () => {
+    it("leads the body with the state, saying the duration once", async () => {
       const wrapper = await renderWith();
 
       const meta = wrapper.find('[data-test="oncall-response-meta"]');
-      expect(meta.find('[data-test="oncall-response-elapsed"]').exists()).toBe(true);
-      expect(wrapper.findAll('[data-test="oncall-response-elapsed"]')).toHaveLength(1);
+      expect(meta.find('[data-test="oncall-response-phrase"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-response-elapsed"]').exists()).toBe(false);
     });
 
     it("applies on a phone too", async () => {
@@ -1723,7 +1714,6 @@ describe("OnCallResponseDetail — responding", () => {
 
       const banner = wrapper.find('[data-test="oncall-response-hold-banner"]');
       expect(banner.text()).toMatch(/^AI triage is checking first · paging within \d+s Page now$/);
-      expect(stat(wrapper, "rung").value).toBe("Waiting for AI triage");
     });
 
     it("pages rung 1 through the existing escalate action", async () => {
@@ -1790,7 +1780,6 @@ describe("OnCallResponseDetail — responding", () => {
       held(null);
       const absent = await renderWith();
       expect(absent.find('[data-test="oncall-response-hold-banner"]').exists()).toBe(false);
-      expect(stat(absent, "rung").value).toBe("—");
     });
   });
 
@@ -1801,8 +1790,7 @@ describe("OnCallResponseDetail — responding", () => {
         closed_at: 1_700_000_000_000_000 + HOUR_MICROS,
       });
 
-      expect(stat(wrapper, "ack").label).toBe("Never acknowledged");
-      expect(stat(wrapper, "ack").value).toBe("—");
+      expect(wrapper.find('[data-test="oncall-response-stats"]').exists()).toBe(false);
     });
 
     it("says how far the ladder got, in the past tense", async () => {
@@ -1827,8 +1815,8 @@ describe("OnCallResponseDetail — responding", () => {
         reached_rung_micros: 300_000_000,
       });
 
-      expect(stat(wrapper, "rung").label).toBe("Reached step");
-      expect(stat(wrapper, "rung").value).toBe("2 of 3");
+      expect(stat(wrapper, "rung").label).toBe("Paged up to");
+      expect(stat(wrapper, "rung").value).toBe("step 2 of 3");
     });
   });
 
@@ -1892,6 +1880,25 @@ describe("OnCallResponseDetail — responding", () => {
     });
   });
 
+  /// The tabs sit in the header like the Incident page, so the activity panel below has its own height for the note box.
+  it("puts the activity, deliveries and causes tabs in the header", async () => {
+    const wrapper = await renderWith();
+    const header = wrapper.find('[data-test="stub-header-tabs"]');
+
+    expect(header.find('[data-test="oncall-response-tab-activity"]').exists()).toBe(true);
+    expect(header.find('[data-test="oncall-response-tab-deliveries"]').exists()).toBe(true);
+    expect(header.find('[data-test="oncall-response-tab-causes"]').exists()).toBe(true);
+  });
+
+  it("names the incident by its title in the rail", async () => {
+    incidentsGet.mockResolvedValue({ data: { title: "Checkout outage" } } as any);
+    const wrapper = await renderWith({ incident_id: "inc_9" });
+
+    expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("incidentTitle")).toBe(
+      "Checkout outage",
+    );
+  });
+
   describe("a team that was deleted", () => {
     /// A deleted team's ladder has no rotations to reach; Hand off is the next step, and Snooze still works.
     it("offers no Escalate for a deleted team, but keeps Snooze", async () => {
@@ -1916,6 +1923,16 @@ describe("OnCallResponseDetail — responding", () => {
       expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("teamDeleted")).toBe(true);
       expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("teamDeleted")).toBe(true);
       expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("noTeam")).toBe(true);
+    });
+
+    /// A deleted team's roster can never load, so the card is not left waiting on a read that only 404s.
+    it("does not ask who is on call for a team that no longer exists", async () => {
+      service.listTeams.mockResolvedValue({ data: [{ id: "team_2", name: "Payments" }] } as any);
+      service.whoIsOnCall.mockClear();
+      const wrapper = await renderWith();
+
+      expect(service.whoIsOnCall).not.toHaveBeenCalled();
+      expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("loading")).toBe(false);
     });
 
     /// An unrouted page has no team at all, which is a routing fact, not a deleted team.

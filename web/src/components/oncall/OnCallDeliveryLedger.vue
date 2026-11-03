@@ -15,7 +15,6 @@
 -->
 <template>
   <div class="flex flex-col gap-2" data-test="oncall-delivery-ledger">
-    <p class="text-text-secondary text-xs">{{ t("oncall.deliveriesHint") }}</p>
 
     <OInnerLoading v-if="loading" showing />
 

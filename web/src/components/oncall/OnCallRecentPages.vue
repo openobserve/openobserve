@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost-primary"
         size="xs"
         class="ms-auto"
+        icon-left="open-in-new"
         data-test="oncall-recent-pages-view-all"
         @click="emit('view-all')"
       >

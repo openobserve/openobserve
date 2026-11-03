@@ -78,9 +78,9 @@ describe("OnCallSlackCard (LN-1)", () => {
     const w = render();
     await flushPromises();
 
-    expect(w.find('[data-test="oncall-slack-not-set-up"]').text()).toBe(
-      "Slack is not set up. An admin sets it up in Settings › Slack.",
-    );
+    expect(w.find('[data-test="oncall-slack-not-set-up"]').text()).toBe("Not set up");
+    expect(w.find('[data-test="oncall-slack-ask-admin"]').exists()).toBe(true);
+    expect(w.find('[data-test="oncall-slack-settings-link"]').exists()).toBe(false);
     expect(w.find('[data-test="oncall-slack-not-linked"]').exists()).toBe(false);
   });
 

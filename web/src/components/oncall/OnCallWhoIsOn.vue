@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            empty list is ambiguous mid-fetch — this tells "still loading" apart
            from "resolved to nobody" before either read that as the same row. -->
       <div
-        v-if="loading && !positions.length"
+        v-if="loading && !positions.length && !teamDeleted"
         class="flex flex-col gap-2"
         data-test="oncall-who-is-on-loading"
       >
@@ -51,9 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- An unstaffed rotation is an emergency while a page is open and a
            plain fact once it is closed, so the colour follows the state. -->
       <p
-        v-else-if="!positions.length"
+        v-else-if="!positions.length || teamDeleted"
         class="text-sm"
-        :class="closed ? 'text-text-secondary' : 'text-status-error-text'"
+        :class="closed || teamDeleted ? 'text-text-secondary' : 'text-status-error-text'"
         data-test="oncall-who-is-on-nobody"
       >
         {{ nobodyLine }}
@@ -200,8 +200,8 @@ const nowMicros = useOnCallClock();
 const closed = computed(() => Boolean(props.closedAt));
 
 const nobodyLine = computed(() => {
-  if (closed.value) return t("oncall.nobodyWasOnCall");
-  return props.teamDeleted ? t("oncall.nobodyOnCallTeamDeleted") : t("oncall.nobodyOnCall");
+  if (props.teamDeleted) return t("oncall.nobodyOnCallTeamDeleted");
+  return closed.value ? t("oncall.nobodyWasOnCall") : t("oncall.nobodyOnCall");
 });
 
 /// The first rotation the team staffs. Not a special one: the response is

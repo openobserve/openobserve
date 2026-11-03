@@ -129,33 +129,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </ODescriptionItem>
 
-        <!-- The ids somebody pastes into a channel, boxed with their own copy
-             control — the same shape the Incident Details card uses, so an id
-             reads and copies the same way on both pages. -->
         <ODescriptionItem v-if="incidentId" :label="t('oncall.incident')">
-          <span
-            class="rounded-default border-border-default bg-surface-panel flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
+          <router-link
+            class="text-accent min-w-0"
+            :to="{
+              name: 'incidentDetail',
+              params: { id: incidentId },
+              query: { org_identifier: orgId },
+            }"
+            data-test="oncall-about-incident-link"
           >
-            <router-link
-              class="text-accent min-w-0 flex-1 font-mono"
-              :to="{
-                name: 'incidentDetail',
-                params: { id: incidentId },
-                query: { org_identifier: orgId },
-              }"
-              data-test="oncall-about-incident-link"
-            >
-              <OTruncatedText class="block">{{ raw(incidentId) }}</OTruncatedText>
-            </router-link>
-            <OButton
-              variant="ghost"
-              size="icon-xs"
-              icon-left="content-copy"
-              :aria-label="t('common.copyToClipboard')"
-              data-test="oncall-about-copy-incident"
-              @click="copyIncidentId"
-            />
-          </span>
+            <OTruncatedText class="block">{{ raw(incidentTitle || incidentId) }}</OTruncatedText>
+          </router-link>
         </ODescriptionItem>
 
         <!-- When the subject IS the incident, this row would repeat the
@@ -229,6 +214,8 @@ const props = withDefaults(
     routingReason?: string | null;
     subjectStream?: string | null;
     incidentId?: string | null;
+    /** The incident's own title; the id stands in until it loads. */
+    incidentTitle?: string | null;
     cause?: ResolutionCause | null;
     causeNote?: string | null;
   }>(),
@@ -237,6 +224,7 @@ const props = withDefaults(
     routingReason: null,
     subjectStream: null,
     incidentId: null,
+    incidentTitle: null,
     cause: null,
     causeNote: null,
   },
@@ -318,9 +306,5 @@ const alertEditRoute = computed<RouteLocationRaw | null>(() =>
 
 async function copySubjectId() {
   await copyToClipboard(props.sourceId, t);
-}
-
-async function copyIncidentId() {
-  if (props.incidentId) await copyToClipboard(props.incidentId, t);
 }
 </script>

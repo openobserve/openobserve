@@ -54,12 +54,13 @@ function render(props: Record<string, unknown> = {}) {
 }
 
 describe("OnCallWhoIsOn", () => {
-  /// A deleted team has no rotation to add, so the setup prompt would be a dead end.
-  it("points a deleted team's page at a handoff, not at team setup", () => {
-    const text = render({ teamDeleted: true }).find('[data-test="oncall-who-is-on-nobody"]').text();
+  /// A deleted team's roster can never load, so the card says so instead of skeleton-loading forever.
+  it("says the team was deleted instead of loading forever", () => {
+    const wrapper = render({ teamDeleted: true, loading: true });
 
-    expect(text).toBe(
-      "Nobody is on call: the team was deleted. Hand this page off to another team.",
+    expect(wrapper.find('[data-test="oncall-who-is-on-loading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-who-is-on-nobody"]').text()).toBe(
+      "Team was deleted — who was on call is unknown",
     );
   });
 

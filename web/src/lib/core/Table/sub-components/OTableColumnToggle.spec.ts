@@ -25,12 +25,17 @@ const columns = [
   { id: "from", header: "Last connected from", hideable: true },
 ] as unknown as OTableColumnDef[];
 
-function mountToggle(defaults?: Record<string, boolean>) {
+function mountToggle(
+  defaults?: Record<string, boolean>,
+  visibility: Record<string, boolean> = { name: false, arch: true, from: true },
+  hasResizedColumns = false,
+) {
   return mount(OTableColumnToggle, {
     props: {
       columns,
-      columnVisibility: { name: false, arch: true, from: true },
+      columnVisibility: visibility,
       defaultColumnVisibility: defaults,
+      hasResizedColumns,
     },
     global: {
       plugins: [i18n],
@@ -57,5 +62,29 @@ describe("OTableColumnToggle", () => {
     expect(wrapper.emitted("update:columnVisibility")?.[0]).toEqual([
       { name: true, arch: true, from: true },
     ]);
+  });
+
+  it("does not count a column the table hides by default as hidden", () => {
+    const wrapper = mountToggle({ arch: false }, { name: true, arch: false, from: true });
+    expect(wrapper.find('[data-test="o2-table-column-toggle-hidden-badge"]').exists()).toBe(false);
+  });
+
+  it("counts a default-hidden column the reader turned on", () => {
+    const wrapper = mountToggle({ arch: false }, { name: true, arch: true, from: true });
+    expect(wrapper.find('[data-test="o2-table-column-toggle-hidden-badge"]').text()).toBe("1");
+  });
+
+  it("disables reset while the table is already at its defaults", async () => {
+    const wrapper = mountToggle({ arch: false }, { name: true, arch: false, from: true });
+    const reset = wrapper.find('[data-test="o2-table-column-toggle-reset-btn"]');
+    expect(reset.attributes("disabled")).toBeDefined();
+    await reset.trigger("click");
+    expect(wrapper.emitted("update:columnVisibility")).toBeUndefined();
+  });
+
+  it("resets widths too when only the sizes differ from default", async () => {
+    const wrapper = mountToggle({ arch: false }, { name: true, arch: false, from: true }, true);
+    await wrapper.find('[data-test="o2-table-column-toggle-reset-btn"]').trigger("click");
+    expect(wrapper.emitted("reset:columnSizes")).toHaveLength(1);
   });
 });

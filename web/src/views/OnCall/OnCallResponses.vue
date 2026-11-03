@@ -25,30 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <!-- Whether the reader is themselves on call, beside the buttons rather
            than in the body: it qualifies the whole screen, not one section. -->
+      <!-- Hidden while setup is unfinished: a green shift chip there would read as all-good when pages cannot reach anyone yet. -->
       <OnCallShiftBanner
-        v-if="myShift && !isMobile"
+        v-if="myShift && !isMobile && !showChecklist"
         :user-email="viewerEmail"
         :rotation="myShift.rotation"
         :team-name="myShift.teamName"
         :ends-at="myShift.endsAt"
         :other-teams="myShift.otherTeams"
       />
-      <!-- A filter, not a destination. "What is mine" is this same list
-           narrowed; leaving for another screen to ask it threw away every other
-           filter the reader had set and answered from a different dataset.
-           Hidden when we do not know who is signed in, rather than left as a
-           toggle that can only ever empty the table. -->
-      <OButton
-        v-if="viewerEmail"
-        variant="outline"
-        size="sm"
-        :active="mineOnly"
-        :aria-pressed="mineOnly"
-        data-test="oncall-responses-mine-btn"
-        @click="mineOnly = !mineOnly"
-      >
-        {{ t("oncall.onlyMineFilter") }}
-      </OButton>
     </template>
 
     <!-- §G.8.1: the entry fetch is the capability probe. 404 (feature off) and
@@ -73,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          naming the next undone step, over a list that stays fully usable. -->
     <!-- A phone header has no room for the banner, so it leads the body instead. -->
     <OnCallShiftBanner
-      v-if="myShift && isMobile"
+      v-if="myShift && isMobile && !showChecklist"
       class="mx-page-edge mt-2 shrink-0"
       :user-email="viewerEmail"
       :rotation="myShift.rotation"
@@ -86,11 +71,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showChecklist && !unavailable"
       :has-team="setup.hasTeam"
       :has-staffed-rotation="setup.hasStaffedRotation"
+      :has-policy="setup.hasPolicy"
       :has-routing="setup.hasRouting"
-      :has-destinations="setup.hasDestinations"
       :compact="hasPages"
       :can-configure="canConfigure"
       :first-team-id="teams[0]?.id ?? null"
+      :first-team-name="teams[0]?.name ?? null"
       @create-team="createTeam"
     />
 
@@ -103,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!unavailable && !setupOnly"
       ref="oTableRef"
       :frame="false"
-      :data="rows"
+      :data="tableRows"
       :columns="columns"
       row-key="rowKey"
       :loading="loading || !setupLoaded"
@@ -140,40 +126,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- During an incident the list IS the work surface. Opening 200 pages
            one at a time to claim them is not triage. -->
-      <template #toolbar>
+      <template v-if="hasPages" #toolbar>
         <div class="flex w-full flex-wrap items-center gap-2 max-md:contents">
-          <!-- One tab, one section — spread out rather than tucked behind a
-               filter icon, the way Alerts' type tabs are: what the list is
-               currently narrowed to should be visible at a glance, not a
-               state hidden inside a dropdown. -->
+          <!-- First, and always on screen, so a list narrowed to the reader's own pages never looks empty for a hidden reason. -->
+          <OToggleGroup
+            v-if="viewerEmail"
+            :model-value="mineOnly ? 'mine' : 'everyone'"
+            mobile-dropdown
+            data-test="oncall-responses-scope"
+            @update:model-value="(v) => setMineOnly(v === 'mine')"
+          >
+            <OToggleGroupItem
+              value="mine"
+              size="sm"
+              icon-left="person"
+              data-test="oncall-responses-scope-mine"
+            >
+              {{ t("oncall.scopeMine") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem
+              value="everyone"
+              size="sm"
+              icon-left="group"
+              data-test="oncall-responses-scope-everyone"
+            >
+              {{ t("oncall.scopeEveryone") }}
+            </OToggleGroupItem>
+          </OToggleGroup>
           <OToggleGroup
             :model-value="activeFilter"
             mobile-dropdown
             data-test="oncall-responses-filter-tabs"
             @update:model-value="(v) => selectFilterTab(v as 'all' | SectionKey)"
           >
-            <OToggleGroupItem value="all" size="sm" data-test="oncall-responses-tab-all">
+            <OToggleGroupItem
+              value="all"
+              size="sm"
+              icon-left="list"
+              data-test="oncall-responses-tab-all"
+            >
               {{ t("oncall.all") }}
             </OToggleGroupItem>
-            <OToggleGroupItem value="ringing" size="sm" data-test="oncall-responses-tab-ringing">
+            <OToggleGroupItem
+              value="ringing"
+              size="sm"
+              icon-left="notifications-active"
+              data-test="oncall-responses-tab-ringing"
+            >
               {{ t("oncall.section_ringing") }}
             </OToggleGroupItem>
-            <OToggleGroupItem value="handled" size="sm" data-test="oncall-responses-tab-handled">
+            <OToggleGroupItem
+              value="handled"
+              size="sm"
+              icon-left="check-circle"
+              data-test="oncall-responses-tab-handled"
+            >
               {{ t("oncall.section_handled") }}
             </OToggleGroupItem>
-            <OToggleGroupItem value="resolved" size="sm" data-test="oncall-responses-tab-resolved">
+            <OToggleGroupItem
+              value="resolved"
+              size="sm"
+              icon-left="task-alt"
+              data-test="oncall-responses-tab-resolved"
+            >
               {{ t("oncall.section_resolved") }}
             </OToggleGroupItem>
-            <OToggleGroupItem value="snoozed" size="sm" data-test="oncall-responses-tab-snoozed">
+            <OToggleGroupItem
+              value="snoozed"
+              size="sm"
+              icon-left="alarm"
+              data-test="oncall-responses-tab-snoozed"
+            >
               {{ t("oncall.section_snoozed") }}
             </OToggleGroupItem>
           </OToggleGroup>
-          <!-- `width` is a PROP, not a class: OSelect merges an incoming class
-               with its own width class, so a `w-56` here lost to the default
-               `w-full` and stacked the whole toolbar into three rows. -->
-          <!-- Refetches, because the server does this filter now: narrowing
-               the rows this page happened to have walked hid a team's older
-               pages entirely past the fetch cap. -->
+          <!-- Server-side, so a team's older pages past the fetch cap are not hidden by a client filter. -->
           <OSelect
             v-if="!isMobile"
             v-model="teamFilter"
@@ -190,32 +217,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="priorityFilter"
             :options="priorityOptions"
             :aria-label="t('oncall.priorityFilterLabel')"
-            width="xs"
+            width="sm"
             data-test="oncall-responses-priority-filter"
           />
-          <!-- `basis-40` so the search keeps a usable width once the row
-               wraps, instead of collapsing to its padding. -->
-          <OSearchInput
-            v-model="search"
-            class="min-w-40 flex-1 basis-40 max-md:min-w-24 max-md:basis-24"
-            clearable
-            :placeholder="t('oncall.searchResponses')"
-            data-test="oncall-responses-search"
-          />
-          <!-- On by default. A rule firing every minute is one problem, not
-               ninety-five, and the ungrouped view is for reading history. -->
-          <OCheckbox
-            v-if="!isMobile"
-            v-model="grouped"
-            :label="t('oncall.groupByAlert')"
-            data-test="oncall-responses-group-toggle"
-          />
-          <!-- Only on a tab showing resolved pages: a cause is written at
-               resolve, so filtering an open list by one can only ever empty
-               it. Server-side, like the team filter — the cause somebody wants
-               is usually months back, past any page cap. Keyed off the tab
-               rather than `includeResolved`, which stays true once fetched
-               even after the reader narrows away from resolved rows. -->
+          <!-- Only where resolved pages show: a cause is written at resolve, so it can only empty an open list. -->
           <OSelect
             v-if="!isMobile && sectionVisibility.resolved"
             :model-value="causeFilter"
@@ -225,6 +230,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             width="sm"
             data-test="oncall-responses-cause-filter"
             @update:model-value="onCauseFilter"
+          />
+          <OCheckbox
+            v-if="!isMobile"
+            v-model="grouped"
+            :label="t('oncall.groupByAlert')"
+            data-test="oncall-responses-group-toggle"
+          />
+          <OSearchInput
+            v-model="search"
+            class="min-w-40 flex-1 basis-40 max-md:min-w-24 max-md:basis-24"
+            clearable
+            :placeholder="t('oncall.searchResponses')"
+            data-test="oncall-responses-search"
           />
           <!-- A phone toolbar is one row, so everything that narrows the list waits behind one button. -->
           <OPopover
@@ -280,13 +298,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #selection-actions>
         <OButton
-          variant="primary"
+          variant="outline"
           size="sm"
           :loading="bulkBusy"
           data-test="oncall-bulk-ack"
           @click="bulkAcknowledge"
         >
-          {{ t("oncall.acknowledge") }}
+          <OIcon name="check-circle" size="sm" />{{ t("oncall.acknowledge") }}
         </OButton>
         <ODropdown>
           <template #trigger>
@@ -297,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="bulkBusy"
               data-test="oncall-bulk-snooze"
             >
-              {{ t("oncall.snooze") }}
+              <OIcon name="alarm" size="sm" />{{ t("oncall.snooze") }}
             </OButton>
           </template>
           <ODropdownItem
@@ -316,15 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="oncall-bulk-resolve"
           @click="confirmBulkResolve = true"
         >
-          {{ t("oncall.resolve") }}
-        </OButton>
-        <OButton
-          variant="outline"
-          size="sm"
-          data-test="oncall-bulk-cancel"
-          @click="selectedIds = []"
-        >
-          {{ t("oncall.cancel") }}
+          <OIcon name="task-alt" size="sm" />{{ t("oncall.resolve") }}
         </OButton>
       </template>
 
@@ -434,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             params: { teamId: row.latest.team_id },
             query: { org_identifier: orgId },
           }"
-          class="text-text-body inline-block max-w-full underline"
+          class="text-text-body inline-block max-w-full hover:underline"
           :data-test="`oncall-row-team-${row.rowKey}`"
           @click.stop
         >
@@ -455,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             params: { id: row.latest.incident_id },
             query: { org_identifier: orgId },
           }"
-          class="text-text-body inline-block max-w-full underline"
+          class="text-text-body inline-block max-w-full hover:underline"
           :data-test="`oncall-row-incident-${row.rowKey}`"
           @click.stop
         >
@@ -517,8 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OUserCell
           v-if="row.latest.acked_by"
           :value="row.latest.acked_by"
-          :name="row.latest.acked_by === viewerEmail ? youLabel : undefined"
-          local-part
+          :name="displayName(row.latest.acked_by)"
           copy
           :copy-label="t('oncall.copyEmail')"
         />
@@ -546,12 +555,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OUserCell
           v-if="positionsByTeam[row.latest.team_id ?? '']?.[0]"
           :value="positionsByTeam[row.latest.team_id ?? '']![0].user_email"
-          :name="
-            positionsByTeam[row.latest.team_id ?? '']![0].user_email === viewerEmail
-              ? youLabel
-              : undefined
-          "
-          local-part
+          :name="displayName(positionsByTeam[row.latest.team_id ?? '']![0].user_email)"
           copy
           :copy-label="t('oncall.copyEmail')"
         />
@@ -650,191 +654,124 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <!-- What the row can actually be done to, rather than the same two
-           buttons everywhere: claiming is only offered while something is still
-           escalating, and a page nobody owns is a routing fix, not a triage.
-
-           Exactly one action carries a label, and it is whatever this row's next
-           step actually is — claim it, close it, or read it. Acknowledge or
-           nothing meant a handled page that still had to be closed offered its
-           one visible button to a menu. Everything else sits behind the
-           more-menu, as it does on every other list in the app. -->
+      <!-- Same slots and verbs as the Incidents list; an empty slot keeps its width so the icons line up down the column. -->
       <template #cell-actions="{ row }">
-        <!-- The slot's wrapper is inline-flex and shrinks to content by design, so pin to the column's resolved width directly instead of `w-full`. -->
-        <span
-          class="flex items-center justify-between max-md:w-auto! max-md:justify-center"
-          :style="{ width: actionsColumnWidthVar }"
-        >
-          <ODropdown v-if="!row.latest.team_id">
-            <template #trigger>
-              <OButton
-                variant="outline"
-                size="xs"
-                class="max-md:ps-2 max-md:pe-2"
-                :loading="busyId === row.rowKey"
-                :aria-label="isMobile ? t('oncall.assignTeamShort') : undefined"
-                :data-test="`oncall-row-assign-${row.rowKey}`"
-                @click.stop
+        <div class="flex items-center justify-end">
+          <template v-if="!row.latest.team_id">
+            <ODropdown>
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  :loading="busyId === row.rowKey"
+                  :aria-label="t('oncall.assignTeamShort')"
+                  :data-test="`oncall-row-assign-${row.rowKey}`"
+                  @click.stop
+                >
+                  <OIcon name="group-add" size="sm" />
+                  <OTooltip side="bottom" :content="t('oncall.assignTeamShort')" />
+                </OButton>
+              </template>
+              <ODropdownItem
+                v-for="team in teams"
+                :key="team.id"
+                icon-left="group"
+                :data-test="`oncall-row-assign-${row.rowKey}-${team.id}`"
+                @select="assignTeamToRow(row, team.id, team.name)"
               >
-                <OIcon v-if="isMobile" name="group-add" size="sm" />
-                <template v-else>{{ t("oncall.assignTeamShort") }}</template>
-              </OButton>
-            </template>
-
-            <ODropdownItem
-              v-for="team in teams"
-              :key="team.id"
-              :data-test="`oncall-row-assign-${row.rowKey}-${team.id}`"
-              @select="assignTeamToRow(row, team.id, team.name)"
-            >
-              {{ raw(team.name) }}
-            </ODropdownItem>
-            <ODropdownItem v-if="!teams.length" disabled data-test="oncall-row-assign-no-teams">
-              {{ t("oncall.noTeamsToAssign") }}
-            </ODropdownItem>
-          </ODropdown>
+                {{ raw(team.name) }}
+              </ODropdownItem>
+              <ODropdownItem v-if="!teams.length" disabled data-test="oncall-row-assign-no-teams">
+                {{ t("oncall.noTeamsToAssign") }}
+              </ODropdownItem>
+            </ODropdown>
+            <span class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
+            <span class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
+          </template>
           <template v-else>
-            <!-- Primary is `primaryAction(row)`: claiming is loud because it is
-                 the one somebody is woken for; closing and reading are ordinary
-                 work, so they stay quiet. -->
             <OButton
-              v-if="primaryAction(row) === 'acknowledge'"
-              variant="primary"
-              size="xs"
-              class="w-28 max-md:hidden"
+              v-if="canAcknowledge(row)"
+              variant="ghost-warning"
+              size="icon-sm"
+              class="max-md:hidden"
               :loading="busyId === row.rowKey"
+              :aria-label="t('oncall.acknowledge')"
               :data-test="`oncall-row-ack-${row.rowKey}`"
               @click.stop="acknowledgeRow(row)"
             >
-              {{ t("oncall.acknowledge") }}
-              <OTooltip
-                :content="
-                  pageAckWords(
-                    row.latest.team_id
-                      ? (teamNameById[row.latest.team_id] ?? row.latest.team_id)
-                      : '',
-                    row.latest.subject.subject_type,
-                    t,
-                  ).ackHint
-                "
-              />
+              <OIcon name="check-circle" size="sm" aria-hidden="true" />
+              <OTooltip :content="ackTooltip(row)" />
             </OButton>
+            <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
             <OButton
-              v-else-if="primaryAction(row) === 'resolve'"
-              variant="outline"
-              size="xs"
-              class="w-28 max-md:hidden"
+              v-if="hasUnresolved(row)"
+              variant="ghost-primary"
+              size="icon-sm"
+              class="max-md:hidden"
               :loading="busyId === row.rowKey"
+              :aria-label="t('oncall.resolve')"
               :data-test="`oncall-row-resolve-${row.rowKey}`"
               @click.stop="resolveRow(row)"
             >
-              {{ t("oncall.resolve") }}
+              <OIcon name="task-alt" size="sm" aria-hidden="true" />
+              <OTooltip :content="t('oncall.resolve')" />
             </OButton>
-            <OButton
-              v-else
-              variant="outline"
-              size="xs"
-              class="w-28 max-md:hidden"
-              :data-test="`oncall-row-timeline-${row.rowKey}`"
-              @click.stop="openResponse(row)"
-            >
-              {{ t("oncall.timeline") }}
-            </OButton>
-
-            <!-- Hidden when the row has nothing left to offer: a closed page's
-                 only action is already the button beside it, and a menu whose
-                 single item is the thing you just clicked is furniture. -->
-            <ODropdown v-if="isMobile || canAcknowledge(row) || menuActions(row).length">
+            <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
+            <ODropdown v-if="canAcknowledge(row) || hasUnresolved(row)" side="bottom" align="end">
               <template #trigger>
                 <OButton
                   variant="ghost"
                   size="icon-sm"
                   icon-left="more-vert"
+                  :class="canAcknowledge(row) ? '' : 'md:hidden'"
                   :loading="busyId === row.rowKey"
+                  :aria-label="t('oncall.moreActions')"
                   :data-test="`oncall-row-more-${row.rowKey}`"
                   @click.stop
                 >
                   <OTooltip side="bottom" :content="t('oncall.moreActions')" />
                 </OButton>
               </template>
-
-              <!-- A phone has room for one control per row, so the menu is always there and leads with the row's next step. -->
-              <template v-if="isMobile">
-                <ODropdownItem
-                  v-if="primaryAction(row) === 'acknowledge'"
-                  :data-test="`oncall-row-ack-${row.rowKey}-menu`"
-                  @select="acknowledgeRow(row)"
-                >
-                  <template #icon-left>
-                    <OIcon name="check" size="sm" />
-                  </template>
-                  {{ t("oncall.acknowledge") }}
-                </ODropdownItem>
-                <ODropdownItem
-                  v-else-if="primaryAction(row) === 'resolve'"
-                  :data-test="`oncall-row-resolve-${row.rowKey}-menu`"
-                  @select="resolveRow(row)"
-                >
-                  <template #icon-left>
-                    <OIcon name="task-alt" size="sm" />
-                  </template>
-                  {{ t("oncall.resolve") }}
-                </ODropdownItem>
-                <ODropdownItem
-                  v-else
-                  :data-test="`oncall-row-timeline-${row.rowKey}-menu`"
-                  @select="openResponse(row)"
-                >
-                  <template #icon-left>
-                    <OIcon name="format-list-bulleted" size="sm" />
-                  </template>
-                  {{ t("oncall.timeline") }}
-                </ODropdownItem>
-                <ODropdownSeparator v-if="canAcknowledge(row) || menuActions(row).length" />
-              </template>
-
-              <!-- Grouped rather than four loose items: they are one decision
-                   ("quiet it") asked at four lengths. -->
+              <ODropdownItem
+                v-if="canAcknowledge(row)"
+                icon-left="check-circle"
+                class="md:hidden"
+                :data-test="`oncall-row-ack-${row.rowKey}-menu`"
+                @select="acknowledgeRow(row)"
+              >
+                {{ t("oncall.acknowledge") }}
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="hasUnresolved(row)"
+                icon-left="task-alt"
+                class="md:hidden"
+                :data-test="`oncall-row-resolve-${row.rowKey}-menu`"
+                @select="resolveRow(row)"
+              >
+                {{ t("oncall.resolve") }}
+              </ODropdownItem>
               <ODropdownGroup v-if="canAcknowledge(row)" :label="t('oncall.snoozeFor')">
                 <ODropdownItem
                   v-for="option in snoozeOptions"
                   :key="option.minutes"
+                  icon-left="alarm"
                   :data-test="`oncall-row-snooze-${row.rowKey}-${option.minutes}`"
                   @select="snoozeRow(row, option.minutes)"
                 >
-                  <template #icon-left>
-                    <OIcon name="pause-circle-filled" size="sm" />
-                  </template>
                   {{ option.label }}
                 </ODropdownItem>
               </ODropdownGroup>
-
-              <ODropdownSeparator v-if="canAcknowledge(row)" />
-
               <ODropdownItem
-                v-if="menuActions(row).includes('resolve')"
-                :data-test="`oncall-row-resolve-${row.rowKey}`"
-                @select="resolveRow(row)"
-              >
-                <template #icon-left>
-                  <OIcon name="task-alt" size="sm" />
-                </template>
-                {{ t("oncall.resolve") }}
-              </ODropdownItem>
-
-              <ODropdownItem
-                v-if="menuActions(row).includes('timeline')"
+                icon-left="format-list-bulleted"
                 :data-test="`oncall-row-timeline-${row.rowKey}`"
                 @select="openResponse(row)"
               >
-                <template #icon-left>
-                  <OIcon name="format-list-bulleted" size="sm" />
-                </template>
                 {{ t("oncall.timeline") }}
               </ODropdownItem>
             </ODropdown>
+            <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
           </template>
-        </span>
+        </div>
       </template>
 
       <!-- A transient 500 is not "this org has no pages", and it must offer a
@@ -842,8 +779,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #error>
         <OEmptyState
           size="hero"
-          variant="error"
-          illustration="broken-panel"
+          preset="load-error"
           :title="t('oncall.loadResponsesFailed')"
           :description="loadError ? raw(loadError) : undefined"
           :action-label="t('oncall.retry')"
@@ -918,6 +854,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
@@ -933,7 +870,6 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { pageAckWords } from "@/utils/alerts/ackState";
@@ -964,7 +900,6 @@ import type { OTableColumnDef, RowRailTone, RowTone } from "@/lib/core/Table/OTa
 import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import { destinationsQuery } from "@/services/alert_destination.queries";
 import type { IncidentWithAlerts } from "@/services/incidents";
 import { incidentQuery } from "@/services/incidents.queries";
 import type {
@@ -1078,6 +1013,8 @@ const savedView = useListViewState("oncall-responses", {
   teamFilter: "all",
   priorityFilter: "all",
   mineOnly: false,
+  /** Set once the reader picks Mine or Everyone, so the on-call default never overrides a choice. */
+  mineChosen: false,
   grouped: true,
   activeFilter: "all" as "all" | SectionKey,
   causeFilter: "" as ResolutionCause | "",
@@ -1131,8 +1068,8 @@ const loaded = ref(false);
 const setup = ref({
   hasTeam: false,
   hasStaffedRotation: false,
+  hasPolicy: false,
   hasRouting: false,
-  hasDestinations: false,
 });
 /// The list and the checklist are answered by two different fetches, and these
 /// defaults are all-false. Drawing the checklist off them the moment the LIST
@@ -1200,11 +1137,12 @@ const showChecklist = computed(
     // it is the default we started from, and the first step would be a lie.
     teamsAvailable.value &&
     !loadError.value &&
+    // The test-page step is left out: the server keeps no record of one, so it could never stay done.
     !(
       setup.value.hasTeam &&
       setup.value.hasStaffedRotation &&
-      setup.value.hasRouting &&
-      setup.value.hasDestinations
+      setup.value.hasPolicy &&
+      setup.value.hasRouting
     ),
 );
 
@@ -1340,18 +1278,12 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     id: "actions",
     header: t("oncall.actions"),
     isAction: true,
+    pinned: "right",
     sortable: false,
-    // One labelled button plus the more-menu. `actionCount` is what OTable
-    // sizes the hover rail from, so it counts the controls, not the width.
-    size: 128,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+    size: 112,
+    meta: { align: "center", actionCount: 3 },
   },
 ]);
-
-// Built, not written literally: a bare `var(--header-actions-size)` in source
-// trips scripts/check-css-tokens.mjs (no static `--header-actions-size:` decl —
-// OTable sets it at runtime via `:style`, see useTableCore.ts `columnSizeVars`).
-const actionsColumnWidthVar = `var(--header-${"actions"}-size)`;
 
 /// Teams whose CURRENT rotation resolves to the viewer, from the same slots the
 /// engine would page. Membership is not the question: a member who is not on
@@ -1367,6 +1299,19 @@ const myTeamIds = computed(() => {
   }
   return ids;
 });
+
+function setMineOnly(on: boolean) {
+  mineOnly.value = on;
+  savedView.mineChosen = true;
+}
+
+// Someone holding a pager starts on their own pages, unless they already chose or a link asked.
+watch(
+  () => myTeamIds.value.size > 0,
+  (onCall) => {
+    if (onCall && !savedView.mineChosen && route.query.mine === undefined) mineOnly.value = true;
+  },
+);
 
 /// Inert until we know who is signed in — otherwise a stale toggle would hide
 /// every row with no visible control to turn it off.
@@ -1426,6 +1371,9 @@ function toRows(records: OnCallResponse[]): PageRow[] {
 /// header controls alone.
 const rows = computed(() => toRows(scopedResponses.value));
 
+/// Only the tab's sections reach the table, so its pager counts what is on screen rather than every fetched row.
+const tableRows = computed(() => rows.value.filter((row) => visibleRowSection(row) !== null));
+
 const causeOptions = computed(() => [
   { label: t("oncall.causeFilterAny"), value: "" },
   ...RESOLUTION_CAUSES.map((cause) => ({ label: t(`oncall.cause_${cause}`), value: cause })),
@@ -1465,6 +1413,11 @@ function selectFilterTab(tab: "all" | SectionKey) {
 }
 
 const youLabel = computed(() => String(t("oncall.onCallYou")));
+const { nameOf } = useOrgUserNames();
+
+function displayName(email: string): string {
+  return email.toLowerCase() === viewerEmail.value ? youLabel.value : nameOf(email);
+}
 
 /// Is this row somebody else's outage reaching this team's service?
 ///
@@ -1564,31 +1517,10 @@ function hasUnresolved(row: PageRow): boolean {
   return row.firings.some((firing) => firing.state !== "resolved");
 }
 
-/** The three things a row can be asked to do, in the order they take priority. */
-type RowAction = "acknowledge" | "resolve" | "timeline";
-
-/**
- * The one action that earns a label on the row.
- *
- * Precedence, not a mode: a ringing page is claimed first, an owned one still
- * has to be closed, and a closed one is only there to be read. The point is that
- * every row has a visible next step — "Acknowledge or nothing" left a handled
- * page's actual next step buried in a menu.
- */
-function primaryAction(row: PageRow): RowAction {
-  if (canAcknowledge(row)) return "acknowledge";
-  if (hasUnresolved(row)) return "resolve";
-  return "timeline";
-}
-
-/// What the more-menu carries: every action the row has EXCEPT the one already
-/// labelled beside it, so nothing is offered twice.
-function menuActions(row: PageRow): RowAction[] {
-  const primary = primaryAction(row);
-  const actions: RowAction[] = [];
-  if (hasUnresolved(row) && primary !== "resolve") actions.push("resolve");
-  if (primary !== "timeline") actions.push("timeline");
-  return actions;
+function ackTooltip(row: PageRow): I18nText {
+  const teamId = row.latest.team_id;
+  const team = teamId ? (teamNameById.value[teamId] ?? teamId) : "";
+  return pageAckWords(team, row.latest.subject.subject_type, t).ackHint;
 }
 
 /// One list writes to many rows, so the id rides in the variables, not the setup.
@@ -1931,11 +1863,10 @@ async function fetchIncidentTitles(force = false) {
 /// Teams, coverage and ownership answer the checklist, not the list. A failure
 /// on any one of them degrades a single control rather than the page.
 async function fetchContext(force = false) {
-  const [teamRes, gapRes, ruleRes, destRes] = await Promise.allSettled([
+  const [teamRes, gapRes, ruleRes] = await Promise.allSettled([
     read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force),
     read<CoverageGaps | null>(coverageGapsQuery(orgId.value), force),
     read<OwnershipRule[]>(ownershipRulesQuery(orgId.value), force),
-    read<any[]>(destinationsQuery(orgId.value, "alert", false, ["jira"]), force),
   ]);
 
   teamsAvailable.value = teamRes.status === "fulfilled";
@@ -1947,13 +1878,10 @@ async function fetchContext(force = false) {
   setup.value = {
     hasTeam: teams.value.length > 0,
     hasStaffedRotation: await someTeamWouldPage(gapRes, force),
+    hasPolicy: setup.value.hasPolicy,
     // An alert bound straight to a team counts: it is routing without a rule.
     hasRouting: rules.length > 0 || responses.value.some((r) => !!r.team_id),
-    hasDestinations: destRes.status === "fulfilled" && destRes.value.length > 0,
   };
-  // Set even when a call failed: the screen has to stop waiting either way.
-  // Whether the answer is trustworthy is `teamsAvailable`, checked separately.
-  setupLoaded.value = true;
 }
 
 /// "Would any team page a person right now?" The coverage-gap endpoint answers
@@ -2091,6 +2019,10 @@ async function loadAll(force = false) {
   if (unavailable.value) return;
   await fetchContext(force);
   await fetchTeamContext(force);
+  // The server creates the default ladder on first read, so a policy that answers is one that pages.
+  setup.value.hasPolicy = Object.keys(policyByTeam.value).length > 0;
+  // Set even when a call failed: the screen has to stop waiting either way; `teamsAvailable` says whether to trust it.
+  setupLoaded.value = true;
   await fetchEscalationProgress(force);
   // The open timeline is part of what the reader sees, so a refresh reaches it too.
   const open = expandedResponseId();
@@ -2135,7 +2067,7 @@ function onEmptyAction(id?: string) {
     search.value = "";
     teamFilter.value = "all";
     priorityFilter.value = "all";
-    mineOnly.value = false;
+    setMineOnly(false);
     selectFilterTab("all");
   }
 }
@@ -2195,7 +2127,7 @@ useShortcuts([
 ]);
 
 onMounted(() => {
-  if (route.query.mine === "1") mineOnly.value = true;
+  if (route.query.mine === "1") setMineOnly(true);
   return loadAll();
 });
 </script>

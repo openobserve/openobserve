@@ -66,6 +66,13 @@ const stubs = {
     emits: ["update:modelValue", "blur"],
     template: `<input :value="modelValue" :disabled="disabled" @input="$emit('update:modelValue', $event.target.value)" @blur="$emit('blur', $event)" />`,
   },
+  OTooltip: { name: "OTooltip", props: ["content"], template: "<span>{{ content }}</span>" },
+  ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+  ODropdownItem: {
+    name: "ODropdownItem",
+    emits: ["select"],
+    template: "<button @click=\"$emit('select')\"><slot /></button>",
+  },
   ConfirmDialog: {
     name: "ConfirmDialog",
     props: ["modelValue", "title", "message", "okLabel", "okVariant"],
@@ -91,9 +98,9 @@ function refusal(body: Partial<VerificationRefusalBody> & { reason: RefusalReaso
   return { response: { status, data: { message: "English API text", ...body } } };
 }
 
-async function render(read: Contact) {
+async function render(read: Contact, props: Record<string, unknown> = {}) {
   service.getContact.mockResolvedValue({ data: read } as any);
-  const wrapper = mount(OnCallPhoneCard, { global: { plugins: [i18n, store], stubs } });
+  const wrapper = mount(OnCallPhoneCard, { props, global: { plugins: [i18n, store], stubs } });
   await flushPromises();
   return wrapper;
 }
@@ -233,7 +240,6 @@ describe("OnCallPhoneCard", () => {
     expect(find(w, "input").exists()).toBe(true);
     await find(w, "input").setValue(PHONE);
     expect(find(w, "send").attributes("disabled")).toBeUndefined();
-    expect(w.text()).toContain("We text a 6-digit code to confirm it is yours.");
   });
 
   it("an empty box cannot be sent, so Send code never clears a number", async () => {
@@ -377,7 +383,7 @@ describe("OnCallPhoneCard", () => {
     await flushPromises();
 
     expect(service.sendContactCode).not.toHaveBeenCalled();
-    expect(find(w, "state").text()).toBe("Verified");
+    expect(find(w, "state").text()).toMatch(/^Verified/);
   });
 
   it("too_soon opens the code box with the server's countdown", async () => {
@@ -448,7 +454,7 @@ describe("OnCallPhoneCard", () => {
 
   it("verified with press-4: the call can be acknowledged by key", async () => {
     const w = await render(VERIFIED);
-    expect(find(w, "state").text()).toBe("Verified");
+    expect(find(w, "state").text()).toMatch(/^Verified/);
     expect(find(w, "number").text()).toBe(PHONE);
     expect(find(w, "change").exists()).toBe(true);
     expect(w.text()).toContain(
@@ -508,7 +514,7 @@ describe("OnCallPhoneCard", () => {
       );
       w.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
       await flushPromises();
-      expect(w.findComponent('[data-test="oncall-phone-remove"]').props("loading")).toBe(true);
+      expect(w.findComponent('[data-test="oncall-phone-more"]').props("loading")).toBe(true);
 
       service.getContact.mockResolvedValue({ data: contact() } as any);
       finish({ data: contact() });
@@ -580,13 +586,18 @@ describe("OnCallPhoneCard", () => {
     );
   });
 
-  it("no provider: disabled, and the admin hint links to Telephony settings", async () => {
-    const w = await render(contact({ phone: PHONE, phone_provider_available: false }));
-    expect(find(w, "input").attributes("disabled")).toBeDefined();
-    expect(find(w, "send").attributes("disabled")).toBeDefined();
-    expect(w.text()).toContain(
-      "This organisation has no phone provider yet, so pages reach you by email.",
-    );
+  /// No disabled box with a real-looking placeholder: the row says it is not available and who can fix it.
+  it("no provider: says not available yet and asks an admin", async () => {
+    const w = await render(contact({ phone_provider_available: false }));
+    expect(find(w, "input").exists()).toBe(false);
+    expect(find(w, "no-provider").text()).toContain("Not available yet");
+    expect(find(w, "ask-admin").exists()).toBe(true);
+    expect(find(w, "telephony-link").exists()).toBe(false);
+  });
+
+  it("no provider: an admin gets the Telephony setup button", async () => {
+    const w = await render(contact({ phone_provider_available: false }), { admin: true });
+    expect(find(w, "ask-admin").exists()).toBe(false);
     await find(w, "telephony-link").trigger("click");
     expect(push).toHaveBeenCalledWith({
       name: "telephonySettings",
@@ -596,7 +607,7 @@ describe("OnCallPhoneCard", () => {
 
   it("changed: an unverified saved number is amber, not red", async () => {
     const w = await render(UNVERIFIED);
-    expect(find(w, "state").text()).toBe("Not verified");
+    expect(find(w, "state").text()).toMatch(/^Not verified/);
     expect(w.findComponent({ name: "OTag" }).props("variant")).toBe("amber-soft");
     expect(w.text()).toContain("Pages will not text or call this number until you confirm it.");
   });

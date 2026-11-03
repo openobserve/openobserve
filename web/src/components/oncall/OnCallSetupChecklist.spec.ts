@@ -16,9 +16,14 @@
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { flushPromises } from "@vue/test-utils";
+
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import i18n from "@/locales";
+import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
+
+vi.mock("@/services/oncall", () => ({ default: { testPage: vi.fn() } }));
 
 const push = vi.fn();
 vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
@@ -34,6 +39,12 @@ const stubs = {
     emits: ["click"],
     template: "<button @click=\"$emit('click')\"><slot /></button>",
   },
+  ConfirmDialog: {
+    name: "ConfirmDialog",
+    props: ["modelValue", "message"],
+    emits: ["update:ok", "update:cancel"],
+    template: "<div v-if='modelValue' data-test='confirm'>{{ message }}</div>",
+  },
 };
 
 /// `data-state` per step, in order — the whole visual contract of the list.
@@ -48,8 +59,8 @@ function render(props: Record<string, unknown> = {}) {
     props: {
       hasTeam: false,
       hasStaffedRotation: false,
+      hasPolicy: false,
       hasRouting: false,
-      hasDestinations: false,
       ...props,
     },
     global: { plugins: [i18n, store], stubs },
@@ -63,19 +74,28 @@ describe("OnCallSetupChecklist", () => {
   it("marks each step done from live data", () => {
     const wrapper = render({ hasTeam: true, hasStaffedRotation: true, hasRouting: false });
 
-    expect(states(wrapper)).toEqual(["done", "done", "active", "locked"]);
+    expect(states(wrapper)).toEqual(["done", "done", "active", "todo", "todo"]);
   });
 
-  /// The steps genuinely depend on each other: a rotation needs a team, and
-  /// routing needs somebody to route to. Exactly one is actionable.
-  it("locks every step after the first undone one", () => {
+  /// No artificial lock: every undone step can be opened out of order, and only the next one is loud.
+  it("offers a button on every undone step", () => {
     const wrapper = render();
 
-    expect(states(wrapper)).toEqual(["active", "locked", "locked", "locked"]);
-    expect(wrapper.find('[data-test="oncall-setup-cta-team"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-setup-cta-rotation"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-setup-locked-rotation"]').text()).toContain("team");
-    expect(wrapper.find('[data-test="oncall-setup-locked-routing"]').text()).toContain("rotation");
+    expect(states(wrapper)).toEqual(["active", "todo", "todo", "todo", "todo"]);
+    for (const key of ["team", "rotation", "policy", "routing", "test"]) {
+      expect(wrapper.find(`[data-test="oncall-setup-cta-${key}"]`).exists()).toBe(true);
+    }
+    expect(wrapper.find('[data-test^="oncall-setup-locked-"]').exists()).toBe(false);
+  });
+
+  /// A done step is one line: its name and a Change button, no description.
+  it("collapses a done step to one line naming the team", () => {
+    const wrapper = render({ hasTeam: true, firstTeamName: "Checkout" });
+    const team = wrapper.find('[data-test="oncall-setup-step-team"]');
+
+    expect(team.text()).toContain("Create your team · Checkout");
+    expect(team.find('[data-test="oncall-setup-body-team"]').exists()).toBe(false);
+    expect(team.find('[data-test="oncall-setup-change-team"]').exists()).toBe(true);
   });
 
   /// Which shape shows is the page's call, not progress: an org with nothing to
@@ -96,7 +116,7 @@ describe("OnCallSetupChecklist", () => {
     const wrapper = render({ compact: true, hasTeam: true, firstTeamId: "team_1" });
 
     expect(wrapper.find('[data-test="oncall-setup-next"]').text()).toContain(
-      "Add people and a rotation",
+      "Add people and who's on first",
     );
 
     await wrapper.find('[data-test="oncall-setup-bar-cta-rotation"]').trigger("click");
@@ -159,16 +179,39 @@ describe("OnCallSetupChecklist", () => {
     expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallRouting" }));
   });
 
-  /// A team, a rotation and a routing rule can all be finished and a page
-  /// still lands nowhere without a destination — this is the step that
-  /// actually makes paging possible.
-  it("sends the destinations step to Notification Destinations", async () => {
-    const wrapper = render({ hasTeam: true, hasStaffedRotation: true, hasRouting: true });
+  it("sends the policy step to the first team's escalation tab", async () => {
+    const wrapper = render({ hasTeam: true, hasStaffedRotation: true, firstTeamId: "team_1" });
+    await wrapper.find('[data-test="oncall-setup-cta-policy"]').trigger("click");
 
-    expect(states(wrapper)).toEqual(["done", "done", "done", "active"]);
-    await wrapper.find('[data-test="oncall-setup-cta-destinations"]').trigger("click");
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({ params: { teamId: "team_1", tab: "escalation" } }),
+    );
+  });
 
-    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "alertDestinations" }));
+  /// The test page is a real page, so it asks first, and the step is done only once a send landed.
+  it("ticks the test step only once a test page actually lands", async () => {
+    const result = (delivered: boolean) => ({
+      data: {
+        reached_anyone: delivered,
+        channels: ["email"],
+        attempts: [{ channel: "email", recipient: "a@o2.ai", reason: "", delivered }],
+      },
+    });
+    vi.mocked(oncallService.testPage).mockResolvedValueOnce(result(false) as any);
+    const wrapper = render({ hasTeam: true, firstTeamId: "team_1", firstTeamName: "Checkout" });
+
+    await wrapper.find('[data-test="oncall-setup-cta-test"]').trigger("click");
+    expect(oncallService.testPage).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="confirm"]').text()).toContain("Checkout");
+    wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+    await flushPromises();
+    expect(states(wrapper).at(-1)).not.toBe("done");
+
+    vi.mocked(oncallService.testPage).mockResolvedValueOnce(result(true) as any);
+    await wrapper.find('[data-test="oncall-setup-cta-test"]').trigger("click");
+    wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+    await flushPromises();
+    expect(states(wrapper).at(-1)).toBe("done");
   });
 
   /// Every step is an `oncall` write. Offering the button to somebody who
