@@ -74,7 +74,7 @@ struct SpanExtractions {
     user_id: Option<String>,
     session_id: Option<String>,
     prompt_name: Option<String>,
-    prompt_version: Option<i64>,
+    prompt_version: Option<String>,
     prompt_label: Option<String>,
     completion_start_time: Option<i64>,
     tool_name: Option<String>,
@@ -1420,11 +1420,15 @@ mod tests {
         );
         assert_eq!(
             span_attrs.get(GenAiAttributes::PROMPT_VERSION),
-            Some(&json::json!(3))
+            Some(&json::json!("3"))
         );
         assert_eq!(
             span_attrs.get(GenAiAttributes::PROMPT_LABEL),
             Some(&json::json!("production"))
+        );
+        assert_eq!(
+            span_attrs.get("gen_ai.prompt.variable.customer"),
+            Some(&json::json!("must-not-be-normalized"))
         );
         assert!(!span_attrs.contains_key("gen_ai_prompt_variable_customer"));
     }

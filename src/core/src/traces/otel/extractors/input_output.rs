@@ -59,16 +59,19 @@ impl InputOutputExtractor {
             return (Some(input.clone()), output.cloned());
         }
 
+        // Standard Gen-AI attributes
+        if attributes.get(GenAiAttributes::INPUT_MESSAGES).is_some()
+            || attributes.get(GenAiAttributes::OUTPUT_MESSAGES).is_some()
+        {
+            let input = attributes.get(GenAiAttributes::INPUT_MESSAGES).cloned();
+            let output = attributes.get(GenAiAttributes::OUTPUT_MESSAGES).cloned();
+            return (input, output);
+        }
+
         // TraceLoop nested attributes (gen_ai.prompt.* and gen_ai.completion.*)
         let (input, output) = self.extract_traceloop_nested(attributes);
         if input.is_some() || output.is_some() {
             return (input, output);
-        }
-
-        // Standard Gen-AI attributes
-        if let Some(input) = attributes.get(GenAiAttributes::INPUT_MESSAGES) {
-            let output = attributes.get(GenAiAttributes::OUTPUT_MESSAGES);
-            return (Some(input.clone()), output.cloned());
         }
 
         // Gen-AI tool attributes
@@ -683,6 +686,18 @@ fn set_nested_value(target: &mut json::Value, path: &[&str], value: json::Value)
     }
 }
 
+// TraceLoop flattens message arrays into numeric indices like gen_ai.prompt.0.role.
+fn is_traceloop_indexed_key(key: &str, prefix: &str) -> bool {
+    let Some(after) = key.strip_prefix(prefix).and_then(|s| s.strip_prefix('.')) else {
+        return false;
+    };
+    after
+        .split('.')
+        .next()
+        .and_then(|part| part.parse::<usize>().ok())
+        .is_some()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1080,5 +1095,122 @@ mod tests {
         let result = convert_key_path_to_nested_object(&input, "obj");
         assert!(result.is_object());
         assert_eq!(result["flat_key"], 42);
+    }
+
+    #[test]
+    fn test_is_input_output_attribute_preserves_variables_and_attribution() {
+        let extractor = InputOutputExtractor;
+        assert!(!extractor.is_input_output_attribute("gen_ai.prompt.variable.customer"));
+        assert!(!extractor.is_input_output_attribute("gen_ai.prompt.variable.foo.bar"));
+        assert!(!extractor.is_input_output_attribute("gen_ai.prompt.name"));
+        assert!(!extractor.is_input_output_attribute("gen_ai.prompt.version"));
+        assert!(!extractor.is_input_output_attribute("gen_ai.prompt.label"));
+        assert!(!extractor.is_input_output_attribute("gen_ai.prompt"));
+        assert!(!extractor.is_input_output_attribute("gen_ai.completion"));
+        assert!(extractor.is_input_output_attribute("gen_ai.prompt.0.role"));
+        assert!(extractor.is_input_output_attribute("gen_ai.completion.0.content"));
+    }
+
+    #[test]
+    fn test_extract_semconv_prompt_attrs_not_treated_as_traceloop() {
+        let extractor = InputOutputExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.prompt.name".to_string(), json::json!("rules"));
+        attrs.insert("gen_ai.prompt.version".to_string(), json::json!("3"));
+        attrs.insert(
+            "gen_ai.prompt.variable.topic".to_string(),
+            json::json!("support"),
+        );
+        attrs.insert(
+            "gen_ai.input.messages".to_string(),
+            json::json!([{"role": "user", "content": "hello"}]),
+        );
+        attrs.insert(
+            "gen_ai.output.messages".to_string(),
+            json::json!([{"role": "assistant", "content": "world"}]),
+        );
+
+        let (input, output) = extractor.extract(&[], &attrs, "");
+        assert_eq!(
+            input,
+            Some(json::json!([{"role": "user", "content": "hello"}]))
+        );
+        assert_eq!(
+            output,
+            Some(json::json!([{"role": "assistant", "content": "world"}]))
+        );
+    }
+
+    #[test]
+    fn test_standard_genai_takes_precedence_over_traceloop_nested() {
+        let extractor = InputOutputExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.input.messages".to_string(),
+            json::json!([{"role": "user", "content": "standard_input"}]),
+        );
+        attrs.insert(
+            "gen_ai.output.messages".to_string(),
+            json::json!([{"role": "assistant", "content": "standard_output"}]),
+        );
+        attrs.insert("gen_ai.prompt.0.role".to_string(), json::json!("user"));
+        attrs.insert(
+            "gen_ai.prompt.0.content".to_string(),
+            json::json!("traceloop_input"),
+        );
+
+        let (input, output) = extractor.extract(&[], &attrs, "");
+        assert_eq!(
+            input,
+            Some(json::json!([{"role": "user", "content": "standard_input"}]))
+        );
+        assert_eq!(
+            output,
+            Some(json::json!([{"role": "assistant", "content": "standard_output"}]))
+        );
+    }
+
+    #[test]
+    fn test_is_traceloop_indexed_key() {
+        assert!(is_traceloop_indexed_key(
+            "gen_ai.prompt.0.role",
+            "gen_ai.prompt"
+        ));
+        assert!(is_traceloop_indexed_key("gen_ai.prompt.0", "gen_ai.prompt"));
+        assert!(is_traceloop_indexed_key(
+            "gen_ai.prompt.42.content",
+            "gen_ai.prompt"
+        ));
+        assert!(is_traceloop_indexed_key(
+            "gen_ai.completion.0.content",
+            "gen_ai.completion"
+        ));
+
+        assert!(!is_traceloop_indexed_key(
+            "gen_ai.prompt.variable.topic",
+            "gen_ai.prompt"
+        ));
+        assert!(!is_traceloop_indexed_key(
+            "gen_ai.prompt.name",
+            "gen_ai.prompt"
+        ));
+        assert!(!is_traceloop_indexed_key(
+            "gen_ai.prompt.version",
+            "gen_ai.prompt"
+        ));
+        assert!(!is_traceloop_indexed_key(
+            "gen_ai.prompt.label",
+            "gen_ai.prompt"
+        ));
+        assert!(!is_traceloop_indexed_key("gen_ai.prompt", "gen_ai.prompt"));
+        assert!(!is_traceloop_indexed_key(
+            "gen_ai.prompt..0",
+            "gen_ai.prompt"
+        ));
+        assert!(!is_traceloop_indexed_key(
+            "gen_ai.prompt.-1.role",
+            "gen_ai.prompt"
+        ));
+        assert!(!is_traceloop_indexed_key("other.0.role", "gen_ai.prompt"));
     }
 }
