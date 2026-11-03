@@ -149,6 +149,7 @@ import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/varia
 import {
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
+  formatDateVariable,
 } from "@/utils/dashboard/variables/variablesUtils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
@@ -1961,7 +1962,7 @@ export default defineComponent({
       queryContext = replaceVariablePlaceholders(
         queryContext,
         variablesByName.keys(),
-        ({ name, quoted }) => {
+        ({ name, quoted, format }) => {
           const variable = variablesByName.get(name);
           // an unloaded variable keeps its placeholder rather than resolving as a shorter name
           if (!variable.isVariablePartialLoaded) return undefined;
@@ -1974,7 +1975,8 @@ export default defineComponent({
               : values.map((value: any) => `'${value}'`).join(", ");
           }
           if (variable.value === null || variable.value === undefined) return undefined;
-          return `${escapeSingleQuotes(variable.value)}`;
+          // a date variable passes its effective format, like a scalar value
+          return `${escapeSingleQuotes(formatDateVariable(variable, format) ?? variable.value)}`;
         },
       );
 

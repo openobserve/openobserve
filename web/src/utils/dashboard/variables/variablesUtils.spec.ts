@@ -15,6 +15,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  DATE_VARIABLE_FORMATS,
+  formatDateVariable,
+  formatDateVariableValue,
   formatInterval,
   getTimeInSecondsBasedOnUnit,
   formatRateInterval,
@@ -988,6 +991,181 @@ describe("Variables Utils", () => {
       expect(processVariableContent("${start_time}", withTimeRangeVariables(data, undefined))).toBe(
         "${start_time}",
       );
+    });
+  });
+
+  describe("formatDateVariableValue", () => {
+    it("formats the six named formats in UTC", () => {
+      expect(formatDateVariableValue("2026-03-08", "iso", "UTC")).toBe("2026-03-08");
+      expect(formatDateVariableValue("2026-03-08", "dmy", "UTC")).toBe("08/03/2026");
+      expect(formatDateVariableValue("2026-03-08", "mdy", "UTC")).toBe("03/08/2026");
+      expect(formatDateVariableValue("2026-03-08", "epoch", "UTC")).toBe("1772928000");
+      expect(formatDateVariableValue("2026-03-08", "epochms", "UTC")).toBe("1772928000000");
+      expect(formatDateVariableValue("2026-03-08", "epochus", "UTC")).toBe("1772928000000000");
+    });
+
+    it("lists every format and tries the longer epoch names first", () => {
+      expect([...DATE_VARIABLE_FORMATS]).toEqual([
+        "iso",
+        "dmy",
+        "mdy",
+        "epochms",
+        "epochus",
+        "epoch",
+      ]);
+    });
+
+    it("reads midnight in a DST zone on both sides of a transition", () => {
+      // America/New_York springs forward on 2026-03-08 at 02:00, so midnight that day is still EST
+      expect(formatDateVariableValue("2026-03-08", "epoch", "America/New_York")).toBe("1772946000");
+      expect(formatDateVariableValue("2026-03-09", "epoch", "America/New_York")).toBe("1773028800");
+      expect(formatDateVariableValue("2026-07-01", "epoch", "America/New_York")).toBe("1782878400");
+      expect(formatDateVariableValue("2026-07-01", "epochus", "America/New_York")).toBe(
+        "1782878400000000",
+      );
+    });
+
+    it("uses the jump itself when midnight does not exist", () => {
+      // Santiago skips 00:00-01:00 on 2026-09-06; the day starts at 04:00Z
+      expect(formatDateVariableValue("2026-09-06", "epoch", "America/Santiago")).toBe("1788667200");
+    });
+
+    it("takes the earlier instant when midnight repeats", () => {
+      // Havana clocks go back at 01:00 on 2026-11-01, so 00:00 happens twice; the first is 04:00Z
+      expect(formatDateVariableValue("2026-11-01", "epoch", "America/Havana")).toBe("1793505600");
+    });
+
+    it("ignores the timezone for the text formats", () => {
+      expect(formatDateVariableValue("2026-03-08", "dmy", "Pacific/Kiritimati")).toBe("08/03/2026");
+    });
+
+    it("falls back to UTC for a missing or invalid timezone", () => {
+      expect(formatDateVariableValue("2026-03-08", "epoch", "Not/AZone")).toBe("1772928000");
+      expect(formatDateVariableValue("2026-03-08", "epoch", "")).toBe("1772928000");
+      expect(formatDateVariableValue("2026-03-08", "epoch", undefined)).toBe("1772928000");
+    });
+
+    it("returns undefined for empty, malformed or impossible dates", () => {
+      for (const bad of [
+        "",
+        null,
+        undefined,
+        5,
+        "2026-3-8",
+        "2026-02-30",
+        "2026-13-01",
+        " 2026-03-08",
+        "2026-03-08T00:00",
+      ]) {
+        expect(formatDateVariableValue(bad, "iso", "UTC")).toBeUndefined();
+      }
+      expect(formatDateVariableValue("2028-02-29", "iso", "UTC")).toBe("2028-02-29");
+      expect(formatDateVariableValue("2026-02-29", "iso", "UTC")).toBeUndefined();
+    });
+  });
+
+  describe("formatDateVariable", () => {
+    const date = { type: "date", value: "2026-03-08", dateFormat: "dmy", timezone: "UTC" };
+
+    it("uses the variable's dateFormat, defaulting to iso", () => {
+      expect(formatDateVariable(date)).toBe("08/03/2026");
+      expect(formatDateVariable({ ...date, dateFormat: undefined })).toBe("2026-03-08");
+      expect(formatDateVariable({ ...date, dateFormat: "bogus" })).toBe("2026-03-08");
+    });
+
+    it("lets a date format on the placeholder override the default", () => {
+      expect(formatDateVariable(date, "epochus")).toBe("1772928000000000");
+      expect(formatDateVariable(date, "mdy")).toBe("03/08/2026");
+    });
+
+    it("formats with the default for any other placeholder format", () => {
+      expect(formatDateVariable(date, "csv")).toBe("08/03/2026");
+      expect(formatDateVariable(date, "percentencode")).toBe("08/03/2026");
+    });
+
+    it("returns undefined for a non-date variable or an unusable value", () => {
+      expect(formatDateVariable({ type: "textbox", value: "2026-03-08" }, "dmy")).toBeUndefined();
+      expect(formatDateVariable({ ...date, value: "" })).toBeUndefined();
+      expect(formatDateVariable({ ...date, value: "nope" })).toBeUndefined();
+      expect(formatDateVariable(null)).toBeUndefined();
+    });
+  });
+
+  describe("date formats in placeholders", () => {
+    it("parses date formats in all three placeholder styles", () => {
+      const resolve = (p: { name: string; format?: string }) => `${p.name}/${p.format ?? "-"}`;
+      expect(
+        replaceVariablePlaceholders("$d ${d:epochus} {{d:dmy}} ${ d : epoch }", ["d"], resolve),
+      ).toBe("d/- d/epochus d/dmy d/epoch");
+      expect(
+        replaceVariablePlaceholders(normalizeVariableSyntax("${ d : epochms }"), ["d"], resolve),
+      ).toBe("d/epochms");
+    });
+
+    it("matches format names case-sensitively", () => {
+      expect(replaceVariablePlaceholders("${d:EPOCH}", ["d"], () => "x")).toBe("${d:EPOCH}");
+    });
+
+    it("counts a placeholder with a date format as a reference", () => {
+      expect([...getReferencedVariableNames(["x ${d:epochus}"], ["d", "e"])]).toEqual(["d"]);
+    });
+  });
+
+  describe("processVariableContent with date variables", () => {
+    const data = (extra: Record<string, unknown> = {}) => ({
+      values: [
+        { name: "d", type: "date", value: "2026-03-08", scope: "global", ...extra },
+        { name: "t", type: "textbox", value: "2026-03-08", scope: "global" },
+      ],
+    });
+
+    it("prints the variable's default format", () => {
+      expect(processVariableContent("$d", data({ dateFormat: "dmy" }))).toBe("08/03/2026");
+      expect(processVariableContent("$d", data())).toBe("2026-03-08");
+    });
+
+    it("lets the placeholder override the default and honours the timezone", () => {
+      expect(processVariableContent("${d:epoch}", data({ dateFormat: "dmy" }))).toBe("1772928000");
+      expect(processVariableContent("{{d:epoch}}", data({ timezone: "America/New_York" }))).toBe(
+        "1772946000",
+      );
+    });
+
+    it("applies the formatted text to the other placeholder formats", () => {
+      expect(processVariableContent("?q=${d:percentencode}", data({ dateFormat: "dmy" }))).toBe(
+        "?q=08%2F03%2F2026",
+      );
+      expect(processVariableContent("${d:csv}", data({ dateFormat: "mdy" }))).toBe("03/08/2026");
+    });
+
+    it("ignores a date format on a non-date variable", () => {
+      expect(processVariableContent("${t:epochus} $t", data())).toBe("2026-03-08 2026-03-08");
+    });
+
+    it("renders an empty or malformed date as before", () => {
+      expect(
+        processVariableContent("$d", { values: [{ name: "d", type: "date", value: "" }] }),
+      ).toBe("");
+      expect(
+        processVariableContent("${d:dmy}", { values: [{ name: "d", type: "date", value: "x" }] }),
+      ).toBe("x");
+    });
+
+    it("uses the scope-resolved value", () => {
+      const scoped = {
+        values: [
+          { name: "d", type: "date", scope: "global", value: "2026-03-08", dateFormat: "dmy" },
+          {
+            name: "d",
+            type: "date",
+            scope: "tabs",
+            tabId: "t1",
+            value: "2026-04-01",
+            dateFormat: "dmy",
+          },
+        ],
+      };
+      expect(processVariableContent("$d", scoped, { tabId: "t1" })).toBe("01/04/2026");
     });
   });
 });

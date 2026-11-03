@@ -23,7 +23,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import analytics from "@/services/product_analytics";
-import { addVariable, updateVariable } from "../../../utils/commons";
+import { addVariable, getDashboard, updateVariable } from "../../../utils/commons";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -274,6 +274,103 @@ describe("AddSettingVariable", () => {
       await nextTick();
 
       expect(wrapper.vm.variableData.value).toBe("");
+    });
+  });
+
+  describe("Date variable format and timezone", () => {
+    const formatSelect = '[data-test="dashboard-variable-date-format-select"]';
+    const zoneSelect = '[data-test="dashboard-variable-date-timezone-select"]';
+    const dateForm = (extra: Record<string, unknown> = {}) => ({
+      scope: "global",
+      selectedTabs: [],
+      selectedPanels: [],
+      name: "from_date",
+      type: "date",
+      value: "2026-03-08",
+      dateFormat: "dmy",
+      timezone: "America/New_York",
+      options: [],
+      ...extra,
+    });
+
+    it("shows the two selects only for a date variable", async () => {
+      expect(wrapper.find(formatSelect).exists()).toBe(false);
+      expect(wrapper.find(zoneSelect).exists()).toBe(false);
+
+      wrapper.vm.variableData.type = "date";
+      await nextTick();
+      expect(wrapper.find(formatSelect).exists()).toBe(true);
+      expect(wrapper.find(zoneSelect).exists()).toBe(true);
+
+      wrapper.vm.variableData.type = "textbox";
+      await nextTick();
+      expect(wrapper.find(formatSelect).exists()).toBe(false);
+    });
+
+    it("defaults to iso and UTC and offers every format with its name", () => {
+      expect(wrapper.vm.variableData.dateFormat).toBe("iso");
+      expect(wrapper.vm.variableData.timezone).toBe("UTC");
+      expect(wrapper.vm.dateFormatOptions.map((o: any) => o.value)).toEqual([
+        "iso",
+        "dmy",
+        "mdy",
+        "epochms",
+        "epochus",
+        "epoch",
+      ]);
+      expect(wrapper.vm.timezoneOptions.some((o: any) => o.value === "UTC")).toBe(true);
+    });
+
+    it("saves dateFormat and timezone for a date variable", () => {
+      const payload = wrapper.vm.buildVariablePayload(dateForm());
+      expect(payload.dateFormat).toBe("dmy");
+      expect(payload.timezone).toBe("America/New_York");
+      expect(payload.value).toBe("2026-03-08");
+    });
+
+    it("drops them when the variable is not a date", () => {
+      const payload = wrapper.vm.buildVariablePayload(dateForm({ type: "textbox" }));
+      expect(payload).not.toHaveProperty("dateFormat");
+      expect(payload).not.toHaveProperty("timezone");
+    });
+
+    it("shows the defaults when editing a date variable saved without them", async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        variables: { list: [{ name: "old_date", type: "date", value: "2026-01-01" }] },
+      } as any);
+      const editWrapper = mount(AddSettingVariable, {
+        global: { plugins: [] },
+        props: { variableName: "old_date", dashboardVariablesList: [] },
+      });
+      await flushPromises();
+      expect(editWrapper.vm.variableData.type).toBe("date");
+      expect(editWrapper.vm.variableData.dateFormat).toBe("iso");
+      expect(editWrapper.vm.variableData.timezone).toBe("UTC");
+      editWrapper.unmount();
+    });
+
+    it("keeps the saved values when editing", async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        variables: {
+          list: [
+            {
+              name: "d2",
+              type: "date",
+              value: "",
+              dateFormat: "epochus",
+              timezone: "Europe/Berlin",
+            },
+          ],
+        },
+      } as any);
+      const editWrapper = mount(AddSettingVariable, {
+        global: { plugins: [] },
+        props: { variableName: "d2", dashboardVariablesList: [] },
+      });
+      await flushPromises();
+      expect(editWrapper.vm.variableData.dateFormat).toBe("epochus");
+      expect(editWrapper.vm.variableData.timezone).toBe("Europe/Berlin");
+      editWrapper.unmount();
     });
   });
 

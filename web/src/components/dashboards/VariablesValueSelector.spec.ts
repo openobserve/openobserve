@@ -2881,6 +2881,74 @@ describe("VariablesValueSelector", () => {
     });
   });
 
+  describe("Date variables in a filter", () => {
+    afterEach(async () => {
+      const { addLabelsToSQlQuery } = await import("@/utils/query/sqlUtils");
+      vi.mocked(addLabelsToSQlQuery).mockImplementation((query: string) => Promise.resolve(query));
+    });
+
+    it("passes a date variable in its effective format, like a scalar value", async () => {
+      const { addLabelsToSQlQuery } = await import("@/utils/query/sqlUtils");
+      vi.mocked(addLabelsToSQlQuery).mockImplementation(
+        async (query: string, labels: any[]) =>
+          `${query} WHERE ${labels.map((l: any) => `${l.name} = '${l.value}'`).join(" AND ")}`,
+      );
+
+      wrapper = createWrapper({
+        variablesConfig: {
+          list: [
+            { name: "d", type: "date", label: "d", value: "2026-03-08", dateFormat: "dmy" },
+            { name: "blank", type: "date", label: "blank", value: "" },
+            {
+              name: "spans",
+              type: "query_values",
+              label: "spans",
+              multiSelect: false,
+              query_data: {
+                field: "span_id",
+                stream: "default",
+                stream_type: "logs",
+                max_record_size: 10,
+                filter: [
+                  { name: "a", operator: "=", value: "$d" },
+                  { name: "b", operator: "=", value: "${d:epochus}" },
+                  { name: "c", operator: "=", value: "'$d'" },
+                  { name: "e", operator: "=", value: "$blank" },
+                ],
+              },
+            },
+          ],
+        },
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const byName = (name: string) => vm.variablesData.values.find((v: any) => v.name === name);
+      ["d", "blank"].forEach((name) => {
+        byName(name).isVariablePartialLoaded = true;
+      });
+
+      let capturedSql = "";
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          capturedSql = atob(payload.queryReq.sql);
+          handlers.complete(payload, { type: "end" });
+        },
+      );
+
+      const spans = byName("spans");
+      spans.isLoading = false;
+      spans.isVariablePartialLoaded = true;
+      spans.isVariableLoadingPending = false;
+      await vm.loadVariableOptions(spans);
+
+      expect(capturedSql).toContain(
+        "WHERE a = '08/03/2026' AND b = '1772928000000000' AND c = ''08/03/2026'' AND e = ''",
+      );
+    });
+  });
+
   describe("textbox debounce follows Auto Run", () => {
     it("uses 1s normally and 300ms while the manager is in live mode", async () => {
       const { useVariablesManager, LIVE_COMMIT_DEBOUNCE_MS } =
