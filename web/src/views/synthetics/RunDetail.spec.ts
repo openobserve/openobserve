@@ -569,6 +569,25 @@ describe("RunDetail — id-less error override (quota / reaper rows)", () => {
     expect(w.find('[data-test="synthetics-run-detail-error-desc"]').exists()).toBe(false);
   });
 
+  it("headlines a dead-letter message without its cut '(phase' group", async () => {
+    mockRunDetailRef.value = null;
+    w = mountComponent({
+      drawerMode: true,
+      overrideMonitorType: "browser",
+      overrideError: {
+        ...overrideError,
+        errorSource: "dispatch",
+        message:
+          "no probe claimed the check for this location before its schedule window closed (phase: never claimed; 0 dispatch attempt(s)); a probe may be unable to reach the callback endpoint http://localhost:5080",
+      },
+    });
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-run-detail-error-type"]').text()).toBe(
+      "no probe claimed the check for this location before its schedule window closed",
+    );
+  });
+
   it("renders the error view even for a protocol monitor type (skips ProtocolRunSummary)", async () => {
     mockRunDetailRef.value = null;
     w = mountComponent({ drawerMode: true, overrideMonitorType: "http", overrideError });
