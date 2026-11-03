@@ -882,17 +882,8 @@ export function recordForbidden({ url, method, routeKey: stamp }: AccessRequest)
   const key = routeKey(route);
   // A response from a page the user has already left says nothing about the page now on screen.
   if (!stampedHere(stamp, key)) return;
-  const {
-    resource: named,
-    permission,
-    inPage,
-    collection,
-    write,
-    bypass,
-  } = classifyRequest(verb, url);
+  const { resource, permission, inPage, collection, write } = deniedResource(verb, url);
   if (!write && inPage) return;
-  // An unnamed read is a side fetch whose resource no role editor row names, like a server bypass.
-  const resource = named ?? unnamedResource(url, write && !bypass);
   const denied: DeniedRequest = { permission, request: `${verb} ${resource.path}` };
   if (write) {
     const [el, ...fallbacks] = anchorCandidates();
@@ -1083,6 +1074,17 @@ export function failedRequests(...errors: unknown[]): string[] {
     } catch {
       return [];
     }
+  });
+}
+
+/** Each failed request among `errors` under the chip key `recordForbidden` would use, so a lock naming them covers those entries. */
+export function requestDenials(...errors: unknown[]): AccessDenial[] {
+  return errors.flatMap((err) => {
+    const config = (err as { config?: { method?: string; url?: string } } | null)?.config;
+    if (!config?.url) return [];
+    const verb = (config.method ?? "get").toUpperCase();
+    const { resource, permission } = deniedResource(verb, config.url);
+    return [{ resource, permission, requests: [`${verb} ${resource.path}`] }];
   });
 }
 
@@ -1584,6 +1586,16 @@ function unnamedResource(url: string, grantable = true): AccessResource {
     path,
     ...(grantable ? {} : { grantable: false as const }),
   };
+}
+
+/** `classifyRequest` with the unnamed fallback applied; the chip and inline locks share it so their keys match. */
+function deniedResource(
+  verb: string,
+  url: string,
+): Omit<ClassifiedRequest, "resource" | "bypass"> & { resource: AccessResource } {
+  const { resource: named, bypass, ...rest } = classifyRequest(verb, url);
+  // An unnamed read is a side fetch whose resource no role editor row names, like a server bypass.
+  return { ...rest, resource: named ?? unnamedResource(url, rest.write && !bypass) };
 }
 
 function isKnownResource(path: string): boolean {

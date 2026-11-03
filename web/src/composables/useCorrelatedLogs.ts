@@ -130,6 +130,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps, t: TranslateFn) {
   const hasResults = computed(() => searchResults.value.length > 0);
   const isLoading = computed(() => loading.value);
   const hasError = computed(() => !!error.value);
+  const noLogStreams = computed(() => !props.logStreams || props.logStreams.length === 0);
   const isEmpty = computed(() => !loading.value && !error.value && !hasResults.value);
   // Streams finish one by one, so the count (and the pager that shows it) waits for the last one.
   const totalPages = computed(() =>
@@ -208,9 +209,10 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps, t: TranslateFn) {
       });
     }
 
-    // Validate that we have log streams
-    if (!props.logStreams || props.logStreams.length === 0) {
-      error.value = t("traces.noLogStreamForCorrelation");
+    // No correlated log stream is an empty result, not a failure.
+    if (noLogStreams.value) {
+      error.value = null;
+      searchResults.value = [];
       return;
     }
 
@@ -438,6 +440,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps, t: TranslateFn) {
     // Computed
     hasResults,
     isLoading,
+    noLogStreams,
     hasError,
     isEmpty,
 

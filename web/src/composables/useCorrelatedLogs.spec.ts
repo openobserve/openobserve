@@ -414,15 +414,23 @@ describe("useCorrelatedLogs", () => {
       expect(composable.logStreamsCount.value).toBe(0);
     });
 
-    it("should show the no-log-stream message without logging an error", async () => {
+    it("should report no log stream as an empty result, not an error", async () => {
       const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
       const composable = useCorrelatedLogs({ ...props, logStreams: [] }, gt);
 
       await composable.fetchCorrelatedLogs();
 
-      expect(composable.error.value).toBeTruthy();
+      expect(composable.error.value).toBeNull();
+      expect(composable.hasError.value).toBe(false);
+      expect(composable.noLogStreams.value).toBe(true);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
       expect(consoleError).not.toHaveBeenCalled();
       consoleError.mockRestore();
+    });
+
+    it("should not flag no log stream when streams exist", () => {
+      const composable = useCorrelatedLogs(props, gt);
+      expect(composable.noLogStreams.value).toBe(false);
     });
 
     it("should handle missing ftsFields", () => {

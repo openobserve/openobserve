@@ -30,6 +30,7 @@ import {
   extractResourceInfo,
   noteAccessSuccess,
   recordForbidden,
+  requestDenials,
   resetAccess,
   useAccessBoundary,
 } from "@/composables/useAccessStore";
@@ -185,6 +186,26 @@ describe("access store classification", () => {
       routeKey: currentAccessRouteKey(),
     });
     expect(access.sectionEntries.value).toHaveLength(0);
+  });
+
+  it("derives the same denial from a failed request that the interceptor records for it", async () => {
+    await boot("/settings");
+    for (const url of [
+      "/api/acme/anomaly_detection",
+      "/api/v2/acme/alerts/incidents",
+      "/api/acme/domain_management",
+    ]) {
+      resetAccess();
+      forbidden("GET", url);
+      const error = { response: { status: 403 }, config: { method: "get", url } };
+      const entry = ({
+        resource,
+        permission,
+        requests,
+      }: (typeof access.sectionEntries.value)[0]) => [resource.key, permission, requests];
+      expect(requestDenials(error).map(entry), url).toEqual(access.sectionEntries.value.map(entry));
+    }
+    expect(requestDenials({ response: { status: 403 } })).toEqual([]);
   });
 
   it("keeps app-shell reads and reads a view's own lock names out of the section notice", async () => {
