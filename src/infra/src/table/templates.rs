@@ -911,6 +911,8 @@ mod tests {
             serde_json::json!({"anomaly": "user_o2_default_anomaly_2"})
         );
 
+        // A renamed row leaves the reserved prefix, so the user can edit it again.
+        assert!(renames.iter().all(|r| !r.to.starts_with(RESERVED_PREFIX)));
         // A second boot finds nothing left under the prefix that is not a seed.
         assert!(rename_reserved_collisions(&db).await.unwrap().is_empty());
     }

@@ -287,7 +287,9 @@ mod tests {
         assert!(is_reserved_template_name("prebuilt_slack"));
         assert!(is_reserved_template_name("o2_default_synthetics"));
         assert!(is_reserved_template_name("o2_default_on_call"));
+        // The rename target of a reserved collision is an ordinary user name.
         assert!(!is_reserved_template_name("user_o2_default_anomaly"));
+        assert!(!is_reserved_template_name("user_o2_default_anomaly_2"));
         assert!(!is_reserved_template_name("my_template"));
     }
 }
