@@ -76,6 +76,16 @@ export interface SlackInstallationHealth {
   /** Alert messages waiting on the outbound queue; absent before the server sends it. */
   outbound_depth?: number;
   outbound_oldest_age_secs?: number | null;
+  /** Absent when no alert post failed for this org in the last 24 h. */
+  refused_posts?: SlackRefusedPosts;
+}
+
+export interface SlackRefusedPosts {
+  count: number;
+  last_reason: string;
+  last_destination: string;
+  /** Microseconds. */
+  last_at: number;
 }
 
 export interface InstallationView {

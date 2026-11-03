@@ -28136,6 +28136,7 @@
       "managedQuestions": "Questions: {contact}",
       "outboundQueue": "Alert messages: {count} queued, oldest {age} | Alert messages: {count} queued, oldest {age}",
       "outboundEmpty": "No alert messages queued",
+      "refusedPosts": "{count} alert post failed in the last 24 h. Last: {reason} on {destination}, | {count} alert posts failed in the last 24 h. Last: {reason} on {destination},",
       "ageSeconds": "{count} s"
     },
     "channels": {

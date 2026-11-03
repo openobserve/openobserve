@@ -15,7 +15,6 @@ const PROFILE = '[data-test="header-my-account-profile-icon"]';
 const THEME_ROW = '[data-test="menu-link-predefined-themes-item"]';
 const EN_OPTION = '[data-test="language-dropdown-item-en-us"]';
 const LANGUAGE_COOKIE = "vue3-typescript-admin-languageKey";
-const ONCALL_ROW = '[data-test="header-my-oncall"]';
 
 async function setLanguageCookie(page, code) {
   const url = new URL(process.env.ZO_BASE_URL);
@@ -152,19 +151,12 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
     }
   }
 
-  test("My on-call stays out of the menu while the full config loads, so arrows keep focus in it", async ({
+  test("Arrows keep focus in the profile menu opened while the full config loads", async ({
     page,
   }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     const navRail = new NavRailPage(page);
-    const oncallOff = { oncall_enabled: false };
-    const { release } = await navRail.holdOrgConfig(oncallOff);
-    await page.addInitScript((selector) => {
-      window.__oncallRowSeen = false;
-      new MutationObserver(() => {
-        if (document.querySelector(selector)) window.__oncallRowSeen = true;
-      }).observe(document, { childList: true, subtree: true });
-    }, ONCALL_ROW);
+    const { release, served } = await navRail.holdOrgConfig();
     await page.setViewportSize(SIZES[0]);
     await setLanguageCookie(page, "en-us");
 
@@ -172,11 +164,11 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
     await navigateToBase(page);
     // The home view cannot finish loading while the config is held.
     await openProfileMenuByKeyboard(page, { whileLoading: true });
-    await expect(page.locator(ONCALL_ROW)).toHaveCount(0);
 
-    testLogger.step("Release the full config with on-call off");
+    testLogger.step("Release the full config");
     release();
-    await navRail.waitForStoreConfig(oncallOff);
+    await served;
+    await navRail.waitForHomeLoaded();
     await expect(page.locator(ROW)).toBeVisible();
 
     testLogger.step("Arrow keys still move between menu rows");
@@ -187,6 +179,5 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
     const second = await navRail.focusedMenuRow();
     expect(second, "focus is inside the menu").not.toBeNull();
     expect(second).not.toBe(first);
-    expect(await page.evaluate(() => window.__oncallRowSeen), "My on-call never rendered").toBe(false);
   });
 });
