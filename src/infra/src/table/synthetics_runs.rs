@@ -111,6 +111,8 @@ pub struct RunFinalized {
     pub run_class: RunClass,
     /// A confirm job passed, so a failed location counts as up (`flaky`).
     pub confirmed_flaky: bool,
+    /// The run held a confirm job, so its answer is the merged vote, not the worst raw result.
+    pub had_confirm: bool,
     /// The run earns one extra run: it is a scheduled run that measured nothing because the probe
     /// could not reach the job API or could not be dispatched.
     pub gap_retry: bool,
@@ -139,6 +141,7 @@ pub struct Tally {
     /// the run has no confirm job, so the stored `run_result` stands.
     pub run_result: Option<i32>,
     pub confirmed_flaky: bool,
+    pub has_confirm: bool,
     /// Some job measured nothing because of [`GAP_RETRY_SOURCES`].
     pub gap_cause: bool,
 }
@@ -220,16 +223,17 @@ pub fn tally(job_count: i32, jobs: &[JobOutcome]) -> Tally {
         _ if failed + healthy == 0 && config > 0 => RunClass::Misconfigured,
         _ if failed + healthy == 0 => RunClass::NotMeasured,
         Verdict::Down => RunClass::Down,
-        Verdict::Up => RunClass::Up,
-        Verdict::NoVerdict if failed > 0 => RunClass::Partial,
-        // Only healthy locations tested the site, too few for a verdict.
-        Verdict::NoVerdict => RunClass::Up,
+        // A failure below quorum is partial, even when a healthy majority makes the verdict Up.
+        _ if failed > 0 => RunClass::Partial,
+        // Only healthy locations tested the site.
+        _ => RunClass::Up,
     };
     Tally {
         verdict,
         class,
         run_result: (!confirms.is_empty() && worst > 0).then_some(worst),
         confirmed_flaky,
+        has_confirm: !confirms.is_empty(),
         gap_cause: jobs.iter().any(JobOutcome::is_gap_cause),
     }
 }
@@ -518,6 +522,17 @@ async fn finalize<C: ConnectionTrait + TransactionTrait>(
         .or(run.run_result)
         .or(job_result)
         .unwrap_or(STATUS_ERROR);
+    if t.run_result
+        .is_some_and(|merged| Some(merged) != run.run_result)
+    {
+        // The run history shows the merged vote, as the check row does.
+        txn.execute(Statement::from_sql_and_values(
+            txn.get_database_backend(),
+            "UPDATE synthetics_runs SET run_result = $1 WHERE id = $2",
+            [Value::from(run_result), Value::from(run_id.to_owned())],
+        ))
+        .await?;
+    }
     let check_update = write_check_row(
         &txn,
         &run.synthetics_id,
@@ -537,6 +552,7 @@ async fn finalize<C: ConnectionTrait + TransactionTrait>(
         verdict: t.verdict,
         run_class: t.class,
         confirmed_flaky: t.confirmed_flaky,
+        had_confirm: t.has_confirm,
         gap_retry: t.class == RunClass::NotMeasured
             && t.gap_cause
             && run.trigger_type == TRIGGER_SCHEDULE,
@@ -1508,6 +1524,21 @@ mod tests {
             ],
         );
         assert_eq!((two.verdict, two.class), (Verdict::Up, RunClass::Up));
+        // A confirmed failure below quorum is partial, even with a healthy majority.
+        let regional = tally(
+            4,
+            &[
+                job("a", JOB_FAILED),
+                job("b", JOB_PASSED),
+                job("d", JOB_PASSED),
+                confirm("c", "a", JOB_FAILED),
+            ],
+        );
+        assert_eq!(
+            (regional.verdict, regional.class),
+            (Verdict::Up, RunClass::Partial)
+        );
+        assert!(regional.has_confirm);
         // No confirm job: the stored run result stands.
         assert_eq!(tally(1, &[job("a", JOB_FAILED)]).run_result, None);
     }
@@ -1651,7 +1682,13 @@ mod tests {
         let done = finalize_run(&db, "r", 1, 300).await.unwrap().unwrap();
         assert_eq!(done.run_class, RunClass::Up);
         assert!(done.confirmed_flaky);
+        assert!(done.had_confirm);
         assert_eq!(done.run_result, 2);
+        assert_eq!(
+            get_run(&db, "r").await.unwrap().unwrap().run_result,
+            Some(2),
+            "the run history shows the merged vote"
+        );
     }
 
     #[tokio::test]

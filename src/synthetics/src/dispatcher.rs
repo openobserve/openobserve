@@ -356,7 +356,10 @@ async fn mark_failure(row: &synthetics_jobs::LeasedRow, reason: Option<&str>) ->
         return false;
     }
     match synthetics_runs::finalize_run(db, &row.run_id, 4, now_us).await {
-        Ok(Some(done)) => crate::job_api::after_run_finalized(&done).await,
+        Ok(Some(done)) => {
+            crate::job_api::after_run_finalized(&done).await;
+            crate::job_api::alert_for_swept_run(&done).await;
+        }
         Ok(None) => {}
         Err(e) => {
             tracing::error!(synthetics_id = %row.synthetics_id, run_id = %row.run_id, job_id = %row.id, "[synthetics dispatcher] finalize_run: {e}");

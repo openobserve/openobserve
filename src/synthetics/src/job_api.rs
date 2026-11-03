@@ -1680,6 +1680,102 @@ pub(crate) fn wants_confirm_job(
         && !synthetics_runs::is_not_measured_source(error_source, status_reason)
 }
 
+/// Sends the notification for a run that finalized outside an ack; the server registers it, as
+/// notification delivery lives above this crate.
+pub type RunNotifier = fn(AckResponse) -> crate::alerting::BoxFuture<'static, ()>;
+
+static RUN_NOTIFIER: std::sync::OnceLock<RunNotifier> = std::sync::OnceLock::new();
+
+pub fn register_run_notifier(f: RunNotifier) {
+    let _ = RUN_NOTIFIER.set(f);
+}
+
+/// The alert inputs of a run that held a confirm job: `(status, status_reason, error_source)`
+/// from the merged vote, so neither the worst raw job nor the last ack decides the alert.
+pub(crate) fn merged_alert_input(
+    class: config::meta::synthetics::RunClass,
+    confirmed_flaky: bool,
+) -> (&'static str, Option<&'static str>, &'static str) {
+    use config::meta::synthetics::RunClass as C;
+    match class {
+        C::Up if confirmed_flaky => ("warning", Some(crate::alerting::REASON_FLAKY), ""),
+        C::Up => ("passed", None, ""),
+        C::Partial | C::Down => ("failed", None, ""),
+        C::NotMeasured => ("error", None, crate::alerting::ERROR_SOURCE_CONTROL_PLANE),
+        C::Misconfigured => ("error", None, crate::alerting::ERROR_SOURCE_CONFIG),
+        C::Unknown => ("error", None, ""),
+    }
+}
+
+/// Decides and sends the alert of a run that a confirm job kept open and that finalized outside
+/// an ack: a dead letter, a failed dispatch or the stuck-run sweep. No ack runs the alert for it.
+pub(crate) async fn alert_for_swept_run(done: &synthetics_runs::RunFinalized) {
+    if !done.had_confirm {
+        return;
+    }
+    let conn = get_orm_client_rw().await;
+    let Ok(Some(synthetic)) =
+        synthetics_checks::get_cached(conn, &done.org_id, &done.synthetics_id).await
+    else {
+        return;
+    };
+    let (status, status_reason, error_source) =
+        merged_alert_input(done.run_class, done.confirmed_flaky);
+    let now_us = config::utils::time::now_micros();
+    let (alert, consecutive_failures, suppressed_by) = resolve_alert(
+        conn,
+        &done.synthetics_id,
+        RunOutcome {
+            status: Some(status),
+            attempts: 1,
+            status_reason,
+            error_source,
+        },
+        &synthetic,
+        now_us,
+    )
+    .await;
+    if matches!(alert, AlertDecision::Silent) || suppressed_by.is_some() {
+        return;
+    }
+    let Some(notify) = RUN_NOTIFIER.get() else {
+        return;
+    };
+    let outcomes = synthetics_jobs::run_location_outcomes(conn, &done.run_id)
+        .await
+        .unwrap_or_default();
+    let failing_environments = environment_names(&done.org_id, &done.run_id).await;
+    let synthetic_type = serde_json::to_value(&synthetic.check_type)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_owned))
+        .unwrap_or_default();
+    notify(AckResponse {
+        run_complete: true,
+        run_status: Some(status.to_string()),
+        job_count: done.job_count,
+        org_id: done.org_id.clone(),
+        job_id: String::new(),
+        run_id: done.run_id.clone(),
+        synthetics_id: done.synthetics_id.clone(),
+        synthetics_name: synthetic.name,
+        synthetic_type,
+        target: synthetic.target,
+        destinations: synthetic.destinations,
+        location: String::new(),
+        pool: String::new(),
+        trigger_type: "scheduled".to_string(),
+        alert,
+        status_reason: status_reason.map(str::to_owned),
+        consecutive_failures,
+        failing_locations: outcomes.failing,
+        passing_locations: outcomes.passing,
+        usage_events: Vec::new(),
+        failing_environments,
+        suppressed_by: None,
+    })
+    .await;
+}
+
 /// Delay before the one extra run that fills a Not measured gap.
 const GAP_RETRY_DELAY_US: i64 = 60_000_000;
 
@@ -1870,7 +1966,12 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     let run_complete = run_completion.is_some();
+    let merged = run_completion
+        .as_ref()
+        .filter(|d| d.had_confirm)
+        .map(|d| merged_alert_input(d.run_class, d.confirmed_flaky));
     let (run_status, job_count) = match &run_completion {
+        Some(done) if merged.is_some() => (merged.map(|m| m.0.to_string()), done.job_count),
         Some(done) => {
             let status =
                 match config::meta::synthetics::SyntheticStatus::from_db(done.run_result) {
@@ -1935,26 +2036,16 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
     // location for the same outage, and would advance the failure streak by the
     // fan-out factor rather than by one.
     let (alert, consecutive_failures, suppressed_by) = if run_complete {
-        // A confirm job's ack completes the run, but the run's answer is the merged vote: its own
-        // error source must not silence the failure it confirms.
-        let confirmed_flaky = run_completion.as_ref().is_some_and(|d| d.confirmed_flaky);
-        let completed_by_confirm = is_confirm_job(&check);
+        // A run that held a confirm job answers with its merged vote, so neither its worst raw
+        // job nor the last ack's error source decides the alert.
         resolve_alert(
             conn,
             &check.synthetics_id,
             RunOutcome {
                 status: run_status.as_deref(),
                 attempts: req.attempts,
-                status_reason: if confirmed_flaky {
-                    Some(crate::alerting::REASON_FLAKY)
-                } else {
-                    req.status_reason.as_deref()
-                },
-                error_source: if completed_by_confirm {
-                    ""
-                } else {
-                    &req.error_source
-                },
+                status_reason: merged.map_or(req.status_reason.as_deref(), |m| m.1),
+                error_source: merged.map_or(req.error_source.as_str(), |m| m.2),
             },
             &synthetic,
             now_us,
@@ -2002,7 +2093,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         trigger_type: req.trigger_type,
         alert,
         // Echoed straight back so the notification can name the condition.
-        status_reason: req.status_reason.clone(),
+        status_reason: merged.map_or(req.status_reason.clone(), |m| m.1.map(str::to_owned)),
         consecutive_failures,
         failing_locations,
         passing_locations,
@@ -2361,6 +2452,24 @@ mod tests {
     }
 
     // Step billing. Every guard is a pure function, so these need no database.
+    #[test]
+    fn a_confirm_run_alerts_on_its_merged_vote() {
+        use config::meta::synthetics::RunClass as C;
+        let classify = |class, flaky| {
+            let (status, reason, source) = super::merged_alert_input(class, flaky);
+            crate::alerting::classify(Some(status), 1, source, reason)
+        };
+        use crate::alerting::RunClass as A;
+        assert_eq!(classify(C::Up, true), A::Flaky);
+        assert_eq!(classify(C::Up, false), A::Healthy);
+        // A not measured location beside a confirmed pass must not page the owner.
+        assert_eq!(classify(C::Up, false), A::Healthy);
+        assert_eq!(classify(C::Down, false), A::Failing);
+        assert_eq!(classify(C::Partial, false), A::Failing);
+        assert_eq!(classify(C::NotMeasured, false), A::NotMeasured);
+        assert_eq!(classify(C::Misconfigured, false), A::Failing);
+    }
+
     #[test]
     fn only_a_scheduled_target_failure_gets_a_confirm_job() {
         let want = |status, source: &str, reason, probe, run, on, confirm| {

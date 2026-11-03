@@ -76,6 +76,65 @@ pub struct CheckNotification {
     pub failing_environments: Vec<String>,
 }
 
+#[cfg(feature = "enterprise")]
+impl CheckNotification {
+    /// The notification for a completed run. `status`, `error` and `error_source` describe the
+    /// ack that completed it, and `status` is the fallback when the run has no aggregate status.
+    pub fn from_ack(
+        resp: &openobserve_synthetics::job_api::AckResponse,
+        status: &str,
+        error: Option<String>,
+        error_source: String,
+        checked_at: i64,
+    ) -> Self {
+        use openobserve_synthetics::job_api::AlertDecision;
+        Self {
+            org_id: resp.org_id.clone(),
+            check_name: resp.synthetics_name.clone(),
+            check_id: resp.synthetics_id.clone(),
+            check_type: resp.synthetic_type.clone(),
+            target: resp.target.clone(),
+            destinations: resp.destinations.clone(),
+            run_id: resp.run_id.clone(),
+            status: resp
+                .run_status
+                .clone()
+                .unwrap_or_else(|| status.to_string()),
+            job_count: resp.job_count as i64,
+            error,
+            checked_at,
+            recovery: matches!(resp.alert, AlertDecision::Recovered),
+            consecutive_failures: resp.consecutive_failures,
+            flaky: matches!(resp.alert, AlertDecision::Flaky),
+            // A degrading target is `warning` on every run for as long as the condition lasts,
+            // so this one is throttled by transition upstream, not by cooldown.
+            degraded: matches!(resp.alert, AlertDecision::Degraded),
+            status_reason: resp.status_reason.clone(),
+            error_source,
+            failing_locations: resp.failing_locations.clone(),
+            failing_environments: resp.failing_environments.clone(),
+            passing_locations: resp.passing_locations.clone(),
+        }
+    }
+}
+
+/// Sends the notification of a run that finalized outside an ack, for
+/// `openobserve_synthetics::job_api::register_run_notifier`.
+#[cfg(feature = "enterprise")]
+pub fn notify_finalized_run(
+    resp: openobserve_synthetics::job_api::AckResponse,
+) -> openobserve_synthetics::alerting::BoxFuture<'static, ()> {
+    Box::pin(async move {
+        if resp.destinations.is_empty() {
+            return;
+        }
+        let checked_at = config::utils::time::now_micros();
+        let status = resp.run_status.clone().unwrap_or_default();
+        let n = CheckNotification::from_ack(&resp, &status, None, String::new(), checked_at);
+        notify_check_result(n).await;
+    })
+}
+
 /// Fires once per run (when all jobs have completed) for non-passing runs.
 /// Passing runs are suppressed — operators want alerts, not confirmations.
 ///
