@@ -108,8 +108,9 @@ pub async fn save(
             return Err(TemplateError::ReservedName(template.name.clone()));
         }
         // Updates are allowed for root (internal ops / self-hosted admins);
-        // all other callers get a 403.
-        if !is_root {
+        // all other callers get a 403. The `o2_default_*` rows mirror code
+        // and stay read only for root too: the seeder owns them.
+        if !is_root || is_compiled_default_name(&template.name) {
             return Err(TemplateError::PrebuiltReadOnly(template.name.clone()));
         }
     }
@@ -166,6 +167,11 @@ pub async fn save(
     Ok(saved)
 }
 
+/// The seeded `o2_default_*` rows: read only for every caller, root included.
+fn is_compiled_default_name(name: &str) -> bool {
+    name.starts_with(infra::table::templates::RESERVED_PREFIX)
+}
+
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
     db::alerts::templates::get(org_id, name).await
 }
@@ -193,7 +199,7 @@ pub async fn list(
 }
 
 pub async fn delete(org_id: &str, name: &str, is_root: bool) -> Result<(), TemplateError> {
-    if !is_root && is_reserved_template_name(name) {
+    if (!is_root && is_reserved_template_name(name)) || is_compiled_default_name(name) {
         return Err(TemplateError::PrebuiltReadOnly(name.to_string()));
     }
     let existing = db::alerts::templates::get(org_id, name).await?;
@@ -851,6 +857,29 @@ mod tests {
                 "{name}: {err}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn root_cannot_update_or_delete_a_seeded_default_row() {
+        let template = Template {
+            org_id: DEFAULT_ORG.to_string(),
+            body: "{}".to_string(),
+            ..Default::default()
+        };
+        let err = save("o2_default_alert", template, None, None, false, true)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, TemplateError::PrebuiltReadOnly(ref n) if n == "o2_default_alert"),
+            "{err}"
+        );
+        let err = delete(DEFAULT_ORG, "o2_default_alert", true)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, TemplateError::PrebuiltReadOnly(ref n) if n == "o2_default_alert"),
+            "{err}"
+        );
     }
 
     /// The global meta store CI configures through `ZO_META_STORE`, migrated once per binary.

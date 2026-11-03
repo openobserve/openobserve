@@ -277,7 +277,12 @@ pub fn choose_explicit_or_destination(
     }
     let t = dest_template?;
     if !destination_template_applies(&t, kind) {
-        skipped.push((TemplateSource::Destination, format!("{}: reserved", t.name)));
+        let reason = if is_user_template(&t) {
+            "not_applicable"
+        } else {
+            "reserved"
+        };
+        skipped.push((TemplateSource::Destination, format!("{}: {reason}", t.name)));
         return None;
     }
     if !fits(&t) {
@@ -699,6 +704,40 @@ mod tests {
             &content("prebuilt_slack"),
             NotificationKind::Downtime
         ));
+    }
+
+    #[test]
+    fn a_skipped_destination_template_names_why() {
+        let reason = |dest: Template| {
+            let mut skipped = Vec::new();
+            let chosen = choose_explicit_or_destination(
+                NotificationKind::Synthetics,
+                &[],
+                Some(dest),
+                Some(&slack_dest()),
+                &mut skipped,
+            );
+            assert!(chosen.is_none());
+            skipped
+        };
+        let alert_only = Template {
+            applies_to: vec![NotificationKind::Alert],
+            ..content("ut_hook_alert")
+        };
+        assert_eq!(
+            reason(alert_only),
+            vec![(
+                TemplateSource::Destination,
+                "ut_hook_alert: not_applicable".to_string()
+            )]
+        );
+        assert_eq!(
+            reason(content("prebuilt_slack")),
+            vec![(
+                TemplateSource::Destination,
+                "prebuilt_slack: reserved".to_string()
+            )]
+        );
     }
 
     #[test]

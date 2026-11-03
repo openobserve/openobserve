@@ -166,10 +166,9 @@ pub fn synthetics_notification_context(
     } else {
         (AlertLevel::Critical, "critical")
     };
-    let mut description = status_headline(n);
-    if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
-        description.push_str(&format!("\n```\n{e}\n```"));
-    }
+    // Plain text: the body escapes substituted values, and the card's Error field carries the
+    // error.
+    let description = status_headline(n);
     let checked = crate::anomaly_detection::fmt_local_us(n.checked_at);
     let legacy: serde_json::Value = serde_json::from_str(&build_slack_json(n)).unwrap_or_default();
     NotificationContext {
@@ -851,6 +850,33 @@ mod tests {
     }
 
     #[test]
+    fn the_check_card_body_has_no_escaped_code_fence() {
+        use crate::alerts::notifications::{
+            default_template::compiled_synthetics_content, resolve_content,
+        };
+        let n = CheckNotification {
+            error: Some("connect to https://example.com:443/health?x=1 timed out".into()),
+            ..firing()
+        };
+        let ctx = synthetics_notification_context(&n);
+        assert!(
+            !ctx.alert_description.contains('`'),
+            "{}",
+            ctx.alert_description
+        );
+        let content = resolve_content(&compiled_synthetics_content(), &ctx, "slack");
+        assert!(
+            !content.body_markdown.contains("\\`"),
+            "{}",
+            content.body_markdown
+        );
+        assert!(
+            content.fields.iter().any(|(_, v)| v.contains("timed out")),
+            "the Error field carries the error"
+        );
+    }
+
+    #[test]
     fn a_generic_webhook_gets_todays_text_body_byte_for_byte() {
         use crate::alerts::notifications::notify::{Route, route};
         let n = firing();
@@ -892,6 +918,7 @@ mod tests {
         };
         assert!(!body.contains(UNMATCHED_MARKER), "{body}");
         assert!(body.contains("private_location"), "{body}");
+        assert!(!content.body_markdown.contains("\\`"), "{body}");
         let email = resolve_content(&compiled_synthetics_content(), &ctx, "email");
         let RenderedMessage::Email { html, text, .. } =
             render(ChannelFormat::Email, &email, &ctx).unwrap()
