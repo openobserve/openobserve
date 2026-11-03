@@ -14,6 +14,38 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Structured EXPLAIN ANALYZE profile: the executed plan with typed, per-node metrics.
+//!
+//! The profile is a tree that follows the leader's physical plan. Ordinary operators
+//! recurse through `ProfileNode::children`. A `RemoteScanExec` stops the recursion:
+//! its `children` stay empty, because the subtree under it on the leader is only the
+//! plan template sent to the remote nodes and never ran there. Its `remote` list
+//! holds one `RemoteNodeProfile` per node it called directly (one per partition),
+//! including nodes skipped because they had no files.
+//!
+//! A `RemoteNodeProfile` has two parts:
+//! - what the caller observed of that node: start and end time, rows, batches and bytes received
+//!   over Flight, decode time, and the node's scan stats;
+//! - `plan`: the plan the node actually ran, with its own metrics, sent back by the node itself.
+//!
+//! A caller lists only the nodes it called directly; deeper nodes nest inside
+//! `plan`. In a super cluster the cluster leader's plan has its own
+//! `RemoteScanExec`, whose `remote` lists that cluster's queriers and ingesters:
+//!
+//! ```text
+//! QueryProfile                                  super leader
+//! └─ plan … RemoteScanExec
+//!    └─ remote: [sc-a, sc-b, sc-c]              cluster leaders
+//!       └─ plan … RemoteScanExec
+//!          └─ remote: [querier-0 … ingester-1]  nodes of that cluster
+//!             └─ plan …
+//! ```
+//!
+//! A plan with several remote scans, such as a join of two streams, has one
+//! `remote` list per scan, so the same node appears once under each of them.
+//!
+//! Each plan appears exactly once: a node takes its callees' plans out of the
+//! metrics it receives before it forwards those metrics upstream, so only the
+//! node's own metrics entry carries a plan.
 
 use config::meta::search::ScanStats;
 use serde::{Deserialize, Serialize};
