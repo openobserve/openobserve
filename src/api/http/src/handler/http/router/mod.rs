@@ -23,10 +23,7 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
 };
-use config::{
-    get_config,
-    meta::{feature::Feature, user::UserRole},
-};
+use config::{get_config, meta::feature::Feature};
 use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, X_O2_ASSISTANT_TURN_ID};
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "cloud")]
@@ -369,12 +366,6 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     parts.headers.insert(
         header::HeaderName::from_static("user_id"),
         header::HeaderValue::from_str(&result.user_email)
-            .unwrap_or_else(|_| header::HeaderValue::from_static("")),
-    );
-    let role = result.user_role.unwrap_or(UserRole::User);
-    parts.headers.insert(
-        header::HeaderName::from_static("user_role"),
-        header::HeaderValue::from_str(&role.to_string())
             .unwrap_or_else(|_| header::HeaderValue::from_static("")),
     );
 
