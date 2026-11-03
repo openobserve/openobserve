@@ -521,6 +521,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :unpriced-tokens="trace.unpricedTokens"
                               :unpriced-models="trace.unpricedModels"
                               :stream="streamName"
+                              :time-window="{
+                                start: sessionEvaluationRange.startTime,
+                                end: sessionEvaluationRange.endTime,
+                              }"
                               :format="
                                 (c: number) =>
                                   `${t('traces.sessionDetail.currencySymbol')}${c.toFixed(4)}`

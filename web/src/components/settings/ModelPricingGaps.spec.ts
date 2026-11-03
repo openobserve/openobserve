@@ -118,6 +118,24 @@ describe("ModelPricingGaps", () => {
     );
   });
 
+  it("lists the window a link counted over, so it matches the count that linked here", async () => {
+    w = mountPage({ stream: "llm", start_time: "1000000", end_time: "9000000" });
+    await flushPromises();
+
+    const params = vi.mocked(modelPricingService.listUnpriced).mock.calls.at(-1)![1];
+    expect([params.start_time, params.end_time]).toEqual([1_000_000, 9_000_000]);
+    // A date range, not "Last 24 hours".
+    expect(String(w.findComponent({ name: "UnpricedModelsTable" }).props("windowLabel"))).toContain(
+      " – ",
+    );
+
+    // Refresh re-reads the same window instead of moving to the last 24 h.
+    w.findComponent({ name: "UnpricedModelsTable" }).vm.$emit("refresh");
+    await flushPromises();
+    const again = vi.mocked(modelPricingService.listUnpriced).mock.calls.at(-1)![1];
+    expect([again.start_time, again.end_time]).toEqual([1_000_000, 9_000_000]);
+  });
+
   it("reads the first LLM stream when the link names none", async () => {
     w = mountPage();
     await flushPromises();

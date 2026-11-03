@@ -33,7 +33,13 @@ import type {
   DataHealthCheckId,
   DataHealthResponse,
 } from "@/services/gen-ai-data-health.service";
-import { fixTarget, healthCounts, sortChecks, unpricedTotals } from "./llmDataTrust.utils";
+import {
+  fixTarget,
+  healthCounts,
+  sortChecks,
+  unpricedTotals,
+  type TimeWindow,
+} from "./llmDataTrust.utils";
 import type { DataHealthSamples } from "./composables/useLLMDataHealth";
 import { formatTokens } from "@/utils/llmUtils";
 
@@ -42,6 +48,8 @@ const props = defineProps<{
   loading?: boolean;
   error?: boolean;
   stream: string;
+  /** The window `health` was checked over; the fix links open the same window. */
+  checkedWindow?: TimeWindow | null;
   /** Sample trace ids per check; null until loaded. */
   samples: DataHealthSamples | null;
   samplesLoading?: boolean;
@@ -183,8 +191,12 @@ function orgId(): string {
   return store.state.selectedOrganization?.identifier ?? "";
 }
 
+function targetFor(id: DataHealthCheckId) {
+  return fixTarget(id, props.stream, orgId(), props.checkedWindow);
+}
+
 function openFix(id: DataHealthCheckId) {
-  const target = fixTarget(id, props.stream, orgId());
+  const target = targetFor(id);
   if (target.kind === "route") {
     drawerOpen.value = false;
     router.push(target.to);
@@ -195,7 +207,7 @@ function openFix(id: DataHealthCheckId) {
 
 /** For users who cannot open the setting themselves: a link an admin can follow. */
 async function copyFixLink(id: DataHealthCheckId) {
-  const target = fixTarget(id, props.stream, orgId());
+  const target = targetFor(id);
   const href =
     target.kind === "route"
       ? new URL(router.resolve(target.to).href, window.location.origin).toString()
@@ -353,7 +365,7 @@ function viewTrace(traceId: string) {
             >{{ fixLabel(check.id) }}</OButton
           >
           <OButton
-            v-if="fixTarget(check.id, stream, orgId()).kind === 'route'"
+            v-if="targetFor(check.id).kind === 'route'"
             variant="ghost-muted"
             size="xs"
             @click="copyFixLink(check.id)"

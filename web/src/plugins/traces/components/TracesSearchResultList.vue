@@ -188,6 +188,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :unpriced-tokens="unpricedFields(row).unpricedTokens"
                       :unpriced-models="unpricedFields(row).unpricedModels"
                       :stream="searchObj.data.stream.selectedStream?.value ?? ''"
+                      :time-window="{
+                        start: searchObj.data.datetime.startTime,
+                        end: searchObj.data.datetime.endTime,
+                      }"
                       :format="(c: number) => `$${formatCost(c)}`"
                     />
                     <template v-else>-</template>

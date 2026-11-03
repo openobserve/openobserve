@@ -20,6 +20,7 @@ import {
   type DataHealthParams,
   type DataHealthResponse,
 } from "@/services/gen-ai-data-health.service";
+import type { TimeWindow } from "../llmDataTrust.utils";
 
 export type DataHealthSamples = Partial<Record<DataHealthCheckId, string[]>>;
 
@@ -32,6 +33,8 @@ export type DataHealthSamples = Partial<Record<DataHealthCheckId, string[]>>;
  */
 export function useLLMDataHealth() {
   const health = ref<DataHealthResponse | null>(null);
+  /** The window `health` was checked over, so links can open the same window. */
+  const checkedWindow = ref<TimeWindow | null>(null);
   const loading = ref(false);
   const error = ref(false);
   /** Samples per check for the last fetched scope + window; null until requested. */
@@ -58,10 +61,12 @@ export function useLLMDataHealth() {
       const res = await getDataHealth(orgId, last.params);
       if (mine !== seq) return;
       health.value = res.data;
+      checkedWindow.value = { start: params.start_time, end: params.end_time };
     } catch (e) {
       if (mine !== seq) return;
       console.error("LLM data health fetch error:", e);
       health.value = null;
+      checkedWindow.value = null;
       error.value = true;
     } finally {
       if (mine === seq) loading.value = false;
@@ -92,9 +97,20 @@ export function useLLMDataHealth() {
     last = null;
     clearSamples();
     health.value = null;
+    checkedWindow.value = null;
     loading.value = false;
     error.value = false;
   }
 
-  return { health, loading, error, samples, samplesLoading, fetchHealth, fetchSamples, reset };
+  return {
+    health,
+    checkedWindow,
+    loading,
+    error,
+    samples,
+    samplesLoading,
+    fetchHealth,
+    fetchSamples,
+    reset,
+  };
 }

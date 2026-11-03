@@ -18,6 +18,7 @@ import {
   costKind,
   fixTarget,
   healthCounts,
+  pricingGapsRoute,
   sortChecks,
   unpricedFields,
   unpricedSummary,
@@ -130,5 +131,17 @@ describe("health checks", () => {
       to: { name: "genAiAgentMapping" },
     });
     expect(fixTarget("zero_duration_spans", "default", "org1").kind).toBe("url");
+  });
+
+  it("carries the counted window to Pricing gaps, and drops an unset one", () => {
+    expect(fixTarget("unpriced_models", "default", "org1", { start: 100, end: 200 })).toMatchObject(
+      {
+        to: { query: { stream: "default", start_time: "100", end_time: "200" } },
+      },
+    );
+    expect(pricingGapsRoute("default", "org1", { start: 0, end: 0 }).query).toEqual({
+      stream: "default",
+      org_identifier: "org1",
+    });
   });
 });

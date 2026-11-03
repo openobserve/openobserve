@@ -255,6 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :unpriced-tokens="row.unpricedTokens"
           :unpriced-models="row.unpricedModels"
           :stream="effectiveStream"
+          :time-window="{ start: startTime, end: endTime }"
           :format="(c: number) => `${t('traces.sessionDetail.currencySymbol')}${c.toFixed(4)}`"
         />
       </template>

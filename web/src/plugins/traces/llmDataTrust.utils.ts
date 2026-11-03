@@ -111,13 +111,24 @@ export type FixTarget =
   | { kind: "route"; to: { name: string; query: Record<string, string> } }
   | { kind: "url"; href: string };
 
+/** A time window in epoch microseconds. */
+export interface TimeWindow {
+  start: number;
+  end: number;
+}
+
 /** Where each check is fixed: a setting when one exists, else the instrumentation docs. */
-export function fixTarget(id: DataHealthCheckId, stream: string, orgId: string): FixTarget {
+export function fixTarget(
+  id: DataHealthCheckId,
+  stream: string,
+  orgId: string,
+  window?: TimeWindow | null,
+): FixTarget {
   switch (id) {
     case "unpriced_models":
       return {
         kind: "route",
-        to: pricingGapsRoute(stream, orgId),
+        to: pricingGapsRoute(stream, orgId, window),
       };
     case "missing_agent_identity":
       return { kind: "route", to: { name: "genAiAgentMapping", query: { org_identifier: orgId } } };
@@ -127,10 +138,15 @@ export function fixTarget(id: DataHealthCheckId, stream: string, orgId: string):
   }
 }
 
-/** Route to Model Pricing's Pricing gaps page for `stream`. */
-export function pricingGapsRoute(stream: string, orgId: string) {
-  return {
-    name: "modelPricingGaps",
-    query: { stream, org_identifier: orgId },
-  };
+/**
+ * Route to Model Pricing's Pricing gaps page for `stream`. Pass the window the linking
+ * page counted over, or the page lists only the last 24 h and can miss what the link named.
+ */
+export function pricingGapsRoute(stream: string, orgId: string, window?: TimeWindow | null) {
+  const query: Record<string, string> = { stream, org_identifier: orgId };
+  if (window && window.start > 0 && window.end > window.start) {
+    query.start_time = String(window.start);
+    query.end_time = String(window.end);
+  }
+  return { name: "modelPricingGaps", query };
 }

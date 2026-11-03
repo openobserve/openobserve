@@ -21,9 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { costKind, pricingGapsRoute } from "./llmDataTrust.utils";
+import { costKind, pricingGapsRoute, type TimeWindow } from "./llmDataTrust.utils";
 
 const props = withDefaults(
   defineProps<{
@@ -34,12 +34,15 @@ const props = withDefaults(
     scope: "session" | "trace";
     /** Trace stream, for the "Add a price" link. */
     stream?: string;
+    /** The list's window (µs), so "Add a price" lists this row's models; else the last 24 h. */
+    timeWindow?: TimeWindow | null;
     format?: (cost: number) => string;
   }>(),
   {
     unpricedTokens: 0,
     unpricedModels: () => [],
     stream: "",
+    timeWindow: null,
     format: (cost: number) => `$${cost.toFixed(4)}`,
   },
 );
@@ -67,7 +70,11 @@ const tooltip = computed(() => {
 });
 
 const fixRoute = computed(() =>
-  pricingGapsRoute(props.stream, store.state.selectedOrganization?.identifier ?? ""),
+  pricingGapsRoute(
+    props.stream,
+    store.state.selectedOrganization?.identifier ?? "",
+    props.timeWindow,
+  ),
 );
 </script>
 
@@ -81,12 +88,16 @@ const fixRoute = computed(() =>
     data-test="llm-cost-cell"
     :data-cost-kind="kind"
   >
-    <template v-if="kind === 'partial'">
-      <span>{{ t("llmDataTrust.cost.atLeast", { cost: format(cost) }) }}</span>
-      <OBadge variant="warning-soft" size="sm" data-test="llm-cost-cell-partial">{{
-        t("llmDataTrust.cost.partial")
-      }}</OBadge>
-    </template>
+    <!-- Inline like the plain numbers beside it: a pill would outgrow narrow cost columns. -->
+    <span
+      v-if="kind === 'partial'"
+      class="inline-flex items-center gap-1"
+      data-test="llm-cost-cell-partial"
+    >
+      {{ t("llmDataTrust.cost.atLeast", { cost: format(cost) }) }}
+      <OIcon name="warning-amber" size="xs" class="text-status-warning-text" />
+      <span class="sr-only">{{ t("llmDataTrust.cost.partial") }}</span>
+    </span>
     <span v-else class="text-text-secondary italic" data-test="llm-cost-cell-unknown">{{
       t("llmDataTrust.cost.unknown")
     }}</span>

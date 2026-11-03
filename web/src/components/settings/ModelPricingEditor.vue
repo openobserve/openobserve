@@ -1434,7 +1434,12 @@ function goBack() {
   if (backToGaps.value) {
     router.push({
       name: "modelPricingGaps",
-      query: { org_identifier: orgIdentifier.value, stream: route.query.stream as string },
+      query: {
+        org_identifier: orgIdentifier.value,
+        stream: route.query.stream as string,
+        start_time: route.query.start_time,
+        end_time: route.query.end_time,
+      },
     });
     return;
   }

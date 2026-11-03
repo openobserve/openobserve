@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="schedule"
               data-test="model-pricing-unpriced-window"
             >
-              {{ t("modelPricing.unpriced.window") }}
+              {{ windowLabel }}
             </OBadge>
           </div>
         </template>
@@ -263,6 +263,8 @@ const props = defineProps<{
   streams: string[];
   streamsLoaded: boolean;
   stream: string;
+  /** The window the list covers, for the toolbar badge. */
+  windowLabel: I18nText;
 }>();
 
 const emit = defineEmits<{
@@ -382,9 +384,11 @@ function createPrice(row: UnpricedModel) {
       org_identifier: orgIdentifier.value,
       name: row.model,
       match_pattern: exactModelPattern(row.model),
-      // The editor's Back and Save return here instead of to the price list.
+      // The editor's Back and Save return here instead of to the price list, in the same window.
       from: "gaps",
       stream: props.stream,
+      start_time: router.currentRoute.value.query.start_time,
+      end_time: router.currentRoute.value.query.end_time,
     },
   });
 }

@@ -262,6 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="dataHealthLoading"
           :error="dataHealthError"
           :stream="effectiveStream"
+          :checked-window="dataHealthWindow"
           :samples="dataHealthSamples"
           :samples-loading="dataHealthSamplesLoading"
           @rerun="loadDataHealth(true)"
@@ -508,6 +509,7 @@ const {
 // AI data health (AIO-17) — also feeds the Total Cost tile's unpriced note (AIO-16).
 const {
   health: dataHealth,
+  checkedWindow: dataHealthWindow,
   loading: dataHealthLoading,
   error: dataHealthError,
   samples: dataHealthSamples,
@@ -542,9 +544,14 @@ function loadDataHealth(refresh = false, start = props.startTime, end = props.en
     refresh,
   });
 }
+// The tile's unpriced note comes from the health check, so open the window it counted.
 function openUnpricedTab() {
   router.push(
-    pricingGapsRoute(effectiveStream.value, store.state.selectedOrganization?.identifier ?? ""),
+    pricingGapsRoute(
+      effectiveStream.value,
+      store.state.selectedOrganization?.identifier ?? "",
+      dataHealthWindow.value,
+    ),
   );
 }
 
