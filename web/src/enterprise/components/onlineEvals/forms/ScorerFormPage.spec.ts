@@ -157,6 +157,32 @@ describe("ScorerFormPage", () => {
     expect(wrapper.emitted("saved")).toBeTruthy();
   });
 
+  it("sends the judge temperature as a number and omits it when blank", async () => {
+    wrapper = createWrapper();
+    expect(wrapper.find('[data-test="scorer-form-temperature-input"]').exists()).toBe(true);
+    setField(wrapper, "name", "my-scorer");
+    setField(wrapper, "providerId", "p1");
+    setField(wrapper, "temperature", "0.1");
+    await submit(wrapper);
+    const [, payload] = vi.mocked(onlineEvalsService.scorers.create).mock.calls[0];
+    expect(payload.scorer.params).toMatchObject({ temperature: 0.1 });
+
+    setField(wrapper, "temperature", "");
+    await submit(wrapper);
+    const [, blank] = vi.mocked(onlineEvalsService.scorers.create).mock.calls[1];
+    expect(blank.scorer.params).not.toHaveProperty("temperature");
+  });
+
+  it("rejects a temperature outside 0–2", async () => {
+    wrapper = createWrapper();
+    setField(wrapper, "name", "my-scorer");
+    setField(wrapper, "providerId", "p1");
+    setField(wrapper, "temperature", "3");
+    await submit(wrapper);
+    expect(oform(wrapper).form.state.isValid).toBe(false);
+    expect(onlineEvalsService.scorers.create).not.toHaveBeenCalled();
+  });
+
   // A decision model fills no extra fields; its reasoning is the answer summary, so it stays.
   it("drops extra fields but keeps reasoning for a decision-model provider", async () => {
     wrapper = createWrapper();

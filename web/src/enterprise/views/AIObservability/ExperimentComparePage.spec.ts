@@ -128,7 +128,7 @@ beforeEach(() => {
   });
   getRow.mockImplementation(async (_org: string, experimentId: string, rowId: string) => ({
     experimentId,
-    snapshot: { datasetId: "dataset-1", datasetVersion: 1 },
+    snapshot: { datasetId: "dataset-1", datasetVersion: 1, datasetWriteVersion: 1 },
     navigation: { rowIndex: 0, totalRows: 1, previousRowId: null, nextRowId: null },
     rowId,
     logicalId: "case-1",

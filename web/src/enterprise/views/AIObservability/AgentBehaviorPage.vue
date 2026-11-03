@@ -56,18 +56,35 @@
         :streams-loaded="true"
         :agents-loaded="agentsLoaded"
         @filter-mode-change="onFilterModeChange"
+        @agent-pick="modeExplicit = true"
       />
     </template>
 
+    <!-- Stream mode because these LLM spans carry no agent identity: the
+         signals show for every span in the stream (agent "unknown"). -->
+    <AiNoAgentIdentityBanner v-if="noAgentIdentity && scopeReady" data-test="agent-behavior" />
+
+    <!-- Agent mode whose agents list failed to load: not "no agents". -->
+    <div
+      v-if="scopeReady && agentsLoadFailed"
+      class="px-page-edge flex min-h-0 flex-1 items-center justify-center"
+    >
+      <AiAgentsLoadError
+        :error="agentsError ?? 'failed'"
+        data-test="agent-behavior"
+        @retry="settleScope(true)"
+      />
+    </div>
     <!-- Full-height column: the panel splits the available height between its
          two cards, so the page itself never scrolls — each table scrolls
-         internally when its rows overflow. -->
-    <div class="px-page-edge flex min-h-0 flex-1 flex-col py-4">
+         internally when its rows overflow. The stream is withheld until the
+         scope is settled, so the panel fetches once, for the final scope. -->
+    <div v-else class="px-page-edge flex min-h-0 flex-1 flex-col py-4">
       <AgentBehaviorPanel
         ref="panelRef"
         class="min-h-0 flex-1"
         :scope-ready="scopeReady"
-        :source-stream="effectiveStream"
+        :source-stream="scopeReady ? effectiveStream : ''"
         :agent-filter="agentFilter"
         :agent-env="filterMode === 'agent' ? selectedAgent?.env : null"
         :agent-version="filterMode === 'agent' ? selectedAgent?.version : null"
@@ -79,14 +96,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
 import AgentBehaviorPanel from "./AgentBehaviorPanel.vue";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
+import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
+import AiAgentsLoadError from "@/enterprise/components/AIObservability/AiAgentsLoadError.vue";
 import useStreams from "@/composables/useStreams";
 import { useStore } from "vuex";
-import { useAgentScope } from "@/enterprise/composables/useAgentScope";
+import {
+  useAgentScope,
+  readUrlScope,
+  explicitScopeMode,
+  resolveScopeMode,
+  rememberModeChoice,
+  scopeUrlQuery,
+  type ScopeMode,
+} from "@/enterprise/composables/useAgentScope";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
 import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
 
@@ -95,27 +123,50 @@ defineOptions({ name: "AgentBehaviorPage" });
 const { t } = useI18nTyped();
 const { getStreams } = useStreams(t);
 const store = useStore();
+const route = useRoute();
+const router = useRouter();
 
 // Shared with LLM Insights / Sessions / Quality — see useAiDateRange.ts.
 // Agent Behavior has no from/to/period URL sync (urlSync:false), matching its
 // prior behavior of resolving from shared state only.
-const { dateState, timeRange, applyRelative, onDateChange, mountResolve, DEFAULT_RELATIVE } =
-  useAiDateController({ urlSync: false });
+const {
+  dateState,
+  timeRange,
+  applyRelative,
+  onDateChange: onDateStateChange,
+  mountResolve,
+  DEFAULT_RELATIVE,
+} = useAiDateController({ urlSync: false });
 
-// Agent is the default scope: the page is about a specific agent's behaviour,
-// so it opens focused on one agent. Stream mode widens to every agent's signals.
-const filterMode = ref<"stream" | "agent">("agent");
+// The scope in the URL (`type`, `stream`, `agent`, `env`, `version`) wins over
+// the defaults, so a link shared from any Monitor page opens the same agent
+// here. Without an explicit mode (URL or remembered toggle) the agents list
+// decides: Agent (the page is about one agent's behaviour) when the window has
+// agents, Stream (every span's signals) when it has none.
+const urlScope = readUrlScope(route.query);
+// The URL's agent is applied once, on the first settle that has agents; later
+// settles (a new window) keep whatever the user picked since.
+let pendingUrlScope = urlScope.agent || urlScope.env || urlScope.version ? urlScope : null;
+const explicitMode = explicitScopeMode(urlScope);
+const filterMode = ref<ScopeMode>(explicitMode ?? "agent");
+const modeExplicit = ref(explicitMode !== null);
+// False until streams and agents have loaded and the mode and selection are
+// settled; the panel gets its stream only then.
+const scopeReady = ref(false);
 const availableStreams = ref<string[]>([]);
-const activeStream = ref<string>("");
+const activeStream = ref<string>(urlScope.stream);
 const panelRef = ref<any>(null);
-const streamsLoaded = ref(false);
 
 // Agent-mode selection — mirrors Agent Graph. Same stream-scoped identity so
 // same-named agents in different streams don't collide. Owned by the shared
 // useAgentScope composable (allAgents:false → first agent auto-selected).
 const {
   agentsLoaded,
+  agentsError,
+  agentsLoadFailed,
+  agents,
   loadAgents,
+  noAgentIdentity,
   streamSelectOptions,
   selectedStreamCount,
   selectedAgent,
@@ -126,6 +177,7 @@ const {
   selectedEnv,
   selectedAgentName,
   selectedVersion,
+  selectAgentByScope,
 } = useAgentScope({
   filterMode,
   activeStream,
@@ -145,14 +197,32 @@ const agentFilter = computed(() =>
   filterMode.value === "agent" ? (selectedAgent.value?.name ?? "") : "",
 );
 
-const scopeReady = computed(
-  () => streamsLoaded.value && (filterMode.value === "agent" ? agentsLoaded.value : true),
-);
-
-function onFilterModeChange(mode: unknown) {
-  if (mode === "stream" || mode === "agent") filterMode.value = mode;
-  if (mode === "agent" && !agentsLoaded.value) loadAgents();
+function syncScopeUrl() {
+  const agent = selectedAgent.value
+    ? { name: selectedAgent.value.name, env: selectedEnv.value, version: selectedVersion.value }
+    : null;
+  const query = scopeUrlQuery(route.query, {
+    mode: filterMode.value,
+    explicit: modeExplicit.value,
+    stream: activeStream.value,
+    agent,
+  });
+  router.replace({ query }).catch(() => {});
 }
+
+// A toggle click is an explicit choice: kept in the URL and remembered for the
+// other Monitor pages.
+function onFilterModeChange(mode: unknown) {
+  if (mode !== "stream" && mode !== "agent") return;
+  filterMode.value = mode;
+  modeExplicit.value = true;
+  rememberModeChoice(mode);
+  syncScopeUrl();
+}
+
+watch([activeStream, selectedEnv, selectedAgentName, selectedVersion], () => {
+  if (scopeReady.value) syncScopeUrl();
+});
 
 // Last-refresh + loading for the header's ORefreshButton — the panel stamps
 // `lastRunAt` when its fetch settles and exposes its own `loading`. The
@@ -170,9 +240,7 @@ const {
   },
 });
 
-onMounted(async () => {
-  mountResolve();
-
+async function loadStreams() {
   try {
     const res = (await getStreams("traces", false, false)) as {
       list?: { name: string; settings?: { is_llm_stream?: boolean } }[];
@@ -184,16 +252,43 @@ onMounted(async () => {
     availableStreams.value = (res?.list ?? [])
       .filter((s) => s.settings?.is_llm_stream !== false)
       .map((s) => s.name);
-    if (availableStreams.value.length && !activeStream.value) {
-      activeStream.value = availableStreams.value[0];
+    if (!availableStreams.value.includes(activeStream.value)) {
+      activeStream.value = availableStreams.value[0] ?? "";
     }
   } catch {
     availableStreams.value = [];
-  } finally {
-    streamsLoaded.value = true;
   }
+}
 
-  // Agent is the default scope, so the agent list must be ready on first paint.
-  await loadAgents();
+// Streams and agents in parallel: together they settle the mode (agents in the
+// window → Agent, none → Stream) and the URL's agent before the panel gets a
+// stream, so it fetches once. A failed agents load settles nothing (the page
+// stays on Agent with the error); its retry (`force`) runs this again, and so
+// does a new date window, whose agents may differ.
+async function settleScope(force = false) {
+  const { startTime, endTime } = timeRange.value;
+  await Promise.all([loadStreams(), loadAgents(startTime, endTime, force)]);
+  if (!modeExplicit.value) {
+    filterMode.value = resolveScopeMode(null, agents.value.length, agentsError.value);
+  }
+  if (pendingUrlScope && agents.value.length) {
+    selectAgentByScope(pendingUrlScope.env, pendingUrlScope.agent, pendingUrlScope.version);
+    pendingUrlScope = null;
+  }
+  scopeReady.value = true;
+  syncScopeUrl();
+}
+
+// Date state is owned by useAiDateController. A user's pick re-settles the
+// scope for the new window, as Agent Graph reloads its agents; the window
+// replay DateTime fires on mount is already covered by the mount settle.
+function onDateChange(value: unknown) {
+  onDateStateChange(value);
+  if ((value as { userChangedValue?: boolean } | null)?.userChangedValue === true) settleScope();
+}
+
+onMounted(() => {
+  mountResolve();
+  settleScope();
 });
 </script>
