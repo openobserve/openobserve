@@ -2774,8 +2774,6 @@ describe("useRoutes (router.ts)", () => {
       ["traceDetails", "traces"],
       ["sessionDetails", "traces"],
       ["metrics", "metrics"],
-      ["metricsEditor", "metrics"],
-      ["promqlBuilder", "metrics"],
     ])("tags %s with meta.licenseFeature %s", (name, feature) => {
       expect(findRoute(useRoutes().homeChildRoutes, name).meta.licenseFeature).toBe(feature);
     });

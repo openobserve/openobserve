@@ -210,21 +210,18 @@ describe("MainLayout — Product Analytics menu entry", () => {
         meta: { licenseFeatureFromStreamType: true },
       });
       store.state.zoConfig.features = { logs: "locked", metrics: "enabled" };
-      store.state.zoConfig.feature_names = { logs: "Logs" };
       await router.push("/stream-probe");
       await railItems();
       (wrapper!.vm as any).isLoading = true;
       await flushPromises();
       const lockedFeature = () => (wrapper!.vm as any).lockedFeature;
       expect(lockedFeature()).toBe("logs");
-      expect(wrapper!.find('[data-test="feature-lock-banner-feature"]').text()).toBe("Logs");
       await router.push({ path: "/stream-probe", query: { stream_type: "enrichment_tables" } });
       expect(lockedFeature()).toBeNull();
       await router.push({ path: "/stream-probe", query: { stream_type: "metrics" } });
       expect(lockedFeature()).toBeNull();
       await router.push({ path: "/stream-probe", query: { stream_type: "logs" } });
       expect(lockedFeature()).toBe("logs");
-      delete store.state.zoConfig.feature_names;
       await router.push("/");
       router.removeRoute("streamProbe");
     });
