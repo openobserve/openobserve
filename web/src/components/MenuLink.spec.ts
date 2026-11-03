@@ -454,9 +454,9 @@ describe("MenuLink", async () => {
   });
 
   describe("rail lens selection", () => {
-    function mountTile(link: string) {
+    function mountTile(link: string, paywalled = false, active = false) {
       return mount(MenuLink, {
-        props: { title: "Tile", link },
+        props: { title: "Tile", link, paywalled, active },
         global: {
           plugins: [i18n, mockRouter],
           provide: {
@@ -466,6 +466,19 @@ describe("MenuLink", async () => {
         },
       });
     }
+
+    it("keeps the lens foregrounds on a selected tile that is paywalled", () => {
+      const selected = mountTile("/logs", true, true);
+      expect(selected.find(".icon-wrapper").classes()).toContain("text-nav-lens-icon");
+      expect(selected.find(".nav-menu-item-label").classes()).toContain(
+        "text-nav-rail-text-strong",
+      );
+      selected.unmount();
+      const resting = mountTile("/traces", true);
+      expect(resting.find(".icon-wrapper").classes()).toContain("text-text-secondary");
+      expect(resting.find(".nav-menu-item-label").classes()).toContain("text-text-body");
+      resting.unmount();
+    });
 
     it("tints the whole tile on hover, never the icon box", () => {
       const tile = mountTile("/traces");

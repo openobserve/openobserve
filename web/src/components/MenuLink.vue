@@ -287,10 +287,10 @@ export default defineComponent({
     );
     const lensIconClass = computed(() => {
       const well = "h-6 w-12";
+      // A selected tile sits on the lens, so it keeps the lens foreground even when paywalled; the lock still marks it.
+      if (isActive.value) return `${well} text-nav-lens-icon`;
       if (props.paywalled) return `${well} text-text-secondary`;
-      return isActive.value
-        ? `${well} text-nav-lens-icon`
-        : `${well} text-nav-rail-text group-hover:text-nav-rail-text-strong`;
+      return `${well} text-nav-rail-text group-hover:text-nav-rail-text-strong`;
     });
     const iconClass = computed(() => {
       if (lens.value) return lensIconClass.value;
@@ -300,12 +300,12 @@ export default defineComponent({
         : "rounded-default p-0.5 text-tabs-inactive-text group-hover:text-accent";
     });
     const labelClass = computed(() => {
-      if (props.paywalled) return "text-text-body font-medium";
       if (lens.value) {
-        return isActive.value
-          ? "font-semibold text-nav-rail-text-strong"
-          : "font-medium text-nav-rail-text group-hover:text-nav-rail-text-strong";
+        if (isActive.value) return "font-semibold text-nav-rail-text-strong";
+        if (props.paywalled) return "text-text-body font-medium";
+        return "font-medium text-nav-rail-text group-hover:text-nav-rail-text-strong";
       }
+      if (props.paywalled) return "text-text-body font-medium";
       return isActive.value
         ? activeLabelClass.value
         : "text-tabs-inactive-text group-hover:text-nav-label-accent font-medium";
