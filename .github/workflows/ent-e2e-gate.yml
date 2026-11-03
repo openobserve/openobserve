@@ -31,16 +31,16 @@ name: Playwright E2E Crosscheck
 #   vars.ENT_E2E_GATE_DISABLED — 'true' kill switch: gate passes without dispatching.
 
 on:
-  # Pushes and the gate's own labels run it; any other label only mirrors its current result.
+  # Pushes, base changes and the gate's own labels run it; any other label or edit only mirrors its current result.
   pull_request:
-    types: [synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
+    types: [synchronize, edited, labeled, unlabeled, ready_for_review, converted_to_draft]
   # A required check must also report on merge-queue commits; the gate already passed on the PR head.
   merge_group:
 
 # PR-scoped: a new push or gate label supersedes the previous gate attempt for the same PR.
 concurrency:
-  # Other labels (auto-requeue-* and the like) only mirror the gate's result, so they must not cancel a running gate; the newest mirror is enough.
-  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'ready-for-ci' && github.event.label.name != 'skip-ent-e2e' && '-mirror' || '' }}
+  # Other labels (auto-requeue-* and the like) and title/body edits only mirror the gate's result, so they must not cancel a running gate; the newest mirror is enough.
+  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'ready-for-ci' && github.event.label.name != 'skip-ent-e2e') || (github.event.action == 'edited' && !github.event.changes.base)) && '-mirror' || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -69,7 +69,7 @@ jobs:
           HAS_SKIP: ${{ contains(github.event.pull_request.labels.*.name, 'skip-ent-e2e') }}
           DISABLED: ${{ vars.ENT_E2E_GATE_DISABLED }}
           IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
-          MIRROR: ${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'ready-for-ci' && github.event.label.name != 'skip-ent-e2e' }}
+          MIRROR: ${{ ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'ready-for-ci' && github.event.label.name != 'skip-ent-e2e') || (github.event.action == 'edited' && !github.event.changes.base) }}
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "merge_group" ]; then
@@ -88,7 +88,12 @@ jobs:
 
           # Relevant = any changed file under web/ or tests/ui-testing/
           FILES=$(gh api "repos/${{ github.repository }}/pulls/$PR/files" --paginate -q '.[].filename')
-          if printf '%s\n' "$FILES" | grep -qE '^(web/|tests/ui-testing/)'; then
+          CHANGED=$(gh api "repos/${{ github.repository }}/pulls/$PR" -q .changed_files)
+          # The files API lists at most 3000 files, so a list it cut short cannot prove the PR is irrelevant.
+          if [ "$CHANGED" -ge 3000 ] || [ "$CHANGED" -gt "$(grep -c . <<<"$FILES")" ]; then
+            RELEVANT=true
+          # A here-string, not a pipe: grep -q exits early and the writer's SIGPIPE would fail the pipeline under pipefail.
+          elif grep -qE '^(web/|tests/ui-testing/)' <<<"$FILES"; then
             RELEVANT=true
           else
             RELEVANT=false
@@ -151,7 +156,9 @@ jobs:
               if [ "$RAN" = "0" ]; then IGNORE=$(jq -c --argjson i "$ID" '. + [$i]' <<<"$IGNORE"); continue; fi
             fi
             if [ "$STATUS" = "completed" ]; then break; fi
-            ERRORS=0; sleep 30
+            # Waiting would hold a runner for the whole gate, and a green here would override the running gate.
+            echo "::error::Gate check $ID on $HEAD_SHA is still running — re-run this check once it finishes."
+            exit 1
           done
           echo "::notice::Mirroring gate check $ID on $HEAD_SHA: $CONCL."
           [ "$CONCL" = "success" ] || { echo "::error::The gate's current result on this head is '$CONCL'."; exit 1; }
@@ -218,7 +225,7 @@ jobs:
             echo "::notice::No ENT counterpart for '$HEAD_REF' (base '$BASE_REF') — building against main."
           fi
 
-          # Reuse is decided by the engine's run title, so it must name the exact ENT code and engine commits.
+          # The run title names the exact ENT code and engine commits, so the gate can tell its own run from any other.
           sha_of() {
             local sha
             for _ in 1 2 3; do
@@ -251,32 +258,28 @@ jobs:
           # The engine checks out oss_branch, so a commit SHA there makes it test exactly what its title names.
           MATCH="Playwright E2E Crosscheck — OSS PR #$PR ("
           TITLE="${MATCH}$TESTED_SHA) oss=$HEAD_SHA ent=$ENT_SHA engine=$ENGINE_SHA"
-          RUN_ID=""; P_STATE=""
-          read -r RUN_ID P_STATE < <(gh run list --repo "$REPO" --workflow "$WF" --event workflow_dispatch -L 200 \
-            --json databaseId,displayTitle,event,status,conclusion 2>/dev/null \
-            | jq -r --arg t "$TITLE" 'first(.[] | select(.event == "workflow_dispatch" and .displayTitle == $t)) | "\(.databaseId) \(if .status != "completed" then "running" else .conclusion end)"' 2>/dev/null) || true
-          if [ "$P_STATE" = "success" ] || [ "$P_STATE" = "running" ]; then
-            echo "::notice::ENT run $RUN_ID already tests this exact commit set ($P_STATE) — not dispatching."
-          else
-            RUN_ID=""
-            DISPATCH_TS=$(date -u +%s)
-            echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF=$ENGINE_SHA, code=$ENT_CODE_REF@$ENT_SHA, oss=$TESTED_SHA) for OSS PR #$PR ($HEAD_REF)…"
-            gh workflow run "$WF" --repo "$REPO" --ref "$ENT_REF" \
-              -f oss_branch="$TESTED_SHA" \
-              -f oss_pr="$PR" \
-              -f oss_sha="$HEAD_SHA" \
-              -f enterprise_ref="$ENT_SHA"
-            # The newest run for this PR and commit created since the dispatch (60 s clock skew) is ours.
-            sleep 8
-            for _ in $(seq 1 30); do
-              RUN_ID=$(gh run list --repo "$REPO" --workflow "$WF" --event workflow_dispatch -L 40 --json databaseId,displayTitle,createdAt 2>/dev/null \
-                | jq -r --arg p "${MATCH}$TESTED_SHA)" --argjson min "$((DISPATCH_TS - 60))" \
-                  '[.[] | select((.displayTitle | startswith($p)) and (.createdAt | fromdateiso8601) >= $min)] | sort_by(.createdAt) | last | .databaseId // empty' 2>/dev/null || echo "")
-              if [[ "$RUN_ID" =~ ^[0-9]+$ ]]; then break; fi
-              RUN_ID=""; sleep 10
-            done
-            [ -n "$RUN_ID" ] || cannot_start "Dispatching the enterprise e2e engine failed or the run never appeared within 5 min (check \`ORG_ADMIN_TOKEN\` / \`ENT_GATE_REF=$ENT_REF\`)."
-          fi
+          # Newest engine run titled for exactly this test (or the older engine's shorter title), created since $1.
+          newest_run() {
+            gh run list --repo "$REPO" --workflow "$WF" --event workflow_dispatch -L 40 --json databaseId,displayTitle,createdAt,event 2>/dev/null \
+              | jq -r --arg t "$TITLE" --arg old "${MATCH}$TESTED_SHA)" --argjson min "$1" \
+                '[.[] | select(.event == "workflow_dispatch" and (.displayTitle == $t or .displayTitle == $old) and (.createdAt | fromdateiso8601) >= $min)] | sort_by(.createdAt) | last | .databaseId // empty' 2>/dev/null || true
+          }
+          DISPATCH_TS=$(date -u +%s)
+          echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF=$ENGINE_SHA, code=$ENT_CODE_REF@$ENT_SHA, oss=$TESTED_SHA) for OSS PR #$PR ($HEAD_REF)…"
+          gh workflow run "$WF" --repo "$REPO" --ref "$ENT_REF" \
+            -f oss_branch="$TESTED_SHA" \
+            -f oss_head_ref="$HEAD_REF" \
+            -f oss_pr="$PR" \
+            -f oss_sha="$HEAD_SHA" \
+            -f enterprise_ref="$ENT_SHA"
+          RUN_ID=""
+          sleep 8
+          for _ in $(seq 1 30); do
+            RUN_ID=$(newest_run "$((DISPATCH_TS - 60))")
+            if [[ "$RUN_ID" =~ ^[0-9]+$ ]]; then break; fi
+            RUN_ID=""; sleep 10
+          done
+          [ -n "$RUN_ID" ] || cannot_start "Dispatching the enterprise e2e engine failed or the run never appeared within 5 min (check \`ORG_ADMIN_TOKEN\` / \`ENT_GATE_REF=$ENT_REF\`)."
 
           RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
           echo "::notice::Tracking ENT run: $RUN_URL"
@@ -290,8 +293,6 @@ jobs:
           [ENT run]($RUN_URL)"
             echo "::notice::✅ Enterprise e2e specs passed against this PR."
           }
-          if [ "$P_STATE" = "success" ]; then report_pass; exit 0; fi
-
           sticky "### 🔄 Playwright E2E Crosscheck — running
 
           $MARKER
@@ -326,26 +327,21 @@ jobs:
 
             if [ "$CONCL" = "success" ]; then report_pass; exit 0; fi
 
-            # Only a newer engine run for this PR supersedes this one; a run cancelled any other way never finished the specs.
+            # A run of this same test cancels ours (engine concurrency), so the gate follows it; anything else never finished the specs.
             if [ "$CONCL" = "cancelled" ] || [ "$CONCL" = "skipped" ] || [ -z "$CONCL" ]; then
-              RUN_CREATED=$(gh api "repos/$REPO/actions/runs/$RUN_ID" -q '.created_at' 2>/dev/null || echo "")
-              NEWER=0
-              if [ -n "$RUN_CREATED" ]; then
-                NEWER=$(gh run list --repo "$REPO" --workflow "$WF" --event workflow_dispatch -L 40 --json databaseId,displayTitle,createdAt 2>/dev/null \
-                  | jq -r --arg m "$MATCH" --argjson id "$RUN_ID" --arg created "$RUN_CREATED" \
-                    '[.[] | select((.displayTitle | startswith($m)) and .databaseId != $id and .createdAt > $created)] | length' 2>/dev/null || echo 0)
-              fi
-              if [ "${NEWER:-0}" != "0" ]; then
-                echo "::notice::ENT run concluded '$CONCL' and a newer ENT run exists for this PR — superseded, deferring to it."
-                exit 0
+              NEXT=$(newest_run "$((DISPATCH_TS - 60))")
+              if [[ "$NEXT" =~ ^[0-9]+$ ]] && [ "$NEXT" -gt "$RUN_ID" ]; then
+                echo "::notice::ENT run $RUN_ID was cancelled by run $NEXT of this same test — following it."
+                RUN_ID="$NEXT"; RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"; DEADLINE=$((SECONDS + RUN_BUDGET_MIN * 60))
+                continue
               fi
           sticky "### 🚫 Playwright E2E Crosscheck — enterprise run was cancelled, re-run needed
 
           $MARKER
-          The [enterprise e2e run]($RUN_URL) was cancelled (conclusion: \`${CONCL:-none}\`) and no newer enterprise run replaced it, so the specs did not finish. Re-run the failed job of this check.
+          The [enterprise e2e run]($RUN_URL) was cancelled (conclusion: \`${CONCL:-none}\`) and no newer run of this same test replaced it, so the specs did not finish. Re-run the failed job of this check.
 
           $SISTER_NOTE"
-              echo "::error::ENT run concluded '${CONCL:-none}' with no newer ENT run for this PR — failing the gate (unverified)."
+              echo "::error::ENT run concluded '${CONCL:-none}' with no newer run of this same test — failing the gate (unverified)."
               exit 1
             fi
 
