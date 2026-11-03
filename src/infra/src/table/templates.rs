@@ -360,6 +360,8 @@ where
     Ok(renames)
 }
 
+/// A `user_{name}` free in `org`; a default org row needs one free in every org, because
+/// its references follow it everywhere and an org's own row of that name would win the read.
 async fn free_name<C: ConnectionTrait>(
     db: &C,
     org: &str,
@@ -368,11 +370,26 @@ async fn free_name<C: ConnectionTrait>(
     let base = format!("user_{name}");
     let mut candidate = base.clone();
     let mut n = 1;
-    while get_org_model(db, org, &candidate).await?.is_some() {
+    while name_taken(db, org, &candidate).await? {
         n += 1;
         candidate = format!("{base}_{n}");
     }
     Ok(candidate)
+}
+
+async fn name_taken<C: ConnectionTrait>(
+    db: &C,
+    org: &str,
+    name: &str,
+) -> Result<bool, sea_orm::DbErr> {
+    if org != DEFAULT_ORG {
+        return Ok(get_org_model(db, org, name).await?.is_some());
+    }
+    Ok(Entity::find()
+        .filter(Column::Name.eq(name))
+        .one(db)
+        .await?
+        .is_some())
 }
 
 /// Points alerts, composites and org template settings at the new name; `None` is every org.
@@ -930,5 +947,46 @@ mod tests {
 
         // A second boot finds nothing left under the prefix that is not a seed.
         assert!(rename_reserved_collisions(&db).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_inherited_reference_keeps_its_body_when_another_org_owns_the_new_name() {
+        let db = reference_db().await;
+        insert_row(&db, DEFAULT_ORG, "o2_default_mine", false, "custom").await;
+        insert_row(&db, "acme", "user_o2_default_mine", false, "custom").await;
+        for (org, name, body) in [
+            (DEFAULT_ORG, "o2_default_mine", "shared body"),
+            ("acme", "user_o2_default_mine", "acme body"),
+        ] {
+            Entity::update_many()
+                .col_expr(Column::Body, sea_orm::sea_query::Expr::value(body))
+                .filter(Column::Org.eq(org))
+                .filter(Column::Name.eq(name))
+                .exec(&db)
+                .await
+                .unwrap();
+        }
+        // The acme alert reads the default row through the fallback.
+        insert_alert(&db, "alerts", "acme", "acme-alert", "o2_default_mine").await;
+        async fn body_for(db: &DatabaseConnection, name: &str) -> String {
+            get_model(db, "acme", name).await.unwrap().unwrap().body
+        }
+        let before = body_for(&db, "o2_default_mine").await;
+        assert_eq!(before, "shared body");
+
+        let renames = rename_reserved_collisions(&db).await.unwrap();
+
+        assert_eq!(
+            renames,
+            vec![ReservedRename {
+                org: DEFAULT_ORG.to_string(),
+                from: "o2_default_mine".to_string(),
+                to: "user_o2_default_mine_2".to_string(),
+            }]
+        );
+        let after = alert_template(&db, "alerts", "acme-alert").await.unwrap();
+        assert_eq!(after, "user_o2_default_mine_2");
+        assert_eq!(body_for(&db, &after).await, before);
+        assert_eq!(body_for(&db, "user_o2_default_mine").await, "acme body");
     }
 }
