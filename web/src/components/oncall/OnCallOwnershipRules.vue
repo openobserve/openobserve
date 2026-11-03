@@ -14,202 +14,236 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The routing rules as sentences, shared by org Routing and a team's Routing tab. -->
+<!-- The routing rules table, in the order the engine consults them; shared by org Routing and a team's Routing tab. -->
 <template>
-  <div class="relative flex flex-col gap-3" data-test="oncall-ownership-rules">
-    <div v-if="loading" class="flex flex-col gap-2" data-test="oncall-ownership-loading">
-      <OSkeleton v-for="n in 3" :key="n" type="rect" class="rounded-surface h-16 w-full" />
-    </div>
-
-    <template v-else>
-      <template v-if="groups.length">
-        <section
-          v-for="group in groups"
-          :key="group.teamId"
-          class="flex flex-col gap-2"
-          :data-test="`oncall-rule-group-${group.teamId}`"
-        >
-          <OText v-if="!teamId" variant="label" class="text-text-secondary">
-            {{ group.teamName }}
-          </OText>
-
-          <div
-            v-for="row in group.rows"
-            :key="row.rule.rule_id"
-            class="border-border-default bg-surface-base rounded-surface flex flex-wrap items-center gap-x-4 gap-y-2 border px-4 py-3"
-            :data-test="`oncall-routing-row-${row.rule.rule_id}`"
-          >
-            <span class="flex min-w-0 flex-1 flex-col gap-1">
-              <i18n-t
-                keypath="oncall.ruleSentence"
-                tag="span"
-                scope="global"
-                class="text-text-body flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm"
-                :data-test="`oncall-routing-says-${row.rule.rule_id}`"
-              >
-                <template #conditions>
-                  <template v-for="(condition, index) in row.conditions" :key="condition.name">
-                    <OText v-if="index" as="span" variant="meta">
-                      {{ t("oncall.ruleEditorAnd") }}
-                    </OText>
-                    <ODimensionChip
-                      :dim-key="condition.name"
-                      :key-label="condition.label"
-                      :value="condition.value"
-                    />
-                  </template>
-                </template>
-                <template #team>
-                  <span
-                    class="text-text-heading font-semibold"
-                    :data-test="`oncall-rule-team-${row.rule.rule_id}`"
-                  >
-                    {{ teamNameOf(row.rule) }}
-                  </span>
-                </template>
-              </i18n-t>
-
-              <OText variant="meta" :data-test="`oncall-routing-caught-${row.rule.rule_id}`">
-                {{ caughtOf(row.rule) }}
-              </OText>
-              <OTag
-                v-if="row.overlap"
-                type="oncallRuleHealth"
-                value="shadowed"
-                size="sm"
-                class="self-start"
-                :data-test="`oncall-routing-note-${row.rule.rule_id}`"
-              >
-                {{ row.overlap }}
-              </OTag>
-            </span>
-
-            <!-- Fixed slots [edit][more], so every row's icons line up with the catch-all's. -->
-            <span v-if="editable" class="ms-auto flex w-16 shrink-0 items-center justify-end gap-1">
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                icon-left="edit"
-                :aria-label="t('oncall.edit')"
-                :data-test="`oncall-routing-edit-${row.rule.rule_id}`"
-                @click="emit('edit', row.rule)"
-              >
-                <OTooltip side="bottom" :content="t('oncall.edit')" />
-              </OButton>
-              <ODropdown side="bottom" align="end">
-                <template #trigger>
-                  <OButton
-                    variant="ghost"
-                    size="icon-xs-sq"
-                    icon-left="more-vert"
-                    :aria-label="t('oncall.moreActions')"
-                    :data-test="`oncall-routing-more-${row.rule.rule_id}`"
-                  >
-                    <OTooltip side="bottom" :content="t('oncall.moreActions')" />
-                  </OButton>
-                </template>
-                <ODropdownItem
-                  v-if="testable"
-                  icon-left="manage-search"
-                  :data-test="`oncall-routing-test-${row.rule.rule_id}`"
-                  @select="emit('test', row.rule)"
-                >
-                  <span>{{ t("oncall.routingTestRouting") }}</span>
-                </ODropdownItem>
-                <ODropdownItem
-                  icon-left="delete-outline"
-                  variant="destructive"
-                  :data-test="`oncall-ownership-delete-${row.rule.rule_id}`"
-                  @select="emit('remove', row.rule)"
-                >
-                  <span>{{ t("oncall.removeRule") }}</span>
-                </ODropdownItem>
-              </ODropdown>
-            </span>
-          </div>
-        </section>
+  <div class="flex min-h-0 flex-1 flex-col" data-test="oncall-ownership-rules">
+    <OTable
+      :data="ordered"
+      :columns="columns"
+      row-key="rule_id"
+      :frame="false"
+      :loading="loading"
+      pagination="client"
+      :global-filter="search"
+      :show-global-filter="false"
+      :table-id="teamId ? 'oncall-team-routing-rules' : 'oncall-ownership-rules'"
+      :persist-columns="true"
+      :enable-column-resize="true"
+      data-test="oncall-ownership-table"
+    >
+      <template v-if="$slots.toolbar" #toolbar><slot name="toolbar" /></template>
+      <template v-if="$slots['toolbar-trailing']" #toolbar-trailing>
+        <slot name="toolbar-trailing" />
       </template>
 
-      <OEmptyState
-        v-else-if="search"
-        size="block"
-        preset="no-oncall-rules"
-        filtered
-        data-test="oncall-ownership-empty"
-        @action="onEmptyAction"
-      />
-      <OEmptyState
-        v-else
-        size="block"
-        preset="no-oncall-rules"
-        :description="emptyDescription"
-        data-test="oncall-ownership-empty"
-        @action="emit('add')"
-      />
-
-      <!-- Pinned last: the catch-all is where an alert lands once every rule above has failed. -->
-      <div
-        v-if="catchAll"
-        class="border-border-default rounded-surface flex flex-wrap items-center gap-x-4 gap-y-2 border border-dashed px-4 py-3"
-        data-test="oncall-routing-catch-all"
-      >
+      <template #cell-match="{ row }">
         <span
-          class="min-w-0 flex-1 text-sm"
-          :class="catchAll === 'unset' ? 'text-status-warning-text' : 'text-text-body'"
-          data-test="oncall-routing-catch-all-team"
+          class="flex w-full max-w-full min-w-0 flex-wrap items-center gap-1 py-1"
+          :data-test="`oncall-routing-says-${row.rule_id}`"
         >
-          <i18n-t v-if="catchAll === 'org'" keypath="oncall.routingEverythingElse" scope="global">
-            <template #team>
-              <span class="text-text-heading font-semibold">{{ defaultTeamName }}</span>
-            </template>
-          </i18n-t>
-          <template v-else-if="catchAll === 'unset'">
-            {{ t("oncall.routingEverythingElseNobody") }}
-          </template>
-          <template v-else>{{ t("oncall.routingDefaultAlsoGets") }}</template>
+          <ODimensionChip
+            v-for="condition in conditionsOf(row)"
+            :key="condition.name"
+            :dim-key="condition.name"
+            :key-label="condition.label"
+            :value="condition.value"
+          />
         </span>
-        <!-- The team tab's way out is a labelled link to another page, not a row edit, so it is not an icon slot. -->
-        <OButton
-          v-if="editable && teamId"
-          variant="outline"
+      </template>
+
+      <template #cell-team="{ row }">
+        <OTruncatedText class="text-text-body" :data-test="`oncall-rule-team-${row.rule_id}`">
+          {{ teamNameOf(row) }}
+        </OTruncatedText>
+      </template>
+
+      <template #cell-specificity="{ row }">
+        <span class="flex flex-wrap gap-1">
+          <OTag
+            v-for="condition in conditionsOf(row)"
+            :key="condition.name"
+            type="dimensionKey"
+            :value="condition.name"
+            :label="raw(condition.field)"
+            size="sm"
+          />
+        </span>
+      </template>
+
+      <template #cell-caught="{ row }">
+        <span class="text-text-body" :data-test="`oncall-routing-caught-${row.rule_id}`">
+          {{ t("oncall.rulePagesCaught", { count: row.pages_caught }, row.pages_caught) }}
+        </span>
+      </template>
+
+      <template #cell-last="{ row }">
+        <OTimeCell
+          :value="row.last_matched_at ?? null"
+          unit="us"
+          :timezone="timezone"
+          :empty-label="t('oncall.ruleNeverMatched')"
+        />
+      </template>
+
+      <!-- The server's verdict, never a recomputed one: "shadowed" is a claim about rules this screen may not see. -->
+      <template #cell-health="{ row }">
+        <OTag
+          type="oncallRuleHealth"
+          :value="row.health"
           size="sm"
-          icon-left="alt-route"
-          class="ms-auto"
-          data-test="oncall-routing-catch-all-set"
-          @click="emit('change-default')"
+          :data-test="`oncall-rule-health-${row.rule_id}`"
         >
-          {{ t("oncall.routingChangeInRouting") }}
-        </OButton>
-        <span
-          v-else-if="editable"
-          class="ms-auto flex w-16 shrink-0 items-center justify-end gap-1"
-        >
+          {{ healthLabel(row) }}
+          <OTooltip v-if="row.health_summary" side="bottom" :content="raw(row.health_summary)" />
+        </OTag>
+      </template>
+
+      <template #cell-actions="{ row }">
+        <span class="flex items-center justify-end gap-1">
+          <OButton
+            v-if="testable"
+            variant="ghost"
+            size="icon-sm"
+            icon-left="manage-search"
+            class="max-md:hidden"
+            :aria-label="t('oncall.routingTestRouting')"
+            :data-test="`oncall-routing-test-${row.rule_id}`"
+            @click.stop="emit('test', row)"
+          >
+            <OTooltip side="bottom" :content="t('oncall.routingTestRouting')" />
+          </OButton>
           <OButton
             variant="ghost"
             size="icon-sm"
             icon-left="edit"
-            :aria-label="catchAllAction"
+            class="max-md:hidden"
+            :aria-label="t('oncall.edit')"
+            :data-test="`oncall-routing-edit-${row.rule_id}`"
+            @click.stop="emit('edit', row)"
+          >
+            <OTooltip side="bottom" :content="t('oncall.edit')" />
+          </OButton>
+          <OButton
+            variant="ghost-destructive"
+            size="icon-sm"
+            icon-left="delete-outline"
+            class="max-md:hidden"
+            :aria-label="t('oncall.removeRule')"
+            :data-test="`oncall-ownership-delete-${row.rule_id}`"
+            @click.stop="emit('remove', row)"
+          >
+            <OTooltip side="bottom" :content="t('oncall.removeRule')" />
+          </OButton>
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                icon-left="more-vert"
+                variant="ghost"
+                size="icon-xs-sq"
+                class="md:hidden"
+                :aria-label="t('oncall.moreActions')"
+                :data-test="`oncall-routing-more-${row.rule_id}`"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              v-if="testable"
+              icon-left="manage-search"
+              class="md:hidden"
+              :data-test="`oncall-routing-test-${row.rule_id}-menu`"
+              @select="emit('test', row)"
+            >
+              <span>{{ t("oncall.routingTestRouting") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="edit"
+              class="md:hidden"
+              :data-test="`oncall-routing-edit-${row.rule_id}-menu`"
+              @select="emit('edit', row)"
+            >
+              <span>{{ t("oncall.edit") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="delete-outline"
+              variant="destructive"
+              class="md:hidden"
+              :data-test="`oncall-ownership-delete-${row.rule_id}-menu`"
+              @select="emit('remove', row)"
+            >
+              <span>{{ t("oncall.removeRule") }}</span>
+            </ODropdownItem>
+          </ODropdown>
+        </span>
+      </template>
+
+      <!-- Where an alert lands once every rule above has failed, said once under the table. -->
+      <template v-if="catchAll" #footer-note>
+        <span class="flex flex-wrap items-center gap-2" data-test="oncall-routing-catch-all">
+          <span
+            class="text-sm"
+            :class="catchAll === 'unset' ? 'text-status-warning-text' : 'text-text-body'"
+            data-test="oncall-routing-catch-all-team"
+          >
+            <i18n-t v-if="catchAll === 'org'" keypath="oncall.routingEverythingElse" scope="global">
+              <template #team>
+                <span class="text-text-heading font-semibold">{{ defaultTeamName }}</span>
+              </template>
+            </i18n-t>
+            <template v-else-if="catchAll === 'unset'">
+              {{ t("oncall.routingEverythingElseNobody") }}
+            </template>
+            <template v-else>{{ t("oncall.routingDefaultAlsoGets") }}</template>
+          </span>
+          <OButton
+            v-if="editable"
+            variant="outline"
+            size="xs"
+            :icon-left="teamId ? 'alt-route' : 'edit'"
             data-test="oncall-routing-catch-all-set"
             @click="emit('change-default')"
           >
-            <OTooltip side="bottom" :content="catchAllAction" />
+            {{ catchAllAction }}
           </OButton>
-          <span class="w-7 shrink-0" aria-hidden="true" />
         </span>
-      </div>
-    </template>
+      </template>
+
+      <template #empty>
+        <template v-if="!loading">
+          <!-- A search that matched nothing is not an org without rules. -->
+          <OEmptyState
+            v-if="search"
+            size="block"
+            preset="no-oncall-rules"
+            filtered
+            data-test="oncall-ownership-empty"
+            @action="onEmptyAction"
+          />
+          <OEmptyState
+            v-else
+            size="block"
+            preset="no-oncall-rules"
+            :description="emptyDescription"
+            data-test="oncall-ownership-empty"
+            @action="emit('add')"
+          />
+        </template>
+      </template>
+    </OTable>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useStore } from "vuex";
 
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OText from "@/lib/core/Typography/OText.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -220,6 +254,9 @@ import { compareRulePrecedence, fieldLabel } from "@/utils/oncall";
 
 interface RuleCondition {
   name: string;
+  /** The field alone, for the Specificity column. */
+  field: string;
+  /** The chip's key segment, "starts with" folded in for a prefix claim. */
   label: string;
   value: string;
 }
@@ -230,7 +267,7 @@ const props = withDefaults(
     teams?: { id: string; name: string }[];
     /** The org's field vocabulary, so a dimension reads as it does elsewhere. */
     aliases?: { id: string; display?: string }[];
-    /** Set on a team's tab: only that team's rules, no team headings. */
+    /** Set on a team's tab: only that team's rules, and no Routes to column. */
     teamId?: string;
     /** The org's catch-all team, or null when none is nominated. */
     defaultTeamId?: string | null;
@@ -264,36 +301,100 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
+const timezone = computed<string | undefined>(() => store.state.timezone || undefined);
 
-const scoped = computed(() =>
-  props.teamId ? props.rules.filter((rule) => rule.team_id === props.teamId) : props.rules,
+/// Most specific first, the order the engine consults them; the endpoint returns storage order.
+const ordered = computed(() =>
+  (props.teamId ? props.rules.filter((rule) => rule.team_id === props.teamId) : props.rules)
+    .slice()
+    .sort(compareRulePrecedence),
 );
 
-const visible = computed(() => {
-  const needle = props.search.trim().toLowerCase();
-  if (!needle) return scoped.value;
-  return scoped.value.filter((rule) => searchTextOf(rule).includes(needle));
-});
-
-const groups = computed(() => {
-  const byTeam = new Map<string, OwnershipRuleStats[]>();
-  for (const rule of visible.value) {
-    const list = byTeam.get(rule.team_id);
-    if (list) list.push(rule);
-    else byTeam.set(rule.team_id, [rule]);
-  }
-  return [...byTeam.entries()]
-    .map(([teamId, rules]) => ({
-      teamId,
-      teamName: teamNameOf(rules[0]),
-      rows: [...rules].sort(compareRulePrecedence).map((rule) => ({
-        rule,
-        conditions: conditionsOf(rule),
-        overlap: overlapOf(rule),
-      })),
-    }))
-    .sort((a, b) => String(a.teamName).localeCompare(String(b.teamName)));
-});
+const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
+  {
+    id: "order",
+    header: t("oncall.ruleOrder"),
+    size: 70,
+    sortable: false,
+    accessorFn: (row: OwnershipRuleStats) => ordered.value.indexOf(row) + 1,
+    meta: { align: "center" },
+  },
+  {
+    id: "match",
+    header: t("oncall.ownershipMatch"),
+    // Search matches what the chips read, not the stored `k=v` path.
+    accessorFn: (row: OwnershipRuleStats) =>
+      conditionsOf(row)
+        .map((condition) => `${condition.label} ${condition.value}`)
+        .join(" "),
+    meta: { isName: true, cellOverflowTooltip: false },
+  },
+  ...(props.teamId
+    ? []
+    : [
+        {
+          id: "team",
+          header: t("oncall.ruleRoutesTo"),
+          size: 160,
+          sortable: true,
+          accessorFn: (row: OwnershipRuleStats) => String(teamNameOf(row)),
+        } as OTableColumnDef<OwnershipRuleStats>,
+      ]),
+  {
+    id: "specificity",
+    header: t("oncall.ruleSpecificity"),
+    size: 170,
+    sortable: false,
+    hideable: true,
+    accessorFn: (row: OwnershipRuleStats) =>
+      conditionsOf(row)
+        .map((condition) => condition.field)
+        .join(", "),
+  },
+  {
+    id: "caught",
+    header: t("oncall.rulePagesCaughtHeader"),
+    size: 150,
+    sortable: true,
+    hideable: true,
+    accessorFn: (row: OwnershipRuleStats) => row.pages_caught,
+  },
+  {
+    id: "last",
+    header: t("oncall.ruleLastMatched"),
+    size: 140,
+    sortable: true,
+    hideable: true,
+    accessorFn: (row: OwnershipRuleStats) => row.last_matched_at ?? 0,
+  },
+  {
+    id: "health",
+    header: t("oncall.ruleHealth"),
+    size: 180,
+    sortable: false,
+    hideable: true,
+    // The label, not the enum: search has to match what the cell shows.
+    accessorFn: (row: OwnershipRuleStats) => String(healthLabel(row)),
+  },
+  ...(props.editable
+    ? [
+        {
+          id: "actions",
+          header: t("oncall.actions"),
+          isAction: true,
+          pinned: "right",
+          sortable: false,
+          size: props.testable ? 110 : 80,
+          meta: {
+            align: "center",
+            cellClass: "actions-column",
+            actionCount: props.testable ? 3 : 2,
+          },
+        } as OTableColumnDef<OwnershipRuleStats>,
+      ]
+    : []),
+]);
 
 /// `org` / `unset` on the org page; `team` only on the tab of the team that IS the catch-all.
 const catchAll = computed<"org" | "unset" | "team" | null>(() => {
@@ -305,9 +406,12 @@ const defaultTeamName = computed<I18nText>(() =>
   raw(props.teams.find((team) => team.id === props.defaultTeamId)?.name || props.defaultTeamId),
 );
 
-const catchAllAction = computed<I18nText>(() =>
-  props.defaultTeamId ? t("oncall.routingChangeCatchAll") : t("oncall.routingCatchAllRowSet"),
-);
+const catchAllAction = computed<I18nText>(() => {
+  if (props.teamId) return t("oncall.routingChangeInRouting");
+  return props.defaultTeamId
+    ? t("oncall.routingChangeCatchAll")
+    : t("oncall.routingCatchAllRowSet");
+});
 
 const emptyDescription = computed<I18nText>(() => {
   if (!props.teamId) return t("oncall.noOwnershipRulesOrg");
@@ -316,10 +420,6 @@ const emptyDescription = computed<I18nText>(() => {
     ? t("oncall.routingEmptyBodyNamed", { team: raw(name) })
     : t("oncall.noOwnershipRules");
 });
-
-function displayOf(name: string): string {
-  return fieldLabel(name, props.aliases);
-}
 
 function teamNameOf(rule: OwnershipRuleStats): I18nText {
   return raw(
@@ -334,34 +434,24 @@ function conditionsOf(rule: OwnershipRuleStats): RuleCondition[] {
     .map((name) => {
       const value = String(rule.dimensions[name]);
       const prefix = value.endsWith("*");
+      const field = fieldLabel(name, props.aliases);
       return {
         name,
-        label: prefix
-          ? String(t("oncall.ruleChipStartsWith", { field: raw(displayOf(name)) }))
-          : displayOf(name),
+        field,
+        label: prefix ? String(t("oncall.ruleChipStartsWith", { field: raw(field) })) : field,
         value: prefix ? value.slice(0, -1) : value,
       };
     });
 }
 
-function caughtOf(rule: OwnershipRuleStats): I18nText {
-  if (!rule.last_matched_at) return t("oncall.ruleNeverMatchedYet");
-  return t("oncall.rulePagesInWindow", { count: rule.pages_caught }, rule.pages_caught);
-}
-
-/// The server's verdict, never a recomputed one: only a shadowed rule earns the line.
-function overlapOf(rule: OwnershipRuleStats): I18nText | null {
-  if (rule.health !== "shadowed") return null;
-  const other = rule.shadowed_by[0];
-  const who = other?.team_name || other?.path;
-  return who ? t("oncall.ruleAlsoClaimedBy", { team: raw(who) }) : raw(rule.health_summary);
-}
-
-function searchTextOf(rule: OwnershipRuleStats): string {
-  const conditions = Object.entries(rule.dimensions ?? {})
-    .map(([name, value]) => `${displayOf(name)} ${value}`)
-    .join(" ");
-  return `${conditions} ${String(teamNameOf(rule))}`.toLowerCase();
+/// A shadowed rule names the team taking its pages, because "shadowed" alone does not say who to talk to.
+function healthLabel(rule: OwnershipRuleStats): I18nText {
+  if (rule.health === "shadowed") {
+    const other = rule.shadowed_by[0];
+    const who = other?.team_name || other?.path;
+    return who ? t("oncall.ruleAlsoClaimedBy", { team: raw(who) }) : t("oncall.ruleShadowed");
+  }
+  return rule.health === "never_used" ? t("oncall.ruleNeverMatchedYet") : t("oncall.ruleActive");
 }
 
 function onEmptyAction(id?: string) {

@@ -109,7 +109,7 @@ const stubs = {
       "search",
       "editable",
     ],
-    template: "<div />",
+    template: "<div><slot name='toolbar' /><slot name='toolbar-trailing' /></div>",
   },
   OnCallRuleEditor: {
     name: "OnCallRuleEditor",

@@ -97,6 +97,13 @@ function rule(id: string, teamId: string) {
   };
 }
 
+/// The table holds its skeleton for a moment after loading ends, so rows need that beat to appear.
+async function settle() {
+  await flushPromises();
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  await flushPromises();
+}
+
 function render() {
   return mount(OnCallOwnership, {
     props: { teamId: "team_1", teams: TEAMS },
@@ -130,7 +137,7 @@ describe("OnCallOwnership", () => {
 
   it("titles the tab with the team and states the same precedence as org Routing", async () => {
     const wrapper = render();
-    await flushPromises();
+    await settle();
     expect(wrapper.find('[data-test="oncall-ownership-title"]').text()).toBe(
       "Alerts that come to Platform",
     );
@@ -141,24 +148,24 @@ describe("OnCallOwnership", () => {
 
   it("asks for this team's stats and lists only this team's rules", async () => {
     const wrapper = render();
-    await flushPromises();
+    await settle();
     expect(service.ownershipStats).toHaveBeenCalledWith(
       expect.objectContaining({ team_id: "team_1" }),
     );
-    expect(wrapper.find('[data-test="oncall-routing-row-checkout"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-routing-row-moved"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-routing-says-checkout"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-routing-says-moved"]').exists()).toBe(false);
   });
 
   it("reports the count the tab lists, so the header can agree with it", async () => {
     const wrapper = render();
-    await flushPromises();
+    await settle();
     expect(wrapper.emitted("rules-loaded")?.[0]).toEqual([1]);
   });
 
   it("shows the catch-all line only on the default team, pointing at Routing", async () => {
     routingConfig("team_1");
     const wrapper = render();
-    await flushPromises();
+    await settle();
     await wrapper.find('[data-test="oncall-routing-catch-all-set"]').trigger("click");
     expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallRouting" }));
   });
@@ -171,7 +178,7 @@ describe("OnCallOwnership", () => {
       ],
     } as never);
     const wrapper = render();
-    await flushPromises();
+    await settle();
     const link = wrapper.find('[data-test="oncall-ownership-unclaimed"]');
     expect(link.text()).toBe("2 signals have no owner → Routing");
     await link.trigger("click");
@@ -185,7 +192,7 @@ describe("OnCallOwnership", () => {
 
   it("edits a rule in the same editor the org page uses", async () => {
     const wrapper = render();
-    await flushPromises();
+    await settle();
     await wrapper.find('[data-test="oncall-routing-edit-checkout"]').trigger("click");
     await flushPromises();
     const editor = wrapper.findComponent({ name: "OnCallRuleEditor" });
@@ -199,7 +206,7 @@ describe("OnCallOwnership", () => {
 
   it("creates a new rule for this team by default", async () => {
     const wrapper = render();
-    await flushPromises();
+    await settle();
     await wrapper.find('[data-test="oncall-ownership-add-rule"]').trigger("click");
     const editor = wrapper.findComponent({ name: "OnCallRuleEditor" });
     expect(editor.props("teamId")).toBe("team_1");

@@ -104,13 +104,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Identity only: pod names and status codes are evidence about one firing, not what a rule pins. -->
       <template #cell-path="{ row }">
-        <span class="flex flex-wrap gap-1" :data-test="`oncall-unrouted-path-${row.id}`">
+        <span
+          class="flex w-full max-w-full min-w-0 flex-wrap items-center gap-1"
+          :data-test="`oncall-unrouted-path-${row.id}`"
+        >
           <ODimensionChip
-            v-for="(value, name) in claimableDimensions(row.dimensions)"
-            :key="name"
-            :dim-key="String(name)"
-            :value="value"
+            v-for="chip in pathChips(row).shown"
+            :key="chip.name"
+            :dim-key="chip.name"
+            :key-label="chip.label"
+            :value="chip.value"
           />
+          <OTag
+            v-if="pathChips(row).hidden.length"
+            type="countChip"
+            value="neutral"
+            size="sm"
+            class="cursor-help"
+            :data-test="`oncall-unrouted-path-more-${row.id}`"
+          >
+            <OTooltip side="bottom" :content="hiddenChipsText(row)" />
+            {{ t("oncall.unroutedPathMore", { count: pathChips(row).hidden.length }) }}
+          </OTag>
         </span>
       </template>
 
@@ -251,7 +266,15 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { UnroutedSignal } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { claimableDimensions, dimensionsSentence, identityDimensions } from "@/utils/oncall";
+import {
+  claimableDimensions,
+  dimensionsSentence,
+  fieldLabel,
+  identityDimensions,
+} from "@/utils/oncall";
+
+/// Beyond this a row grows taller than the rest; the remainder sits behind "+N".
+const PATH_CHIPS_SHOWN = 3;
 
 export interface UnroutedFilters {
   landing?: "default_team" | "nobody";
@@ -387,6 +410,22 @@ function teamNameOf(teamId: string): string {
 function routablePathOf(signal: UnroutedSignal): string {
   const kept = identityDimensions(signal.dimensions);
   return Object.keys(kept).length ? dimensionsSentence(kept) : pathOf(signal);
+}
+
+function pathChips(signal: UnroutedSignal) {
+  const dims = claimableDimensions(signal.dimensions);
+  const chips = Object.keys(dims)
+    .sort()
+    .map((name) => ({ name, label: fieldLabel(name), value: dims[name] }));
+  return { shown: chips.slice(0, PATH_CHIPS_SHOWN), hidden: chips.slice(PATH_CHIPS_SHOWN) };
+}
+
+function hiddenChipsText(signal: UnroutedSignal): I18nText {
+  return raw(
+    pathChips(signal)
+      .hidden.map((chip) => `${chip.label} ${chip.value}`)
+      .join(" · "),
+  );
 }
 
 function onEmptyAction(id?: string) {

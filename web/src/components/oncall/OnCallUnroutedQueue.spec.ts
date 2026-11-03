@@ -72,6 +72,27 @@ function render(signals: UnroutedSignal[] = [signal()]) {
 }
 
 describe("OnCallUnroutedQueue", () => {
+  it("shows three identity chips and the rest behind +N, so the path stays in its cell", () => {
+    const wrapper = render([
+      signal({
+        dimensions: {
+          service: "inventory-service",
+          "service-namespace": "ecommerce",
+          environment: "production",
+          region: "eu-west-1",
+          "k8s-pod-name": "pod-1",
+        },
+      }),
+    ]);
+    const path = wrapper.find('[data-test="oncall-unrouted-path-s1"]');
+    expect(path.findAllComponents({ name: "ODimensionChip" })).toHaveLength(3);
+    const more = wrapper.find('[data-test="oncall-unrouted-path-more-s1"]');
+    expect(more.text()).toBe("+1");
+    expect(more.findComponent({ name: "OTooltip" }).props("content")).toBe(
+      "Service namespace ecommerce",
+    );
+  });
+
   it("names the alert and the dimensions a rule would be written against", () => {
     const wrapper = render();
     expect(wrapper.text()).toContain("Dispute webhook backlog");

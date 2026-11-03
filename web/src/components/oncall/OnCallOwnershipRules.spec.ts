@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 
 import OnCallOwnershipRules from "@/components/oncall/OnCallOwnershipRules.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import i18n from "@/locales";
 import type { OwnershipRuleStats } from "@/ts/interfaces/oncall";
 import store from "@/test/unit/helpers/store";
@@ -65,94 +67,63 @@ function render(props: Record<string, unknown> = {}) {
 }
 
 describe("OnCallOwnershipRules", () => {
-  it("reads each rule as a sentence: conditions → team", () => {
-    const wrapper = render();
-    const says = wrapper.find('[data-test="oncall-routing-says-r1"]').text();
-    expect(says).toContain("Alerts from");
-    expect(says).toContain("Service");
-    expect(says).toContain("payments-api");
-    expect(says).toContain("Platform SRE");
-  });
-
-  it("says what a rule caught in 30 days, or that it never matched", () => {
+  it("lists rules in a table, most specific first, numbered in that order", async () => {
     const wrapper = render({
-      rules: [rule(), rule({ rule_id: "r2", last_matched_at: null, pages_caught: 0 })],
+      rules: [
+        rule(),
+        rule({
+          rule_id: "r2",
+          team_id: "team_2",
+          dimensions: { service: "cart", "k8s-namespace": "shop" },
+        }),
+      ],
     });
-    expect(wrapper.find('[data-test="oncall-routing-caught-r1"]').text()).toBe(
-      "6 pages in 30 days",
-    );
-    expect(wrapper.find('[data-test="oncall-routing-caught-r2"]').text()).toBe("Never matched yet");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-ownership-table"]').exists()).toBe(true);
+    const rows = wrapper.findAll('[data-test^="oncall-routing-says-"]');
+    expect(rows.map((r) => r.attributes("data-test"))).toEqual([
+      "oncall-routing-says-r2",
+      "oncall-routing-says-r1",
+    ]);
+    expect(wrapper.text()).toContain("Order");
   });
 
-  it("reads a trailing * as starts with, not a literal star", () => {
-    const wrapper = render({ rules: [rule({ dimensions: { service: "checkout-*" } })] });
+  it("reads the match as chips with sentence-case fields, and a trailing * as starts with", async () => {
+    const wrapper = render({
+      rules: [rule({ dimensions: { service: "checkout-*", "k8s-namespace": "shop" } })],
+    });
+    await flushPromises();
     const says = wrapper.find('[data-test="oncall-routing-says-r1"]').text();
+    expect(says).toContain("K8s namespace");
     expect(says).toContain("Service starts with");
     expect(says).toContain("checkout-");
     expect(says).not.toContain("*");
   });
 
-  it("groups the org list by team, alphabetically", () => {
-    const wrapper = render({
-      rules: [rule(), rule({ rule_id: "r2", team_id: "team_2", dimensions: { service: "cart" } })],
-    });
-    const groups = wrapper.findAll('[data-test^="oncall-rule-group-"]');
-    expect(groups.map((g) => g.attributes("data-test"))).toEqual([
-      "oncall-rule-group-team_2",
-      "oncall-rule-group-team_1",
-    ]);
-    expect(groups[0].text()).toContain("Checkout");
-  });
-
-  it("filters to one team on a team's tab, with no team heading", () => {
-    const wrapper = render({
+  it("names where each rule routes on the org page, and drops that column on a team's tab", async () => {
+    const org = render({ rules: [rule(), rule({ rule_id: "r2", team_id: "team_2" })] });
+    await flushPromises();
+    expect(org.find('[data-test="oncall-rule-team-r2"]').text()).toBe("Checkout");
+    const team = render({
       teamId: "team_1",
       rules: [rule(), rule({ rule_id: "r2", team_id: "team_2" })],
     });
-    expect(wrapper.find('[data-test="oncall-routing-row-r1"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-routing-row-r2"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-rule-group-team_1"]').text()).not.toMatch(
-      /^Platform SRE/,
-    );
+    await flushPromises();
+    expect(team.find('[data-test="oncall-routing-says-r1"]').exists()).toBe(true);
+    expect(team.find('[data-test="oncall-routing-says-r2"]').exists()).toBe(false);
+    expect(team.find('[data-test="oncall-rule-team-r1"]').exists()).toBe(false);
   });
 
-  it("keeps delete behind the more menu, never as a row button", async () => {
-    const wrapper = render();
-    const remove = wrapper.find('[data-test="oncall-ownership-delete-r1"]');
-    expect(remove.exists()).toBe(true);
-    await remove.trigger("click");
-    expect(wrapper.emitted("remove")?.[0]).toEqual([rule()]);
-    await wrapper.find('[data-test="oncall-routing-edit-r1"]').trigger("click");
-    expect(wrapper.emitted("edit")?.[0]).toEqual([rule()]);
+  it("counts pages caught and marks a rule that never matched", async () => {
+    const wrapper = render({
+      rules: [rule(), rule({ rule_id: "r2", last_matched_at: null, pages_caught: 0 })],
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-caught-r1"]').text()).toBe("6 pages");
+    expect(wrapper.text()).toContain("Never");
   });
 
-  it("pins the catch-all as the last row on the org list", async () => {
-    const wrapper = render({ defaultTeamId: "team_2" });
-    const row = wrapper.find('[data-test="oncall-routing-catch-all"]');
-    expect(row.text()).toContain("Everything else");
-    expect(row.text()).toContain("Checkout");
-    await wrapper.find('[data-test="oncall-routing-catch-all-set"]').trigger("click");
-    expect(wrapper.emitted("change-default")).toHaveLength(1);
-  });
-
-  it("warns when the org has no catch-all", () => {
-    const wrapper = render({ defaultTeamId: null });
-    expect(wrapper.find('[data-test="oncall-routing-catch-all-team"]').text()).toBe(
-      "Everything else pages nobody",
-    );
-  });
-
-  it("shows the catch-all line on a team's tab only when that team is the default", () => {
-    const own = render({ teamId: "team_1", defaultTeamId: "team_1" });
-    expect(own.find('[data-test="oncall-routing-catch-all"]').text()).toContain(
-      "Also gets every alert no team owns",
-    );
-    expect(own.find('[data-test="oncall-routing-catch-all-set"]').text()).toBe("Change in Routing");
-    const other = render({ teamId: "team_1", defaultTeamId: "team_2" });
-    expect(other.find('[data-test="oncall-routing-catch-all"]').exists()).toBe(false);
-  });
-
-  it("names the team taking a shadowed rule's pages", () => {
+  it("colours Health and Specificity through the badge registry", async () => {
     const wrapper = render({
       rules: [
         rule({
@@ -169,22 +140,71 @@ describe("OnCallOwnershipRules", () => {
         }),
       ],
     });
-    expect(wrapper.find('[data-test="oncall-routing-note-r1"]').text()).toContain("Checkout");
-    const types = wrapper.findAllComponents({ name: "OTag" }).map((tag) => tag.props("type"));
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-health-r1"]').text()).toContain("Checkout");
+    const types = wrapper.findAllComponents(OTag).map((tag) => tag.props("type"));
     expect(types).toContain("oncallRuleHealth");
+    expect(types).toContain("dimensionKey");
   });
 
-  it("filters by search on conditions and team name", () => {
+  it("acts from the row: Edit and a destructive Delete, plus Test routing where hosted", async () => {
+    const wrapper = render({ testable: true });
+    await flushPromises();
+    const remove = wrapper
+      .findAllComponents(OButton)
+      .find((b) => b.attributes("data-test") === "oncall-ownership-delete-r1")!;
+    expect(remove.props("variant")).toBe("ghost-destructive");
+    await remove.trigger("click");
+    expect(wrapper.emitted("remove")?.[0]).toEqual([rule()]);
+    await wrapper.find('[data-test="oncall-routing-edit-r1"]').trigger("click");
+    expect(wrapper.emitted("edit")?.[0]).toEqual([rule()]);
+    await wrapper.find('[data-test="oncall-routing-test-r1"]').trigger("click");
+    expect(wrapper.emitted("test")?.[0]).toEqual([rule()]);
+  });
+
+  it("states the catch-all under the table on the org list", async () => {
+    const wrapper = render({ defaultTeamId: "team_2" });
+    await flushPromises();
+    const row = wrapper.find('[data-test="oncall-routing-catch-all"]');
+    expect(row.text()).toContain("Everything else");
+    expect(row.text()).toContain("Checkout");
+    await wrapper.find('[data-test="oncall-routing-catch-all-set"]').trigger("click");
+    expect(wrapper.emitted("change-default")).toHaveLength(1);
+  });
+
+  it("warns when the org has no catch-all", async () => {
+    const wrapper = render({ defaultTeamId: null });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-catch-all-team"]').text()).toBe(
+      "Everything else pages nobody",
+    );
+  });
+
+  it("shows the catch-all line on a team's tab only when that team is the default", async () => {
+    const own = render({ teamId: "team_1", defaultTeamId: "team_1" });
+    await flushPromises();
+    expect(own.find('[data-test="oncall-routing-catch-all"]').text()).toContain(
+      "Also gets every alert no team owns",
+    );
+    expect(own.find('[data-test="oncall-routing-catch-all-set"]').text()).toBe("Change in Routing");
+    const other = render({ teamId: "team_1", defaultTeamId: "team_2" });
+    await flushPromises();
+    expect(other.find('[data-test="oncall-routing-catch-all"]').exists()).toBe(false);
+  });
+
+  it("filters by search on what the cells read", async () => {
     const wrapper = render({
       search: "checkout",
       rules: [rule(), rule({ rule_id: "r2", team_id: "team_2", dimensions: { service: "cart" } })],
     });
-    expect(wrapper.find('[data-test="oncall-routing-row-r1"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-routing-row-r2"]').exists()).toBe(true);
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-says-r1"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-routing-says-r2"]').exists()).toBe(true);
   });
 
-  it("hides row actions for a reader who cannot edit routing", () => {
+  it("hides row actions for a reader who cannot edit routing", async () => {
     const wrapper = render({ editable: false, defaultTeamId: "team_1" });
+    await flushPromises();
     expect(wrapper.find('[data-test="oncall-routing-edit-r1"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-routing-catch-all-set"]').exists()).toBe(false);
   });

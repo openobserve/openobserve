@@ -26,7 +26,7 @@ const { settleRows } = require('../../playwright-tests/utils/oncall-settle.js');
 
 /** Rules and signals are plain rows, not an OTable, so each tab has its own hook. */
 const ROUTING_ROWS = {
-  rules: '[data-test^="oncall-routing-row-"]',
+  rules: '[data-test^="oncall-routing-says-"]',
   signals: '[data-test^="oncall-unrouted-path-"]',
 };
 
@@ -131,16 +131,16 @@ export class OnCallRoutingPage {
   }
 
   // Row-scoped selectors carry the rule id or the signal id, never a name.
-  ruleRow(ruleId) { return `[data-test="oncall-routing-row-${ruleId}"]`; }
+  ruleRow(ruleId) { return `[data-test="oncall-routing-says-${ruleId}"]`; }
   ruleSays(ruleId) { return `[data-test="oncall-routing-says-${ruleId}"]`; }
-  ruleNote(ruleId) { return `[data-test="oncall-routing-note-${ruleId}"]`; }
+  ruleNote(ruleId) { return `[data-test="oncall-rule-health-${ruleId}"]`; }
   ruleCaught(ruleId) { return `[data-test="oncall-routing-caught-${ruleId}"]`; }
   ruleEdit(ruleId) { return `[data-test="oncall-routing-edit-${ruleId}"]`; }
   ruleMore(ruleId) { return `[data-test="oncall-routing-more-${ruleId}"]`; }
-  ruleGroup(teamId) { return `[data-test="oncall-rule-group-${teamId}"]`; }
+  ruleTest(ruleId) { return `[data-test="oncall-routing-test-${ruleId}"]`; }
 
-  /** The shadowed verdict is the row's own note, naming the team taking its pages. */
-  ruleHealth(ruleId) { return `[data-test="oncall-routing-note-${ruleId}"]`; }
+  /** The Health cell; a shadowed verdict names the team taking its pages. */
+  ruleHealth(ruleId) { return `[data-test="oncall-rule-health-${ruleId}"]`; }
   ruleTeam(ruleId) { return `[data-test="oncall-rule-team-${ruleId}"]`; }
   ownershipEdit(ruleId) { return this.ruleEdit(ruleId); }
   ownershipDelete(ruleId) { return `[data-test="oncall-ownership-delete-${ruleId}"]`; }
@@ -329,7 +329,6 @@ export class OnCallRoutingPage {
 
   /** Delete lives in the row's ⋯ menu. */
   async deleteRule(ruleId) {
-    await this.page.locator(this.ruleMore(ruleId)).click();
     await this.page.locator(this.ownershipDelete(ruleId)).click();
     const confirm = this.page.locator(this.locators.confirmOk);
     if (await confirm.count()) await confirm.click();
@@ -361,12 +360,12 @@ export class OnCallRoutingPage {
 
   /** The rule ids drawn, in the order the engine consults them — most specific first. */
   async readRuleIds() {
-    const rows = this.page.locator('[data-test^="oncall-routing-row-"]');
+    const rows = this.page.locator('[data-test^="oncall-routing-says-"]');
     const count = await rows.count();
     const ids = [];
     for (let i = 0; i < count; i++) {
       const attr = await rows.nth(i).getAttribute('data-test');
-      if (attr) ids.push(attr.replace('oncall-routing-row-', ''));
+      if (attr) ids.push(attr.replace('oncall-routing-says-', ''));
     }
     return ids;
   }

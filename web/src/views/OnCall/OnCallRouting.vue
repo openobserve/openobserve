@@ -128,43 +128,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTab>
       </OTabs>
 
-      <OContent v-if="tab === 'rules'" y class="min-h-0 flex-1 overflow-y-auto">
-        <div class="flex flex-col gap-3">
-          <div class="flex items-center gap-2">
-            <OSearchInput
-              v-model="search"
-              class="min-w-48 flex-1 max-md:min-w-24"
-              clearable
-              :placeholder="t('oncall.routingSearchRules')"
-              data-test="oncall-routing-search"
-            />
-            <ORefreshButton
-              layout="inline"
-              variant="outline"
-              :last-run-at="lastFetchedAt"
-              :loading="refreshing"
-              data-test="oncall-routing-refresh"
-              @click="refreshPage"
-            />
-          </div>
-          <OnCallOwnershipRules
-            :rules="rules"
-            :teams="teams"
-            :aliases="aliases"
-            :default-team-id="routingConfig?.default_team_id ?? null"
-            :loading="loadingRules"
-            :search="search"
-            :editable="canConfigure"
-            testable
-            @add="openAdd"
-            @edit="openEdit"
-            @remove="(rule: OwnershipRuleStats) => (ruleToDelete = rule)"
-            @test="(rule: OwnershipRuleStats) => openTester(rule.dimensions)"
-            @change-default="defaultTeamCard?.openDialog()"
-            @clear-search="clearSearch"
+      <OnCallOwnershipRules
+        v-if="tab === 'rules'"
+        :rules="rules"
+        :teams="teams"
+        :aliases="aliases"
+        :default-team-id="routingConfig?.default_team_id ?? null"
+        :loading="loadingRules"
+        :search="search"
+        :editable="canConfigure"
+        testable
+        @add="openAdd"
+        @edit="openEdit"
+        @remove="(rule: OwnershipRuleStats) => (ruleToDelete = rule)"
+        @test="(rule: OwnershipRuleStats) => openTester(rule.dimensions)"
+        @change-default="defaultTeamCard?.openDialog()"
+        @clear-search="clearSearch"
+      >
+        <template #toolbar>
+          <OSearchInput
+            v-model="search"
+            class="min-w-48 flex-1 max-md:min-w-24"
+            clearable
+            :placeholder="t('oncall.routingSearchRules')"
+            data-test="oncall-routing-search"
           />
-        </div>
-      </OContent>
+        </template>
+        <template #toolbar-trailing>
+          <ORefreshButton
+            layout="inline"
+            variant="outline"
+            :last-run-at="lastFetchedAt"
+            :loading="refreshing"
+            data-test="oncall-routing-refresh"
+            @click="refreshPage"
+          />
+        </template>
+      </OnCallOwnershipRules>
 
       <OnCallUnroutedQueue
         v-else
@@ -358,7 +358,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OContent from "@/lib/core/Content/OContent.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";

@@ -26811,7 +26811,8 @@
     "unroutedClaimAllTitlePlain": "Claim {count} signal | Claim {count} signals",
     "unroutedClaimAllOutcome": "Future alerts like these go to {team}",
     "toastSignalsClaimed": "{count} signal now goes to {team} | {count} signals now go to {team}",
-    "claimSignalsFailed": "Could not claim the signals"
+    "claimSignalsFailed": "Could not claim the signals",
+    "unroutedPathMore": "+{count}"
   },
   "paidUsage": {
     "consentTitle": "Turn on paid AI usage?",

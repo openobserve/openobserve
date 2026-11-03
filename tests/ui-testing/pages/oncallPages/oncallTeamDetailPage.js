@@ -211,7 +211,7 @@ export class OnCallTeamDetailPage {
   ownershipEditRule(ruleId) { return `[data-test="oncall-routing-edit-${ruleId}"]`; }
   ownershipRuleMore(ruleId) { return `[data-test="oncall-routing-more-${ruleId}"]`; }
   ownershipDeleteRule(ruleId) { return `[data-test="oncall-ownership-delete-${ruleId}"]`; }
-  ruleHealth(ruleId) { return `[data-test="oncall-routing-note-${ruleId}"]`; }
+  ruleHealth(ruleId) { return `[data-test="oncall-rule-health-${ruleId}"]`; }
   ruleTeam(ruleId) { return `[data-test="oncall-rule-team-${ruleId}"]`; }
 
   memberRemove(memberId) { return `[data-test="oncall-members-remove-${memberId}"]`; }
