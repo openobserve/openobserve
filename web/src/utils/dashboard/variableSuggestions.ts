@@ -45,7 +45,7 @@ const FORMAT_EXAMPLES: Record<ListVariableFormat, I18nText> = {
 };
 
 const dateExample = (format: DateVariableFormat): I18nText =>
-  raw(formatDateVariableValue(DATE_EXAMPLE, format, "UTC") ?? DATE_EXAMPLE);
+  raw(formatDateVariableValue(DATE_EXAMPLE, format) ?? DATE_EXAMPLE);
 
 const isVisibleIn = (variable: any, context?: VariableSuggestionContext): boolean => {
   if (!context) return true;

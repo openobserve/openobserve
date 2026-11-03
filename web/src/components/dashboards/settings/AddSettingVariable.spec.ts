@@ -277,9 +277,8 @@ describe("AddSettingVariable", () => {
     });
   });
 
-  describe("Date variable format and timezone", () => {
+  describe("Date variable format", () => {
     const formatSelect = '[data-test="dashboard-variable-date-format-select"]';
-    const zoneSelect = '[data-test="dashboard-variable-date-timezone-select"]';
     const dateForm = (extra: Record<string, unknown> = {}) => ({
       scope: "global",
       selectedTabs: [],
@@ -288,28 +287,24 @@ describe("AddSettingVariable", () => {
       type: "date",
       value: "2026-03-08",
       dateFormat: "dmy",
-      timezone: "America/New_York",
       options: [],
       ...extra,
     });
 
-    it("shows the two selects only for a date variable", async () => {
+    it("shows the format select only for a date variable", async () => {
       expect(wrapper.find(formatSelect).exists()).toBe(false);
-      expect(wrapper.find(zoneSelect).exists()).toBe(false);
 
       wrapper.vm.variableData.type = "date";
       await nextTick();
       expect(wrapper.find(formatSelect).exists()).toBe(true);
-      expect(wrapper.find(zoneSelect).exists()).toBe(true);
 
       wrapper.vm.variableData.type = "textbox";
       await nextTick();
       expect(wrapper.find(formatSelect).exists()).toBe(false);
     });
 
-    it("defaults to iso and UTC and offers every format with its name", () => {
+    it("defaults to iso and offers every format with its name", () => {
       expect(wrapper.vm.variableData.dateFormat).toBe("iso");
-      expect(wrapper.vm.variableData.timezone).toBe("UTC");
       expect(wrapper.vm.dateFormatOptions.map((o: any) => o.value)).toEqual([
         "iso",
         "dmy",
@@ -318,23 +313,20 @@ describe("AddSettingVariable", () => {
         "epochus",
         "epoch",
       ]);
-      expect(wrapper.vm.timezoneOptions.some((o: any) => o.value === "UTC")).toBe(true);
     });
 
-    it("saves dateFormat and timezone for a date variable", () => {
+    it("saves dateFormat for a date variable", () => {
       const payload = wrapper.vm.buildVariablePayload(dateForm());
       expect(payload.dateFormat).toBe("dmy");
-      expect(payload.timezone).toBe("America/New_York");
       expect(payload.value).toBe("2026-03-08");
     });
 
-    it("drops them when the variable is not a date", () => {
+    it("drops it when the variable is not a date", () => {
       const payload = wrapper.vm.buildVariablePayload(dateForm({ type: "textbox" }));
       expect(payload).not.toHaveProperty("dateFormat");
-      expect(payload).not.toHaveProperty("timezone");
     });
 
-    it("shows the defaults when editing a date variable saved without them", async () => {
+    it("shows the default when editing a date variable saved without one", async () => {
       vi.mocked(getDashboard).mockResolvedValueOnce({
         variables: { list: [{ name: "old_date", type: "date", value: "2026-01-01" }] },
       } as any);
@@ -345,11 +337,10 @@ describe("AddSettingVariable", () => {
       await flushPromises();
       expect(editWrapper.vm.variableData.type).toBe("date");
       expect(editWrapper.vm.variableData.dateFormat).toBe("iso");
-      expect(editWrapper.vm.variableData.timezone).toBe("UTC");
       editWrapper.unmount();
     });
 
-    it("keeps the saved values when editing", async () => {
+    it("keeps the saved format when editing", async () => {
       vi.mocked(getDashboard).mockResolvedValueOnce({
         variables: {
           list: [
@@ -358,7 +349,6 @@ describe("AddSettingVariable", () => {
               type: "date",
               value: "",
               dateFormat: "epochus",
-              timezone: "Europe/Berlin",
             },
           ],
         },
@@ -369,7 +359,6 @@ describe("AddSettingVariable", () => {
       });
       await flushPromises();
       expect(editWrapper.vm.variableData.dateFormat).toBe("epochus");
-      expect(editWrapper.vm.variableData.timezone).toBe("Europe/Berlin");
       editWrapper.unmount();
     });
   });

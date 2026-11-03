@@ -436,9 +436,6 @@ pub struct PublicVariable {
     /// A date variable's default output format.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub date_format: Option<String>,
-    /// The zone whose midnight a date variable's epoch formats give.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub timezone: Option<String>,
 }
 
 impl PublicVariable {
@@ -495,7 +492,6 @@ impl PublicVariable {
                             panel_id,
                             var_type: is_date.then(|| "date".to_string()),
                             date_format: v.date_format.clone().filter(|_| is_date),
-                            timezone: v.timezone.clone().filter(|_| is_date),
                         };
                         (key, entry)
                     })
@@ -799,15 +795,15 @@ mod tests {
     }
 
     #[test]
-    fn public_variables_carry_a_date_variables_format_and_timezone() {
+    fn public_variables_carry_a_date_variables_format() {
         let dash = Dashboard {
             v8: Some(
                 serde_json::from_value(serde_json::json!({
                     "variables": { "list": [
                         { "type": "date", "name": "day", "label": "Day",
-                          "dateFormat": "dmy", "timezone": "Asia/Kolkata" },
+                          "dateFormat": "dmy" },
                         { "type": "textbox", "name": "q", "label": "Q",
-                          "dateFormat": "dmy", "timezone": "Asia/Kolkata" }
+                          "dateFormat": "dmy" }
                     ] }
                 }))
                 .unwrap(),
@@ -819,10 +815,8 @@ mod tests {
         let day = serde_json::to_value(&list[0]).unwrap();
         assert_eq!(day["type"], "date");
         assert_eq!(day["date_format"], "dmy");
-        assert_eq!(day["timezone"], "Asia/Kolkata");
         let q = serde_json::to_value(&list[1]).unwrap();
         assert!(q.get("type").is_none() && q.get("date_format").is_none());
-        assert!(q.get("timezone").is_none());
         let stored: PublicVariable =
             serde_json::from_value(serde_json::json!({ "label": "Day", "value": "2026-10-30" }))
                 .unwrap();

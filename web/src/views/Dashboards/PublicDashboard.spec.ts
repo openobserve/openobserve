@@ -848,7 +848,6 @@ describe("PublicDashboard viewer", () => {
             value: "2026-10-30",
             type: "date",
             date_format: "dmy",
-            timezone: "Asia/Kolkata",
           },
         ],
       },
@@ -862,16 +861,16 @@ describe("PublicDashboard viewer", () => {
       type: "date",
       value: "2026-10-30",
       dateFormat: "dmy",
-      timezone: "Asia/Kolkata",
       readOnly: true,
     });
+    expect(variables.list[0]).not.toHaveProperty("timezone");
     const title = getPanelDisplayTitle(
       tabs[0].panels[0].title,
       { values: variables.list },
       { tabId: "t1", panelId: "p1" },
       "All",
     );
-    expect(title).toBe("On 30/10/2026 / 1793298600");
+    expect(title).toBe("On 30/10/2026 / 1793318400");
   });
 
   it("shows a typed-in value without the picker's custom marker", async () => {

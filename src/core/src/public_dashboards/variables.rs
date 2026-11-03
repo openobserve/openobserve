@@ -127,7 +127,6 @@ struct ScopedVar {
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct DateSpec {
     format: String,
-    timezone: String,
 }
 
 impl DateSpec {
@@ -139,7 +138,6 @@ impl DateSpec {
                 .clone()
                 .filter(|f| DATE_FORMATS.contains(&f.as_str()))
                 .unwrap_or_else(|| "iso".to_string()),
-            timezone: v.timezone.clone().unwrap_or_else(|| "UTC".to_string()),
         })
     }
 
@@ -152,7 +150,7 @@ impl DateSpec {
         let serde_json::Value::String(date) = value else {
             return None;
         };
-        let start = config::utils::time::start_of_date_micros(date, &self.timezone)?;
+        let start = config::utils::time::start_of_date_micros(date)?;
         let format = placeholder
             .filter(|f| DATE_FORMATS.contains(f))
             .unwrap_or(self.format.as_str());
@@ -542,8 +540,7 @@ mod tests {
                     "variables": {
                         "list": [
                             { "type": "date", "name": "day" },
-                            { "type": "date", "name": "ny", "dateFormat": "epochus",
-                              "timezone": "America/New_York" },
+                            { "type": "date", "name": "micros", "dateFormat": "epochus" },
                             { "type": "date", "name": "odd", "dateFormat": "nope" },
                             { "type": "textbox", "name": "tb" },
                             { "type": "date", "name": "empty" }
@@ -556,7 +553,7 @@ mod tests {
         };
         let frozen = BTreeMap::from([
             ("day".to_string(), json!("2026-07-01")),
-            ("ny".to_string(), json!("2026-07-01")),
+            ("micros".to_string(), json!("2026-07-01")),
             ("odd".to_string(), json!("2026-07-01")),
             ("tb".to_string(), json!("2026-07-01")),
             ("empty".to_string(), json!("")),
@@ -572,8 +569,12 @@ mod tests {
         );
         // The placeholder's date format wins; a list format keeps the variable's default.
         assert_eq!(
-            sub(&v, "$ny ${ny:iso} ${ny:epoch} ${ny:csv}", "sql"),
-            "1782878400000000 2026-07-01 1782878400 1782878400000000"
+            sub(
+                &v,
+                "$micros ${micros:iso} ${micros:epoch} ${micros:csv}",
+                "sql"
+            ),
+            "1782864000000000 2026-07-01 1782864000 1782864000000000"
         );
         // An unknown default prints iso, a date format means nothing to a textbox, and empty stays
         // empty.

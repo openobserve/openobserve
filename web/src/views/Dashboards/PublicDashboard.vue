@@ -301,7 +301,6 @@ type PublicVariable = {
   panel_id?: string;
   type?: string;
   date_format?: string;
-  timezone?: string;
 };
 
 type ViewState =
@@ -404,7 +403,7 @@ const frozenVariables = computed(() => {
       // A date stays a date so titles and text format it as the dashboard does; it is read-only here.
       type: isDate ? "date" : "constant",
       value: isDate ? (typeof v.value === "string" ? v.value : "") : variableValue(v.value),
-      ...(isDate ? { dateFormat: v.date_format, timezone: v.timezone, readOnly: true } : {}),
+      ...(isDate ? { dateFormat: v.date_format, readOnly: true } : {}),
       scope: v.tab_id ? "tabs" : v.panel_id ? "panels" : "global",
       ...(v.tab_id ? { tabs: [v.tab_id] } : {}),
       ...(v.panel_id ? { panels: [v.panel_id] } : {}),

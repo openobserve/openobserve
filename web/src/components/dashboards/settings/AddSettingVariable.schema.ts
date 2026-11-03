@@ -17,10 +17,7 @@
 // non-`custom`/non-`query_values` type's default rows never block submit.
 
 import { z } from "zod";
-import {
-  DEFAULT_DATE_VARIABLE_FORMAT,
-  DEFAULT_DATE_VARIABLE_TIMEZONE,
-} from "@/utils/dashboard/variables/variablesUtils";
+import { DEFAULT_DATE_VARIABLE_FORMAT } from "@/utils/dashboard/variables/variablesUtils";
 
 export const VARIABLE_NAME_REGEX = /^[a-zA-Z0-9_-]*$/;
 
@@ -68,7 +65,6 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
       value: z.string().optional().default(""),
       // Only saved for `date` variables.
       dateFormat: z.string().optional().default(DEFAULT_DATE_VARIABLE_FORMAT),
-      timezone: z.string().optional().default(DEFAULT_DATE_VARIABLE_TIMEZONE),
       // form-owned custom option rows; row rules enforced in superRefine below.
       options: z.array(z.record(z.string(), z.any())).optional().default([]),
       multiSelect: z.boolean().optional().default(false),

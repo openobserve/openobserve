@@ -7678,8 +7678,6 @@
     "dateFormatEpoch": "Epoch seconds (epoch)",
     "dateFormatEpochms": "Epoch milliseconds (epochms)",
     "dateFormatEpochus": "Epoch microseconds (epochus)",
-    "dateTimezone": "Timezone",
-    "dateTimezoneHelp": "Used by the epoch formats: the start of the day in this timezone.",
     "newFolder": "New Folder",
     "updateFolder": "Update Folder",
     "newReport": "New Report",

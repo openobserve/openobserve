@@ -318,7 +318,7 @@ describe("usePanelDrilldown", () => {
       } as any,
     ];
     deps.variablesData.value.values = [
-      { name: "d", type: "date", value: "2026-03-08", dateFormat: "dmy", timezone: "UTC" },
+      { name: "d", type: "date", value: "2026-03-08", dateFormat: "dmy" },
       { name: "t", type: "textbox", value: "2026-03-08" },
     ] as any;
     const api = usePanelDrilldown(deps as any);

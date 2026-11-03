@@ -34,9 +34,8 @@ export interface VariableConfig {
   tabs?: string[];
   panels?: string[];
   value: any;
-  /** Date variables only: the default output format and the zone the epoch formats read midnight in. */
+  /** Date variables only: the default output format. */
   dateFormat?: string;
-  timezone?: string;
   multiSelect?: boolean;
   query_data?: {
     stream_type?: string;

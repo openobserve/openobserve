@@ -297,29 +297,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-variable-date-default-value"
             />
           </div>
-          <div
-            class="mt-3 flex gap-4 max-md:flex-col max-md:gap-2"
-            v-if="variableData.type === 'date'"
-          >
-            <div class="flex flex-1 flex-col">
-              <OFormSelect
-                name="dateFormat"
-                :label="t('dashboard.dateFormat')"
-                :options="dateFormatOptions"
-                :help-text="t('dashboard.dateFormatHelp')"
-                data-test="dashboard-variable-date-format-select"
-              />
-            </div>
-            <div class="flex flex-1 flex-col">
-              <OFormSelect
-                name="timezone"
-                :label="t('dashboard.dateTimezone')"
-                :options="timezoneOptions"
-                :help-text="t('dashboard.dateTimezoneHelp')"
-                searchable
-                data-test="dashboard-variable-date-timezone-select"
-              />
-            </div>
+          <div class="mt-3 flex flex-col" v-if="variableData.type === 'date'">
+            <OFormSelect
+              name="dateFormat"
+              :label="t('dashboard.dateFormat')"
+              :options="dateFormatOptions"
+              :help-text="t('dashboard.dateFormatHelp')"
+              data-test="dashboard-variable-date-format-select"
+            />
           </div>
           <div v-if="variableData.type == 'custom'">
             <div class="flex">
@@ -547,11 +532,9 @@ import {
   nextTick,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import {
   DATE_VARIABLE_FORMATS,
   DEFAULT_DATE_VARIABLE_FORMAT,
-  DEFAULT_DATE_VARIABLE_TIMEZONE,
 } from "@/utils/dashboard/variables/variablesUtils";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
@@ -637,7 +620,6 @@ export default defineComponent({
       },
       value: "",
       dateFormat: DEFAULT_DATE_VARIABLE_FORMAT,
-      timezone: DEFAULT_DATE_VARIABLE_TIMEZONE,
       options: [{ label: raw(""), value: "", selected: true }],
       multiSelect: false,
       hideOnDashboard: false,
@@ -716,7 +698,6 @@ export default defineComponent({
         label: fieldView("label"),
         value: fieldView("value"),
         dateFormat: fieldView("dateFormat"),
-        timezone: fieldView("timezone"),
         query_data: {
           get: () => formValues.value?.query_data ?? {},
           set: (v: unknown) => {
@@ -910,22 +891,20 @@ export default defineComponent({
     ]);
 
     // Each option shows its format name as written in `${name:<format>}`.
-    const dateFormatLabels: Record<(typeof DATE_VARIABLE_FORMATS)[number], string> = {
+    const dateFormatLabels = {
       iso: "dashboard.dateFormatIso",
       dmy: "dashboard.dateFormatDmy",
       mdy: "dashboard.dateFormatMdy",
       epoch: "dashboard.dateFormatEpoch",
       epochms: "dashboard.dateFormatEpochms",
       epochus: "dashboard.dateFormatEpochus",
-    };
+    } as const satisfies Record<(typeof DATE_VARIABLE_FORMATS)[number], string>;
     const dateFormatOptions = computed(() =>
       DATE_VARIABLE_FORMATS.map((format) => ({
-        label: t(dateFormatLabels[format] as any),
+        label: t(dateFormatLabels[format]),
         value: format,
       })),
     );
-    // The stored zone stays an option under its own name, so a save never rewrites it.
-    const { timezoneOptions } = useTimezoneOptions({ current: () => variableData.timezone });
 
     const filterCycleError: any = ref("");
 
@@ -1023,7 +1002,6 @@ export default defineComponent({
         },
         value: variable.value ?? "",
         dateFormat: variable.dateFormat ?? DEFAULT_DATE_VARIABLE_FORMAT,
-        timezone: variable.timezone ?? DEFAULT_DATE_VARIABLE_TIMEZONE,
         options,
         multiSelect: variable.multiSelect ?? false,
         hideOnDashboard: variable.hideOnDashboard ?? false,
@@ -1260,10 +1238,7 @@ export default defineComponent({
       delete v.selectedPanels;
 
       if (v.type !== "query_values") delete v.query_data;
-      if (v.type !== "date") {
-        delete v.dateFormat;
-        delete v.timezone;
-      }
+      if (v.type !== "date") delete v.dateFormat;
       if (v.type !== "query_values" && v.type !== "custom") {
         v.multiSelect = false;
         v.selectAllValueForMultiSelect = "";
@@ -1729,7 +1704,6 @@ export default defineComponent({
       fieldsFilteredOptions,
       variableTypes,
       dateFormatOptions,
-      timezoneOptions,
       streamTypeUpdated,
       streamUpdated,
       onActivated,

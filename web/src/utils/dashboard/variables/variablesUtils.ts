@@ -9,7 +9,6 @@ export const DATE_VARIABLE_FORMATS = ["iso", "dmy", "mdy", "epochms", "epochus",
 export type DateVariableFormat = (typeof DATE_VARIABLE_FORMATS)[number];
 
 export const DEFAULT_DATE_VARIABLE_FORMAT: DateVariableFormat = "iso";
-export const DEFAULT_DATE_VARIABLE_TIMEZONE = "UTC";
 
 export const VARIABLE_FORMATS = [...LIST_VARIABLE_FORMATS, ...DATE_VARIABLE_FORMATS] as const;
 
@@ -49,70 +48,12 @@ export interface VariablePlaceholder<F extends string = VariableFormat> {
 export const isDateVariableFormat = (format: unknown): format is DateVariableFormat =>
   (DATE_VARIABLE_FORMATS as readonly unknown[]).includes(format);
 
-const isValidTimeZone = (timeZone: unknown): timeZone is string => {
-  if (typeof timeZone !== "string" || !timeZone) return false;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone });
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const DAY_MS = 86_400_000;
-
-/** The zone's UTC offset in ms at an instant, read from Intl (date-fns-tz's getTimezoneOffset is off near a transition). */
-const zoneOffsetMs = (timeZone: string, instant: number): number => {
-  const parts: Record<string, number> = {};
-  new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-    hour: "numeric",
-    minute: "numeric",
-    second: "numeric",
-  })
-    .formatToParts(new Date(instant))
-    .forEach((part) => {
-      if (part.type !== "literal") parts[part.type] = Number(part.value);
-    });
-  const asUtc = Date.UTC(
-    parts.year,
-    parts.month - 1,
-    parts.day,
-    parts.hour,
-    parts.minute,
-    parts.second,
-  );
-  return asUtc - Math.floor(instant / 1000) * 1000;
-};
-
-/**
- * Epoch ms of 00:00 on the given day in `timeZone`. A repeated midnight takes the earlier instant;
- * a midnight skipped by a DST jump takes the jump itself (00:00 at the offset in force before it).
- */
-const startOfDayMs = (year: number, month: number, day: number, timeZone: string): number => {
-  const local = Date.UTC(year, month - 1, day);
-  const offsetBefore = zoneOffsetMs(timeZone, local - DAY_MS);
-  const offsetAfter = zoneOffsetMs(timeZone, local + DAY_MS);
-  const valid = [offsetBefore, offsetAfter]
-    .map((offset) => local - offset)
-    .filter((instant) => local - instant === zoneOffsetMs(timeZone, instant));
-  return valid.length ? Math.min(...valid) : local - offsetBefore;
-};
-
 const DATE_VALUE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-/**
- * Formats a stored `YYYY-MM-DD` value. The epoch formats are the start of that day in `timeZone`
- * (missing or invalid means UTC); the text formats ignore it. Undefined when the value is not a real calendar date.
- */
+/** Formats a stored `YYYY-MM-DD` value; the epoch formats are 00:00 UTC of that day. Undefined when the value is not a real calendar date. */
 export const formatDateVariableValue = (
   value: unknown,
   format: DateVariableFormat | string | undefined,
-  timeZone?: string | null,
 ): string | undefined => {
   if (typeof value !== "string") return undefined;
   const match = DATE_VALUE_RE.exec(value);
@@ -136,9 +77,7 @@ export const formatDateVariableValue = (
     case "epoch":
     case "epochms":
     case "epochus": {
-      const zone = isValidTimeZone(timeZone) ? timeZone : DEFAULT_DATE_VARIABLE_TIMEZONE;
-      const ms = startOfDayMs(year, month, day, zone);
-      if (!Number.isFinite(ms)) return undefined;
+      const ms = check.getTime();
       if (format === "epoch") return String(Math.floor(ms / 1000));
       return format === "epochms" ? String(ms) : String(ms * 1000);
     }
@@ -153,8 +92,7 @@ export const formatDateVariableValue = (
  * A date format on the placeholder wins; any other placeholder format uses the variable's own `dateFormat`.
  */
 export const formatDateVariable = (
-  variable:
-    { type?: string; value?: unknown; dateFormat?: string; timezone?: string } | null | undefined,
+  variable: { type?: string; value?: unknown; dateFormat?: string } | null | undefined,
   placeholderFormat?: string,
 ): string | undefined => {
   if (variable?.type !== "date") return undefined;
@@ -163,7 +101,7 @@ export const formatDateVariable = (
     : isDateVariableFormat(variable.dateFormat)
       ? variable.dateFormat
       : DEFAULT_DATE_VARIABLE_FORMAT;
-  return formatDateVariableValue(variable.value, format, variable.timezone);
+  return formatDateVariableValue(variable.value, format);
 };
 
 export const formatInterval = (interval: any) => {

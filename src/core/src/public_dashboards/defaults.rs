@@ -803,7 +803,7 @@ mod tests {
     #[test]
     fn a_date_variable_reaches_a_values_query_in_its_format() {
         let dash = dashboard(json!([
-            { "type": "date", "name": "day", "dateFormat": "epochus", "timezone": "America/New_York" },
+            { "type": "date", "name": "day", "dateFormat": "epochus" },
             { "type": "query_values", "name": "pod",
               "query_data": { "stream": "logs", "field": "pod", "filter": [
                 { "name": "_timestamp", "operator": ">=", "value": "$day" },
@@ -814,7 +814,7 @@ mod tests {
         let pod = d.next_query().expect("pod");
         assert_eq!(
             pod.query.sql,
-            r#"SELECT "pod" AS zo_sql_key FROM "logs" WHERE "_timestamp" >= '1782878400000000' AND "d" = '01/07/2026' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT 10"#
+            r#"SELECT "pod" AS zo_sql_key FROM "logs" WHERE "_timestamp" >= '1782864000000000' AND "d" = '01/07/2026' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT 10"#
         );
     }
 

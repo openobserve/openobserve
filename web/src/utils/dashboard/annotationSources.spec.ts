@@ -114,7 +114,7 @@ describe("renderAnnotationTemplate", () => {
 
   it("prints a date variable in its format, or the placeholder's", () => {
     const variables = [
-      { name: "from", type: "date", value: "2026-03-08", dateFormat: "dmy", timezone: "UTC" },
+      { name: "from", type: "date", value: "2026-03-08", dateFormat: "dmy" },
       { name: "note", type: "textbox", value: "2026-03-08" },
     ];
     expect(

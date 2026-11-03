@@ -243,7 +243,6 @@ mod tests {
             panel_id: None,
             var_type: None,
             date_format: None,
-            timezone: None,
         };
         let body = ResultBody {
             variables: vec![var("svc", json!("checkout")), var("env", json!("prod"))],

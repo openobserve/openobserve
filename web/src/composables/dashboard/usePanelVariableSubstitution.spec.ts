@@ -491,10 +491,10 @@ describe("replaceQueryValue with date variables", () => {
     );
   });
 
-  it("reads the day in the variable's timezone", () => {
-    expect(
-      run("WHERE _timestamp >= ${d:epochus}", [dateVar({ timezone: "America/New_York" })]),
-    ).toBe("WHERE _timestamp >= 1772946000000000");
+  it("prints 00:00 UTC of the day for ${d:epoch} and ${d:epochms}", () => {
+    expect(run("WHERE a >= ${d:epoch} AND b >= ${d:epochms}", [dateVar()])).toBe(
+      "WHERE a >= 1772928000 AND b >= 1772928000000",
+    );
   });
 
   it("uses the variable's dateFormat for a bare $d", () => {

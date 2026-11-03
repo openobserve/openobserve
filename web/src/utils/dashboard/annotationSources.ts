@@ -71,7 +71,6 @@ export interface AnnotationVariable {
   /** Only read for `date` variables. */
   type?: string;
   dateFormat?: string;
-  timezone?: string;
 }
 
 export const defaultAnnotationSourceColor = (index: number): string =>

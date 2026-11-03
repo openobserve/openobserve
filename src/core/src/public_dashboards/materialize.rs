@@ -1464,7 +1464,6 @@ pub(super) mod tests {
                     panel_id: None,
                     var_type: None,
                     date_format: None,
-                    timezone: None,
                 }],
                 variable_keys: vec!["svc".into()],
                 values_dependencies: vec![ValuesDependency {
