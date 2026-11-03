@@ -17,7 +17,10 @@ use std::str::FromStr;
 
 use config::{
     ider,
-    meta::destinations::{Template, TemplateKind, TemplateType},
+    meta::{
+        alerts::notification_kind::NotificationKind,
+        destinations::{Template, TemplateKind, TemplateType},
+    },
 };
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait,
@@ -55,8 +58,23 @@ impl TryFrom<Model> for Template {
             template_type,
             body: value.body,
             kind: TemplateKind::from(value.kind.as_str()),
+            applies_to: applies_to_from_column(&value.applies_to),
         })
     }
+}
+
+/// A stored value that does not parse, or names a kind this binary lacks, drops that entry.
+fn applies_to_from_column(value: &str) -> Vec<NotificationKind> {
+    serde_json::from_str::<Vec<String>>(value)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|k| NotificationKind::parse(k))
+        .collect()
+}
+
+fn applies_to_column(kinds: &[NotificationKind]) -> String {
+    let names: Vec<&str> = kinds.iter().map(|k| k.as_str()).collect();
+    serde_json::to_string(&names).unwrap_or_else(|_| "[]".to_string())
 }
 
 pub async fn put(template: Template) -> Result<Template, Error> {
@@ -79,6 +97,7 @@ pub async fn put_with<C: ConnectionTrait>(db: &C, template: Template) -> Result<
         body: Set(template.body),
         title: Set(title),
         kind: Set(template.kind.to_string()),
+        applies_to: Set(applies_to_column(&template.applies_to)),
     };
     let model: Model = match get_org_model(db, &template.org_id, &template.name).await? {
         Some(model) => {
@@ -278,6 +297,129 @@ async fn delete_by_org_returning_with<C: ConnectionTrait>(
     Ok(super::delete_returning(client, delete, &[Column::Id, Column::Name]).await?)
 }
 
+/// The prefix of compiled default names; every name under it is reserved.
+pub const RESERVED_PREFIX: &str = "o2_default_";
+/// The setting keys whose values can name a template.
+const POINTER_KEYS: [&str; 2] = ["default_alert_template", "default_templates"];
+
+/// One user row moved out of the reserved prefix.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReservedRename {
+    pub org: String,
+    pub from: String,
+    pub to: String,
+}
+
+/// A shipped seed row: the default org, written by the seeder (not `is_default`), Content.
+fn is_shipped_seed(org: &str, is_default: bool, kind: &str) -> bool {
+    org == DEFAULT_ORG && !is_default && kind == TemplateKind::Content.to_string()
+}
+
+/// Renames user rows under `o2_default_` to `user_{name}` and moves their references.
+pub async fn rename_reserved_collisions<C>(db: &C) -> Result<Vec<ReservedRename>, sea_orm::DbErr>
+where
+    C: ConnectionTrait + sea_orm::TransactionTrait,
+{
+    let txn = db.begin().await?;
+    let mut rows: Vec<Model> = Entity::find()
+        .filter(Column::Name.like(format!("{RESERVED_PREFIX}%")))
+        .all(&txn)
+        .await?
+        .into_iter()
+        .filter(|m| m.name.starts_with(RESERVED_PREFIX))
+        .filter(|m| !is_shipped_seed(&m.org, m.is_default, &m.kind))
+        .collect();
+    // Other orgs first, so a reference left on the old name afterwards reads the default row.
+    rows.sort_by_key(|m| (m.org == DEFAULT_ORG, m.org.clone(), m.name.clone()));
+    let mut renames = Vec::with_capacity(rows.len());
+    for row in rows {
+        let to = free_name(&txn, &row.org, &row.name).await?;
+        Entity::update_many()
+            .col_expr(Column::Name, sea_orm::sea_query::Expr::value(to.clone()))
+            .filter(Column::Id.eq(row.id.clone()))
+            .exec(&txn)
+            .await?;
+        let scope = (row.org != DEFAULT_ORG).then_some(row.org.as_str());
+        follow_rename(&txn, scope, &row.name, &to).await?;
+        renames.push(ReservedRename {
+            org: row.org,
+            from: row.name,
+            to,
+        });
+    }
+    txn.commit().await?;
+    Ok(renames)
+}
+
+async fn free_name<C: ConnectionTrait>(
+    db: &C,
+    org: &str,
+    name: &str,
+) -> Result<String, sea_orm::DbErr> {
+    let base = format!("user_{name}");
+    let mut candidate = base.clone();
+    let mut n = 1;
+    while get_org_model(db, org, &candidate).await?.is_some() {
+        n += 1;
+        candidate = format!("{base}_{n}");
+    }
+    Ok(candidate)
+}
+
+/// Points alerts, composites and org template settings at the new name; `None` is every org.
+async fn follow_rename<C: ConnectionTrait>(
+    db: &C,
+    org: Option<&str>,
+    from: &str,
+    to: &str,
+) -> Result<(), sea_orm::DbErr> {
+    use sea_orm::sea_query::Expr;
+
+    use super::entity::{alert_composites, alerts, system_settings};
+
+    let mut alerts_update = alerts::Entity::update_many()
+        .col_expr(alerts::Column::Template, Expr::value(to))
+        .filter(alerts::Column::Template.eq(from));
+    let mut composites_update = alert_composites::Entity::update_many()
+        .col_expr(alert_composites::Column::Template, Expr::value(to))
+        .filter(alert_composites::Column::Template.eq(from));
+    let mut settings = system_settings::Entity::find()
+        .filter(system_settings::Column::Scope.eq("org"))
+        .filter(system_settings::Column::SettingKey.is_in(POINTER_KEYS));
+    if let Some(org) = org {
+        alerts_update = alerts_update.filter(alerts::Column::Org.eq(org));
+        composites_update = composites_update.filter(alert_composites::Column::Org.eq(org));
+        settings = settings.filter(system_settings::Column::OrgId.eq(org));
+    }
+    alerts_update.exec(db).await?;
+    composites_update.exec(db).await?;
+    for setting in settings.all(db).await? {
+        let mut value = setting.setting_value.clone();
+        if !rename_in_value(&mut value, from, to) {
+            continue;
+        }
+        let mut active: system_settings::ActiveModel = setting.into();
+        active.setting_value = Set(value);
+        active.update(db).await?;
+    }
+    Ok(())
+}
+
+/// Replaces every string value equal to `from` one level deep; returns whether one changed.
+fn rename_in_value(value: &mut serde_json::Value, from: &str, to: &str) -> bool {
+    let Some(map) = value.as_object_mut() else {
+        return false;
+    };
+    let mut changed = false;
+    for v in map.values_mut() {
+        if v.as_str() == Some(from) {
+            *v = serde_json::Value::String(to.to_string());
+            changed = true;
+        }
+    }
+    changed
+}
+
 #[cfg(test)]
 mod tests {
     use sea_orm::{Database, DatabaseConnection, Schema};
@@ -382,6 +524,7 @@ mod tests {
             body: r#"{"text": "alert"}"#.to_string(),
             title: title.map(|s| s.to_string()),
             kind: "custom".to_string(),
+            applies_to: "[]".to_string(),
         }
     }
 
@@ -509,5 +652,266 @@ mod tests {
                 ("live".to_string(), "live".to_string())
             ]
         );
+    }
+
+    /// A templates entity as a binary before stage 2 knew it: no `applies_to`.
+    mod old_binary {
+        use sea_orm::entity::prelude::*;
+
+        #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+        #[sea_orm(table_name = "templates")]
+        pub struct Model {
+            #[sea_orm(primary_key, auto_increment = false)]
+            pub id: String,
+            pub org: String,
+            pub name: String,
+            pub is_default: bool,
+            pub r#type: String,
+            pub body: String,
+            pub title: Option<String>,
+            pub kind: String,
+        }
+
+        #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+        pub enum Relation {}
+
+        impl ActiveModelBehavior for ActiveModel {}
+    }
+
+    #[tokio::test]
+    async fn an_old_binary_update_keeps_applies_to() {
+        let db = db().await;
+        let mut t = template("acme", "ops-card", "v1");
+        t.applies_to = vec![NotificationKind::Anomaly, NotificationKind::Incident];
+        let saved = put_with(&db, t).await.unwrap();
+        let id = saved.id.unwrap().to_string();
+
+        // The old put_with names every column it knows and updates by id.
+        old_binary::ActiveModel {
+            id: Set(id),
+            org: Set("acme".to_string()),
+            name: Set("ops-card".to_string()),
+            is_default: Set(false),
+            r#type: Set("http".to_string()),
+            body: Set("v2".to_string()),
+            title: Set(None),
+            kind: Set("custom".to_string()),
+        }
+        .update(&db)
+        .await
+        .unwrap();
+
+        let read = get_with(&db, "acme", "ops-card").await.unwrap().unwrap();
+        assert_eq!(read.body, "v2");
+        assert_eq!(
+            read.applies_to,
+            vec![NotificationKind::Anomaly, NotificationKind::Incident]
+        );
+    }
+
+    #[test]
+    fn applies_to_column_round_trips_and_drops_unknown_kinds() {
+        let kinds = vec![NotificationKind::OnCall, NotificationKind::Alert];
+        assert_eq!(applies_to_column(&kinds), r#"["on_call","alert"]"#);
+        assert_eq!(applies_to_from_column(r#"["on_call","alert"]"#), kinds);
+        assert_eq!(
+            applies_to_from_column(r#"["pages","anomaly"]"#),
+            vec![NotificationKind::Anomaly]
+        );
+        assert!(applies_to_from_column("not json").is_empty());
+    }
+
+    /// Templates plus reference tables; the alerts tables hold only the columns a rename uses.
+    async fn reference_db() -> DatabaseConnection {
+        use crate::table::entity::system_settings;
+
+        let db = db().await;
+        for table in ["alerts", "alert_composites"] {
+            db.execute_unprepared(&format!(
+                "CREATE TABLE {table} (id TEXT PRIMARY KEY, org TEXT NOT NULL, name TEXT NOT NULL, template TEXT)"
+            ))
+            .await
+            .unwrap();
+        }
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(system_settings::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        db
+    }
+
+    async fn insert_row(
+        db: &DatabaseConnection,
+        org: &str,
+        name: &str,
+        is_default: bool,
+        kind: &str,
+    ) {
+        ActiveModel {
+            id: Set(ider::uuid()),
+            org: Set(org.to_string()),
+            name: Set(name.to_string()),
+            is_default: Set(is_default),
+            r#type: Set("http".to_string()),
+            body: Set("{}".to_string()),
+            title: Set(None),
+            kind: Set(kind.to_string()),
+            applies_to: Set("[]".to_string()),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    async fn insert_alert(
+        db: &DatabaseConnection,
+        table: &str,
+        org: &str,
+        name: &str,
+        template: &str,
+    ) {
+        db.execute_unprepared(&format!(
+            "INSERT INTO {table} (id, org, name, template) VALUES ('{}', '{org}', '{name}', '{template}')",
+            ider::uuid()
+        ))
+        .await
+        .unwrap();
+    }
+
+    async fn alert_template(db: &DatabaseConnection, table: &str, name: &str) -> Option<String> {
+        use sea_orm::{FromQueryResult, Statement};
+
+        #[derive(FromQueryResult)]
+        struct Row {
+            template: Option<String>,
+        }
+        Row::find_by_statement(Statement::from_string(
+            db.get_database_backend(),
+            format!("SELECT template FROM {table} WHERE name = '{name}'"),
+        ))
+        .one(db)
+        .await
+        .unwrap()
+        .unwrap()
+        .template
+    }
+
+    async fn names(db: &DatabaseConnection, org: &str) -> Vec<String> {
+        Entity::find()
+            .filter(Column::Org.eq(org))
+            .order_by(Column::Name, sea_orm::Order::Asc)
+            .all(db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|m| m.name)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn reserved_collisions_are_renamed_and_their_references_follow() {
+        use crate::table::entity::system_settings;
+
+        let db = reference_db().await;
+        // The shipped seeds: default org, written by the seeder, Content.
+        insert_row(&db, DEFAULT_ORG, "o2_default_content", false, "content").await;
+        insert_row(&db, DEFAULT_ORG, "o2_default_anomaly", false, "content").await;
+        // User rows: another org, and a default org row a user saved.
+        insert_row(&db, "acme", "o2_default_anomaly", false, "custom").await;
+        insert_row(&db, "acme", "user_o2_default_anomaly", false, "custom").await;
+        insert_row(&db, DEFAULT_ORG, "o2_default_mine", true, "content").await;
+        insert_row(&db, "acme", "ops-card", false, "content").await;
+        insert_alert(&db, "alerts", "acme", "acme-alert", "o2_default_anomaly").await;
+        insert_alert(&db, "alerts", "other", "other-alert", "o2_default_anomaly").await;
+        insert_alert(&db, "alerts", "other", "shared-alert", "o2_default_mine").await;
+        insert_alert(
+            &db,
+            "alert_composites",
+            "acme",
+            "acme-composite",
+            "o2_default_anomaly",
+        )
+        .await;
+        system_settings::ActiveModel {
+            scope: Set("org".to_string()),
+            org_id: Set(Some("acme".to_string())),
+            setting_key: Set("default_templates".to_string()),
+            setting_value: Set(serde_json::json!({"anomaly": "o2_default_anomaly"})),
+            created_at: Set(0),
+            updated_at: Set(0),
+            ..Default::default()
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        let renames = rename_reserved_collisions(&db).await.unwrap();
+
+        assert_eq!(
+            renames,
+            vec![
+                ReservedRename {
+                    org: "acme".to_string(),
+                    from: "o2_default_anomaly".to_string(),
+                    to: "user_o2_default_anomaly_2".to_string(),
+                },
+                ReservedRename {
+                    org: DEFAULT_ORG.to_string(),
+                    from: "o2_default_mine".to_string(),
+                    to: "user_o2_default_mine".to_string(),
+                },
+            ]
+        );
+        assert_eq!(
+            names(&db, "acme").await,
+            vec![
+                "ops-card",
+                "user_o2_default_anomaly",
+                "user_o2_default_anomaly_2"
+            ]
+        );
+        assert_eq!(
+            names(&db, DEFAULT_ORG).await,
+            vec![
+                "o2_default_anomaly",
+                "o2_default_content",
+                "user_o2_default_mine"
+            ]
+        );
+        // The acme alert follows its org's row; another org's alert keeps reading the shipped seed.
+        assert_eq!(
+            alert_template(&db, "alerts", "acme-alert").await.as_deref(),
+            Some("user_o2_default_anomaly_2")
+        );
+        assert_eq!(
+            alert_template(&db, "alerts", "other-alert")
+                .await
+                .as_deref(),
+            Some("o2_default_anomaly")
+        );
+        // A renamed default org row is shared, so every org's reference follows it.
+        assert_eq!(
+            alert_template(&db, "alerts", "shared-alert")
+                .await
+                .as_deref(),
+            Some("user_o2_default_mine")
+        );
+        assert_eq!(
+            alert_template(&db, "alert_composites", "acme-composite")
+                .await
+                .as_deref(),
+            Some("user_o2_default_anomaly_2")
+        );
+        let pointer = system_settings::Entity::find()
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            pointer.setting_value,
+            serde_json::json!({"anomaly": "user_o2_default_anomaly_2"})
+        );
+
+        // A second boot finds nothing left under the prefix that is not a seed.
+        assert!(rename_reserved_collisions(&db).await.unwrap().is_empty());
     }
 }

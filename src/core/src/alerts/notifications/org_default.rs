@@ -92,6 +92,34 @@ pub async fn set_org_default_template(
     Ok(())
 }
 
+/// A `default_templates` value: an object of kind to user template name that applies to it.
+pub async fn validate_default_templates(
+    org_id: &str,
+    value: &serde_json::Value,
+) -> Result<(), String> {
+    let Some(map) = value.as_object() else {
+        return Err(format!(
+            "{DEFAULT_TEMPLATES_KEY}: expected an object of kind to template"
+        ));
+    };
+    for (key, name) in map {
+        let Some(kind) = NotificationKind::parse(key) else {
+            return Err(format!(
+                "{DEFAULT_TEMPLATES_KEY}: unknown kind '{key}'; allowed: alert, incident, anomaly, synthetics, downtime, on_call"
+            ));
+        };
+        let Some(name) = name.as_str().filter(|n| !n.is_empty()) else {
+            return Err(format!(
+                "{DEFAULT_TEMPLATES_KEY}.{key}: expected a template name; omit the key to clear it"
+            ));
+        };
+        crate::alerts::templates::check_binding(org_id, name, kind)
+            .await
+            .map_err(|e| format!("{DEFAULT_TEMPLATES_KEY}.{}: {e}", kind.as_str()))?;
+    }
+    Ok(())
+}
+
 /// Which precedence level supplied the template (Backend section 3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TemplateSource {
@@ -145,9 +173,9 @@ pub fn is_user_template(t: &Template) -> bool {
     !is_reserved_template_name(&t.name)
 }
 
-/// Level 2: alerts keep any destination template; other kinds take only user templates (D2).
+/// Level 2 (D2): alerts keep any destination template; other kinds need a user one that applies.
 pub fn destination_template_applies(t: &Template, kind: NotificationKind) -> bool {
-    kind == NotificationKind::Alert || is_user_template(t)
+    kind == NotificationKind::Alert || (is_user_template(t) && t.applies_to_kind(kind))
 }
 
 /// A Content template fits every transport; a Custom one only its own (Http, Email, Sns).
@@ -396,6 +424,7 @@ pub fn compiled_fallback_for(org_id: &str, kind: NotificationKind) -> Template {
         body: serde_json::to_string(&compiled_content_for(kind))
             .unwrap_or_else(|_| "{}".to_string()),
         kind: TemplateKind::Content,
+        applies_to: Vec::new(),
     }
 }
 
@@ -470,6 +499,7 @@ mod tests {
             template_type,
             body: "{}".into(),
             kind,
+            applies_to: Vec::new(),
         }
     }
 
@@ -567,7 +597,40 @@ mod tests {
         let prebuilt = content("prebuilt_slack");
         let user = content("ops-card");
         let hook = custom_http("hook");
+        let anomaly_only = Template {
+            applies_to: vec![Anomaly],
+            ..content("anomaly-card")
+        };
         let cases: Vec<Case> = vec![
+            // Level 2 re-checks applies_to: skipped for synthetics, used for anomaly.
+            (
+                Synthetics,
+                vec![],
+                Some(anomaly_only.clone()),
+                None,
+                slack_dest(),
+                TemplateSource::Compiled,
+                1,
+            ),
+            (
+                Anomaly,
+                vec![],
+                Some(anomaly_only.clone()),
+                None,
+                slack_dest(),
+                TemplateSource::Destination,
+                0,
+            ),
+            // Alerts keep any destination template, whatever it applies to.
+            (
+                Alert,
+                vec![],
+                Some(anomaly_only.clone()),
+                None,
+                slack_dest(),
+                TemplateSource::Destination,
+                0,
+            ),
             // Level 1 wins when it fits.
             (
                 Anomaly,

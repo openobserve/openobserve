@@ -251,6 +251,9 @@ mod m20261101_000001_create_oncall_slack;
 mod m20261110_000001_create_notification_deliveries;
 mod m20261110_000002_add_anomaly_alert_episode;
 mod m20261110_000003_add_incident_episode_opened_at;
+mod m20261120_000001_add_template_applies_to;
+mod m20261120_000002_rename_reserved_template_collisions;
+mod m20261120_000003_add_anomaly_template;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -783,6 +786,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20261110_000001_create_notification_deliveries::Migration),
             Box::new(m20261110_000002_add_anomaly_alert_episode::Migration),
             Box::new(m20261110_000003_add_incident_episode_opened_at::Migration),
+            Box::new(m20261120_000001_add_template_applies_to::Migration),
+            Box::new(m20261120_000002_rename_reserved_template_collisions::Migration),
+            Box::new(m20261120_000003_add_anomaly_template::Migration),
         ]
     }
 }
@@ -886,6 +892,9 @@ mod tests {
         (133, "m20261110_000001_create_notification_deliveries"),
         (134, "m20261110_000002_add_anomaly_alert_episode"),
         (135, "m20261110_000003_add_incident_episode_opened_at"),
+        (136, "m20261120_000001_add_template_applies_to"),
+        (137, "m20261120_000002_rename_reserved_template_collisions"),
+        (138, "m20261120_000003_add_anomaly_template"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

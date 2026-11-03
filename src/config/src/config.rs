@@ -133,7 +133,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 133: create notification_deliveries, notification_episodes, notification_episode_destinations.
 // 134: add alert_episode_started_at to anomaly_detection_config.
 // 135: add episode_opened_at to alert_incidents.
-pub const DB_SCHEMA_VERSION: u64 = 135;
+// 136: add applies_to to templates.
+// 137: rename user templates under the reserved o2_default_ prefix.
+// 138: add template to anomaly_detection_config.
+pub const DB_SCHEMA_VERSION: u64 = 138;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

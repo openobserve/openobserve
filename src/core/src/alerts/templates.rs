@@ -21,7 +21,7 @@
 use config::{
     DEFAULT_ORG,
     meta::{
-        alerts::content_spec::ContentSpec,
+        alerts::{content_spec::ContentSpec, notification_kind::NotificationKind},
         destinations::{Template, TemplateKind, TemplateType},
     },
 };
@@ -82,6 +82,7 @@ pub async fn save(
     name: &str,
     mut template: Template,
     requested_kind: Option<TemplateKind>,
+    requested_applies_to: Option<Vec<NotificationKind>>,
     create: bool,
     is_root: bool,
 ) -> Result<Template, TemplateError> {
@@ -131,6 +132,15 @@ pub async fn save(
 
     let existing_kind = existing.as_ref().map(|e| e.kind);
     template.kind = resolve_kind(requested_kind, existing_kind, create);
+    template.applies_to = match &existing {
+        // Reserved rows are read only; root edits keep the stored list.
+        Some(e) if is_reserved_template_name(&e.name) => e.applies_to.clone(),
+        Some(e) => requested_applies_to.unwrap_or_else(|| e.applies_to.clone()),
+        None => requested_applies_to.unwrap_or_default(),
+    };
+    if let Some(existing) = &existing {
+        check_narrowing(existing, &template.applies_to).await?;
+    }
 
     if template.kind == TemplateKind::Content {
         let spec = ContentSpec::parse(&template.body)
@@ -163,9 +173,10 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
 pub async fn list(
     org_id: &str,
     permitted: Option<Vec<String>>,
+    filter: ListFilter,
 ) -> Result<Vec<Template>, TemplateError> {
-    Ok(db::alerts::templates::list(org_id)
-        .await?
+    let templates = apply_list_filter(db::alerts::templates::list(org_id).await?, filter);
+    Ok(templates
         .into_iter()
         .filter(|template| {
             permitted.is_none()
@@ -187,12 +198,269 @@ pub async fn delete(org_id: &str, name: &str, is_root: bool) -> Result<(), Templ
     }
     let existing = db::alerts::templates::get(org_id, name).await?;
     let owner = write_org(org_id, &existing.org_id, is_root)?;
+    let used = used_by(&owner, name).await?;
+    if let Some(by) = used.bindings_outside_caches() {
+        return Err(TemplateError::DeleteWithBinding(by));
+    }
     let owners = owners_to_disown(&owner, name).await?;
     db::alerts::templates::delete(&owner, name).await?;
     for owner in owners {
         remove_ownership(&owner, "templates", Authz::new(name)).await;
     }
     Ok(())
+}
+
+/// Parses wire kind names; the first unknown one is the error.
+pub fn parse_applies_to(names: &[String]) -> Result<Vec<NotificationKind>, TemplateError> {
+    let mut kinds = Vec::with_capacity(names.len());
+    for name in names {
+        let kind = NotificationKind::parse(name.trim())
+            .ok_or_else(|| TemplateError::UnknownKind(name.clone()))?;
+        if !kinds.contains(&kind) {
+            kinds.push(kind);
+        }
+    }
+    Ok(kinds)
+}
+
+/// Kinds the old list covered that the new one drops; an empty new list drops nothing.
+pub(crate) fn dropped_kinds(
+    old: &[NotificationKind],
+    new: &[NotificationKind],
+) -> Vec<NotificationKind> {
+    if new.is_empty() {
+        return Vec::new();
+    }
+    NotificationKind::ALL
+        .into_iter()
+        .filter(|k| (old.is_empty() || old.contains(k)) && !new.contains(k))
+        .collect()
+}
+
+/// Narrowing rule: a dropped kind must have no level 1 or level 3 binding of this template.
+async fn check_narrowing(
+    existing: &Template,
+    applies_to: &[NotificationKind],
+) -> Result<(), TemplateError> {
+    for kind in dropped_kinds(&existing.applies_to, applies_to) {
+        let by = bindings_for(&existing.org_id, &existing.name, kind).await?;
+        if !by.is_empty() {
+            return Err(TemplateError::InUseForKind {
+                kind: kind.as_str().to_string(),
+                by: by.join(", "),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// A `default` template is shared, so its bindings are looked up in every org.
+fn binding_scope(org_id: &str) -> Option<&str> {
+    (org_id != DEFAULT_ORG).then_some(org_id)
+}
+
+/// Level 1 overrides and level 3 org pointers of `kind` that name the template.
+pub(crate) async fn bindings_for(
+    org_id: &str,
+    name: &str,
+    kind: NotificationKind,
+) -> Result<Vec<String>, TemplateError> {
+    let mut by = Vec::new();
+    match kind {
+        NotificationKind::Anomaly => {
+            let db_conn = infra::db::get_orm_client_ro().await;
+            for (_, config) in infra::table::anomaly_detection::config::names_using_template(
+                db_conn,
+                binding_scope(org_id),
+                name,
+            )
+            .await?
+            {
+                by.push(format!("anomaly config '{config}'"));
+            }
+        }
+        NotificationKind::Alert => {
+            let (_, alerts) = db::alerts::templates::cached_references(org_id, name).await;
+            by.extend(alerts.into_iter().map(|a| format!("alert '{a}'")));
+        }
+        _ => {}
+    }
+    for org in pointer_orgs(org_id, name).await? {
+        if org.1.contains(&kind) {
+            by.push(format!("org default template of {}", org.0));
+        }
+    }
+    Ok(by)
+}
+
+/// `(org, kinds)` whose org default pointers name the template.
+async fn pointer_orgs(
+    org_id: &str,
+    name: &str,
+) -> Result<Vec<(String, Vec<NotificationKind>)>, TemplateError> {
+    use super::notifications::org_default::{
+        DEFAULT_ALERT_TEMPLATE_KEY, DEFAULT_TEMPLATES_KEY, DefaultTemplates, pointer_from_value,
+    };
+
+    let scope = binding_scope(org_id);
+    let in_scope = |org: &str| scope.is_none_or(|s| s == org);
+    let mut found: Vec<(String, Vec<NotificationKind>)> = Vec::new();
+    let mut add = |org: String, kind: NotificationKind| match found.iter_mut().find(|f| f.0 == org)
+    {
+        Some(entry) if !entry.1.contains(&kind) => entry.1.push(kind),
+        Some(_) => {}
+        None => found.push((org, vec![kind])),
+    };
+    let read =
+        |e: anyhow::Error| TemplateError::InfraError(infra::errors::Error::Message(e.to_string()));
+    for (org, value) in infra::table::system_settings::list_org_values(DEFAULT_TEMPLATES_KEY)
+        .await
+        .map_err(read)?
+    {
+        if !in_scope(&org) {
+            continue;
+        }
+        let pointers = DefaultTemplates::from_value(&value);
+        for kind in NotificationKind::ALL {
+            if pointers.get(kind) == Some(name) {
+                add(org.clone(), kind);
+            }
+        }
+    }
+    for (org, value) in infra::table::system_settings::list_org_values(DEFAULT_ALERT_TEMPLATE_KEY)
+        .await
+        .map_err(read)?
+    {
+        if in_scope(&org) && pointer_from_value(&value).as_deref() == Some(name) {
+            add(org, NotificationKind::Alert);
+        }
+    }
+    Ok(found)
+}
+
+/// Where a template is referenced (Data section 2, GET template).
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
+pub struct UsedBy {
+    pub destinations: usize,
+    pub alerts: usize,
+    pub anomaly: usize,
+    pub synthetics: usize,
+    pub on_call: usize,
+    /// Kinds whose org default pointer names the template.
+    pub org_default: Vec<String>,
+    #[serde(skip)]
+    anomaly_names: Vec<String>,
+}
+
+impl UsedBy {
+    /// The references the cached delete guard does not see, as one message.
+    fn bindings_outside_caches(&self) -> Option<String> {
+        let mut by = self.anomaly_names.clone();
+        if !self.org_default.is_empty() {
+            by.push(format!("org default for {}", self.org_default.join(", ")));
+        }
+        (!by.is_empty()).then(|| by.join(", "))
+    }
+}
+
+pub async fn used_by(org_id: &str, name: &str) -> Result<UsedBy, TemplateError> {
+    let (destinations, alerts) = db::alerts::templates::cached_references(org_id, name).await;
+    let anomaly_names: Vec<String> = infra::table::anomaly_detection::config::names_using_template(
+        infra::db::get_orm_client_ro().await,
+        binding_scope(org_id),
+        name,
+    )
+    .await?
+    .into_iter()
+    .map(|(_, config)| format!("anomaly config '{config}'"))
+    .collect();
+    let mut org_default: Vec<String> = Vec::new();
+    for (_, kinds) in pointer_orgs(org_id, name).await? {
+        for kind in kinds {
+            let kind = kind.as_str().to_string();
+            if !org_default.contains(&kind) {
+                org_default.push(kind);
+            }
+        }
+    }
+    Ok(UsedBy {
+        destinations: destinations.len(),
+        alerts: alerts.len(),
+        anomaly: anomaly_names.len(),
+        synthetics: 0,
+        on_call: 0,
+        org_default,
+        anomaly_names,
+    })
+}
+
+/// A level 1 or level 3 binding must name a user template that applies to `kind`.
+pub async fn check_binding(org_id: &str, name: &str, kind: NotificationKind) -> Result<(), String> {
+    let template = db::alerts::templates::get(org_id, name)
+        .await
+        .map_err(|_| format!("template '{name}' does not exist"))?;
+    if is_reserved_template_name(&template.name) {
+        return Err(format!("template '{name}' is reserved"));
+    }
+    if !template.applies_to_kind(kind) {
+        return Err(format!(
+            "template '{name}' does not apply to {}",
+            kind.as_str()
+        ));
+    }
+    Ok(())
+}
+
+/// The list filter of `GET templates?applies_to=&type=`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ListFilter {
+    pub applies_to: Option<NotificationKind>,
+    /// Custom templates of other types are dropped; Content fits every type.
+    pub template_type: Option<TemplateTypeFilter>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TemplateTypeFilter {
+    Http,
+    Email,
+    Sns,
+}
+
+impl TemplateTypeFilter {
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "http" => Some(Self::Http),
+            "email" => Some(Self::Email),
+            "sns" => Some(Self::Sns),
+            _ => None,
+        }
+    }
+
+    fn matches(self, t: &TemplateType) -> bool {
+        matches!(
+            (self, t),
+            (Self::Http, TemplateType::Http)
+                | (Self::Email, TemplateType::Email { .. })
+                | (Self::Sns, TemplateType::Sns)
+        )
+    }
+}
+
+/// With a kind: user templates that apply to it, Content first; reserved rows are left out.
+pub fn apply_list_filter(templates: Vec<Template>, filter: ListFilter) -> Vec<Template> {
+    let keep_type = |t: &Template| match filter.template_type {
+        Some(ty) => t.kind == TemplateKind::Content || ty.matches(&t.template_type),
+        None => true,
+    };
+    let Some(kind) = filter.applies_to else {
+        return templates.into_iter().filter(keep_type).collect();
+    };
+    let (content, custom): (Vec<_>, Vec<_>) = templates
+        .into_iter()
+        .filter(|t| !is_reserved_template_name(&t.name) && t.applies_to_kind(kind))
+        .filter(keep_type)
+        .partition(|t| t.kind == TemplateKind::Content);
+    content.into_iter().chain(custom).collect()
 }
 
 pub(crate) const PREBUILT_REVISION_KEY: &str = "prebuilt_templates_revision";
@@ -206,6 +474,7 @@ pub fn downtime_templates() -> [Template; 2] {
         template_type,
         body: body.to_string(),
         kind: TemplateKind::Custom,
+        applies_to: Vec::new(),
     };
     [
         template(DOWNTIME_TEMPLATE, DOWNTIME_HTTP_BODY, TemplateType::Http),
@@ -247,6 +516,21 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
 
     // Acquire distributed lock to ensure only one instance initializes templates
     let locker = dist_lock::lock(lock_key, 0).await?;
+
+    // A row an old node created under the reserved prefix moves before the seed lands.
+    match db::alerts::templates::rename_reserved_collisions().await {
+        Ok(renames) => {
+            for r in renames {
+                log::info!(
+                    "[TEMPLATES] renamed reserved template '{}' in org {} to '{}'",
+                    r.from,
+                    r.org,
+                    r.to
+                );
+            }
+        }
+        Err(e) => log::error!("[TEMPLATES] reserved name rename failed: {e}"),
+    }
 
     let shipped_rev = config::prebuilt_loader::get_prebuilt_revision();
     let applied_rev: u32 = match system_settings::get(
@@ -429,6 +713,107 @@ fn seeded_downtime_templates() -> Vec<Template> {
 mod tests {
     use super::*;
 
+    fn user(name: &str, kind: TemplateKind, applies_to: Vec<NotificationKind>) -> Template {
+        Template {
+            name: name.to_string(),
+            kind,
+            applies_to,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn narrowing_drops_only_kinds_the_old_list_covered() {
+        use NotificationKind::*;
+        assert!(dropped_kinds(&[], &[]).is_empty());
+        assert!(dropped_kinds(&[Anomaly], &[]).is_empty());
+        assert_eq!(
+            dropped_kinds(&[Anomaly, Incident], &[Incident]),
+            vec![Anomaly]
+        );
+        assert_eq!(
+            dropped_kinds(&[], &[Anomaly]),
+            vec![Alert, Incident, Synthetics, Downtime, OnCall]
+        );
+        assert!(dropped_kinds(&[Incident], &[Incident, Anomaly]).is_empty());
+    }
+
+    #[test]
+    fn applies_to_rejects_an_unknown_kind_with_the_allowed_list() {
+        let err = parse_applies_to(&["anomaly".to_string(), "pages".to_string()]).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "applies_to: unknown kind 'pages'; allowed: alert, incident, anomaly, synthetics, downtime, on_call"
+        );
+        assert_eq!(
+            parse_applies_to(&["on_call".to_string(), "on_call".to_string()]).unwrap(),
+            vec![NotificationKind::OnCall]
+        );
+    }
+
+    #[test]
+    fn the_kind_filter_lists_user_templates_that_apply_content_first() {
+        use NotificationKind::*;
+        let email = Template {
+            template_type: TemplateType::Email {
+                title: "t".to_string(),
+            },
+            ..user("mail", TemplateKind::Custom, vec![])
+        };
+        let all = vec![
+            user("a-hook", TemplateKind::Custom, vec![]),
+            user("b-card", TemplateKind::Content, vec![Anomaly]),
+            user("c-incident", TemplateKind::Content, vec![Incident]),
+            user("o2_default_anomaly", TemplateKind::Content, vec![]),
+            user("prebuilt_slack", TemplateKind::Content, vec![]),
+            email,
+        ];
+        let names = |filter| -> Vec<String> {
+            apply_list_filter(all.clone(), filter)
+                .into_iter()
+                .map(|t| t.name)
+                .collect()
+        };
+        assert_eq!(
+            names(ListFilter {
+                applies_to: Some(Anomaly),
+                template_type: None,
+            }),
+            vec!["b-card", "a-hook", "mail"]
+        );
+        assert_eq!(
+            names(ListFilter {
+                applies_to: Some(Anomaly),
+                template_type: Some(TemplateTypeFilter::Http),
+            }),
+            vec!["b-card", "a-hook"]
+        );
+        // Without a kind the list is unchanged, reserved rows included.
+        assert_eq!(names(ListFilter::default()).len(), all.len());
+    }
+
+    #[tokio::test]
+    async fn creating_any_name_under_the_reserved_prefix_is_refused() {
+        for name in [
+            "o2_default_anomaly",
+            "o2_default_synthetics",
+            "o2_default_x",
+        ] {
+            let template = Template {
+                org_id: "acme".to_string(),
+                body: "{}".to_string(),
+                ..Default::default()
+            };
+            let err = save(name, template, None, None, true, false)
+                .await
+                .unwrap_err();
+            assert!(
+                matches!(err, TemplateError::ReservedName(ref n) if n == name),
+                "{name}: {err}"
+            );
+        }
+    }
+
     /// The global meta store CI configures through `ZO_META_STORE`, migrated once per binary.
     async fn meta_store() -> bool {
         static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
@@ -562,12 +947,12 @@ mod tests {
             template_type: TemplateType::Http,
             ..Default::default()
         };
-        let err = save(name, mine.clone(), None, false, false)
+        let err = save(name, mine.clone(), None, None, false, false)
             .await
             .unwrap_err();
         assert!(matches!(err, TemplateError::NotFound), "{err}");
         mine.org_id = DEFAULT_ORG.to_string();
-        let err = save(name, mine, None, true, false).await.unwrap_err();
+        let err = save(name, mine, None, None, true, false).await.unwrap_err();
         assert!(matches!(err, TemplateError::AlreadyExists), "{err}");
     }
 

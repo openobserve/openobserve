@@ -152,9 +152,7 @@ fn field(label: &str, value: &str) -> ContentField {
 /// prebuilt).
 pub fn is_reserved_template_name(name: &str) -> bool {
     config::prebuilt_loader::is_prebuilt_template_name(name)
-        || name == DEFAULT_CONTENT_TEMPLATE_NAME
-        || name == NotificationKind::Incident.compiled_default_name()
-        || name == NotificationKind::Anomaly.compiled_default_name()
+        || name.starts_with(infra::table::templates::RESERVED_PREFIX)
         || crate::alerts::templates::is_downtime_template_name(name)
 }
 
@@ -194,6 +192,7 @@ async fn ensure_compiled_row(
         template_type: TemplateType::Http,
         body: body.clone(),
         kind: TemplateKind::Content,
+        applies_to: Vec::new(),
     };
 
     match db::alerts::templates::get(DEFAULT_ORG, name).await {
@@ -286,6 +285,9 @@ mod tests {
         assert!(is_reserved_template_name("o2_default_anomaly"));
         assert!(is_reserved_template_name("o2_default_incident"));
         assert!(is_reserved_template_name("prebuilt_slack"));
+        assert!(is_reserved_template_name("o2_default_synthetics"));
+        assert!(is_reserved_template_name("o2_default_on_call"));
+        assert!(!is_reserved_template_name("user_o2_default_anomaly"));
         assert!(!is_reserved_template_name("my_template"));
     }
 }

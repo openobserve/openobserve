@@ -170,6 +170,9 @@ pub fn template_error_response(value: TemplateError) -> Response {
         TemplateError::DeleteWithDestination(destination) => {
             MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(destination))
         }
+        TemplateError::DeleteWithBinding(by) => {
+            MetaHttpResponse::conflict(TemplateError::DeleteWithBinding(by))
+        }
         TemplateError::PrebuiltReadOnly(name) => {
             MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
         }

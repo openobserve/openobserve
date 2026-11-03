@@ -75,6 +75,8 @@ pub struct Model {
     pub last_recovery_notified_at: Option<i64>,
     /// Start of this region's open alert episode; NULL means no episode is open.
     pub alert_episode_started_at: Option<i64>,
+    /// The template override by name; NULL uses the destination's template.
+    pub template: Option<String>,
     /// Start of this region's in-flight detection run; NULL or expired means free.
     #[serde(skip)]
     pub detection_lease_us: Option<i64>,
@@ -151,6 +153,7 @@ mod tests {
             last_failed_at: None,
             last_alert_fired_at: None,
             last_recovery_notified_at: None,
+            template: None,
             alert_episode_started_at: None,
             detection_lease_us: None,
             last_updated: 0,

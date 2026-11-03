@@ -2486,6 +2486,7 @@ mod tests {
                 body: Set(r#"{"text":"{alert_name}"}"#.to_string()),
                 title: Set(None),
                 kind: Set("custom".to_string()),
+                applies_to: Set("[]".to_string()),
             }
             .insert(conn)
             .await
