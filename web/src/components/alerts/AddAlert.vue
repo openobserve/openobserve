@@ -278,13 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('alerts.sections.watch.title')"
             :help="t('alerts.sections.watch.help')"
           >
-            <div
-              v-if="!isCompositeMode"
-              :class="rowGroup"
-              data-row-group
-              data-test="add-alert-source-card"
-              data-snap-stop
-            >
+            <div v-if="!isCompositeMode" data-test="add-alert-source-card" data-snap-stop>
               <OSettingRow
                 :label="t('alerts.sections.rows.streamTypeLabel')"
                 :description="t('alerts.sections.rows.streamType')"
@@ -328,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OSettingRow>
             </div>
 
-            <div :class="rowGroup" data-row-group data-test="add-alert-query-card" data-snap-stop>
+            <div data-test="add-alert-query-card" data-snap-stop>
               <CompositeAlertForm
                 v-if="isCompositeMode"
                 :model-value="formData"
@@ -400,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex flex-col" data-snap-stop>
               <p
                 v-if="formData.is_real_time === 'true'"
-                class="text-text-secondary m-0 p-3 text-sm"
+                class="text-text-secondary m-0 py-3 text-sm"
                 data-test="add-alert-realtime-condition-note"
               >
                 {{ t("alerts.summary.plainEnglish.realTime") }}
@@ -409,47 +403,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-show="!isAnomalyMode && !isCompositeMode"
                 :ref="(el) => setSectionTarget('queryCondition', el)"
                 class="empty:hidden"
-                :class="rowGroup"
-                data-row-group
                 data-snap-stop
               />
               <div
                 v-show="isCompositeMode"
                 :ref="(el) => setSectionTarget('compositeCondition', el)"
                 class="empty:hidden"
-                :class="rowGroup"
-                data-row-group
                 data-snap-stop
               />
               <div
                 v-show="isAnomalyMode"
                 :ref="(el) => setSectionTarget('anomalyCondition', el)"
                 class="empty:hidden"
-                :class="rowGroup"
-                data-row-group
                 data-snap-stop
               />
               <div
                 v-show="isAnomalyMode"
                 :ref="(el) => setSectionTarget('anomalyTraining', el)"
                 class="empty:hidden"
-                :class="rowGroup"
-                data-row-group
                 data-snap-stop
               />
               <div
                 v-show="!isAnomalyMode"
                 :ref="(el) => setSectionTarget('settingsHold', el)"
                 class="empty:hidden"
-                :class="rowGroup"
-                data-row-group
                 data-snap-stop
               />
               <div
                 v-if="formData.is_real_time === 'false' && tiers.isVisible('compareWithPast')"
                 data-snap-stop
-                :class="rowGroup"
-                data-row-group
               >
                 <CompareWithPast
                   ref="step3Ref"
@@ -464,12 +446,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <AlertTierLinks
                 v-if="!isAnomalyMode"
-                :class="rowGroup"
-                data-row-group
                 section="condition"
                 :view="tiers.view('condition')"
+                :auto-opened="autoOpenedTiers.has('condition')"
                 @add="onTierAdd"
-                @toggle="tiers.toggle('condition')"
+                @toggle="onTierToggle('condition')"
               />
             </div>
           </AlertFormSection>
@@ -485,16 +466,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-show="!isAnomalyMode"
                 :ref="(el) => setSectionTarget('settingsNotify', el)"
                 class="empty:hidden"
-                :class="rowGroup"
-                data-row-group
                 data-snap-stop
               />
               <div
                 v-show="!isAnomalyMode"
                 :ref="(el) => setSectionTarget('settingsNotifyMore', el)"
                 class="empty:hidden"
-                :class="rowGroup"
-                data-row-group
                 data-snap-stop
               />
               <div v-show="isAnomalyMode" data-snap-stop>
@@ -508,16 +485,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-show="!isAnomalyMode"
                 :ref="(el) => setSectionTarget('advancedMessage', el)"
                 class="empty:hidden"
-                :class="rowGroup"
-                data-row-group
                 data-snap-stop
               />
               <div
                 v-show="!isAnomalyMode"
                 :ref="(el) => setSectionTarget('advancedOncall', el)"
                 class="empty:hidden"
-                :class="rowGroup"
-                data-row-group
                 data-snap-stop
               />
               <div
@@ -534,12 +507,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <AlertTierLinks
                 v-if="!isAnomalyMode"
-                :class="rowGroup"
-                data-row-group
                 section="notify"
                 :view="tiers.view('notify')"
+                :auto-opened="autoOpenedTiers.has('notify')"
                 @add="onTierAdd"
-                @toggle="tiers.toggle('notify')"
+                @toggle="onTierToggle('notify')"
               />
             </div>
           </AlertFormSection>
@@ -585,24 +557,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-show="!isAnomalyMode && !isCompositeMode"
                 :ref="(el) => setSectionTarget('querySchedule', el)"
                 class="empty:hidden"
-                :class="rowGroup"
-                data-row-group
                 data-snap-stop
               />
               <div
                 v-show="isAnomalyMode"
                 :ref="(el) => setSectionTarget('anomalySchedule', el)"
                 class="empty:hidden"
-                :class="rowGroup"
-                data-row-group
                 data-snap-stop
               />
               <div
                 v-show="!isAnomalyMode"
                 :ref="(el) => setSectionTarget('settingsSchedule', el)"
                 class="empty:hidden"
-                :class="rowGroup"
-                data-row-group
                 data-snap-stop
               />
             </div>
@@ -642,11 +608,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-show="!isAnomalyMode"
                 :ref="(el) => setSectionTarget('advancedDetails', el)"
                 class="empty:hidden"
-                :class="rowGroup"
-                data-row-group
                 data-snap-stop
               />
-              <div v-show="!isAnomalyMode" :class="rowGroup" data-row-group data-snap-stop>
+              <div v-show="!isAnomalyMode" data-snap-stop>
                 <Advanced
                   :section-targets="sectionTargets"
                   :template="formData.template"
@@ -695,12 +659,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <AlertTierLinks
                 v-if="!isAnomalyMode"
-                :class="rowGroup"
-                data-row-group
                 section="details"
                 :view="tiers.view('details')"
+                :auto-opened="autoOpenedTiers.has('details')"
                 @add="onTierAdd"
-                @toggle="tiers.toggle('details')"
+                @toggle="onTierToggle('details')"
               />
             </div>
           </AlertFormSection>
@@ -906,7 +869,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { raw } from "@/types/i18n";
-import { defineComponent, computed, watch, provide, ref, reactive, onMounted } from "vue";
+import {
+  defineComponent,
+  computed,
+  watch,
+  provide,
+  ref,
+  reactive,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+} from "vue";
 import { useStore } from "vuex";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
@@ -1320,9 +1293,6 @@ export default defineComponent({
         ALERT_SECTIONS.findIndex((section) => section.id === activeSection.value),
       ),
     );
-    // A divider between slot groups that each drop the rule under their own last row.
-    const rowGroup =
-      "border-border-default [[data-row-group]:not(:empty):not([style*=none])~&]:border-t";
     const previousSection = computed(() => ALERT_SECTIONS[sectionPosition.value - 1]);
     const nextSection = computed(() => ALERT_SECTIONS[sectionPosition.value + 1]);
     // Creating walks forward, so Next holds the one primary action until the last step.
@@ -1546,6 +1516,67 @@ export default defineComponent({
     const focusNameField = () =>
       (alertForm.step1Ref.value as { focus?: () => void } | null)?.focus?.();
 
+    // A section opens all its settings while they fit the view; a group the user toggled is left alone.
+    const userToggledTiers = new Set<AlertSectionId>();
+    const autoOpenedTiers = reactive(new Set<AlertSectionId>());
+    const onTierToggle = (section: AlertSectionId) => {
+      userToggledTiers.add(section);
+      autoOpenedTiers.delete(section);
+      tiers.toggle(section);
+    };
+    const sectionsScroller = () => (snapScrollRef.value as { $el?: HTMLElement } | null)?.$el;
+    const overflowsView = (id: AlertSectionId, scroller: HTMLElement): boolean => {
+      const section = scroller.querySelector<HTMLElement>(`[data-snap-section="${id}"]`);
+      const body = section?.lastElementChild;
+      if (!section || !body) return false;
+      const top = section.getBoundingClientRect().top;
+      const bottoms = Array.from(body.children).map(
+        (child) => child.getBoundingClientRect().bottom,
+      );
+      return Math.max(top, ...bottoms) - top > scroller.clientHeight;
+    };
+    const closeOverflowingTiers = () => {
+      const scroller = sectionsScroller();
+      if (!scroller) return;
+      for (const id of autoOpenedTiers) {
+        if (!overflowsView(id, scroller)) continue;
+        autoOpenedTiers.delete(id);
+        tiers.collapse(id);
+      }
+    };
+    const openSettingsThatFit = async () => {
+      if (!lgUp.value || !sectionsScroller() || alertForm.isAnomalyMode.value) return;
+      for (const { id } of ALERT_SECTIONS) {
+        const view = tiers.view(id);
+        if (userToggledTiers.has(id) || view.expanded) continue;
+        if (!view.tucked.length && !view.addLinks.length) continue;
+        tiers.expand(id);
+        autoOpenedTiers.add(id);
+      }
+      await nextTick();
+      closeOverflowingTiers();
+    };
+    let tierResizeObserver: ResizeObserver | null = null;
+    onMounted(() => {
+      nextTick(openSettingsThatFit);
+      const content = sectionsScroller()?.firstElementChild;
+      if (content && typeof ResizeObserver !== "undefined") {
+        tierResizeObserver = new ResizeObserver(closeOverflowingTiers);
+        tierResizeObserver.observe(content);
+      }
+    });
+    onBeforeUnmount(() => tierResizeObserver?.disconnect());
+    watch(
+      () => [
+        lgUp.value,
+        alertForm.formData.value.stream_name,
+        alertForm.formData.value.is_real_time,
+        alertForm.formData.value.query_condition?.type,
+      ],
+      openSettingsThatFit,
+      { flush: "post" },
+    );
+
     // A one-click link adds the setting itself, so the click is never only a reveal.
     const onTierAdd = (id: AlertSettingId) => {
       tiers.reveal(id);
@@ -1650,7 +1681,6 @@ export default defineComponent({
       previousSection,
       nextSection,
       guidesToNext,
-      rowGroup,
       sectionTargets,
       setSectionTarget,
       sectionItems,
@@ -1665,6 +1695,8 @@ export default defineComponent({
       RAIL_VERDICT_ICONS,
       tiers,
       onTierAdd,
+      onTierToggle,
+      autoOpenedTiers,
       settingFind,
       focusNameField,
       activeFolderName,
