@@ -68,7 +68,6 @@ jobs:
           - name: anthropic
             provider_id: anthropic-review
             model_id: claude-sonnet-5-5
-            model_variant: high
             api_key_env: ANTHROPIC_REVIEW_API_KEY
             marker: "<!-- ai-code-review -->"
     steps:
@@ -109,6 +108,11 @@ jobs:
           fi
           merge_base="$(gh api "repos/$REPO/compare/$base_sha...$head_sha" --jq '.merge_base_commit.sha' || true)"
           echo "merge_base=$merge_base" >> "$GITHUB_OUTPUT"
+          {
+            echo "author=$(jq -r '.user.login // ""' <<<"$pr_json")"
+            echo "changed_files=$(jq -r '.changed_files // ""' <<<"$pr_json")"
+            echo "commit_count=$(jq -r '.commits // ""' <<<"$pr_json")"
+          } >> "$GITHUB_OUTPUT"
           echo "REVIEW_RUN=true" >> "$GITHUB_ENV"
 
       # If minting fails (app not installed, bad key) the steps below fall back to github.token.
@@ -148,6 +152,37 @@ jobs:
             scripts/ai-review
             .claude/skills/ui-architect
             .claude/skills/eslint-error-handling
+
+      # Bills nothing and posts nothing; a hand-started run, a failed listing or a failed check always reviews.
+      - name: Skip PRs with nothing to review
+        if: env.REVIEW_RUN == 'true' && github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PR_AUTHOR: ${{ steps.pr.outputs.author }}
+          # The listings are checked against these, as both endpoints stop at a cap however far they are paged.
+          EXPECTED_FILES: ${{ steps.pr.outputs.changed_files }}
+          EXPECTED_COMMITS: ${{ steps.pr.outputs.commit_count }}
+        run: |
+          set -uo pipefail
+          list="$RUNNER_TEMP/pr-files.tsv"
+          commits="$RUNNER_TEMP/pr-commits.tsv"
+          # One line per file with its rename source, so code moved under docs/ is not taken for docs and the count can be checked.
+          if ! gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --jq '.[] | [.filename, (.previous_filename // "")] | @tsv' > "$list"; then
+            echo "::warning::Could not list the PR's files; reviewing."
+            : > "$list"
+          fi
+          # One line per commit: author login, committer login, signature verified; a missing field lists as empty and reviews.
+          if ! gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits?per_page=100" --jq '.[] | [(.author.login // ""), (.committer.login // ""), ((.commit.verification.verified // "") | tostring)] | @tsv' > "$commits"; then
+            echo "::warning::Could not list the PR's commits; reviewing."
+            : > "$commits"
+          fi
+          reason="$(node engine/scripts/ai-review/skip-check.mjs "$list" "$commits")" || reason=""
+          if [ -n "$reason" ]; then
+            echo "::notice::PR #$PR_NUMBER needs no review ($reason); skipped."
+            echo "REVIEW_RUN=false" >> "$GITHUB_ENV"
+          fi
 
       # Paired OSS+ENT changes are reviewed once, by the o2-enterprise workflow, which pulls this PR's diff in.
       - name: Defer to a paired o2-enterprise PR
@@ -291,10 +326,12 @@ jobs:
           FORCE_FULL: ${{ inputs.force_full || 'false' }}
           REVIEW_PROVIDER_ID: ${{ matrix.provider.provider_id }}
           REVIEW_MODEL_ID: ${{ matrix.provider.model_id }}
-          REVIEW_MODEL_VARIANT: ${{ matrix.provider.model_variant }}
+          # The effort is set here only, so the variable is the single source; each value must be a variant in opencode.ci.jsonc.
+          REVIEW_MODEL_VARIANT: ${{ vars.AI_REVIEW_EFFORT || 'high' }}
+          REVIEW_COORDINATOR_VARIANT: ${{ vars.AI_REVIEW_COORDINATOR_EFFORT || vars.AI_REVIEW_EFFORT || 'high' }}
           REVIEW_API_KEY_ENV: ${{ matrix.provider.api_key_env }}
           REVIEW_MARKER: ${{ matrix.provider.marker }}
-          # opencode.ci.jsonc: every tool (shell, edit, webfetch) allowed with no prompts; "default" is the read-only opencode.jsonc.
+          # opencode.ci.jsonc: file tools plus a read-only shell allowlist, no web or sub-agent tools, no prompts; "default" is the read-only opencode.jsonc.
           REVIEW_OPENCODE_CONFIG: ci-full
           # Empty under the github.token fallback: any workflow a same-repo PR adds can also post as github-actions[bot].
           REVIEW_BOT_LOGIN: ${{ steps.app_token.outputs.token && format('{0}[bot]', steps.app_token.outputs.app-slug) || '' }}
@@ -313,6 +350,8 @@ jobs:
           # Optional ceiling on automatic reviews per PR; unset means no cap, so each new commit gets one review. The manual input bypasses it for one run.
           REVIEW_MAX_PASSES: ${{ vars.AI_REVIEW_MAX_PASSES }}
           REVIEW_IGNORE_PASS_LIMIT: ${{ inputs.ignore_pass_limit || 'false' }}
+          # A hand-started run reviews even a diff the last review already read.
+          REVIEW_MANUAL_RUN: ${{ github.event_name == 'workflow_dispatch' }}
           # Independent reviewer sessions per area (1-3), merged by the coordinator; one cold pass misses findings a second catches.
           REVIEW_COLD_PASSES: ${{ vars.AI_REVIEW_COLD_PASSES || '2' }}
           # An unknown value means off, so a typo can never start approving.
