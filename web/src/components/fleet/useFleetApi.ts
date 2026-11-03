@@ -188,7 +188,7 @@ export const NO_OVERRIDES: FleetSettings = {
 
 export const HALT_EXITS: FleetHaltExit[] = ["rollback", "resume", "fix_forward", "skip"];
 
-const ACTIVE_ROLLOUT: FleetRolloutStatus[] = ["halted", "in_progress", "scheduled"];
+const ACTIVE_ROLLOUT: FleetRolloutStatus[] = ["halted", "in_progress", "scheduled", "waiting"];
 
 const ENV_REF = /\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}/g;
 

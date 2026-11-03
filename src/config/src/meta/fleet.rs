@@ -692,6 +692,8 @@ pub struct PlanPreview {
 #[serde(rename_all = "snake_case")]
 pub enum RolloutStatus {
     Scheduled,
+    /// No collector was online at the start, so nothing is sent until one is (§9.3).
+    Waiting,
     InProgress,
     Halted,
     Completed,
@@ -701,7 +703,10 @@ pub enum RolloutStatus {
 
 impl RolloutStatus {
     pub fn is_active(self) -> bool {
-        matches!(self, Self::Scheduled | Self::InProgress | Self::Halted)
+        matches!(
+            self,
+            Self::Scheduled | Self::Waiting | Self::InProgress | Self::Halted
+        )
     }
 }
 
@@ -1197,6 +1202,7 @@ mod tests {
         assert_eq!(back, rollout());
         for (status, text) in [
             (RolloutStatus::Scheduled, "scheduled"),
+            (RolloutStatus::Waiting, "waiting"),
             (RolloutStatus::InProgress, "in_progress"),
             (RolloutStatus::Superseded, "superseded"),
             (RolloutStatus::RolledBack, "rolled_back"),
