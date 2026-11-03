@@ -369,7 +369,7 @@ pub(super) async fn buffer_stream_records(
     }
 
     if let Some(split) = mute_split {
-        triggers.extend(split.finish().await);
+        tokio::spawn(split.evaluate());
     }
     (!triggers.is_empty()).then_some(triggers)
 }

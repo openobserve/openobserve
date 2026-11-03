@@ -279,6 +279,8 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
         };
         let delivered = if let Some(downtime) = downtime {
             // One suppressed record per downtime per floor; other rows of the alert stay live.
+            // Expired claims go first, since a downtime key is never released.
+            REALTIME_FLOOR_CLAIMS.retain(|_, (until, _)| *until > now);
             if claim_realtime_floor(
                 &format!("{floor_key}/{}", downtime.id),
                 now,

@@ -2051,7 +2051,7 @@ async fn write_traces(
     })?;
 
     if let Some(split) = mute_split {
-        triggers.extend(split.finish().await);
+        tokio::spawn(split.evaluate());
     }
     // only one trigger per request; notification/db work must not block ingestion
     if !triggers.is_empty() {

@@ -699,7 +699,7 @@ async fn write_logs(
     };
 
     if let Some(split) = mute_split {
-        triggers.extend(split.finish().await);
+        tokio::spawn(split.evaluate());
     }
     // only one trigger per request
     if !triggers.is_empty() {

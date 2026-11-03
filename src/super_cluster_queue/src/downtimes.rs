@@ -374,6 +374,11 @@ async fn remeasure_plan<'a>(
     })
 }
 
+/// How long a row waits for its folder to replicate before it is filed under `default`.
+/// The queue has no delivery limit, and a folder made while replication was off never
+/// arrives, so an unbounded wait would keep the mute out of this region for good.
+const FOLDER_WAIT_MICROS: i64 = 10 * 60 * 1_000_000;
+
 /// The local folder of a replicated row; a folder that has not replicated yet fails the
 /// message, so the queue redelivers it after the folder lands instead of misfiling it.
 async fn local_folder_id(downtime: &Downtime) -> Result<String> {
@@ -381,33 +386,43 @@ async fn local_folder_id(downtime: &Downtime) -> Result<String> {
         table::folders::get_pk_by_name(&downtime.org, &downtime.folder_id, FolderType::Downtimes)
             .await?
             .is_some();
-    match folder_action(&downtime.folder_id, known) {
+    let waited = now_micros().saturating_sub(downtime.updated_at);
+    match folder_action(&downtime.folder_id, known, waited) {
         FolderAction::Use => Ok(downtime.folder_id.clone()),
-        // The default folder is created lazily in each region, so its absence is not a lag.
-        FolderAction::CreateDefault => {
-            table::folders::get_or_create(&downtime.org, default_folder(), FolderType::Downtimes)
-                .await?;
-            Ok(DEFAULT_FOLDER.to_owned())
-        }
         FolderAction::Missing => Err(Error::Message(format!(
             "[DOWNTIMES] folder {} of downtime {}/{} is not in this region yet",
             downtime.folder_id, downtime.org, downtime.id
         ))),
+        FolderAction::UseDefault => {
+            if downtime.folder_id != DEFAULT_FOLDER {
+                log::warn!(
+                    "[DOWNTIMES] folder {} of downtime {}/{} did not replicate; filing it under {DEFAULT_FOLDER}",
+                    downtime.folder_id,
+                    downtime.org,
+                    downtime.id
+                );
+            }
+            // The default folder is created lazily in each region, so its absence is not a lag.
+            table::folders::get_or_create(&downtime.org, default_folder(), FolderType::Downtimes)
+                .await?;
+            Ok(DEFAULT_FOLDER.to_owned())
+        }
     }
 }
 
 #[derive(Debug, PartialEq)]
 enum FolderAction {
     Use,
-    CreateDefault,
+    UseDefault,
     Missing,
 }
 
-fn folder_action(folder_id: &str, known: bool) -> FolderAction {
+fn folder_action(folder_id: &str, known: bool, waited_micros: i64) -> FolderAction {
     match (known, folder_id == DEFAULT_FOLDER) {
         (true, _) => FolderAction::Use,
-        (false, true) => FolderAction::CreateDefault,
-        (false, false) => FolderAction::Missing,
+        (false, true) => FolderAction::UseDefault,
+        (false, false) if waited_micros < FOLDER_WAIT_MICROS => FolderAction::Missing,
+        (false, false) => FolderAction::UseDefault,
     }
 }
 
@@ -677,14 +692,22 @@ mod tests {
     }
 
     #[test]
-    fn a_row_waits_for_its_folder_and_only_the_default_folder_is_created() {
-        assert_eq!(folder_action("ops", true), FolderAction::Use);
-        assert_eq!(folder_action("ops", false), FolderAction::Missing);
+    fn a_row_waits_for_its_folder_and_then_falls_back_to_the_default_folder() {
+        assert_eq!(folder_action("ops", true, 0), FolderAction::Use);
+        assert_eq!(folder_action("ops", false, 0), FolderAction::Missing);
         assert_eq!(
-            folder_action(DEFAULT_FOLDER, false),
-            FolderAction::CreateDefault
+            folder_action("ops", false, FOLDER_WAIT_MICROS - 1),
+            FolderAction::Missing
         );
-        assert_eq!(folder_action(DEFAULT_FOLDER, true), FolderAction::Use);
+        assert_eq!(
+            folder_action("ops", false, FOLDER_WAIT_MICROS),
+            FolderAction::UseDefault
+        );
+        assert_eq!(
+            folder_action(DEFAULT_FOLDER, false, 0),
+            FolderAction::UseDefault
+        );
+        assert_eq!(folder_action(DEFAULT_FOLDER, true, 0), FolderAction::Use);
     }
 
     #[test]

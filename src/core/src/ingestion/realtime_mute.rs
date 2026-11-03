@@ -257,6 +257,15 @@ impl RealtimeMuteSplit {
         }
     }
 
+    /// Decides and sends the split's alerts. The ingest path spawns it, because the
+    /// verdicts read the alert cache and service correlation.
+    pub async fn evaluate(self) {
+        let triggers = self.finish().await;
+        if !triggers.is_empty() {
+            super::evaluate_trigger(triggers).await;
+        }
+    }
+
     /// The alerts with a verdict, ready for `evaluate_trigger`.
     pub async fn finish(mut self) -> TriggerAlertData {
         let mut out = Vec::with_capacity(self.order.len());
