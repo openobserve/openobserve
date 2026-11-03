@@ -192,7 +192,7 @@ describe("SectionRail", () => {
     await wrapper.get('[data-test="section-rail-toggle"]').trigger("click");
     expect(wrapper.findComponent({ name: "OTab" }).props("suffixIcon")).toBeUndefined();
     expect(wrapper.get(".sr-only").text()).toBe("Locked: needs RBAC");
-    expect(wrapper.find(".bg-gradient-lock").exists()).toBe(true);
+    expect(wrapper.find(".text-icon-locked").exists()).toBe(true);
   });
 
   const headings = (wrapper: ReturnType<typeof mountRail>) =>

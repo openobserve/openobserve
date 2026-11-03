@@ -180,15 +180,15 @@
   );
 }
 
-@utility bg-gradient-lock {
-  background-image: radial-gradient(
-    circle at 30% 25%,
-    var(--color-warning-500),
-    var(--color-warning-700) 70%
-  );
+/* Thin ring cut around a glyph so it stays legible when it overlaps another icon. */
+@utility lock-halo {
+  filter: drop-shadow(0.09375rem 0 0 var(--color-surface-chrome-deeper))
+    drop-shadow(-0.09375rem 0 0 var(--color-surface-chrome-deeper))
+    drop-shadow(0 0.09375rem 0 var(--color-surface-chrome-deeper))
+    drop-shadow(0 -0.09375rem 0 var(--color-surface-chrome-deeper));
 }
 
-/* Gold glow disc behind a lock glyph, so a locked entry stands out in light and dark. */
+/* Bare amber lock glyph, no container: the one look for every lock icon. */
 @utility lock-chip {
-  @apply bg-gradient-lock text-text-inverse drop-shadow-warning-600/50 box-content rounded-full p-0.5 drop-shadow-md;
+  @apply text-icon-locked;
 }

@@ -24,10 +24,8 @@ defineProps<{
 </script>
 
 <template>
-  <span
-    class="bg-gradient-lock drop-shadow-warning-600/50 ring-surface-base absolute -end-3.5 -top-2 z-1 flex size-4 items-center justify-center rounded-full ring-2 drop-shadow-md"
-  >
-    <OIcon name="lock" size="xs" class="text-text-inverse size-2.5!" aria-hidden="true" />
+  <span class="lock-halo absolute -end-3 -top-2 z-1 flex size-4 items-center justify-center">
+    <OIcon name="lock" size="xs" class="text-icon-locked size-4!" aria-hidden="true" />
     <span v-if="label" class="sr-only">{{ label }}</span>
   </span>
 </template>
