@@ -16,8 +16,8 @@
 
   <div
     :class="[
-      `filter-group-box border-card-glass-border rounded-default mb-2 border px-2`,
-      'mt-4',
+      `filter-group-box border-card-glass-border rounded-default`,
+      isQuietEmpty ? 'mt-1' : 'mt-4 mb-2 border px-2',
       store.state.isAiChatEnabled ? 'w-full' : 'xl:w-fit',
     ]"
     :style="{
@@ -40,7 +40,7 @@
       </OToggleGroup>
     </div>
     <!-- Spacer for root group to maintain consistent spacing -->
-    <div v-else class="h-3.5"></div>
+    <div v-else-if="!isQuietEmpty" class="h-3.5"></div>
 
     <!-- Group content -->
 
@@ -99,19 +99,22 @@
       </div>
       <!-- Action buttons -->
 
-      <div class="ms-4 flex items-center justify-start">
+      <div class="flex items-center justify-start" :class="!isQuietEmpty && 'ms-4'">
         <OButton
           data-test="alert-conditions-add-condition-btn"
-          class="ms-3"
+          :class="!isQuietEmpty && 'ms-3'"
           size="sm"
           variant="ghost-primary"
           @click="addCondition(props.group.groupId)"
         >
           <OIcon class="me-1 rounded-full border font-bold" size="xs" name="add" />
-          <span class="text-xs font-bold">{{ t("alerts.conditions.condition") }}</span>
+          <span class="text-xs font-bold">{{
+            isQuietEmpty ? t("alerts.sections.addFilter") : t("alerts.conditions.condition")
+          }}</span>
           <OTooltip :delay="300" :content="t('alerts.conditions.addConditionTooltip')" />
         </OButton>
         <OButton
+          v-if="!isQuietEmpty"
           data-test="alert-conditions-add-condition-group-btn"
           class="ms-1"
           size="sm"
@@ -129,6 +132,7 @@
           <OTooltip v-else :delay="300" :content="t('alerts.conditions.maxDepthReachedTooltip')" />
         </OButton>
         <OButton
+          v-if="!isQuietEmpty"
           data-test="alert-conditions-reorder-btn"
           class="ms-1"
           size="sm"
@@ -201,6 +205,11 @@ const props = defineProps({
     type: String,
     default: "",
     required: false,
+  },
+  /** An empty root group renders as one "Add a filter" link instead of the full toolbar. */
+  compactEmpty: {
+    type: Boolean,
+    default: false,
   },
   isFirstGroup: {
     type: Boolean,
@@ -529,6 +538,10 @@ const computedStyleMap = computed(() => {
     return hslToCSS(h, s, newLightness);
   }
 });
+
+const isQuietEmpty = computed(
+  () => props.compactEmpty && props.depth === 0 && !props.group?.conditions?.length,
+);
 
 const computedOpacity = computed(() => {
   return props.depth + 10;

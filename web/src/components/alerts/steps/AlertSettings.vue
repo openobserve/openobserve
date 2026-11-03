@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Silence Notification (Cooldown) -->
             <OSettingRow
               :label="t('alerts.plain.cooldown')"
-              :info="t('alerts.alertSettings.cooldownTooltip')"
+              :description="t('alerts.sections.rows.cooldown')"
               fill
             >
               <div class="me-2 flex w-fit flex-col gap-1">
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isForecastMode"
               ref="periodFieldRef"
               :label="t('alerts.plain.lookBack')"
-              :info="t('alerts.alertSettings.periodTooltip')"
+              :description="t('alerts.sections.rows.lookBack')"
               fill
             >
               <div class="me-2 flex w-fit flex-col gap-1">
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSettingRow
               ref="silenceFieldRef"
               :label="t('alerts.plain.cooldown')"
-              :info="t('alerts.alertSettings.cooldownTooltip')"
+              :description="t('alerts.sections.rows.cooldown')"
               fill
             >
               <div class="me-2 flex w-fit flex-col gap-1">

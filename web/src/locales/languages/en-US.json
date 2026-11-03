@@ -10416,11 +10416,26 @@
   "alerts": {
     "sections": {
       "navLabel": "Alert sections",
-      "eyebrow": "{n} of {total}",
+      "eyebrow": "Step {n} of {total}",
+      "filtersMode": "Filters",
+      "addFilter": "Add a filter",
+      "typeHelp": {
+        "scheduled": "Looks at recent data on a timer. The right choice for most alerts.",
+        "realtime": "Checks each event the moment it arrives, so any match alerts you.",
+        "anomaly": "Learns what is normal and alerts you when values look unusual.",
+        "composite": "Alerts you when a combination of your other alerts is firing."
+      },
+      "operators": {
+        "gte": "at least",
+        "gt": "more than",
+        "lte": "at most",
+        "lt": "fewer than",
+        "eq": "exactly",
+        "ne": "anything but"
+      },
       "next": "Next: {title}",
       "back": "Back",
-      "needsValue": "Needs a value",
-      "needsFix": "Needs a fix · {count}",
+      "needsFix": "{count} thing to fix | {count} things to fix",
       "howItChecks": "How it checks",
       "everyMinutes": "Every {count} min",
       "everyHours": "Every {count} h",
@@ -10430,46 +10445,56 @@
       "whenCombined": "When alerts combine",
       "watch": {
         "title": "What should we watch?",
+        "nav": "What to watch",
+        "help": "Pick the data this alert keeps an eye on.",
         "pickStream": "Pick a stream",
         "childCount": "{count} alert combined | {count} alerts combined"
       },
       "condition": {
-        "title": "When is it a problem?",
-        "countPhrase": "Count {operator} {threshold}",
+        "title": "When should we alert you?",
+        "nav": "When to alert",
+        "help": "Draw the line between normal and a problem. The preview shows how it behaves right now.",
         "realtime": "Any matching event",
         "anomaly": "Unusual values",
         "composite": "When the expression holds"
       },
       "notify": {
         "title": "Who should hear about it?",
-        "nobody": "Nobody yet",
+        "nav": "Who to tell",
+        "help": "Choose where the message goes. You can skip this and add someone later.",
+        "nobody": "No one yet",
         "destinationCount": "{count} destination | {count} destinations"
       },
       "schedule": {
         "title": "How often should we check?",
+        "nav": "How often to check",
+        "help": "The defaults suit most alerts, so change these only if you need to.",
         "realtime": "As events arrive",
         "cron": "Cron {cron}"
       },
       "details": {
-        "title": "Name and details",
+        "title": "What should we call it?",
+        "nav": "Name it",
+        "help": "Pick a name you will recognize in a notification. Everything else is optional.",
         "name": "Name",
         "folder": "Folder",
-        "unnamed": "Not named yet"
-      },
-      "cards": {
-        "source": "Data source",
-        "query": "Query",
-        "combine": "Alerts to combine",
-        "trigger": "Trigger",
-        "destinations": "Destinations",
-        "message": "Message",
-        "schedule": "Schedule",
-        "about": "About this alert"
+        "unnamed": "Add a name"
       },
       "rows": {
+        "streamTypeLabel": "Type of data",
         "streamType": "Logs, metrics or traces",
+        "streamLabel": "Stream",
         "stream": "The data this alert reads",
-        "howItChecks": "On a schedule, as events arrive, or when alerts combine",
+        "whichEvents": "Which events count?",
+        "whichEventsAll": "Every event in this stream counts. Add a filter to narrow it down.",
+        "whichEventsFiltered": "Only events that match these filters count.",
+        "whichEventsSql": "Write a query. The rows it returns are what the alert looks at.",
+        "whichEventsPromql": "Write a PromQL query. The value it returns is what the alert looks at.",
+        "checkEvery": "How often we run the check",
+        "lookBack": "How much recent data each check reads",
+        "cooldown": "Stops repeat alerts for the same problem",
+        "rowTemplate": "How each matching row reads in the message",
+        "descriptionPlaceholder": "Optional. What should someone do when this fires?",
         "name": "Shown in the alert list and in notifications"
       }
     },
@@ -13042,20 +13067,20 @@
     },
     "tiers": {
       "rowFires": "When it fires",
-      "rowMessage": "Message",
-      "moreAll": "{count} more: {names}",
-      "moreSome": "{count} more: {names} and {rest} more",
+      "rowMessage": "Customize message",
+      "moreAll": "More options: {names}",
+      "moreSome": "More options: {names} and {rest} more",
       "showFewer": "Show fewer",
       "names": {
-        "warning": "warning",
-        "holdFor": "hold for",
+        "warning": "warning level",
+        "holdFor": "how long it must last",
         "groupBy": "group by",
-        "compareWithPast": "compare with past",
+        "compareWithPast": "compare with the past",
         "destinations": "destinations",
         "createsIncident": "Open an incident",
         "template": "Message template",
         "variables": "Variables",
-        "recovery": "recovery",
+        "recovery": "recovery message",
         "oncall": "on-call",
         "keepFiring": "keep firing",
         "description": "description",

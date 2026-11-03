@@ -28,6 +28,8 @@ const EDGE = 2;
 const GESTURE_GAP_MS = 200;
 // The section whose start has crossed this share of the viewport is the current one.
 const SPY_BAND = 0.3;
+// A wheel stop nearer the section's start than this share of the view would spend a gesture on almost no movement.
+const MIN_STOP = 0.1;
 // A reveal hands focus to the element at once; a dropdown opened during a smooth glide closes on its next scroll event.
 const REVEAL_BEHAVIOR: ScrollBehavior = "instant";
 
@@ -43,6 +45,9 @@ const offsetOf = (el: HTMLElement): number => {
   return el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
 };
 
+const restOffset = (el: HTMLElement): number =>
+  Math.max(0, offsetOf(el) - (parseFloat(getComputedStyle(el).scrollMarginTop) || 0));
+
 // A short section snaps only at its start; a tall one also at each visible block.
 const markStops = (): void => {
   const scroller = root.value;
@@ -57,6 +62,14 @@ const markStops = (): void => {
   }
 };
 
+// Past this offset a tall section no longer fills the view and the browser snaps on to the next one, skipping what is left.
+const sectionEnds = (): number[] => {
+  const viewport = root.value?.clientHeight ?? 0;
+  return sections()
+    .filter((section) => section.offsetHeight > viewport + EDGE)
+    .map((section) => offsetOf(section) + section.offsetHeight - viewport);
+};
+
 // `at` is where the stop starts; `to` is where the browser rests for it, above it by its scroll margin.
 const stopList = (sectionsOnly: boolean): { at: number; to: number }[] => {
   const stops = sectionsOnly
@@ -65,18 +78,18 @@ const stopList = (sectionsOnly: boolean): { at: number; to: number }[] => {
         ...sections(),
         ...Array.from(root.value?.querySelectorAll<HTMLElement>("[data-snap-on]") ?? []),
       ];
-  return stops
-    .map((el) => {
-      const at = offsetOf(el);
-      return { at, to: Math.max(0, at - (parseFloat(getComputedStyle(el).scrollMarginTop) || 0)) };
-    })
-    .sort((a, b) => a.at - b.at);
+  return stops.map((el) => ({ at: offsetOf(el), to: restOffset(el) })).sort((a, b) => a.at - b.at);
 };
 
-const stopOffsets = (sectionsOnly: boolean): number[] =>
-  stopList(sectionsOnly)
+const stopOffsets = (sectionsOnly: boolean): number[] => {
+  const starts = sections().map(offsetOf);
+  if (sectionsOnly) return starts.sort((a, b) => a - b);
+  const near = (root.value?.clientHeight ?? 0) * MIN_STOP;
+  const blocks = stopList(false)
     .map((s) => s.to)
-    .sort((a, b) => a - b);
+    .filter((to) => !starts.some((start) => to > start && to - start < near));
+  return [...blocks, ...sectionEnds()].sort((a, b) => a - b);
+};
 
 const targetFor = (direction: 1 | -1, sectionsOnly: boolean): number | null => {
   const scroller = root.value;

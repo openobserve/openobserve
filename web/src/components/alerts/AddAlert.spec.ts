@@ -22,6 +22,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import AddAlert from "@/components/alerts/AddAlert.vue";
+import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import alertsService from "@/services/alerts";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import anomalyDetectionService from "@/services/anomaly_detection";
@@ -1135,22 +1136,62 @@ describe("AddAlert (OForm owner)", () => {
       breakpoint.lgUp!.value = true;
     });
 
-    it("opens the tucked settings on a full-height step when they fit the view", async () => {
+    it("keeps rare settings tucked until the user asks, even when they would fit", async () => {
       wrapper = mountAlert();
       await flushPromises();
-      expect(wrapper.vm.tiers.view("condition").expanded).toBe(true);
-      expect(
-        wrapper.find('[data-test="add-alert-section-condition-more"]').attributes("aria-expanded"),
-      ).toBe("true");
-    });
-
-    it("leaves a group the user closed closed", async () => {
-      wrapper = mountAlert();
-      await flushPromises();
-      await wrapper.find('[data-test="add-alert-section-condition-more"]').trigger("click");
       wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
       await flushPromises();
-      expect(wrapper.vm.tiers.view("condition").expanded).toBe(false);
+      for (const section of ["condition", "notify", "details"] as const) {
+        expect(wrapper.vm.tiers.view(section).expanded).toBe(false);
+      }
+      expect(
+        wrapper.find('[data-test="add-alert-section-condition-more"]').attributes("aria-expanded"),
+      ).toBe("false");
+    });
+
+    it("gives Next the one primary action while creating, and Save on the last step", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const save = wrapper.findComponent('[data-test="add-alert-submit-btn"]');
+      const next = () => wrapper.findComponent('[data-test="add-alert-step-next-btn"]');
+      wrapper.vm.activeSection = "watch";
+      await flushPromises();
+      expect(wrapper.vm.guidesToNext).toBe(true);
+      expect(next().exists()).toBe(true);
+
+      wrapper.vm.activeSection = "details";
+      await flushPromises();
+      expect(wrapper.vm.guidesToNext).toBe(false);
+      expect(next().exists()).toBe(false);
+      expect(save.exists()).toBe(true);
+    });
+
+    it("does not save the alert when Enter commits the name", () => {
+      wrapper = mountAlert(
+        {},
+        {
+          global: {
+            provide: { store },
+            plugins: [i18n, router],
+            stubs: { ...stubs, OPageHeader: false },
+          },
+        },
+      );
+      const name = wrapper.findComponent(OFormInlineEdit);
+      expect(name.props("submitOnEnter")).toBe(false);
+    });
+
+    it("ticks a section with a value once the user moves past it", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const state = (id: string) =>
+        wrapper.vm.sectionItems.find((item: { id: string }) => item.id === id).state;
+      wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
+      wrapper.vm.activeSection = "condition";
+      await flushPromises();
+      wrapper.vm.activeSection = "notify";
+      await flushPromises();
+      expect(state("condition")).toBe("done");
     });
 
     it("renders the five sections in order beside the section list", async () => {
@@ -1178,18 +1219,15 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       const back = '[data-test="add-alert-step-back-btn"]';
       const next = '[data-test="add-alert-step-next-btn"]';
-      const position = '[data-test="add-alert-step-position"]';
       wrapper.vm.activeSection = "watch";
       await flushPromises();
       expect(wrapper.find(back).exists()).toBe(false);
-      expect(wrapper.find(next).text()).toBe("Next: When is it a problem?");
-      expect(wrapper.find(position).text()).toBe("1 of 5");
+      expect(wrapper.find(next).text()).toBe("Next: When to alert");
 
       wrapper.vm.activeSection = "notify";
       await flushPromises();
       expect(wrapper.find(back).exists()).toBe(true);
-      expect(wrapper.find(next).text()).toBe("Next: How often should we check?");
-      expect(wrapper.find(position).text()).toBe("3 of 5");
+      expect(wrapper.find(next).text()).toBe("Next: How often to check");
 
       wrapper.vm.activeSection = "details";
       await flushPromises();
@@ -1216,9 +1254,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find('[data-test="add-alert-rail-sentence"]').text()).toBe(
         "Alerts nobody yet when 3+ events turn up in 10 minutes, checked every 10 min, at most once every 10 minutes.",
       );
-      expect(wrapper.find('[data-test="add-alert-read-back"]').text()).toContain(
-        "Alerts nobody yet when 3+ events turn up in 10 minutes",
-      );
+      expect(wrapper.find('[data-test="add-alert-read-back"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="alerts-alert-summary"]').exists()).toBe(false);
     });
 
@@ -1227,7 +1263,7 @@ describe("AddAlert (OForm owner)", () => {
       wrapper = mountAlert();
       await flushPromises();
       const more = () => wrapper.find('[data-test="add-alert-section-condition-more"]');
-      expect(more().text()).toBe("2 more: warning, hold for");
+      expect(more().text()).toBe("More options: warning level, how long it must last");
       expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(false);
       expect(wrapper.vm.tiers.isVisible("warning")).toBe(false);
 
@@ -1248,7 +1284,7 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(true);
       expect(wrapper.find('[data-test="add-alert-section-condition-more"]').text()).toBe(
-        "1 more: warning",
+        "More options: warning level",
       );
     });
 
@@ -1264,7 +1300,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.vm.form.getFieldValue("context_attributes")).toHaveLength(1);
       expect(wrapper.vm.tiers.isVisible("tags")).toBe(true);
       expect(wrapper.find('[data-test="add-alert-section-details-more"]').text()).toBe(
-        "1 more: priority",
+        "More options: row template, priority",
       );
     });
 
@@ -1461,7 +1497,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(row().exists()).toBe(true);
       expect(wrapper.find('[data-test="alert-settings-pending-period-error"]').text()).not.toBe("");
       expect(wrapper.find('[data-test="o-section-nav-item-condition"]').text()).toContain(
-        "Needs a fix",
+        "1 thing to fix",
       );
       expect(alertsService.update_by_alert_id).not.toHaveBeenCalled();
     });

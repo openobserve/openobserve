@@ -231,13 +231,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="description"
                   :aria-label="t('alerts.description')"
                   data-test="add-alert-description-textarea"
-                  :placeholder="t('alerts.placeholders.typeSomething')"
-                  :rows="4"
+                  :placeholder="t('alerts.sections.rows.descriptionPlaceholder')"
+                  :rows="2"
                 />
               </OSettingRow>
 
               <!-- Row Template -->
-              <OSettingRow :label="t('alerts.plain.rowTemplate')" fill>
+              <OSettingRow
+                v-if="tierShows('rowTemplate')"
+                :label="t('alerts.plain.rowTemplate')"
+                :description="t('alerts.sections.rows.rowTemplate')"
+                fill
+              >
                 <div class="flex flex-col gap-2">
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
