@@ -658,9 +658,9 @@ def test_a_token_whose_subject_left_the_team_does_not_acknowledge(
         create_session, base_url, org_id, viewer_ack_token_with_a_teammate):
     """12.6: a viewer removed from a team that still has members cannot take its page from their old email.
 
-    `ack_claims` checks only org membership, so the link still opens; the team
-    check is `record_for_actor`, which exempts root/admin/editor and an emptied
-    team, hence the viewer subject and the teammate left behind.
+    `ack_claims` checks only org membership, so the link still opens; the ack
+    rule then needs edit access to the alert or being on call for it, hence the
+    viewer subject, and the teammate keeps the team from being emptied.
     """
     token, response_id, subject = viewer_ack_token_with_a_teammate
 
@@ -683,12 +683,8 @@ def test_a_token_whose_subject_left_the_team_does_not_acknowledge(
     assert_did_not_act(get_ack(base_url, org_id, token))
 
     leaver_post = post_ack(base_url, org_id, token)
-    # The refused ack is swallowed by the handler, which then shows the record as it stands.
-    assert leaver_post.status_code == 200, f"{leaver_post.status_code}: {leaver_post.text[:300]}"
-    assert leaver_post.headers.get("Content-Type", "").startswith("text/html"), leaver_post.headers
-    assert "<h1>Not acknowledged yet.</h1>" in leaver_post.text, (
-        f"a removed member's link must leave the page open: {leaver_post.text[:300]}"
-    )
+    assert leaver_post.status_code == 403, f"{leaver_post.status_code}: {leaver_post.text[:300]}"
+    assert leaver_post.json().get("code") == "ack_refused", leaver_post.text[:300]
     assert_did_not_act(leaver_post)
 
     after = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}")
