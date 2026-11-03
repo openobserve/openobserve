@@ -41,8 +41,8 @@ on:
 
 # PR-scoped: a new push/label supersedes the previous gate attempt for the same PR.
 concurrency:
-  # A non-approval review or a label the gate ignores (e.g. auto-requeue-*) does nothing, so it must not cancel a running gate.
-  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ ((github.event_name == 'pull_request_review' && github.event.review.state != 'approved') || ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'ready-for-ci' && github.event.label.name != 'skip-ent-e2e')) && format('-{0}', github.run_id) || '' }}
+  # A non-approval review only mirrors the gate's current result, so it must not cancel a running gate.
+  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -52,7 +52,7 @@ permissions:
 jobs:
   trigger:
     # reviewDecision of a stacked PR is judged by the stack's merge rules, so it is what the merge will require.
-    if: ${{ github.event_name != 'merge_group' && (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) && ((github.event_name == 'pull_request_review' && github.event.review.state == 'approved') || github.event_name == 'pull_request') }}
+    if: ${{ github.event_name != 'merge_group' && contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -66,17 +66,23 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           ACTION: ${{ github.event_name == 'pull_request' && github.event.action || '' }}
-          LABEL: ${{ github.event.label.name }}
+          REVIEW_STATE: ${{ github.event.review.state }}
         run: |
-          # Other labels run in their own concurrency group and must not dispatch; the gate's own labels cancel it, so they start a replacement.
-          if { [ "$ACTION" = "labeled" ] || [ "$ACTION" = "unlabeled" ]; } && [ "$LABEL" != "ready-for-ci" ] && [ "$LABEL" != "skip-ent-e2e" ]; then
-            echo "Label '$LABEL' does not affect the gate; nothing to do."
-            echo "dispatch=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          # Any label change cancels the running gate, so it must start a replacement, which attaches to the ENT run already covering this head.
           if [ "$ACTION" = "labeled" ] || [ "$ACTION" = "unlabeled" ] || [ "$ACTION" = "ready_for_review" ]; then
             echo "Triggered by $ACTION; approval not required."
             echo "dispatch=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # An approval cancels the running gate even when the PR still needs more approvals, so it always starts a replacement.
+          if [ "$REVIEW_STATE" = "approved" ]; then
+            echo "dispatch=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A skipped required check counts as passing, so another review must report the gate's current result instead.
+          if [ -n "$REVIEW_STATE" ]; then
+            echo "Review '$REVIEW_STATE' does not start the gate; mirroring its current result."
+            echo "dispatch=mirror" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           DECISION=$(gh pr view "$PR" --json reviewDecision --jq .reviewDecision)
@@ -88,9 +94,13 @@ jobs:
   playwright-e2e-crosscheck:
     needs: trigger
     # A pre-merge gate: runs when ready-for-ci is added or the PR is approved, and on pushes only while approved.
-    if: ${{ !cancelled() && (github.event_name == 'merge_group' || needs.trigger.outputs.dispatch == 'true') }}
+    if: ${{ !cancelled() && (github.event_name == 'merge_group' || needs.trigger.outputs.dispatch == 'true' || needs.trigger.outputs.dispatch == 'mirror') }}
     name: Playwright E2E Crosscheck
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: read
     # ~5 min to find the ENT run + up to ~75 min to poll. Generous on purpose: normal is ~20 min,
     # but a cold Rust cache can push the ENT build+run toward its own timeouts — don't false-fail
     # the gate ("timed out") while ENT is still legitimately running. Two lost-runner re-runs add 40 min each.
@@ -104,6 +114,7 @@ jobs:
           HAS_SKIP: ${{ contains(github.event.pull_request.labels.*.name, 'skip-ent-e2e') }}
           DISABLED: ${{ vars.ENT_E2E_GATE_DISABLED }}
           IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          DISPATCH: ${{ needs.trigger.outputs.dispatch }}
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "merge_group" ]; then
@@ -136,6 +147,8 @@ jobs:
           elif [ "$HAS_SKIP" = "true" ]; then
             echo "::warning::PR carries 'skip-ent-e2e' — enterprise gate explicitly opted out (auditable)."
             echo "mode=skip" >> "$GITHUB_OUTPUT"
+          elif [ "$DISPATCH" = "mirror" ]; then
+            echo "mode=mirror" >> "$GITHUB_OUTPUT"
           else
             echo "mode=run" >> "$GITHUB_OUTPUT"
           fi
@@ -143,6 +156,38 @@ jobs:
       - name: Pass — no enterprise-relevant changes (or opted out / disabled)
         if: steps.triage.outputs.mode == 'pass' || steps.triage.outputs.mode == 'skip'
         run: echo "✅ Playwright E2E Crosscheck not required for this PR."
+
+      - name: Mirror — report the gate's current result for this head
+        if: steps.triage.outputs.mode == 'mirror'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          CHECKS="repos/${{ github.repository }}/commits/$HEAD_SHA/check-runs?check_name=Playwright%20E2E%20Crosscheck&filter=all&per_page=100"
+          OWN=""
+          for _ in 1 2 3 4 5; do
+            OWN=$(gh api --paginate "$CHECKS" -q ".check_runs[] | select(.details_url | contains(\"/actions/runs/$RUN_ID/\")) | .id" | sort -n | tail -n 1) && [ -n "$OWN" ] && break
+            sleep 10
+          done
+          [ -n "$OWN" ] || { echo "::error::Could not find this job's own check run."; exit 1; }
+          # Only older checks count: the newest check of this name is the required one, so a later gate run overrides this mirror anyway.
+          while :; do
+            # An API error must not read as "no result", which would pass.
+            if ! LIST=$(gh api --paginate "$CHECKS" -q ".check_runs[] | select(.id < $OWN and .conclusion != \"skipped\") | \"\(.id) \(.status) \(.conclusion // \"\")\""); then
+              sleep 30; continue
+            fi
+            read -r ID STATUS CONCL <<<"$(sort -n <<<"$LIST" | tail -n 1)"
+            if [ -z "$ID" ]; then
+              echo "::notice::No gate result on $HEAD_SHA yet — nothing to mirror."
+              exit 0
+            fi
+            if [ "$STATUS" = "completed" ]; then break; fi
+            sleep 30
+          done
+          echo "::notice::Mirroring gate check $ID on $HEAD_SHA: $CONCL."
+          [ "$CONCL" = "success" ] || { echo "::error::The gate's current result on this head is '$CONCL'."; exit 1; }
 
       - name: Run — dispatch ENT engine, poll, mirror result
         if: steps.triage.outputs.mode == 'run'
@@ -159,23 +204,30 @@ jobs:
           MARKER="<!-- playwright-e2e-crosscheck -->"
           # The sticky's run record decides reuse, so only this token's own comments may count as the sticky.
           GATE_LOGIN=$(gh api user -q .login 2>/dev/null || echo "")
+          if [ -z "$GATE_LOGIN" ]; then echo "::warning::Could not resolve the gate token's login — not reusing a prior ENT run."; fi
 
           # Upsert ONE sticky gate comment per PR (located by the hidden marker) so status updates in
           # place — pass AND fail — instead of spamming a fresh comment each run.
+          # --paginate applies -q to each page, so emit one id per match and keep the first.
+          sticky_id() {
+            [ -n "$GATE_LOGIN" ] || return 0
+            gh api "repos/openobserve/openobserve/issues/$PR/comments" --paginate \
+              -q ".[] | select(.user.login == \"$GATE_LOGIN\" and (.body|contains(\"$MARKER\"))) | .id" 2>/dev/null | head -n 1 || true
+          }
           sticky() {
-            local body="$1" cid
+            local body="$1"
             if [ -n "${META:-}" ]; then body="$body"$'\n\n'"$META"; fi
-            cid=$(gh api "repos/openobserve/openobserve/issues/$PR/comments" --paginate \
-              -q "[.[] | select(.user.login == \"$GATE_LOGIN\" and (.body|contains(\"$MARKER\"))) | .id][0]" 2>/dev/null || echo "")
-            if [ -n "$cid" ] && [ "$cid" != "null" ]; then
-              gh api -X PATCH "repos/openobserve/openobserve/issues/comments/$cid" -f body="$body" >/dev/null 2>&1 || true
+            STICKY_ID=${STICKY_ID:-$(sticky_id)}
+            if [ -n "$STICKY_ID" ]; then
+              gh api -X PATCH "repos/openobserve/openobserve/issues/comments/$STICKY_ID" -f body="$body" >/dev/null 2>&1 || true
             else
-              gh api -X POST "repos/openobserve/openobserve/issues/$PR/comments" -f body="$body" >/dev/null 2>&1 || true
+              STICKY_ID=$(gh api -X POST "repos/openobserve/openobserve/issues/$PR/comments" -f body="$body" -q .id 2>/dev/null || echo "")
             fi
           }
           sticky_body() {
-            gh api "repos/openobserve/openobserve/issues/$PR/comments" --paginate \
-              -q "[.[] | select(.user.login == \"$GATE_LOGIN\" and (.body|contains(\"$MARKER\"))) | .body][0] // \"\"" 2>/dev/null || true
+            local cid
+            cid=$(sticky_id)
+            if [ -n "$cid" ]; then gh api "repos/openobserve/openobserve/issues/comments/$cid" -q .body 2>/dev/null || true; fi
           }
 
           # Sister ENT resolution. An OPEN same-named ENT PR is the live counterpart — let ITS checks
@@ -208,6 +260,15 @@ jobs:
             SISTER_NOTE="No ENT counterpart — built against ENT \`main\`."
             echo "::notice::No ENT counterpart for '$HEAD_REF' (base '$BASE_REF') — building against main."
           fi
+          # The engine builds this exact commit, so a recorded pass never stands for newer ENT code.
+          ENT_SHA=""
+          for _ in 1 2 3; do
+            ENT_SHA=$(gh api "repos/$REPO/commits/$ENT_CODE_REF" -q .sha 2>/dev/null || echo "")
+            if [[ "$ENT_SHA" =~ ^[0-9a-f]{40}$ ]]; then break; fi
+            ENT_SHA=""; sleep 5
+          done
+          if [ -z "$ENT_SHA" ]; then echo "::warning::Could not resolve ENT '$ENT_CODE_REF' to a commit — building the branch tip, not reusing a prior ENT run."; fi
+          ENT_PIN="${ENT_SHA:-$ENT_CODE_REF}"
 
           # Against ENT main, test the PR merged into OSS main: a stale branch would miss OSS code ENT main already uses.
           OSS_REF="$HEAD_REF"; TESTED_SHA="$HEAD_SHA"
@@ -227,27 +288,36 @@ jobs:
           fi
 
           MATCH="OSS PR #$PR ("
+          # The engine's run-name carries its inputs, so a reused run is checked against what it actually built.
+          KEY="OSS PR #$PR ($OSS_REF) oss=$HEAD_SHA ent=$ENT_SHA"
           RUN_ID=""
-          # Approval and label changes restart this gate; the sticky records the run already started for this exact head and merge commit.
+          # Approval and label changes restart this gate; the sticky records the run already started for this exact head, merge commit and ENT commit.
           PRIOR=$(sticky_body | grep -o 'ent-run: [^>]*' | head -n 1 || true)
-          read -r P_ID P_HEAD P_TESTED P_OSS P_ENT _ <<<"${PRIOR#ent-run: }"
-          if [[ "$P_ID" =~ ^[0-9]+$ ]] && [ "$P_HEAD $P_TESTED $P_OSS $P_ENT" = "$HEAD_SHA $TESTED_SHA $OSS_REF $ENT_CODE_REF" ]; then
-            P_STATE=$(gh api "repos/$REPO/actions/runs/$P_ID" 2>/dev/null | jq -r --arg m "$MATCH" 'if (.display_title // "" | contains($m)) | not then "none" elif .status != "completed" then "running" elif .conclusion == "success" then "success" else "none" end' 2>/dev/null || echo none)
+          read -r P_ID P_HEAD P_TESTED P_OSS P_ENT P_ENT_SHA _ <<<"${PRIOR#ent-run: }"
+          if [ -n "$GATE_LOGIN" ] && [ -n "$ENT_SHA" ] && [[ "$P_ID" =~ ^[0-9]+$ ]] \
+            && [ "$P_HEAD $P_TESTED $P_OSS $P_ENT ${P_ENT_SHA:-}" = "$HEAD_SHA $TESTED_SHA $OSS_REF $ENT_CODE_REF $ENT_SHA" ]; then
+            P_STATE=$(gh api "repos/$REPO/actions/runs/$P_ID" 2>/dev/null | jq -r --arg k "$KEY" 'if (.display_title // "" | contains($k)) | not then "none" elif .status != "completed" then "running" elif .conclusion == "success" then "success" else "none" end' 2>/dev/null || echo none)
             if [ "$P_STATE" = "success" ] || [ "$P_STATE" = "running" ]; then
               RUN_ID="$P_ID"
               echo "::notice::ENT run $RUN_ID already covers head $HEAD_SHA tested as $TESTED_SHA ($P_STATE) — not dispatching."
             fi
           fi
+          # A gate cancelled between its dispatch and its sticky update leaves a live run the sticky does not record yet.
+          if [ -z "$RUN_ID" ] && [ -n "$ENT_SHA" ]; then
+            RUN_ID=$(gh run list --repo "$REPO" --workflow "$WF" -L 40 --json databaseId,displayTitle,createdAt,status \
+              -q "[.[] | select((.displayTitle | contains(\"$KEY\")) and .status != \"completed\" and (.createdAt|fromdateiso8601) >= $(( $(date -u +%s) - 600 )))] | sort_by(.createdAt) | last | .databaseId // empty" 2>/dev/null || echo "")
+            if [ -n "$RUN_ID" ]; then echo "::notice::ENT run $RUN_ID for this head was just started by a superseded gate — attaching, not dispatching."; fi
+          fi
 
           if [ -z "$RUN_ID" ]; then
             # Stamp the time BEFORE dispatch so correlation can reject stale prior runs for this PR.
             DISPATCH_TS=$(date -u +%s)
-            echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF, code=$ENT_CODE_REF, oss=$OSS_REF) for OSS PR #$PR ($HEAD_REF)…"
+            echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF, code=$ENT_CODE_REF@$ENT_PIN, oss=$OSS_REF) for OSS PR #$PR ($HEAD_REF)…"
             gh workflow run "$WF" --repo "$REPO" --ref "$ENT_REF" \
               -f oss_branch="$OSS_REF" \
               -f oss_pr="$PR" \
               -f oss_sha="$HEAD_SHA" \
-              -f enterprise_ref="$ENT_CODE_REF"
+              -f enterprise_ref="$ENT_PIN"
 
             # Correlate by PR-scoped run-name ("Playwright E2E Crosscheck — OSS PR #<PR> ("; the "(" boundary keeps
             # #12 from matching #123) AND createdAt >= dispatch time (minus 60s clock-skew), so a stale
@@ -274,7 +344,7 @@ jobs:
           fi
 
           RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
-          META="<!-- ent-run: $RUN_ID $HEAD_SHA $TESTED_SHA $OSS_REF $ENT_CODE_REF -->"
+          META="<!-- ent-run: $RUN_ID $HEAD_SHA $TESTED_SHA $OSS_REF $ENT_CODE_REF $ENT_PIN -->"
           echo "::notice::Tracking ENT run: $RUN_URL"
 
           report_pass() {
