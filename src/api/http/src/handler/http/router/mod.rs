@@ -1056,7 +1056,9 @@ pub fn basic_routes() -> Router {
         // Unauthenticated like the email link: the signed token in the path is the credential.
         router = router.route(
             "/api/v2/{org_id}/oncall/ack/voice/{token}",
-            post(oncall::voice_ack),
+            post(oncall::voice_ack).route_layer(middleware::from_fn(|req, next| {
+                require_features(&[Feature::Oncall], req, next)
+            })),
         );
     }
 
