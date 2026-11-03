@@ -96,6 +96,8 @@ mod one_ack_oncall_off_tests;
 #[cfg(all(test, feature = "enterprise"))]
 mod one_ack_tests;
 pub mod openapi;
+#[cfg(test)]
+mod openapi_coverage;
 
 use common::meta::http::ERROR_HEADER;
 
@@ -2604,7 +2606,7 @@ fn fleet_router() -> Router {
         .route_layer(middleware::from_fn(fleet_gate))
 }
 
-/// §17: with `O2_FLEET_ENABLED` off, OpAMP answers 503 and management reads work but writes do not.
+/// §17: with `O2_FLEET_ENABLED` off, auth refuses fleet tokens first (401); writes get 503.
 #[cfg(feature = "enterprise")]
 async fn fleet_gate(request: Request, next: Next) -> Response {
     if openobserve_core::fleet::enabled() || request.method() == Method::GET && !is_opamp(&request)
@@ -5349,8 +5351,6 @@ mod tests {
         "GET /api/{org_id}/folders/{folder_id}",
         "POST /api/{org_id}/folders",
         "PUT /api/{org_id}/folders/{folder_id}",
-        // o2-enterprise rbac_known_gaps.txt keys this path; fixing it needs a paired change there.
-        "POST /{org_id}/service_streams/_correlate",
     ];
 
     #[cfg(feature = "enterprise")]
@@ -5366,7 +5366,13 @@ mod tests {
     /// An unrouted documented path meets the auth layer's 401, failing its MCP tool.
     #[tokio::test]
     async fn every_openapi_operation_reaches_the_route_it_documents() {
-        let app = local_routes().route_layer(middleware::from_fn(
+        // On-call is mounted only when enabled at runtime; the spec documents it regardless.
+        let routes = if get_o2_config().oncall.enabled {
+            local_routes()
+        } else {
+            local_routes().nest("/api", oncall_routes(Router::new()))
+        };
+        let app = routes.route_layer(middleware::from_fn(
             |req: Request<Body>, _next: Next| async move {
                 let matched = req
                     .extensions()

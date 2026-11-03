@@ -41,6 +41,15 @@ use crate::common::meta::{
     organization::{OrganizationSetting, OrganizationSettingPayload, OrganizationSettingResponse},
 };
 
+// Only documents the multipart body: the handler concatenates every part it receives.
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+struct LogoUploadForm {
+    /// Image file.
+    #[schema(value_type = String, format = Binary)]
+    file: Vec<u8>,
+}
+
 /// Organization specific settings
 
 #[utoipa::path(
@@ -154,6 +163,27 @@ pub async fn get(Path(org_id): Path<String>) -> Response {
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/logo",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "UploadOrgLogo",
+    summary = "Upload the organization logo",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("theme" = Option<String>, Query, description = "Logo theme"),
+    ),
+    request_body(content = inline(LogoUploadForm), description = "Image file", content_type = "multipart/form-data"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn upload_logo(
     Query(query): Query<std::collections::HashMap<String, String>>,
     mut payload: Multipart,
@@ -182,11 +212,52 @@ pub async fn upload_logo(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/logo",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "UploadOrgLogo",
+    summary = "Upload the organization logo",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("theme" = Option<String>, Query, description = "Logo theme"),
+    ),
+    request_body(content = inline(LogoUploadForm), description = "Image file", content_type = "multipart/form-data"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn upload_logo() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/settings/logo",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "DeleteOrgLogo",
+    summary = "Delete the organization logo",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("theme" = Option<String>, Query, description = "Logo theme"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_logo(
     Query(query): Query<std::collections::HashMap<String, String>>,
 ) -> Response {
@@ -203,11 +274,51 @@ pub async fn delete_logo(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/settings/logo",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "DeleteOrgLogo",
+    summary = "Delete the organization logo",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("theme" = Option<String>, Query, description = "Logo theme"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_logo() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/logo/text",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "SetOrgLogoText",
+    summary = "Set the organization logo text",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = String, description = "Logo text", content_type = "text/plain"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn set_logo_text(body: axum::body::Bytes) -> Response {
     match settings::set_logo_text(body).await {
         Ok(_) => (
@@ -220,11 +331,50 @@ pub async fn set_logo_text(body: axum::body::Bytes) -> Response {
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/settings/logo/text",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "SetOrgLogoText",
+    summary = "Set the organization logo text",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = String, description = "Logo text", content_type = "text/plain"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn set_logo_text() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/settings/logo/text",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "DeleteOrgLogoText",
+    summary = "Delete the organization logo text",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_logo_text() -> Response {
     match settings::delete_logo_text().await {
         Ok(_) => (
@@ -237,6 +387,25 @@ pub async fn delete_logo_text() -> Response {
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/settings/logo/text",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "DeleteOrgLogoText",
+    summary = "Delete the organization logo text",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_logo_text() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }

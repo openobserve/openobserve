@@ -63,9 +63,9 @@ use crate::{
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("trace_id" = Option<String>, Query, description = "trace_id, eg: trace_id=684a4e5dac43429a86a0a2ef9adf62c2"),
-        ("start_time" = i64, Query, description = "start time"),
-        ("end_time" = i64, Query, description = "end time"),
+        ("trace_id" = String, Query, description = "trace_id, eg: trace_id=684a4e5dac43429a86a0a2ef9adf62c2"),
+        ("start_time" = Option<i64>, Query, description = "start time; defaults from the trace id"),
+        ("end_time" = Option<i64>, Query, description = "end time; defaults from the trace id"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
@@ -90,7 +90,7 @@ use crate::{
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"}))
     )
 )]

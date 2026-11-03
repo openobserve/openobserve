@@ -82,6 +82,7 @@ describe("internalStreams", () => {
     expect(isUserDataStream("default", "logs")).toBe(true);
     expect(isUserDataStream("up", "metrics")).toBe(true);
     expect(isUserDataStream("default", "traces")).toBe(true);
+    expect(isUserDataStream("default", "profiles")).toBe(true);
     expect(isUserDataStream("_rumdata", "logs")).toBe(true);
     expect(isUserDataStream("_rumlog", "logs")).toBe(true);
     expect(isUserDataStream("_sessionreplay", "logs")).toBe(true);

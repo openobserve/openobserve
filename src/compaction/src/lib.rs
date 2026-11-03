@@ -152,6 +152,12 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                     );
                     continue;
                 }
+                // a stream created before over-long keys were rejected can never record a job
+                if infra_file_list::stream_key_violation(&org_id, stream_type, &stream_name)
+                    .is_some()
+                {
+                    continue;
+                }
 
                 match job_type {
                     CompactionJobType::Current => {
@@ -243,6 +249,11 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
                     log::warn!(
                         "[DOWNSAMPLING] the stream [{org_id}/{stream_type}/{stream_name}] is deleting, just skip",
                     );
+                    continue;
+                }
+                if infra_file_list::stream_key_violation(&org_id, stream_type, &stream_name)
+                    .is_some()
+                {
                     continue;
                 }
 

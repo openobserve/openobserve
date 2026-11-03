@@ -252,9 +252,8 @@ pub async fn update_workflow_record(workflow: Workflow) -> Result<(), anyhow::Er
     Ok(())
 }
 
-pub async fn update_draft_record(workflow: Workflow) -> Result<(), anyhow::Error> {
-    infra::table::workflows::update_draft(workflow).await?;
-    Ok(())
+pub async fn update_draft_record(org_id: &str, workflow: Workflow) -> Result<u64, anyhow::Error> {
+    infra::table::workflows::update_draft(org_id, workflow).await
 }
 
 pub async fn promote_draft(org_id: &str, workflow: Workflow) -> Result<(), anyhow::Error> {
@@ -267,9 +266,8 @@ pub async fn delete_workflow_record(id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn delete_draft_record(id: &str) -> Result<(), anyhow::Error> {
-    infra::table::workflows::delete_draft(id).await?;
-    Ok(())
+pub async fn delete_draft_record(org_id: &str, id: &str) -> Result<u64, anyhow::Error> {
+    infra::table::workflows::delete_draft(org_id, id).await
 }
 
 pub async fn notify_workflow_upsert(workflow: &Workflow) -> Result<(), anyhow::Error> {

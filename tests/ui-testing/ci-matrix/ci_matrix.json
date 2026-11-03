@@ -5,10 +5,8 @@
     "browser": "chrome",
     "run_files": [
       "alerts-help-drawer.spec.js",
-      "alerts-ui-operations.spec.js",
       "alerts-import.spec.js",
       "alerts-metrics-notification.spec.js",
-      "alerts-destinations-prebuilt.spec.js",
       "dl-email-destinations.spec.js",
       "alerts-vrl-encoding.spec.js",
       "alerts-history.spec.js",
@@ -16,20 +14,12 @@
       "alerts-form-validation.spec.js",
       "alerts-priority-tags.spec.js",
       "alerts-multialert-ui.spec.js",
-      "alert-library.spec.js",
       "alerts-add-alert-org-identifier.spec.js",
-      "alerts-composite-builder.spec.js",
-      "alerts-composite-list.spec.js",
-      "alerts-clone-dialog.spec.js",
-      "alerts-composite-preview.spec.js",
-      "alerts-composite-detail.spec.js",
-      "alerts-evaluation-chart.spec.js",
       "alerts-chart-error-state.spec.js",
       "alertsPagination.spec.js",
       "alertTemplatesPagination.spec.js",
       "alertDestinationsPagination.spec.js",
       "alerts-destinations-usage.spec.js",
-      "alerts-save-query-mode.spec.js",
       "alerts-no-destination.spec.js",
       "alerts-from-panel.spec.js",
       "alertCalibration.spec.js",
@@ -51,6 +41,24 @@
     ]
   },
   {
+    "testfolder": "Alerts-Composite-Library",
+    "actual_folder": "Alerts",
+    "browser": "chrome",
+    "run_files": [
+      "alerts-ui-operations.spec.js",
+      "alerts-destinations-prebuilt.spec.js",
+      "alert-library.spec.js",
+      "alerts-composite-builder.spec.js",
+      "alerts-composite-detail.spec.js",
+      "alerts-composite-list.spec.js",
+      "alerts-composite-preview.spec.js",
+      "alerts-clone-dialog.spec.js",
+      "alerts-save-query-mode.spec.js",
+      "alerts-evaluation-chart.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "Dashboard-Config-Settings",
     "actual_folder": "Dashboards",
     "browser": "chrome",
@@ -67,7 +75,6 @@
       "dashboard-config-panel-time.spec.js",
       "dashboard-config-table.spec.js",
       "dashboard-config-trellis.spec.js",
-      "dashboard-config-drilldown.spec.js",
       "dashboard-config-promql.spec.js",
       "dashboard-config-markline.spec.js",
       "dashboard-config-unit-locale.spec.js",
@@ -93,7 +100,8 @@
       "dashboard-enrichment-table-panel.spec.js",
       "dashboard-metric-camelcase.spec.js",
       "dashboard-create-alert.spec.js",
-      "dashboard-zoom-brush.spec.js"
+      "dashboard-zoom-brush.spec.js",
+      "dashboard-config-drilldown.spec.js"
     ],
     "disabled": []
   },
@@ -113,11 +121,6 @@
       "dashboard-promql-suggestions.spec.js",
       "dashboard-sql-autocomplete.spec.js",
       "dashboard-share-link.spec.js",
-      "crossLinking.spec.js",
-      "dashboard-multi-sql.spec.js",
-      "crossLinkMultiStream.spec.js",
-      "dashboards-form-validation.spec.js",
-      "dashboard-panel-unsaved-changes.spec.js",
       "dashboard-panel-live-preview.spec.js",
       "dashboard-refresh-without-cache.spec.js",
       "dashboard-print-layout.spec.js",
@@ -171,7 +174,8 @@
       "dashboard-join.spec.js",
       "dashboard-nested-functions.spec.js",
       "dashboard-legends-copy.spec.js",
-      "dashboard-raw-query.spec.js"
+      "dashboard-raw-query.spec.js",
+      "dashboards-form-validation.spec.js"
     ],
     "disabled": []
   },
@@ -180,7 +184,10 @@
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
-      "dashboard-streaming.spec.js"
+      "dashboard-streaming.spec.js",
+      "dashboard-multi-sql.spec.js",
+      "dashboard-variables-stream-field.spec.js",
+      "dashboard-variables-dependency.spec.js"
     ],
     "disabled": []
   },
@@ -198,7 +205,8 @@
       "dashboard-table-pagination.spec.js",
       "dashboard-pivot-table.spec.js",
       "interactive-dashboard-table.spec.js",
-      "dashboard-cell-explorer-detail.spec.js"
+      "dashboard-cell-explorer-detail.spec.js",
+      "dashboard-panel-unsaved-changes.spec.js"
     ],
     "disabled": []
   },
@@ -211,13 +219,11 @@
       "dashboard-variables-global.spec.js",
       "dashboard-variables-tab-level.spec.js",
       "dashboard-variables-panel-level.spec.js",
-      "dashboard-variables-dependency.spec.js",
       "dashboard-variables-refresh.spec.js",
       "dashboard-variables-url-sync.spec.js",
       "dashboard-variables-creation-scopes.spec.js",
       "dashboard-variables-default-values-chain.spec.js",
       "dashboard-variables-custom-parents.spec.js",
-      "dashboard-variables-stream-field.spec.js",
       "dashboard-mustache-variables.spec.js",
       "dashboard-variable-select-all.spec.js",
       "dashboard-variables-auto-run.spec.js"
@@ -230,7 +236,9 @@
     "browser": "chrome",
     "run_files": [
       "visualize.spec.js",
-      "visualize-vrl.spec.js"
+      "visualize-vrl.spec.js",
+      "crossLinking.spec.js",
+      "crossLinkMultiStream.spec.js"
     ],
     "disabled": [],
     "paths": [
@@ -324,7 +332,10 @@
       "logsquickmode.spec.js",
       "logshistogram.spec.js",
       "logsQuickPick.spec.js",
-      "logs-jk-navigation.spec.js"
+      "logs-jk-navigation.spec.js",
+      "monaco-query-prefill.spec.js",
+      "logsVisualizePersistence.spec.js",
+      "logsqueries.matchall.spec.js"
     ],
     "disabled": []
   },
@@ -337,7 +348,6 @@
       "logsQueryBuilder-filters-basic.spec.js",
       "pagination.spec.js",
       "unflattened.spec.js",
-      "logsFreeText.spec.js",
       "logsNoFtsRecovery.spec.js"
     ],
     "disabled": []
@@ -354,10 +364,7 @@
       "join.spec.js",
       "shareLink.spec.js",
       "logsAnalyzeDimensions.spec.js",
-      "monaco-query-prefill.spec.js",
-      "logsqueries.matchall.spec.js",
       "ftsDefaultColumn.spec.js",
-      "logsVisualizePersistence.spec.js",
       "streamNotFound.spec.js",
       "logsRefreshCacheDropdown.spec.js",
       "logs-highlighting.spec.js",
@@ -394,7 +401,8 @@
       "logsToolbarPins.spec.js",
       "logs-query-editor-keyboard.spec.js",
       "logsCrossLinks.spec.js",
-      "logsFieldValuePaging.spec.js"
+      "logsFieldValuePaging.spec.js",
+      "logsFreeText.spec.js"
     ],
     "disabled": [
       {
@@ -461,10 +469,7 @@
     "actual_folder": "Pipelines",
     "browser": "chrome",
     "run_files": [
-      "pipeline-conditions.spec.js",
-      "pipeline-conditions-validation.spec.js",
       "pipelines.spec.js",
-      "pipeline-dynamic.spec.js",
       "pipeline-core.spec.js",
       "pipeline-traces.spec.js",
       "pipeline-metrics.spec.js",
@@ -480,6 +485,17 @@
         "reason": ""
       }
     ]
+  },
+  {
+    "testfolder": "Pipelines-Conditions",
+    "actual_folder": "Pipelines",
+    "browser": "chrome",
+    "run_files": [
+      "pipeline-conditions.spec.js",
+      "pipeline-conditions-validation.spec.js",
+      "pipeline-dynamic.spec.js"
+    ],
+    "disabled": []
   },
   {
     "testfolder": "Reports",
@@ -571,21 +587,29 @@
     "actual_folder": "Traces",
     "browser": "chrome",
     "run_files": [
-      "traces-autocomplete-filter-mode.spec.js",
       "service-catalog.spec.js",
-      "tracesSearch.spec.js",
-      "traceQueryEditor.spec.js",
-      "traceErrorFilter.spec.js",
-      "traceDetails.spec.js",
       "traceDetailsPaging.spec.js",
-      "traceAdvancedFiltering.spec.js",
       "tracesTriageLoop.spec.js",
-      "traces-autocomplete-suggestions.spec.js",
       "traceGenAiParts.spec.js",
       "tracesCharts.spec.js",
       "traceSessionReplay.spec.js",
       "traces-jk-navigation.spec.js",
       "service-graph-side-panel.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Traces-Search",
+    "actual_folder": "Traces",
+    "browser": "chrome",
+    "run_files": [
+      "tracesSearch.spec.js",
+      "traceAdvancedFiltering.spec.js",
+      "traceErrorFilter.spec.js",
+      "traceQueryEditor.spec.js",
+      "traces-autocomplete-suggestions.spec.js",
+      "traces-autocomplete-filter-mode.spec.js",
+      "traceDetails.spec.js"
     ],
     "disabled": []
   },

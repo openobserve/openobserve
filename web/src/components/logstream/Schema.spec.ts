@@ -638,25 +638,26 @@ describe("Schema Component Tests", () => {
     it("should compute store original data toggle visibility", async () => {
       expect(wrapper.vm.showStoreOriginalDataToggle).toBe(true);
 
-      // Test with traces
-      const tracesWrapper = mount(LogStream, {
-        props: {
-          modelValue: {
-            name: "test-stream",
-            stream_type: "traces",
-            settings: { defined_schema_fields: [] },
+      for (const streamType of ["traces", "metrics", "profiles", "metadata", "enrichment_tables"]) {
+        const otherWrapper = mount(LogStream, {
+          props: {
+            modelValue: {
+              name: "test-stream",
+              stream_type: streamType,
+              settings: { defined_schema_fields: [] },
+            },
           },
-        },
-        global: {
-          provide: { store: store },
-          plugins: [i18n],
-          stubs: { ODrawer: ODrawerStub },
-        },
-      });
+          global: {
+            provide: { store: store },
+            plugins: [i18n],
+            stubs: { ODrawer: ODrawerStub },
+          },
+        });
 
-      await flushPromises();
-      expect(tracesWrapper.vm.showStoreOriginalDataToggle).toBe(false);
-      tracesWrapper.unmount();
+        await flushPromises();
+        expect(otherWrapper.vm.showStoreOriginalDataToggle).toBe(false);
+        otherWrapper.unmount();
+      }
     });
 
     // Test 41-50: Additional edge cases and error scenarios

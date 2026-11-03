@@ -76,11 +76,17 @@ const RUM_TOKEN = "rum-secret-token-xyz";
 function makeStore(
   overrides: {
     rumToken?: string;
+    rumTokenForbidden?: boolean;
     org?: string;
     apiEndpoint?: string;
   } = {},
 ) {
-  const { rumToken = RUM_TOKEN, org = ORG_ID, apiEndpoint = HTTPS_ENDPOINT } = overrides;
+  const {
+    rumToken = RUM_TOKEN,
+    rumTokenForbidden = false,
+    org = ORG_ID,
+    apiEndpoint = HTTPS_ENDPOINT,
+  } = overrides;
 
   return createStore({
     state: {
@@ -88,6 +94,7 @@ function makeStore(
       selectedOrganization: { identifier: org },
       organizationData: {
         rumToken: rumToken !== undefined ? { rum_token: rumToken } : null,
+        rumTokenForbidden,
       },
       zoConfig: {},
     },
@@ -253,6 +260,15 @@ describe("FrontendRumConfig", () => {
       });
 
       expect(wrapper.find('[data-test="rum-web-no-token-message"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-web-setup-card"]').exists()).toBe(false);
+    });
+
+    it("tells a caller who may not read the token that it is withheld, not to generate one", () => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      ({ wrapper } = mountComponent({ rumToken: "", rumTokenForbidden: true }));
+
+      expect(wrapper.find('[data-test="rum-web-token-forbidden"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-web-no-token-message"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="rum-web-setup-card"]').exists()).toBe(false);
     });
   });

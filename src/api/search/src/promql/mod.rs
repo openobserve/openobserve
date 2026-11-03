@@ -60,6 +60,7 @@ use crate::{
     request_body(content = String, description = "prometheus WriteRequest", content_type = "application/x-protobuf"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
+        (status = 400, description = "Not a protobuf body or the payload cannot be ingested", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -132,6 +133,9 @@ pub async fn remote_write(
                ]
             }
         })),
+        (status = 400, description = "Invalid query or time", content_type = "application/json", body = ()),
+        (status = 403, description = "No permission on the metric stream", content_type = "application/json", body = ()),
+        (status = 429, description = "Search disabled after exceeding the licensed ingestion limit, or rate limited", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -148,6 +152,26 @@ pub async fn query_get(
     query(&org_id, req, &user_email.user_id, &headers).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/query",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusQueryPost",
+    summary = "Execute Prometheus instant query with form parameters",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(config::meta::promql::RequestQuery), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn query_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestQuery>,
@@ -304,6 +328,9 @@ async fn query(
                ]
             }
         })),
+        (status = 400, description = "Invalid query, time range, step or search type", content_type = "application/json", body = ()),
+        (status = 403, description = "No permission on the metric stream", content_type = "application/json", body = ()),
+        (status = 429, description = "Search disabled after exceeding the licensed ingestion limit, or rate limited", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -320,6 +347,26 @@ pub async fn query_range_get(
     query_range(&org_id, req, &user_email.user_id, &headers, false).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/query_range",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusRangeQueryPost",
+    summary = "Execute Prometheus range query with form parameters",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(config::meta::promql::RequestRangeQuery), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
+    responses(
+        (status = 200, description = "JSON result, or a server-sent event stream when use_streaming is true", content((Object = "application/json"), ("text/event-stream"))),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn query_range_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestRangeQuery>,
@@ -398,6 +445,9 @@ pub async fn query_range_post(
                 }
             ]
         })),
+        (status = 400, description = "Invalid query, time range, step or search type", content_type = "application/json", body = ()),
+        (status = 403, description = "No permission on the metric stream", content_type = "application/json", body = ()),
+        (status = 429, description = "Search disabled after exceeding the licensed ingestion limit, or rate limited", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -413,6 +463,26 @@ pub async fn query_exemplars_get(
     query_range(&org_id, req, &user_email.user_id, &headers, true).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/query_exemplars",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusQueryExemplarsPost",
+    summary = "Query Prometheus exemplars with form parameters",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(config::meta::promql::RequestRangeQuery), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn query_exemplars_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestRangeQuery>,
@@ -626,6 +696,7 @@ async fn query_range(
               ]
             }
         })),
+        (status = 403, description = "No permission to read metrics", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -750,6 +821,9 @@ pub async fn metadata(
                }
             ]
         })),
+        (status = 400, description = "Invalid match[] or time range", content_type = "application/json", body = ()),
+        (status = 403, description = "No permission on the metric stream", content_type = "application/json", body = ()),
+        (status = 429, description = "Search disabled after exceeding the licensed ingestion limit, or rate limited", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -765,6 +839,26 @@ pub async fn series_get(
     series(&org_id, req, &user_email.user_id).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/series",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusSeriesPost",
+    summary = "Find Prometheus series with form parameters",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(config::meta::promql::RequestSeries), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn series_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestSeries>,
@@ -883,6 +977,8 @@ async fn series(
                 "version"
             ]
         })),
+        (status = 400, description = "Invalid match[] or time range", content_type = "application/json", body = ()),
+        (status = 403, description = "No permission to read metrics", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -898,6 +994,26 @@ pub async fn labels_get(
     labels(&org_id, req, &user_email.user_id).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/labels",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusLabelsPost",
+    summary = "List Prometheus labels with form parameters",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(config::meta::promql::RequestLabels), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn labels_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestLabels>,
@@ -1024,6 +1140,7 @@ async fn labels(
             ]
         })),
         (status = 400, description = "Invalid parameters or match[] does not identify a metric", content_type = "application/json", body = ()),
+        (status = 403, description = "No permission to read metrics", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1246,6 +1363,7 @@ fn validate_range_window(start: i64, end: i64) -> Result<(), String> {
             "status" : "success",
             "data" : "foo / bar"
         })),
+        (status = 400, description = "The query does not parse", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1260,6 +1378,27 @@ pub async fn format_query_get(
     format_query(&req.query)
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/format_query",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusFormatQueryPost",
+    summary = "Format a PromQL expression with form parameters",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("query" = String, Query, description = "PromQL expression; the extractor rejects a request without it, and a non-empty form value wins"),
+    ),
+    request_body(content = inline(config::meta::promql::RequestFormatQuery), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn format_query_post(
     Path(_org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestFormatQuery>,
