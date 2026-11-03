@@ -24,6 +24,12 @@ import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants } from "./otelShared";
 import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
+import {
+  dbContainerUninstalls,
+  dbDockerStep,
+  dbKubernetesStep,
+  type DbContainerOptions,
+} from "./dbContainer";
 
 const CONFIG_YAML = `receivers:
   redis:
@@ -51,6 +57,16 @@ service:
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
 
+// The Docker and Kubernetes modes run this card's own configs in the upstream collector image.
+const CONTAINER: DbContainerOptions = {
+  db: "redis",
+  hostLabelKey: "ingestion.setupCard.redisHostLabel",
+  defaultPort: "6379",
+  k8sHost: "redis.default.svc.cluster.local",
+  configYaml: CONFIG_YAML,
+  env: { REDIS_PASSWORD: "yourpassword" },
+};
+
 export default function redisCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
@@ -68,6 +84,8 @@ export default function redisCard(subs: CardSubstitutions, t: TranslateFn): Rich
         hostLabelKey: "ingestion.setupCard.redisHostLabel",
         defaultPort: "6379",
       }),
+      dbDockerStep(t, subs, CONTAINER),
+      dbKubernetesStep(t, subs, CONTAINER),
       manualOnly(collectorInstallStep(t)),
       {
         id: "configure",
@@ -129,7 +147,7 @@ export default function redisCard(subs: CardSubstitutions, t: TranslateFn): Rich
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "redis", filter: "" },
-    extras: { uninstall: dbUninstallExtra() },
+    extras: { uninstall: dbUninstallExtra(), uninstallByMode: dbContainerUninstalls("redis") },
     docUrl: "https://openobserve.ai/blog/monitor-redis-metrics-otel",
   };
 }

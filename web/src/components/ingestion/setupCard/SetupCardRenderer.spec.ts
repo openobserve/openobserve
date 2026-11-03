@@ -1141,4 +1141,60 @@ describe("SetupCardRenderer — setup modes", () => {
       "verify-dbm",
     ]);
   });
+
+  it("drives the Postgres card's Docker and Kubernetes modes, each with its own host and uninstall", async () => {
+    const PG_SUBS = { ...SUBS, token: "dGVzdEB0b2tlbg==" };
+    wrapper = mount(SetupCardRenderer, {
+      props: { content: postgresCard(PG_SUBS, gt), subs: PG_SUBS },
+      global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
+      attachTo: document.body,
+    });
+    expect(
+      wrapper
+        .find('[data-test="ai-setup-mode-tabs"]')
+        .findAll("[data-test^='ai-setup-mode-']")
+        .map((b) => b.attributes("data-test")),
+    ).toEqual([
+      "ai-setup-mode-auto",
+      "ai-setup-mode-docker",
+      "ai-setup-mode-kubernetes",
+      "ai-setup-mode-manual",
+    ]);
+    // The accordion keeps its open state across modes, so open it only once.
+    const openUninstall = async () => {
+      if (!wrapper.find('[data-test="ai-uninstall-code"]').exists()) {
+        await wrapper.find('[data-test="ai-uninstall-accordion"] button').trigger("click");
+        await flushPromises();
+      }
+      return wrapper.find('[data-test="ai-uninstall-code"]').text();
+    };
+    await wrapper.find('[data-test="ai-input-host"] input').setValue("db.local");
+
+    await pickMode("docker");
+    expect(stepIds().slice(0, 3)).toEqual(["prepare", "docker-run", "verify"]);
+    const docker = () => wrapper.find('[data-test="ai-step-docker-run"]').findComponent(OCodeBlock);
+    // The script's host stays its own: a container reaches the database another way.
+    expect(docker().props("code")).toContain("endpoint: host.docker.internal:5432");
+    expect(docker().props("code")).not.toContain("db.local");
+    expect(docker().props("codeMasked")).not.toContain(PG_SUBS.token);
+    await wrapper.find('[data-test="ai-input-dockerHost"] input').setValue("pg");
+    expect(docker().props("code")).toContain("endpoint: pg:5432");
+    expect(await openUninstall()).toContain("docker rm -f o2-postgres-collector");
+
+    await pickMode("kubernetes");
+    expect(stepIds().slice(0, 3)).toEqual(["prepare", "k8s-deploy", "verify"]);
+    await wrapper.find('[data-test="ai-input-namespace"] input').setValue("dbmon");
+    const k8s = wrapper.find('[data-test="ai-step-k8s-deploy"]').findComponent(OCodeBlock);
+    expect(k8s.props("code")).toContain("namespace: dbmon");
+    expect(k8s.props("code")).toContain("endpoint: postgres.default.svc.cluster.local:5432");
+    expect(await openUninstall()).toContain(
+      "kubectl delete deployment,configmap,secret -n dbmon -l app=o2-postgres-collector",
+    );
+
+    await pickMode("auto");
+    expect(await openUninstall()).toContain("o2-db-uninstall.sh");
+    expect(
+      wrapper.find('[data-test="ai-step-quick-install"]').findComponent(OCodeBlock).props("code"),
+    ).toContain("--host='db.local'");
+  });
 });

@@ -22,6 +22,12 @@ import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
+import {
+  dbContainerUninstalls,
+  dbDockerStep,
+  dbKubernetesStep,
+  type DbContainerOptions,
+} from "./dbContainer";
 
 // The receiver authenticates as a user with clusterMonitor. Name/password are
 // literal here and in the config so the two stay in lockstep.
@@ -59,6 +65,16 @@ service:
       receivers: [mongodb]
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
+
+// The Docker and Kubernetes modes run this card's own configs in the upstream collector image.
+const CONTAINER: DbContainerOptions = {
+  db: "mongodb",
+  hostLabelKey: "ingestion.setupCard.mongodbHostLabel",
+  defaultPort: "27017",
+  k8sHost: "mongodb.default.svc.cluster.local",
+  configYaml: CONFIG_YAML,
+  env: {},
+};
 
 export default function mongodbCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const tool = sharedToolIcons();
@@ -112,6 +128,8 @@ export default function mongodbCard(subs: CardSubstitutions, t: TranslateFn): Ri
         defaultPort: "27017",
         defaultUser: "otel",
       }),
+      dbDockerStep(t, subs, CONTAINER),
+      dbKubernetesStep(t, subs, CONTAINER),
       manualOnly(collectorInstallStep(t)),
       {
         id: "configure",
@@ -169,7 +187,7 @@ export default function mongodbCard(subs: CardSubstitutions, t: TranslateFn): Ri
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mongodb", filter: "" },
-    extras: { uninstall: dbUninstallExtra() },
+    extras: { uninstall: dbUninstallExtra(), uninstallByMode: dbContainerUninstalls("mongodb") },
     docUrl: "https://openobserve.ai/blog/monitor-mongodb-metrics-otel",
   };
 }

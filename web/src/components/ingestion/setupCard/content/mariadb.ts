@@ -30,6 +30,12 @@ import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
 import {
+  dbContainerUninstalls,
+  dbDockerStep,
+  dbKubernetesStep,
+  type DbContainerOptions,
+} from "./dbContainer";
+import {
   DBM_CONTRIB_VERSION,
   MARIADB_DBM_CONFIG_YAML,
   MARIADB_DBM_GRANT_SQL,
@@ -75,6 +81,26 @@ service:
       receivers: [mysql]
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
+
+// The Docker and Kubernetes modes run this card's own configs in the upstream collector image.
+const CONTAINER: DbContainerOptions = {
+  db: "mariadb",
+  hostLabelKey: "ingestion.setupCard.mariadbHostLabel",
+  defaultPort: "3306",
+  k8sHost: "mariadb.default.svc.cluster.local",
+  configYaml: CONFIG_YAML,
+  env: { MYSQL_PASSWORD: "yourpassword" },
+  database: { default: "mysql", scope: "all" },
+  dbm: {
+    configYaml: MARIADB_DBM_CONFIG_YAML,
+    env: { MYSQL_USER: "otel" },
+    logPath: {
+      default: MY_ERROR_LOG,
+      labelKey: "ingestion.setupCard.dbmMariadbLogPathLabel",
+      helpKey: "ingestion.setupCard.dbInstallerMysqlLogPathHelp",
+    },
+  },
+};
 
 export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const tool = sharedToolIcons();
@@ -137,6 +163,8 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
           helpKey: "ingestion.setupCard.dbInstallerMysqlLogPathHelp",
         },
       }),
+      dbDockerStep(t, subs, CONTAINER),
+      dbKubernetesStep(t, subs, CONTAINER),
       // Pinned so all four Tier-1 cards install the same collector.
       manualOnly(collectorInstallStep(t, DBM_CONTRIB_VERSION)),
       {
@@ -292,7 +320,7 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
       dbmVerifyStep("full", true, "60s", "noSampleText"),
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mysql", filter: "" },
-    extras: { uninstall: dbUninstallExtra() },
+    extras: { uninstall: dbUninstallExtra(), uninstallByMode: dbContainerUninstalls("mariadb") },
     docUrl: "https://openobserve.ai/blog/monitor-mysql-metrics-otel",
   };
 }

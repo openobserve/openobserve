@@ -468,9 +468,9 @@ const codeChrome = (step: RichCardStep): "terminal" | "editor" =>
 
 const extras = computed(() => props.content.extras ?? {});
 const uninstallSection = computed(() => {
-  const section = extras.value.uninstall;
-  if (!section?.mode || !props.content.setupModes?.length) return section;
-  return section.mode === setupMode.value ? section : undefined;
+  const sections = [extras.value.uninstall, ...(extras.value.uninstallByMode ?? [])];
+  if (!props.content.setupModes?.length) return sections[0];
+  return sections.find((u) => u && (!u.mode || u.mode === setupMode.value));
 });
 const hasInstallerAccordion = computed(
   () => !!(extras.value.installs?.length || extras.value.envVars?.length),

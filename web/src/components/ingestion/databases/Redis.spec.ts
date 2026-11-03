@@ -64,6 +64,8 @@ describe("redisCard builder", () => {
     // Redis needs no monitoring user, so there is no prepare step.
     expect(card.steps.map((s) => s.id)).toEqual([
       "quick-install",
+      "docker-run",
+      "k8s-deploy",
       "install",
       "configure",
       "run",

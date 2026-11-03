@@ -22,6 +22,12 @@ import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
 import {
+  dbContainerUninstalls,
+  dbDockerStep,
+  dbKubernetesStep,
+  type DbContainerOptions,
+} from "./dbContainer";
+import {
   DBM_CONTRIB_VERSION,
   MYSQL_DBM_CONFIG_YAML,
   MYSQL_DBM_GRANT_SQL,
@@ -86,6 +92,26 @@ service:
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
 
+// The Docker and Kubernetes modes run this card's own configs in the upstream collector image.
+const CONTAINER: DbContainerOptions = {
+  db: "mysql",
+  hostLabelKey: "ingestion.setupCard.mysqlHostLabel",
+  defaultPort: "3306",
+  k8sHost: "mysql.default.svc.cluster.local",
+  configYaml: CONFIG_YAML,
+  env: { MYSQL_USER: "otel", MYSQL_PASSWORD: "yourpassword" },
+  database: { default: "mysql", scope: "all" },
+  dbm: {
+    configYaml: MYSQL_DBM_CONFIG_YAML,
+    env: {},
+    logPath: {
+      default: MY_ERROR_LOG,
+      labelKey: "ingestion.setupCard.dbmMysqlLogPathLabel",
+      helpKey: "ingestion.setupCard.dbInstallerMysqlLogPathHelp",
+    },
+  },
+};
+
 export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const tool = sharedToolIcons();
   return {
@@ -145,6 +171,8 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
           helpKey: "ingestion.setupCard.dbInstallerMysqlLogPathHelp",
         },
       }),
+      dbDockerStep(t, subs, CONTAINER),
+      dbKubernetesStep(t, subs, CONTAINER),
       // Pinned: the DBM config below needs upstream contrib >= 0.148.0 (the
       // `events:` block is an unknown key on older releases).
       manualOnly(collectorInstallStep(t, DBM_CONTRIB_VERSION)),
@@ -301,7 +329,7 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
       dbmVerifyStep("full", true),
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mysql", filter: "" },
-    extras: { uninstall: dbUninstallExtra() },
+    extras: { uninstall: dbUninstallExtra(), uninstallByMode: dbContainerUninstalls("mysql") },
     docUrl: "https://openobserve.ai/blog/monitor-mysql-metrics-otel",
   };
 }

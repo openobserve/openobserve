@@ -62,8 +62,8 @@ export type StepChipKind = "terminal" | "editor" | "run" | "traces";
  */
 export type StepCompleteOn = "copy" | "detect" | "action";
 
-/** A card-level setup path: the one-command installer, or the step-by-step manual sequence. */
-export type SetupMode = "auto" | "manual";
+/** A card-level setup path: the one-command installer, a container runtime, or the step-by-step manual sequence. */
+export type SetupMode = "auto" | "docker" | "kubernetes" | "manual";
 
 /**
  * One entry of the card's setup-mode toggle (see RichCardContent.setupModes).
@@ -240,6 +240,20 @@ export interface RichCardDetect {
   modelLabel?: string;
 }
 
+export interface RichCardUninstall {
+  /** Accordion label, e.g. "Uninstall the Agent". Omit when `labelKey` is set. */
+  label?: I18nText;
+  /** i18n KEY for the accordion label, translated by the renderer. */
+  labelKey?: I18nKey;
+  /** Optional paragraph above the code (inline markdown: **bold**, `code`). */
+  description?: I18nText;
+  /** i18n KEY for that paragraph, translated by the renderer. */
+  descriptionKey?: I18nKey;
+  code: RichCardCode;
+  /** Show the section only in this setup mode (cards with `setupModes`). */
+  mode?: SetupMode;
+}
+
 export interface RichCardExtras {
   /** Packages the installer adds (pills). */
   installs?: string[];
@@ -278,19 +292,9 @@ export interface RichCardExtras {
    * out of the way of the setup flow while remaining discoverable on the page that
    * installed the thing.
    */
-  uninstall?: {
-    /** Accordion label, e.g. "Uninstall the Agent". Omit when `labelKey` is set. */
-    label?: I18nText;
-    /** i18n KEY for the accordion label, translated by the renderer. */
-    labelKey?: I18nKey;
-    /** Optional paragraph above the code (inline markdown: **bold**, `code`). */
-    description?: I18nText;
-    /** i18n KEY for that paragraph, translated by the renderer. */
-    descriptionKey?: I18nKey;
-    code: RichCardCode;
-    /** Show the section only in this setup mode (cards with `setupModes`). */
-    mode?: SetupMode;
-  };
+  uninstall?: RichCardUninstall;
+  /** Uninstall sections for the card's other setup modes; the one whose `mode` is selected renders in `uninstall`'s place. */
+  uninstallByMode?: RichCardUninstall[];
   troubleshooting?: { q: I18nText; a: I18nText }[];
 }
 

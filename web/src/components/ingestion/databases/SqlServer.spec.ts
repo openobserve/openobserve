@@ -77,6 +77,8 @@ describe("sqlServerCard builder", () => {
     expect(card.steps.map((s) => s.id)).toEqual([
       "prepare",
       "quick-install",
+      "docker-run",
+      "k8s-deploy",
       "install",
       "configure",
       "run",

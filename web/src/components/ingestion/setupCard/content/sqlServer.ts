@@ -24,6 +24,12 @@ import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
 import {
+  dbContainerUninstalls,
+  dbDockerStep,
+  dbKubernetesStep,
+  type DbContainerOptions,
+} from "./dbContainer";
+import {
   DBM_CONTRIB_VERSION,
   MSSQL_DBM_CONFIG_YAML,
   MSSQL_2022_PLUS,
@@ -75,6 +81,21 @@ service:
       receivers: [sqlserver]
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
+
+// The Docker and Kubernetes modes run this card's own configs in the upstream collector image.
+const CONTAINER: DbContainerOptions = {
+  db: "sqlserver",
+  hostLabelKey: "ingestion.setupCard.sqlServerHostLabel",
+  defaultPort: "1433",
+  k8sHost: "sqlserver.default.svc.cluster.local",
+  configYaml: CONFIG_YAML,
+  env: {},
+  database: { default: "master", scope: "dbm" },
+  dbm: {
+    configYaml: MSSQL_DBM_CONFIG_YAML,
+    env: { MSSQL_USER: "otel", MSSQL_PASSWORD: "YourStrong@Passw0rd" },
+  },
+};
 
 export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const tool = sharedToolIcons();
@@ -141,6 +162,8 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
         defaultDatabase: "master",
         dbm: true,
       }),
+      dbDockerStep(t, subs, CONTAINER),
+      dbKubernetesStep(t, subs, CONTAINER),
       // Pinned so all four Tier-1 cards install the same collector.
       manualOnly(collectorInstallStep(t, DBM_CONTRIB_VERSION)),
       {
@@ -296,7 +319,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
     // Metrics fan out into one stream per metric — match by keyword: any
     // metrics stream containing "sqlserver" means data is flowing.
     detect: { streamType: "metrics", match: "keyword", streamName: "sqlserver", filter: "" },
-    extras: { uninstall: dbUninstallExtra() },
+    extras: { uninstall: dbUninstallExtra(), uninstallByMode: dbContainerUninstalls("sqlserver") },
     docUrl: "https://openobserve.ai/blog/monitor-sql-server-with-otel/",
   };
 }

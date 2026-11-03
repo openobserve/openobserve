@@ -23,6 +23,12 @@ import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
 import {
+  dbContainerUninstalls,
+  dbDockerStep,
+  dbKubernetesStep,
+  type DbContainerOptions,
+} from "./dbContainer";
+import {
   DBM_CONTRIB_VERSION,
   PG_DBM_AUTO_EXPLAIN_CONF,
   PG_DBM_CONFIG_YAML,
@@ -78,6 +84,26 @@ service:
       receivers: [postgresql]
       processors: [memory_limiter, batch]
       exporters: [otlphttp/openobserve]`;
+
+// The Docker and Kubernetes modes run this card's own configs in the upstream collector image.
+const CONTAINER: DbContainerOptions = {
+  db: "postgres",
+  hostLabelKey: "ingestion.setupCard.postgresqlHostLabel",
+  defaultPort: "5432",
+  k8sHost: "postgres.default.svc.cluster.local",
+  configYaml: CONFIG_YAML,
+  env: { POSTGRESQL_PASSWORD: "mypassword" },
+  database: { default: "postgres", scope: "all" },
+  dbm: {
+    configYaml: PG_DBM_CONFIG_YAML,
+    env: { PGUSER: "myuser", PGPASS: "mypassword" },
+    logPath: {
+      default: PG_LOG_PATH,
+      labelKey: "ingestion.setupCard.dbmPgLogPathLabel",
+      helpKey: "ingestion.setupCard.dbmPgLogPathHelp",
+    },
+  },
+};
 
 export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const tool = sharedToolIcons();
@@ -141,6 +167,8 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
           helpKey: "ingestion.setupCard.dbmPgLogPathHelp",
         },
       }),
+      dbDockerStep(t, subs, CONTAINER),
+      dbKubernetesStep(t, subs, CONTAINER),
       // Pinned, not the shared default: the DBM config below needs upstream
       // contrib >= 0.148.0 (the `events:` block is an unknown key on older
       // releases).
@@ -340,7 +368,7 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
       streamName: "postgresql",
       filter: "",
     },
-    extras: { uninstall: dbUninstallExtra() },
+    extras: { uninstall: dbUninstallExtra(), uninstallByMode: dbContainerUninstalls("postgres") },
     docUrl: "https://openobserve.ai/blog/how-to-monitor-postgresql-performance",
   };
 }

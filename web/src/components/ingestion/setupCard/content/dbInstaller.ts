@@ -37,6 +37,8 @@ export type InstallerDb = "postgres" | "mysql" | "mariadb" | "sqlserver" | "mong
 /** Automatic first: it is the path the cards recommend. */
 export const DB_SETUP_MODES: RichCardSetupMode[] = [
   { id: "auto", labelKey: "ingestion.setupCard.setupModeAuto" },
+  { id: "docker", labelKey: "ingestion.setupCard.setupModeDocker" },
+  { id: "kubernetes", labelKey: "ingestion.setupCard.setupModeKubernetes" },
   { id: "manual", labelKey: "ingestion.setupCard.setupModeManual" },
 ];
 
