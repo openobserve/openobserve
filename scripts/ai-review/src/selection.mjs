@@ -4,6 +4,9 @@ import { isLoaderPath } from "./sanitize.mjs";
 
 // Dependency bots whose PRs only bump versions; any other bot or App can write code and is reviewed.
 const DEPENDENCY_BOTS = new Set(["dependabot[bot]", "renovate[bot]"]);
+// GitHub's files and commits endpoints stop at these counts however far they are paged.
+const MAX_LISTED_FILES = 3000;
+const MAX_LISTED_COMMITS = 250;
 
 // Diffs that can affect a release: migrations, dependency manifests, server config, CI and deployment files.
 export function isReleaseFile(filePath) {
@@ -56,6 +59,14 @@ export function isDocsPath(filePath) {
 export function isTranslationPath(filePath) {
   if (filePath === "scripts/translations/.translation_state.json") return true;
   return /^web\/src\/locales\/languages\/[^/]+\.json$/.test(filePath) && !filePath.endsWith("/en-US.json");
+}
+
+// A listing is whole only when it matches the PR's own counts below each endpoint's cap; anything else may hide a file or commit.
+export function listingComplete({ files, commits, expectedFiles, expectedCommits }) {
+  const count = value => (/^\d+$/.test(String(value ?? "").trim()) ? Number(value) : Number.NaN);
+  const wantFiles = count(expectedFiles);
+  const wantCommits = count(expectedCommits);
+  return files === wantFiles && commits === wantCommits && wantFiles < MAX_LISTED_FILES && wantCommits < MAX_LISTED_COMMITS;
 }
 
 // GitHub commits a bot's API-made commits as web-flow, so the committer is either the bot or web-flow, and GitHub must have verified the signature.

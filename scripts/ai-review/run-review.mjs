@@ -65,7 +65,7 @@ import { OpencodeServer, modelVariantIds, resolveOpencodeConfig, selfCheck, shou
 import { stripJsonc } from "./src/jsonc.mjs";
 import { lostPasses, lostPassesNote, mergePassResults, parseColdPasses, passLabel, passPlan, reviewComplete, runPooled } from "./src/passes.mjs";
 import { MAX_USER_PROMPT_CHARS, fitCoordinatorPrompt } from "./src/coordinator-input.mjs";
-import { diffFingerprint, fetchPinnedDiff, prefixDiffPaths, reviewerDiff } from "./src/pr-diff.mjs";
+import { diffFingerprint, fetchPinnedDiff, hunksLocatable, prefixDiffPaths, reviewerDiff, runFile } from "./src/pr-diff.mjs";
 import {
   buildFallbackReview,
   partialFindingsBlock,
@@ -321,6 +321,20 @@ function ghSilent(args) {
 
 function execErrorText(err) {
   return [err?.message, err?.stderr?.toString(), err?.stdout?.toString()].filter(Boolean).join(" ");
+}
+
+// cat-file reads the raw blob, so the PR's own attributes cannot reshape the base text a hunk is matched against.
+function readBaseFile(path) {
+  const paired = Boolean(PAIRED.dir) && path.startsWith(`${PAIRED.dir}/`);
+  const rel = paired ? path.slice(PAIRED.dir.length + 1) : path;
+  const dir = paired ? resolve(PR_DIR, PAIRED.dir) : PR_DIR;
+  const base = paired ? PAIRED.mergeBase : process.env.MERGE_BASE_SHA;
+  if (!dir || !base) return null;
+  try {
+    return runFile("git", ["-C", dir, "cat-file", "blob", `${base}:${rel}`]);
+  } catch {
+    return null;
+  }
 }
 
 // The API refuses diffs over 20k lines; the workflow fetches the merge base into PR_DIR so the same three-dot diff can be built locally.
@@ -761,10 +775,12 @@ function filterDiff(diff) {
 function assessRiskTier(filteredDiff) {
   const totalLines = filteredDiff.totalAdded + filteredDiff.totalRemoved;
   const fileCount = filteredDiff.files.length;
-  const hasSecurityFiles = filteredDiff.files.some(f => isSecuritySensitiveFile(f.newPath));
+  // A rename's source counts too: moving code out of production or CI removes it from there.
+  const paths = filteredDiff.files.flatMap(f => [f.oldPath, f.newPath]);
+  const hasSecurityFiles = paths.some(isSecuritySensitiveFile);
 
   if (fileCount > 50 || hasSecurityFiles) return "full";
-  const narrow = narrowTier(filteredDiff.files.map(f => logicalPath(f.newPath)));
+  const narrow = narrowTier(paths.map(logicalPath));
   if (narrow) return narrow;
   if (totalLines <= 10 && fileCount <= 20) return "trivial";
   if (totalLines <= 100 && fileCount <= 20) return "lite";
@@ -1315,8 +1331,9 @@ function unchangedDiffCheck(prNumber, comment) {
   if (force || !reviewedDiffFingerprint(comment?.body)) return null;
   try {
     const fetched = fetchPrDiff(prNumber);
-    const fingerprint = diffFingerprint(filterDiff(fetched.diff).diff);
-    return { fetched, unchanged: shouldSkipAsUnchangedDiff(comment.body, fingerprint, { pinned: fetched.pinned, force }) };
+    const fingerprint = diffFingerprint(fetched.diff);
+    const unchanged = shouldSkipAsUnchangedDiff(comment.body, fingerprint, { pinned: fetched.pinned, force }) && hunksLocatable(fetched.diff, readBaseFile);
+    return { fetched, unchanged };
   } catch (err) {
     console.warn(`[${isoNow()}] Could not fetch the diff to compare with the last review, so it is reviewed: ${execErrorText(err).slice(0, 300)}`);
     return null;
@@ -1471,7 +1488,8 @@ async function main() {
     const rawFiles = parseDiffFiles(diff);
     const filtered = filterDiff(diff);
     const changedLines = filtered.totalAdded + filtered.totalRemoved;
-    const fingerprint = diffFingerprint(filtered.diff);
+    // The unfiltered diff: a lockfile or asset the filter hides still changes what the verdict covers.
+    const fingerprint = diffFingerprint(diff);
     TRACE.endSpan(filterSpan, {
       "diff.fingerprint": fingerprint,
       "diff.changed_lines": changedLines,
@@ -1734,7 +1752,7 @@ async function main() {
     const complete = reviewComplete(passResults, coordinatorResult);
     if (reviewed && !complete) console.warn(`[${isoNow()}] The review was partial, so the next push re-reviews even an unchanged diff`);
     if (reviewed && !diffPinned) console.warn(`[${isoNow()}] The reviewed diff is not tied to ${headKey}, so the commit stays reviewable`);
-    finalReview = finishReviewBody(sanitizedReview, { key: headKey, passes, maxPasses: REVIEW_MAX_PASSES, reviewed: reviewed && diffPinned, confidence, gateLine: autoApproveLine(autoApprove), diffFingerprint: complete ? fingerprint : "" });
+    finalReview = finishReviewBody(sanitizedReview, { key: headKey, passes, maxPasses: REVIEW_MAX_PASSES, reviewed: reviewed && diffPinned, confidence, gateLine: autoApproveLine(autoApprove), diffFingerprint: complete && diffPinned && hunksLocatable(diff, readBaseFile) ? fingerprint : "" });
     TRACE.setSpanAttributes(rootSpan, { "review.final_length": finalReview.length });
     console.log(`[${isoNow()}] Final review length: ${finalReview.length} chars`);
 

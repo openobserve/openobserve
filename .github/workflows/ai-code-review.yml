@@ -106,6 +106,8 @@ jobs:
           echo "merge_base=$merge_base" >> "$GITHUB_OUTPUT"
           {
             echo "author=$(jq -r '.user.login // ""' <<<"$pr_json")"
+            echo "changed_files=$(jq -r '.changed_files // ""' <<<"$pr_json")"
+            echo "commit_count=$(jq -r '.commits // ""' <<<"$pr_json")"
           } >> "$GITHUB_OUTPUT"
           echo "REVIEW_RUN=true" >> "$GITHUB_ENV"
 
@@ -155,12 +157,15 @@ jobs:
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           PR_AUTHOR: ${{ steps.pr.outputs.author }}
+          # The listings are checked against these, as both endpoints stop at a cap however far they are paged.
+          EXPECTED_FILES: ${{ steps.pr.outputs.changed_files }}
+          EXPECTED_COMMITS: ${{ steps.pr.outputs.commit_count }}
         run: |
           set -uo pipefail
-          list="$RUNNER_TEMP/pr-files.txt"
+          list="$RUNNER_TEMP/pr-files.tsv"
           commits="$RUNNER_TEMP/pr-commits.tsv"
-          # A rename lists its old path too, so code moved under docs/ is not taken for docs.
-          if ! gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --jq '.[] | .filename, (.previous_filename // empty)' > "$list"; then
+          # One line per file with its rename source, so code moved under docs/ is not taken for docs and the count can be checked.
+          if ! gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --jq '.[] | [.filename, (.previous_filename // "")] | @tsv' > "$list"; then
             echo "::warning::Could not list the PR's files; reviewing."
             : > "$list"
           fi

@@ -155,6 +155,6 @@ test("only a review whose every pass finished in time and whose coordinator merg
 test("run-review writes the diff fingerprint only for a complete review", () => {
   const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
   assert.match(source, /const complete = reviewComplete\(passResults, coordinatorResult\);/);
-  assert.match(source, /diffFingerprint: complete \? fingerprint : ""/);
+  assert.match(source, /diffFingerprint: complete && diffPinned && hunksLocatable\(diff, readBaseFile\) \? fingerprint : ""/);
   assert.equal((source.match(/diffFingerprint:/g) || []).length, 1, "every finishReviewBody call goes through the completeness check");
 });

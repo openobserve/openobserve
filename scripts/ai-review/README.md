@@ -46,7 +46,8 @@ so the review costs about M times one pass; reviewer spans carry `review.pass`.
 security-sensitive (`auth`, `token`, `secret`, `crypto`, `password`, `oauth`, `unsafe`, `acme`,
 `cert`), is `full`. Otherwise a PR whose every file is test code (`tests/`, `test/`, `e2e/`,
 `fixtures/`, `*.spec.*`, `*.test.*`, `*_test.rs`; `isTestOnlyPath` in `src/selection.mjs`) is
-`test-only` and runs qa and correctness, whatever its size. A PR whose every file is CI
+`test-only` and runs qa and correctness, whatever its size; a rename counts by both its source and
+its destination, so code moved from `src/` into `tests/` is not test-only. A PR whose every file is CI
 definition (`.github/workflows/**`, `.github/actions/**` or a top-level `.github/*.yml`;
 `isCiOnlyPath`) is `ci-only` and runs security and release. Scripts, including this engine and the
 two opencode configs, are code and take the size tiers below. Everything else is `trivial` (at most 10
@@ -70,7 +71,9 @@ line give way to a 🔴 Low line saying the review did not run. Spans carry the 
 The workflow's `Skip PRs with nothing to review` step runs right after the engine checkout and
 before anything is installed. It lists the PR's files (a rename lists its old path too) and the
 author login, committer login and signature state of each commit, and runs `skip-check.mjs` (`nothingToReviewReason` in
-`src/selection.mjs`). A PR is skipped, with nothing posted and no model called, when its author is
+`src/selection.mjs`). It skips nothing unless both listings match the PR's `changed_files` and
+`commits` counts and stay under the endpoints' caps (3000 files, 250 commits; `listingComplete`),
+since a listing cut short could hide a code file or a human commit. A PR is skipped, with nothing posted and no model called, when its author is
 `dependabot[bot]` or `renovate[bot]` and every commit is authored by that same bot, committed by
 it or by `web-flow` (how GitHub commits a bot's API-made commits) and carries a signature GitHub
 verified, when every file is docs (`*.md` or `docs/**`, but not markdown under `scripts/ai-review/` or
@@ -108,17 +111,21 @@ A run where no reviewer finished also reports `Not reviewed` and fails the check
 
 A stamped review that was complete (every reviewer pass finished without a failure, timeout or
 wrap-up, and the coordinator merged them without falling back; `reviewComplete` in
-`src/passes.mjs`) also records a fingerprint of the filtered diff it read, in a hidden
+`src/passes.mjs`) also records a fingerprint of the unfiltered diff, in a hidden
 `o2-review-diff` tag (`diffFingerprint` in `src/pr-diff.mjs`: a SHA-256 of the diff with blob ids
 and hunk line numbers removed but each hunk's function context kept, so the same lines changed in another function differ, while a rebase or a merge from main that leaves the PR's own changed
-and context lines alone keeps it). When a new head's pinned diff has the same fingerprint, the run
+and context lines alone keeps it). Lockfiles, assets and generated files the reviewers never see are
+in it, so adding one reviews again instead of carrying the old merge confidence over. Equal text proves
+the same change only where it sits once in the base, so both the write and the skip also need every
+hunk's old lines (context and removed lines) to occur exactly once in its base file (`hunksLocatable`);
+an edit to one of two identical blocks, or a base file that cannot be read, reviews. When a new head's pinned diff has the same fingerprint, the run
 skips with `unchanged_diff` before any model call: it uses no pass, keeps the review and its merge
 confidence, and moves the `o2-review-sha` tag and the `Reviewed commit` line to the new head. The
 check runs ahead of the review cap, so such a push is skipped, not refused, after the cap. A manual
 dispatch (`REVIEW_MANUAL_RUN`), `force_full` or `ignore_pass_limit` always reviews, and so does a
 diff that is not pinned to the head. In `approve` mode the skip still dismisses the earlier
-approval, and the kept review's `Auto-approved` line becomes `Needs human review`, because the
-fingerprint ignores lockfiles and other noise the approval gate checks. A partial review records no fingerprint, so the next push
+approval, and the kept review's `Auto-approved` line becomes `Needs human review`, because a
+skip does not rerun the approval gate's checks. A partial review records no fingerprint, so the next push
 reviews again even when its diff is the same.
 
 There is no cap on reviews per PR unless the variable `AI_REVIEW_MAX_PASSES` is a positive integer;

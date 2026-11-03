@@ -37,7 +37,7 @@ import {
 } from "../src/report.mjs";
 import { extractInlineBlock } from "../src/inline.mjs";
 import { LOADER_DIRS, LOADER_FILES } from "../src/sanitize.mjs";
-import { diffFingerprint, reviewerDiff } from "../src/pr-diff.mjs";
+import { diffFingerprint, hunksLocatable, reviewerDiff } from "../src/pr-diff.mjs";
 import { narrowTier } from "../src/selection.mjs";
 import * as approvalModule from "../src/auto-approve.mjs";
 import * as commentsModule from "../src/comments.mjs";
@@ -789,7 +789,7 @@ const silentReviewer = key => ({ ...finishedReviewer(key), parsed: false, rawTex
 const smallRawDiff = "diff --git a/docs/a.md b/docs/a.md\n--- a/docs/a.md\n+++ b/docs/a.md\n@@ -1 +1 @@\n-old\n+new\n";
 
 // Every default makes the run an approvable one, so a test changes the single fact it is about.
-async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], byPass = null, pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, manual = false, head = MAIN_HEAD, coordinatorOutput = cleanCoordinatorOutput, rawDiff = smallRawDiff, keptDiff = null, variantError = "", ignorePassLimit = false, forceFull = false } = {}) {
+async function runMain({ results = [finishedReviewer("security"), finishedReviewer("correctness")], byPass = null, pinned = {}, mode = "approve", existing = null, reviewedBody = "plain words", prNow = {}, paired = {}, contextFails = false, noiseOnly = false, diffFails = false, manual = false, head = MAIN_HEAD, coordinatorOutput = cleanCoordinatorOutput, rawDiff = smallRawDiff, keptDiff = null, variantError = "", ignorePassLimit = false, forceFull = false, baseFile = "old\n" } = {}) {
   const run = { posted: "", approvals: [], logs: [], coordinatorCalls: 0, coordinatorArgs: null, reviewerCalls: [], artifact: null, updates: 0, creates: 0, claims: 0, sanitized: 0 };
   const pr = { ...eligibleInput().pr, title: "fix a bug", body: "plain words", head: { sha: head }, changed_files: 1, additions: 1, deletions: 1, ...prNow };
   const noop = () => {};
@@ -801,7 +801,7 @@ async function runMain({ results = [finishedReviewer("security"), finishedReview
     TRACE: { startSpan: () => ({}), endSpan: noop, setSpanAttributes: noop }, activeRootSpan: null, isoNow: () => "now", prepareReviewTree: noop,
     findExistingReviewComment: () => ({ comment: existing, ok: true }),
     passesDoneIn: comment => (comment ? commentsModule.reviewPassCount(comment.body) : 0),
-    REVIEW_IGNORE_PASS_LIMIT: ignorePassLimit, REVIEW_MANUAL_RUN: manual, diffFingerprint, variantProblem: () => variantError, MODEL_VARIANT: "high", COORDINATOR_VARIANT: "high", REVIEW_MAX_PASSES: 0, REVIEW_BOT_LOGIN: "review[bot]", REVIEW_PAIR_CLEAR: true, AUTO_APPROVE_MODE: mode,
+    REVIEW_IGNORE_PASS_LIMIT: ignorePassLimit, REVIEW_MANUAL_RUN: manual, diffFingerprint, hunksLocatable, readBaseFile: () => baseFile, variantProblem: () => variantError, MODEL_VARIANT: "high", COORDINATOR_VARIANT: "high", REVIEW_MAX_PASSES: 0, REVIEW_BOT_LOGIN: "review[bot]", REVIEW_PAIR_CLEAR: true, AUTO_APPROVE_MODE: mode,
     REVIEW_MARKER: "<!-- ai-code-review -->", PAIRED: { repo: "", prNumber: "", dir: "", mergeBase: "", head: "", ...paired }, PR_DIR: "/pr", resolve: (...parts) => parts.join("/"),
     githubReviewApi: () => ({ readPr: () => pr, listReviews: () => [], dismissReview: noop, approve: payload => run.approvals.push(payload) }),
     noteSkippedPush: noop, apiKey: () => "configured", API_KEY_VAR_NAME: "TEST_KEY", MODEL_SLUG: "test/model",
@@ -1004,6 +1004,27 @@ test("an invalid effort setting retracts the old verdict and approval line witho
     assert.equal(commentsModule.reviewPassCount(run.posted), 1);
     assert.equal(commentsModule.reviewedKey(run.posted), MAIN_HEAD);
   }
+});
+
+test("an unchanged diff whose hunk text appears twice in the base is reviewed, as the edit cannot be located", async () => {
+  const first = await runMain({ mode: "off" });
+  const twice = await runMain({ mode: "off", existing: { id: 1, body: first.posted }, head: PAIRED_MAIN_HEAD, baseFile: "old\nx\nold\n" });
+  assert.equal(twice.logs.some(line => line.includes("unchanged_diff")), false);
+  assert.equal(twice.claims, 1);
+  assert.equal(commentsModule.reviewedDiffFingerprint(twice.posted), "", "a review whose edit cannot be located records no fingerprint");
+  const unreadable = await runMain({ mode: "off", existing: { id: 1, body: first.posted }, head: PAIRED_MAIN_HEAD, baseFile: null });
+  assert.equal(unreadable.claims, 1);
+  assert.ok((await runMain({ mode: "off", existing: { id: 1, body: first.posted }, head: PAIRED_MAIN_HEAD })).logs.some(line => line.includes("unchanged_diff")));
+});
+
+test("a push that only adds a production asset the noise filter hides is reviewed, not skipped with the old High", async () => {
+  const first = await runMain({ mode: "off" });
+  assert.match(first.posted, /Merge confidence: 🟢 High/);
+  const svg = "diff --git a/web/src/assets/chart.svg b/web/src/assets/chart.svg\nnew file mode 100644\n--- /dev/null\n+++ b/web/src/assets/chart.svg\n@@ -0,0 +1 @@\n+<svg/>\n";
+  const next = await runMain({ mode: "off", existing: { id: 1, body: first.posted }, head: PAIRED_MAIN_HEAD, rawDiff: `${smallRawDiff}${svg}`, keptDiff: smallRawDiff });
+  assert.equal(next.logs.some(line => line.includes("unchanged_diff")), false);
+  assert.equal(next.claims, 1);
+  assert.doesNotMatch(next.posted, /Merge confidence: 🟢 High/);
 });
 
 test("a dangling second block cannot read as a clean count, so the gate refuses", () => {
@@ -1448,4 +1469,13 @@ test("test-only and CI-only PRs of any size get their narrow reviewer set, unles
   assert.equal(assessRiskTier(diff(Array.from({ length: 51 }, (_, i) => `tests/api-testing/test_${i}.py`))), "full");
   assert.equal(assessRiskTier(diff(["src/service/search.rs"], 5)), "trivial");
   assert.equal(assessRiskTier(diff(["src/service/search.rs"], 50)), "lite");
+});
+
+test("a narrow tier needs both a rename's source and its destination to qualify", () => {
+  const { assessRiskTier } = riskTierFns();
+  const moved = (oldPath, newPath) => ({ files: [{ oldPath, newPath }], totalAdded: 120, totalRemoved: 120 });
+  assert.equal(assessRiskTier(moved("src/service/search.rs", "tests/search.rs")), "full", "moving production code into tests removes it from production");
+  assert.equal(assessRiskTier(moved("scripts/deploy.sh", ".github/workflows/deploy.yml")), "full");
+  assert.equal(assessRiskTier(moved("src/handler/http/auth/login.rs", "src/service/login.rs")), "full", "a security-looking source still escalates");
+  assert.equal(assessRiskTier(moved("tests/a_test.py", "tests/b_test.py")), "test-only");
 });

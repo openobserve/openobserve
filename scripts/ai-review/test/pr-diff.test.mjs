@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { parseRawDiff, sizeReasons } from "../src/auto-approve.mjs";
-import { diffFingerprint, fetchDiff, fetchPinnedDiff, localDiff, pinDiff, prefixDiffPaths } from "../src/pr-diff.mjs";
+import { diffFingerprint, fetchDiff, fetchPinnedDiff, hunksLocatable, localDiff, pinDiff, prefixDiffPaths } from "../src/pr-diff.mjs";
 
 const DIFF = [
   "diff --git a/src/lib.rs b/src/lib.rs",
@@ -258,6 +258,42 @@ test("the same lines changed inside a different function get a different fingerp
     assert.match(safe, /^@@ .* @@ function preview\(user\) \{$/m);
     assert.match(unsafe, /^@@ .* @@ function authorize\(user\) \{$/m);
     assert.notEqual(diffFingerprint(unsafe), diffFingerprint(safe));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an edit to one of two identical blocks in a function cannot be located, so it is never taken for the reviewed one", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ai-review-fingerprint-"));
+  const git = (...args) => execFileSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], { encoding: "utf-8" });
+  const block = (flag, allowed) => [`  if (${flag}) {`, "    const a = 1;", "    const b = 2;", "    const c = 3;", `    ok = ${allowed};`, "    const d = 4;", "    const e = 5;", "    const f = 6;", "  }"];
+  const source = (first, second) => ["function check(user, internal) {", "  let ok = false;", ...block("internal", first), ...block("!internal", second), "  return ok;", "}", ""].join("\n");
+  const readBase = ref => path => { try { return execFileSync("git", ["-C", dir, "cat-file", "blob", `${ref}:${path}`], { encoding: "utf-8" }); } catch { return null; } };
+  try {
+    git("init", "-q", "-b", "main");
+    writeFileSync(join(dir, "check.js"), source("user.admin", "user.admin"));
+    git("add", ".");
+    git("commit", "-qm", "base");
+    git("checkout", "-qb", "internal");
+    writeFileSync(join(dir, "check.js"), source("true", "user.admin"));
+    git("commit", "-qam", "internal");
+    git("checkout", "-qb", "external", "main");
+    writeFileSync(join(dir, "check.js"), source("user.admin", "true"));
+    git("commit", "-qam", "external");
+    const internal = localDiff(dir, "main", "internal");
+    const external = localDiff(dir, "main", "external");
+    assert.notEqual(internal, external);
+    assert.equal(hunksLocatable(external, readBase("main")), false, "the edited block's old text sits twice in the base");
+    assert.equal(hunksLocatable(internal, readBase("main")), false);
+    writeFileSync(join(dir, "other.js"), "a\nb\nc\nd\ne\nf\ng\n");
+    git("add", "other.js");
+    git("commit", "-qm", "unique");
+    writeFileSync(join(dir, "other.js"), "a\nb\nc\nD\ne\nf\ng\n");
+    git("commit", "-qam", "edit unique");
+    const unique = localDiff(dir, "HEAD~1", "HEAD");
+    assert.equal(hunksLocatable(unique, readBase("HEAD~1")), true);
+    assert.equal(hunksLocatable(unique, () => null), false, "an unreadable base file cannot locate the edit");
+    assert.equal(hunksLocatable("diff --git a/n b/n\nnew file mode 100644\n--- /dev/null\n+++ b/n\n@@ -0,0 +1 @@\n+x\n", () => null), true, "a new file has nothing to locate");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

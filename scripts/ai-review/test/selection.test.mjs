@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { isCiOnlyPath, isDocsPath, isReleaseFile, isTestOnlyPath, narrowTier, nothingToReviewReason, resolveRulesFiles } from "../src/selection.mjs";
+import { isCiOnlyPath, isDocsPath, isReleaseFile, isTestOnlyPath, listingComplete, narrowTier, nothingToReviewReason, resolveRulesFiles } from "../src/selection.mjs";
 import { isSensitivePath } from "../src/auto-approve.mjs";
 import { LOADER_DIRS, LOADER_FILES } from "../src/sanitize.mjs";
 
@@ -102,6 +102,7 @@ test("skip-check.mjs prints the reason the workflow step reads, and nothing when
     const commits = join(dir, "commits.txt");
     const run = (files, env = {}, authors = null) => {
       writeFileSync(list, files.join("\n"));
+      env = { EXPECTED_FILES: String(files.length), EXPECTED_COMMITS: String(authors?.length ?? 0), ...env };
       // The workflow's jq output: one login per line, newline-terminated.
       if (authors) writeFileSync(commits, authors.map(a => `${a}\n`).join(""));
       const args = authors ? [list, commits] : [list];
@@ -120,6 +121,36 @@ test("skip-check.mjs prints the reason the workflow step reads, and nothing when
     assert.equal(run(["src/a.rs"], { PR_AUTHOR: "renovate[bot]" }), "", "no commit file reviews");
     assert.equal(run(["src/a.rs", "docs/a.md"], { PR_AUTHOR: "alice" }), "");
     assert.equal(run([], { PR_AUTHOR: "alice" }), "");
+    assert.equal(run(["docs/new.md\tdocs/old.md"], { PR_AUTHOR: "alice" }), "docs_only", "a rename is one listed file");
+    assert.equal(run(["docs/new.md\tsrc/old.rs"], { PR_AUTHOR: "alice" }), "", "a rename source outside docs reviews");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a file or commit listing that may be cut short never skips a review", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ai-review-skip-"));
+  try {
+    const list = join(dir, "files.tsv");
+    const commits = join(dir, "commits.tsv");
+    const run = (fileCount, commitCount, env) => {
+      writeFileSync(list, Array.from({ length: fileCount }, (_, i) => `docs/a${i}.md`).join("\n"));
+      writeFileSync(commits, Array.from({ length: commitCount }, () => "renovate[bot]\tweb-flow\ttrue\n").join(""));
+      const out = spawnSync(process.execPath, [new URL("../skip-check.mjs", import.meta.url).pathname, list, commits], { encoding: "utf-8", env: { PATH: process.env.PATH, PR_AUTHOR: "alice", ...env } });
+      assert.equal(out.status, 0, out.stderr);
+      return out.stdout;
+    };
+    assert.equal(run(2, 1, { EXPECTED_FILES: "2", EXPECTED_COMMITS: "1" }), "docs_only");
+    assert.equal(run(3000, 1, { EXPECTED_FILES: "3000", EXPECTED_COMMITS: "1" }), "", "the files endpoint stops at 3000");
+    assert.equal(run(3000, 1, { EXPECTED_FILES: "3200", EXPECTED_COMMITS: "1" }), "");
+    assert.equal(run(2, 1, { EXPECTED_FILES: "3", EXPECTED_COMMITS: "1" }), "", "a listing shorter than the PR's own count");
+    assert.equal(run(2, 1, { EXPECTED_FILES: "2", EXPECTED_COMMITS: "2" }), "");
+    assert.equal(run(2, 250, { EXPECTED_FILES: "2", EXPECTED_COMMITS: "250" }), "", "the commits endpoint stops at 250");
+    assert.equal(run(2, 1, {}), "", "unknown PR counts review");
+    assert.equal(run(2, 1, { EXPECTED_FILES: "two", EXPECTED_COMMITS: "1" }), "");
+    assert.equal(listingComplete({ files: 2, commits: 1, expectedFiles: "2", expectedCommits: "1" }), true);
+    assert.equal(listingComplete({ files: 2999, commits: 249, expectedFiles: "2999", expectedCommits: "249" }), true);
+    assert.equal(listingComplete({ files: 250, commits: 250, expectedFiles: "250", expectedCommits: "250" }), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -139,6 +170,11 @@ test("the workflow never waits, skips nothing-to-review PRs before installing an
   assert.match(step, /pulls\/\$PR_NUMBER\/commits/);
   assert.match(step, /\.committer\.login \/\/ ""/);
   assert.match(step, /\.commit\.verification\.verified \/\/ ""/);
+  assert.match(step, /EXPECTED_FILES: \$\{\{ steps\.pr\.outputs\.changed_files \}\}/);
+  assert.match(step, /EXPECTED_COMMITS: \$\{\{ steps\.pr\.outputs\.commit_count \}\}/);
+  assert.match(step, /\[\.filename, \(\.previous_filename \/\/ ""\)\] \| @tsv/, "one line per listed file, so the count can be checked");
+  assert.match(workflow, /echo "changed_files=\$\(jq -r '\.changed_files \/\/ ""'/);
+  assert.match(workflow, /echo "commit_count=\$\(jq -r '\.commits \/\/ ""'/);
   assert.doesNotMatch(step, /set -[a-z]*e/, "set -e would end the step on a failed listing instead of reviewing");
   assert.match(step, /REVIEW_RUN=false/);
   assert.match(workflow, /REVIEW_MANUAL_RUN: \$\{\{ github\.event_name == 'workflow_dispatch' \}\}/);
