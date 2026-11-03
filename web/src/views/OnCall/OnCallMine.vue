@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   narrowed rather than rendering a second copy of it.
 -->
 <template>
-  <!-- Reached from the On-Call menu only. -->
+  <!-- Reached from the On-Call menu and from a channel chip. -->
   <OPageLayout
     bleed
     data-test="oncall-mine-page"
