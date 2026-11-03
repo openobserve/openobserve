@@ -70,12 +70,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-busy="loading"
       data-test="oncall-simulator-result"
     >
-      <span class="flex min-w-0 items-baseline gap-1 text-sm" data-test="oncall-simulator-answer">
-        <span class="text-text-heading shrink-0 font-semibold" data-test="oncall-simulator-team">
+      <!-- Wraps rather than cuts: the names are the answer, and a tooltip would hide the one being asked for. -->
+      <p class="text-sm" data-test="oncall-simulator-answer">
+        <span class="text-text-heading font-semibold" data-test="oncall-simulator-team">
           {{ t("oncall.simulatorAnswerTeam", { team: teamLabel }) }}
         </span>
-        <OTruncatedText v-if="preview.team_id" class="text-text-body flex-1">
-          <span>{{ raw("· ") }}</span>
+        <span v-if="preview.team_id" class="text-text-body">
+          <span>{{ raw(" · ") }}</span>
           <i18n-t
             v-if="wakes"
             keypath="oncall.simulatorWakesNow"
@@ -85,10 +86,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="oncall-simulator-responder"
           >
             <template #who>
-              <OnCallPersonName
-                :email="wakes.email"
-                data-test="oncall-simulator-responder-person"
-              />
+              <template v-for="(email, index) in wakes.emails" :key="email">
+                <span v-if="index">{{ raw(", ") }}</span>
+                <OnCallPersonName :email="email" data-test="oncall-simulator-responder-person" />
+              </template>
             </template>
             <template #channels>{{ wakes.channels }}</template>
           </i18n-t>
@@ -112,8 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #after>{{ nextStep.after }}</template>
             </i18n-t>
           </template>
-        </OTruncatedText>
-      </span>
+        </span>
+      </p>
 
       <OCollapsible :label="t('oncall.simulatorWhy')" data-test="oncall-simulator-why">
         <div class="flex flex-col gap-1 pt-1">
@@ -194,7 +195,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -428,31 +428,6 @@ const sentChannels = computed<Channel[]>(() => {
   return person.deliverable_channels.filter((channel) => entry.channels.includes(channel));
 });
 
-/// The person and channels when a page would land, so the name renders with its email tooltip.
-const wakes = computed<{ email: string; channels: string } | null>(() => {
-  if (ladderEntry.value && !ladderEntry.value.pages_anyone) return null;
-  const person = responder.value;
-  if (!person?.would_a_page_land || !sentChannels.value.length) return null;
-  const channels = sentChannels.value
-    .map((channel) => String(t(`oncall.channel_${channel}`)))
-    .join(", ");
-  return { email: person.user_email, channels };
-});
-
-const responderNote = computed<I18nText>(() => {
-  if (ladderEntry.value && !ladderEntry.value.pages_anyone) return t("oncall.reachPagesNobody");
-  const person = responder.value;
-  if (!person) return t("oncall.simulatorNobodyOnCall");
-  if (!person.would_a_page_land) return raw(person.why_not) || t("oncall.contactNoChannel");
-  return t("oncall.simulatorSendsNothing");
-});
-
-const responderTone = computed(() => {
-  if (ladderEntry.value && !ladderEntry.value.pages_anyone) return "text-text-secondary";
-  if (!responder.value?.would_a_page_land) return "text-status-error-text";
-  return sentChannels.value.length ? "text-text-body" : "text-status-warning-text";
-});
-
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 
 const escalation = useQuery(() =>
@@ -466,13 +441,83 @@ const escalation = useQuery(() =>
   ),
 );
 
-/// The next step that wakes somebody new; hidden when the reader may not see the ladder.
+/// The ladder's first step, which pages every target on it at once; null until the ladder has loaded.
+const firstStep = computed<PreviewRung | null>(() => {
+  if (escalation.isError.value) return null;
+  const rungs = [...(escalation.data.value?.rungs ?? [])].sort(
+    (a, b) => a.after_micros - b.after_micros,
+  );
+  return rungs[0] ?? null;
+});
+
+/// Everybody the first step reaches and what they are sent, so the names render with their email tooltips.
+const wakes = computed<{ emails: string[]; channels: string } | null>(() => {
+  if (ladderEntry.value && !ladderEntry.value.pages_anyone) return null;
+  const step = firstStep.value;
+  if (!step) return wakesFromResponder();
+  const landing = step.recipients.filter((one) => one.would_a_page_land);
+  const ladderChannels = escalation.data.value?.channels ?? ladderEntry.value?.channels ?? [];
+  const sent = ladderChannels.filter((channel) =>
+    landing.some((one) => one.deliverable_channels.includes(channel)),
+  );
+  if (!landing.length || !sent.length) return null;
+  return {
+    emails: [...new Set(landing.map((one) => one.user_email))],
+    channels: sent.map((channel) => String(t(`oncall.channel_${channel}`))).join(", "),
+  };
+});
+
+/// Before the ladder loads, or when the reader may not see it, the engine's current responder is all there is.
+function wakesFromResponder(): { emails: string[]; channels: string } | null {
+  const person = responder.value;
+  if (!person?.would_a_page_land || !sentChannels.value.length) return null;
+  const channels = sentChannels.value
+    .map((channel) => String(t(`oncall.channel_${channel}`)))
+    .join(", ");
+  return { emails: [person.user_email], channels };
+}
+
+const responderNote = computed<I18nText>(() => {
+  if (ladderEntry.value && !ladderEntry.value.pages_anyone) return t("oncall.reachPagesNobody");
+  const step = firstStep.value;
+  if (step) {
+    if (!step.recipients.length) return t("oncall.simulatorNobodyOnCall");
+    const blocked = step.recipients.find((one) => !one.would_a_page_land);
+    if (!step.recipients.some((one) => one.would_a_page_land)) {
+      return raw(blocked?.why_not) || t("oncall.contactNoChannel");
+    }
+    return t("oncall.simulatorSendsNothing");
+  }
+  const person = responder.value;
+  if (!person) return t("oncall.simulatorNobodyOnCall");
+  if (!person.would_a_page_land) return raw(person.why_not) || t("oncall.contactNoChannel");
+  return t("oncall.simulatorSendsNothing");
+});
+
+const responderTone = computed(() => {
+  if (ladderEntry.value && !ladderEntry.value.pages_anyone) return "text-text-secondary";
+  if (firstStep.value) {
+    if (wakes.value) return "text-text-body";
+    return firstStep.value.recipients.some((one) => one.would_a_page_land)
+      ? "text-status-warning-text"
+      : "text-status-error-text";
+  }
+  if (!responder.value?.would_a_page_land) return "text-status-error-text";
+  return sentChannels.value.length ? "text-text-body" : "text-status-warning-text";
+});
+
+/// The next step that wakes somebody the first step did not; hidden when the reader may not see the ladder.
 const nextStep = computed<{ emails: string[]; after: string } | null>(() => {
   if (escalation.isError.value) return null;
-  const woken = responder.value?.user_email.toLowerCase();
+  const rungs = [...(escalation.data.value?.rungs ?? [])].sort(
+    (a, b) => a.after_micros - b.after_micros,
+  );
+  const first = rungs[0];
+  if (!first) return null;
+  const woken = new Set(first.recipients.map((one) => one.user_email.toLowerCase()));
   const fresh = (rung: PreviewRung) =>
-    rung.recipients.map((one) => one.user_email).filter((email) => email.toLowerCase() !== woken);
-  const step = (escalation.data.value?.rungs ?? []).slice(1).find((rung) => fresh(rung).length);
+    rung.recipients.map((one) => one.user_email).filter((email) => !woken.has(email.toLowerCase()));
+  const step = rungs.slice(1).find((rung) => fresh(rung).length);
   if (!step) return null;
   return {
     emails: [...new Set(fresh(step))],

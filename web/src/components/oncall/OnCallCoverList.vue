@@ -46,13 +46,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-cover-table"
     >
       <template #cell-who="{ row }">
-        <OUserCell :value="row.user_email" />
+        <OnCallPersonName truncate :email="row.user_email" />
       </template>
 
       <!-- Optional on the wire, and legitimately so: "cover tonight" is a real
            request before anybody has worked out whose night it is. -->
       <template #cell-coveringFor="{ row }">
-        <OUserCell v-if="row.covering_for" :value="row.covering_for" />
+        <OnCallPersonName v-if="row.covering_for" truncate :email="row.covering_for" />
         <OText v-else variant="meta">{{ t("oncall.coverForNobodyNamed") }}</OText>
       </template>
 
@@ -104,11 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OText v-if="shownRemove">
       <i18n-t keypath="oncall.coverRemoveBody" tag="span">
         <template #who>
-          <span
+          <OnCallPersonName
+            :email="shownRemove.user_email"
             data-test="oncall-cover-remove-name"
-            class="text-text-heading font-semibold break-all"
-            >{{ shownRemove.user_email }}</span
-          >
+            class="text-text-heading font-semibold"
+          />
         </template>
         <template #range>{{ windowOf(shownRemove) }}</template>
       </i18n-t>
@@ -125,7 +125,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OnCallPersonName from "./OnCallPersonName.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";

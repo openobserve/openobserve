@@ -55,7 +55,9 @@
           <template #label>
             <span class="flex min-w-0 flex-col gap-0.5">
               <OText variant="body-strong">{{ raw(preset.name) }}</OText>
-              <OText variant="meta">{{ raw(preset.description) }}</OText>
+              <OTruncatedText class="text-text-secondary text-xs">{{
+                raw(preset.description)
+              }}</OTruncatedText>
             </span>
           </template>
         </ORadio>
@@ -349,6 +351,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -422,8 +426,10 @@ const overridden = ref<Record<string, boolean>>({});
 /// Kept as plain wire values so `apply` is a spread, not a translation.
 const model = ref<Record<string, unknown>>({});
 
+const { optionOf } = useOrgUserNames();
+
 const memberOptions = computed<SelectOption[]>(() =>
-  props.members.map((m) => ({ label: raw(m.user_email), value: m.user_email })),
+  props.members.map((m) => optionOf(m.user_email, true)),
 );
 
 // ── The catalogue ─────────────────────────────────────────────────────────────

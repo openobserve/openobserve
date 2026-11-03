@@ -124,7 +124,7 @@ const stubs = {
     name: "OSelect",
     props: ["modelValue", "options", "multiple"],
     template: `<select multiple @change="$emit('update:modelValue', pick($event))">
-      <option v-for="o in options" :key="String(o.value)" :value="o.value" :disabled="o.disabled">{{ o.label }}</option>
+      <option v-for="o in options" :key="String(o.value)" :value="o.value" :disabled="o.disabled">{{ o.label }}{{ o.subLabel ? " – " + o.subLabel : "" }}{{ o.badge ? " · " + o.badge : "" }}</option>
     </select>`,
     methods: {
       pick(e: any) {
@@ -239,7 +239,8 @@ describe("OnCallMembers", () => {
     const picker = wrapper.find('[data-test="oncall-members-user-select"]');
     expect(picker.exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-members-email-input"]').exists()).toBe(false);
-    expect(picker.text()).toContain("Ana Sharma (ana@o2.ai)");
+    // Name to read, email to tell namesakes apart — one row, not "Name (email)" in one string.
+    expect(picker.text()).toContain("Ana Sharma – ana@o2.ai");
   });
 
   // A name is what a person recognises; the email disambiguates. A user with
@@ -286,6 +287,25 @@ describe("OnCallMembers", () => {
     expect(options.find((o) => o.element.value === "bob@o2.ai")!.attributes("disabled")).toBe(
       undefined,
     );
+  });
+
+  // Against the real OSelect: the picked people are listed once, below the field, not again as chips inside it.
+  it("lists picked people once, below the picker, by name with their email", async () => {
+    const wrapper = mount(OnCallMembers, {
+      props: { teamId: "team_1", teamName: "Platform", members: [], canConfigure: true },
+      global: { plugins: [i18n, store], stubs: { ...stubs, OSelect: false } },
+    });
+    await flushPromises();
+    await openAdd(wrapper);
+    wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", ["ana@o2.ai"]);
+    await flushPromises();
+
+    const field = wrapper.find('[data-test="oncall-members-user-select"]');
+    expect(field.text()).not.toContain("Ana Sharma");
+    expect(field.text()).toContain("Select a team member to add");
+    const staged = wrapper.find('[data-test="oncall-members-add-staged-ana@o2.ai"]');
+    expect(staged.text()).toContain("Ana Sharma");
+    expect(staged.text()).toContain("ana@o2.ai");
   });
 
   it("names the button without a count until somebody is picked", async () => {

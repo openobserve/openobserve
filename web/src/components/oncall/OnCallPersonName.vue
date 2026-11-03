@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- A person by display name inside a sentence; the email rides in the tooltip because two people can share a name. -->
 <template>
-  <span :data-test="dataTest">
-    <OTooltip side="bottom" :content="tooltip" />
+  <span :data-test="dataTest" :class="truncate ? 'block min-w-0 truncate' : ''">
+    <OTooltip side="bottom" :content="tooltipOf(email)" />
     <span>{{ name }}</span>
   </span>
 </template>
@@ -28,20 +28,14 @@ import { computed } from "vue";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { I18nText } from "@/types/i18n";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw } from "@/types/i18n";
 
-const props = withDefaults(defineProps<{ email: string; dataTest?: string }>(), {
-  dataTest: "oncall-person-name",
-});
+const props = withDefaults(
+  defineProps<{ email: string; dataTest?: string; truncate?: boolean }>(),
+  { dataTest: "oncall-person-name", truncate: false },
+);
 
-const { t } = useI18nTyped();
-const { nameOf } = useOrgUserNames();
+const { nameOf, tooltipOf } = useOrgUserNames();
 
 const name = computed<I18nText>(() => raw(nameOf(props.email)));
-
-const tooltip = computed<I18nText>(() =>
-  String(name.value) === props.email
-    ? raw(props.email)
-    : t("oncall.personNameWithEmail", { name: name.value, email: raw(props.email) }),
-);
 </script>

@@ -61,13 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="clash.id"
         class="text-status-warning-text text-xs"
       >
-        {{
-          t("oncall.rotationMemberAway", {
-            who: raw(clash.user_email),
-            from: raw(shortDate(clash.start_at)),
-            to: raw(shortDate(clash.end_at)),
-          })
-        }}
+        <i18n-t keypath="oncall.rotationMemberAway" tag="span" scope="global">
+          <template #who><OnCallPersonName :email="clash.user_email" /></template>
+          <template #from>{{ raw(shortDate(clash.start_at)) }}</template>
+          <template #to>{{ raw(shortDate(clash.end_at)) }}</template>
+        </i18n-t>
       </p>
     </div>
 
@@ -245,6 +243,7 @@ import {
   formatMinuteOfDay,
 } from "@/utils/oncall";
 import OnCallRulePeople from "./OnCallRulePeople.vue";
+import OnCallPersonName from "./OnCallPersonName.vue";
 
 const props = defineProps<{
   rule: ShiftRule;

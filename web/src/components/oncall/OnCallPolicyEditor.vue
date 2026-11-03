@@ -120,7 +120,7 @@
                 inline-actions
                 data-test="oncall-policy-sentence"
               >
-                {{ ladderSentence }}
+                <OTruncatedText class="min-w-0">{{ ladderSentence }}</OTruncatedText>
               </OBanner>
 
               <div class="flex flex-col gap-2">
@@ -409,8 +409,6 @@
 
           <OTabPanel name="delivery" data-test="oncall-policy-delivery">
             <div class="flex flex-col gap-3 px-4 pt-3 pb-4">
-              <OText variant="meta">{{ t("oncall.policyDeliveryHint") }}</OText>
-
               <!-- Channels apply to everyone paged at this priority; the primary
                      and the secondary are not treated differently. -->
               <div v-if="current" class="flex flex-col gap-2">
@@ -430,11 +428,7 @@
                 </div>
                 <div class="flex flex-col items-start gap-2 ps-34 max-md:ps-0">
                   <OText variant="meta" data-test="oncall-policy-channels-hint">
-                    {{
-                      t("oncall.policyChannelsHint", {
-                        priority: raw(priorityLabel(current.priority)),
-                      })
-                    }}
+                    {{ t("oncall.policyChannelsHintShort") }}
                   </OText>
                   <OText v-if="emailLocked" variant="meta" data-test="oncall-policy-email-locked">
                     {{ t("oncall.policyEmailLockedBySlack") }}
@@ -487,7 +481,7 @@
                 >
                   {{ t("oncall.policyReachesNobody") }}
                 </OTag>
-                <OText v-else variant="meta">{{ t("oncall.policyDestinationsHint") }}</OText>
+                <OText v-else variant="meta">{{ t("oncall.policyDestinationsHintShort") }}</OText>
               </div>
 
               <!-- C15/C16: WHERE the team is talked to, beside the policy list it
@@ -495,9 +489,18 @@
                      channel and pages still go to the old room" has to be answerable
                      here, not by paging somebody to find out. -->
               <div class="flex flex-wrap items-center gap-2" data-test="oncall-team-channel">
-                <OText variant="label" class="w-32 shrink-0">
-                  {{ t("oncall.teamChannelTitle") }}
-                </OText>
+                <span class="flex w-32 shrink-0 items-center gap-1">
+                  <OText variant="label">{{ t("oncall.teamChannelTitle") }}</OText>
+                  <!-- One post per firing, not a live room: the HTTP transport cannot edit what it already sent. -->
+                  <OIcon
+                    name="info-outline"
+                    size="sm"
+                    class="text-text-secondary cursor-help"
+                    data-test="oncall-team-channel-info"
+                  >
+                    <OTooltip side="right" :content="t('oncall.teamChannelHint')" />
+                  </OIcon>
+                </span>
                 <span class="w-72">
                   <OSelect
                     v-model="teamChannelDraft"
@@ -532,10 +535,6 @@
                 >
                   {{ t("oncall.teamChannelUsePolicy") }}
                 </OButton>
-                <!-- One post per firing, not a live room: the only transport is an
-                       HTTP destination, which cannot edit what it already sent. Said
-                       here so nobody designs an expectation the engine cannot meet. -->
-                <OText variant="meta">{{ t("oncall.teamChannelHint") }}</OText>
                 <!-- Only the team's own empty list is a choice; an empty list inherited from the policy is the policy's. -->
                 <span
                   v-if="channelFromTeam && !teamChannelDraft.length"
@@ -618,6 +617,7 @@ import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";

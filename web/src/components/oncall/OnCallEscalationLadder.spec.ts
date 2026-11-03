@@ -728,6 +728,30 @@ describe("OnCallEscalationLadder", () => {
     expect(wrapper.emitted("edit")).toHaveLength(1);
   });
 
+  // The card body is a pointer shortcut to Edit, so it says so on hover and only for a reader who may edit.
+  it("opens Edit from anywhere on the ladder for a reader who may change it", async () => {
+    const editor = render({ canConfigure: true });
+    const body = editor.find('[data-test="oncall-ladder-body"]');
+    expect(body.classes()).toContain("cursor-pointer");
+    await body.trigger("click");
+    expect(editor.emitted("edit")).toHaveLength(1);
+
+    const reader = render();
+    const readOnly = reader.find('[data-test="oncall-ladder-body"]');
+    expect(readOnly.classes()).not.toContain("cursor-pointer");
+    await readOnly.trigger("click");
+    expect(reader.emitted("edit")).toBeUndefined();
+  });
+
+  // Two people can share a name, so each name on a rung carries its email in a tooltip.
+  it("names people on a rung with their email one hover away", () => {
+    const wrapper = render();
+    const names = wrapper.findAllComponents({ name: "OnCallPersonName" });
+    expect(names.length).toBeGreaterThan(0);
+    expect(names[0].props("email")).toBe("ana@o2.ai");
+    expect(names[0].findComponent({ name: "OTooltip" }).props("content")).toBe("ana@o2.ai");
+  });
+
   it("offers no Add a step to a reader who cannot change the policy", () => {
     const wrapper = render({ preview: preview({ reaches_nobody: true }) });
 

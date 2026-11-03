@@ -33,16 +33,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <span class="text-text-secondary text-xs">{{ t("oncall.onCallNow") }}</span>
       <template v-if="current.primary">
-        <span data-test="oncall-coverage-now-primary">{{
-          t("oncall.coveragePrimaryOnly", { primary: raw(current.primary) })
-        }}</span>
-        <span
+        <i18n-t
+          keypath="oncall.coveragePrimaryOnly"
+          tag="span"
+          scope="global"
+          data-test="oncall-coverage-now-primary"
+        >
+          <template #primary>
+            <OnCallPersonName
+              :email="current.primary"
+              data-test="oncall-coverage-now-primary-person"
+            />
+          </template>
+        </i18n-t>
+        <i18n-t
           v-if="current.secondary"
+          keypath="oncall.coverageSecondaryOnly"
+          tag="span"
+          scope="global"
           class="text-text-secondary"
           data-test="oncall-coverage-now-secondary"
         >
-          {{ t("oncall.coverageSecondaryOnly", { secondary: raw(current.secondary) }) }}
-        </span>
+          <template #secondary>
+            <OnCallPersonName
+              :email="current.secondary"
+              data-test="oncall-coverage-now-secondary-person"
+            />
+          </template>
+        </i18n-t>
       </template>
       <span v-else class="text-status-error-text" data-test="oncall-coverage-now-nobody">
         {{ t("oncall.coverNobody") }}
@@ -123,6 +141,8 @@ import type {
   ScheduleTrack,
 } from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import type { Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
@@ -146,6 +166,7 @@ const props = withDefaults(
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
+const { tooltipOf } = useOrgUserNames();
 
 /** One sample per hour: fine enough to catch an hour-long hole. */
 const STEP_MICROS = 60 * 60 * 1_000_000;
@@ -338,9 +359,9 @@ function tooltipFor(bandKey: string): TooltipSegment[] {
           `${rangeStamp(Math.max(segment.from, run.from))} – ${rangeStamp(Math.min(segment.to, run.to))}`,
         )
       : null,
-    primary: t("oncall.coveragePrimaryOnly", { primary: raw(segment.primary ?? "") }),
+    primary: t("oncall.coveragePrimaryOnly", { primary: tooltipOf(segment.primary ?? "") }),
     secondary: segment.secondary
-      ? t("oncall.coverageSecondaryOnly", { secondary: raw(segment.secondary) })
+      ? t("oncall.coverageSecondaryOnly", { secondary: tooltipOf(segment.secondary) })
       : null,
   }));
 

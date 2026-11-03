@@ -22,6 +22,7 @@ import i18n from "@/locales";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import oncallService from "@/services/oncall";
 import { userKeys } from "@/services/users.querykeys";
+import { orgUsersQuery } from "@/services/users.queries";
 import store from "@/test/unit/helpers/store";
 import OnCallTeams from "@/views/OnCall/OnCallTeams.vue";
 import {
@@ -73,7 +74,16 @@ const stubs = {
   // draws rather than a column-def function OTable never calls.
   OTable: {
     name: "OTable",
-    props: ["data", "columns", "error", "currentPage", "pageSize", "sortBy", "sortOrder"],
+    props: [
+      "data",
+      "columns",
+      "error",
+      "currentPage",
+      "pageSize",
+      "sortBy",
+      "sortOrder",
+      "persistColumns",
+    ],
     emits: ["update:currentPage", "update:pageSize", "update:sortBy", "update:sortOrder"],
     template: `<div>
       <slot name='toolbar' />
@@ -110,7 +120,7 @@ const stubs = {
   ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
   ODropdownItem: {
     name: "ODropdownItem",
-    props: ["iconLeft", "variant", "disabled", "description"],
+    props: ["iconLeft", "variant", "disabled", "description", "focusableUnavailable"],
     emits: ["select"],
     template: `<button :data-icon="iconLeft" @click="$emit('select')"><slot /></button>`,
   },
@@ -198,6 +208,31 @@ describe("OnCallTeams", () => {
     });
   });
 
+  // A create action reads as a button with its icon, like every other On-Call header action.
+  it("gives New team its add icon", async () => {
+    service.listTeams.mockResolvedValue({ data: [] } as any);
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-teams-add-btn"]').attributes("icon-left")).toBe("add");
+  });
+
+  // Search, columns and refresh have nothing to act on until a team exists.
+  it("shows no search or refresh while the org has no teams", async () => {
+    service.listTeams.mockResolvedValue({ data: [] } as any);
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-teams-search"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OTable" }).props("persistColumns")).toBe(false);
+  });
+
+  it("keeps search once there is a team to find", async () => {
+    service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-teams-search"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "OTable" }).props("persistColumns")).toBe(true);
+  });
+
   it("shows who is on call for each team", async () => {
     service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
     service.whoIsOnCall.mockResolvedValue({
@@ -207,9 +242,31 @@ describe("OnCallTeams", () => {
     const wrapper = render();
     await flushPromises();
 
-    expect(onCallCell(wrapper).findComponent({ name: "OUserCell" }).props("value")).toBe(
+    expect(onCallCell(wrapper).findComponent({ name: "OnCallPersonName" }).props("email")).toBe(
       "engineer@example.com",
     );
+  });
+
+  // Names are what a responder recognises; the email rides in the tooltip because two people can share a name.
+  it("names the people on call and keeps their email in a tooltip", async () => {
+    queryClient.setQueryData(orgUsersQuery("default").queryKey, [
+      { email: "engineer@example.com", first_name: "Ena", last_name: "Gineer" },
+    ]);
+    service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+    service.whoIsOnCall.mockResolvedValue({
+      data: [{ rotation_id: "r1", rotation_name: "Primary", user_email: "engineer@example.com" }],
+    } as any);
+
+    const wrapper = render();
+    await flushPromises();
+
+    const person = wrapper.find('[data-test="oncall-teams-primary-team_1"]');
+    expect(person.text()).toContain("Ena Gineer");
+    expect(person.findComponent({ name: "OTooltip" }).props("content")).toBe(
+      "Ena Gineer (engineer@example.com)",
+    );
+    expect(person.attributes("title")).toBeUndefined();
+    queryClient.removeQueries({ queryKey: orgUsersQuery("default").queryKey });
   });
 
   /// A team nobody staffs will page no one, so it earns the one colour on this
@@ -268,8 +325,8 @@ describe("OnCallTeams", () => {
     await flushPromises();
 
     const emails = wrapper
-      .findAllComponents({ name: "OUserCell" })
-      .map((cell: any) => cell.props("value"));
+      .findAllComponents({ name: "OnCallPersonName" })
+      .map((cell: any) => cell.props("email"));
     expect(emails).toEqual(["primary@example.com", "dba@example.com"]);
     // It keeps its own name rather than being filed under "Secondary".
     expect(wrapper.find('[data-test="oncall-teams-rotation-team_1-rot_db"]').exists()).toBe(true);
@@ -561,8 +618,14 @@ describe("OnCallTeams", () => {
         items.find((item) => item.attributes("data-test") === `oncall-team-delete-${id}`);
       // Still listed, so every row's menu reads the same, but off and saying why.
       expect(deleteOf("team_2")?.props("disabled")).toBe(true);
-      expect(deleteOf("team_2")?.props("description")).toBe("Make another team the default first");
+      // One line per item: the reason rides a tooltip, not a second line under the label.
+      expect(deleteOf("team_2")?.props("description")).toBeUndefined();
+      expect(deleteOf("team_2")?.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "Make another team the default first",
+      );
+      expect(deleteOf("team_2")?.props("focusableUnavailable")).toBe(true);
       expect(deleteOf("team_1")?.props("disabled")).toBeFalsy();
+      expect(deleteOf("team_1")?.findComponent({ name: "OTooltip" }).exists()).toBe(false);
     });
 
     it("offers to set as default on every team but the current one", async () => {

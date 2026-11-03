@@ -37,18 +37,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-match="{ row }">
-        <span
-          class="flex w-full max-w-full min-w-0 flex-wrap items-center gap-1 py-1"
+        <!-- One line per row: the chips that fit, and "+N" naming every condition. -->
+        <OnCallFitChips
+          :items="conditionsOf(row)"
+          :tooltip="conditionsTip(row)"
           :data-test="`oncall-routing-says-${row.rule_id}`"
         >
-          <ODimensionChip
-            v-for="condition in conditionsOf(row)"
-            :key="condition.name"
-            :dim-key="condition.name"
-            :key-label="condition.label"
-            :value="condition.value"
-          />
-        </span>
+          <template #item="{ item }">
+            <ODimensionChip :dim-key="item.name" :key-label="item.label" :value="item.value" />
+          </template>
+        </OnCallFitChips>
       </template>
 
       <template #cell-team="{ row }">
@@ -58,16 +56,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-specificity="{ row }">
-        <span class="flex flex-wrap gap-1">
-          <OTag
-            v-for="condition in conditionsOf(row)"
-            :key="condition.name"
-            type="dimensionKey"
-            :value="condition.name"
-            :label="raw(condition.field)"
-            size="sm"
-          />
-        </span>
+        <OnCallFitChips
+          :items="conditionsOf(row)"
+          :tooltip="fieldsTip(row)"
+          :data-test="`oncall-routing-specificity-${row.rule_id}`"
+        >
+          <template #item="{ item }">
+            <OTag type="dimensionKey" :value="item.name" :label="raw(item.field)" size="sm" />
+          </template>
+        </OnCallFitChips>
       </template>
 
       <template #cell-caught="{ row }">
@@ -237,6 +234,7 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import OnCallFitChips from "./OnCallFitChips.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -442,6 +440,23 @@ function conditionsOf(rule: OwnershipRuleStats): RuleCondition[] {
         value: prefix ? value.slice(0, -1) : value,
       };
     });
+}
+
+/// Every condition in one line, for the "+N" chip that stands in for the ones that did not fit.
+function conditionsTip(rule: OwnershipRuleStats): I18nText {
+  return raw(
+    conditionsOf(rule)
+      .map((condition) => `${condition.label} = ${condition.value}`)
+      .join(" · "),
+  );
+}
+
+function fieldsTip(rule: OwnershipRuleStats): I18nText {
+  return raw(
+    conditionsOf(rule)
+      .map((condition) => condition.field)
+      .join(" · "),
+  );
 }
 
 /// A shadowed rule names the team taking its pages, because "shadowed" alone does not say who to talk to.

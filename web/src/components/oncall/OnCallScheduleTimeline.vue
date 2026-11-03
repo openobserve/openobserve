@@ -97,7 +97,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
+        <!-- A template rewrites the first rotation, so it can only build a new one while there is none. -->
+        <ODropdown v-if="!rotations.length" align="end">
+          <template #trigger>
+            <OButton
+              variant="outline"
+              size="sm-action"
+              icon-left="add"
+              icon-right="arrow-drop-down"
+              data-test="oncall-timeline-add"
+            >
+              {{ t("oncall.addRotation") }}
+            </OButton>
+          </template>
+          <ODropdownItem
+            icon-left="dashboard-customize"
+            data-test="oncall-timeline-add-template"
+            @select="emit('presets')"
+          >
+            {{ t("oncall.addRotationFromTemplate") }}
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="edit"
+            data-test="oncall-timeline-add-scratch"
+            @select="emit('add')"
+          >
+            {{ t("oncall.addRotationFromScratch") }}
+          </ODropdownItem>
+        </ODropdown>
         <OButton
+          v-else
           variant="outline"
           size="sm-action"
           icon-left="add"
@@ -256,10 +285,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
+      <!-- The tooltip follows the band, so it anchors to the band itself, not to the menu around it. -->
       <template #band="{ band }">
         <ODropdown v-if="shiftActions(band.key).length" align="start">
           <template #trigger>
-            <OScheduleBand :band="band" role="button" aria-haspopup="menu" class="cursor-pointer" />
+            <OScheduleBand
+              :band="band"
+              :tooltip="bandTip(band.key) ? false : undefined"
+              role="button"
+              aria-haspopup="menu"
+              class="cursor-pointer"
+            />
           </template>
           <ODropdownItem
             v-for="action in shiftActions(band.key)"
@@ -271,7 +307,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ action.label }}
           </ODropdownItem>
         </ODropdown>
-        <OScheduleBand v-else :band="band" />
+        <OScheduleBand v-else :band="band" :tooltip="bandTip(band.key) ? false : undefined" />
+        <OTooltip
+          v-if="bandTip(band.key)"
+          side="top"
+          :content="bandTip(band.key)"
+          :data-test="`oncall-shift-tip-${band.key}`"
+        />
       </template>
 
       <!-- Three entries, and every one of them means something. The old key
@@ -432,7 +474,7 @@ const { isMobile } = useBreakpoint();
 const nowMicros = useOnCallClock();
 
 // Band labels only: a narrow bar has no room for an email; the aria-label keeps the full address.
-const { nameOf } = useOrgUserNames();
+const { nameOf, tooltipOf } = useOrgUserNames();
 
 /// The lane dots, spelled out rather than built from the index: Tailwind reads
 /// class names as literal text, so a template-built `bg-schedule-band-${n}-...`
@@ -777,6 +819,29 @@ const segmentByBand = computed(() => {
   }
   return map;
 });
+
+const tipRange = (start: number, end: number) =>
+  t("oncall.shiftBandTipRange", {
+    from: raw(fmt(start, { weekday: "short", hour: "2-digit", minute: "2-digit" })),
+    to: raw(fmt(end, { weekday: "short", hour: "2-digit", minute: "2-digit" })),
+  });
+
+/// Name and email for a band's person, because the band itself only has room for a name and two people can share one.
+function bandTip(bandKey: string): I18nText | undefined {
+  const segment = segmentByBand.value.get(bandKey);
+  if (segment?.user_email) {
+    return t("oncall.shiftBandTip", {
+      person: tooltipOf(segment.user_email),
+      range: tipRange(segment.from, segment.to),
+    });
+  }
+  const absence = props.absences.find((one) => `away-${one.id}` === bandKey);
+  if (!absence) return undefined;
+  return t("oncall.shiftBandTip", {
+    person: tooltipOf(absence.user_email),
+    range: tipRange(absence.start_at, absence.end_at),
+  });
+}
 
 interface ShiftMenuItem {
   id: ShiftAction;

@@ -22,13 +22,15 @@
     <!-- Whether a page would reach anybody is the team's headline fact, so it
          rides the title instead of sitting in a card below it. -->
     <template #title-trail>
-      <OTag
-        v-if="loaded"
-        type="oncallCoverage"
-        :value="coverageState"
-        size="sm"
-        data-test="oncall-team-coverage"
-      />
+      <span v-if="loaded" class="inline-flex">
+        <OTag
+          type="oncallCoverage"
+          :value="coverageState"
+          size="sm"
+          data-test="oncall-team-coverage"
+        />
+        <OTooltip v-if="coverageTip" side="bottom" :content="coverageTip" />
+      </span>
     </template>
 
     <template #actions>
@@ -175,7 +177,6 @@
       <OnCallTeamAttention
         :risks="configRisks"
         :timezone="team?.timezone ?? 'UTC'"
-        :viewer-timezone="store.state.timezone"
         :reachability="reachability"
         :overview="overview"
         :checked-at="insightsCheckedAt"
@@ -218,7 +219,6 @@
                 :rotations="schedule?.rotations ?? []"
                 :unreachable="unreachableEmails"
                 :timezone="team?.timezone ?? 'UTC'"
-                :viewer-timezone="store.state.timezone"
                 :days="COVERAGE_DAYS"
               />
             </div>
@@ -247,7 +247,6 @@
             :members="members"
             :rotations="schedule?.rotations ?? []"
             :timezone="team?.timezone ?? 'UTC'"
-            :viewer-timezone="store.state.timezone"
             :on-call-now="onCallNow"
             :reachability="reachability"
             :load="teamLoad"
@@ -279,7 +278,6 @@
               :rotations="teamRotations"
               :segments="segments"
               :timezone="team?.timezone ?? 'UTC'"
-              :viewer-timezone="store.state.timezone"
               :loading="segmentsLoading"
               :can-cover="hasMembers !== false && canConfigure"
               :absences="teamAbsences"
@@ -312,7 +310,6 @@
               :team-id="teamId"
               :members="members"
               :timezone="team?.timezone ?? 'UTC'"
-              :viewer-timezone="store.state.timezone"
               :primary-rotation-name="schedule?.rotations?.[0]?.name ?? ''"
               @applied="onScheduleSaved"
             />
@@ -324,7 +321,6 @@
               drawer-only
               :team-id="teamId"
               :timezone="team?.timezone ?? 'UTC'"
-              :viewer-timezone="store.state.timezone"
               :schedule="schedule"
               :members="members"
               :intent="scheduleIntent"
@@ -401,14 +397,35 @@
     />
 
     <!-- Named from the loaded preview: the first step can be the whole team, so this is the last look at who gets woken. -->
-    <ConfirmDialog
-      :model-value="testPageOpen"
+    <ODialog
+      v-model:open="testPageOpen"
+      size="sm"
       :title="t('oncall.testPageConfirmTitle')"
-      :message="testPageMessage"
-      :ok-label="t('oncall.ladderSendTest')"
-      @update:ok="sendTestPage"
-      @update:cancel="testPageOpen = false"
-    />
+      :primary-button-label="t('oncall.ladderSendTest')"
+      :secondary-button-label="t('oncall.cancel')"
+      data-test="oncall-team-test-page-dialog"
+      @click:primary="sendTestPage"
+      @click:secondary="testPageOpen = false"
+    >
+      <i18n-t
+        :keypath="
+          testPageCopy.channels ? 'oncall.testPageConfirm' : 'oncall.testPageConfirmNoChannel'
+        "
+        tag="p"
+        scope="global"
+        class="text-sm"
+        data-test="oncall-team-test-page-message"
+      >
+        <template #priority>{{ raw(selectedPriority) }}</template>
+        <template #names>
+          <template v-for="(email, index) in testPageCopy.emails" :key="email">
+            <span v-if="index">{{ raw(", ") }}</span>
+            <OnCallPersonName :email="email" data-test="oncall-team-test-page-person" />
+          </template>
+        </template>
+        <template #channels>{{ testPageCopy.channels }}</template>
+      </i18n-t>
+    </ODialog>
 
     <OnCallCoverForm
       v-model:open="coverOpen"
@@ -451,7 +468,8 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
 import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
@@ -537,7 +555,7 @@ import type {
   Unavailability,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   channelList,
   formatInZone,
@@ -971,31 +989,32 @@ const silentPriorities = computed(
     ).length,
 );
 
-/// Rostered and reachable are two questions, and the chip used to answer only
-/// the first — a green `Covered` sat beside a panel reading "no page can be
-/// delivered to anyone", which tells the reader the team is fine at the exact
-/// moment it is not. Reachability is folded in: if everybody holding the pager
-/// right now would fail to receive a page, the team is rostered, not covered.
-///
-/// Silent when reachability did not load — an unanswered question is not a
-/// finding, and inventing one here would be the same lie in the other
-/// direction.
-const coverageState = computed<"covered" | "gap" | "unreachable">(() => {
-  const covered = overview.value?.covered_now ?? onCallNow.value.length > 0;
-  if (!covered) return "gap";
-
+/// Green only when every person on call now would receive a page, so the chip never disagrees with the banner naming one who would not.
+const unreachableHolders = computed(() => {
   const verdicts = reachability.value?.members ?? [];
-  const holders = onCallNow.value
-    .map((position) => position.user_email?.toLowerCase())
-    .filter((email): email is string => !!email);
+  const holders = [
+    ...new Set(
+      onCallNow.value
+        .map((position) => position.user_email?.toLowerCase())
+        .filter((email): email is string => !!email),
+    ),
+  ];
   const known = holders
     .map((email) => verdicts.find((member) => member.user_email.toLowerCase() === email))
     .filter((member) => !!member);
+  return { total: holders.length, unreachable: known.filter((m) => !m.would_a_page_land).length };
+});
 
-  // Only when the server actually judged the people on call, and judged every
-  // one of them unreachable: one reachable holder means a page still lands.
-  if (known.length && known.every((member) => !member.would_a_page_land)) return "unreachable";
-  return "covered";
+const coverageState = computed<"covered" | "gap" | "unreachable">(() => {
+  const covered = overview.value?.covered_now ?? onCallNow.value.length > 0;
+  if (!covered) return "gap";
+  return unreachableHolders.value.unreachable ? "unreachable" : "covered";
+});
+
+const coverageTip = computed<I18nText | undefined>(() => {
+  if (coverageState.value !== "unreachable") return undefined;
+  const { unreachable, total } = unreachableHolders.value;
+  return t("oncall.coverageCantReachTip", { count: unreachable, total });
 });
 
 /// Who the strip must not count as cover: the server judged a page to them would not land.
@@ -1006,7 +1025,7 @@ const unreachableEmails = computed(() =>
 );
 
 /// The server sends a test to the first step only, so the first step's people are who it names.
-const testPageMessage = computed(() => {
+const testPageCopy = computed<{ emails: string[]; channels: I18nText | "" }>(() => {
   const first = [...(preview.value?.rungs ?? [])].sort(
     (a, b) => a.after_micros - b.after_micros,
   )[0];
@@ -1015,13 +1034,10 @@ const testPageMessage = computed(() => {
   const sent = (preview.value?.channels ?? []).filter((channel) =>
     people.some((one) => (one.deliverable_channels ?? []).includes(channel)),
   );
-  const params = {
-    priority: raw(selectedPriority.value),
-    names: raw(people.map((one) => one.user_email).join(", ")),
+  return {
+    emails: [...new Set(people.map((one) => one.user_email))],
+    channels: sent.length ? raw(channelList(sent, t)) : "",
   };
-  return sent.length
-    ? t("oncall.testPageConfirm", { ...params, channels: raw(channelList(sent, t)) })
-    : t("oncall.testPageConfirmNoChannel", params);
 });
 
 /// The one honest answer to "would a page actually land": send a real one and
