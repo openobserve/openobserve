@@ -226,6 +226,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
 import useMetricsExplorerGrid, {
   INITIAL_PAGE_SIZE,
   PAGE_SIZE_INCREMENT,
+  SHOW_MORE_MAX_BATCHES,
   SWEEP_DEBOUNCE_MS,
 } from "./useMetricsExplorerGrid";
 import StreamService from "@/services/stream";
@@ -969,7 +970,31 @@ describe("useMetricsExplorerGrid", () => {
         stats: { doc_num: 100 },
       }));
 
-    it("never renders more than the page size, however many come back empty", async () => {
+    const answerAll = (answer: (query: string) => any, asked: number[]) => {
+      for (const q of inFlight.splice(0, inFlight.length)) {
+        const m = q.query.match(/metric_(\d+)_total/);
+        if (m) asked.push(Number(m[1]));
+        q.complete(answer(q.query));
+      }
+    };
+
+    /** Answers every query, including showMore's batches, until nothing is in flight and no walk is running. */
+    const drainWalk = async (grid: any, answer: (query: string) => any, asked: number[]) => {
+      let quiet = 0;
+      for (let round = 0; round < 500 && quiet < 5; round++) {
+        await flush();
+        if (!inFlight.length) {
+          quiet = grid.showingMore.value ? 0 : quiet + 1;
+          continue;
+        }
+        quiet = 0;
+        answerAll(answer, asked);
+      }
+      expect(inFlight).toHaveLength(0);
+      expect(grid.showingMore.value).toBe(false);
+    };
+
+    it("an all-empty page looks ahead once, within the Show more guard, never further", async () => {
       getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
 
       const grid = createGrid(t);
@@ -1018,23 +1043,62 @@ describe("useMetricsExplorerGrid", () => {
         inFlight.length = 0;
       }
 
-      // The point of the test, now actually measured rather than assumed.
-      // No metric outside the first page is ever queried: this is the cascade
-      // itself, caught at the query layer rather than only at its after-effect.
-      expect(Math.max(...asked)).toBeLessThan(INITIAL_PAGE_SIZE);
-      expect(new Set(asked).size).toBe(INITIAL_PAGE_SIZE);
+      // The emptied page auto-advances through showMore's look-ahead; drain it to quiescence.
+      await drainWalk(grid, () => NO_SERIES, asked);
+
+      // Exactly one guarded walk: page one plus SHOW_MORE_MAX_BATCHES increments, not the other ~440.
+      const walked = INITIAL_PAGE_SIZE + SHOW_MORE_MAX_BATCHES * PAGE_SIZE_INCREMENT;
+      expect(Math.max(...asked)).toBe(walked - 1);
+      expect(new Set(asked).size).toBe(walked);
       // And each card is asked at most twice — the rate query, plus the presence
       // probe that confirms an empty rate() result is real.
       const perMetric = [...new Set(asked)].map((i) => asked.filter((a) => a === i).length);
       expect(Math.max(...perMetric)).toBeLessThanOrEqual(2);
-      expect(asked).toHaveLength(2 * INITIAL_PAGE_SIZE);
+      expect(asked).toHaveLength(2 * walked);
 
-      // The page is now EMPTY (all 30 hidden) — it must not have refilled itself
-      // from the other 470 metrics.
+      // Still empty after the guard: the budget stops at the walk and Show more stays on offer.
       expect(grid.pagedCards.value).toHaveLength(0);
-      // ...and the budget is untouched: no card outside the first 30 was pulled in.
-      expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
-      expect(grid.pageSlice.value.map((c: any) => c.name)).toEqual(page.map((c: any) => c.name));
+      expect(grid.pageSlice.value).toHaveLength(walked);
+      expect(grid.hasMore.value).toBe(true);
+
+      // No chained second walk, not even once the debounced sweep has run.
+      await new Promise((r) => setTimeout(r, SWEEP_DEBOUNCE_MS + 50));
+      await flush();
+      expect(inFlight).toHaveLength(0);
+      expect(grid.pageSlice.value).toHaveLength(walked);
+    });
+
+    it("an all-empty first page reveals the matching metrics with data behind it", async () => {
+      getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
+      const grid = createGrid(t);
+      grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
+      await grid.loadStreams();
+
+      const firstWithData = 20;
+      const answer = (query: string) => {
+        const m = query.match(/metric_(\d+)_total/);
+        return m && Number(m[1]) >= firstWithData ? SERIES : NO_SERIES;
+      };
+
+      // Resolve page one (all empty) the way the visible cards would; no showMore call from the test.
+      const page = [...grid.pagedCards.value];
+      expect(page).toHaveLength(INITIAL_PAGE_SIZE);
+      for (const card of page) {
+        let settled = false;
+        const preview = grid.requestPreview(card).finally(() => (settled = true));
+        for (let round = 0; round < 100 && !settled; round++) {
+          await flush();
+          answerAll(answer, []);
+        }
+        await preview;
+      }
+      await drainWalk(grid, answer, []);
+
+      const shown = grid.pagedCards.value.map((c: any) => c.name);
+      expect(shown).toHaveLength(PAGE_SIZE_INCREMENT);
+      expect(shown[0]).toBe(`metric_${String(firstWithData).padStart(4, "0")}_total`);
+      expect(grid.emptyHiddenCount.value).toBe(firstWithData);
+      expect(grid.showingMore.value).toBe(false);
     });
 
     it("showMore is how the user asks to spend more budget", async () => {
@@ -2471,6 +2535,83 @@ describe("useMetricsExplorerGrid", () => {
       expect(usageMock()).toHaveBeenCalledTimes(2);
       expect(grid.usageError.value).toBe(false);
       expect(names(grid)[0]).toBe("http_requests_total");
+    });
+  });
+
+  describe("searching", () => {
+    const stream = (name: string, help: string) => ({
+      name,
+      stream_type: "metrics",
+      metrics_meta: { metric_type: "Gauge", metric_family_name: name, help, unit: "" },
+      stats: { doc_num: 100 },
+    });
+    const names = (grid: any) => grid.sortedCards.value.map((c: any) => c.name);
+
+    it("lists metrics whose name matches before those matching only by help text", async () => {
+      getStreamsMock.mockResolvedValue({
+        list: [
+          stream("aaa_other", "Unrelated gauge"),
+          stream("cnpg_blks_read", "Blocks read from disk"),
+          stream("cnpg_blks_hit", "Blocks found in cache, not on disk"),
+          stream("node_disk_io", "IO time"),
+          stream("zz_disk_free", "Free bytes"),
+        ],
+      });
+      const grid = await setup();
+
+      expect(names(grid)).toEqual([
+        "aaa_other",
+        "cnpg_blks_hit",
+        "cnpg_blks_read",
+        "node_disk_io",
+        "zz_disk_free",
+      ]);
+
+      grid.searchTerm.value = "disk";
+      expect(names(grid)).toEqual([
+        "node_disk_io",
+        "zz_disk_free",
+        "cnpg_blks_hit",
+        "cnpg_blks_read",
+      ]);
+      expect(grid.pageSlice.value.map((c: any) => c.name)[0]).toBe("node_disk_io");
+
+      grid.sortBy.value = "z-a";
+      expect(names(grid)).toEqual([
+        "zz_disk_free",
+        "node_disk_io",
+        "cnpg_blks_read",
+        "cnpg_blks_hit",
+      ]);
+
+      grid.searchTerm.value = "";
+      expect(names(grid)).toEqual([
+        "zz_disk_free",
+        "node_disk_io",
+        "cnpg_blks_read",
+        "cnpg_blks_hit",
+        "aaa_other",
+      ]);
+    });
+
+    it("counts every match, not just the loaded page, minus metrics known to be empty", async () => {
+      const matching = Array.from({ length: 25 }, (_, i) =>
+        stream(`node_disk_${String(i).padStart(2, "0")}`, "Disk stat"),
+      );
+      getStreamsMock.mockResolvedValue({
+        list: [...matching, ...Array.from({ length: 10 }, (_, i) => stream(`cpu_${i}`, "CPU"))],
+      });
+      const grid = await setup();
+      grid.searchTerm.value = "node_disk";
+
+      expect(grid.pagedCards.value).toHaveLength(INITIAL_PAGE_SIZE);
+      expect(grid.filteredCards.value).toHaveLength(25);
+
+      await landPreview(grid.requestPreview(grid.pagedCards.value[0]), NO_SERIES);
+      expect(grid.filteredCards.value).toHaveLength(24);
+
+      grid.hideEmptyPanels.value = false;
+      expect(grid.filteredCards.value).toHaveLength(25);
     });
   });
 });

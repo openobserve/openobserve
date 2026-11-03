@@ -42,6 +42,7 @@ import {
   computeSuffixGroups,
   MISC_GROUP_ID,
   matchesSearch,
+  matchesSearchName,
   type PrefixGroup,
   type SuffixGroup,
 } from "@/utils/metrics/prefixGrouping";
@@ -284,6 +285,14 @@ export const SWEEP_DEBOUNCE_MS = 250;
  * "a whole new page". The button's label is computed from this constant.
  */
 export const PAGE_SIZE_INCREMENT = 6;
+/**
+ * A single "Show more" may pull at most this many budget batches while
+ * stepping over no-data cards. A guard, not a target: it stops a long run of
+ * empty metrics from walking the whole list in one click. ~8 batches is the
+ * same order as a handful of manual clicks, never the query storm an unbounded
+ * fill would cost on a sparse org.
+ */
+export const SHOW_MORE_MAX_BATCHES = 8;
 
 /** Cards are ~40-60 points wide; a coarse step keeps preview responses tiny. */
 const PREVIEW_POINTS = 50;
@@ -864,6 +873,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       // Stable over the A–Z order above, so equally used metrics stay alphabetical.
       out.sort((a, b) => (usage[b.name]?.[kind] ?? 0) - (usage[a.name]?.[kind] ?? 0));
     }
+    const query = searchTerm.value;
+    if (!query) return out;
+    // Stable, so each group keeps the order chosen above; help-only hits otherwise fill page one.
+    const nameHits = new Set(
+      out.filter((c) => matchesSearchName(c.name, query)).map((c) => c.name),
+    );
+    out.sort((a, b) => Number(nameHits.has(b.name)) - Number(nameHits.has(a.name)));
     return out;
   };
 
@@ -955,14 +971,6 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     Math.max(0, sortedCandidates.value.length - pageSize.value),
   );
 
-  /**
-   * A single "Show more" may pull at most this many budget batches while
-   * stepping over no-data cards. A guard, not a target: it stops a long run of
-   * empty metrics from walking the whole list in one click. ~8 batches is the
-   * same order as a handful of manual clicks, never the query storm an unbounded
-   * fill would cost on a sparse org.
-   */
-  const SHOW_MORE_MAX_BATCHES = 8;
   /** True while a "Show more" click is resolving; drives the button's spinner. */
   const showingMore = ref(false);
 
@@ -1034,6 +1042,20 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     },
     { deep: true },
   );
+
+  // Identity of the list already auto-advanced: one guarded walk per list, then Show more, never chained walks.
+  let autoAdvancedFor: MetricCard[] | null = null;
+
+  // Registered after the page-one reset (watchers flush in creation order) and cannot fire mid-sweep: an unresolved card still renders.
+  watch([pagedCards, pageSlice, hasMore, hideEmptyPanels, paused], () => {
+    // Turning the filter back on earns the same list a fresh auto-advance.
+    if (!hideEmptyPanels.value) autoAdvancedFor = null;
+    if (!hideEmptyPanels.value || paused.value || showingMore.value) return;
+    if (!hasMore.value || !pageSlice.value.length || pagedCards.value.length) return;
+    if (autoAdvancedFor === sortedCandidates.value) return;
+    autoAdvancedFor = sortedCandidates.value;
+    void showMore();
+  });
 
   const clearFilters = () => {
     searchTerm.value = "";

@@ -591,6 +591,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-workspace-empty-grid"
           />
 
+          <!-- Every card checked so far is empty but candidates remain: not a verdict, so no remedies, just Show more below. -->
+          <OEmptyState
+            v-else-if="!visibleCards.length && grid.hasMore.value"
+            size="block"
+            variant="no-results"
+            illustration="no-results"
+            :title="t('metrics.explorer.noMatchYet')"
+            :description="t('metrics.explorer.noMatchYetHint')"
+            data-test="metrics-explorer-no-match-yet"
+          />
+
           <!-- Every remedy the hint names, as an action card — but only the ones
              that would actually change anything right now: each card is gated
              on its own cause being active. "Clear all filters" is always last. -->
@@ -652,7 +663,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div v-if="grid.hasMore.value && visibleCards.length" class="flex justify-center py-4">
+          <div
+            v-if="grid.hasMore.value && !showLoading && !grid.loadError.value"
+            class="flex justify-center py-4"
+          >
             <OButton
               variant="outline"
               size="sm"
@@ -956,8 +970,9 @@ export default defineComponent({
     // suffix restated the control next to it and wrapped onto two lines doing
     // it. The exact number still appears where it is actually needed: the empty
     // state, where it explains why the grid has nothing in it.
+    // Matches, not the loaded page: unqueried candidates count, known-empty ones do not while "With data" is on.
     const resultCountLabel = computed(() => {
-      const shown = visibleCards.value.length;
+      const shown = grid.filteredCards.value.length;
       const total = grid.cards.value.length;
       return shown === total
         ? total.toLocaleString()
