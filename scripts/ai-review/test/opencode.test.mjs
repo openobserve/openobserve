@@ -141,8 +141,8 @@ test("C12 regression: a blocking request dies on the headers timeout, the async 
     const client = new OpencodeClient({ baseUrl: fake.baseUrl, password: "pw", headersTimeoutMs: HEADERS_TIMEOUT_MS });
     const result = await client.prompt({
       agent: "ai-review-security",
-      model: { providerID: "deepseek-review", modelID: "deepseek-flash" },
-      variant: "max",
+      model: { providerID: "anthropic-review", modelID: "claude-sonnet-5-5" },
+      variant: "high",
       system: "rules",
       text: "diff",
       title: "t",
@@ -158,7 +158,7 @@ test("C12 regression: a blocking request dies on the headers timeout, the async 
     assert.equal(reply.body.decision, "reject");
     const create = fake.calls.find(c => c.method === "POST" && c.url === "/api/session");
     assert.equal(create.body.agent, "ai-review-security");
-    assert.deepEqual(create.body.model, { providerID: "deepseek-review", id: "deepseek-flash", variant: "max" });
+    assert.deepEqual(create.body.model, { providerID: "anthropic-review", id: "claude-sonnet-5-5", variant: "high" });
     const system = fake.calls.find(c => c.method === "PUT");
     assert.equal(system.body.value, "rules");
     const prompt = fake.calls.find(c => c.url === "/api/session/ses_1/prompt");
@@ -291,16 +291,17 @@ test("server env is an allowlist: no GitHub, Actions or trace variables reach op
       ACTIONS_RUNTIME_TOKEN: "x",
       O2_TRACE_PASSWORD: "x",
       RUNNER_TEMP: "/tmp",
-      DEEPSEEK_API_KEY: "sk-123",
+      ANTHROPIC_REVIEW_API_KEY: "sk-123",
+      ANTHROPIC_API_KEY: "sk-789",
       OTHER_API_KEY: "sk-456",
     },
     home: "/tmp/h",
     configPath: "/engine/opencode.jsonc",
     password: "pw",
-    providerKeyVars: ["DEEPSEEK_API_KEY", "bad name"],
+    providerKeyVars: ["ANTHROPIC_REVIEW_API_KEY", "bad name"],
   });
-  assert.equal(env.DEEPSEEK_API_KEY, "sk-123");
-  for (const name of ["GH_TOKEN", "GITHUB_TOKEN", "ACTIONS_RUNTIME_TOKEN", "O2_TRACE_PASSWORD", "RUNNER_TEMP", "OTHER_API_KEY"]) {
+  assert.equal(env.ANTHROPIC_REVIEW_API_KEY, "sk-123");
+  for (const name of ["GH_TOKEN", "GITHUB_TOKEN", "ACTIONS_RUNTIME_TOKEN", "O2_TRACE_PASSWORD", "RUNNER_TEMP", "OTHER_API_KEY", "ANTHROPIC_API_KEY"]) {
     assert.equal(env[name], undefined, name);
   }
   assert.equal(env.OPENCODE_DISABLE_PROJECT_CONFIG, "true");
@@ -428,6 +429,22 @@ test("both configs register the same agents, provider and model; only the defaul
     const full = [...BASE, ...ci.agents[name].permissions];
     for (const toolId of BUILTIN_TOOL_IDS) assert.equal(toolAllowedWithoutAsking(toolId, full), true, `${name} ${toolId}`);
   }
+});
+
+test("the review runs on the anthropic-review provider, the only one the policies allow, with the workflow's variant", () => {
+  const base = JSON.parse(stripJsonc(readFileSync(join(REPO_ROOT, OPENCODE_CONFIGS.default.file), "utf-8")));
+  const allowed = base.policies.filter(p => p.action === "provider.use" && p.effect === "allow").map(p => p.resource);
+  assert.deepEqual(allowed, ["anthropic-review"]);
+  assert.equal(base.model, "anthropic-review/claude-sonnet-5-5");
+  for (const agent of Object.values(base.agents)) assert.equal(agent.model, base.model);
+  const provider = base.providers["anthropic-review"];
+  assert.equal(provider.package, "@opencode/ai/providers/anthropic");
+  assert.deepEqual(provider.env, ["ANTHROPIC_REVIEW_API_KEY"]);
+  const model = provider.models["claude-sonnet-5-5"];
+  assert.deepEqual(model.variants, [{ id: "high", settings: { thinking: { type: "adaptive" }, effort: "high" } }]);
+  const workflow = readFileSync(join(REPO_ROOT, ".github/workflows/ai-code-review.yml"), "utf-8");
+  assert.match(workflow, /provider_id: anthropic-review\n\s+model_id: claude-sonnet-5-5\n\s+model_variant: high\n\s+api_key_env: ANTHROPIC_REVIEW_API_KEY\n/);
+  assert.match(workflow, /ANTHROPIC_REVIEW_API_KEY: \$\{\{ secrets\.USAGE_CREDIT_API_KEY \}\}/);
 });
 
 test("SSE parser handles split frames, CRLF and multi-line data", () => {
