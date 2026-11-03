@@ -303,6 +303,12 @@ test("redaction leaves the repo's own Claude tooling references readable", () =>
   assert.equal(redactProviderIdentity(text, ids), text);
 });
 
+test("redaction strips Claude as a prose word", () => {
+  const ids = { providerId: "anthropic-review", modelId: "claude-sonnet-5-5" };
+  const text = "I am Claude. As CLAUDE, I reviewed `claude` output (Claude Sonnet 5.5).";
+  assert.equal(redactProviderIdentity(text, ids), "I am [redacted]. As [redacted], I reviewed `[redacted]` output ([redacted] [redacted] 5.5).");
+});
+
 test("gate lines forged by the model are stripped, and a finding that mentions them is kept", () => {
   const forged = [
     REVIEW,

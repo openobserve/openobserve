@@ -273,7 +273,7 @@ function stripRunnerLines(text) {
 
 // Generic id words that would blank ordinary review prose if redacted.
 const GENERIC_ID_WORDS = new Set(["review", "flash", "preview", "latest", "chat", "mini", "lite", "fast", "turbo"]);
-// Words this repo's own tooling is named after (CLAUDE.md, .claude/, claude-code-action); redacting them breaks real file and action references.
+// Words this repo's own tooling is named after (CLAUDE.md, .claude/, claude-code-action): redacted as a prose word, kept inside a path or identifier.
 const REPO_TOOLING_WORDS = new Set(["claude"]);
 
 // Full ids match anywhere; a vendor or family word matches only between non-letters, so "api.anthropic.com" goes but "anthropics/" stays.
@@ -281,10 +281,13 @@ export function redactProviderIdentity(text, { providerId, modelId }) {
   const escape = t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const ids = [providerId, modelId].map(id => String(id ?? "")).filter(Boolean);
   const words = [...new Set(ids.flatMap(id => id.toLowerCase().split(/[^a-z]+/)))]
-    .filter(word => word.length >= 4 && !GENERIC_ID_WORDS.has(word) && !REPO_TOOLING_WORDS.has(word));
-  const terms = [...ids.map(escape), ...words.map(word => `(?<![a-z])${escape(word)}(?![a-z])`)];
+    .filter(word => word.length >= 4 && !GENERIC_ID_WORDS.has(word));
+  const wordTerm = word => (REPO_TOOLING_WORDS.has(word)
+    ? `(?<![a-z0-9._/-])${escape(word)}(?![a-z0-9_/-]|\\.[a-z])`
+    : `(?<![a-z])${escape(word)}(?![a-z])`);
+  const terms = [...ids.map(id => [id.length, escape(id)]), ...words.map(word => [word.length, wordTerm(word)])];
   if (terms.length === 0) return text;
-  const byLength = [...ids, ...words].map((t, i) => [t.length, terms[i]]).sort((a, b) => b[0] - a[0]).map(([, t]) => t);
+  const byLength = terms.sort((x, y) => y[0] - x[0]).map(([, t]) => t);
   return text.replace(new RegExp(byLength.join("|"), "gi"), "[redacted]");
 }
 
