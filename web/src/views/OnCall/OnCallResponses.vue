@@ -374,7 +374,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag variant="default-soft" size="sm" :data-test="`oncall-section-count-${sectionKey}`">
             {{ raw(String(sectionCounts[sectionKey] ?? 0)) }}
           </OTag>
-          <OText v-if="sectionKey !== 'ringing' || unroutedRinging === 0" variant="meta">
+          <OText
+            v-if="sectionKey !== 'ringing' || unroutedRinging + stoppedRinging === 0"
+            variant="meta"
+          >
             {{ t(`oncall.sectionHint_${sectionKey}`) }}
           </OText>
           <template v-else>
@@ -384,9 +387,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OText v-if="routedRinging > 0" variant="meta" aria-hidden="true">
               {{ raw("·") }}
             </OText>
-            <OText variant="meta" data-test="oncall-section-hint-unrouted">
+            <OText
+              v-if="unroutedRinging > 0"
+              variant="meta"
+              data-test="oncall-section-hint-unrouted"
+            >
               {{
                 t("oncall.sectionHint_ringingUnrouted", { count: unroutedRinging }, unroutedRinging)
+              }}
+            </OText>
+            <OText
+              v-if="unroutedRinging > 0 && stoppedRinging > 0"
+              variant="meta"
+              aria-hidden="true"
+            >
+              {{ raw("·") }}
+            </OText>
+            <OText v-if="stoppedRinging > 0" variant="meta" data-test="oncall-section-hint-stopped">
+              {{
+                t("oncall.sectionHint_ringingStopped", { count: stoppedRinging }, stoppedRinging)
               }}
             </OText>
           </template>
@@ -505,6 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :progress-loaded="progressAnswered.has(row.latest.id)"
           :total-rungs="totalRungsFor(row.latest)"
           :reached-step="reachedStepFor(row.latest)"
+          :team-deleted="teamIsDeleted(row.latest.team_id)"
         />
       </template>
 
@@ -993,6 +1013,7 @@ import {
   isEscalating,
   isOnCallUnavailable,
   isDeletedTeam,
+  ladderStopped,
   isSnoozed,
   reachedStepOf,
   nextHandover,
@@ -1789,7 +1810,20 @@ const unroutedRinging = computed(
         !row.escalating.some((r) => r.team_id && !r.acked_by && !isSnoozed(r)),
     ).length,
 );
-const routedRinging = computed(() => (sectionCounts.value.ringing ?? 0) - unroutedRinging.value);
+const stoppedRinging = computed(
+  () =>
+    rows.value.filter((row) => {
+      if (rowSection(row) !== "ringing") return false;
+      const live = row.escalating.filter((r) => r.team_id && !r.acked_by && !isSnoozed(r));
+      return (
+        live.length > 0 &&
+        live.every((r) => ladderStopped(progressById.value[r.id], teamIsDeleted(r.team_id)))
+      );
+    }).length,
+);
+const routedRinging = computed(
+  () => (sectionCounts.value.ringing ?? 0) - unroutedRinging.value - stoppedRinging.value,
+);
 
 /// Only the run that needs somebody gets colour. Snoozed is deliberately
 /// inert and handled and resolved are both finished, so all three stay in the

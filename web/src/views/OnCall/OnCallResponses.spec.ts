@@ -595,6 +595,45 @@ describe("OnCallResponses", () => {
       );
     });
 
+    /// R11: a page whose ladder stopped has a team but pages nobody, so it is not counted as paging.
+    it("does not count a page whose ladder stopped as still paging", async () => {
+      service.escalationProgress.mockImplementation((({ response_id }: { response_id: string }) =>
+        Promise.resolve({
+          data: {
+            fired: [{ after_micros: 0, at: 1, targets: [], reached: ["ana@o2.ai"] }],
+            next_targets: [],
+            next_at: null,
+            exhausted: false,
+            stopped_because: response_id === "b" ? "the owning team was deleted" : undefined,
+          },
+        })) as any);
+      const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
+
+      const text = wrapper.find(ringingHeader).text();
+      expect(text).toContain(
+        "nobody has acknowledged — 1 of these is still paging·1 is not being paged",
+      );
+      expect(wrapper.find('[data-test="oncall-escalation-cell-b"]').text()).toContain(
+        "Nobody is being paged",
+      );
+    });
+
+    /// F4: a deleted team pages nobody, so a page past the progress cap is counted and phrased as such.
+    it("counts and phrases a page whose team was deleted as not paged, without its progress", async () => {
+      service.escalationProgress.mockRejectedValue({ response: { status: 500, data: {} } });
+      const wrapper = await withPages([
+        page({ id: "a" }),
+        page({ id: "b", team_id: "team_gone" }, "al_pay"),
+      ]);
+
+      expect(wrapper.find(ringingHeader).text()).toContain(
+        "nobody has acknowledged — 1 of these is still paging·1 is not being paged",
+      );
+      expect(wrapper.find('[data-test="oncall-escalation-cell-b"]').text()).toContain(
+        "Nobody is being paged",
+      );
+    });
+
     it("keeps the plain still-paging hint when every ringing page has a team", async () => {
       const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
 

@@ -22,7 +22,12 @@
  * trusting either.
  */
 
-import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import {
+  convertV0ToV2,
+  convertV1BEToV2,
+  detectConditionsVersion,
+} from "@/utils/alerts/alertDataTransforms";
+import { buildConditionsString, isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
 const EMPTY = "—";
 
@@ -33,10 +38,7 @@ function queryConditionOf(alert: any) {
   return alert?.query_condition || alert?.condition;
 }
 
-/**
- * The critical condition — `avg(latency) > 500`, a PromQL comparison, or the
- * raw SQL of a non-Builder rule with no aggregation. `—` when the alert is unknown.
- */
+/** The critical condition as one line; `—` when the alert is unknown. */
 export function alertConditionText(alert: any): string {
   const qc = queryConditionOf(alert);
   // PromQL keeps its threshold on `promql_condition`; the expression itself is
@@ -48,11 +50,32 @@ export function alertConditionText(alert: any): string {
   }
   const agg = qc?.aggregation;
   // A Builder alert can still store SQL from another mode; it never runs.
-  if (!agg) return qc?.type === "custom" ? EMPTY : qc?.sql || EMPTY;
+  if (!agg)
+    return qc?.type === "custom"
+      ? countConditionText(qc, alert?.trigger_condition)
+      : qc?.sql || EMPTY;
   const fn = agg.function || "";
   const col = agg.having?.column || "";
   const op = agg.having?.operator || "";
   return `${fn}(${col}) ${op} ${agg.having?.value}`;
+}
+
+/** A Builder rule with no aggregation fires on how many rows match: `body contains 'ERROR' · count >= 1`. */
+function countConditionText(qc: any, trigger: any): string {
+  const group = storedConditionsGroup(qc?.conditions);
+  const filters = group ? buildConditionsString(group) : "";
+  const threshold = isBlank(trigger?.threshold)
+    ? ""
+    : `count ${trigger.operator || ""} ${trigger.threshold}`.replace(/\s+/g, " ");
+  return [filters, threshold].filter(Boolean).join(" · ") || EMPTY;
+}
+
+/** A stored condition tree as a v2 group: the `{version: 2}` wrapper the API returns, a bare group, a v1 tree or a v0 list. */
+function storedConditionsGroup(stored: any): any {
+  if (!stored) return null;
+  if (String(stored.version) === "2") return stored.conditions ?? null;
+  if (Array.isArray(stored)) return convertV0ToV2(stored);
+  return detectConditionsVersion(stored) === 1 ? convertV1BEToV2(stored) : stored;
 }
 
 /** The warning condition, or `—` when the alert has only a critical one. */
