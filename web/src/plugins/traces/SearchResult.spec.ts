@@ -174,6 +174,12 @@ const globalOptions = {
       ],
       emits: ["row-click", "load-more"],
     },
+    TracesGroupsTable: {
+      name: "TracesGroupsTable",
+      template: '<div data-test="traces-groups-stub"></div>',
+      props: ["request", "sort", "columns", "columnVisibility", "wrap"],
+      emits: ["update:sort"],
+    },
     TracesSqlResultTable: {
       name: "TracesSqlResultTable",
       template: '<div data-test="traces-sql-result"></div>',
@@ -278,6 +284,92 @@ describe("SearchResult", () => {
       wrapper = mount(SearchResult, { global: globalOptions });
       await flushPromises();
       expect(toggle().props("columnVisibility")).toEqual({ service_name: false });
+    });
+  });
+
+  describe("Groups view", () => {
+    const request = {
+      stream: "default",
+      key: "service_name",
+      filter: "",
+      scope: "",
+      startTime: 1,
+      endTime: 2,
+      runId: 1,
+    };
+    const groups = () => wrapper.findComponent({ name: "TracesGroupsTable" });
+    const toggle = () => wrapper.findComponent({ name: "OTableColumnToggle" });
+
+    beforeEach(async () => {
+      localStorage.clear();
+      mockSearchObj.meta.searchMode = "spans";
+      (mockSearchObj.meta as any).groupsSort = { by: "errors", order: "desc" };
+      (mockSearchObj.meta.resultGrid as any).showPagination = true;
+      (mockSearchObj.data as any).groupsRequest = request;
+      wrapper.unmount();
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      mockSearchObj.meta.searchMode = undefined;
+      (mockSearchObj.data as any).groupsRequest = null;
+      delete (mockSearchObj.meta.resultGrid as any).showPagination;
+      localStorage.clear();
+    });
+
+    it("shows the Groups table in place of the span list, below the RED charts", () => {
+      expect(groups().exists()).toBe(true);
+      expect(groups().props("request")).toEqual(request);
+      expect(wrapper.findComponent({ name: "TracesSearchResultList" }).exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-metrics-dashboard"]').exists()).toBe(true);
+    });
+
+    it("hides the page-size select and the pager", () => {
+      expect(wrapper.find('[data-test="traces-search-result-records-per-page"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.findComponent({ name: "OPagination" }).exists()).toBe(false);
+    });
+
+    it("lets the Columns button hide Groups columns, apart from the list's", async () => {
+      expect(
+        toggle()
+          .props("columns")
+          .map((c: any) => c.id),
+      ).toEqual(["value", "spans", "errors", "error_pct", "p50", "p95", "p99", "rate"]);
+      toggle().vm.$emit("update:columnVisibility", { p50: false });
+      await flushPromises();
+      expect(groups().props("columnVisibility")).toEqual({ p50: false });
+      (mockSearchObj.data as any).groupsRequest = null;
+      await flushPromises();
+      expect(toggle().props("columnVisibility")).toEqual({});
+    });
+
+    it("lets the last shown Groups column take the leftover width, as the span list does", async () => {
+      const fill = () =>
+        groups()
+          .props("columns")
+          .filter((c: any) => c.meta?.autoWidth && c.meta?.fillRemaining)
+          .map((c: any) => c.id);
+      expect(fill()).toEqual(["rate"]);
+      toggle().vm.$emit("update:columnVisibility", { rate: false });
+      await flushPromises();
+      expect(fill()).toEqual(["p99"]);
+    });
+
+    it("keeps the picked sort for the next run and the URL", async () => {
+      groups().vm.$emit("update:sort", { by: "p95", order: "asc" });
+      await flushPromises();
+      expect((mockSearchObj.meta as any).groupsSort).toEqual({ by: "p95", order: "asc" });
+      expect(groups().props("sort")).toEqual({ by: "p95", order: "asc" });
+    });
+
+    it("shows the span list in SQL mode even before the next run", async () => {
+      (mockSearchObj.meta as any).sqlMode = true;
+      await flushPromises();
+      expect(groups().exists()).toBe(false);
+      (mockSearchObj.meta as any).sqlMode = false;
     });
   });
 

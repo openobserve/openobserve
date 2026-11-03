@@ -2052,6 +2052,40 @@ describe("useTraces", () => {
       expect(searchObj.meta.scope).toBe("all");
     });
 
+    it("writes the Groups view to the URL only in the Spans view with SQL mode off", () => {
+      const { searchObj, getUrlQueryParams } = freshState();
+      searchObj.meta.searchMode = "spans";
+      searchObj.data.stream.selectedFields = [...DEFAULT_TRACE_COLUMNS.spans];
+      expect(getUrlQueryParams()).not.toHaveProperty("group_by");
+      searchObj.meta.groupBy = "service_name";
+      searchObj.meta.groupsSort = { by: "p99", order: "desc" };
+      const query = getUrlQueryParams();
+      expect(query.view).toBe("groups");
+      expect(query.group_by).toBe("service_name");
+      expect(query.group_sort).toBe("p99:desc");
+      searchObj.meta.sqlMode = true;
+      expect(getUrlQueryParams()).not.toHaveProperty("group_by");
+      searchObj.meta.sqlMode = false;
+      searchObj.meta.searchMode = "traces";
+      searchObj.data.stream.selectedFields = [...DEFAULT_TRACE_COLUMNS.traces];
+      expect(getUrlQueryParams()).not.toHaveProperty("view");
+    });
+
+    it("restores Group by and its sort from a link, and a link without them as the list", () => {
+      const { searchObj, applyUrlListState } = freshState();
+      applyUrlListState({
+        tab: "spans",
+        view: "groups",
+        group_by: "http_method",
+        group_sort: "p50:asc",
+      });
+      expect(searchObj.meta.groupBy).toBe("http_method");
+      expect(searchObj.meta.groupsSort).toEqual({ by: "p50", order: "asc" });
+      applyUrlListState({ tab: "spans" });
+      expect(searchObj.meta.groupBy).toBe("");
+      expect(searchObj.meta.groupsSort).toEqual({ by: "errors", order: "desc" });
+    });
+
     it("opens an old link without list keys unchanged", () => {
       const { searchObj, applyUrlListState } = freshState();
       searchObj.data.stream.selectedFields = ["service_name"];

@@ -169,6 +169,7 @@ const mockSearchObj = {
     showQuery: true,
     showHistogram: true,
     sqlMode: false,
+    groupBy: "",
     searchMode: "traces" as "traces" | "spans" | "service-graph" | "services-catalog",
     resultGrid: {
       rowsPerPage: 25,
@@ -202,6 +203,7 @@ const mockSearchObj = {
     },
     streamResults: { list: [] },
     queryResults: { hits: [] },
+    groupsRequest: null as any,
     sortedQueryResults: [],
     histogram: {
       layout: {},
@@ -4531,6 +4533,18 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockUpdatedLocalLogFilterField).toHaveBeenCalledWith("spans");
     });
 
+    it("restores a version 2 view's Group by, and reads a view without one as None", async () => {
+      await mountPage();
+      await applyViewAndWaitForSearch(savedView({ version: 2, groupBy: "service_name" }));
+      expect(mockSearchObj.meta.groupBy).toBe("service_name");
+      await applyViewAndWaitForSearch(savedView({ version: 2 }));
+      expect(mockSearchObj.meta.groupBy).toBe("");
+      mockSearchObj.meta.groupBy = "http_method";
+      await applyViewAndWaitForSearch(savedView({ version: 1, groupBy: "service_name" }));
+      expect(mockSearchObj.meta.groupBy).toBe("");
+      mockSearchObj.data.groupsRequest = null;
+    });
+
     it("restores a version 2 view's scope, and reads a view without one as All spans", async () => {
       await mountPage();
       await applyViewAndWaitForSearch(savedView({ version: 2, scope: "entrypoint" }));
@@ -5922,6 +5936,157 @@ describe("Index.vue (Main Traces Page)", () => {
         await wrapper.vm.extractFields();
         await flushPromises();
         expect(mockSearchObj.data.stream.hasParentColumn).toBe(false);
+      });
+    });
+
+    describe("Groups view", () => {
+      const ROOT = "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
+
+      const ownSqls = () =>
+        mockFetchQueryDataWithHttpStream.mock.calls
+          .filter((_c, i) => mockFetchQueryDataWithHttpStream.mock.contexts[i] === wrapper.vm.$)
+          .map(([request]: any[]) => b64DecodeUnicode(request.queryReq.query.sql));
+
+      const runGrouped = async (editorValue = "") => {
+        mockSearchObj.meta.sqlMode = false;
+        mockSearchObj.data.editorValue = editorValue;
+        wrapper.vm.searchData();
+        await flushPromises();
+      };
+
+      afterEach(() => {
+        mockSearchObj.meta.groupBy = "";
+        mockSearchObj.meta.scope = "all";
+        mockSearchObj.data.stream.hasParentColumn = false;
+        mockSearchObj.data.groupsRequest = null;
+      });
+
+      it("hands the Groups table the filter, scope and window, runs no span list, and still counts", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        mockSearchObj.meta.scope = "root";
+        mockSearchObj.data.stream.hasParentColumn = true;
+        await runGrouped("service_name = 'a'");
+        expect(mockSearchObj.data.groupsRequest).toMatchObject({
+          stream: "default",
+          key: "service_name",
+          filter: "service_name = 'a'",
+          scope: ROOT,
+        });
+        const request = mockSearchObj.data.groupsRequest!;
+        expect(request.startTime).toBeGreaterThan(0);
+        expect(request.endTime).toBeGreaterThan(request.startTime);
+        const sqls = ownSqls();
+        expect(sqls.some((sql) => sql.startsWith("SELECT * FROM"))).toBe(false);
+        expect(sqls.at(-1)).toMatch(/^select count\(\*\) as span_count/);
+        expect(mockSearchObj.loading).toBe(false);
+      });
+
+      it("gives every grouped run a new request, so the table reloads", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        await runGrouped();
+        const first = mockSearchObj.data.groupsRequest!.runId;
+        await runGrouped();
+        expect(mockSearchObj.data.groupsRequest!.runId).toBeGreaterThan(first);
+      });
+
+      it("runs at once from page 1 when a field is picked, and back to the list on None", async () => {
+        await mountSql();
+        mockSearchObj.data.resultGrid.currentPage = 2;
+        wrapper.findComponent({ name: "search-bar" }).vm.$emit("update:groupBy", "http_method");
+        await flushPromises();
+        expect(mockSearchObj.meta.groupBy).toBe("http_method");
+        expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
+        expect(mockSearchObj.data.groupsRequest?.key).toBe("http_method");
+
+        mockFetchQueryDataWithHttpStream.mockClear();
+        wrapper.findComponent({ name: "search-bar" }).vm.$emit("update:groupBy", "");
+        await flushPromises();
+        expect(mockSearchObj.data.groupsRequest).toBeNull();
+        expect(ownSqls()[0]).toMatch(/^SELECT \* FROM "default"/);
+      });
+
+      it("records no recent search for a grouped run, as a recent entry holds no Group by", async () => {
+        const record = vi.spyOn(queryHistory, "record").mockResolvedValue({ data: {} } as never);
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        record.mockClear();
+        await runGrouped("service_name = 'a'");
+        expect(mockSearchObj.data.groupsRequest).not.toBeNull();
+        expect(record).not.toHaveBeenCalled();
+        record.mockRestore();
+      });
+
+      it("restores a recent search as the span list, not the current Groups view", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        await runGrouped();
+        mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+        mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+        const entry: QueryHistoryEntry = {
+          id: "t1",
+          source: "traces",
+          query: "service_name = 'cart'",
+          query_key: "k",
+          streams: ["default"],
+          context: { page: { stream: "default", tab: "spans" } },
+          status: "ok",
+          starred: false,
+          run_count: 1,
+          created_at: 1,
+          updated_at: 2,
+        };
+        mockFetchQueryDataWithHttpStream.mockClear();
+        wrapper
+          .findComponent({ name: "search-bar" })
+          .vm.$emit("recent-restore", entry, "now", true);
+        await flushPromises();
+        expect(mockSearchObj.meta.groupBy).toBe("");
+        expect(mockSearchObj.data.groupsRequest).toBeNull();
+        expect(ownSqls()[0]).toMatch(/^SELECT \* FROM "default"/);
+      });
+
+      it("loads a recent search without running and drops the shown Groups table", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        await runGrouped();
+        expect(mockSearchObj.data.groupsRequest).not.toBeNull();
+        mockSearchObj.data.stream.streamLists = [{ label: "default", value: "default" }];
+        mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+        const entry: QueryHistoryEntry = {
+          id: "t1",
+          source: "traces",
+          query: "service_name = 'cart'",
+          query_key: "k",
+          streams: ["default"],
+          context: { page: { stream: "default", tab: "spans" } },
+          status: "ok",
+          starred: false,
+          run_count: 1,
+          created_at: 1,
+          updated_at: 2,
+        };
+        mockFetchQueryDataWithHttpStream.mockClear();
+        wrapper
+          .findComponent({ name: "search-bar" })
+          .vm.$emit("recent-restore", entry, "now", false);
+        await flushPromises();
+        expect(mockSearchObj.meta.groupBy).toBe("");
+        expect(mockSearchObj.data.groupsRequest).toBeNull();
+        expect(ownSqls()).toEqual([]);
+      });
+
+      it("keeps the span list in SQL mode and in the Traces view", async () => {
+        await mountSql();
+        mockSearchObj.meta.groupBy = "service_name";
+        await runSql(`SELECT * FROM "default"`);
+        expect(mockSearchObj.data.groupsRequest).toBeNull();
+
+        mockSearchObj.meta.searchMode = "traces";
+        await runGrouped();
+        expect(mockSearchObj.data.groupsRequest).toBeNull();
+        mockSearchObj.meta.searchMode = "spans";
       });
     });
 

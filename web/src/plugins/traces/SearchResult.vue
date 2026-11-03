@@ -186,13 +186,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The toggle's root renders no DOM node, so a class on it would be dropped. -->
         <div v-if="!matchAllFix && sqlShape === 'spans'" class="ms-1 inline-flex shrink-0">
           <OTableColumnToggle
-            :columns="searchObj.data.resultGrid.columns"
+            :columns="groupsShown ? groupsColumns : searchObj.data.resultGrid.columns"
             :column-visibility="columnVisibility"
             @update:column-visibility="setColumnVisibility"
           />
         </div>
         <div
-          v-if="pagerShown"
+          v-if="pagerShown && !groupsShown"
           class="flex items-center transition-opacity"
           :class="{ 'opacity-60': pagerInert }"
           :aria-disabled="regionBusy ? 'true' : undefined"
@@ -297,6 +297,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @open-trace="openTraceById"
           @add-trace-id="$emit('add-trace-id')"
         />
+        <TracesGroupsTable
+          v-else-if="groupsShown"
+          :request="searchObj.data.groupsRequest!"
+          :sort="searchObj.meta.groupsSort"
+          :columns="groupsColumns"
+          :column-visibility="columnVisibility"
+          :wrap="searchObj.meta.resultGrid.wrapCells"
+          @update:sort="(sort) => (searchObj.meta.groupsSort = sort)"
+        />
         <TracesSearchResultList
           v-else
           ref="searchResultListRef"
@@ -356,7 +365,9 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import { useRouter } from "vue-router";
 import TracesSearchResultList from "./components/TracesSearchResultList.vue";
 import TracesSqlResultTable from "./components/TracesSqlResultTable.vue";
-import { buildResultColumns } from "./composables/useTracesTableColumns";
+import TracesGroupsTable from "./components/TracesGroupsTable.vue";
+import { buildGroupsColumns } from "./composables/tracesGroupsColumns";
+import { buildResultColumns, fillLastColumn } from "./composables/useTracesTableColumns";
 import {
   analyzeTracesSql,
   canAddTraceId,
@@ -404,6 +415,7 @@ export default defineComponent({
     ORegionStatus,
     TracesSearchResultList,
     TracesSqlResultTable,
+    TracesGroupsTable,
     OEmptyState,
     EmptyStateActionCard,
     OTableColumnToggle,
@@ -704,14 +716,30 @@ export default defineComponent({
         ),
     );
 
+    // The Groups table stands for the list until the next run, which is what clears the request.
+    const groupsShown = computed(
+      () =>
+        !!searchObj.data.groupsRequest &&
+        searchObj.meta.searchMode === "spans" &&
+        !searchObj.meta.sqlMode,
+    );
+
     // Each view's list keeps its own hidden columns, as each OTable keeps its own.
     const columnToggles = {
       spans: useExternalColumnToggle("traces-spans-list"),
       traces: useExternalColumnToggle("traces-traces-list"),
+      groups: useExternalColumnToggle("traces-groups-list"),
     };
-    const listColumnToggle = computed(() =>
-      searchObj.meta.searchMode === "spans" ? columnToggles.spans : columnToggles.traces,
-    );
+    const groupsColumns = computed(() => {
+      if (!groupsShown.value) return [];
+      const cols = buildGroupsColumns(searchObj.data.groupsRequest?.key ?? "", t);
+      fillLastColumn(cols, "", columnToggles.groups.columnVisibility.value);
+      return cols;
+    });
+    const listColumnToggle = computed(() => {
+      if (groupsShown.value) return columnToggles.groups;
+      return searchObj.meta.searchMode === "spans" ? columnToggles.spans : columnToggles.traces;
+    });
     const columnVisibility = computed(() => listColumnToggle.value.columnVisibility.value);
     const setColumnVisibility = (visibility: Record<string, boolean>) =>
       listColumnToggle.value.setColumnVisibility(visibility);
@@ -898,6 +926,8 @@ export default defineComponent({
       rowsPerPageOptions,
       columnVisibility,
       setColumnVisibility,
+      groupsShown,
+      groupsColumns,
       totalPages,
       openComparison,
       toggleWrapCells,

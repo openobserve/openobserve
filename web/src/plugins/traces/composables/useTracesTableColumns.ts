@@ -194,8 +194,8 @@ function spanDerivedColumns(
 }
 
 /** Marks the last shown non-timestamp column to absorb leftover width, which clamps every other column to its size. */
-export function fillLastColumn(
-  cols: OTableColumnDef<Record<string, any>>[],
+export function fillLastColumn<TRow>(
+  cols: OTableColumnDef<TRow>[],
   timestampCol: string,
   columnVisibility: Record<string, boolean> = {},
 ): void {
