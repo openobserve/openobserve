@@ -36,8 +36,10 @@
  *    row would be a nesting level whose only content is a missing fact.
  */
 
-import type { DbmBreakdown, DbmBreakdownNode } from "@/utils/dbm/breakdown";
+import { SHORTFALL_FLOOR, type DbmBreakdown, type DbmBreakdownNode } from "@/utils/dbm/breakdown";
+import type { DbTotalsRow } from "@/services/db_monitoring";
 import { errorRate } from "@/utils/dbm/format";
+import { worstPercentile } from "@/utils/dbm/instanceRows";
 
 /**
  * Which tier of the split a child row came from.
@@ -189,6 +191,94 @@ export const toBreakdownRows = (
     };
   });
 };
+
+/** The exact per-schema totals a schema row is built from. */
+export type DbmSchemaTotals = Pick<
+  DbTotalsRow,
+  "db_namespace" | "calls" | "errors" | "total_time_ns" | "p50_ns" | "p95_ns" | "p99_ns"
+>;
+
+const UNATTRIBUTED_KEY = "schema:\u0000none";
+
+const schemaRow = (
+  name: string | null,
+  rows: DbmSchemaTotals[],
+  services: DbmBreakdownNode[],
+  serverTotal: number,
+  parentKey: string,
+): DbmBreakdownRow => {
+  const key = `${parentKey}/${name === null ? UNATTRIBUTED_KEY : `schema:${name}`}`;
+  const calls = rows.reduce((acc, row) => acc + (row.calls ?? 0), 0);
+  const errors = rows.reduce((acc, row) => acc + (row.errors ?? 0), 0);
+  const time = rows.reduce((acc, row) => acc + (row.total_time_ns ?? 0), 0);
+  return {
+    rowKey: key,
+    kind: "schema",
+    name,
+    namespace: name,
+    service: null,
+    calls,
+    errors,
+    errorRate: errorRate(errors, calls),
+    total_time_ns: time,
+    share: serverTotal > 0 ? time / serverTotal : 0,
+    p50_ns: worstPercentile(rows, (row) => row.p50_ns) ?? null,
+    p95_ns: worstPercentile(rows, (row) => row.p95_ns) ?? null,
+    p99_ns: worstPercentile(rows, (row) => row.p99_ns) ?? null,
+    queryCount: services.reduce((acc, service) => acc + service.queryCount, 0),
+    status: null,
+    children: services.map((child) => serviceRow(child, name, key)),
+  };
+};
+
+/** A server's children from its exact schema totals, plus one row for its unnamed totals. */
+export const toSchemaRows = (
+  state: DbmBreakdownState | undefined,
+  schemas: DbmSchemaTotals[],
+  parentKey: string,
+): DbmBreakdownRow[] => {
+  const named = schemas.filter((schema) => !!schema.db_namespace);
+  if (!named.length) return toBreakdownRows(state, parentKey);
+  if (!state || state.loading) return [statusRow("loading", parentKey)];
+
+  const nodes = new Map<string, DbmBreakdownNode>();
+  if (!state.failed) {
+    for (const node of state.breakdown.collapsed ? [] : state.breakdown.levels) {
+      if (node.name) nodes.set(node.name, node);
+    }
+  }
+  const unnamed = schemas.filter((schema) => !schema.db_namespace);
+  const serverTotal = schemas.reduce((acc, schema) => acc + (schema.total_time_ns ?? 0), 0);
+
+  const rows = named.map((schema) => {
+    const name = schema.db_namespace as string;
+    return schemaRow(name, [schema], nodes.get(name)?.children ?? [], serverTotal, parentKey);
+  });
+  // A multi-schema statement's time sits in its schemas' totals, so listing it here would count it twice.
+  if (unnamed.length) {
+    const services = state.failed ? [] : state.breakdown.unnamed;
+    rows.push(schemaRow(null, unnamed, services, serverTotal, parentKey));
+  }
+  if (state.failed) rows.push(statusRow("error", parentKey));
+  return rows;
+};
+
+/** The share of the parent's time its children leave unaccounted, above the rounding floor. */
+export const childShortfall = (
+  children: DbmBreakdownRow[],
+  parentTotalNs: number | null | undefined,
+): number | null => {
+  if (!parentTotalNs || parentTotalNs <= 0) return null;
+  // A status row has no figures, so a split that is not in yet has no gap to state.
+  if (!children.some((child) => child.kind !== "status")) return null;
+  const covered = children.reduce((acc, child) => acc + child.total_time_ns, 0);
+  const missing = (parentTotalNs - covered) / parentTotalNs;
+  return missing >= SHORTFALL_FLOOR ? missing : null;
+};
+
+/** A schema row's own uncovered share; `null` on any other row and when nothing was attributed. */
+export const schemaShortfall = (row: DbmBreakdownRow): number | null =>
+  row.kind === "schema" ? childShortfall(row.children, row.total_time_ns) : null;
 
 /**
  * Whether this database's split may carry the coverage caveat.

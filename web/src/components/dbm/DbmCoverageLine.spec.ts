@@ -62,6 +62,22 @@ describe("DbmCoverageLine", () => {
       expect(lineText(wrapper)).toContain("they're exact");
     });
 
+    it("says a several-schema database shows its slowest schema's speeds", () => {
+      const wrapper = mountLine({ exactPercentiles: true, slowestSchemaSpeeds: true });
+      expect(lineText(wrapper)).toBe(
+        "All databases reporting. Speeds are exact per schema; a database with several schemas shows its slowest one.",
+      );
+    });
+
+    it("keeps the estimated copy when the server fused windows, several schemas or not", () => {
+      const wrapper = mountLine({
+        exactPercentiles: true,
+        slowestSchemaSpeeds: true,
+        freshness: freshness({ percentiles_estimated: true }),
+      });
+      expect(lineText(wrapper)).toContain("close but not exact");
+    });
+
     it("never claims exactness when the server fused windows", () => {
       const wrapper = mountLine({
         exactPercentiles: false,

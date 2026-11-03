@@ -16,7 +16,9 @@
 import { ref } from "vue";
 import { useStore } from "vuex";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
-import onlineEvalsService, { type ScoreConfig } from "@/services/online-evals.service";
+import { type ScoreConfig } from "@/services/online-evals.service";
+import { scoreConfigsQuery } from "@/services/online-evals.service.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { buildTargetScoresSql, type TraceScoreScope } from "../utils/traceScoreSql";
 
 export interface TraceScoreChip {
@@ -70,7 +72,7 @@ export function useTraceScoreChips() {
           endTimeUs,
           "logs",
         ),
-        onlineEvalsService.scoreConfigs.listCached(orgId).catch(() => [] as ScoreConfig[]),
+        queryClient.fetchQuery(scoreConfigsQuery(orgId)).catch(() => [] as ScoreConfig[]),
       ]);
 
       const configById = new Map<string, ScoreConfig>();

@@ -3183,15 +3183,21 @@ pub async fn update_status_as(
         return through_the_one_ack(org_id, incident_id, status, user_id).await;
     }
     // Read before the resolve clears it, so resolving a muted incident still notifies nobody.
+    let before = infra::table::alert_incidents::get(org_id, incident_id).await?;
     let muted_before = reads_mute_before(
         status,
         o2_enterprise::enterprise::common::config::get_config()
             .downtimes
             .enabled,
-    ) && infra::table::alert_incidents::get(org_id, incident_id)
-        .await?
+    ) && before
+        .as_ref()
         .is_some_and(|m| m.muted_by_downtime_id.is_some());
-    let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
+    // A re-sent Resolve re-runs the idempotent repairs but keeps the first row and event.
+    let again = status == "resolved" && before.as_ref().is_some_and(|m| m.status == "resolved");
+    let updated = match before {
+        Some(m) if again => m,
+        _ => infra::table::alert_incidents::update_status(org_id, incident_id, status).await?,
+    };
 
     let muted = status_change_is_muted(
         quiet || muted_before,
@@ -3216,7 +3222,7 @@ pub async fn update_status_as(
         "open" => Some(IncidentEvent::reopened(user_id, "Manually reopened")),
         _ => None,
     };
-    if let Some(evt) = event
+    if let Some(evt) = event.filter(|_| !again)
         && let Err(e) = append_event_unless_muted(org_id, incident_id, evt, muted).await
     {
         log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");

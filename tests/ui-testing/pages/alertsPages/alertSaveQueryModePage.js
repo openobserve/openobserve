@@ -280,9 +280,9 @@ export class AlertSaveQueryModePage {
     ).toBeVisible({ timeout: 15000 });
   }
 
-  async expectDetailConditionEmpty() {
+  async expectDetailConditionCountOnly() {
     const condition = this.page.locator(this.locators.detailCondition);
-    await expect(condition).toContainText('—');
+    await expect(condition).toContainText('count >=');
     await expect(condition).not.toContainText('SELECT');
   }
 
