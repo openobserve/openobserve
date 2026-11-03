@@ -31,9 +31,9 @@ name: Playwright E2E Crosscheck
 #   vars.ENT_E2E_GATE_DISABLED — 'true' kill switch: gate passes without dispatching.
 
 on:
-  # Pushes, base changes and the gate's own labels run it; any other label or edit only mirrors its current result.
+  # Opens, reopens, pushes, base changes and the gate's own labels run it; any other label or edit only mirrors its current result.
   pull_request:
-    types: [synchronize, edited, labeled, unlabeled, ready_for_review, converted_to_draft]
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review, converted_to_draft]
   # A required check must also report on merge-queue commits; the gate already passed on the PR head.
   merge_group:
 
@@ -58,8 +58,8 @@ jobs:
       pull-requests: read
       checks: read
       actions: read
-    # Starting (5) + the first run's budget (155) + two lost-runner re-runs (71 each), from the poll budgets below.
-    timeout-minutes: 310
+    # Starting (5) + the first run's budget (165) + two lost-runner re-runs (80 each, plus 1 to see the new attempt), from the poll budgets below.
+    timeout-minutes: 340
     steps:
       - name: Triage — relevant paths? opted out?
         id: triage
@@ -121,6 +121,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           RUN_ID: ${{ github.run_id }}
+          GATE_ON: ${{ contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false }}
         run: |
           set -euo pipefail
           CHECKS="repos/${{ github.repository }}/commits/$HEAD_SHA/check-runs?check_name=Playwright%20E2E%20Crosscheck&filter=all&per_page=100"
@@ -145,17 +146,23 @@ jobs:
             fi
             read -r ID STATUS CONCL <<<"$(sort -n <<<"$LIST" | tail -n 1)"
             if [ -z "$ID" ]; then
+              # This check is the newest, so passing here would make the required check green without the gate ever running.
+              if [ "$GATE_ON" = "true" ]; then
+                echo "::error::No Playwright E2E Crosscheck run exists for $HEAD_SHA, so there is no result to report. Re-apply the 'ready-for-ci' label or push a commit to run the gate."
+                exit 1
+              fi
               echo "::notice::No gate result on $HEAD_SHA yet — nothing to mirror."
               exit 0
             fi
-            # Mirrors share this check name, so a check that ran the Mirror step, or a cancelled one whose Run step never started, is no gate result.
+            # Mirrors and failed triages share this check name, so only a check whose Run step started is a gate result; an unfinished one may still start it.
             if ! RAN=$(gh api "repos/${{ github.repository }}/actions/jobs/$ID" -q '[.steps[]? | select(.status == "in_progress" or (.conclusion != null and .conclusion != "skipped")) | .name | split(" — ")[0]] | join(" ")'); then
               api_error; continue
             fi
-            if [[ " $RAN " == *" Mirror "* ]] || { [ "$CONCL" = "cancelled" ] && [[ " $RAN " != *" Run "* ]]; }; then
+            if [[ " $RAN " == *" Run "* ]]; then
+              if [ "$STATUS" = "completed" ]; then break; fi
+            elif [[ " $RAN " == *" Mirror "* ]] || [ "$STATUS" = "completed" ]; then
               IGNORE=$(jq -c --argjson i "$ID" '. + [$i]' <<<"$IGNORE"); continue
             fi
-            if [ "$STATUS" = "completed" ]; then break; fi
             # This check is newer than the running gate, so it must end with the gate's result, not before it.
             ERRORS=0; sleep 30
           done
@@ -302,8 +309,8 @@ jobs:
 
           # A lost runner is infra, not the PR: re-run only the lost ENT jobs, up to 3 attempts of the run in all.
           MAX_ATTEMPTS=3; RETRIES=0
-          # Poll budgets follow the engine's job timeouts: subset 10 + build 75 + shard 45 + aggregate 10 min, plus 15 min of runner queueing.
-          SHARD_MIN=45; RUN_BUDGET_MIN=$((10 + 75 + SHARD_MIN + 10 + 15)); RERUN_BUDGET_MIN=$((SHARD_MIN + 10 + 15))
+          # Poll budgets follow the engine's job timeouts: subset 10 + build 75 + shard 45 + aggregate 10 + report 10 min, plus 15 min of runner queueing.
+          SHARD_MIN=45; RUN_BUDGET_MIN=$((10 + 75 + SHARD_MIN + 10 + 10 + 15)); RERUN_BUDGET_MIN=$((SHARD_MIN + 10 + 10 + 15))
           DEADLINE=$((SECONDS + RUN_BUDGET_MIN * 60))
           while :; do
             STATUS=""; CONCL=""
@@ -396,7 +403,7 @@ jobs:
           rm -rf /tmp/fs; SPEC_LIST=""
           if [ "$TEST_CONCL" = "failure" ] && gh run download "$RUN_ID" --repo "$REPO" -n failed-specs -D /tmp/fs >/dev/null 2>&1 && [ -f /tmp/fs/failed-specs.txt ]; then
             # A comment body is capped at 65536 characters, so a huge list would make the update fail.
-            SPEC_LIST=$(sed '/^[[:space:]]*$/d' /tmp/fs/failed-specs.txt | head -n 50 | cut -c1-200 | sed 's/^/- `/; s/$/`/')
+            SPEC_LIST=$(awk '!/^[[:space:]]*$/ && n < 50 { n++; print "- `" substr($0, 1, 200) "`" }' /tmp/fs/failed-specs.txt)
             SPEC_N=$(grep -cv '^[[:space:]]*$' /tmp/fs/failed-specs.txt || true)
             if [ "${SPEC_N:-0}" -gt 50 ]; then SPEC_LIST="$SPEC_LIST"$'\n'"- … $((SPEC_N - 50)) more"; fi
           fi
