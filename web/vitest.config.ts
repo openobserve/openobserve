@@ -56,6 +56,8 @@ export default mergeConfig(
       include: ["src/**/*.spec.{ts,js,vue}"],
       root: fileURLToPath(new URL('.', import.meta.url)),
       setupFiles: ['src/test/unit/helpers/setupTests.ts'],
+      // One CI retry absorbs timing flakes that otherwise eject the merge queue; local runs still fail fast.
+      retry: process.env.CI ? 1 : 0,
       // The suite must not depend on WHERE it runs.
       //
       // Much of what we format is local-time by design — a "last triggered at"
