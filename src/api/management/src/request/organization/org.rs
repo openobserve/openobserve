@@ -498,6 +498,7 @@ pub async fn update_user_passcode(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(RumIngestionResponse)),
+        (status = 403, description = "Forbidden: the caller's role may not read the RUM token", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(

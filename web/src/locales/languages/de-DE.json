@@ -6026,6 +6026,7 @@
     "resetRUMTokenLabel": "RUM-Token zurücksetzen",
     "generateRUMTokenLabel": "RUM-Token generieren",
     "generateRUMTokenMessage": "Generieren Sie ein RUM-Token, um RUM für Ihre Organisation zu aktivieren.",
+    "rumTokenForbiddenMessage": "Ihre Rolle kann das RUM-Token nicht einsehen. Fragen Sie einen Administrator nach dem RUM-Setup-Snippet oder nach der Rolle, die nötig ist, um es hier zu sehen.",
     "rumPlatform": "Plattform",
     "rumPlatformBrowser": "Browser",
     "rumPlatformReactNative": "React Native",
@@ -6185,7 +6186,7 @@
       },
       "installOneClick": "Zu {client} hinzufügen",
       "skillsLabel": "{brand}-Skill hinzufügen (optional)",
-      "skillsHint": "Bringt Ihrem KI-Assistenten bei, wie er in {brand} Abfragen durchführt, Alarme einrichtet und Dashboards erstellt, damit er mehr aus den MCP-Tools herausholt. Führen Sie es in Ihrem Projekt aus; es installiert die Skills in jedes KI-Tool, das es auf Ihrem Rechner findet.",
+      "skillsHint": "Bringt Ihrem KI-Assistenten bei, wie er in {brand} Abfragen durchführt, Alarme einrichtet und Dashboards erstellt, damit er mehr aus den MCP-Tools herausholt. Führen Sie es in Ihrem Projekt aus; es installiert sie in jedes KI-Tool, das es auf Ihrem Rechner findet.",
       "skillsRepo": "Die Skills auf {host} anzeigen"
     },
     "manageTokensBtnLabel": "Tokens verwalten",
