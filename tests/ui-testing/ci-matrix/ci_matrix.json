@@ -31,7 +31,8 @@
       "alerts-destinations-usage.spec.js",
       "alerts-save-query-mode.spec.js",
       "alerts-no-destination.spec.js",
-      "alerts-from-panel.spec.js"
+      "alerts-from-panel.spec.js",
+      "alert-calibration.spec.js"
     ],
     "disabled": [
       {
