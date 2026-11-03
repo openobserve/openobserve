@@ -606,9 +606,21 @@ const FAILED_REQUEST_WINDOW_US = 60_000_000;
 
 const isFailedRequest = computed(() => props.event?.type === "failed_request");
 
+// A resource's action_id is a JSON list of action ids ("[]" when it has none); a plain id is taken as is.
+const requestActionIds = (actionId: unknown): string[] => {
+  if (typeof actionId !== "string" || !actionId) return [];
+  try {
+    const parsed = JSON.parse(actionId);
+    return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [actionId];
+  } catch {
+    return [actionId];
+  }
+};
+
 const canFetchRelated = (type: unknown): boolean => {
   if (type === "action") return !!props.rawEvent?.action_id;
-  if (type === "failed_request") return !!(props.rawEvent?.action_id || props.rawEvent?.view_id);
+  if (type === "failed_request")
+    return requestActionIds(props.rawEvent?.action_id).length > 0 || !!props.rawEvent?.view_id;
   return false;
 };
 
@@ -629,9 +641,14 @@ const relatedResourcesRequest = () => {
     start_time: arrivalUs - FAILED_REQUEST_WINDOW_US,
     end_time: arrivalUs + FAILED_REQUEST_WINDOW_US,
   };
-  if (raw.action_id) {
+  const actionIds = requestActionIds(raw.action_id);
+  if (actionIds.length) {
+    // The other requests of the action hold it in their own action_id list, the action event as a plain id.
+    const ofActions = actionIds
+      .map((id) => `${sqlLike("action_id", id)} or ${sqlEquals("action_id", id)}`)
+      .join(" or ");
     return {
-      sql: `select * from "_rumdata" where ${sqlEquals("action_id", raw.action_id)} and ${sqlEquals("session_id", props.sessionId)} ${orderBy}`,
+      sql: `select * from "_rumdata" where (${ofActions}) and ${sqlEquals("session_id", props.sessionId)} ${orderBy}`,
       ...window,
     };
   }

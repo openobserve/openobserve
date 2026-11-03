@@ -1626,10 +1626,33 @@ describe("EventDetailDrawerContent: failed_request", () => {
 
     expect(captured).toHaveLength(1);
     expect(captured[0].sql).toBe(
-      `select * from "_rumdata" where action_id='act-1' and session_id='session-456' order by _timestamp desc`,
+      `select * from "_rumdata" where (action_id LIKE '%act-1%' or action_id='act-1') and session_id='session-456' order by _timestamp desc`,
     );
     expect(captured[0].start).toBe(1700000000000 * 1000 - 60_000_000);
     expect(captured[0].end).toBe(1700000000000 * 1000 + 60_000_000);
+    wrapper.unmount();
+  });
+
+  it("reads a resource's action_id list, matching each action it holds", async () => {
+    const wrapper = await mountFailed(
+      failedEvent(),
+      failedRaw({ action_id: '["act-1","act-2"]' }),
+      1,
+    );
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].sql).toBe(
+      `select * from "_rumdata" where (action_id LIKE '%act-1%' or action_id='act-1' or action_id LIKE '%act-2%' or action_id='act-2') and session_id='session-456' order by _timestamp desc`,
+    );
+    wrapper.unmount();
+  });
+
+  it("uses the view query when the resource's action_id list is empty", async () => {
+    const wrapper = await mountFailed(failedEvent(), failedRaw({ action_id: "[]" }), 1);
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].sql).toContain(`where view_id=`);
+    expect(captured[0].sql).not.toContain("action_id");
     wrapper.unmount();
   });
 

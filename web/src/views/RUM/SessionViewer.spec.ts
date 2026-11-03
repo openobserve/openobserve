@@ -2292,7 +2292,6 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     streamsMock.getStream = null;
     vi.useRealTimers();
     vi.mocked(searchService.search).mockImplementation(originalSearch);
-    streamsMock.getStream = null;
     tracesStream.resolve = async (ids) =>
       Object.fromEntries(ids.map((id) => [id, { stream: "default" }]));
     tracesStream.outcome = { failed: false, streams: ["default"] };
