@@ -252,6 +252,7 @@
                   class="min-w-0 flex-1"
                   :placeholder="t('aiObservability.promptManagement.form.searchCommitMessage')"
                   clearable
+                  :aria-label="t('aiObservability.promptManagement.form.searchCommitMessage')"
                   data-test="prompt-version-search"
                 />
                 <OSelect

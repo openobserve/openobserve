@@ -102,7 +102,7 @@ describe("loadLogsData — requests the URL search waits on", () => {
     expect(prefetchStreamSchema).toHaveBeenCalledWith("app", "logs");
     expect(prefetchStreamSchema).toHaveBeenCalledWith("web", "logs");
     expect(calls.indexOf("schema:logs/app")).toBeLessThan(calls.indexOf("streams"));
-    finishStreams({ list: [] });
+    finishStreams({ list: [{ name: "app" }, { name: "web" }] });
     await loaded;
   });
 

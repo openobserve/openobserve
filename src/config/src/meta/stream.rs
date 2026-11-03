@@ -160,7 +160,7 @@ impl StreamType {
     pub fn support_uds(&self) -> bool {
         matches!(
             *self,
-            StreamType::Logs | StreamType::Metrics | StreamType::Traces
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Profiles
         )
     }
 
@@ -1734,7 +1734,7 @@ mod tests {
         assert!(StreamType::Metrics.support_uds());
         assert!(StreamType::Traces.support_uds());
         assert!(!StreamType::EnrichmentTables.support_uds());
-        assert!(!StreamType::Profiles.support_uds());
+        assert!(StreamType::Profiles.support_uds());
         assert!(!StreamType::Filelist.support_uds());
         assert!(!StreamType::Metadata.support_uds());
         assert!(!StreamType::Index.support_uds());

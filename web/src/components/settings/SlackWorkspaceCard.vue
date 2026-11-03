@@ -140,6 +140,18 @@ const outbound = computed(() => {
     slow: secs > OUTBOUND_SLOW_SECS,
   };
 });
+const refused = computed(() => {
+  const posts = props.installation.health.refused_posts;
+  if (!posts) return null;
+  return {
+    text: t(
+      "slackApp.card.refusedPosts",
+      { count: posts.count, reason: posts.last_reason, destination: posts.last_destination },
+      posts.count,
+    ),
+    at: posts.last_at,
+  };
+});
 const socketsAsOf = computed(() =>
   props.installation.health.as_of
     ? formatTimestamp(props.installation.health.as_of, "MMM d, HH:mm")
@@ -381,6 +393,15 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
             :class="outbound.slow ? 'text-status-warning-text' : 'text-status-positive'"
           />
           {{ outbound.text }}
+        </span>
+        <span
+          v-if="refused"
+          class="text-status-warning-text flex items-center gap-2 text-sm md:col-span-2"
+          data-test="slack-workspace-refused"
+        >
+          <OIcon name="warning-amber" size="sm" />
+          {{ refused.text }}
+          <OTimeCell :value="refused.at" unit="us" />
         </span>
         <span
           v-if="appTokenWarning"

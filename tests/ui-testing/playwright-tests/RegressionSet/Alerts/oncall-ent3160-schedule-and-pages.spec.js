@@ -19,7 +19,6 @@ const {
   seedOnCallStream,
   seedNotificationDestination,
   createPagingAlert,
-  triggerAlertOrLetSchedulerFire,
   waitForPages,
   getRoutingConfig,
   deleteTeamById,
@@ -134,10 +133,10 @@ test.describe('On-call P2 fixes (o2-enterprise#3160)', {
       });
       made.alerts.push(alert.id);
       alerts.push({ ...spec, alert });
-      await triggerAlertOrLetSchedulerFire(page, alert.id);
     }
     seededPages = {};
     for (const { key, teamId, alert } of alerts) {
+      // The scheduler fires each new alert; a manual trigger would open a teamless page that swallows that firing.
       const [record] = await waitForPages(page, { alertId: alert.id, teamId });
       made.pages.push(record.id);
       seededPages[key] = { name: alert.name, record };

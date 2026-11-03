@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           :model-value="row.label"
           :placeholder="labelPlaceholder"
+          :aria-label="labelLabel"
           :data-test="`${dataTestPrefix}-row-${index}-label-input`"
           @update:model-value="(v) => updateRow(index, 'label', String(v ?? ''))"
         />
@@ -65,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             valueKey === 'value' ? (row as ContentField).value : (row as ContentLink).url
           "
           :placeholder="valuePlaceholder"
+          :aria-label="valueLabel"
           :error="!!valueErrorFor(row)"
           :error-message="valueErrorFor(row) ?? undefined"
           :data-test="`${dataTestPrefix}-row-${index}-value-input`"
@@ -79,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           width="sm"
           :placeholder="t('alert_templates.showWhenAllPlaceholder')"
           :title="t('alert_templates.showWhenCaption')"
+          :aria-label="t('alert_templates.showWhenLabel')"
           :data-test="`${dataTestPrefix}-row-${index}-severity-select`"
           @update:model-value="(v) => updateShowWhen(index, (v as string[]) ?? [])"
         />
