@@ -333,7 +333,9 @@ jobs:
     needs: [check_changes, ui_unit_test_shards]
     if: always() && needs.check_changes.outputs.has_ui_changes == 'true'
     timeout-minutes: 20
-    runs-on: ubuntu-latest
+    # Ubicloud, like the shards: their node_modules cache is invisible to GitHub-hosted runners.
+    runs-on:
+      labels: ubicloud-standard-4
     permissions:
       contents: read
 
@@ -345,6 +347,7 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
