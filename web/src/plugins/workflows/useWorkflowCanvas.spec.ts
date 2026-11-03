@@ -18,7 +18,7 @@
 // response (errors as an ARRAY, per-node inputs as a MAP) into the shared
 // testRun.result shape the canvas badges + step drawer read.
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import i18nInstance from "@/locales";
 
 const t = (i18nInstance.global as any).t;
@@ -3447,26 +3447,57 @@ describe("useWorkflowCanvas — flushing test state to the server", () => {
 // no stored input, and the endpoint answers 400 "Errored run info not found".
 describe("isRetryableRun — the gate that keeps retry off runs the backend must refuse", () => {
   it("accepts a failed run from a real trigger", () => {
-    expect(isRetryableRun({ event_type: "AlertFired", error: "boom" })).toBe(true);
+    expect(isRetryableRun({ event_type: "AlertFired", status: "failed", error: "boom" })).toBe(
+      true,
+    );
   });
 
   it("accepts the other real trigger types", () => {
     for (const et of ["IncidentEvent", "Webhook", "Manual"]) {
-      expect(isRetryableRun({ event_type: et, error: "boom" })).toBe(true);
+      expect(isRetryableRun({ event_type: et, status: "failed", error: "boom" })).toBe(true);
     }
   });
 
   it("rejects a SUCCESSFUL run — there is nothing to replay", () => {
-    expect(isRetryableRun({ event_type: "AlertFired", error: "" })).toBe(false);
+    expect(isRetryableRun({ event_type: "AlertFired", status: "succeeded", error: "" })).toBe(
+      false,
+    );
     expect(isRetryableRun({ event_type: "AlertFired" })).toBe(false);
   });
 
+  it("reads the outcome from the stored status, not the error text", () => {
+    expect(isRetryableRun({ event_type: "AlertFired", status: "succeeded", error: "boom" })).toBe(
+      false,
+    );
+    expect(isRetryableRun({ event_type: "Webhook", status: "failed", error: null })).toBe(true);
+  });
+
+  it("rejects HTTP runs that never executed or never finished — no input was stored", () => {
+    const runs = [
+      { status: "queued" },
+      { status: "running" },
+      { status: "expired" },
+      { status: "failed", error: "worker_lost" },
+      { status: "failed", error: "workflow_disabled" },
+      { status: "failed", error: "run_timeout" },
+      { status: "failed", error: "some node errored", http_request: { error: "worker_lost" } },
+    ];
+    for (const run of runs)
+      expect(isRetryableRun({ event_type: "Webhook", ...run } as any)).toBe(false);
+    expect(retryBlockedReason({ event_type: "Webhook", status: "expired" } as any)).toBe(
+      "no_input",
+    );
+    expect(
+      retryBlockedReason({ event_type: "Webhook", status: "failed", error: "worker_lost" } as any),
+    ).toBe("no_input");
+  });
+
   it("rejects a failed TEST run — /test never persists the run's input", () => {
-    expect(isRetryableRun({ event_type: "Test", error: "boom" })).toBe(false);
+    expect(isRetryableRun({ event_type: "Test", status: "failed", error: "boom" })).toBe(false);
   });
 
   it("rejects a failed RETRY run — retry_run records the run but stores no input", () => {
-    expect(isRetryableRun({ event_type: "Retry", error: "boom" })).toBe(false);
+    expect(isRetryableRun({ event_type: "Retry", status: "failed", error: "boom" })).toBe(false);
   });
 
   it("rejects null/undefined rather than throwing", () => {
@@ -3475,10 +3506,58 @@ describe("isRetryableRun — the gate that keeps retry off runs the backend must
   });
 
   it("names the blocker so a disabled affordance can say why", () => {
-    expect(retryBlockedReason({ event_type: "Test", error: "boom" })).toBe("test");
-    expect(retryBlockedReason({ event_type: "Retry", error: "boom" })).toBe("retry");
-    expect(retryBlockedReason({ event_type: "AlertFired", error: "" })).toBe("succeeded");
-    expect(retryBlockedReason({ event_type: "AlertFired", error: "boom" })).toBe("");
+    expect(retryBlockedReason({ event_type: "Test", status: "failed", error: "boom" })).toBe(
+      "test",
+    );
+    expect(retryBlockedReason({ event_type: "Retry", status: "failed", error: "boom" })).toBe(
+      "retry",
+    );
+    expect(retryBlockedReason({ event_type: "AlertFired", status: "succeeded", error: "" })).toBe(
+      "succeeded",
+    );
+    expect(retryBlockedReason({ event_type: "AlertFired", status: "failed", error: "boom" })).toBe(
+      "",
+    );
+  });
+});
+
+describe("loadWorkflowRun — a run with no stored step data is not fetched", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [{ id: "n1" }],
+      edges: [],
+    } as any;
+    workflowObj.testRun.result = null;
+  });
+
+  afterEach(() => {
+    workflowObj.runsHistory.list = [] as any;
+  });
+
+  it("loads an expired HTTP run as an empty history result without calling the run API", async () => {
+    workflowObj.runsHistory.list = [
+      { run_id: "h1", event_type: "Webhook", status: "expired", error: null },
+    ] as any;
+    const r = await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "h1" });
+    expect(r.ok).toBe(true);
+    expect(mockRun).not.toHaveBeenCalled();
+    const res: any = workflowObj.testRun.result;
+    expect(res.mode).toBe("history");
+    expect(res.runId).toBe("h1");
+    expect(res.inputs).toEqual({});
+    expect(res.errors).toEqual({});
+  });
+
+  it("still fetches a finished run", async () => {
+    workflowObj.runsHistory.list = [
+      { run_id: "h2", event_type: "Webhook", status: "failed", error: "boom" },
+    ] as any;
+    mockRun.mockResolvedValue({ data: { errors: null, data: null } });
+    await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "h2" });
+    expect(mockRun).toHaveBeenCalledTimes(1);
   });
 });
 

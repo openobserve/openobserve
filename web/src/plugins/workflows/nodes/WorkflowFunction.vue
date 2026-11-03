@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, onBeforeUnmount } from "vue";
+import { computed, ref, onBeforeUnmount } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -89,6 +89,7 @@ import {
 } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestDisplaySample } from "@/plugins/workflows/testSample";
 import { buildIncidentDisplaySample } from "@/plugins/workflows/incidentSample";
+import { httpPreviewSample, usesHttpPayload } from "@/plugins/workflows/httpEndpointUi";
 
 const { t } = useI18nTyped();
 const savedData: any = workflowObj.currentSelectedNodeData?.data || {};
@@ -114,7 +115,10 @@ const JS_DEFAULT_CODE = `// \`row\` is the trigger event: { meta: {...}, data: [
 const kind = currentTriggerKind();
 const displaySample = (k: string): unknown =>
   k === "incident_event" ? buildIncidentDisplaySample() : buildTestDisplaySample();
-const sampleEvents = kind ? [displaySample(kind)] : [];
+const sampleEvents = computed(() => {
+  if (!kind) return [];
+  return [usesHttpPayload() ? httpPreviewSample()[0] : displaySample(kind)];
+});
 
 // Inline "Create New Function" widens the drawer + hides its footer (the
 // AddFunction toolbar owns save/cancel).
