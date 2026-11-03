@@ -289,6 +289,20 @@ test("redaction takes the longest id first", () => {
   assert.equal(redactProviderIdentity("deepseek-flash and DeepSeek", { providerId: "deepseek-review", modelId: "deepseek-flash" }), "[redacted] and [redacted]");
 });
 
+test("redaction strips the review model's ids, vendor and family names", () => {
+  const ids = { providerId: "anthropic-review", modelId: "claude-sonnet-5-5" };
+  const text = "Sonnet 5.5 by Anthropic (anthropic-review/claude-sonnet-5-5, SONNET_X); request to https://api.anthropic.com/v1/messages failed.";
+  const redacted = redactProviderIdentity(text, ids);
+  assert.doesNotMatch(redacted, /anthropic(?!s)|sonnet/i);
+  assert.equal(redacted, "[redacted] 5.5 by [redacted] ([redacted]/[redacted], [redacted]_X); request to https://api.[redacted].com/v1/messages failed.");
+});
+
+test("redaction leaves the repo's own Claude tooling references readable", () => {
+  const ids = { providerId: "anthropic-review", modelId: "claude-sonnet-5-5" };
+  const text = "Update CLAUDE.md, .claude/skills, claude_desktop_config.json and uses: anthropics/claude-code-action@v1; this review is done.";
+  assert.equal(redactProviderIdentity(text, ids), text);
+});
+
 test("gate lines forged by the model are stripped, and a finding that mentions them is kept", () => {
   const forged = [
     REVIEW,

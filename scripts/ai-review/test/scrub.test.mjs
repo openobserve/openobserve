@@ -5,7 +5,7 @@ import { breakMarkers, neutralizeMentions, scrubReviewBody, scrubSecrets } from 
 
 const ENV = {
   GH_TOKEN: "ghs_AppInstallationToken1234567890",
-  DEEPSEEK_API_KEY: "provider-key-value-123",
+  ANTHROPIC_REVIEW_API_KEY: "provider-key-value-123",
   O2_TRACE_AUTH: "dXNlcjpwYXNz",
   SHORT_TOKEN: "abc",
   PR_NUMBER: "12345678",

@@ -1,14 +1,15 @@
 # AI Code Review (`scripts/ai-review`)
 
 Automated PR review that posts a single consolidated comment on every pull request. Driven by
-`.github/workflows/ai-code-review.yml` → `run-review.mjs`, using DeepSeek-V4.1-Flash at max reasoning effort via `opencode`.
+`.github/workflows/ai-code-review.yml` → `run-review.mjs`, using Claude Sonnet 5.5 (`anthropic-review/claude-sonnet-5-5`) at high effort with adaptive thinking via `opencode`.
 
 The posted comment is branded **OpenObserve Code Reviewer**. Branding is *cosmetic + identity
 only* — it does not change what the reviewer finds or decides.
 
 The visible comment never names the model or provider behind the review — the heading carries no
-model label, and `redactProviderIdentity` in `run-review.mjs` strips the provider/model ids out of
-anything on its way to the PR (a model naming itself, or an upstream error echoing the slug).
+model label, and `redactProviderIdentity` in `src/comments.mjs` strips the provider/model ids and every
+vendor/family word in them (`anthropic`, `claude`, `sonnet`) out of anything on its way to the PR (a model
+naming itself, or an upstream error echoing the slug); file names such as `CLAUDE.md` are left alone.
 Naming the model in this repo and in the Actions logs is fine; naming it in the comment is not.
 The one exception is the hidden comment marker, which each workflow sets and the runner posts
 verbatim (see below): this repo's `<!-- ai-code-review -->` is provider-neutral, while a workflow
@@ -31,7 +32,7 @@ fails or times out, the runner (not the model) adds a line to the comment saying
 unreviewed.
 
 Each reviewer runs as several cold passes: independent opencode sessions with no shared context,
-so one pass's misses can be another's catches (backtesting on DeepSeek showed one pass misses
+so one pass's misses can be another's catches (backtesting on an earlier model showed one pass misses
 findings two catch). The variable `AI_REVIEW_COLD_PASSES` sets the count (default `2`, clamped to
 1–3; `src/passes.mjs`). The coordinator gets every pass's report labelled `<Reviewer>, pass N/M`
 and keeps a finding raised by any pass, merging duplicates; the fallback comment unions the passes
@@ -202,7 +203,7 @@ A PR must never be able to run code next to the review secrets or weaken its own
 | `src/sanitize.mjs` | Before opencode starts, deletes from `./pr` every symlink and, at any depth, `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `opencode.json[c]`, `.opencode/`, `.claude/`, `.agents/`, then fails the job if any remain. Copies the base-branch skill references to `./pr/.o2-review-context/skills/`, which the prompts read. The base-branch `AGENTS.md` and `web/AGENTS.md`, or `CLAUDE.md` where a directory has no `AGENTS.md` (listed by the workflow in `REVIEW_RULES_FILES`, one path per line; without it, the engine's `AGENTS.md`) go into every reviewer's system prompt instead, so the repo rules still apply without the PR being able to edit them. |
 | `src/opencode.mjs` env allowlist | `opencode serve` runs in `./pr` with only `PATH`, a fresh temp `HOME`/XDG dirs, `OPENCODE_CONFIG` (this repo's `opencode.jsonc` or `opencode.ci.jsonc` from `./engine`), the `OPENCODE_*` disable flags, a random server password and the one provider key. No `GH_*`, `GITHUB_*`, `ACTIONS_*`, `RUNNER_*` or `O2_*` variables. |
 | Config selection | `REVIEW_OPENCODE_CONFIG` = `default` (`opencode.jsonc`) or `ci-full` (`opencode.ci.jsonc`); any other value stops the run. The workflow sets `ci-full`, which keeps `approve` ineligible (see Auto-approve). |
-| `opencode.jsonc` permissions | Each `ai-review-*` agent: deny `*`, then allow `read`, `glob`, `grep`; `external_directory` denied. A `provider.use` policy allows only `deepseek-review`. LSP, formatters, snapshots and sharing are off. |
+| `opencode.jsonc` permissions | Each `ai-review-*` agent: deny `*`, then allow `read`, `glob`, `grep`; `external_directory` denied. A `provider.use` policy allows only `anthropic-review`. LSP, formatters, snapshots and sharing are off. |
 | `opencode.ci.jsonc` permissions | Same provider, model and agents, but each agent allows `*`: shell, edit, write and webfetch run with no prompt. The PR checkout is untrusted input to an agent that can run commands, and the provider key is in the opencode process environment, so a shell command can read it. |
 | Startup self-check | Refuses to review if any agent is missing, any non-built-in plugin or MCP server loaded, or a granted tool's plugin is not active. Under `default` it also refuses any agent that resolves to allow a tool other than `read`/`glob`/`grep` or any outside directory; under `ci-full` it refuses an agent that does not allow every tool without asking. Permission prompts are rejected under `default` and approved once under `ci-full`. |
 | `src/comments.mjs` | The previous review is only ever a marker comment by the reviewer app (`REVIEW_BOT_LOGIN` = `<app-slug>[bot]`), read across every page; anyone else's comment carrying the marker is never fed to the reviewers or edited. When the app token cannot be minted the review posts as `github-actions[bot]`, which any same-repo PR workflow can also post as, so that run uses no previous review and posts a fresh comment. |
@@ -241,9 +242,13 @@ branches → `main`**, in both repos, then:
 
 - Move `OO_REVIEWER_APP_PRIVATE_KEY` into it and delete the repo-level copy (only this workflow
   uses it).
-- The model key is the existing organization secret `DEEPSEEK_API_KEY`, shared with the other AI
-  workflows. Any same-repo PR can add a workflow that reads it, so a dedicated key in this
-  environment is the stronger setup; switching is a one-line change in the workflow.
+- The model key is the secret `USAGE_CREDIT_API_KEY`, which the workflow passes to opencode as
+  `ANTHROPIC_REVIEW_API_KEY` (a name no bundled opencode provider reads). Held at repo or org level,
+  any same-repo PR can add a workflow that reads it, so keeping it in this environment is the
+  stronger setup.
+- The `deepseek-review` provider stays defined in both opencode configs: switching back means
+  allowing it in `policies`, pointing `model` and the agents at it, and restoring the matrix leg and
+  its key in the workflow.
 - Rotate `O2_TRACE_*` to an ingest-only credential; they stay at repo level because other AI
   workflows export to the same stream.
 - Give the reviewer app *Actions: write* and *Pull requests: read* on o2-enterprise and
@@ -251,7 +256,7 @@ branches → `main`**, in both repos, then:
   permission waits for an org owner to accept it on the installation; until then the token cannot
   be minted and paired OSS PRs are reviewed on their own as well.
 
-Without `DEEPSEEK_API_KEY` the job posts a "not reviewed: key not set" comment. If the `ai-review`
+Without `USAGE_CREDIT_API_KEY` the job posts a "not reviewed: key not set" comment. If the `ai-review`
 environment does not exist, GitHub creates it on the first run with no branch restriction, so
 create it with the `main` policy before merging. Set the **organization** variable `AI_REVIEW_ENABLED` to `false`
 to stop every review run in both repos (the job never starts, so no secret is read); unset or any

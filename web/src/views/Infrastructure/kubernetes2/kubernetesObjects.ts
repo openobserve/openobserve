@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { escapeSingleQuotes } from "@/utils/zincutils";
+import { bodyTypeCol, col, selectAs, type JsonKind } from "./kubernetesFlatten";
 import { EVENTS_STREAM, KIND_INFO, type DetailKind } from "./kubernetesQueries";
 import {
   INVENTORY_KEY,
@@ -32,35 +33,39 @@ export interface ObjectRecord {
   object: K8sObject;
 }
 
+type ColumnRef = { kind: JsonKind; path: string[] };
+
+const ref = (kind: JsonKind, ...path: string[]): ColumnRef => ({ kind, path });
+
+const LABELS = ref("json", "metadata", "labels");
+
+const CONDITIONS = ref("json", "status", "conditions");
+
 // Each list variant reads only what its list renders (§7.3), plus the creation time for Age.
-const LIST_COLUMNS: Partial<Record<DetailKind, Record<string, string>>> = {
-  pod: { qos_class: "json_get_str(body_object_status,'qosClass')" },
-  node: {
-    labels: "json_get_json(body_object_metadata,'labels')",
-    unschedulable: "json_get_bool(body_object_spec,'unschedulable')",
-  },
-  deployment: { conditions: "json_get_json(body_object_status,'conditions')" },
-  daemonset: { node_selector: "json_get_json(body_object_spec,'template','spec','nodeSelector')" },
-  cronjob: { last_schedule: "json_get_str(body_object_status,'lastScheduleTime')" },
-  namespace: { labels: "json_get_json(body_object_metadata,'labels')" },
+const LIST_COLUMNS: Partial<Record<DetailKind, Record<string, ColumnRef>>> = {
+  pod: { qos_class: ref("str", "status", "qosClass") },
+  node: { labels: LABELS, unschedulable: ref("bool", "spec", "unschedulable") },
+  deployment: { conditions: CONDITIONS },
+  daemonset: { node_selector: ref("json", "spec", "template", "spec", "nodeSelector") },
+  cronjob: { last_schedule: ref("str", "status", "lastScheduleTime") },
+  namespace: { labels: LABELS },
 };
 
 // The map variant reads only what the map filters or groups on.
-export const MAP_COLUMNS: Record<"pod" | "node", Record<string, string>> = {
-  pod: { ...LIST_COLUMNS.pod, labels: "json_get_json(body_object_metadata,'labels')" },
+export const MAP_COLUMNS: Record<"pod" | "node", Record<string, ColumnRef>> = {
+  pod: { ...LIST_COLUMNS.pod, labels: LABELS },
   node: { ...LIST_COLUMNS.node },
 };
 
 // The overview variant reads only what "for 2h" on Needs attention is derived from.
-export const OVERVIEW_COLUMNS: Record<"pod" | "node", Record<string, string>> = {
-  pod: {
-    conditions: "json_get_json(body_object_status,'conditions')",
-    container_statuses: "json_get_json(body_object_status,'containerStatuses')",
-  },
-  node: { conditions: "json_get_json(body_object_status,'conditions')" },
+export const OVERVIEW_COLUMNS: Record<"pod" | "node", Record<string, ColumnRef>> = {
+  pod: { conditions: CONDITIONS, container_statuses: ref("json", "status", "containerStatuses") },
+  node: { conditions: CONDITIONS },
 };
 
-const CREATED = "json_get_str(body_object_metadata,'creationTimestamp')";
+const CREATED = ref("str", "metadata", "creationTimestamp");
+
+const BODY_PARTS = ["metadata", "spec", "status"];
 
 const OBJECT_LIST_LIMIT = 5000;
 
@@ -74,7 +79,9 @@ export function objectListSql(
   namespaces: string[],
   variant = LIST_COLUMNS[kind],
 ) {
-  const columns = Object.entries({ ...variant, created: CREATED });
+  const columns = Object.entries({ ...variant, created: CREATED }).map(
+    ([alias, c]) => [alias, col(c.path, c.kind)] as const,
+  );
   const nsTerm =
     KIND_INFO[kind].namespaced && namespaces.length
       ? ` AND k8s_namespace_name IN (${namespaces.map(q).join(", ")})`
@@ -97,10 +104,11 @@ export function objectDetailSql(
   let terms = ` AND event_name = ${q(target.name)}`;
   if (KIND_INFO[kind].namespaced) terms += ` AND k8s_namespace_name = ${q(target.namespace)}`;
   if (kind === "pod" && target.uid) {
-    terms += ` AND json_get_str(body_object_metadata,'uid') = ${q(target.uid)}`;
+    terms += ` AND ${col(["metadata", "uid"])} = ${q(target.uid)}`;
   }
-  const bodies = "body_object_metadata, body_object_spec, body_object_status";
-  return objectSql(kind, cluster, bodies, bodies, terms, 1);
+  const inner = BODY_PARTS.map((p) => selectAs(col([p], "json"), `body_object_${p}`)).join(", ");
+  const outer = BODY_PARTS.map((p) => `body_object_${p}`).join(", ");
+  return objectSql(kind, cluster, inner, outer, terms, 1);
 }
 
 export function parseObjects(hits: any[]): ObjectRecord[] {
@@ -248,8 +256,8 @@ function objectSql(
 ) {
   return (
     `SELECT uid, event_name, k8s_namespace_name, body_type, ${outerColumns}, _timestamp FROM (` +
-    "SELECT json_get_str(body_object_metadata,'uid') AS uid, event_name, k8s_namespace_name, " +
-    `body_type, ${innerColumns}, _timestamp, ` +
+    `SELECT ${selectAs(col(["metadata", "uid"]), "uid")}, event_name, k8s_namespace_name, ` +
+    `${selectAs(bodyTypeCol(), "body_type")}, ${innerColumns}, _timestamp, ` +
     "ROW_NUMBER() OVER (PARTITION BY k8s_cluster, k8s_resource_name, " +
     "COALESCE(k8s_namespace_name, ''), event_name ORDER BY _timestamp DESC) AS rn " +
     `FROM "${EVENTS_STREAM}" WHERE k8s_resource_name = ${q(KIND_INFO[kind].resource)} ` +
