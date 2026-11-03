@@ -3474,10 +3474,24 @@ async fn muted_by_downtime(org_id: &str, anomaly_id: &str) -> Option<String> {
     .map(|downtime| downtime.id)
 }
 
+/// The webhook an anomaly alert posts to, or `None` for a destination the sender skips.
+/// Jira is a skip, not an error: an error holds the detection cursor for a retry, so a
+/// Jira-only detector would re-run the same window forever. [pure]
+#[cfg(any(feature = "enterprise", test))]
+fn anomaly_webhook(module: &Module) -> Option<config::meta::destinations::Endpoint> {
+    match module {
+        Module::Alert {
+            destination_type: DestinationType::Http(ep),
+            ..
+        } if !crate::alerts::notifications::jira::is_jira(ep) => Some(ep.clone()),
+        _ => None,
+    }
+}
+
 /// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
 /// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
-/// Non-HTTP destinations (email, SNS) are skipped with a warning — a known, parked gap
-/// that recovery messages inherit. Returns `Ok(true)` only when the webhook accepted the
+/// Non-HTTP destinations (email, SNS) and Jira are skipped with a warning — a known, parked
+/// gap that recovery messages inherit. Returns `Ok(true)` only when the webhook accepted the
 /// send (2xx); a skip returns `Ok(false)` and a non-2xx answer is a `DestinationRejected`
 /// error, so the caller never arms a cooldown, or records a run as delivered, on a send
 /// nobody actually received, and the history row can name the rejection.
@@ -3500,25 +3514,14 @@ pub async fn send_anomaly_alert(
         }
     };
 
-    let endpoint = match &dest.module {
-        Module::Alert {
-            destination_type: DestinationType::Http(ep),
-            ..
-        } => ep.clone(),
-        _ => {
-            log::warn!(
-                "[anomaly_detection {}] destination '{}' is not an HTTP destination — skipping",
-                anomaly_id,
-                destination_id
-            );
-            return Ok(false);
-        }
+    let Some(endpoint) = anomaly_webhook(&dest.module) else {
+        log::warn!(
+            "[anomaly_detection {}] destination '{}' is not a webhook destination — skipping",
+            anomaly_id,
+            destination_id
+        );
+        return Ok(false);
     };
-    if crate::alerts::notifications::jira::is_jira(&endpoint) {
-        return Err(anyhow::anyhow!(
-            crate::alerts::notifications::jira::UNSUPPORTED_SENDER
-        ));
-    }
 
     let link = anomaly_detail_link(&ctx.org_id, &ctx.anomaly_id);
     let message = anomaly_alert_message(&ctx, &link);
@@ -3592,6 +3595,37 @@ pub async fn send_anomaly_alert(
 
 #[cfg(test)]
 mod tests {
+    /// A Jira destination is skipped like email or SNS, never an error that holds the cursor.
+    #[test]
+    fn test_anomaly_webhook_skips_jira_and_non_http_destinations() {
+        use config::meta::destinations::Endpoint;
+
+        let http = |destination_type: Option<&str>| Module::Alert {
+            template: None,
+            destination_type: DestinationType::Http(Endpoint {
+                url: "https://example.com/hook".to_string(),
+                destination_type: destination_type.map(str::to_string),
+                ..Default::default()
+            }),
+        };
+        assert_eq!(
+            anomaly_webhook(&http(None)).map(|ep| ep.url),
+            Some("https://example.com/hook".to_string())
+        );
+        assert!(anomaly_webhook(&http(Some("slack"))).is_some());
+        assert!(
+            anomaly_webhook(&http(Some(
+                crate::alerts::notifications::jira::DESTINATION_TYPE
+            )))
+            .is_none()
+        );
+        let email = Module::Alert {
+            template: None,
+            destination_type: DestinationType::Email(Default::default()),
+        };
+        assert!(anomaly_webhook(&email).is_none());
+    }
+
     // ── Feature 2: priority & tags on anomaly configs ───────────────────────
 
     /// Tags round-trip through the create request, and an absent `tags` key
