@@ -24,19 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="alt-route"
   >
     <template #actions>
-      <ORefreshButton
-        v-if="ready"
-        layout="inline"
-        variant="outline"
-        :last-run-at="lastFetchedAt"
-        :loading="refreshing"
-        data-test="oncall-routing-refresh"
-        @click="refreshPage"
-      />
       <OButton
         v-if="ready && !isMobile"
         variant="outline"
-        size="sm-action"
+        size="sm"
         icon-left="manage-search"
         :active="testerOpen"
         data-test="oncall-routing-test-signal"
@@ -47,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="ready && tab === 'rules' && canConfigure"
         variant="primary"
-        size="sm-action"
+        size="sm"
         icon-left="add"
         data-test="oncall-routing-add-rule"
         @click="openAdd"
@@ -59,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="ready && isMobile"
         variant="outline"
-        size="sm-action"
+        size="sm"
         icon-left="manage-search"
         :active="testerOpen"
         data-test="oncall-routing-test-signal"
@@ -82,11 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OEmptyState
       v-else-if="loadError"
       size="hero"
-      variant="error"
-      illustration="broken-panel"
+      preset="load-error"
       :title="t('oncall.routingLoadFailed')"
       :description="loadError ? raw(loadError) : undefined"
-      :action-label="t('oncall.retry')"
       data-test="oncall-routing-error"
       @action="refreshPage"
     />
@@ -107,27 +96,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-routing-tabs"
         @update:model-value="setTab"
       >
-        <OTab
-          name="rules"
-          :label="t('oncall.routingTabRules')"
-          data-test="oncall-routing-tab-rules"
-        />
-        <OTab
-          name="signals"
-          :label="t('oncall.routingTabNeedsOwner', { count: openSignalCount })"
-          data-test="oncall-routing-tab-signals"
-        />
+        <OTab name="rules" data-test="oncall-routing-tab-rules">
+          <OIcon name="alt-route" size="sm" class="shrink-0" />
+          <span>{{ t("oncall.routingTabRules") }}</span>
+          <OTag type="countChip" :value="tab === 'rules' ? 'primary' : 'neutral'">
+            {{ rules.length }}
+          </OTag>
+        </OTab>
+        <OTab name="signals" data-test="oncall-routing-tab-signals">
+          <OIcon name="warning-amber" size="sm" class="shrink-0" />
+          <span>{{ t("oncall.routingTabNeedsOwnerPlain") }}</span>
+          <OTag
+            v-if="openSignalCount"
+            type="countChip"
+            :value="tab === 'signals' ? 'primary' : 'warning'"
+            data-test="oncall-routing-tab-signals-count"
+          >
+            {{ openSignalCount }}
+          </OTag>
+        </OTab>
       </OTabs>
 
       <OContent v-if="tab === 'rules'" y class="min-h-0 flex-1 overflow-y-auto">
         <div class="flex flex-col gap-3">
-          <OSearchInput
-            v-model="search"
-            class="max-w-96 min-w-48 max-md:max-w-none"
-            clearable
-            :placeholder="t('common.searchEllipsis')"
-            data-test="oncall-routing-search"
-          />
+          <div class="flex items-center gap-2">
+            <OSearchInput
+              v-model="search"
+              class="min-w-48 flex-1 max-md:min-w-24"
+              clearable
+              :placeholder="t('oncall.routingSearchRules')"
+              data-test="oncall-routing-search"
+            />
+            <ORefreshButton
+              layout="inline"
+              variant="outline"
+              :last-run-at="lastFetchedAt"
+              :loading="refreshing"
+              data-test="oncall-routing-refresh"
+              @click="refreshPage"
+            />
+          </div>
           <OnCallOwnershipRules
             :rules="rules"
             :teams="teams"
@@ -169,24 +177,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="oncall-unrouted-filter"
               @update:model-value="setSignalLanding"
             >
-              <OToggleGroupItem value="both" size="sm" data-test="oncall-unrouted-filter-both">
+              <OToggleGroupItem
+                value="both"
+                size="sm"
+                icon-left="format-list-bulleted"
+                data-test="oncall-unrouted-filter-both"
+              >
                 {{ t("oncall.unroutedFilterBoth") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="nobody" size="sm" data-test="oncall-unrouted-filter-nobody">
+              <OToggleGroupItem
+                value="nobody"
+                size="sm"
+                icon-left="notifications-paused"
+                data-test="oncall-unrouted-filter-nobody"
+              >
                 {{ t("oncall.unroutedPagedNobody") }}
               </OToggleGroupItem>
               <OToggleGroupItem
                 value="default_team"
                 size="sm"
+                icon-left="group-work"
                 data-test="oncall-unrouted-filter-default"
               >
                 {{ t("oncall.unroutedFilterDefault") }}
               </OToggleGroupItem>
             </OToggleGroup>
 
-            <div class="bg-border-default h-4 w-px shrink-0 max-md:hidden" />
-
-            <OSwitch
+            <OCheckbox
               :model-value="signalFilters.include_dismissed"
               :label="t('oncall.unroutedShowDismissed')"
               data-test="oncall-unrouted-show-dismissed"
@@ -197,10 +214,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="search"
               class="min-w-48 flex-1 max-md:min-w-24"
               clearable
-              :placeholder="t('common.searchEllipsis')"
+              :placeholder="t('oncall.routingSearchSignals')"
               data-test="oncall-routing-search"
             />
           </div>
+        </template>
+        <template #toolbar-trailing>
+          <ORefreshButton
+            layout="inline"
+            variant="outline"
+            :last-run-at="lastFetchedAt"
+            :loading="refreshing"
+            data-test="oncall-routing-refresh"
+            @click="refreshPage"
+          />
         </template>
       </OnCallUnroutedQueue>
     </div>
@@ -258,8 +285,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :model-value="!!ruleToDelete"
       :title="t('oncall.removeRuleTitle')"
-      :message="t('oncall.removeRuleMessage')"
+      message-keypath="oncall.removeRuleMessageNamed"
+      :message-name="ruleToDelete ? dimensionsSentence(ruleToDelete.dimensions) : ''"
       ok-variant="destructive"
+      :ok-label="t('oncall.removeRule')"
+      focus-cancel
       @update:ok="deleteRule"
       @update:cancel="ruleToDelete = null"
     />
@@ -290,7 +320,9 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -327,7 +359,7 @@ import type {
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { claimableDimensions, isOnCallUnavailable } from "@/utils/oncall";
+import { claimableDimensions, dimensionsSentence, isOnCallUnavailable } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
@@ -410,7 +442,12 @@ const clearSearch = () => (search.value = "");
 
 function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) {
   const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-  toast({ variant: "error", message: raw(message) || fallback });
+  toast({
+    variant: "error",
+    message: message
+      ? t("oncall.toastFailedReason", { action: fallback, reason: raw(message) })
+      : fallback,
+  });
 }
 
 function errorText(err: unknown): string {
@@ -679,7 +716,9 @@ async function saveRule(draft: RuleDraft) {
     dialogOpen.value = false;
     toast({
       variant: "success",
-      message: edited ? t("oncall.ruleUpdated") : t("oncall.ruleCreated"),
+      message: t(edited ? "oncall.toastRuleUpdated" : "oncall.toastRuleCreated", {
+        name: raw(dimensionsSentence(draft.dimensions)),
+      }),
     });
     // A claimed signal is never dismissed — the evidence stays in case the rule is wrong.
     await Promise.all([fetchRules(), fetchSignals()]);
@@ -696,6 +735,10 @@ async function deleteRule() {
   if (!rule) return;
   try {
     await ruleDelete.mutateAsync(rule.rule_id);
+    toast({
+      variant: "success",
+      message: t("oncall.toastRuleRemoved", { name: raw(dimensionsSentence(rule.dimensions)) }),
+    });
     // A path nothing owns again is unrouted again — the queue is half of what a delete moves.
     await Promise.all([fetchRules(), fetchSignals()]);
   } catch (err) {

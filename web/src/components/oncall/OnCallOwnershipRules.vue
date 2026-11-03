@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- The routing rules as sentences, shared by org Routing and a team's Routing tab. -->
 <template>
   <div class="relative flex flex-col gap-3" data-test="oncall-ownership-rules">
-    <OInnerLoading v-if="loading" showing />
+    <div v-if="loading" class="flex flex-col gap-2" data-test="oncall-ownership-loading">
+      <OSkeleton v-for="n in 3" :key="n" type="rect" class="rounded-surface h-16 w-full" />
+    </div>
 
     <template v-else>
       <template v-if="groups.length">
@@ -70,18 +72,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OText variant="meta" :data-test="`oncall-routing-caught-${row.rule.rule_id}`">
                 {{ caughtOf(row.rule) }}
               </OText>
-              <OText
+              <OTag
                 v-if="row.overlap"
-                variant="meta"
-                class="text-status-warning-text"
+                type="oncallRuleHealth"
+                value="shadowed"
+                size="sm"
+                class="self-start"
                 :data-test="`oncall-routing-note-${row.rule.rule_id}`"
               >
                 {{ row.overlap }}
-              </OText>
+              </OTag>
             </span>
 
             <!-- Fixed slots [edit][more], so every row's icons line up with the catch-all's. -->
-            <span v-if="editable" class="ms-auto flex w-17 shrink-0 items-center justify-end gap-1">
+            <span v-if="editable" class="ms-auto flex w-16 shrink-0 items-center justify-end gap-1">
               <OButton
                 variant="ghost"
                 size="icon-sm"
@@ -96,8 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #trigger>
                   <OButton
                     variant="ghost"
-                    size="icon-sm"
-                    icon-left="more-horiz"
+                    size="icon-xs-sq"
+                    icon-left="more-vert"
                     :aria-label="t('oncall.moreActions')"
                     :data-test="`oncall-routing-more-${row.rule.rule_id}`"
                   >
@@ -164,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-else>{{ t("oncall.routingDefaultAlsoGets") }}</template>
         </span>
-        <span v-if="editable" class="ms-auto flex w-17 shrink-0 items-center justify-end gap-1">
+        <span v-if="editable" class="ms-auto flex w-16 shrink-0 items-center justify-end gap-1">
           <OButton
             variant="ghost"
             size="icon-sm"
@@ -175,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OTooltip side="bottom" :content="catchAllAction" />
           </OButton>
-          <span class="w-8 shrink-0" aria-hidden="true" />
+          <span class="w-7 shrink-0" aria-hidden="true" />
         </span>
       </div>
     </template>
@@ -189,7 +193,8 @@ import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

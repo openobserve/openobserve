@@ -172,6 +172,8 @@ describe("OnCallOwnershipRules", () => {
       ],
     });
     expect(wrapper.find('[data-test="oncall-routing-note-r1"]').text()).toContain("Checkout");
+    const types = wrapper.findAllComponents({ name: "OTag" }).map((tag) => tag.props("type"));
+    expect(types).toContain("oncallRuleHealth");
   });
 
   it("filters by search on conditions and team name", () => {

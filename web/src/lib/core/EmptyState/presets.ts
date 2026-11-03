@@ -548,6 +548,13 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noOncallResponses.title",
     descriptionKey: "emptyState.noOncallResponses.description",
   },
+  // Nothing waiting for an owner is the good outcome, so no action is offered.
+  "no-oncall-unrouted": {
+    illustration: "check",
+    variant: "neutral",
+    titleKey: "emptyState.noOncallUnrouted.title",
+    descriptionKey: "emptyState.noOncallUnrouted.description",
+  },
   // Ownership is claimed by path, so the prompt is about the path rather than
   // about a list of services somebody has to enumerate.
   "no-oncall-rules": {

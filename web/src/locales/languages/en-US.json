@@ -611,6 +611,10 @@
       "description": "No results were loaded. Run the query to load events.",
       "action": "Run query",
       "actionDesc": "Run the same query again"
+    },
+    "noOncallUnrouted": {
+      "title": "Nothing needs an owner",
+      "description": "Every alert that fired reached a team."
     }
   },
   "accessBoundary": {
@@ -26783,7 +26787,16 @@
     "simulatorWhy": "Why",
     "simulatorWon": "Won: {path}",
     "unroutedGiveOwner": "Give it an owner",
-    "defaultTeamUnsetShort": "None set: an alert no rule matches pages nobody."
+    "defaultTeamUnsetShort": "None set: an alert no rule matches pages nobody.",
+    "ruleShadowed": "Overlapped",
+    "routingSearchRules": "Search rules",
+    "routingSearchSignals": "Search signals",
+    "removeRuleMessageNamed": "Alerts matching {name} fall back to a less specific rule. If none matches, they page nobody.",
+    "toastRuleCreated": "Rule {name} created",
+    "toastRuleUpdated": "Rule {name} updated",
+    "toastRuleRemoved": "Rule {name} removed",
+    "toastDefaultTeamSet": "Default team {name} set",
+    "toastFailedReason": "{action}: {reason}"
   },
   "paidUsage": {
     "consentTitle": "Turn on paid AI usage?",

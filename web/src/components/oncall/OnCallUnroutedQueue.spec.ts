@@ -23,7 +23,11 @@ import store from "@/test/unit/helpers/store";
 
 const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
-  OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
+  OTag: {
+    name: "OTag",
+    props: ["type", "value"],
+    template: "<span><slot>{{ value }}</slot></span>",
+  },
   OInnerLoading: { name: "OInnerLoading", template: "<div />" },
   OButton: { name: "OButton", template: "<button><slot /></button>" },
   OToggleGroup: {
@@ -125,7 +129,10 @@ describe("OnCallUnroutedQueue", () => {
       global: { plugins: [i18n, store], stubs },
     });
     const nobody = wrapper.find('[data-test="oncall-unrouted-nobody-s1"]');
-    expect(nobody.text()).toContain("No one notified");
+    expect(nobody.findComponent({ name: "OTag" }).props()).toMatchObject({
+      type: "oncallUnroutedOutcome",
+      value: "nobody",
+    });
     const caught = wrapper.find('[data-test="oncall-unrouted-defaulted-s2"]');
     expect(caught.text()).toContain("Platform");
     // A row cannot claim both facts.
@@ -215,7 +222,7 @@ describe("OnCallUnroutedQueue", () => {
       expect(table.props("enableColumnResize")).toBe(true);
       expect(table.props("persistColumns")).toBe(true);
       const hideable = (table.props("columns") as any[]).filter((c) => c.hideable).map((c) => c.id);
-      expect(hideable).toEqual(["path", "fires", "outcome"]);
+      expect(hideable).toEqual(["path", "fires", "last", "outcome"]);
     });
 
     // The error sits in the table body, so the host's toolbar — and its tabs — stay on screen.

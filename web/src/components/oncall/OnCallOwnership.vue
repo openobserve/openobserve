@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="canConfigure"
         variant="primary"
-        size="sm-action"
+        size="sm"
         icon-left="add"
         data-test="oncall-ownership-add-rule"
         @click="openAdd"
@@ -83,8 +83,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :model-value="!!ruleToDelete"
       :title="t('oncall.removeRuleTitle')"
-      :message="t('oncall.removeRuleMessage')"
+      message-keypath="oncall.removeRuleMessageNamed"
+      :message-name="ruleToDelete ? dimensionsSentence(ruleToDelete.dimensions) : ''"
       ok-variant="destructive"
+      :ok-label="t('oncall.removeRule')"
+      focus-cancel
       @update:ok="deleteRule"
       @update:cancel="ruleToDelete = null"
     />
@@ -129,7 +132,7 @@ import type {
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { SERVICE_DIMENSION } from "@/utils/oncall";
+import { SERVICE_DIMENSION, dimensionsSentence } from "@/utils/oncall";
 
 const props = defineProps<{
   teamId: string;
@@ -187,7 +190,12 @@ const ruleDelete = useMutation(() => deleteOwnershipRuleMutation(orgId.value));
 
 function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) {
   const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-  toast({ variant: "error", message: raw(message) || fallback });
+  toast({
+    variant: "error",
+    message: message
+      ? t("oncall.toastFailedReason", { action: fallback, reason: raw(message) })
+      : fallback,
+  });
 }
 
 function goToRouting(tab?: "signals") {
@@ -298,7 +306,9 @@ async function saveRule(draft: RuleDraft) {
     editingRule.value = null;
     toast({
       variant: "success",
-      message: rule ? t("oncall.ruleUpdated") : t("oncall.ruleCreated"),
+      message: t(rule ? "oncall.toastRuleUpdated" : "oncall.toastRuleCreated", {
+        name: raw(dimensionsSentence(draft.dimensions)),
+      }),
     });
     await Promise.all([fetchRules(), fetchSignals()]);
   } catch (err) {
@@ -314,6 +324,10 @@ async function deleteRule() {
   if (!rule) return;
   try {
     await ruleDelete.mutateAsync(rule.rule_id);
+    toast({
+      variant: "success",
+      message: t("oncall.toastRuleRemoved", { name: raw(dimensionsSentence(rule.dimensions)) }),
+    });
     await Promise.all([fetchRules(), fetchSignals()]);
   } catch (err) {
     failed(err, t("oncall.deleteRuleFailed"));

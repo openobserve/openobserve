@@ -41,7 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="signals.length && teamName"
         variant="outline"
-        size="xs"
+        size="sm"
+        icon-left="add"
         class="ms-auto"
         :loading="claiming"
         data-test="oncall-unrouted-claim-all"
@@ -59,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="loading"
       :error="error || null"
       show-index
+      pagination="client"
       :global-filter="search"
       :show-global-filter="false"
       :row-class="rowClass"
@@ -75,10 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Inside the table, so the host's toolbar — and the way back to the other tab — stays up. -->
       <template #error>
         <OEmptyState
-          size="inline"
-          variant="error"
+          size="block"
+          preset="load-error"
           :title="error || undefined"
-          :action-label="t('oncall.retry')"
           data-test="oncall-unrouted-error"
           @action="emit('retry')"
         />
@@ -114,12 +115,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-fires="{ row }">
-        <span class="flex flex-col">
-          <span class="text-text-body">
-            {{ t("oncall.unroutedFires", { count: row.occurrences }, row.occurrences) }}
-          </span>
-          <OTimeCell v-if="row.last_seen_at" :value="row.last_seen_at" unit="us" />
+        <span class="text-text-body">
+          {{ t("oncall.unroutedFires", { count: row.occurrences }, row.occurrences) }}
         </span>
+      </template>
+
+      <template #cell-last="{ row }">
+        <OTimeCell
+          :value="row.last_seen_at"
+          unit="us"
+          :timezone="timezone"
+          :empty-label="raw('—')"
+        />
       </template>
 
       <!-- §G.3: two different emergencies share this queue. A row the default
@@ -129,15 +136,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-outcome="{ row }">
         <OTag
           v-if="row.defaulted_team_id"
-          variant="warning-soft"
+          type="oncallUnroutedOutcome"
+          value="default_team"
           size="sm"
           :data-test="`oncall-unrouted-defaulted-${row.id}`"
         >
           {{ t("oncall.unroutedAbsorbedBy", { team: raw(teamNameOf(row.defaulted_team_id)) }) }}
         </OTag>
-        <OTag v-else variant="error-soft" size="sm" :data-test="`oncall-unrouted-nobody-${row.id}`">
-          {{ t("oncall.unroutedPagedNobody") }}
-        </OTag>
+        <OTag
+          v-else
+          type="oncallUnroutedOutcome"
+          value="nobody"
+          size="sm"
+          :data-test="`oncall-unrouted-nobody-${row.id}`"
+        />
       </template>
 
       <template #cell-actions="{ row }">
@@ -200,22 +212,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            an empty panel somebody has to interpret. -->
       <template #empty>
         <!-- An empty search result says nothing about whether alerts reached a team. -->
-        <OEmptyState
-          v-if="search"
-          size="hero"
-          preset="no-data"
-          :filtered="!!search"
-          data-test="oncall-unrouted-empty"
-          @action="onEmptyAction"
-        />
-        <OEmptyState
-          v-else
-          size="inline"
-          preset="no-data"
-          :title="t('oncall.unroutedNoneTitle')"
-          :description="t('oncall.unroutedNone')"
-          data-test="oncall-unrouted-empty"
-        />
+        <template v-if="!loading">
+          <OEmptyState
+            v-if="search"
+            size="block"
+            preset="no-oncall-unrouted"
+            filtered
+            data-test="oncall-unrouted-empty"
+            @action="onEmptyAction"
+          />
+          <OEmptyState
+            v-else
+            size="block"
+            preset="no-oncall-unrouted"
+            data-test="oncall-unrouted-empty"
+          />
+        </template>
       </template>
     </OTable>
   </div>
@@ -223,6 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useStore } from "vuex";
 
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -283,6 +296,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
+const timezone = computed<string | undefined>(() => store.state.timezone || undefined);
 
 const claimLabel = computed<I18nText>(() =>
   props.teamName
@@ -310,6 +325,13 @@ const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
     size: 150,
     hideable: true,
     accessorFn: (row: UnroutedSignal) => row.occurrences,
+  },
+  {
+    id: "last",
+    header: t("oncall.unroutedLastSeen"),
+    size: 130,
+    hideable: true,
+    accessorFn: (row: UnroutedSignal) => row.last_seen_at ?? 0,
   },
   {
     id: "outcome",

@@ -64,11 +64,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-else-if="preview"
-      class="border-border-default rounded-surface relative flex flex-col gap-3 border px-4 py-3"
+      class="border-border-default rounded-surface flex flex-col gap-3 border px-4 py-3"
+      :class="loading ? 'opacity-60' : ''"
+      :aria-busy="loading"
       data-test="oncall-simulator-result"
     >
-      <OInnerLoading v-if="loading" showing />
-
       <p class="text-text-body text-sm" data-test="oncall-simulator-answer">
         <span class="text-text-heading font-semibold" data-test="oncall-simulator-team">
           {{ t("oncall.simulatorAnswerTeam", { team: teamLabel }) }}
@@ -165,7 +165,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

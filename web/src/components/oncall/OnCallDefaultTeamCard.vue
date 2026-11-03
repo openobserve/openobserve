@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       v-if="showTrigger"
       :variant="loadingRoutingConfig || defaultTeamId ? 'outline' : 'warning'"
-      size="sm-action"
+      size="sm"
       class="max-w-64"
       :loading="loadingRoutingConfig"
       data-test="oncall-default-team-open"
@@ -240,13 +240,26 @@ async function saveDefaultTeam() {
     toast({
       variant: "success",
       message: draftDefaultTeam.value
-        ? t("oncall.defaultTeamSaved")
+        ? t("oncall.toastDefaultTeamSet", {
+            name: raw(
+              props.teams.find((team) => team.id === draftDefaultTeam.value)?.name ||
+                draftDefaultTeam.value,
+            ),
+          })
         : t("oncall.defaultTeamCleared"),
     });
   } catch (err) {
     const message = (err as { response?: { data?: { message?: string } } })?.response?.data
       ?.message;
-    toast({ variant: "error", message: raw(message) || t("oncall.defaultTeamSaveFailed") });
+    toast({
+      variant: "error",
+      message: message
+        ? t("oncall.toastFailedReason", {
+            action: t("oncall.defaultTeamSaveFailed"),
+            reason: raw(message),
+          })
+        : t("oncall.defaultTeamSaveFailed"),
+    });
   } finally {
     savingDefault.value = false;
   }

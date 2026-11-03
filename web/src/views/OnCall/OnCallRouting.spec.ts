@@ -167,7 +167,11 @@ const stubs = {
     props: ["open", "primaryButtonDisabled", "title"],
     template: "<div><slot /></div>",
   },
-  ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue", "okVariant"], template: "<div />" },
+  ConfirmDialog: {
+    name: "ConfirmDialog",
+    props: ["modelValue", "okVariant", "okLabel", "messageKeypath", "messageName"],
+    template: "<div />",
+  },
   OButton: {
     name: "OButton",
     props: ["disabled", "active"],
@@ -185,8 +189,8 @@ const stubs = {
     emits: ["update:modelValue"],
     template: `<select :value="modelValue" />`,
   },
-  OSwitch: {
-    name: "OSwitch",
+  OCheckbox: {
+    name: "OCheckbox",
     props: ["modelValue", "label"],
     emits: ["update:modelValue"],
     template: "<button />",
@@ -302,11 +306,14 @@ describe("OnCallRouting", () => {
   it("asks to remove a rule with a destructive confirm button", async () => {
     const wrapper = render();
     await flushPromises();
-    rulesPanel(wrapper).vm.$emit("remove", { rule_id: "r9" });
+    rulesPanel(wrapper).vm.$emit("remove", { rule_id: "r9", dimensions: { service: "cart" } });
     await wrapper.vm.$nextTick();
     const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
     expect(dialog.props("modelValue")).toBe(true);
     expect(dialog.props("okVariant")).toBe("destructive");
+    expect(dialog.props("okLabel")).toBe("Remove rule");
+    expect(dialog.attributes("focus-cancel")).toBeDefined();
+    expect(dialog.props("messageName")).toBe("service = cart");
   });
 
   /// G4: claiming an unrouted signal opens the rule dialog with the failing
@@ -648,7 +655,7 @@ describe("OnCallRouting", () => {
     wrapper.findAllComponents({ name: "OToggleGroup" })[0].vm.$emit("update:modelValue", "nobody");
     await flushPromises();
 
-    wrapper.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", true);
+    wrapper.findComponent({ name: "OCheckbox" }).vm.$emit("update:modelValue", true);
     await flushPromises();
 
     expect(service.unroutedSignals).toHaveBeenLastCalledWith({
