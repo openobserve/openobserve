@@ -516,6 +516,7 @@ const {
   samplesLoading: dataHealthSamplesLoading,
   fetchHealth,
   fetchSamples,
+  reset: resetDataHealth,
 } = useLLMDataHealth();
 const unpriced = computed(() => unpricedSummary(dataHealth.value));
 // The server lists the top 20 unpriced models; the tile and chart notes say so when there are more.
@@ -1218,7 +1219,10 @@ async function loadInsights(
 
     // Stream comes from the agent (Agent tab) or the picker (Stream tab).
     const stream = effectiveStream.value;
-    if (!stream) return;
+    if (!stream) {
+      resetDataHealth();
+      return;
+    }
     // Data health runs alongside (server-cached ~1 min; a manual refresh re-runs it).
     loadDataHealth(force, start, end);
 

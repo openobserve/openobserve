@@ -74,3 +74,42 @@ describe("useLLMDataHealth — samples", () => {
     expect(h.samplesLoading.value).toBe(false);
   });
 });
+
+describe("useLLMDataHealth — scope changes", () => {
+  it("a new scope hides the previous answer while it loads", async () => {
+    const h = useLLMDataHealth();
+    getDataHealth.mockResolvedValueOnce(response());
+    await h.fetchHealth("org", params);
+    expect(h.health.value).not.toBeNull();
+
+    getDataHealth.mockReturnValueOnce(new Promise(() => {}));
+    void h.fetchHealth("org", { ...params, agent: "b" });
+    expect(h.health.value).toBeNull();
+    expect(h.checkedWindow.value).toBeNull();
+  });
+
+  it("a rerun of the same scope keeps the current answer while it loads", async () => {
+    const h = useLLMDataHealth();
+    getDataHealth.mockResolvedValueOnce(response());
+    await h.fetchHealth("org", params);
+
+    getDataHealth.mockReturnValueOnce(new Promise(() => {}));
+    void h.fetchHealth("org", { ...params, refresh: true });
+    expect(h.health.value).not.toBeNull();
+    expect(h.checkedWindow.value).toEqual({ start: 1, end: 2 });
+  });
+
+  it("invalid input clears the answer and drops a request still in flight", async () => {
+    const h = useLLMDataHealth();
+    const late = Promise.withResolvers<unknown>();
+    getDataHealth.mockReturnValueOnce(late.promise);
+    const pending = h.fetchHealth("org", params);
+
+    await h.fetchHealth("org", { ...params, stream_name: "" });
+    late.resolve(response());
+    await pending;
+    expect(h.health.value).toBeNull();
+    expect(h.checkedWindow.value).toBeNull();
+    expect(h.loading.value).toBe(false);
+  });
+});

@@ -24,6 +24,20 @@ import type { TimeWindow } from "../llmDataTrust.utils";
 
 export type DataHealthSamples = Partial<Record<DataHealthCheckId, string[]>>;
 
+/** What a response describes: org, scope and window, but not `refresh`. */
+function scopeKey(orgId: string, p: DataHealthParams): string {
+  return JSON.stringify([
+    orgId,
+    p.stream_name,
+    p.agent,
+    p.agent_id,
+    p.env,
+    p.version,
+    p.start_time,
+    p.end_time,
+  ]);
+}
+
 /**
  * AI data health for LLM Insights: one request per scope + window, shared by
  * the health strip and the Total Cost tile (which reads the unpriced check).
@@ -43,6 +57,7 @@ export function useLLMDataHealth() {
   let seq = 0;
   let samplesSeq = 0;
   let last: { orgId: string; params: DataHealthParams } | null = null;
+  let lastKey = "";
 
   function clearSamples() {
     samplesSeq++;
@@ -51,7 +66,17 @@ export function useLLMDataHealth() {
   }
 
   async function fetchHealth(orgId: string, params: DataHealthParams): Promise<void> {
-    if (!orgId || !params.stream_name || !params.start_time || !params.end_time) return;
+    if (!orgId || !params.stream_name || !params.start_time || !params.end_time) {
+      reset();
+      return;
+    }
+    const key = scopeKey(orgId, params);
+    if (key !== lastKey) {
+      // Another scope's answer must not show while this one loads.
+      health.value = null;
+      checkedWindow.value = null;
+      lastKey = key;
+    }
     const mine = ++seq;
     last = { orgId, params: { ...params, include_samples: false } };
     clearSamples();
@@ -95,6 +120,7 @@ export function useLLMDataHealth() {
   function reset() {
     seq++;
     last = null;
+    lastKey = "";
     clearSamples();
     health.value = null;
     checkedWindow.value = null;
