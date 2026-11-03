@@ -171,12 +171,7 @@ impl PreCustomMessage {
                 .as_ref()
                 .map(|metrics_info| CustomMessage::Metrics(collect_metrics(metrics_info))),
             PreCustomMessage::MetricsRef(metrics) => {
-                // forwarded profiles are already nested inside this node's own profile
-                let metrics: Vec<Metrics> = metrics
-                    .iter()
-                    .flat_map(|m| m.lock().clone())
-                    .map(|m| Metrics { profile: None, ..m })
-                    .collect();
+                let metrics: Vec<Metrics> = metrics.iter().flat_map(|m| m.lock().clone()).collect();
                 (!metrics.is_empty()).then_some(CustomMessage::Metrics(metrics))
             }
             PreCustomMessage::PeakMemoryRef(peak_memory_ref) => peak_memory_ref
@@ -508,20 +503,6 @@ mod tests {
             }
             _ => panic!("Expected Metrics variant"),
         }
-    }
-
-    #[test]
-    fn test_metrics_ref_strips_forwarded_profiles() {
-        let forwarded = vec![Metrics {
-            stage: 2,
-            profile: Some(ProfileNode::default()),
-            ..Default::default()
-        }];
-        let pre_msg = PreCustomMessage::MetricsRef(vec![Arc::new(Mutex::new(forwarded))]);
-        let Some(CustomMessage::Metrics(metrics)) = pre_msg.get_custom_message() else {
-            panic!("Expected Metrics variant");
-        };
-        assert!(metrics[0].profile.is_none());
     }
 
     #[test]
