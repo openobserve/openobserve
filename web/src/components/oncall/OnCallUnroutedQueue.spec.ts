@@ -71,9 +71,9 @@ describe("OnCallUnroutedQueue", () => {
   it("names the alert and the dimensions a rule would be written against", () => {
     const wrapper = render();
     expect(wrapper.text()).toContain("Dispute webhook backlog");
-    expect(wrapper.find('[data-test="oncall-unrouted-path-s1"]').text()).toContain(
-      "k8s-namespace = payments-edge · service = disputes-api",
-    );
+    const path = wrapper.find('[data-test="oncall-unrouted-path-s1"]').text();
+    expect(path).toContain("payments-edge");
+    expect(path).toContain("disputes-api");
   });
 
   /// The server's own sentence handles the empty-path case, which reads nothing
@@ -89,7 +89,9 @@ describe("OnCallUnroutedQueue", () => {
 
   it("offers to claim for the team whose screen this is", async () => {
     const wrapper = render();
-    expect(wrapper.text()).toContain("Claim for Payments");
+    expect(wrapper.find('[data-test="oncall-unrouted-claim-s1"]').attributes("aria-label")).toBe(
+      "Claim for Payments",
+    );
 
     await wrapper.find('[data-test="oncall-unrouted-claim-s1"]').trigger("click");
     expect(wrapper.emitted("claim")?.[0][0]).toMatchObject({ id: "s1" });
@@ -164,13 +166,14 @@ describe("OnCallUnroutedQueue", () => {
   /// The org screen hosts the queue with no team of its own: a claim starts by
   /// choosing one, so the button says what happens instead of naming a team it
   /// does not have, and the one-team bulk action is not offered at all.
-  it("offers to write a rule, not claim for a team, when hosted without one", async () => {
+  it("offers to give it an owner, not claim for a team, when hosted without one", async () => {
     const wrapper = mount(OnCallUnroutedQueue, {
       props: { signals: [signal()] },
       global: { plugins: [i18n, store], stubs },
     });
-    expect(wrapper.text()).toContain("Write the rule");
-    expect(wrapper.text()).not.toContain("Claim for");
+    expect(wrapper.find('[data-test="oncall-unrouted-claim-s1"]').attributes("aria-label")).toBe(
+      "Give it an owner",
+    );
     expect(wrapper.find('[data-test="oncall-unrouted-claim-all"]').exists()).toBe(false);
 
     await wrapper.find('[data-test="oncall-unrouted-claim-s1"]').trigger("click");

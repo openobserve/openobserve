@@ -370,10 +370,12 @@
         </OTabPanel>
 
         <OTabPanel name="ownership">
-          <!-- The ladder rides along so the rule editor can say what paging
-               this team would actually run. -->
           <OContent y>
-            <OnCallOwnership :team-id="teamId" :teams="teams" :ladder="overview?.rungs ?? []" />
+            <OnCallOwnership
+              :team-id="teamId"
+              :teams="teams"
+              @rules-loaded="(count: number) => (ruleCount = count)"
+            />
           </OContent>
         </OTabPanel>
       </OTabPanels>
@@ -626,7 +628,8 @@ const preview = ref<EscalationPreview | null>(null);
 const previewLoading = ref(false);
 /// Owned by the timeline, which decides the visible range; the fetch follows it.
 const scheduleWindow = ref({ from: 0, to: 0 });
-const ruleCount = ref(0);
+/// Null until known, so the header never claims "0 routing rules" for a lookup that failed.
+const ruleCount = ref<number | null>(null);
 // Where the team actually is in its setup decides the landing tab. A brand
 // new team opens on Members, because a schedule with nobody in it is not
 // something anybody can act on; once there are people, Schedule leads,
@@ -701,14 +704,14 @@ const hasMembers = computed<boolean | null>(() => (loaded.value ? members.value.
 
 const subtitle = computed(() => {
   if (!team.value) return undefined;
-  const rules = overview.value?.alerts_assigned;
+  const rules = ruleCount.value;
   const base = t(
     "oncall.teamSubtitle",
     { tz: team.value.timezone, count: memberCount.value },
     memberCount.value,
   );
-  if (rules === undefined) return base;
-  return raw(`${base} · ${t("oncall.teamAlertRules", { count: rules }, rules)}`);
+  if (rules === null) return base;
+  return raw(`${base} · ${t("oncall.teamOwnsRules", { count: rules }, rules)}`);
 });
 
 /// Pages this team was woken by, inside the activity window.
@@ -882,8 +885,7 @@ async function fetchAll(force = false) {
   ]);
 }
 
-// The count feeds a warning tile, so a failed lookup leaves it at zero-known
-// rather than claiming the team has no routing.
+// Same set the Routing tab lists, so the header, the tab chip and the tab agree.
 async function fetchRuleCount(force = false) {
   try {
     const rules = await read<OwnershipRule[]>(
@@ -892,7 +894,7 @@ async function fetchRuleCount(force = false) {
     );
     ruleCount.value = rules.length;
   } catch {
-    ruleCount.value = 0;
+    ruleCount.value = null;
   }
 }
 

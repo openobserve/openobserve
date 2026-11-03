@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        itself names the current answer. -->
   <template v-if="dialog">
     <OButton
+      v-if="showTrigger"
       :variant="loadingRoutingConfig || defaultTeamId ? 'outline' : 'warning'"
       size="sm-action"
       class="max-w-64"
@@ -53,16 +54,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="open = false"
     >
       <div class="flex flex-col gap-3">
-        <!-- ODialog's sub-title is one truncating line; a sentence belongs in
-             the body, where it wraps. -->
-        <OText variant="meta">{{ t("oncall.defaultTeamHint") }}</OText>
         <p
           v-if="routingConfig && !routingConfig.default_team_id"
           class="text-status-warning-text text-sm"
           data-test="oncall-default-team-unset"
         >
-          {{ t("oncall.defaultTeamUnset") }}
+          {{ t("oncall.defaultTeamUnsetShort") }}
         </p>
+        <OText v-else variant="meta">{{ t("oncall.defaultTeamHint") }}</OText>
         <OSelect
           :model-value="draftDefaultTeam"
           :options="defaultTeamOptions"
@@ -140,8 +139,10 @@ const props = withDefaults(
     /** Render as a header button that opens the picker in a modal, instead of
      *  a card the page has to make room for. */
     dialog?: boolean;
+    /** Off when the host opens the dialog itself through `openDialog`. */
+    showTrigger?: boolean;
   }>(),
-  { teams: () => [], dialog: false },
+  { teams: () => [], dialog: false, showTrigger: true },
 );
 
 const { t } = useI18nTyped();
@@ -250,6 +251,8 @@ async function saveDefaultTeam() {
     savingDefault.value = false;
   }
 }
+
+defineExpose({ openDialog });
 
 // Started directly in setup, not onMounted: the trigger's `loading` prop
 // must read true on the very first render, before any lifecycle hook fires.

@@ -1592,4 +1592,31 @@ describe("OnCallTeamDetail", () => {
       expect(drawn.map((s) => [s.from, s.to])).toEqual([[0, 1]]);
     });
   });
+
+  it("counts the same routing rules in the header as the Routing tab lists", async () => {
+    service.listOwnershipRules.mockResolvedValue({
+      data: [{ id: "r1" }, { id: "r2" }],
+    } as never);
+    service.teamOverview.mockResolvedValue({ data: { alerts_assigned: 0, members: 1 } } as never);
+    routeParams.tab = "routing";
+    const wrapper = mount(OnCallTeamDetail, {
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ...stubs,
+          OPageLayout: {
+            name: "OPageLayout",
+            props: ["subtitle"],
+            template: "<div><span class='sub'>{{ subtitle }}</span><slot /></div>",
+          },
+        },
+      },
+    });
+    await flushPromises();
+    expect(wrapper.find(".sub").text()).toContain("owns 2 routing rules");
+
+    wrapper.findComponent({ name: "OnCallOwnership" }).vm.$emit("rules-loaded", 3);
+    await flushPromises();
+    expect(wrapper.find(".sub").text()).toContain("owns 3 routing rules");
+  });
 });

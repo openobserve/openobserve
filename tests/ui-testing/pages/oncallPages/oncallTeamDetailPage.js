@@ -136,7 +136,8 @@ export class OnCallTeamDetailPage {
 
       // Routing tab (internally "ownership").
       ownership: '[data-test="oncall-ownership"]',
-      ownershipTable: '[data-test="oncall-ownership-table"]',
+      ownershipTitle: '[data-test="oncall-ownership-title"]',
+      ownershipUnclaimed: '[data-test="oncall-ownership-unclaimed"]',
       ownershipRules: '[data-test="oncall-ownership-rules"]',
       ownershipHeader: '[data-test="oncall-ownership-header"]',
       ownershipAddRule: '[data-test="oncall-ownership-add-rule"]',
@@ -207,9 +208,10 @@ export class OnCallTeamDetailPage {
     return `[data-test="oncall-ladder-rung-problem-${firstMicros}"]`;
   }
 
-  ownershipEditRule(ruleId) { return `[data-test="oncall-ownership-edit-${ruleId}"]`; }
+  ownershipEditRule(ruleId) { return `[data-test="oncall-routing-edit-${ruleId}"]`; }
+  ownershipRuleMore(ruleId) { return `[data-test="oncall-routing-more-${ruleId}"]`; }
   ownershipDeleteRule(ruleId) { return `[data-test="oncall-ownership-delete-${ruleId}"]`; }
-  ruleHealth(ruleId) { return `[data-test="oncall-rule-health-${ruleId}"]`; }
+  ruleHealth(ruleId) { return `[data-test="oncall-routing-note-${ruleId}"]`; }
   ruleTeam(ruleId) { return `[data-test="oncall-rule-team-${ruleId}"]`; }
 
   memberRemove(memberId) { return `[data-test="oncall-members-remove-${memberId}"]`; }

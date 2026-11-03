@@ -1919,6 +1919,12 @@ export function identityDimensions(dimensions: Record<string, string>): Record<s
   );
 }
 
+/** What a rule written from a signal pins: its identity dimensions, or everything when it carries none. */
+export function claimableDimensions(dimensions: Record<string, string>): Record<string, string> {
+  const kept = identityDimensions(dimensions ?? {});
+  return Object.keys(kept).length ? kept : { ...(dimensions ?? {}) };
+}
+
 /**
  * The severity a promotion derives when the caller sends none — the record's
  * own priority, with P5 folded into P4 because the incident scale has no P5.

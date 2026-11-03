@@ -101,19 +101,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
 
-      <!-- The dimensions a rule would be written against, and nothing else.
-           Pod names, node names and status codes are evidence about ONE
-           firing — showing them here made every row an unreadable dump and
-           implied the claim would pin to them. The full set stays a hover
-           away for whoever is identifying the alert. -->
+      <!-- Identity only: pod names and status codes are evidence about one firing, not what a rule pins. -->
       <template #cell-path="{ row }">
-        <code
-          class="text-text-secondary truncate text-xs"
-          :title="pathOf(row)"
-          :data-test="`oncall-unrouted-path-${row.id}`"
-        >
-          {{ raw(routablePathOf(row)) }}
-        </code>
+        <span class="flex flex-wrap gap-1" :data-test="`oncall-unrouted-path-${row.id}`">
+          <ODimensionChip
+            v-for="(value, name) in claimableDimensions(row.dimensions)"
+            :key="name"
+            :dim-key="String(name)"
+            :value="value"
+          />
+        </span>
       </template>
 
       <template #cell-fires="{ row }">
@@ -146,23 +143,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <span class="flex items-center justify-end gap-1">
           <OButton
-            variant="outline"
-            size="xs"
+            variant="ghost-primary"
+            size="icon-sm"
+            icon-left="add"
             class="max-md:hidden"
+            :aria-label="claimLabel"
             :data-test="`oncall-unrouted-claim-${row.id}`"
             @click.stop="emit('claim', row)"
           >
-            {{ claimLabel }}
+            <OTooltip side="bottom" :content="claimLabel" />
           </OButton>
           <OButton
             variant="ghost"
             size="icon-sm"
             icon-left="close"
             class="max-md:hidden"
-            :aria-label="t('oncall.unroutedDismiss')"
+            :aria-label="t('oncall.routingNotOurs')"
             :data-test="`oncall-unrouted-dismiss-${row.id}`"
             @click.stop="emit('dismiss', row)"
-          />
+          >
+            <OTooltip side="bottom" :content="t('oncall.routingNotOurs')" />
+          </OButton>
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
@@ -189,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`oncall-unrouted-dismiss-${row.id}-menu`"
               @select="emit('dismiss', row)"
             >
-              <span>{{ t("oncall.unroutedDismiss") }}</span>
+              <span>{{ t("oncall.routingNotOurs") }}</span>
             </ODropdownItem>
           </ODropdown>
         </span>
@@ -223,6 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -233,10 +235,11 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { UnroutedSignal } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { dimensionsSentence, identityDimensions } from "@/utils/oncall";
+import { claimableDimensions, dimensionsSentence, identityDimensions } from "@/utils/oncall";
 
 export interface UnroutedFilters {
   landing?: "default_team" | "nobody";
@@ -284,7 +287,7 @@ const { t } = useI18nTyped();
 const claimLabel = computed<I18nText>(() =>
   props.teamName
     ? t("oncall.unroutedClaimFor", { team: raw(props.teamName) })
-    : t("oncall.unroutedWriteRule"),
+    : t("oncall.unroutedGiveOwner"),
 );
 
 const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
@@ -324,9 +327,10 @@ const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
     id: "actions",
     header: t("oncall.actions"),
     isAction: true,
+    pinned: "right",
     sortable: false,
-    size: 170,
-    meta: { align: "right", cellClass: "actions-column", actionCount: 2 },
+    size: 100,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
 ]);
 
