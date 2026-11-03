@@ -24,6 +24,7 @@ const defaults = () => ({
   rowsPerPage: 25,
   currentPage: 0,
   showHistogram: true,
+  scope: "all" as const,
 });
 
 describe("encodeTracesListState", () => {
@@ -44,6 +45,11 @@ describe("encodeTracesListState", () => {
     expect(encodeTracesListState({ ...defaults(), currentPage: 2 })).toEqual({ page: 3 });
   });
 
+  it("writes the scope only when it is not All spans", () => {
+    expect(encodeTracesListState({ ...defaults(), scope: "root" })).toEqual({ scope: "root" });
+    expect(encodeTracesListState({ ...defaults(), scope: "all" })).toEqual({});
+  });
+
   it("treats a reordered column list as a change", () => {
     const query = encodeTracesListState({
       ...defaults(),
@@ -61,6 +67,7 @@ describe("decodeTracesListState", () => {
       rowsPerPage: 100,
       currentPage: 4,
       showHistogram: false,
+      scope: "entrypoint" as const,
     };
     const query = encodeTracesListState(state);
     // Router query values arrive as strings.
@@ -70,6 +77,7 @@ describe("decodeTracesListState", () => {
       rowsPerPage: 100,
       currentPage: 4,
       showHistogram: false,
+      scope: "entrypoint",
     });
   });
 
@@ -80,7 +88,12 @@ describe("decodeTracesListState", () => {
       rowsPerPage: null,
       currentPage: null,
       showHistogram: null,
+      scope: null,
     });
+  });
+
+  it("reads a link without scope as All spans", () => {
+    expect(decodeTracesListState({ tab: "spans" }).scope).toBeNull();
   });
 
   it("reads show_histogram=true written by older links", () => {
@@ -89,7 +102,19 @@ describe("decodeTracesListState", () => {
 
   it("ignores values a hand-edited link cannot mean", () => {
     expect(
-      decodeTracesListState({ rows: "7", page: "0", columns: "not-base64!", show_histogram: "x" }),
-    ).toEqual({ columns: null, rowsPerPage: null, currentPage: null, showHistogram: null });
+      decodeTracesListState({
+        rows: "7",
+        page: "0",
+        columns: "not-base64!",
+        show_histogram: "x",
+        scope: "children",
+      }),
+    ).toEqual({
+      columns: null,
+      rowsPerPage: null,
+      currentPage: null,
+      showHistogram: null,
+      scope: null,
+    });
   });
 });

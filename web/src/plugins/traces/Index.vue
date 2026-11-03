@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filters-reset="onFiltersReset"
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
+              @update:scope="onScopeChange"
               @apply-saved-view="onApplySavedView"
               @recent-restore="onRecentRestore"
               :refresh-loading="activeHealthView?.loading ?? false"
@@ -431,6 +432,12 @@ import TracesSqlTemplateGallery from "./components/TracesSqlTemplateGallery.vue"
 import TracesSqlSelectorProblem from "./components/TracesSqlSelectorProblem.vue";
 import TracesSqlErrorState from "./components/TracesSqlErrorState.vue";
 import { ONE_HOUR_US } from "@/utils/traces/tracesSqlErrors";
+import {
+  activeScopePredicate,
+  isTracesScope,
+  withScope,
+  type TracesScope,
+} from "@/utils/traces/tracesScope";
 import { isAuthoredStatement } from "@/utils/query/freeTextFilter";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
@@ -471,6 +478,7 @@ import type { HistoryTime, QueryHistoryEntry } from "@/services/query_history";
 interface TracesSavedView {
   version?: number;
   sqlMode?: boolean;
+  scope?: TracesScope;
   stream: { label: string; value: string };
   editorValue: string;
   datetime: { type: string; relativeTimePeriod: string; startTime: number; endTime: number };
@@ -544,7 +552,11 @@ const activeHealthView = computed(() =>
       ? servicesCatalogRef.value
       : null,
 );
-const splitterModel = ref(90);
+// The Spans view's Scope row sits under the editor, so the bar grows by it instead of squeezing the editor.
+const SCOPE_ROW_PX = 36;
+const scopeRowPx = () =>
+  searchObj.meta.searchMode === "spans" && searchObj.meta.showQuery ? SCOPE_ROW_PX : 0;
+const splitterModel = ref(90 + scopeRowPx());
 const fieldValues = ref({});
 
 const { isMobile, isTablet } = useBreakpoint();
@@ -554,12 +566,12 @@ watch(
   (mobile, wasMobile) => {
     if (mobile) {
       searchObj.config.splitterModel = 0;
-      splitterModel.value = 150;
+      splitterModel.value = 150 + scopeRowPx();
     } else if (wasMobile) {
       if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
         searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
       }
-      splitterModel.value = 90;
+      splitterModel.value = 90 + scopeRowPx();
     }
   },
   { immediate: true },
@@ -569,12 +581,17 @@ const filterBuilderGrowth = ref<number | null>(null);
 let autoSplitterHeight = 0;
 // The query pane grows with the builder and shrinks back, but never overrides a larger user-set height.
 watch([filterBuilderGrowth, isMobile], ([growth, mobile]) => {
-  const base = mobile ? 150 : 90;
+  const base = (mobile ? 150 : 90) + scopeRowPx();
   const target = base + (growth ?? 0);
   if (splitterModel.value < target || splitterModel.value <= Math.max(base, autoSplitterHeight)) {
     splitterModel.value = target;
   }
   autoSplitterHeight = target;
+});
+watch(scopeRowPx, (px, was) => {
+  splitterModel.value += px - was;
+  if (autoSplitterHeight) autoSplitterHeight += px - was;
+  onSplitterUpdate();
 });
 // The 90px bar shows two editor lines of 18px; SQL grows it to show up to six, and never shrinks a taller bar.
 const SQL_BAR_MAX_LINES = 6;
@@ -582,7 +599,7 @@ const EDITOR_LINE_PX = 18;
 watch(
   () => (searchObj.meta.sqlMode ? String(searchObj.data.editorValue ?? "").split("\n").length : 0),
   (lines) => {
-    const fit = 90 + (Math.min(lines, SQL_BAR_MAX_LINES) - 2) * EDITOR_LINE_PX;
+    const fit = 90 + scopeRowPx() + (Math.min(lines, SQL_BAR_MAX_LINES) - 2) * EDITOR_LINE_PX;
     if (splitterModel.value >= fit) return;
     splitterModel.value = fit;
     onSplitterUpdate();
@@ -658,6 +675,8 @@ let builtFromClause = "";
 let submittedFilter = "";
 // The typed SQL page 1 ran, sent as written; empty outside SQL mode.
 let submittedSql = "";
+// The Spans view scope condition page 1 ran with, so paging and the count keep it.
+let submittedScope = "";
 // The last Run's Traces view SQL that cannot pick traces, with the fix to offer.
 const traceSqlProblem = ref<{
   sql: string;
@@ -1000,7 +1019,8 @@ function fetchTracesCount() {
   }
 
   const streamName = selectedStreamName.value;
-  const whereClause = builtWhereClause ? ` WHERE ${builtWhereClause}` : "";
+  const scopedWhere = withScope(builtWhereClause, submittedScope);
+  const whereClause = scopedWhere ? ` WHERE ${scopedWhere}` : "";
   const fromClause = builtFromClause || `"${streamName}"`;
   const isSpansMode = searchObj.meta.searchMode === "spans";
 
@@ -1180,6 +1200,7 @@ async function getQueryData(
 
     if (!isPagination) {
       submittedSql = searchObj.meta.sqlMode ? String(searchObj.data.editorValue ?? "").trim() : "";
+      submittedScope = activeScopePredicate(searchObj);
       queryReq = buildSearch(isSort);
       if (queryReq == null) return false;
       searchObj.data.queryPayload = queryReq;
@@ -1301,7 +1322,8 @@ async function getQueryData(
 
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
-      const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
+      const spansFilter = withScope(combinedFilter, submittedScope);
+      const whereClause = spansFilter ? ` WHERE ${spansFilter}` : "";
       const spansSql =
         submittedSql ||
         `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${orderByCol} ${sortOrd}${tieBreaks}`;
@@ -1624,6 +1646,7 @@ async function extractFields() {
     if (owner !== fieldsOwner) {
       fieldsOwner = "";
       searchObj.data.stream.selectedStreamFields = [];
+      searchObj.data.stream.hasParentColumn = false;
       selectedStreamStats.value = null;
       storesExtraFieldsInAll.value = false;
     }
@@ -1712,6 +1735,8 @@ async function extractFields() {
       // Ignoring timestamp as start time is present
       let fields: any = {};
       const schemaTypeMap = new Map(schema.map((row: any) => [row.name, row.type]));
+      // The field list always lists reference_parent_span_id, so the schema says whether it exists.
+      searchObj.data.stream.hasParentColumn = schemaTypeMap.has("reference_parent_span_id");
       Object.keys(importantFields).forEach((rowName) => {
         fields[rowName] = {};
         fieldList.push({
@@ -2280,6 +2305,14 @@ const onSearchModeChange = (mode: TraceSearchMode) => {
   getQueryData();
 };
 
+// Like the view switch, a new scope runs at once and starts from page 1.
+const onScopeChange = (scope: TracesScope) => {
+  searchObj.meta.scope = scope;
+  pendingUrlPage = null;
+  searchObj.data.resultGrid.currentPage = 0;
+  getQueryData();
+};
+
 watch(
   () => [router.currentRoute.value.name, router.currentRoute.value.query.tab] as const,
   ([routeName, tab]) => {
@@ -2789,7 +2822,15 @@ const onApplySavedView = async (view: TracesSavedView) => {
     toast({ variant: "error", message: t("search.errorWhileApplyingSavedView") });
     return;
   }
-  await applyTracesView({ ...view, sqlMode: view.version === 2 && view.sqlMode === true }, true);
+  const v2 = view.version === 2;
+  await applyTracesView(
+    {
+      ...view,
+      sqlMode: v2 && view.sqlMode === true,
+      scope: v2 && isTracesScope(view.scope) ? view.scope : "all",
+    },
+    true,
+  );
 };
 
 /** Applies a stream, filter, window and mode in place, then runs unless only loading. */
@@ -2820,6 +2861,8 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
   if (seq !== savedViewApplySeq) return;
   // A recent search carries no mode, so the text itself says whether it is SQL.
   searchObj.meta.sqlMode = view.sqlMode ?? isAuthoredStatement(view.editorValue ?? "");
+  // A recent search records no scope, so it keeps the current one.
+  if (view.scope) searchObj.meta.scope = view.scope;
   searchObj.data.editorValue = view.editorValue;
   searchBarRef.value?.setEditorValue?.(view.editorValue);
   searchObj.meta.resultGrid.sortBy = view.sortBy;

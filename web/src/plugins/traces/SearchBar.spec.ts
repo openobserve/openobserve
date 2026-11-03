@@ -184,6 +184,7 @@ const makeSearchObj = () =>
       showDetailTab: false,
       showTraceDetails: false,
       sqlMode: false,
+      scope: "all" as "all" | "root" | "entrypoint",
       searchMode: "traces" as "traces" | "spans" | "service-graph" | "services-catalog",
       queryEditorPlaceholderFlag: true,
       metricsRangeFilters: new Map<string, { panelTitle: string; start: number; end: number }>(),
@@ -226,6 +227,7 @@ const makeSearchObj = () =>
           { name: "service_name" },
         ],
         selectedFields: [] as string[],
+        hasParentColumn: false,
         filterField: "",
         addToFilter: "",
         functions: [],
@@ -1402,6 +1404,17 @@ describe("SearchBar", () => {
       expect(searchObjInstance.meta.metricsRangeFilters.size).toBe(0);
     });
 
+    it("returns the scope to All spans", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      searchObjInstance.meta.scope = "entrypoint";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]').trigger("click");
+
+      expect(searchObjInstance.meta.scope).toBe("all");
+    });
+
     it("should emit filters-reset when the reset button is clicked", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
@@ -1907,6 +1920,24 @@ describe("SearchBar", () => {
       expect(panels.map((p) => p.title.split(" · ")[0])).toEqual(["Rate", "Errors", "Duration"]);
       expect(panels.every((p) => p.queries[0].fields.stream_type === "traces")).toBe(true);
       expect(dialog.props("notice")).toBe("traces.redActions.bucketNotice.seconds");
+    });
+
+    it("narrows the Spans view's RED panels to the scope", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      searchObjInstance.meta.scope = "root";
+      searchObjInstance.data.stream.hasParentColumn = true;
+      searchObjInstance.data.editorValue = "service_name = 'api'";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await redItem().trigger("click");
+      await flushPromises();
+      const panels = wrapper.findComponent({ name: "AddToDashboard" }).props("panels") as any[];
+      for (const panel of panels) {
+        expect(panel.queries[0].query).toContain(
+          "(service_name = 'api') AND (reference_parent_span_id IS NULL OR reference_parent_span_id = '')",
+        );
+      }
+      expect(panels[0].title).toBe("Rate · service_name = 'api'");
     });
 
     it("disables Add RED charts when no stream is picked", async () => {
@@ -2670,6 +2701,7 @@ describe("SearchBar", () => {
     const expectedData = () => ({
       version: 2,
       sqlMode: false,
+      scope: "all",
       stream: { label: "default", value: "default" },
       editorValue: "span_status = 'ERROR'",
       datetime: { type: "relative", relativeTimePeriod: "1h", startTime: 10, endTime: 20 },
@@ -2798,6 +2830,20 @@ describe("SearchBar", () => {
         view_name: "checkout errors",
         view_type: "traces",
         data: expectedData(),
+      });
+    });
+
+    it("saves the Spans view's scope with the view", async () => {
+      searchObjInstance.meta.scope = "entrypoint";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      (wrapper.vm as any).newViewName = "entry view";
+      await (wrapper.vm as any).saveAsNewView();
+
+      expect(mockSavedViewsPost.mock.calls[0][1].data).toEqual({
+        ...expectedData(),
+        scope: "entrypoint",
       });
     });
 
@@ -3518,6 +3564,54 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("Scope row under the query editor", () => {
+    const row = () => wrapper.find('[data-test="traces-search-bar-scope-row"]');
+    const select = () => wrapper.findComponent({ name: "TracesScopeSelect" });
+
+    it("holds the Scope select in the Spans view only", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(row().exists()).toBe(true);
+      expect(select().props()).toMatchObject({
+        modelValue: "all",
+        sqlMode: false,
+        hasParentColumn: false,
+      });
+
+      searchObjInstance.meta.searchMode = "traces";
+      await flushPromises();
+      expect(row().exists()).toBe(false);
+    });
+
+    it("sits under the query editor", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const editor = wrapper.find('[data-test="code-query-editor-stub"]').element;
+      const position = editor.compareDocumentPosition(row().element);
+      expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("passes SQL mode and the stream's parent column to the select", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      searchObjInstance.meta.sqlMode = true;
+      searchObjInstance.data.stream.hasParentColumn = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(select().props()).toMatchObject({ sqlMode: true, hasParentColumn: true });
+      searchObjInstance.meta.sqlMode = false;
+    });
+
+    it("asks the page to apply a picked scope", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      select().vm.$emit("update:modelValue", "root");
+      expect(wrapper.emitted("update:scope")).toEqual([["root"]]);
+    });
+  });
+
   describe("SQL mode", () => {
     const { isPinned, togglePin } = useToolbarPins("traces");
     const pinnedBtn = () => wrapper.find('[data-test="traces-search-bar-sql-mode-pinned-btn"]');
@@ -3630,6 +3724,62 @@ describe("SearchBar", () => {
       await (wrapper.vm as any).setSqlMode(true);
       expect(searchObjInstance.meta.sqlMode).toBe(true);
       expect(searchObjInstance.data.editorValue).toBe("");
+    });
+
+    describe("with a scope", () => {
+      const ROOT = "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
+      const ENTRY = `(CAST(span_kind AS VARCHAR) IN ('2','5') OR ${ROOT})`;
+
+      beforeEach(() => {
+        searchObjInstance.data.stream.hasParentColumn = true;
+      });
+
+      it("writes the scope into the pre-filled WHERE, and the select steps back to All spans", async () => {
+        searchObjInstance.meta.scope = "root";
+        searchObjInstance.data.editorValue = "service_name = 'api' or duration > '5ms'";
+        wrapper = mountSearchBar();
+        await flushPromises();
+        await (wrapper.vm as any).setSqlMode(true);
+        expect(searchObjInstance.data.editorValue).toBe(
+          `SELECT * FROM "default" WHERE (service_name = 'api' or duration > 5000) AND ${ROOT} ORDER BY start_time DESC`,
+        );
+        expect(searchObjInstance.meta.scope).toBe("all");
+        expect(wrapper.emitted("searchdata")).toBeUndefined();
+      });
+
+      it("pre-fills the scope alone over an empty editor", async () => {
+        searchObjInstance.meta.scope = "entrypoint";
+        searchObjInstance.data.editorValue = "";
+        wrapper = mountSearchBar();
+        await flushPromises();
+        await (wrapper.vm as any).setSqlMode(true);
+        expect(searchObjInstance.data.editorValue).toBe(
+          `SELECT * FROM "default" WHERE ${ENTRY} ORDER BY start_time DESC`,
+        );
+      });
+
+      it("keeps typed SQL as it is, and the scope with it", async () => {
+        searchObjInstance.meta.scope = "root";
+        const typed = `SELECT * FROM "default" WHERE a = 1`;
+        searchObjInstance.data.editorValue = typed;
+        wrapper = mountSearchBar();
+        await flushPromises();
+        await (wrapper.vm as any).setSqlMode(true);
+        expect(searchObjInstance.data.editorValue).toBe(typed);
+        expect(searchObjInstance.meta.scope).toBe("root");
+      });
+
+      it("writes no scope into the Traces view selector", async () => {
+        searchObjInstance.meta.searchMode = "traces";
+        searchObjInstance.meta.scope = "root";
+        searchObjInstance.data.editorValue = "service_name = 'api'";
+        wrapper = mountSearchBar();
+        await flushPromises();
+        await (wrapper.vm as any).setSqlMode(true);
+        expect(searchObjInstance.data.editorValue).toBe(
+          `SELECT trace_id FROM "default" WHERE service_name = 'api'`,
+        );
+      });
     });
 
     it("offers the view's templates under Examples once the editor has SQL, and fills it without running", async () => {

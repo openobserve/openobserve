@@ -121,6 +121,7 @@ import {
 import useTraces from "@/composables/useTraces";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { analyzeTracesSql, traceSelector } from "@/utils/traces/tracesSql";
+import { activeScopePredicate, withScope } from "@/utils/traces/tracesScope";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
 import { buildTracesRedPanel, tracesBucketNotice, type TracesRedChart } from "./tracesRedPanels";
 import type { I18nText } from "@/types/i18n";
@@ -241,6 +242,8 @@ let comparisonEntry: MetricsRangeFilter | null = null;
 let chartsRange: TimeRange | null = null;
 // The editor text the charts ran with; with auto-run off the editor may hold an unrun edit.
 let chartsFilter = "";
+// The scope condition the charts ran with, which a comparison of their spans keeps.
+let chartsScope = "";
 // The stream and mode the charts ran with, for the same reason.
 let chartsStream = "";
 let chartsMode: "spans" | "traces" = "traces";
@@ -269,7 +272,7 @@ const getBaseFilters = () => {
     }
   });
 
-  const parsedFilter = parseEffectiveFilter();
+  const parsedFilter = withScope(parseEffectiveFilter(), activeScopePredicate(searchObj));
   if (parsedFilter) baseFilters.push(parsedFilter);
 
   return baseFilters;
@@ -308,6 +311,7 @@ const loadDashboard = async () => {
     };
     chartsRange = { ...effectiveTimeRange.value };
     chartsFilter = searchObj.data.editorValue ?? "";
+    chartsScope = activeScopePredicate(searchObj);
     chartsStream = streamName;
     chartsMode = isSpansMode ? "spans" : "traces";
     chartsInterval = interval;
@@ -429,7 +433,7 @@ const openAddToDashboard = (chart: TracesRedChart) => {
     chartInterval(effectiveTimeRange.value.startTime, effectiveTimeRange.value.endTime);
   addToDashboardPanel.value = buildTracesRedPanel(chart, {
     streamName: chartsStream || searchObj.data.stream.selectedStream.value,
-    filter: decodeFilter(chartsFilter),
+    filter: withScope(decodeFilter(chartsFilter), chartsScope),
     filterText: chartsFilter,
     view: chartsMode,
     interval,
@@ -492,7 +496,7 @@ const onHeatmapDrillDown = () => {
     rangeEndUs: range.endTime,
     durationLoUs: box.durationLoUs || null,
     durationHiUs: box.durationHiUs,
-    filter: decodeFilter(chartsFilter),
+    filter: withScope(decodeFilter(chartsFilter), chartsScope),
   };
   showComparison.value = true;
 };
@@ -636,7 +640,7 @@ const openComparison = () => {
   presetContext.value = {
     rangeStartUs: shown.startTime,
     rangeEndUs: shown.endTime,
-    filter: decodeFilter(chartsFilter),
+    filter: withScope(decodeFilter(chartsFilter), chartsScope),
   };
   const range = originalTimeRangeBeforeSelection.value ?? effectiveTimeRange.value;
   const current =
@@ -662,7 +666,7 @@ const openComparison = () => {
           rangeEndUs: range.endTime,
           durationLoUs: entry.start,
           durationHiUs: entry.end,
-          filter: decodeFilter(entry.baselineFilter),
+          filter: withScope(decodeFilter(entry.baselineFilter), chartsScope),
         }
       : null;
   showComparison.value = true;

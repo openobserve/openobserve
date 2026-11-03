@@ -2032,6 +2032,26 @@ describe("useTraces", () => {
       expect(searchObj.data.stream.selectedFields).toEqual(["service_name", "http.method"]);
     });
 
+    it("writes the Spans view's scope to the URL only when it is not All spans", () => {
+      const { searchObj, getUrlQueryParams } = freshState();
+      searchObj.meta.searchMode = "spans";
+      searchObj.data.stream.selectedFields = [...DEFAULT_TRACE_COLUMNS.spans];
+      expect(getUrlQueryParams()).not.toHaveProperty("scope");
+      searchObj.meta.scope = "root";
+      expect(getUrlQueryParams().scope).toBe("root");
+      searchObj.meta.searchMode = "traces";
+      searchObj.data.stream.selectedFields = [...DEFAULT_TRACE_COLUMNS.traces];
+      expect(getUrlQueryParams()).not.toHaveProperty("scope");
+    });
+
+    it("restores the scope from a link, and reads a link without it as All spans", () => {
+      const { searchObj, applyUrlListState } = freshState();
+      applyUrlListState({ tab: "spans", scope: "entrypoint" });
+      expect(searchObj.meta.scope).toBe("entrypoint");
+      applyUrlListState({ tab: "spans" });
+      expect(searchObj.meta.scope).toBe("all");
+    });
+
     it("opens an old link without list keys unchanged", () => {
       const { searchObj, applyUrlListState } = freshState();
       searchObj.data.stream.selectedFields = ["service_name"];

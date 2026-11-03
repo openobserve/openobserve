@@ -2415,12 +2415,13 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
       const bar = wrapper.findComponent('[data-test="logs-search-bar"]');
+      // The Spans view adds its 36px scope row under the query.
       bar.vm.$emit("filterBuilderGrowth", 54);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 54);
+      expect(wrapper.vm.splitterModel).toBe(90 + 36 + 54);
       bar.vm.$emit("filterBuilderGrowth", null);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(90 + 36);
     });
 
     it("should render the drill-down target in the search tab", async () => {
@@ -2602,8 +2603,8 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      // splitterModel is initialized to 90 (horizontal px height for the search-bar panel)
-      expect(wrapper.vm.splitterModel).toBe(90);
+      // 90px for the search bar, plus 36px for the Scope row of the default Spans view.
+      expect(wrapper.vm.splitterModel).toBe(126);
     });
 
     it("should render the second-level container with full-height class", async () => {
@@ -4530,6 +4531,17 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockUpdatedLocalLogFilterField).toHaveBeenCalledWith("spans");
     });
 
+    it("restores a version 2 view's scope, and reads a view without one as All spans", async () => {
+      await mountPage();
+      await applyViewAndWaitForSearch(savedView({ version: 2, scope: "entrypoint" }));
+      expect(mockSearchObj.meta.scope).toBe("entrypoint");
+      await applyViewAndWaitForSearch(savedView({ version: 2 }));
+      expect(mockSearchObj.meta.scope).toBe("all");
+      mockSearchObj.meta.scope = "root";
+      await applyViewAndWaitForSearch(savedView({ version: 1, scope: "root" }));
+      expect(mockSearchObj.meta.scope).toBe("all");
+    });
+
     describe("restores the picker's date type", () => {
       const ABSOLUTE = {
         type: "absolute",
@@ -5549,17 +5561,18 @@ describe("Index.vue (Main Traces Page)", () => {
         mockSearchObj.meta.sqlMode = sqlMode;
         await flushPromises();
       };
+      // The Spans view's Scope row adds its 36px under the editor.
       await showSql("a = 1\nAND b = 2\nAND c = 3", false);
-      expect(wrapper.vm.splitterModel).toBe(90);
+      expect(wrapper.vm.splitterModel).toBe(126);
 
       await showSql(`SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200`);
-      expect(wrapper.vm.splitterModel).toBe(108);
+      expect(wrapper.vm.splitterModel).toBe(144);
 
       await showSql(Array.from({ length: 9 }, (_, i) => `-- ${i}`).join("\n"));
-      expect(wrapper.vm.splitterModel).toBe(162);
+      expect(wrapper.vm.splitterModel).toBe(198);
 
       await showSql("SELECT 1");
-      expect(wrapper.vm.splitterModel).toBe(162);
+      expect(wrapper.vm.splitterModel).toBe(198);
     });
 
     it.each([
@@ -5793,6 +5806,123 @@ describe("Index.vue (Main Traces Page)", () => {
       const { handlers } = await runSql(grouped);
       await finish(handlers, [{ service_name: "api", n: 3 }], { is_partial: true });
       expect(mockSearchObj.data.queryResults.is_partial).toBe(true);
+    });
+
+    describe("Scope select", () => {
+      const ROOT = "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
+
+      const ownCalls = () => {
+        const { calls, contexts } = mockFetchQueryDataWithHttpStream.mock;
+        return calls.filter((_c, i) => contexts[i] === wrapper.vm.$) as any[][];
+      };
+
+      const runChips = async (editorValue = "") => {
+        mockSearchObj.meta.sqlMode = false;
+        mockSearchObj.data.editorValue = editorValue;
+        wrapper.vm.searchData();
+        await flushPromises();
+        const [request, handlers] = ownCalls().at(-1)!;
+        return { request, handlers };
+      };
+
+      const countSqlAfter = async (handlers: any) => {
+        await finish(handlers, [{ trace_id: "t", span_id: "s" }]);
+        const [countRequest] = ownCalls().at(-1)!;
+        return b64DecodeUnicode(countRequest.queryReq.query.sql);
+      };
+
+      const mountScoped = async (scope: string) => {
+        await mountSql();
+        mockSearchObj.meta.scope = scope;
+        mockSearchObj.data.stream.hasParentColumn = true;
+      };
+
+      afterEach(() => {
+        mockSearchObj.meta.scope = "all";
+        mockSearchObj.data.stream.hasParentColumn = false;
+      });
+
+      it("narrows the Spans list and its count to the scope", async () => {
+        await mountScoped("root");
+        const { request, handlers } = await runChips();
+        expect(b64DecodeUnicode(request.queryReq.query.sql)).toBe(
+          `SELECT * FROM "default" WHERE ${ROOT} ORDER BY _timestamp DESC`,
+        );
+        expect(await countSqlAfter(handlers)).toContain(`FROM "default" WHERE ${ROOT}`);
+      });
+
+      it("adds the scope after the filter, bracketing the filter", async () => {
+        await mountScoped("root");
+        const { request, handlers } = await runChips("service_name = 'a'");
+        expect(b64DecodeUnicode(request.queryReq.query.sql)).toContain(
+          `WHERE (service_name = 'a') AND ${ROOT} ORDER BY`,
+        );
+        expect(await countSqlAfter(handlers)).toMatch(/WHERE \(service_name\s+=\s*'a'\) AND /);
+      });
+
+      it("sends All spans requests as before", async () => {
+        await mountScoped("all");
+        const { request, handlers } = await runChips();
+        expect(b64DecodeUnicode(request.queryReq.query.sql)).toBe(
+          `SELECT * FROM "default" ORDER BY _timestamp DESC`,
+        );
+        expect(await countSqlAfter(handlers)).toBe(
+          `select count(*) as span_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count FROM "default"`,
+        );
+      });
+
+      it("leaves the Traces view request and count alone", async () => {
+        await mountScoped("root");
+        mockSearchObj.meta.searchMode = "traces";
+        const { request, handlers } = await runChips();
+        expect(request.queryReq.filter).toBe("");
+        expect(await countSqlAfter(handlers)).not.toContain("reference_parent_span_id");
+      });
+
+      it("sends typed SQL as written whatever the scope", async () => {
+        await mountScoped("entrypoint");
+        const typed = `SELECT * FROM "default" WHERE a = 1`;
+        const { sql, handlers } = await runSql(typed);
+        expect(sql).toBe(typed);
+        expect(await countSqlAfter(handlers)).not.toContain("span_kind");
+      });
+
+      it("runs the Spans view again from page 1 when the scope is picked", async () => {
+        await mountScoped("all");
+        mockSearchObj.data.resultGrid.currentPage = 3;
+        wrapper.findComponent({ name: "search-bar" }).vm.$emit("update:scope", "root");
+        await flushPromises();
+        expect(mockSearchObj.meta.scope).toBe("root");
+        expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
+        const [request] = ownCalls().at(-1)!;
+        expect(b64DecodeUnicode(request.queryReq.query.sql)).toContain(`WHERE ${ROOT}`);
+      });
+
+      it("makes room for the Scope row in the Spans view only", async () => {
+        await mountSql();
+        expect(wrapper.vm.splitterModel).toBe(126);
+        mockSearchObj.meta.searchMode = "traces";
+        await flushPromises();
+        expect(wrapper.vm.splitterModel).toBe(90);
+        mockSearchObj.meta.searchMode = "spans";
+        await flushPromises();
+        expect(wrapper.vm.splitterModel).toBe(126);
+      });
+
+      it("reads whether the stream records reference_parent_span_id", async () => {
+        await mountSql();
+        const base = mockStreamList.list.find((st: any) => st.name === "default")!;
+        mockGetStream.mockResolvedValueOnce({
+          ...base,
+          schema: [...base.schema, { name: "reference_parent_span_id", type: "Utf8" }],
+        });
+        await wrapper.vm.extractFields();
+        await flushPromises();
+        expect(mockSearchObj.data.stream.hasParentColumn).toBe(true);
+        await wrapper.vm.extractFields();
+        await flushPromises();
+        expect(mockSearchObj.data.stream.hasParentColumn).toBe(false);
+      });
     });
 
     it("waits for Run when the stream changes in SQL mode, even with auto-run on", async () => {

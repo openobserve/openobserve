@@ -126,6 +126,17 @@ describe("useTracesTableColumns", () => {
     });
   });
 
+  describe("Columns button", () => {
+    it.each(["spans", "traces"] as const)(
+      "lets every %s column but the pinned timestamp be hidden",
+      (mode) => {
+        const fields = mode === "spans" ? DEFAULT_SPANS_FIELDS : DEFAULT_TRACES_FIELDS;
+        const cols = buildCols(true, mode, [...fields]);
+        expect(cols.filter((c) => !c.hideable).map((c) => c.id)).toEqual(["_timestamp"]);
+      },
+    );
+  });
+
   describe("spans mode — user removes status_code", () => {
     it("should not include status_code when absent from selectedFields", () => {
       const fields = DEFAULT_SPANS_FIELDS.filter((f) => f !== "status_code");
@@ -623,6 +634,19 @@ describe("useTracesTableColumns", () => {
       expect(fillIds(cols)).toEqual(["duration"]);
       expect(cols[0].minSize).toBeUndefined();
       expect((cols[0].meta as Record<string, unknown>).autoWidth).toBeUndefined();
+    });
+
+    it("gives the fill to the last shown column, skipping hidden ones", () => {
+      const cols = [
+        { id: "service_name", size: 160, meta: {} },
+        { id: "duration", size: 120, meta: {} },
+        { id: "method", size: 160, minSize: 160, meta: { autoWidth: true, fillRemaining: true } },
+      ];
+      fillLastColumn(cols, "_timestamp", { method: false });
+
+      expect(fillIds(cols)).toEqual(["duration"]);
+      expect(cols[1].minSize).toBe(120);
+      expect(cols[2].minSize).toBeUndefined();
     });
   });
 

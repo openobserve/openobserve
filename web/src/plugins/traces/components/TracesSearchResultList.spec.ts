@@ -647,6 +647,52 @@ describe("TracesSearchResultList", () => {
     });
   });
 
+  describe("Columns button — fill column", () => {
+    afterEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [];
+    });
+
+    const stored = () => [
+      { id: "service_name", size: 160, meta: {} },
+      { id: "duration", size: 120, meta: {} },
+      { id: "method", size: 160, minSize: 160, meta: { autoWidth: true, fillRemaining: true } },
+    ];
+    const tableFillIds = () =>
+      (wrapper.findComponent({ name: "OTable" }).props("columns") as any[])
+        .filter((c) => c.meta?.fillRemaining)
+        .map((c) => c.id);
+
+    it("hands the fill to the last shown column while the last one is hidden", async () => {
+      sharedSearchObj.data.resultGrid.columns = stored();
+      wrapper = mount_({
+        hits: [makeHit("t1")],
+        loading: false,
+        searchMode: "spans" as any,
+        columnVisibility: { method: false },
+      });
+
+      expect(tableFillIds()).toEqual(["duration"]);
+      expect(sharedSearchObj.data.resultGrid.columns.at(-1).meta.fillRemaining).toBe(true);
+
+      await wrapper.setProps({ columnVisibility: {} } as any);
+      expect(tableFillIds()).toEqual(["method"]);
+    });
+
+    it("passes the stored columns through when the fill column is shown", () => {
+      sharedSearchObj.data.resultGrid.columns = stored();
+      wrapper = mount_({
+        hits: [makeHit("t1")],
+        loading: false,
+        searchMode: "spans" as any,
+        columnVisibility: { service_name: false },
+      });
+
+      expect(wrapper.findComponent({ name: "OTable" }).props("columns")).toBe(
+        sharedSearchObj.data.resultGrid.columns,
+      );
+    });
+  });
+
   describe("onColumnReorder — fill column", () => {
     afterEach(() => {
       sharedSearchObj.data.resultGrid.columns = [];
