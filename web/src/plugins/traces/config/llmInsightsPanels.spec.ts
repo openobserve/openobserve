@@ -13,6 +13,7 @@ import {
   renderPanelSql,
   compactSql,
   pickInterval,
+  llmCallUsageSum,
   type LLMPanelDef,
 } from "./llmInsightsPanels";
 
@@ -370,5 +371,70 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
     const fields = recentErrors!.columns!.map((c) => c.field);
     expect(fields).toContain("operation");
     expect(fields).toContain("trace_id");
+  });
+});
+
+/**
+ * Evaluate a generated `SUM(CASE WHEN <op predicate> THEN col ELSE 0 END)`
+ * over in-memory spans: reads the IN list and the IS NULL branch out of the
+ * SQL so the test checks what the query would actually sum.
+ */
+function evalUsageSum(
+  sql: string,
+  column: string,
+  spans: Array<Record<string, string | number | null>>,
+): number {
+  const ops = [
+    ...(sql.match(/gen_ai_operation_name IN \(([^)]*)\)/)?.[1] ?? "").matchAll(/'([^']+)'/g),
+  ].map((m) => m[1]);
+  const nullCounts = /gen_ai_operation_name IS NULL OR/.test(sql);
+  expect(sql).toContain(`THEN ${column} ELSE 0 END`);
+  return spans
+    .filter((s) => {
+      const op = s.gen_ai_operation_name;
+      return op == null ? nullCounts : ops.includes(String(op));
+    })
+    .reduce((acc, s) => acc + Number(s[column] ?? 0), 0);
+}
+
+describe("llmCallUsageSum", () => {
+  // An agent span repeats its children's usage; only the LLM calls count.
+  it("sums an agent span with two chat children to the children's total", () => {
+    const spans = [
+      { gen_ai_operation_name: "invoke_agent", gen_ai_usage_total_tokens: 60 },
+      { gen_ai_operation_name: "chat", gen_ai_usage_total_tokens: 30 },
+      { gen_ai_operation_name: "chat", gen_ai_usage_total_tokens: 30 },
+    ];
+    const sql = llmCallUsageSum("gen_ai_usage_total_tokens");
+    expect(evalUsageSum(sql, "gen_ai_usage_total_tokens", spans)).toBe(60);
+  });
+
+  it("counts every generation operation and spans with no operation name", () => {
+    const spans = [
+      { gen_ai_operation_name: "text_completion", gen_ai_usage_cost: 1 },
+      { gen_ai_operation_name: "generate_content", gen_ai_usage_cost: 2 },
+      { gen_ai_operation_name: "embeddings", gen_ai_usage_cost: 4 },
+      { gen_ai_operation_name: null, gen_ai_usage_cost: 8 },
+      { gen_ai_operation_name: "execute_tool", gen_ai_usage_cost: 16 },
+      { gen_ai_operation_name: "create_agent", gen_ai_usage_cost: 32 },
+    ];
+    const sql = llmCallUsageSum("gen_ai_usage_cost");
+    expect(evalUsageSum(sql, "gen_ai_usage_cost", spans)).toBe(15);
+  });
+
+  it("every panel sums usage columns only over LLM-call spans", () => {
+    const usagePanels = LLM_INSIGHTS_PANELS.filter((p) => /gen_ai_usage_/.test(p.query.sql));
+    expect(usagePanels.length).toBeGreaterThan(0);
+    for (const p of usagePanels) {
+      const sql = compactSql(p.query.sql);
+      expect(sql, `panel ${p.id} sums usage over every span`).not.toMatch(/SUM\(\s*gen_ai_usage_/i);
+      const column = sql.match(/THEN (gen_ai_usage_\w+) ELSE 0 END/)![1];
+      const spans = [
+        { gen_ai_operation_name: "invoke_agent", [column]: 60 },
+        { gen_ai_operation_name: "chat", [column]: 30 },
+        { gen_ai_operation_name: "chat", [column]: 30 },
+      ];
+      expect(evalUsageSum(sql, column, spans), `panel ${p.id}`).toBe(60);
+    }
   });
 });
