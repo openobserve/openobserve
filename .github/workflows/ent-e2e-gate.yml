@@ -233,8 +233,8 @@ jobs:
               sleep 5
             done
           }
-          ENT_SHA=$(sha_of "$ENT_CODE_REF"); ENGINE_SHA=$(sha_of "$ENT_REF")
-          [ -n "$ENT_SHA" ] && [ -n "$ENGINE_SHA" ] || cannot_start "Could not resolve ENT \`$ENT_CODE_REF\` or the engine ref \`$ENT_REF\` to a commit."
+          ENT_SHA=$(sha_of "$ENT_CODE_REF")
+          [ -n "$ENT_SHA" ] || cannot_start "Could not resolve ENT \`$ENT_CODE_REF\` to a commit."
 
           # Against ENT main, test the PR merged into OSS main: a stale branch would miss OSS code ENT main already uses.
           TESTED_SHA="$HEAD_SHA"
@@ -256,15 +256,15 @@ jobs:
 
           # The engine checks out oss_branch, so a commit SHA there makes it test exactly what its title names.
           MATCH="Playwright E2E Crosscheck — OSS PR #$PR ("
-          TITLE="${MATCH}$TESTED_SHA) oss=$HEAD_SHA ent=$ENT_SHA engine=$ENGINE_SHA"
-          # Newest engine run titled for exactly this test (or the older engine's shorter title), created since $1.
+          # The engine commit is whatever ENT_REF points at when the run starts, so it is read from the title, not predicted.
+          TITLE="${MATCH}$TESTED_SHA) oss=$HEAD_SHA ent=$ENT_SHA engine="
           newest_run() {
             gh run list --repo "$REPO" --workflow "$WF" --event workflow_dispatch -L 40 --json databaseId,displayTitle,createdAt,event 2>/dev/null \
               | jq -r --arg t "$TITLE" --arg old "${MATCH}$TESTED_SHA)" --argjson min "$1" \
-                '[.[] | select(.event == "workflow_dispatch" and (.displayTitle == $t or .displayTitle == $old) and (.createdAt | fromdateiso8601) >= $min)] | sort_by(.createdAt) | last | .databaseId // empty' 2>/dev/null || true
+                '[.[] | select(.event == "workflow_dispatch" and ((.displayTitle | startswith($t) and (ltrimstr($t) | test("^[0-9a-f]{40}$"))) or .displayTitle == $old) and (.createdAt | fromdateiso8601) >= $min)] | sort_by(.databaseId) | last | .databaseId // empty' 2>/dev/null || true
           }
           DISPATCH_TS=$(date -u +%s)
-          echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF=$ENGINE_SHA, code=$ENT_CODE_REF@$ENT_SHA, oss=$TESTED_SHA) for OSS PR #$PR ($HEAD_REF)…"
+          echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF, code=$ENT_CODE_REF@$ENT_SHA, oss=$TESTED_SHA) for OSS PR #$PR ($HEAD_REF)…"
           gh workflow run "$WF" --repo "$REPO" --ref "$ENT_REF" \
             -f oss_branch="$TESTED_SHA" \
             -f oss_head_ref="$HEAD_REF" \

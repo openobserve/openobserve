@@ -125,7 +125,8 @@ If findings exist:
 </details>
 ```
 (Use the callout tag + heading that match the actual decision — the block above shows
-`blocked`; swap to `> [!NOTE]` / `> ### 💬 Approved with comments` etc. per the mapping table.)
+`blocked` with a `p0`; with only `p1` blocking findings the heading is `> ### ⚠️ Major concerns found`;
+swap to `> [!NOTE]` / `> ### 💬 Approved with comments` etc. per the mapping table.)
 
 If NO issues across all reviewers:
 ```
