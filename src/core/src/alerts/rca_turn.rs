@@ -3491,9 +3491,9 @@ mod tests {
         clock.abort();
     }
 
-    #[tokio::test(start_paused = true)]
+    // Real clock: the 100x fast_clock turns a 50 ms CI stall into a false 5 s backoff.
+    #[tokio::test]
     async fn other_start_errors_fail_the_continuation_at_once() {
-        let clock = fast_clock();
         let _db = db().await;
         for (error, can_retry, code) in [
             (RcaTurnError::Busy, true, "busy"),
@@ -3543,7 +3543,6 @@ mod tests {
                 "{stored_error:?}"
             );
         }
-        clock.abort();
     }
 
     #[tokio::test]

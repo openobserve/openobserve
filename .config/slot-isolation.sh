@@ -23,4 +23,6 @@ if [ -n "${NEXTEST_TEST_GLOBAL_SLOT:-}" ]; then
         fi
     done
 fi
+# test threads get the 16 MB stack the server's runtime threads have; debug async code outgrows 2 MB
+export RUST_MIN_STACK="${RUST_MIN_STACK:-16777216}"
 exec "$@"
