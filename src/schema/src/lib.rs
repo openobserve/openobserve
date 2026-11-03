@@ -29,7 +29,10 @@ use config::{
     ider::SnowflakeIdGenerator,
     is_uds_internal_column,
     meta::{
-        promql::METADATA_LABEL,
+        promql::{
+            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL,
+            VALUE_LABEL,
+        },
         stream::{StreamSettings, StreamType},
         traces::ALL_INFER_FIELDS,
     },
@@ -545,7 +548,7 @@ pub async fn check_for_schema(
     let is_new = schema.schema().fields().is_empty();
     if !is_new {
         let (is_schema_changed, field_datatype_delta) =
-            get_schema_changes(stream_type, schema, &inferred_schema);
+            get_schema_changes(schema, &inferred_schema);
         if !is_schema_changed {
             // check defined_schema_fields
             let stream_setting = unwrap_stream_settings(schema.schema());
@@ -657,7 +660,7 @@ pub async fn handle_diff_schema(
     // check if the schema has been updated by another thread
     let read_cache = STREAM_SCHEMAS_LATEST.read().await;
     if let Some(updated_schema) = read_cache.get(&cache_key)
-        && let (false, _) = get_schema_changes(stream_type, updated_schema, inferred_schema)
+        && let (false, _) = get_schema_changes(updated_schema, inferred_schema)
     {
         // the caller still holds the schema it started from, empty for a just-created stream
         stream_schema_map.insert(stream_name.to_string(), updated_schema.clone());
@@ -927,13 +930,15 @@ pub fn check_schema_for_defined_schema_fields(
     let mut fields: HashSet<String> = fields.into_iter().collect();
     match stream_type {
         StreamType::Logs => {}
-        StreamType::Metrics | StreamType::Profiles => {
-            fields.extend(
-                stream_type
-                    .uds_required_columns()
-                    .iter()
-                    .map(|f| f.to_string()),
-            );
+        StreamType::Metrics => {
+            fields.insert(NAME_LABEL.to_string());
+            fields.insert(HASH_LABEL.to_string());
+            fields.insert(BUCKET_LABEL.to_string());
+            fields.insert(QUANTILE_LABEL.to_string());
+            fields.insert(EXEMPLARS_LABEL.to_string());
+            fields.insert(VALUE_LABEL.to_string());
+            fields.insert("trace_id".to_string());
+            fields.insert("span_id".to_string());
         }
         StreamType::Traces => {
             fields.insert("service_name".to_string());
@@ -963,16 +968,26 @@ pub fn check_schema_for_defined_schema_fields(
                 }
             }
         }
+        StreamType::Profiles => {
+            fields.insert("stack".to_string());
+            fields.insert("value".to_string());
+            fields.insert("profile_type".to_string());
+            fields.insert("profile_unit".to_string());
+            fields.insert("service_name".to_string());
+            fields.insert("otel_scope_name".to_string());
+            fields.insert("service_instance_id".to_string());
+            fields.insert("host_name".to_string());
+            fields.insert("process_pid".to_string());
+            fields.insert("profile_duration_nanos".to_string());
+            fields.insert("trace_id".to_string());
+            fields.insert("span_id".to_string());
+        }
         _ => {}
     }
     fields
 }
 
-pub fn get_schema_changes(
-    stream_type: StreamType,
-    schema: &SchemaCache,
-    inferred_schema: &Schema,
-) -> (bool, Vec<Field>) {
+pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
     let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<Field> = vec![];
 
@@ -990,12 +1005,7 @@ pub fn get_schema_changes(
                 is_schema_changed = true;
             }
             Some(idx) => {
-                if !defined_schema_fields.is_empty()
-                    && !defined_schema_fields.contains(item_name)
-                    && !stream_type
-                        .uds_required_columns()
-                        .contains(&item_name.as_str())
-                {
+                if !defined_schema_fields.is_empty() && !defined_schema_fields.contains(item_name) {
                     continue;
                 }
                 let existing_field: Arc<Field> = schema.schema().fields()[*idx].clone();
@@ -1064,7 +1074,6 @@ mod tests {
     use std::str::FromStr;
 
     use arrow_schema::DataType;
-    use config::meta::promql::{HASH_LABEL, NAME_LABEL, VALUE_LABEL};
 
     use super::*;
 
@@ -1333,38 +1342,6 @@ mod tests {
                 "value",
             ]
         );
-    }
-
-    #[test]
-    fn test_get_schema_changes_widens_required_columns_missing_from_the_uds() {
-        let settings = StreamSettings {
-            defined_schema_fields: vec!["foo".to_string()],
-            ..Default::default()
-        };
-        let metadata = HashMap::from([(
-            "settings".to_string(),
-            serde_json::to_string(&settings).unwrap(),
-        )]);
-        let schema = SchemaCache::new(Schema::new_with_metadata(
-            vec![
-                Field::new("le", DataType::UInt64, true),
-                Field::new("bar", DataType::UInt64, true),
-            ],
-            metadata,
-        ));
-        let inferred = Schema::new(vec![
-            Field::new("le", DataType::Utf8, true),
-            Field::new("bar", DataType::Utf8, true),
-        ]);
-
-        let (changed, delta) = get_schema_changes(StreamType::Metrics, &schema, &inferred);
-        assert!(changed);
-        assert_eq!(
-            delta.iter().map(|f| f.name().as_str()).collect::<Vec<_>>(),
-            ["le"]
-        );
-        let (changed, delta) = get_schema_changes(StreamType::Logs, &schema, &inferred);
-        assert!(!changed && delta.is_empty());
     }
 
     #[test]

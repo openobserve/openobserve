@@ -100,7 +100,21 @@ pub async fn schema(
             .into_response();
     };
     if !schema.settings.defined_schema_fields.is_empty() {
-        schema.uds_schema = uds_schema(&schema);
+        let mut schema_fields = schema
+            .schema
+            .iter()
+            .map(|f| (&f.name, f))
+            .collect::<HashMap<_, _>>();
+        // internal columns are implicit in the UDS even when not persisted
+        let internal_columns = schema.settings.uds_internal_columns();
+        schema.uds_schema = schema
+            .settings
+            .defined_schema_fields
+            .iter()
+            .chain(internal_columns.iter())
+            .filter_map(|f| schema_fields.remove(f))
+            .cloned()
+            .collect::<Vec<_>>();
     }
 
     // filter by keyword
@@ -598,27 +612,6 @@ pub async fn list(
         }),
     )
         .into_response()
-}
-
-fn uds_schema(stream: &meta::stream::Stream) -> Vec<config::meta::stream::StreamField> {
-    let mut schema_fields = stream
-        .schema
-        .iter()
-        .map(|f| (f.name.as_str(), f))
-        .collect::<HashMap<_, _>>();
-    // internal and required columns are implicit in the UDS even when not persisted
-    let internal_columns = stream.settings.uds_internal_columns();
-    let required_columns = stream.stream_type.uds_required_columns().iter();
-    stream
-        .settings
-        .defined_schema_fields
-        .iter()
-        .chain(internal_columns.iter())
-        .map(String::as_str)
-        .chain(required_columns.copied())
-        .filter_map(|f| schema_fields.remove(f))
-        .cloned()
-        .collect()
 }
 
 /// Keeps only the name and stats of each stream `can_read` refuses: settings name fields too.
@@ -1187,29 +1180,6 @@ mod tests {
         assert_eq!(streams[0].stats.doc_num, 3);
         assert_eq!(streams[1].schema.len(), 1);
         assert_eq!(streams[1].total_fields, 1);
-    }
-
-    #[test]
-    fn uds_schema_lists_required_columns_missing_from_the_saved_list() {
-        let mut stream = typed_stream("cpu", StreamType::Metrics);
-        stream.schema = ["foo", "le", "bar"]
-            .map(|name| config::meta::stream::StreamField {
-                name: name.to_string(),
-                r#type: "Utf8".to_string(),
-            })
-            .to_vec();
-        stream.settings.defined_schema_fields = vec!["foo".to_string()];
-        let names = |stream: &meta::stream::Stream| {
-            let mut names = uds_schema(stream)
-                .into_iter()
-                .map(|f| f.name)
-                .collect::<Vec<_>>();
-            names.sort();
-            names
-        };
-        assert_eq!(names(&stream), ["foo", "le"]);
-        stream.stream_type = StreamType::Logs;
-        assert_eq!(names(&stream), ["foo"]);
     }
 
     #[test]

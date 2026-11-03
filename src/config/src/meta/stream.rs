@@ -24,12 +24,7 @@ use utoipa::ToSchema;
 
 use crate::{
     get_config,
-    meta::{
-        promql::{
-            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, QUANTILE_LABEL, VALUE_LABEL,
-        },
-        self_reporting::usage::Stats,
-    },
+    meta::self_reporting::usage::Stats,
     stats::MemorySize,
     utils::{
         hash::{Sum64, gxhash},
@@ -167,44 +162,6 @@ impl StreamType {
             *self,
             StreamType::Logs | StreamType::Metrics | StreamType::Traces | StreamType::Profiles
         )
-    }
-
-    /// Columns every UDS of this type keeps, saved or not, because this type's queries read them.
-    pub fn uds_required_columns(&self) -> &'static [&'static str] {
-        match self {
-            StreamType::Metrics => &[
-                NAME_LABEL,
-                HASH_LABEL,
-                BUCKET_LABEL,
-                QUANTILE_LABEL,
-                EXEMPLARS_LABEL,
-                VALUE_LABEL,
-                "trace_id",
-                "span_id",
-            ],
-            StreamType::Profiles => &[
-                "stack",
-                "value",
-                "profile_type",
-                "profile_unit",
-                "service_name",
-                "otel_scope_name",
-                "service_instance_id",
-                "host_name",
-                "process_pid",
-                "profile_duration_nanos",
-                "trace_id",
-                "span_id",
-            ],
-            // traces keeps its required columns as a save-time rule for now
-            StreamType::Logs
-            | StreamType::Traces
-            | StreamType::ServiceGraph
-            | StreamType::EnrichmentTables
-            | StreamType::Filelist
-            | StreamType::Metadata
-            | StreamType::Index => &[],
-        }
     }
 
     pub fn as_str(&self) -> &'static str {

@@ -819,8 +819,7 @@ pub async fn get_uds_and_original_data_streams(
         );
 
         if !stream_settings.defined_schema_fields.is_empty() {
-            let fields =
-                uds_pack_fields(stream.stream_type, &stream_settings.defined_schema_fields);
+            let fields = uds_pack_fields(&stream_settings.defined_schema_fields);
             user_defined_schema_map.insert(stream.stream_name.to_string(), Some(fields));
         } else {
             user_defined_schema_map.insert(stream.stream_name.to_string(), None);
@@ -830,7 +829,6 @@ pub async fn get_uds_and_original_data_streams(
 
 /// The fields to repack a batch with when its own schema check turned the UDS on, else None.
 pub fn newly_enabled_uds_fields(
-    stream_type: StreamType,
     had_uds: bool,
     schema: Option<&SchemaCache>,
 ) -> Option<HashSet<String>> {
@@ -841,7 +839,7 @@ pub fn newly_enabled_uds_fields(
     if settings.defined_schema_fields.is_empty() {
         return None;
     }
-    let mut fields = uds_pack_fields(stream_type, &settings.defined_schema_fields);
+    let mut fields = uds_pack_fields(&settings.defined_schema_fields);
     // ingest adds these after packing, so a repack must not move them into `_all`
     fields.extend(settings.uds_internal_columns());
     Some(fields)
@@ -916,16 +914,9 @@ pub fn refactor_map(
     new_map
 }
 
-fn uds_pack_fields(stream_type: StreamType, defined_schema_fields: &[String]) -> HashSet<String> {
+fn uds_pack_fields(defined_schema_fields: &[String]) -> HashSet<String> {
     let mut fields = HashSet::<_>::from_iter(defined_schema_fields.iter().cloned());
     fields.insert(TIMESTAMP_COL_NAME.to_string());
-    // a required column first seen after the UDS was saved must not end up in `_all`
-    fields.extend(
-        stream_type
-            .uds_required_columns()
-            .iter()
-            .map(|f| f.to_string()),
-    );
     fields
 }
 
@@ -1117,23 +1108,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_uds_pack_fields_keeps_required_columns_missing_from_the_saved_list() {
-        let saved = ["foo".to_string()];
-        let metrics = uds_pack_fields(StreamType::Metrics, &saved);
-        assert!(metrics.contains("foo") && metrics.contains(TIMESTAMP_COL_NAME));
-        assert!(metrics.contains("le") && metrics.contains("__hash__"));
-        let profiles = uds_pack_fields(StreamType::Profiles, &saved);
-        assert!(profiles.contains("trace_id") && profiles.contains("stack"));
-        for stream_type in [StreamType::Logs, StreamType::Traces] {
-            let fields = uds_pack_fields(stream_type, &saved);
-            assert_eq!(
-                fields,
-                HashSet::from(["foo".to_string(), TIMESTAMP_COL_NAME.to_string()])
-            );
-        }
-    }
-
-    #[test]
     fn test_newly_enabled_uds_fields_only_when_the_check_turned_the_uds_on() {
         let with_settings = |settings: &config::meta::stream::StreamSettings| {
             SchemaCache::new(arrow_schema::Schema::empty().with_metadata(
@@ -1151,22 +1125,18 @@ mod tests {
         let uds_schema = with_settings(&uds);
         let no_uds_schema = with_settings(&Default::default());
 
-        let fields =
-            newly_enabled_uds_fields(StreamType::Profiles, false, Some(&uds_schema)).unwrap();
+        let fields = newly_enabled_uds_fields(false, Some(&uds_schema)).unwrap();
         for name in [
             "foo",
-            "trace_id",
             TIMESTAMP_COL_NAME,
             config::ID_COL_NAME,
             config::ORIGINAL_DATA_COL_NAME,
         ] {
             assert!(fields.contains(name), "missing {name}");
         }
-        assert!(newly_enabled_uds_fields(StreamType::Profiles, true, Some(&uds_schema)).is_none());
-        assert!(
-            newly_enabled_uds_fields(StreamType::Profiles, false, Some(&no_uds_schema)).is_none()
-        );
-        assert!(newly_enabled_uds_fields(StreamType::Profiles, false, None).is_none());
+        assert!(newly_enabled_uds_fields(true, Some(&uds_schema)).is_none());
+        assert!(newly_enabled_uds_fields(false, Some(&no_uds_schema)).is_none());
+        assert!(newly_enabled_uds_fields(false, None).is_none());
     }
 
     #[test]

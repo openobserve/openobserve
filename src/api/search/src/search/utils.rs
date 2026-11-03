@@ -127,12 +127,7 @@ pub async fn validate_query_fields(
                 ))));
             }
 
-            if !uds_fields.is_empty()
-                && !uds_fields.contains(&field)
-                && !target_stream_type
-                    .uds_required_columns()
-                    .contains(&field.as_str())
-            {
+            if !uds_fields.is_empty() && !uds_fields.contains(&field) {
                 let valid = uds_fields
                     .iter()
                     .map(|f| f.to_owned())
@@ -499,58 +494,6 @@ JOIN "test1" AS b"#;
             "{invalid:?}"
         );
         assert!(valid.is_ok(), "{valid:?}");
-    }
-
-    #[tokio::test]
-    async fn test_validate_query_fields_accepts_required_columns_missing_from_the_uds() {
-        use arrow_schema::{DataType, Field, Schema};
-        use config::meta::stream::StreamSettings;
-        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
-
-        let org_id = "test_org_uds_required_columns";
-        let key = format!("{org_id}/{}/cpu", StreamType::Metrics);
-        let settings = StreamSettings {
-            defined_schema_fields: vec!["foo".to_string()],
-            ..Default::default()
-        };
-        let metadata = std::collections::HashMap::from([(
-            "settings".to_string(),
-            serde_json::to_string(&settings).unwrap(),
-        )]);
-        let schema = Schema::new_with_metadata(
-            vec![
-                Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
-                Field::new("foo", DataType::Utf8, true),
-                Field::new("le", DataType::Utf8, true),
-                Field::new("bar", DataType::Utf8, true),
-            ],
-            metadata,
-        );
-        STREAM_SCHEMAS_LATEST
-            .write()
-            .await
-            .insert(key.clone(), SchemaCache::new(schema));
-
-        let required = validate_query_fields(
-            org_id,
-            "cpu",
-            StreamType::Metrics,
-            r#"SELECT le FROM "cpu""#,
-        )
-        .await;
-        let packed = validate_query_fields(
-            org_id,
-            "cpu",
-            StreamType::Metrics,
-            r#"SELECT bar FROM "cpu""#,
-        )
-        .await;
-
-        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
-        infra::schema::remove_stream_settings(&key).await;
-
-        assert!(required.is_ok(), "{required:?}");
-        assert!(packed.is_err(), "{packed:?}");
     }
 }
 
