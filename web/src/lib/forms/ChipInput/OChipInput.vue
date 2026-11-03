@@ -53,6 +53,7 @@ const props = withDefaults(defineProps<ChipInputProps>(), {
   appearance: "field",
   ariaLabel: undefined,
   inlineCaret: false,
+  resting: false,
   maxRows: undefined,
   dataTest: undefined,
 });
@@ -611,6 +612,7 @@ function onFieldFocusOut() {
           ref="listRef"
           role="listbox"
           :aria-multiselectable="multiple || undefined"
+          :data-list-resting="resting ? '' : undefined"
           :aria-label="searchPlaceholder ?? ariaLabel"
           class="min-h-0 flex-1 overflow-y-auto p-1"
         >

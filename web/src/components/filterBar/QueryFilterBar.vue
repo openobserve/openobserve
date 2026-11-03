@@ -202,6 +202,11 @@ const emptyText = computed(() => {
   return t("filterBar.noOperators");
 });
 
+// Reopened for the next condition with nothing typed: offering a pick, not holding an edit.
+const resting = computed(
+  () => step.value === "field" && !text.value && !editingId.value && !draft.value,
+);
+
 const multiStep = computed(() => step.value === "value" && editor.multiValue.value);
 const selectedCount = computed(() => draft.value?.values.length ?? 0);
 
@@ -370,6 +375,7 @@ const draftOperator = computed(() => {
     :loading="step === 'value' ? valuesLoading : step === 'field' && fieldsLoading"
     :auto-highlight="autoHighlight"
     :multiple="multiStep"
+    :resting="resting"
     :placeholder="placeholderText"
     :aria-label="t('filterBar.ariaLabel')"
     :disabled="disabled"

@@ -185,6 +185,12 @@ describe("usePanelLivePreview", () => {
         '<div data-reka-popper-content-wrapper><div role="listbox"></div></div>';
       expect(isPopupOpen()).toBe(true);
     });
+
+    it("does not hold for a resting list that only offers the next pick", () => {
+      document.body.innerHTML =
+        '<div data-reka-popper-content-wrapper><div role="listbox" data-list-resting></div></div>';
+      expect(isPopupOpen()).toBe(false);
+    });
   });
 
   describe("live runs", () => {

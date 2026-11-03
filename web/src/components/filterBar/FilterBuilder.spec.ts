@@ -123,6 +123,33 @@ async function addEq(field: string, value: string) {
 }
 
 describe("FilterBuilder", () => {
+  describe("resting list signal for live preview", () => {
+    const listbox = () => document.body.querySelector<HTMLElement>('[role="listbox"]');
+    const resting = () => listbox()?.hasAttribute("data-list-resting");
+
+    it("marks only the list reopened after a commit as resting, never one mid-edit", async () => {
+      mountBuilder("promql-builder", []);
+      await find("input").trigger("click");
+      await flushPromises();
+      expect(resting()).toBe(true);
+      await type("lev");
+      expect(resting()).toBe(false);
+      await type("level");
+      await press("Enter");
+      expect(listbox()).not.toBeNull();
+      expect(resting()).toBe(false);
+      await pickRow("eq");
+      expect(resting()).toBe(false);
+      await type("error");
+      await press("Enter");
+      expect(listbox()).not.toBeNull();
+      expect(resting()).toBe(true);
+      await find("chip-level-value").trigger("click");
+      await flushPromises();
+      expect(resting()).toBe(false);
+    });
+  });
+
   describe("server switch for the extended engine operators", () => {
     const EXTENDED = ["in", "not_in", "starts_with", "ends_with", "regex", "not_regex"];
 

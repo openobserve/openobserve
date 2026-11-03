@@ -58,6 +58,8 @@ export interface ChipInputProps {
   /** `plain` drops the input frame, for a field that sits inside an editor surface. */
   appearance?: "field" | "plain";
   ariaLabel?: I18nText;
+  /** The open list only offers a next pick and nothing is mid-edit; its listbox carries `data-list-resting` so watchers need not wait on it. */
+  resting?: boolean;
   /** The default slot places the caret itself, by rendering its `caret` slot prop where typing should land. */
   inlineCaret?: boolean;
   /** Lines of chips shown before the field scrolls inside itself; it grows freely when unset. */
