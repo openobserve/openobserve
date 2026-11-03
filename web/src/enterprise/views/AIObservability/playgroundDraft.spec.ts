@@ -347,11 +347,28 @@ describe("prompt config round trip", () => {
     expect(promptConfigFor(variant).params).toEqual(rest);
   });
 
-  it("carries a non-numeric temperature verbatim rather than dropping it", () => {
+  it("saves a non-numeric temperature verbatim but leaves it out of the run", () => {
     const variant = opened({ ...bare, params: { temperature: "0.3" } });
     expect(variant.temperature).toBe("");
     expect(promptConfigFor(variant).params).toEqual({ temperature: "0.3" });
-    expect(runParams(variant)).toEqual({ temperature: "0.3" });
+    expect(runParams(variant)).toEqual({});
+  });
+
+  it("saves null sampling params verbatim but leaves them out of the run", () => {
+    const stored = { temperature: null, max_tokens: null, top_p: 0.9 };
+    const variant = opened({ ...bare, params: stored });
+    expect(promptConfigFor(variant).params).toEqual(stored);
+    expect(runParams(variant)).toEqual({ top_p: 0.9 });
+  });
+
+  it("runs only max tokens the server accepts, preferring max_tokens", () => {
+    const run = (params: Record<string, unknown>) => runParams(opened({ ...bare, params }));
+    expect(run({ max_tokens: "256" })).toEqual({});
+    expect(run({ maxTokens: -1 })).toEqual({});
+    expect(run({ max_tokens: 1.5 })).toEqual({});
+    expect(run({ maxTokens: 128 })).toEqual({ maxTokens: 128 });
+    expect(run({ max_tokens: 256, maxTokens: 128 })).toEqual({ max_tokens: 256 });
+    expect(run({ max_tokens: "x", maxTokens: 128 })).toEqual({ maxTokens: 128 });
   });
 
   it("runs with every stored param", () => {
