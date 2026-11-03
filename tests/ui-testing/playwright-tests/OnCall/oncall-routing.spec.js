@@ -306,10 +306,7 @@ test.describe('On-call routing rules', {
     await pm.oncallRoutingPage.selectTab('rules');
     await pm.oncallRoutingPage.openRuleEditor();
     await pm.oncallRoutingPage.chooseRuleTeam(f.team.id, f.team.name);
-    // The editor opens on the scope picker, which offers claims built from
-    // dimensions the org has already seen; a freshly-seeded service is not one,
-    // so the rule is written on the dimension builder behind it.
-    await pm.oncallRoutingPage.useAdvancedRuleScope();
+    // A freshly-seeded service is not a known value yet, so it is typed into the row's value picker.
     await pm.oncallRoutingPage.addCondition('service', f.service);
     await pm.oncallRoutingPage.saveRule();
 
@@ -511,11 +508,7 @@ test.describe('On-call routing rules', {
 
     // The screen has to show it, not just the API.
     //
-    // The ORG routing screen draws `OnCallOwnershipRules` (the stats table,
-    // keyed `oncall-rule-team-{id}`). `oncall-routing-row-{id}` belongs to
-    // `OnCallRoutingList`, which only the TEAM's own routing tab renders — so
-    // asking for it here was asking the wrong component for a row it never
-    // draws, on a screen that was otherwise fine.
+    // The org page and the team tab draw the same list, keyed `oncall-rule-team-{id}`.
     await pm.oncallRoutingPage.goto(ORG);
     await pm.oncallRoutingPage.expectAvailable();
     await pm.oncallRoutingPage.expectOrgRuleRowVisible(rule.id);

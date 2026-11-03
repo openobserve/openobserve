@@ -29,7 +29,6 @@ vi.mock("@/services/service_streams", () => ({
   default: {
     getSemanticGroups: vi.fn(),
     getServicesList: vi.fn(),
-    getIdentityConfig: vi.fn(),
     getDimensionAnalytics: vi.fn(),
   },
 }));
@@ -46,16 +45,18 @@ vi.mock("@/services/oncall", () => ({
     testPage: vi.fn(),
     getRoutingConfig: vi.fn(),
     setRoutingConfig: vi.fn(),
-    teamOverview: vi.fn(),
+    whoIsOnCall: vi.fn(),
   },
 }));
 // Hoisted so every useRouter() call shares ONE spy — a fresh vi.fn() per call
 // records the navigation onto an object the test can no longer see.
 const push = vi.hoisted(() => vi.fn());
+const routeQuery = vi.hoisted(() => ({ value: {} as Record<string, string> }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push }),
+  useRoute: () => ({ query: routeQuery.value }),
 }));
 
 import { queryClient } from "@/composables/query/queryClient";
@@ -67,13 +68,14 @@ const correlation = vi.mocked(serviceStreamsService);
 const correlationReads = () => [
   correlation.getSemanticGroups,
   correlation.getServicesList,
-  correlation.getIdentityConfig,
   correlation.getDimensionAnalytics,
 ];
 const ORG = store.state.selectedOrganization.identifier;
 
 /// The sections are stubbed so this file is about the WIRING between them and
 /// the org-level API — each section has its own spec for what it renders.
+const openDefaultDialog = vi.fn();
+
 const stubs = {
   OPageLayout: {
     name: "OPageLayout",
@@ -81,13 +83,32 @@ const stubs = {
   },
   OnCallRoutingSimulator: {
     name: "OnCallRoutingSimulator",
-    props: ["preview", "teams", "aliases", "loading", "sending", "canConfigure", "testResult"],
+    props: [
+      "preview",
+      "teams",
+      "aliases",
+      "signals",
+      "rules",
+      "seed",
+      "loading",
+      "sending",
+      "canConfigure",
+      "testResult",
+    ],
     template: "<div />",
   },
-  // Both tables render the host's toolbar, which carries the tabs, search and refresh.
   OnCallOwnershipRules: {
     name: "OnCallOwnershipRules",
-    props: ["rules", "aliases", "loading", "showTeam", "search"],
+    props: [
+      "rules",
+      "teams",
+      "aliases",
+      "teamId",
+      "defaultTeamId",
+      "loading",
+      "search",
+      "editable",
+    ],
     template: "<div><slot name='toolbar' /><slot name='toolbar-trailing' /></div>",
   },
   OnCallRuleEditor: {
@@ -102,9 +123,7 @@ const stubs = {
       "services",
       "signals",
       "saving",
-      "ladder",
     ],
-    emits: ["team-change"],
     template: "<div />",
   },
   OnCallUnroutedQueue: {
@@ -114,9 +133,17 @@ const stubs = {
   },
   OnCallDefaultTeamCard: {
     name: "OnCallDefaultTeamCard",
-    props: ["teams", "dialog"],
+    props: ["teams", "dialog", "showTrigger"],
+    methods: { openDialog: openDefaultDialog },
     template: "<div />",
   },
+  OTabs: {
+    name: "OTabs",
+    props: ["modelValue", "bordered"],
+    emits: ["update:modelValue"],
+    template: "<div><slot /></div>",
+  },
+  OTab: { name: "OTab", props: ["name", "label"], template: "<button>{{ label }}</button>" },
   OToggleGroup: {
     name: "OToggleGroup",
     props: ["modelValue"],
@@ -140,7 +167,11 @@ const stubs = {
     props: ["open", "primaryButtonDisabled", "title"],
     template: "<div><slot /></div>",
   },
-  ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue", "okVariant"], template: "<div />" },
+  ConfirmDialog: {
+    name: "ConfirmDialog",
+    props: ["modelValue", "okVariant", "okLabel", "messageKeypath", "messageName"],
+    template: "<div />",
+  },
   OButton: {
     name: "OButton",
     props: ["disabled", "active"],
@@ -158,8 +189,8 @@ const stubs = {
     emits: ["update:modelValue"],
     template: `<select :value="modelValue" />`,
   },
-  OSwitch: {
-    name: "OSwitch",
+  OCheckbox: {
+    name: "OCheckbox",
     props: ["modelValue", "label"],
     emits: ["update:modelValue"],
     template: "<button />",
@@ -206,7 +237,7 @@ const simulator = (w: Wrapper) => w.findComponent({ name: "OnCallRoutingSimulato
 /// The queue lives behind the second tab, so a test about it starts by asking
 /// for that list.
 async function showSignals(w: Wrapper) {
-  w.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "signals");
+  w.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "signals");
   await flushPromises();
 }
 
@@ -217,16 +248,19 @@ describe("OnCallRouting", () => {
     __resetOnCallRoutingConfig();
     resetOnCallPermissions();
     vi.clearAllMocks();
+    routeQuery.value = {};
+    service.getRoutingConfig.mockResolvedValue({
+      data: { org_id: "default", default_team_id: "team_2", updated_at: 0 },
+    } as never);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as never);
     service.listTeams.mockResolvedValue({ data: TEAMS } as any);
     service.ownershipStats.mockResolvedValue({ data: { rules: [], total: 0 } } as any);
     service.unroutedSignals.mockResolvedValue({ data: [] } as any);
     service.createOwnershipRule.mockResolvedValue({ data: {} } as any);
     service.updateOwnershipRule.mockResolvedValue({ data: {} } as any);
-    service.teamOverview.mockResolvedValue({ data: { rungs: [] } } as any);
     // Defined data, or nothing is cached and a remount re-reads anyway.
     correlation.getSemanticGroups.mockResolvedValue({ data: [] } as any);
     correlation.getServicesList.mockResolvedValue({ data: [] } as any);
-    correlation.getIdentityConfig.mockResolvedValue({ data: { sets: [] } } as any);
     correlation.getDimensionAnalytics.mockResolvedValue({ data: { dimensions: [] } } as any);
   });
 
@@ -238,20 +272,48 @@ describe("OnCallRouting", () => {
     expect(service.ownershipStats).toHaveBeenCalledWith({ org_identifier: ORG });
   });
 
-  it("hosts the rules table in team-naming mode", async () => {
+  it("hosts the shared rules list org-wide, with the catch-all team pinned", async () => {
     const wrapper = render();
     await flushPromises();
-    expect(rulesPanel(wrapper).props("showTeam")).toBe(true);
+    expect(rulesPanel(wrapper).props("teamId")).toBeUndefined();
+    expect(rulesPanel(wrapper).props("defaultTeamId")).toBe("team_2");
+  });
+
+  it("states the same precedence sentence the team tab uses", () => {
+    const wrapper = mount(OnCallRouting, {
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ...stubs,
+          OPageLayout: {
+            name: "OPageLayout",
+            props: ["subtitle"],
+            template: "<div><span class='sub'>{{ subtitle }}</span><slot /></div>",
+          },
+        },
+      },
+    });
+    expect(wrapper.find(".sub").text()).toBe(String(i18n.global.t("oncall.routingPrecedence")));
+  });
+
+  it("opens on the queue when linked there from a team's tab", async () => {
+    routeQuery.value = { tab: "signals" };
+    const wrapper = render();
+    await flushPromises();
+    expect(unrouted(wrapper).exists()).toBe(true);
   });
 
   it("asks to remove a rule with a destructive confirm button", async () => {
     const wrapper = render();
     await flushPromises();
-    rulesPanel(wrapper).vm.$emit("remove", { rule_id: "r9" });
+    rulesPanel(wrapper).vm.$emit("remove", { rule_id: "r9", dimensions: { service: "cart" } });
     await wrapper.vm.$nextTick();
     const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
     expect(dialog.props("modelValue")).toBe(true);
     expect(dialog.props("okVariant")).toBe("destructive");
+    expect(dialog.props("okLabel")).toBe("Remove rule");
+    expect(dialog.attributes("focus-cancel")).toBeDefined();
+    expect(dialog.props("messageName")).toBe("Service cart");
   });
 
   /// G4: claiming an unrouted signal opens the rule dialog with the failing
@@ -317,6 +379,27 @@ describe("OnCallRouting", () => {
     expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(true);
   });
 
+  it("opens Test routing pre-filled from the signal that fell through most", async () => {
+    service.unroutedSignals.mockResolvedValue({
+      data: [
+        { id: "s1", dimensions: { service: "rare" }, occurrences: 1 },
+        { id: "s2", dimensions: { service: "noisy", "k8s-pod-name": "p" }, occurrences: 9 },
+      ],
+    } as never);
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-routing-test-signal"]').trigger("click");
+    expect(simulator(wrapper).props("seed")).toEqual({ service: "noisy" });
+  });
+
+  it("opens Test routing from a rule with that rule's conditions", async () => {
+    const wrapper = render();
+    await flushPromises();
+    rulesPanel(wrapper).vm.$emit("test", { rule_id: "r1", dimensions: { service: "cart" } });
+    await flushPromises();
+    expect(simulator(wrapper).props("seed")).toEqual({ service: "cart" });
+  });
+
   /// A10: Send test page renders for everyone; the server's 403 is what closes it for the org.
   it("latches Send test page disabled after a 403 on the test page", async () => {
     service.testPage.mockRejectedValue({ response: { status: 403, data: {} } });
@@ -379,16 +462,14 @@ describe("OnCallRouting", () => {
     expect(simulator(wrapper).props("testResult")).toBeNull();
   });
 
-  /// Nominating a catch-all is a one-time act, but whether one exists is a
-  /// standing fact — so the trigger is in the header on both tabs.
-  it("carries the catch-all trigger on both tabs", async () => {
+  it("changes the catch-all from the pinned row, not a header button", async () => {
     const wrapper = render();
     await flushPromises();
-    const card = () => wrapper.findComponent({ name: "OnCallDefaultTeamCard" });
-    expect(card().props("dialog")).toBe(true);
+    const card = wrapper.findComponent({ name: "OnCallDefaultTeamCard" });
+    expect(card.props("showTrigger")).toBe(false);
 
-    await showSignals(wrapper);
-    expect(card().exists()).toBe(true);
+    rulesPanel(wrapper).vm.$emit("change-default");
+    expect(openDefaultDialog).toHaveBeenCalledTimes(1);
   });
 
   /// Add rule writes a rule, so it belongs to the tab that lists them — on the
@@ -405,58 +486,58 @@ describe("OnCallRouting", () => {
     expect(wrapper.find('[data-test="oncall-routing-add-rule"]').exists()).toBe(false);
   });
 
-  /// The dialog serves every team in the org from one editor instance, so the
-  /// team it should describe is whatever the editor's own picker reports —
-  /// not a team fixed by this page. Regression: this page used to never pass
-  /// a ladder at all, so the "page this team" note always read "no
-  /// escalation ladder yet", for every team.
-  it("fetches the picked team's ladder and feeds it back to the editor", async () => {
-    service.teamOverview.mockResolvedValue({
-      data: {
-        rungs: [{ priority: "P1", rungs: 2, pages_anyone: true, ends_with_whole_team: false }],
-      },
+  it("claims every unowned path for one team, once per path, after naming the outcome", async () => {
+    const signal = (id: string, dimensions: Record<string, string>) => ({
+      id,
+      org_id: "default",
+      path: "",
+      dimensions,
+      occurrences: 1,
+    });
+    service.ownershipStats.mockResolvedValue({
+      data: { rules: [{ rule_id: "r1", team_id: "team_1", dimensions: { service: "owned" } }] },
+    } as any);
+    service.unroutedSignals.mockResolvedValue({
+      data: [
+        signal("s1", { service: "cart", "k8s-pod-name": "pod-1" }),
+        signal("s2", { service: "cart", "k8s-pod-name": "pod-2" }),
+        signal("s3", { service: "owned" }),
+        signal("s4", { service: "search" }),
+      ],
     } as any);
     const wrapper = render();
     await flushPromises();
-    await wrapper.find('[data-test="oncall-routing-add-rule"]').trigger("click");
+    await showSignals(wrapper);
+    expect(wrapper.find('[data-test="oncall-routing-add-rule"]').exists()).toBe(false);
+    await wrapper.find('[data-test="oncall-routing-claim-all"]').trigger("click");
 
-    editor(wrapper).vm.$emit("team-change", "team_2");
+    const dialog = wrapper
+      .findAllComponents({ name: "ODialog" })
+      .find((c) => c.attributes("data-test") === "oncall-routing-claim-all-dialog")!;
+    expect(dialog.props("open")).toBe(true);
+    expect(dialog.props("primaryButtonDisabled")).toBe(true);
+    wrapper
+      .findAllComponents({ name: "OSelect" })
+      .find((c) => c.attributes("data-test") === "oncall-routing-claim-all-team")!
+      .vm.$emit("update:modelValue", "team_2");
     await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-claim-all-outcome"]').text()).toBe(
+      "Future alerts like these go to Payments",
+    );
 
-    expect(service.teamOverview).toHaveBeenCalledWith({ org_identifier: ORG, team_id: "team_2" });
-    expect(editor(wrapper).props("ladder")).toEqual([
-      { priority: "P1", rungs: 2, pages_anyone: true, ends_with_whole_team: false },
+    dialog.vm.$emit("click:primary");
+    await flushPromises();
+    const written = service.createOwnershipRule.mock.calls.map(
+      (call) => (call[0] as { data: unknown }).data,
+    );
+    expect(written).toEqual([
+      { team_id: "team_2", dimensions: { service: "cart" } },
+      { team_id: "team_2", dimensions: { service: "search" } },
     ]);
-  });
-
-  it("clears the ladder when the picker reports no team chosen", async () => {
-    service.teamOverview.mockResolvedValue({
-      data: {
-        rungs: [{ priority: "P1", rungs: 2, pages_anyone: true, ends_with_whole_team: false }],
-      },
-    } as any);
-    const wrapper = render();
-    await flushPromises();
-    await wrapper.find('[data-test="oncall-routing-add-rule"]').trigger("click");
-    editor(wrapper).vm.$emit("team-change", "team_2");
-    await flushPromises();
-    expect(editor(wrapper).props("ladder")).not.toEqual([]);
-
-    editor(wrapper).vm.$emit("team-change", "");
-    await flushPromises();
-    expect(editor(wrapper).props("ladder")).toEqual([]);
-  });
-
-  it("falls back to an empty ladder when the fetch fails", async () => {
-    service.teamOverview.mockRejectedValue(new Error("network"));
-    const wrapper = render();
-    await flushPromises();
-    await wrapper.find('[data-test="oncall-routing-add-rule"]').trigger("click");
-
-    editor(wrapper).vm.$emit("team-change", "team_2");
-    await flushPromises();
-
-    expect(editor(wrapper).props("ladder")).toEqual([]);
+    expect(toast).toHaveBeenCalledWith({
+      variant: "success",
+      message: "2 signals now go to Payments",
+    });
   });
 
   /// One list at a time: rules are what the org owns, the queue is what it
@@ -558,7 +639,7 @@ describe("OnCallRouting", () => {
     expect(unrouted(wrapper).props("error")).toBeFalsy();
   });
 
-  // Every other table has these; the search reaches the table so filtering keeps the rules' precedence numbers.
+  // One search box per tab; switching tabs clears it, since a rules query means nothing against the queue.
   it("hands the toolbar search to the open table, and clears it when the tab changes", async () => {
     const wrapper = render();
     await flushPromises();
@@ -619,19 +700,16 @@ describe("OnCallRouting", () => {
     expect(wrapper.find('[data-test="oncall-routing-unavailable"]').exists()).toBe(false);
   });
 
-  /// The queue's filters are the server's — a change refetches with the params
-  /// rather than sieving rows the client already has. They live in the page's
-  /// own toolbar now, next to the tabs, so the tabs' OToggleGroup is index 0
-  /// and the landing filter's is index 1.
+  /// The queue's filters are the server's: a change refetches with the params.
   it("refetches the queue with the announced filters", async () => {
     const wrapper = render();
     await flushPromises();
     await showSignals(wrapper);
 
-    wrapper.findAllComponents({ name: "OToggleGroup" })[1].vm.$emit("update:modelValue", "nobody");
+    wrapper.findAllComponents({ name: "OToggleGroup" })[0].vm.$emit("update:modelValue", "nobody");
     await flushPromises();
 
-    wrapper.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", true);
+    wrapper.findComponent({ name: "OCheckbox" }).vm.$emit("update:modelValue", true);
     await flushPromises();
 
     expect(service.unroutedSignals).toHaveBeenLastCalledWith({
@@ -651,7 +729,7 @@ describe("OnCallRouting", () => {
     service.unroutedSignals.mockImplementationOnce(
       () => new Promise((resolve) => (answerNobody = resolve)),
     );
-    const landing = wrapper.findAllComponents({ name: "OToggleGroup" })[1];
+    const landing = wrapper.findAllComponents({ name: "OToggleGroup" })[0];
 
     landing.vm.$emit("update:modelValue", "nobody");
     await flushPromises();

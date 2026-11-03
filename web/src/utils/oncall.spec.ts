@@ -26,6 +26,9 @@ import type {
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import {
   CHANNEL_WAKES,
+  fieldLabel,
+  readableConditions,
+  routingFieldIds,
   PRIORITY_TONE,
   colorIndexFor,
   compareRulePrecedence,
@@ -2627,5 +2630,36 @@ describe("listInLocale", () => {
     ["tr-turk", ["A", "B"], "A ve B"],
   ])("%s %j reads %j", (locale, items, expected) => {
     expect(listInLocale(items as string[], locale)).toBe(expected);
+  });
+});
+
+describe("routing field helpers", () => {
+  it("labels a field in sentence case, from its alias or its id", () => {
+    expect(fieldLabel("k8s-namespace", [{ id: "k8s-namespace", display: "K8s Namespace" }])).toBe(
+      "K8s namespace",
+    );
+    expect(fieldLabel("service-namespace")).toBe("Service namespace");
+    expect(
+      fieldLabel("aws-ecs-cluster", [{ id: "aws-ecs-cluster", display: "AWS ECS Cluster" }]),
+    ).toBe("AWS ECS cluster");
+  });
+
+  it("offers the catalogue, the signals' identity fields and the rules' fields, once each", () => {
+    expect(
+      routingFieldIds(
+        ["service"],
+        [{ dimensions: { service: "a", environment: "prod", "k8s-pod-name": "p" } }],
+        [{ dimensions: { region: "eu", service: "b" } }],
+      ),
+    ).toEqual(["service", "environment", "region"]);
+  });
+
+  it("reads conditions as prose, a trailing star as starts with", () => {
+    expect(
+      readableConditions({ service: "api*", "k8s-namespace": "prod" }, [], {
+        and: "and",
+        startsWith: (field) => `${field} starts with`,
+      }),
+    ).toBe("K8s namespace prod and Service starts with api");
   });
 });

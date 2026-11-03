@@ -23,7 +23,11 @@ import store from "@/test/unit/helpers/store";
 
 const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
-  OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
+  OTag: {
+    name: "OTag",
+    props: ["type", "value"],
+    template: "<span><slot>{{ value }}</slot></span>",
+  },
   OInnerLoading: { name: "OInnerLoading", template: "<div />" },
   OButton: { name: "OButton", template: "<button><slot /></button>" },
   OToggleGroup: {
@@ -68,12 +72,33 @@ function render(signals: UnroutedSignal[] = [signal()]) {
 }
 
 describe("OnCallUnroutedQueue", () => {
+  it("shows three identity chips and the rest behind +N, so the path stays in its cell", () => {
+    const wrapper = render([
+      signal({
+        dimensions: {
+          service: "inventory-service",
+          "service-namespace": "ecommerce",
+          environment: "production",
+          region: "eu-west-1",
+          "k8s-pod-name": "pod-1",
+        },
+      }),
+    ]);
+    const path = wrapper.find('[data-test="oncall-unrouted-path-s1"]');
+    expect(path.findAllComponents({ name: "ODimensionChip" })).toHaveLength(3);
+    const more = wrapper.find('[data-test="oncall-unrouted-path-more-s1"]');
+    expect(more.text()).toBe("+1");
+    expect(more.findComponent({ name: "OTooltip" }).props("content")).toBe(
+      "Service namespace ecommerce",
+    );
+  });
+
   it("names the alert and the dimensions a rule would be written against", () => {
     const wrapper = render();
     expect(wrapper.text()).toContain("Dispute webhook backlog");
-    expect(wrapper.find('[data-test="oncall-unrouted-path-s1"]').text()).toContain(
-      "k8s-namespace = payments-edge · service = disputes-api",
-    );
+    const path = wrapper.find('[data-test="oncall-unrouted-path-s1"]').text();
+    expect(path).toContain("payments-edge");
+    expect(path).toContain("disputes-api");
   });
 
   /// The server's own sentence handles the empty-path case, which reads nothing
@@ -89,7 +114,9 @@ describe("OnCallUnroutedQueue", () => {
 
   it("offers to claim for the team whose screen this is", async () => {
     const wrapper = render();
-    expect(wrapper.text()).toContain("Claim for Payments");
+    expect(wrapper.find('[data-test="oncall-unrouted-claim-s1"]').text()).toBe(
+      "Claim for Payments",
+    );
 
     await wrapper.find('[data-test="oncall-unrouted-claim-s1"]').trigger("click");
     expect(wrapper.emitted("claim")?.[0][0]).toMatchObject({ id: "s1" });
@@ -123,7 +150,10 @@ describe("OnCallUnroutedQueue", () => {
       global: { plugins: [i18n, store], stubs },
     });
     const nobody = wrapper.find('[data-test="oncall-unrouted-nobody-s1"]');
-    expect(nobody.text()).toContain("No one notified");
+    expect(nobody.findComponent({ name: "OTag" }).props()).toMatchObject({
+      type: "oncallUnroutedOutcome",
+      value: "nobody",
+    });
     const caught = wrapper.find('[data-test="oncall-unrouted-defaulted-s2"]');
     expect(caught.text()).toContain("Platform");
     // A row cannot claim both facts.
@@ -164,13 +194,12 @@ describe("OnCallUnroutedQueue", () => {
   /// The org screen hosts the queue with no team of its own: a claim starts by
   /// choosing one, so the button says what happens instead of naming a team it
   /// does not have, and the one-team bulk action is not offered at all.
-  it("offers to write a rule, not claim for a team, when hosted without one", async () => {
+  it("offers a labelled Claim, not claim for a team, when hosted without one", async () => {
     const wrapper = mount(OnCallUnroutedQueue, {
       props: { signals: [signal()] },
       global: { plugins: [i18n, store], stubs },
     });
-    expect(wrapper.text()).toContain("Write the rule");
-    expect(wrapper.text()).not.toContain("Claim for");
+    expect(wrapper.find('[data-test="oncall-unrouted-claim-s1"]').text()).toBe("Claim");
     expect(wrapper.find('[data-test="oncall-unrouted-claim-all"]').exists()).toBe(false);
 
     await wrapper.find('[data-test="oncall-unrouted-claim-s1"]').trigger("click");
@@ -212,7 +241,7 @@ describe("OnCallUnroutedQueue", () => {
       expect(table.props("enableColumnResize")).toBe(true);
       expect(table.props("persistColumns")).toBe(true);
       const hideable = (table.props("columns") as any[]).filter((c) => c.hideable).map((c) => c.id);
-      expect(hideable).toEqual(["path", "fires", "outcome"]);
+      expect(hideable).toEqual(["path", "fires", "last", "outcome"]);
     });
 
     // The error sits in the table body, so the host's toolbar — and its tabs — stay on screen.
