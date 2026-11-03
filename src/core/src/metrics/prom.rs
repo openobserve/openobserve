@@ -663,18 +663,16 @@ pub async fn remote_write(
         finish_identity_columns(&mut json_data);
         let has_uds = matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)));
         let min_timestamp = json_data.iter().map(|(_, ts, _)| *ts).min().unwrap_or(0);
-        let record_refs: Vec<&json::Map<String, json::Value>> =
-            json_data.iter().map(|(record, ..)| record).collect();
         let (schema, schema_key) = ingest::resolve_batch_schema(
             org_id,
             &stream_name,
             &mut metric_schema_map,
-            &record_refs,
+            &mut json_data,
+            |(record, ..)| record,
             min_timestamp,
             has_uds,
         )
         .await?;
-        drop(record_refs);
 
         let alerts =
             stream_alerts_map.get(&cache_stream_key(org_id, StreamType::Metrics, &stream_name));
