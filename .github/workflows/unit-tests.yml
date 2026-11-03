@@ -318,9 +318,9 @@ jobs:
           NO_COVERAGE: ${{ github.event_name == 'merge_group' }}
         run: |
           if [ "$NO_COVERAGE" = "true" ]; then
-            npx vitest run --shard="$SHARD" --reporter=default
+            npx vitest run --shard="$SHARD" --reporter=default --reporter=./scripts/vitest-retry-annotations.mjs
           else
-            npx vitest run --coverage --shard="$SHARD" --reporter=default --reporter=blob \
+            npx vitest run --coverage --shard="$SHARD" --reporter=default --reporter=./scripts/vitest-retry-annotations.mjs --reporter=blob \
               --coverage.reportOnFailure --coverage.reporter=json \
               --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
               --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
