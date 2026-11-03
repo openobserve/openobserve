@@ -41,8 +41,8 @@ on:
 
 # PR-scoped: a new push/label supersedes the previous gate attempt for the same PR.
 concurrency:
-  # A non-approval review only mirrors the gate's current result, so it must not cancel a running gate.
-  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && format('-{0}', github.run_id) || '' }}
+  # A non-approval review only mirrors the gate's current result, so it must not cancel a running gate; the newest mirror is enough.
+  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && '-mirror' || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -94,17 +94,15 @@ jobs:
   playwright-e2e-crosscheck:
     needs: trigger
     # A pre-merge gate: runs when ready-for-ci is added or the PR is approved, and on pushes only while approved.
-    if: ${{ !cancelled() && (github.event_name == 'merge_group' || needs.trigger.outputs.dispatch == 'true' || needs.trigger.outputs.dispatch == 'mirror') }}
+    if: ${{ !cancelled() && (github.event_name == 'merge_group' || needs.trigger.result == 'failure' || needs.trigger.outputs.dispatch == 'true' || needs.trigger.outputs.dispatch == 'mirror') }}
     name: Playwright E2E Crosscheck
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
       checks: read
-    # ~5 min to find the ENT run + up to ~75 min to poll. Generous on purpose: normal is ~20 min,
-    # but a cold Rust cache can push the ENT build+run toward its own timeouts — don't false-fail
-    # the gate ("timed out") while ENT is still legitimately running. Two lost-runner re-runs add 40 min each.
-    timeout-minutes: 170
+    # 5 min to start + a 75 min first poll + two 70 min lost-runner re-runs, so it never times out before ENT does.
+    timeout-minutes: 230
     steps:
       - name: Triage — relevant paths? opted out?
         id: triage
@@ -115,11 +113,17 @@ jobs:
           DISABLED: ${{ vars.ENT_E2E_GATE_DISABLED }}
           IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
           DISPATCH: ${{ needs.trigger.outputs.dispatch }}
+          TRIGGER_RESULT: ${{ needs.trigger.result }}
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "merge_group" ]; then
             echo "::notice::merge queue commit — gate already passed on the PR head."
             echo "mode=pass" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # A skipped check counts as passing, so a trigger that could not decide must leave the gate red.
+          if [ "$TRIGGER_RESULT" = "failure" ]; then
+            echo "::error::The trigger job failed, so the gate could not decide whether to run — re-run this check."
+            exit 1
           fi
           if [ "$DISABLED" = "true" ]; then
             echo "::notice::ENT_E2E_GATE_DISABLED=true — passing without dispatch."
@@ -168,23 +172,37 @@ jobs:
           CHECKS="repos/${{ github.repository }}/commits/$HEAD_SHA/check-runs?check_name=Playwright%20E2E%20Crosscheck&filter=all&per_page=100"
           OWN=""
           for _ in 1 2 3 4 5; do
-            OWN=$(gh api --paginate "$CHECKS" -q ".check_runs[] | select(.details_url | contains(\"/actions/runs/$RUN_ID/\")) | .id" | sort -n | tail -n 1) && [ -n "$OWN" ] && break
+            OWN=$(gh api --paginate "$CHECKS" | jq -r --arg u "/actions/runs/$RUN_ID/" '.check_runs[] | select(.details_url | contains($u)) | .id' | sort -n | tail -n 1) && [ -n "$OWN" ] && break
             sleep 10
           done
           [ -n "$OWN" ] || { echo "::error::Could not find this job's own check run."; exit 1; }
           # Only older checks count: the newest check of this name is the required one, so a later gate run overrides this mirror anyway.
+          ERRORS=0; IGNORE="[]"
+          api_error() {
+            ERRORS=$((ERRORS + 1))
+            if [ "$ERRORS" -ge 10 ]; then echo "::error::The GitHub API kept failing — cannot report the gate's result."; exit 1; fi
+            sleep 30
+          }
           while :; do
             # An API error must not read as "no result", which would pass.
-            if ! LIST=$(gh api --paginate "$CHECKS" -q ".check_runs[] | select(.id < $OWN and .conclusion != \"skipped\") | \"\(.id) \(.status) \(.conclusion // \"\")\""); then
-              sleep 30; continue
+            if ! LIST=$(gh api --paginate "$CHECKS" | jq -r --argjson own "$OWN" --argjson ignore "$IGNORE" \
+              '.check_runs[] | select(.id < $own and .conclusion != "skipped" and (.id as $i | $ignore | index($i) | not)) | "\(.id) \(.status) \(.conclusion // "")"'); then
+              api_error; continue
             fi
             read -r ID STATUS CONCL <<<"$(sort -n <<<"$LIST" | tail -n 1)"
             if [ -z "$ID" ]; then
               echo "::notice::No gate result on $HEAD_SHA yet — nothing to mirror."
               exit 0
             fi
+            # A cancelled check whose Run step never started is a superseded mirror or gate, not a result.
+            if [ "$STATUS" = "completed" ] && [ "$CONCL" = "cancelled" ]; then
+              if ! RAN=$(gh api "repos/${{ github.repository }}/actions/jobs/$ID" -q '[.steps[]? | select((.name | startswith("Run — ")) and .conclusion != null and .conclusion != "skipped")] | length'); then
+                api_error; continue
+              fi
+              if [ "$RAN" = "0" ]; then IGNORE=$(jq -c --argjson i "$ID" '. + [$i]' <<<"$IGNORE"); continue; fi
+            fi
             if [ "$STATUS" = "completed" ]; then break; fi
-            sleep 30
+            ERRORS=0; sleep 30
           done
           echo "::notice::Mirroring gate check $ID on $HEAD_SHA: $CONCL."
           [ "$CONCL" = "success" ] || { echo "::error::The gate's current result on this head is '$CONCL'."; exit 1; }
@@ -198,6 +216,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           ENT_REF: ${{ vars.ENT_GATE_REF || 'main' }}
+          IGNORED_LABEL: ${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'ready-for-ci' && github.event.label.name != 'skip-ent-e2e' }}
         run: |
           set -euo pipefail
           REPO="openobserve/o2-enterprise"; WF="oss-pr-ent-gate.yml"
@@ -208,11 +227,11 @@ jobs:
 
           # Upsert ONE sticky gate comment per PR (located by the hidden marker) so status updates in
           # place — pass AND fail — instead of spamming a fresh comment each run.
-          # --paginate applies -q to each page, so emit one id per match and keep the first.
+          # --paginate prints one array per page, so emit one id per match and keep the first.
           sticky_id() {
             [ -n "$GATE_LOGIN" ] || return 0
-            gh api "repos/openobserve/openobserve/issues/$PR/comments" --paginate \
-              -q ".[] | select(.user.login == \"$GATE_LOGIN\" and (.body|contains(\"$MARKER\"))) | .id" 2>/dev/null | head -n 1 || true
+            gh api "repos/openobserve/openobserve/issues/$PR/comments" --paginate 2>/dev/null \
+              | jq -r --arg login "$GATE_LOGIN" --arg marker "$MARKER" '.[] | select(.user.login == $login and (.body | contains($marker))) | .id' | head -n 1 || true
           }
           sticky() {
             local body="$1"
@@ -247,11 +266,12 @@ jobs:
           # release branch (e.g. branch-v1.0.0) must build against the ENT branch of the same name;
           # ENT main would fail to compile the release-line OSS code. Fall back to main only when
           # the base is main or has no ENT counterpart.
-          if gh api "repos/$REPO/branches/$HEAD_REF" >/dev/null 2>&1; then
+          # Branch names go into API paths, where "#", "?" or "%" would point the lookup at another branch.
+          if [[ "$HEAD_REF" =~ ^[A-Za-z0-9._/-]+$ ]] && gh api "repos/$REPO/branches/$HEAD_REF" >/dev/null 2>&1; then
             ENT_CODE_REF="$HEAD_REF"
             SISTER_NOTE="Built against the matching ENT branch \`$HEAD_REF\` (no ENT PR yet)."
             echo "::notice::ENT branch '$HEAD_REF' exists (no PR) — building against it."
-          elif [ "$BASE_REF" != "main" ] && [ "$BASE_REF" != "master" ] && gh api "repos/$REPO/branches/$BASE_REF" >/dev/null 2>&1; then
+          elif [ "$BASE_REF" != "main" ] && [ "$BASE_REF" != "master" ] && [[ "$BASE_REF" =~ ^[A-Za-z0-9._/-]+$ ]] && gh api "repos/$REPO/branches/$BASE_REF" >/dev/null 2>&1; then
             ENT_CODE_REF="$BASE_REF"
             SISTER_NOTE="No same-named ENT branch — built against the PR's base line \`$BASE_REF\` on ENT."
             echo "::notice::No ENT branch '$HEAD_REF'; PR targets '$BASE_REF' which exists on ENT — building against it."
@@ -269,6 +289,9 @@ jobs:
           done
           if [ -z "$ENT_SHA" ]; then echo "::warning::Could not resolve ENT '$ENT_CODE_REF' to a commit — building the branch tip, not reusing a prior ENT run."; fi
           ENT_PIN="${ENT_SHA:-$ENT_CODE_REF}"
+          # A pass recorded by an older engine must not stand once the engine is fixed.
+          ENGINE_SHA=$(gh api "repos/$REPO/commits/$ENT_REF" -q .sha 2>/dev/null || echo "")
+          [[ "$ENGINE_SHA" =~ ^[0-9a-f]{40}$ ]] || ENGINE_SHA=""
 
           # Against ENT main, test the PR merged into OSS main: a stale branch would miss OSS code ENT main already uses.
           OSS_REF="$HEAD_REF"; TESTED_SHA="$HEAD_SHA"
@@ -288,24 +311,35 @@ jobs:
           fi
 
           MATCH="OSS PR #$PR ("
-          # The engine's run-name carries its inputs, so a reused run is checked against what it actually built.
-          KEY="OSS PR #$PR ($OSS_REF) oss=$HEAD_SHA ent=$ENT_SHA"
-          RUN_ID=""
+          # The engine's run-name carries the commits it built, so a reused or attached run is checked against them.
+          KEY="OSS PR #$PR ($OSS_REF) oss=$TESTED_SHA ent=$ENT_SHA engine=$ENGINE_SHA"
+          CAN_REUSE=false
+          if [ -n "$GATE_LOGIN" ] && [ -n "$ENT_SHA" ] && [ -n "$ENGINE_SHA" ]; then CAN_REUSE=true; fi
+          title_ok() { gh api "repos/$REPO/actions/runs/$1" 2>/dev/null | jq -e --arg k "$KEY" '.display_title // "" | contains($k)' >/dev/null 2>&1; }
+          RUN_ID=""; REREPORT=false
           # Approval and label changes restart this gate; the sticky records the run already started for this exact head, merge commit and ENT commit.
-          PRIOR=$(sticky_body | grep -o 'ent-run: [^>]*' | head -n 1 || true)
-          read -r P_ID P_HEAD P_TESTED P_OSS P_ENT P_ENT_SHA _ <<<"${PRIOR#ent-run: }"
-          if [ -n "$GATE_LOGIN" ] && [ -n "$ENT_SHA" ] && [[ "$P_ID" =~ ^[0-9]+$ ]] \
+          # The record is appended last; the PR-controlled failed-spec list above it could hold a forged one.
+          PRIOR=$(sticky_body | grep -o '<!-- ent-run: [^>]* -->' | tail -n 1 || true)
+          PRIOR=${PRIOR#<!-- ent-run: }; PRIOR=${PRIOR% -->}
+          read -r P_ID P_HEAD P_TESTED P_OSS P_ENT P_ENT_SHA _ <<<"$PRIOR"
+          if [ "$CAN_REUSE" = "true" ] && [[ "$P_ID" =~ ^[0-9]+$ ]] \
             && [ "$P_HEAD $P_TESTED $P_OSS $P_ENT ${P_ENT_SHA:-}" = "$HEAD_SHA $TESTED_SHA $OSS_REF $ENT_CODE_REF $ENT_SHA" ]; then
-            P_STATE=$(gh api "repos/$REPO/actions/runs/$P_ID" 2>/dev/null | jq -r --arg k "$KEY" 'if (.display_title // "" | contains($k)) | not then "none" elif .status != "completed" then "running" elif .conclusion == "success" then "success" else "none" end' 2>/dev/null || echo none)
+            P_STATE=$(gh api "repos/$REPO/actions/runs/$P_ID" 2>/dev/null | jq -r --arg k "$KEY" 'if (.display_title // "" | contains($k)) | not then "none" elif .status != "completed" then "running" elif .conclusion == "success" then "success" elif .conclusion == "failure" then "failed" else "none" end' 2>/dev/null || echo none)
             if [ "$P_STATE" = "success" ] || [ "$P_STATE" = "running" ]; then
               RUN_ID="$P_ID"
               echo "::notice::ENT run $RUN_ID already covers head $HEAD_SHA tested as $TESTED_SHA ($P_STATE) — not dispatching."
+            # Bot labels such as auto-requeue-* are no request to retry, so they re-report a recorded failure instead of starting a full run.
+            elif [ "$P_STATE" = "failed" ] && [ "$IGNORED_LABEL" = "true" ]; then
+              RUN_ID="$P_ID"; REREPORT=true
+              echo "::notice::ENT run $RUN_ID already failed for head $HEAD_SHA tested as $TESTED_SHA — re-reporting it, not dispatching."
             fi
           fi
           # A gate cancelled between its dispatch and its sticky update leaves a live run the sticky does not record yet.
-          if [ -z "$RUN_ID" ] && [ -n "$ENT_SHA" ]; then
-            RUN_ID=$(gh run list --repo "$REPO" --workflow "$WF" -L 40 --json databaseId,displayTitle,createdAt,status \
-              -q "[.[] | select((.displayTitle | contains(\"$KEY\")) and .status != \"completed\" and (.createdAt|fromdateiso8601) >= $(( $(date -u +%s) - 600 )))] | sort_by(.createdAt) | last | .databaseId // empty" 2>/dev/null || echo "")
+          if [ -z "$RUN_ID" ] && [ "$CAN_REUSE" = "true" ]; then
+            RUN_ID=$(gh run list --repo "$REPO" --workflow "$WF" -L 40 --json databaseId,displayTitle,createdAt,status 2>/dev/null \
+              | jq -r --arg k "$KEY" --argjson min "$(( $(date -u +%s) - 600 ))" \
+                '[.[] | select((.displayTitle | contains($k)) and .status != "completed" and (.createdAt | fromdateiso8601) >= $min)] | sort_by(.createdAt) | last | .databaseId // empty' 2>/dev/null || echo "")
+            if [[ ! "$RUN_ID" =~ ^[0-9]+$ ]] || ! title_ok "$RUN_ID"; then RUN_ID=""; fi
             if [ -n "$RUN_ID" ]; then echo "::notice::ENT run $RUN_ID for this head was just started by a superseded gate — attaching, not dispatching."; fi
           fi
 
@@ -316,7 +350,7 @@ jobs:
             gh workflow run "$WF" --repo "$REPO" --ref "$ENT_REF" \
               -f oss_branch="$OSS_REF" \
               -f oss_pr="$PR" \
-              -f oss_sha="$HEAD_SHA" \
+              -f oss_sha="$TESTED_SHA" \
               -f enterprise_ref="$ENT_PIN"
 
             # Correlate by PR-scoped run-name ("Playwright E2E Crosscheck — OSS PR #<PR> ("; the "(" boundary keeps
@@ -325,9 +359,9 @@ jobs:
             MIN_TS=$((DISPATCH_TS - 60))
             sleep 8   # let the dispatched run register before the first lookup
             for i in $(seq 1 30); do            # ~5 min to appear
-              RUN_ID=$(gh run list --repo "$REPO" --workflow "$WF" -L 40 \
-                --json databaseId,displayTitle,createdAt \
-                -q "[.[] | select(.displayTitle | contains(\"$MATCH\")) | select((.createdAt|fromdateiso8601) >= $MIN_TS)] | sort_by(.createdAt) | last | .databaseId" 2>/dev/null || echo "")
+              RUN_ID=$(gh run list --repo "$REPO" --workflow "$WF" -L 40 --json databaseId,displayTitle,createdAt 2>/dev/null \
+                | jq -r --arg m "$MATCH" --argjson min "$MIN_TS" \
+                  '[.[] | select((.displayTitle | contains($m)) and (.createdAt | fromdateiso8601) >= $min)] | sort_by(.createdAt) | last | .databaseId' 2>/dev/null || echo "")
               if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then break; fi
               sleep 10
             done
@@ -358,6 +392,7 @@ jobs:
           }
           if [ "${P_STATE:-}" = "success" ] && [ "$RUN_ID" = "$P_ID" ]; then report_pass; exit 0; fi
 
+          if [ "$REREPORT" != "true" ]; then
           sticky "### 🔄 Playwright E2E Crosscheck — running
 
           $MARKER
@@ -365,9 +400,12 @@ jobs:
           $SISTER_NOTE
 
           [ENT run]($RUN_URL)"
+          fi
 
           # A lost runner is infra, not the PR: re-run only the lost ENT jobs, up to 3 attempts of the run in all.
           MAX_ATTEMPTS=3; RETRIES=0
+          # The engine's shard and aggregate job timeouts (ent_gate_shard, ent_gate_tests) bound one re-run.
+          SHARD_TIMEOUT_MIN=45; AGGREGATE_TIMEOUT_MIN=10
           POLLS=300                             # 300 * 15s = 75 min — covers a cold-cache ENT build+run worst case
           while :; do
             STATUS=""; CONCL=""
@@ -395,8 +433,9 @@ jobs:
               RUN_CREATED=$(gh api "repos/$REPO/actions/runs/$RUN_ID" -q '.created_at' 2>/dev/null || echo "")
               NEWER=0
               if [ -n "$RUN_CREATED" ]; then
-                NEWER=$(gh run list --repo "$REPO" --workflow "$WF" -L 40 --json databaseId,displayTitle,createdAt \
-                  -q "[.[] | select(.displayTitle | contains(\"$MATCH\")) | select(.databaseId != $RUN_ID and .createdAt > \"$RUN_CREATED\")] | length" 2>/dev/null || echo 0)
+                NEWER=$(gh run list --repo "$REPO" --workflow "$WF" -L 40 --json databaseId,displayTitle,createdAt 2>/dev/null \
+                  | jq -r --arg m "$MATCH" --argjson id "$RUN_ID" --arg created "$RUN_CREATED" \
+                    '[.[] | select((.displayTitle | contains($m)) and .databaseId != $id and .createdAt > $created)] | length' 2>/dev/null || echo 0)
               fi
               if [ "${NEWER:-0}" != "0" ]; then
                 echo "::notice::ENT run concluded '$CONCL' and a newer ENT run exists for this PR — superseded, deferring to it."
@@ -418,15 +457,16 @@ jobs:
             # Single-job re-runs spread shard results over attempts, so each test job counts by its latest attempt; an aggregate counts only without shards.
             TEST_JOBS=$(gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/jobs?filter=all&per_page=100" --jq '.jobs[]' 2>/dev/null | jq -s '[.[]|select(.name=="ent_gate_tests" or (.name|startswith("ent_gate_tests (")))] | group_by(.name) | map(max_by(.run_attempt)) | (map(select(.name|startswith("ent_gate_tests (")))) as $s | if ($s|length) > 0 then $s else . end' 2>/dev/null || echo '[]')
             TEST_CONCL=$(jq -r '[.[].conclusion]|if index("failure") then "failure" elif length > 0 then .[0] // "" else "" end' <<<"$TEST_JOBS")
-            # A test job that failed with no failed step lost its runner; one with a failed step had spec failures.
-            LOST_IDS=$(jq -r '.[]|select(.conclusion=="failure" and ([.steps[]?|select(.conclusion=="failure")]|length)==0)|.id' <<<"$TEST_JOBS")
-            TEST_LOST=$(jq '[.[]|select(.conclusion=="failure" and ([.steps[]?|select(.conclusion=="failure")]|length)==0)]|length' <<<"$TEST_JOBS")
-            TEST_SPEC_FAILED=$(jq '[.[]|select(.conclusion=="failure" and ([.steps[]?|select(.conclusion=="failure")]|length)>0)]|length' <<<"$TEST_JOBS")
+            # A lost runner leaves its step running: no failed or cancelled step, and it ended before the job timeout, which cancels the step.
+            FAILED_JOBS=$(jq -c --argjson limit "$SHARD_TIMEOUT_MIN" '[.[] | select(.conclusion == "failure") | {id, lost: (([.steps[]? | select(.conclusion == "failure" or .conclusion == "cancelled")] | length) == 0 and .started_at != null and .completed_at != null and ((.completed_at | fromdateiso8601) - (.started_at | fromdateiso8601)) < ($limit * 60))}]' <<<"$TEST_JOBS" 2>/dev/null || echo '[]')
+            LOST_IDS=$(jq -r '.[] | select(.lost) | .id' <<<"$FAILED_JOBS")
+            TEST_LOST=$(jq '[.[] | select(.lost)] | length' <<<"$FAILED_JOBS")
+            TEST_SPEC_FAILED=$(jq '[.[] | select(.lost | not)] | length' <<<"$FAILED_JOBS")
             TEST_LOST=${TEST_LOST:-0}; TEST_SPEC_FAILED=${TEST_SPEC_FAILED:-0}
             RUN_ATTEMPT=$(gh api "repos/$REPO/actions/runs/$RUN_ID" -q '.run_attempt' 2>/dev/null || echo "$MAX_ATTEMPTS")
 
             # A re-run would repeat the jobs with spec failures too, so only a lost-runner-only failure is retried.
-            if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_LOST" != "0" ] && [ "$TEST_SPEC_FAILED" = "0" ] \
+            if [ "$REREPORT" != "true" ] && [ "$TEST_CONCL" = "failure" ] && [ "$TEST_LOST" != "0" ] && [ "$TEST_SPEC_FAILED" = "0" ] \
               && [ "$RUN_ATTEMPT" -lt "$MAX_ATTEMPTS" ] && [ "$RETRIES" -lt $((MAX_ATTEMPTS - 1)) ]; then
               RETRIES=$((RETRIES + 1))
               echo "::warning::ENT test runner lost in $TEST_LOST job(s) — re-running them (attempt $((RUN_ATTEMPT + 1)) of $MAX_ATTEMPTS)."
@@ -450,7 +490,7 @@ jobs:
                   if [ "$NOW_ATTEMPT" -gt "$RUN_ATTEMPT" ]; then break; fi
                   sleep 5
                 done
-                POLLS=160                       # 160 * 15s = 40 min — a re-run reuses the build, so it is one shard's run
+                POLLS=$(( (SHARD_TIMEOUT_MIN + AGGREGATE_TIMEOUT_MIN + 15) * 4 ))   # 15s polls; +15 min for queueing a runner
                 continue
               fi
               echo "::warning::Could not re-run the lost ENT job(s) — reporting the lost runner."
