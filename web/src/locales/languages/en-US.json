@@ -13084,7 +13084,30 @@
       "firingFor": "firing for {duration}",
       "incident": "Incident"
     },
-    "priorityUnsetPagesAs": "Not set (pages as P2)"
+    "priorityUnsetPagesAs": "Not set (pages as P2)",
+    "notificationKinds": {
+      "alert": "Alert",
+      "incident": "Incident",
+      "anomaly": "Anomaly",
+      "synthetics": "Synthetics",
+      "downtime": "Downtime",
+      "on_call": "On-call"
+    },
+    "templateOverride": {
+      "label": "Template override",
+      "placeholder": "Use the destination's template",
+      "help": "Overrides the destination template for {kind} messages. Prebuilt templates cannot be chosen; copy one first.",
+      "empty": "No templates apply to {kind} yet.",
+      "create": "Create template",
+      "loadFailed": "Could not load templates",
+      "forbidden": "Listing templates needs the templates read permission",
+      "mismatch": "Does not fit {count} of your destinations ({names}); those fall back to their own template.",
+      "groupContent": "Content",
+      "groupCustom": "Custom",
+      "webhookOnly": "(webhook only)",
+      "emailOnly": "(email only)",
+      "snsOnly": "(SNS only)"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Open",
@@ -13404,7 +13427,20 @@
     "testSendConfirm": "This will post a real message to the selected channel, marked [TEST].",
     "testSendSuccess": "Test message sent",
     "testSendRateLimited": "Too many test-sends — please wait a moment and try again",
-    "testSendNoDestination": "Select a destination first"
+    "testSendNoDestination": "Select a destination first",
+    "appliesTo": "Applies to",
+    "appliesToAll": "All kinds",
+    "appliesToInferred": "Inferred from the variables in the body",
+    "appliesToManual": "Chosen by you",
+    "appliesToReset": "Reset to inferred",
+    "previewAs": "Preview as",
+    "previewForbidden": "You do not have permission to preview templates",
+    "previewFailed": "Preview failed: {message}",
+    "severityFailed": "Failed",
+    "severityDegraded": "Degraded",
+    "severityFlaky": "Flaky",
+    "severityRecovered": "Recovered",
+    "variableGroupCommon": "Common"
   },
   "alert_sources": {
     "header": "External Alert Sources",
@@ -14900,6 +14936,14 @@
       "requestApproved": "{domain} linked",
       "requestRejected": "Request for {domain} rejected",
       "decisionFailed": "Failed to update the request"
+    },
+    "defaultTemplates": {
+      "title": "Default templates",
+      "description": "Used when a destination has no template of its own, or only a prebuilt one. Applies to this region.",
+      "incidentHelp": "Also overrides the alert's template for incident messages",
+      "save": "Save",
+      "saved": "Default templates saved",
+      "loadFailed": "Could not load the default templates"
     }
   },
   "reports": {

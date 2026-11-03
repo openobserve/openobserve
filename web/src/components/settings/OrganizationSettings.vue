@@ -126,6 +126,7 @@
         >
       </div>
     </OForm>
+    <DefaultTemplatesCard />
   </div>
 </template>
 
@@ -137,6 +138,7 @@ import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import { useStore } from "vuex";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
+import DefaultTemplatesCard from "./DefaultTemplatesCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
