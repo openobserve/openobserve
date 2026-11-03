@@ -53,6 +53,18 @@ struct StacktraceResponse {
     stacktrace: TranslatedStack,
 }
 
+// Only documents the multipart body: the handler reads the form fields by hand.
+#[derive(ToSchema)]
+#[allow(dead_code)]
+struct SourcemapUploadForm {
+    /// ZIP with the minified sources and their sourcemaps.
+    #[schema(value_type = String, format = Binary)]
+    file: Vec<u8>,
+    service: Option<String>,
+    env: Option<String>,
+    version: Option<String>,
+}
+
 /// ListSourcemaps
 #[utoipa::path(
     get,
@@ -67,13 +79,16 @@ struct StacktraceResponse {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-      ),
+        ("service" = Option<String>, Query, description = "Service filter"),
+        ("env" = Option<String>, Query, description = "Environment filter"),
+        ("version" = Option<String>, Query, description = "Version filter"),
+    ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List sourcemaps", "category": "sourcemaps"}))
+        ("x-o2-mcp" = json!({"enabled": false, "description": "List sourcemaps", "category": "sourcemaps"}))
     )
 )]
 pub async fn list(
@@ -122,13 +137,16 @@ pub async fn list(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-      ),
+        ("service" = Option<String>, Query, description = "Service filter"),
+        ("env" = Option<String>, Query, description = "Environment filter"),
+        ("version" = Option<String>, Query, description = "Version filter"),
+    ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "List sourcemaps", "category": "sourcemaps"}))
+        ("x-o2-mcp" = json!({"enabled": false, "description": "List sourcemaps", "category": "sourcemaps"}))
     )
 )]
 pub async fn delete(
@@ -163,12 +181,13 @@ pub async fn delete(
     params(
         ("org_id" = String, Path, description = "Organization name"),
       ),
+    request_body(content = inline(StacktraceRequest), description = "Minified stacktrace and the sourcemap group to translate it with", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "delete"})),
-        ("x-o2-mcp" = json!({"description": "List sourcemaps", "category": "sourcemaps"}))
+        ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false, "description": "List sourcemaps", "category": "sourcemaps"}))
     )
 )]
 pub async fn translate_stacktrace(
@@ -208,13 +227,14 @@ pub async fn translate_stacktrace(
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
+    request_body(content = inline(SourcemapUploadForm), description = "ZIP file with its service, env and version", content_type = "multipart/form-data"),
     responses(
-        (status = 200, description = "Sourcemaps stored successfully", content_type = "application/json", body = String),
+        (status = 201, description = "Sourcemaps stored successfully", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 400, description = "Error processing action", content_type = "application/json", body = String),
         (status = 500, description = "Internal server error", content_type = "application/json", body = String),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Actions", "operation": "create"})),
+        ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "create"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -337,7 +357,7 @@ pub async fn upload_maps(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Sourcemaps", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List sourcemaps", "category": "sourcemaps"}))
+        ("x-o2-mcp" = json!({"enabled": false, "description": "List sourcemaps", "category": "sourcemaps"}))
     )
 )]
 pub async fn list_values(Path(org_id): Path<String>) -> Response {

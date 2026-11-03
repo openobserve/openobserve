@@ -35,6 +35,7 @@ import SetupCardRenderer from "@/components/ingestion/setupCard/SetupCardRendere
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { CardSubstitutions, RichCardContent } from "@/components/ingestion/setupCard/types";
@@ -53,6 +54,7 @@ const store = useStore();
 const { t } = useI18nTyped();
 
 const rumToken = computed<string>(() => store.state.organizationData?.rumToken?.rum_token ?? "");
+const rumTokenForbidden = computed(() => !!store.state.organizationData?.rumTokenForbidden);
 
 // Full origin (preconnect/CSP hints) and the protocol-less `site` SDK option.
 const endpoint = computed(() => (getIngestionURL() as string).replace(/\/$/, ""));
@@ -187,6 +189,12 @@ const subs = computed<CardSubstitutions>(() => ({
         </OToggleGroup>
       </template>
     </SetupCardRenderer>
+    <OBanner
+      v-else-if="rumTokenForbidden"
+      variant="warning"
+      data-test="rum-web-token-forbidden"
+      :content="t('ingestion.rumTokenForbiddenMessage')"
+    />
     <p v-else class="mt-1" data-test="rum-web-no-token-message">
       {{ t("ingestion.generateRUMTokenMessage") }}
     </p>

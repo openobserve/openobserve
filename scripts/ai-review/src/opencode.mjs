@@ -247,7 +247,7 @@ export class OpencodeClient {
     } catch (err) {
       // A failed or timed-out session was still billed; its totals are gone once the session is deleted.
       totals ??= await this.json("GET", `/api/session/${session.id}`).catch(() => null);
-      if (totals?.data && err && typeof err === "object") err.usage = { cost: totals.data.cost, tokens: totals.data.tokens };
+      if (totals?.data && err && typeof err === "object") err.usage = { tokens: totals.data.tokens };
       throw err;
     } finally {
       waiter.cancel();
@@ -435,7 +435,7 @@ export function extractText(content) {
     .trim();
 }
 
-// messages is newest-first; totals is the session, whose cost and tokens cover every step of the run.
+// messages is newest-first; totals is the session, whose tokens cover every step of the run.
 function finalAssistantResult(messages, totals, streamError, rejectedPermissions) {
   const last = (messages || []).find(m => m?.type === "assistant") || null;
   const error = last?.error || streamError;
@@ -446,7 +446,6 @@ function finalAssistantResult(messages, totals, streamError, rejectedPermissions
       id: last.id,
       modelID: last.model?.id,
       finish: last.finish,
-      cost: totals?.cost ?? last.cost,
       tokens: totals?.tokens ?? last.tokens,
     },
     text: extractText(last.content),

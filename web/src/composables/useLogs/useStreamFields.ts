@@ -24,6 +24,8 @@ import config from "@/aws-exports";
 import { searchState } from "@/composables/useLogs/searchState";
 import { columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
 import useStreams from "@/composables/useStreams";
+import { queryClient } from "@/composables/query/queryClient";
+import { streamKeys } from "@/services/stream.querykeys";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { captureFromSearchHits } from "@/composables/fieldValueStore";
 
@@ -63,6 +65,8 @@ export const FIELD_GROUPS_WAIT_MS = 1000;
 let correlationWatcherUsers = 0;
 let correlationWatcherScope: EffectScope | null = null;
 let fieldGroupsHoldId = 0;
+// Streams a fresh list already lacked: re-asking for them on every load would only repeat the miss.
+const refetchedMissing = new Set<string>();
 
 export interface InitialStreamInput {
   list: StreamStatsEntry[];
@@ -1012,7 +1016,8 @@ export const useStreamFields = () => {
       // resetStreamData();
       const streamType = searchObj.data.stream.streamType || "logs";
       const requestOrg = store.state.selectedOrganization.identifier;
-      const streamData: any = await getStreams(streamType, false);
+      const cached: any = await getStreams(streamType, false);
+      const streamData = await withUnlistedRefetched(cached, streamType, requestOrg, options);
       if (store.state.selectedOrganization.identifier !== requestOrg) return;
       if (options.isCurrent && !options.isCurrent()) return;
       searchObj.data.streamResults = {
@@ -1028,15 +1033,54 @@ export const useStreamFields = () => {
     }
   };
 
+  // The list is cached for minutes, so a URL stream created since then would read as missing.
+  const withUnlistedRefetched = async (
+    cached: any,
+    streamType: string,
+    org: string,
+    options: StreamListOptions,
+  ) => {
+    if (!options.fromUrl) return cached;
+    const { missing } = pickInitialLogsStreams({
+      list: cached?.list ?? [],
+      current: requestedStreams(options),
+      currentFromUrl: true,
+      persisted: [],
+      allowLatest: false,
+    });
+    const key = (name: string) => `${org}/${streamType}/${name}`;
+    const unseen = missing.filter((name) => !refetchedMissing.has(key(name)));
+    if (!unseen.length) return cached;
+    try {
+      await queryClient.invalidateQueries({
+        queryKey: streamKeys.nameList(org, streamType),
+        exact: true,
+      });
+      const fresh: any = await getStreams(streamType, false);
+      // Marked only once a fresh list confirms the miss, so a failed or concurrent load still retries.
+      const listed = new Set((fresh?.list ?? []).map((entry: { name: string }) => entry.name));
+      unseen.filter((name) => !listed.has(name)).forEach((name) => refetchedMissing.add(key(name)));
+      return fresh;
+    } catch (e: unknown) {
+      if (e instanceof CancelledError) throw e;
+      return cached;
+    }
+  };
+
+  const requestedStreams = (options: StreamListOptions): string[] => {
+    const selected: string[] = Array.isArray(searchObj.data.stream.selectedStream)
+      ? [...searchObj.data.stream.selectedStream]
+      : [];
+    if (options.fromUrl && !selected.length && searchObj.meta.sqlMode && searchObj.data.query) {
+      return sqlSources(searchObj.data.query).sources;
+    }
+    return selected;
+  };
+
   const initialStreamInput = (options: StreamListOptions): InitialStreamInput => {
     const zoConfig = store.state.zoConfig ?? {};
     const streamType = searchObj.data.stream.streamType || "logs";
-    let current: string[] = Array.isArray(searchObj.data.stream.selectedStream)
-      ? [...searchObj.data.stream.selectedStream]
-      : [];
-    if (options.fromUrl && !current.length && searchObj.meta.sqlMode && searchObj.data.query) {
-      current = sqlSources(searchObj.data.query).sources;
-    }
+    const current = requestedStreams(options);
     const legacy =
       zoConfig.query_on_stream_selection === false ||
       router?.currentRoute?.value?.query?.type === "stream_explorer";

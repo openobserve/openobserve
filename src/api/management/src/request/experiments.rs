@@ -1592,6 +1592,10 @@ pub async fn clone_experiment(
         (status = 400, description = "Invalid page size", body = ()),
         (status = 404, description = "Experiment not found", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_experiment_slots(
     Path((org_id, experiment_id)): Path<(String, String)>,
@@ -1645,6 +1649,10 @@ pub async fn list_experiment_slots(
         (status = 404, description = "Experiment not found", body = ()),
         (status = 409, description = "The Experiment is sealed and a submitted part is new or changed", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn submit_experiment_records(
     Path((org_id, experiment_id)): Path<(String, String)>,
@@ -1682,6 +1690,10 @@ pub async fn submit_experiment_records(
         (status = 404, description = "Experiment not found", body = ()),
         (status = 409, description = "Slots are still missing a terminal execution record", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Experiments", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn finalize_experiment(
     Path((org_id, experiment_id)): Path<(String, String)>,

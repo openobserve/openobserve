@@ -5,7 +5,6 @@
 
 import atexit
 import base64
-import datetime
 import hashlib
 import json
 import os
@@ -29,17 +28,6 @@ SPAN_KIND_INTERNAL = 1
 SPAN_KIND_CLIENT = 3
 STATUS_OK = 1
 STATUS_ERROR = 2
-
-# USD per 1M tokens at peak; off-peak is half. Mirrors openobserve/sdr_patterns llm_pricing.json.
-PEAK_PRICES = {
-    "deepseek-flash": {"cache_hit": 0.006, "cache_miss": 0.30, "output": 1.20},
-    "deepseek-v4-pro": {"cache_hit": 0.044, "cache_miss": 1.32, "output": 3.96},
-}
-MODEL_ALIASES = {
-    "deepseek-v4-flash": "deepseek-flash",
-    "deepseek-v4.1-flash": "deepseek-flash",
-}
-PEAK_HOURS_UTC = ((1, 4), (6, 10))
 
 # Same redaction rules as scripts/ai-review/src/scrub.mjs.
 SECRET_ENV_NAME_RE = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|AUTH)")
@@ -271,7 +259,7 @@ class Tracer:
 
 
 class LlmCall:
-    """Accumulates attempts, usage and cost for one gen_ai.chat span; use it as a context manager."""
+    """Accumulates attempts and usage for one gen_ai.chat span; use it as a context manager."""
 
     def __init__(self, tracer, span, model):
         self.tracer = tracer
@@ -280,7 +268,6 @@ class LlmCall:
         self.attempts = 0
         self.last_error = None
         self.usage = {}
-        self.cost = None
 
     def __enter__(self):
         return self
@@ -306,18 +293,13 @@ class LlmCall:
             return
         data = response_dict(response) or {}
         usage = usage_from_response(data)
-        # Every attempt is billed, so token counts and cost sum over retries, unlike callOpencode.
+        # Every attempt is billed, so token counts sum over retries, unlike callOpencode.
         for key, value in usage.items():
             if value is not None:
                 self.usage[key] = self.usage.get(key, 0) + value
-        started = time.time()
-        cost = estimate_cost(data.get("model") or model or self.model, usage, started)
-        if cost is not None:
-            self.cost = (self.cost or 0.0) + cost
         self.span.attributes.update(
             response_attributes(data, self.tracer.content_prefix, self.tracer.secrets, model or self.model)
         )
-        self.span.attributes[f"{self.tracer.content_prefix}.pricing.peak"] = is_peak(started)
 
     def reject(self, error):
         """Mark the latest attempt failed for a caller-side reason, such as an unusable response."""
@@ -326,8 +308,8 @@ class LlmCall:
     def end(self, error=None):
         prefix = self.tracer.content_prefix
         attrs = {f"{prefix}.attempts": self.attempts}
+        # No gen_ai.usage.cost: OpenObserve prices spans from these token counts when the client sends none.
         attrs.update(usage_attributes(self.usage, prefix))
-        attrs["gen_ai.usage.cost"] = None if self.cost is None else round(self.cost, 10)
         self.tracer.end_span(self.span, attrs, error if error is not None else self.last_error)
 
 
@@ -580,36 +562,6 @@ def usage_attributes(usage, prefix="ai.llm"):
 def finish_reasons(data):
     reasons = [c.get("finish_reason") for c in data.get("choices") or [] if isinstance(c, dict)]
     return [r for r in reasons if isinstance(r, str)] or None
-
-
-def normalize_model(model):
-    name = (model or "").strip().lower().rsplit("/", 1)[-1]
-    return MODEL_ALIASES.get(name, name)
-
-
-def is_peak(unix_seconds):
-    moment = datetime.datetime.fromtimestamp(unix_seconds, tz=datetime.timezone.utc)
-    if moment.weekday() >= 5:
-        return False
-    return any(start <= moment.hour < end for start, end in PEAK_HOURS_UTC)
-
-
-def estimate_cost(model, usage, unix_seconds):
-    """USD for one call, or None for an unknown model or a call with no usage."""
-    prices = PEAK_PRICES.get(normalize_model(model))
-    if prices is None or (usage.get("input") is None and usage.get("output") is None):
-        return None
-    total_input = usage.get("input") or 0
-    cache_hit = min(usage.get("cache_read") or 0, total_input)
-    output = usage.get("output") or 0
-    cost = (
-        cache_hit * prices["cache_hit"]
-        + (total_input - cache_hit) * prices["cache_miss"]
-        + output * prices["output"]
-    ) / 1_000_000
-    if not is_peak(unix_seconds):
-        cost /= 2
-    return round(cost, 10)
 
 
 def otlp_value(value):

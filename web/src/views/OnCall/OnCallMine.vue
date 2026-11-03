@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   narrowed rather than rendering a second copy of it.
 -->
 <template>
-  <!-- Reached from the On-Call menu and the profile menu, behind the same gate. -->
+  <!-- Reached from the On-Call menu and from a channel chip. -->
   <OPageLayout
     bleed
     data-test="oncall-mine-page"
@@ -206,7 +206,7 @@ const unavailable = ref(false);
 /// Set only when the first load fails; a failed refresh keeps the teams on screen instead.
 const loadError = ref<string | null>(null);
 
-// Opened from the avatar menu or a channel chip, so Back returns there when the history has it.
+// Opened from the On-Call menu or a channel chip, so Back returns there when the history has it.
 const back = computed<{
   label?: I18nText;
   to?: RouteLocationRaw;

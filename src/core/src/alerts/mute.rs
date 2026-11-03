@@ -92,7 +92,7 @@ pub async fn mute(
             ends_at: end_of(live),
         }));
     }
-    if let Some(message) = downtimes::cap_reached(&target.org_id) {
+    if let Some(message) = downtimes::cap_reached(&target.org_id, now) {
         return Err(MuteError::Conflict(AlertMuteConflict::DowntimeCap {
             message,
         }));

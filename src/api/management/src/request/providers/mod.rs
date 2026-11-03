@@ -29,6 +29,8 @@ use crate::{
 };
 
 const PROVIDER_TEST_FAILURE_MESSAGE: &str = "Provider connection test failed";
+const SAVED_KEY_TARGET_CHANGED_MESSAGE: &str =
+    "Enter the API key again to test a changed provider type or endpoint";
 
 /// ListProviders
 #[utoipa::path(
@@ -45,7 +47,7 @@ const PROVIDER_TEST_FAILURE_MESSAGE: &str = "Provider connection test failed";
         (status = 200, description = "Success", body = inline(ListProvidersResponseBody)),
         (status = 500, description = "Internal Server Error", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "list"})),
     ),
 )]
@@ -96,7 +98,7 @@ pub async fn list_providers(
         (status = 400, description = "Bad Request", body = ()),
         (status = 500, description = "Internal Server Error", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "create"})),
     ),
 )]
@@ -137,7 +139,7 @@ pub async fn create_provider(
         (status = 200, body = inline(ProviderResponseBody)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "get"})),
     ),
 )]
@@ -170,7 +172,7 @@ pub async fn get_provider(Path((org_id, provider_id)): Path<(String, String)>) -
         (status = 200, description = "Updated", body = inline(ProviderResponseBody)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "update"})),
     ),
 )]
@@ -206,10 +208,10 @@ pub async fn update_provider(
         ("provider_id" = String, Path, description = "Provider ID"),
     ),
     responses(
-        (status = 200, description = "Deleted", body = String),
+        (status = 200, description = "Deleted", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "delete"})),
     ),
 )]
@@ -235,8 +237,8 @@ pub async fn delete_provider(Path((org_id, provider_id)): Path<(String, String)>
         (status = 200, description = "Connection succeeded", body = inline(MetaHttpResponse)),
         (status = 400, description = "Invalid configuration or connection failed", body = inline(MetaHttpResponse)),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "test"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "create"})),
     ),
 )]
 pub async fn test_provider_config(
@@ -265,10 +267,14 @@ pub async fn test_provider_config(
     if provider_auth_is_blank(&provider.auth_config)
         && let Some(provider_id) = provider_id
     {
-        provider.auth_config = match providers::get_provider(&org_id, provider_id).await {
-            Ok(stored) => stored.auth_config,
+        let stored = match providers::get_provider(&org_id, provider_id).await {
+            Ok(stored) => stored,
             Err(error) => return provider_test_error_response(error),
         };
+        if !providers::may_reuse_saved_key(&provider, &stored) {
+            return MetaHttpResponse::bad_request(SAVED_KEY_TARGET_CHANGED_MESSAGE);
+        }
+        provider.auth_config = stored.auth_config;
     }
     match test_provider_connection_config(provider).await {
         Ok(msg) => MetaHttpResponse::ok(msg),

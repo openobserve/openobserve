@@ -36,7 +36,7 @@ pub struct ProviderRequestBody {
     pub auth_config: serde_json::Value,
     #[serde(default)]
     #[serde(alias = "rate_limits")]
-    #[schema(value_type = Object)]
+    #[schema(value_type = Option<Object>)]
     pub rate_limits: Option<ProviderRateLimits>,
     #[serde(default)]
     #[serde(alias = "is_default")]
@@ -69,7 +69,7 @@ pub struct ProviderResponseBody {
     pub available_models: Vec<String>,
     /// API key / auth config is masked in responses.
     pub auth_config_masked: bool,
-    #[schema(value_type = Object)]
+    #[schema(value_type = Option<Object>)]
     pub rate_limits: Option<ProviderRateLimits>,
     pub is_default: bool,
     pub created_at: i64,

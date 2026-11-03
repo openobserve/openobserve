@@ -167,6 +167,11 @@ impl ExponentialHistogram {
     }
 }
 
+/// A stale marker or an unsupported schema expands to nothing, whatever its stream key.
+pub fn expands_to_records(hp: &prometheus_rpc::Histogram) -> bool {
+    SCHEMA_RANGE.contains(&hp.schema) && !is_stale_marker(hp.sum)
+}
+
 pub fn expand_native_histogram(
     hp: &prometheus_rpc::Histogram,
     limits: ExpansionLimits,
@@ -350,6 +355,26 @@ mod tests {
 
     /// Integer histogram: spans `[{0,2},{1,1}]` + deltas `[3,1,-1]` decode to buckets
     /// `{0:3, 1:4, 3:3}` with idx 2 an implicit gap.
+    #[test]
+    fn expands_to_records_agrees_with_the_expansion() {
+        let stale = prometheus_rpc::Histogram {
+            sum: f64::from_bits(config::meta::promql::STALE_NAN_BITS),
+            ..native_histogram_base()
+        };
+        let custom_buckets = prometheus_rpc::Histogram {
+            schema: -53,
+            ..native_histogram_base()
+        };
+        for (hp, expands) in [
+            (native_histogram_base(), true),
+            (stale, false),
+            (custom_buckets, false),
+        ] {
+            assert_eq!(expands_to_records(&hp), expands);
+            assert_eq!(!expand_native_histogram(&hp, lim(160)).is_empty(), expands);
+        }
+    }
+
     #[test]
     fn test_expand_native_histogram_integer() {
         let hp = prometheus_rpc::Histogram {

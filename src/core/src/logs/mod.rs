@@ -50,8 +50,9 @@ use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
     ingestion::{
-        PartitionMemo, TriggerAlertData, evaluate_trigger, resolve_batch_schema,
-        schema_records_to_entries, write_entries, write_entries_synced,
+        PartitionMemo, TriggerAlertData, evaluate_trigger, newly_enabled_uds_fields,
+        repack_records, resolve_batch_schema, schema_records_to_entries, write_entries,
+        write_entries_synced,
     },
 };
 
@@ -416,7 +417,7 @@ async fn write_logs(
     org_id: &str,
     stream_name: &str,
     status: &mut IngestionStatus,
-    json_data: Vec<(i64, Map<String, Value>)>,
+    mut json_data: Vec<(i64, Map<String, Value>)>,
     columnar: Option<columnar::JsonColumnar>,
     is_derived: bool,
 ) -> Result<RequestStats> {
@@ -482,7 +483,7 @@ async fn write_logs(
     // End get stream alert
 
     // start check for schema
-    let (schema_evolution, infer_schema) = resolve_batch_schema(
+    let (mut schema_evolution, mut infer_schema) = resolve_batch_schema(
         org_id,
         stream_name,
         StreamType::Logs,
@@ -492,6 +493,20 @@ async fn write_logs(
         has_uds,
     )
     .await?;
+    // the check that turned the UDS on projected the schema, which would drop unpacked columns
+    if let Some(fields) = newly_enabled_uds_fields(has_uds, stream_schema_map.get(stream_name)) {
+        repack_records(json_data.iter_mut().map(|(_, record)| record), &fields);
+        (schema_evolution, infer_schema) = resolve_batch_schema(
+            org_id,
+            stream_name,
+            StreamType::Logs,
+            &mut stream_schema_map,
+            &json_data,
+            is_derived,
+            true,
+        )
+        .await?;
+    }
 
     // get schema
     let latest_schema = stream_schema_map

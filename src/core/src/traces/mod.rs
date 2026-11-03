@@ -408,6 +408,27 @@ fn restore_derived_fields(
     }
 }
 
+/// Packs a batch into a UDS its own schema check turned on, keeping what per-span packing keeps.
+fn repack_for_new_uds(json_data: &mut [(i64, Map<String, json::Value>)], fields: &HashSet<String>) {
+    let mut fields = fields.clone();
+    // per-span packing writes these after refactor_map, so they stay columns
+    fields.extend(
+        [
+            "gen_ai_agent_name",
+            "gen_ai_agent_id",
+            "gen_ai_agent_env",
+            "gen_ai_agent_version",
+            O2_INGEST_TS_COL_NAME,
+        ]
+        .map(str::to_string),
+    );
+    for (_, record_val) in json_data.iter_mut() {
+        let saved_fields = save_derived_fields_for_uds(record_val, &fields);
+        *record_val = crate::ingestion::refactor_map(std::mem::take(record_val), &fields);
+        restore_derived_fields(record_val, saved_fields);
+    }
+}
+
 /// Derived identity columns of one OTLP span; true when DBM stamped it.
 pub fn enrich_otlp_span(
     span_kind: i32,
@@ -1849,7 +1870,7 @@ async fn write_traces_by_stream(
 async fn write_traces(
     org_id: &str,
     stream_name: &str,
-    json_data: Vec<(i64, json::Map<String, json::Value>)>,
+    mut json_data: Vec<(i64, json::Map<String, json::Value>)>,
 ) -> Result<RequestStats, Error> {
     let cfg = get_config();
     // get schema and stream settings
@@ -1908,6 +1929,23 @@ async fn write_traces(
     )
     .await
     .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
+    // the check that turned the UDS on projected the schema, which would drop unpacked columns
+    if let Some(fields) =
+        crate::ingestion::newly_enabled_uds_fields(has_uds, traces_schema_map.get(stream_name))
+    {
+        repack_for_new_uds(&mut json_data, &fields);
+        check_batch_schema(
+            org_id,
+            stream_name,
+            StreamType::Traces,
+            &mut traces_schema_map,
+            &json_data,
+            false,
+            true,
+        )
+        .await
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
+    }
     let record_schema = traces_schema_map
         .get(stream_name)
         .unwrap()
@@ -3027,6 +3065,34 @@ mod tests {
         record_val.insert("infer_self_ip".to_string(), json::json!("10.0.0.2"));
         super::strip_client_supplied_derived_fields(&mut record_val);
         assert_eq!(record_val, before);
+    }
+
+    #[test]
+    fn test_repack_for_new_uds_keeps_derived_and_agent_columns() {
+        use config::utils::json;
+
+        let record = json::json!({
+            "trace_id": "5b8efff798038103d269b633813fc60c",
+            "o2_db_system": "postgresql",
+            "infer_peer_key": "db:5432",
+            "gen_ai_agent_name": "planner",
+            "junk_attr": "packed",
+        });
+        let mut json_data = vec![(1, record.as_object().unwrap().clone())];
+        let fields = std::collections::HashSet::from(["trace_id".to_string()]);
+
+        super::repack_for_new_uds(&mut json_data, &fields);
+
+        let record = &json_data[0].1;
+        for name in [
+            "trace_id",
+            "o2_db_system",
+            "infer_peer_key",
+            "gen_ai_agent_name",
+        ] {
+            assert!(record.contains_key(name), "missing {name}");
+        }
+        assert!(!record.contains_key("junk_attr"));
     }
 
     #[test]
