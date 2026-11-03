@@ -65,7 +65,8 @@ use crate::{
     },
     ingestion::{
         check_ingestion_allowed, get_stream_partition_keys, get_thread_id,
-        get_uds_and_original_data_streams, get_write_partition_key, refactor_map, write_file,
+        get_uds_and_original_data_streams, get_write_partition_key, newly_enabled_uds_fields,
+        repack_records, write_file,
     },
 };
 
@@ -359,10 +360,7 @@ pub async fn handle_otlp_request(
     )
     .await;
     if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-        all_records = all_records
-            .into_iter()
-            .map(|record| refactor_map(record, fields))
-            .collect();
+        repack_records(all_records.iter_mut(), fields);
     }
 
     if !all_records.is_empty() {
@@ -419,7 +417,7 @@ pub async fn handle_otlp_request(
 async fn buffer_records(
     org_id: &str,
     stream_name: &str,
-    records: Vec<json::Map<String, json::Value>>,
+    mut records: Vec<json::Map<String, json::Value>>,
     partition_keys: &Vec<config::meta::stream::StreamPartition>,
     partition_time_level: config::meta::stream::PartitionTimeLevel,
     write_buf: &mut HashMap<String, SchemaRecords>,
@@ -458,17 +456,38 @@ async fn buffer_records(
         stream_schema_map.insert(stream_name.to_string(), SchemaCache::new(schema));
     }
 
-    let record_refs: Vec<&json::Map<String, json::Value>> = records.iter().collect();
-    let (_schema_evolution, _infer_schema) = check_for_schema(
+    let had_uds = stream_schema_map
+        .get(stream_name)
+        .and_then(|schema| infra::schema::unwrap_stream_settings(schema.schema()))
+        .is_some_and(|settings| !settings.defined_schema_fields.is_empty());
+    check_for_schema(
         org_id,
         stream_name,
         StreamType::Profiles,
         stream_schema_map,
-        record_refs,
+        records.iter().collect(),
         min_timestamp,
         false,
     )
     .await?;
+    // the check that turned the UDS on projected the schema, which would drop unpacked columns
+    if let Some(fields) = newly_enabled_uds_fields(
+        StreamType::Profiles,
+        had_uds,
+        stream_schema_map.get(stream_name),
+    ) {
+        repack_records(records.iter_mut(), &fields);
+        check_for_schema(
+            org_id,
+            stream_name,
+            StreamType::Profiles,
+            stream_schema_map,
+            records.iter().collect(),
+            min_timestamp,
+            false,
+        )
+        .await?;
+    }
 
     let schema = stream_schema_map
         .get(stream_name)

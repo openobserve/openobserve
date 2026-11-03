@@ -311,7 +311,7 @@ fn finish_rows(
 async fn buffer_stream_rows(
     org_id: &str,
     stream_name: &str,
-    (rows, first_type): (Vec<Row>, Option<&'static str>),
+    (mut rows, first_type): (Vec<Row>, Option<&'static str>),
     lookups: &mut StreamLookups,
     partitions: &mut HashMap<String, SchemaRecords>,
 ) -> Result<Option<TriggerAlertData>> {
@@ -340,18 +340,16 @@ async fn buffer_stream_rows(
 
     let has_uds = matches!(lookups.user_defined_schemas.get(stream_name), Some(Some(_)));
     let min_timestamp = rows.iter().map(|(_, ts)| *ts).min().unwrap_or(0);
-    let record_refs: Vec<&json::Map<String, json::Value>> =
-        rows.iter().map(|(record, ..)| record).collect();
     let (schema, schema_key) = ingest::resolve_batch_schema(
         org_id,
         stream_name,
         &mut lookups.schemas,
-        &record_refs,
+        &mut rows,
+        |(record, _)| record,
         min_timestamp,
         has_uds,
     )
     .await?;
-    drop(record_refs);
 
     let alerts = lookups
         .alerts
