@@ -27,7 +27,6 @@ use anyhow::Result;
 use chrono::Utc;
 use config::{
     meta::{
-        destinations::{DestinationType, Module},
         folder::{DEFAULT_FOLDER, FolderType},
         stream::StreamType,
         triggers::{ScheduledTriggerData, TriggerModule},
@@ -45,7 +44,7 @@ use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
 use utoipa::ToSchema;
 
-use crate::{alerts::destinations, common::meta::authz::Authz};
+use crate::common::meta::authz::Authz;
 
 /// G4. Words that name an error subset rather than a population, matched as whole tokens so
 /// an unrelated stream cannot be caught by a substring.
@@ -3358,13 +3357,32 @@ fn anomaly_alert_message(
     ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
     link: &str,
 ) -> String {
+    let body = anomaly_alert_body(ctx);
+    let verb = if ctx.kind
+        == o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind::Recovery
+    {
+        "Anomaly recovered"
+    } else {
+        "Anomaly detected"
+    };
+    format!(
+        "{verb} in stream '{}' (anomaly name: '{}'): {body} | details: {link}",
+        ctx.stream_name, ctx.config_name
+    )
+}
+
+/// The kind specific middle of the message, which a template reads as `{alert_description}`.
+#[cfg(feature = "enterprise")]
+fn anomaly_alert_body(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> String {
     use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
     let window = format!(
         "{}\u{2013}{}",
         fmt_alert_us(ctx.window_start_us),
         fmt_alert_us(ctx.window_end_us)
     );
-    let body = match ctx.kind {
+    match ctx.kind {
         AnomalyAlertKind::Absence => format!(
             "no data received in window {window}, although the stream's learned schedule \
              expected data"
@@ -3383,16 +3401,7 @@ fn anomaly_alert_message(
             format!("a full detection run found no anomalies in window {window}")
         }
         AnomalyAlertKind::Value => value_anomaly_body(ctx, &window),
-    };
-    let verb = if ctx.kind == AnomalyAlertKind::Recovery {
-        "Anomaly recovered"
-    } else {
-        "Anomaly detected"
-    };
-    format!(
-        "{verb} in stream '{}' (anomaly name: '{}'): {body} | details: {link}",
-        ctx.stream_name, ctx.config_name
-    )
+    }
 }
 
 /// The numeric section for a scored value anomaly, degrading field by field so a cold
@@ -3510,120 +3519,175 @@ async fn muted_by_downtime(org_id: &str, anomaly_id: &str) -> Option<String> {
     .map(|downtime| downtime.id)
 }
 
-/// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
-/// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
-/// Non-HTTP destinations (email, SNS) are skipped with a warning — a known, parked gap
-/// that recovery messages inherit. Returns `Ok(true)` only when the webhook accepted the
-/// send (2xx); a skip returns `Ok(false)` and a non-2xx answer is a `DestinationRejected`
-/// error, so the caller never arms a cooldown, or records a run as delivered, on a send
-/// nobody actually received, and the history row can name the rejection.
+/// `Ok(false)` for a skip that never delivers; a non 2xx answer is a `DestinationRejected`.
 #[cfg(feature = "enterprise")]
 pub async fn send_anomaly_alert(
     destination_id: String,
-    ctx: o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+    actx: o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
 ) -> anyhow::Result<bool> {
-    let anomaly_id = ctx.anomaly_id.clone();
-    let dest = match destinations::get(&ctx.org_id, &destination_id).await {
-        Ok(d) => d,
-        Err(e) => {
+    use crate::alerts::notifications::notify::{NotifyError, SkipReason, notify};
+    let org_id = actx.org_id.clone();
+    let explicit = load_override(&org_id, actx.template.as_deref()).await;
+    let mut ctx = anomaly_notification_context(&actx);
+    match notify(&org_id, &destination_id, &explicit, None, &mut ctx).await {
+        Ok(_) => Ok(true),
+        Err(NotifyError::Skipped(SkipReason::NoOrgMemberRecipient)) => Ok(false),
+        Err(NotifyError::Skipped(_)) => Ok(true),
+        Err(NotifyError::DestinationNotFound(_)) => {
             log::warn!(
-                "[anomaly_detection {}] destination '{}' not found: {}",
-                anomaly_id,
-                destination_id,
-                e
+                "[anomaly_detection {}] destination '{destination_id}' not found",
+                actx.anomaly_id
             );
-            return Ok(false);
+            Ok(false)
         }
-    };
-
-    let endpoint = match &dest.module {
-        Module::Alert {
-            destination_type: DestinationType::Http(ep),
-            ..
-        } => ep.clone(),
-        _ => {
-            log::warn!(
-                "[anomaly_detection {}] destination '{}' is not an HTTP destination — skipping",
-                anomaly_id,
-                destination_id
-            );
-            return Ok(false);
-        }
-    };
-    if crate::alerts::notifications::jira::is_jira(&endpoint) {
-        return Err(anyhow::anyhow!(
-            crate::alerts::notifications::jira::UNSUPPORTED_SENDER
-        ));
-    }
-
-    let link = anomaly_detail_link(&ctx.org_id, &ctx.anomaly_id);
-    let message = anomaly_alert_message(&ctx, &link);
-    // Slack-compatible shape: `text` renders in Slack, other receivers read the fields.
-    let payload = anomaly_alert_payload(&ctx, &message, &link);
-
-    // SSRF protection: validate the URL (incl. DNS) before sending and build the
-    // client through `build_safe_destination_client` so redirects + connect-time resolution
-    // are re-validated.
-    if let Err(e) =
-        common::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config_async(
-            &endpoint.url,
-        )
-        .await
-    {
-        return Err(anyhow::anyhow!("Webhook URL blocked by SSRF guard: {e}"));
-    }
-    let builder = if endpoint.skip_tls_verify {
-        reqwest::Client::builder().danger_accept_invalid_certs(true)
-    } else {
-        reqwest::Client::builder()
-    };
-    let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
-
-    let mut req = client.post(&endpoint.url);
-
-    if let Some(headers) = &endpoint.headers {
-        for (key, value) in headers.iter() {
-            if !key.is_empty() && !value.is_empty() {
-                req = req.header(key, value);
-            }
-        }
-    }
-
-    let resp = req
-        .header("Content-Type", "application/json")
-        .body(payload.to_string())
-        .send()
-        .await?;
-
-    let status = resp.status();
-    if !status.is_success() {
-        let body = resp.text().await.unwrap_or_default();
-        log::warn!(
-            "[anomaly_detection {}] destination '{}' rejected the alert: status={}, body={}",
-            anomaly_id,
-            destination_id,
-            status,
-            body
-        );
-        // The body lands in the alert-history error column, so a long HTML error page is cut.
-        let body = body.chars().take(REJECTION_BODY_MAX_CHARS).collect();
-        return Err(
+        Err(NotifyError::Rejected { status, body }) => Err(
             o2_enterprise::enterprise::anomaly_detection::query_executor::DestinationRejected {
-                status: status.as_u16(),
-                body,
+                status,
+                // The body lands in the run history error column, so a long page is cut.
+                body: body.chars().take(REJECTION_BODY_MAX_CHARS).collect(),
             }
             .into(),
-        );
+        ),
+        Err(e) => Err(e.into()),
     }
+}
 
-    log::info!(
-        "[anomaly_detection {}] alert sent to '{}': status={}",
-        anomaly_id,
-        destination_id,
-        status
-    );
+/// The config's template override as a level 1 candidate; a missing template falls through.
+#[cfg(feature = "enterprise")]
+async fn load_override(
+    org_id: &str,
+    name: Option<&str>,
+) -> Vec<config::meta::destinations::Template> {
+    let Some(name) = name.filter(|n| !n.is_empty()) else {
+        return Vec::new();
+    };
+    match db::alerts::templates::get(org_id, name).await {
+        Ok(t) => vec![t],
+        Err(e) => {
+            log::warn!(
+                "[anomaly_detection] template override '{name}' not found, falling through: {e}"
+            );
+            Vec::new()
+        }
+    }
+}
 
-    Ok(true)
+/// The shared path's context for one anomaly message (Backend section 6 field mapping).
+#[cfg(feature = "enterprise")]
+fn anomaly_notification_context(
+    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> crate::alerts::notifications::NotificationContext {
+    use config::meta::alerts::{
+        level::AlertLevel,
+        notification_kind::{NotificationEvent, NotificationKind},
+    };
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
+
+    use crate::alerts::notifications::{
+        LegacyPayload, NotificationContext, STATUS_FIRING, STATUS_RESOLVED,
+    };
+
+    let link = anomaly_detail_link(&actx.org_id, &actx.anomaly_id);
+    let recovery = actx.kind == AnomalyAlertKind::Recovery;
+    let (level, level_str) = match actx.kind {
+        AnomalyAlertKind::Value => (AlertLevel::Critical, "critical"),
+        AnomalyAlertKind::PartialDrop => (AlertLevel::Warning, "warning"),
+        AnomalyAlertKind::Absence => (AlertLevel::NoData, "no_data"),
+        AnomalyAlertKind::Recovery => (AlertLevel::Ok, "ok"),
+    };
+    let event = if recovery {
+        NotificationEvent::Resolved
+    } else {
+        actx.event
+    };
+    let legacy_ctx = actx.clone();
+    let legacy_link = link.clone();
+    let now = now_micros();
+    NotificationContext {
+        org_name: actx.org_id.clone(),
+        stream_type: actx.stream_type.clone(),
+        stream_name: actx.stream_name.clone(),
+        alert_name: actx.config_name.clone(),
+        alert_level: level_str.to_string(),
+        alert_status: if recovery {
+            STATUS_RESOLVED
+        } else {
+            STATUS_FIRING
+        }
+        .to_string(),
+        episode_id: Some(actx.anomaly_id.clone()),
+        alert_start_time: fmt_local_us(actx.window_start_us),
+        alert_end_time: fmt_local_us(actx.window_end_us),
+        alert_start_time_millis: (actx.window_start_us / 1000).to_string(),
+        alert_end_time_millis: (actx.window_end_us / 1000).to_string(),
+        alert_url: link.clone(),
+        alert_trigger_time: now,
+        alert_trigger_time_str: fmt_local_us(now),
+        alert_description: anomaly_alert_body(actx),
+        context_attributes: anomaly_attributes(actx, &link),
+        level: Some(level),
+        kind: NotificationKind::Anomaly,
+        event,
+        cluster_name: config::get_cluster_name(),
+        legacy_payload: Some(LegacyPayload::new(move || {
+            let message = anomaly_alert_message(&legacy_ctx, &legacy_link);
+            anomaly_alert_payload(&legacy_ctx, &message, &legacy_link)
+        })),
+        ..Default::default()
+    }
+}
+
+/// The anomaly variables, formatted as `value_anomaly_body` formats them.
+#[cfg(feature = "enterprise")]
+fn anomaly_attributes(
+    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+    link: &str,
+) -> Vec<(String, String)> {
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
+    let two = |v: Option<f64>| v.map(|v| format!("{v:.2}")).unwrap_or_default();
+    let kind = serde_json::to_value(actx.kind)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_string))
+        .unwrap_or_default();
+    let deviation_kind = match actx.kind {
+        AnomalyAlertKind::Value => "score_over_threshold",
+        AnomalyAlertKind::PartialDrop => "value_below_expected",
+        _ => "",
+    };
+    [
+        ("anomaly_id", actx.anomaly_id.clone()),
+        ("anomaly_name", actx.config_name.clone()),
+        ("anomaly_kind", kind),
+        ("anomaly_count", actx.anomaly_count.to_string()),
+        (
+            "max_deviation_percent",
+            actx.max_deviation_percent
+                .map(|v| format!("{v:.1}"))
+                .unwrap_or_default(),
+        ),
+        ("deviation_kind", deviation_kind.to_string()),
+        ("worst_actual_value", two(actx.worst_actual_value)),
+        ("worst_expected", two(actx.worst_expected)),
+        ("score", two(actx.score)),
+        ("threshold", two(actx.threshold)),
+        ("window_start", fmt_alert_us(actx.window_start_us)),
+        ("window_end", fmt_alert_us(actx.window_end_us)),
+        ("anomaly_url", link.to_string()),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v))
+    .collect()
+}
+
+/// The alert convention for the standard time fields: server local time with no suffix.
+#[cfg(feature = "enterprise")]
+fn fmt_local_us(us: i64) -> String {
+    use chrono::TimeZone;
+    chrono::Local
+        .timestamp_micros(us)
+        .single()
+        .map(|t| t.format("%Y-%m-%dT%H:%M:%S").to_string())
+        .unwrap_or_else(|| "N/A".to_string())
 }
 
 #[cfg(test)]
@@ -6978,7 +7042,123 @@ mod tests {
                 // 2024-01-01T00:00:00Z .. +1h, so the window text is deterministic.
                 window_start_us: 1_704_067_200_000_000,
                 window_end_us: 1_704_070_800_000_000,
+                template: None,
+                stream_type: "logs".to_string(),
+                event: Default::default(),
             }
+        }
+
+        fn resolved_for(
+            dest_type: config::meta::destinations::DestinationType,
+        ) -> crate::alerts::notifications::notify::Resolved {
+            use config::meta::alerts::notification_kind::NotificationKind;
+
+            use crate::alerts::notifications::org_default::{
+                EffectiveTemplate, TemplateSource, compiled_fallback_for,
+            };
+            crate::alerts::notifications::notify::Resolved {
+                destination: Default::default(),
+                channel: crate::alerts::notifications::derive_channel_format(&dest_type),
+                destination_type: dest_type,
+                effective: EffectiveTemplate {
+                    template: compiled_fallback_for("org", NotificationKind::Anomaly),
+                    source: TemplateSource::Compiled,
+                    skipped: vec![],
+                },
+            }
+        }
+
+        fn http(
+            destination_type: &str,
+            payload_format: Option<&str>,
+        ) -> config::meta::destinations::DestinationType {
+            let mut endpoint = config::meta::destinations::Endpoint {
+                destination_type: Some(destination_type.to_string()).filter(|t| !t.is_empty()),
+                url: "https://hooks.example/x".into(),
+                ..Default::default()
+            };
+            if let Some(f) = payload_format {
+                endpoint.metadata.insert("payload_format".into(), f.into());
+            }
+            config::meta::destinations::DestinationType::Http(endpoint)
+        }
+
+        #[test]
+        fn the_context_is_keyed_by_the_anomaly_id_and_the_recovery_resolves() {
+            use config::meta::alerts::notification_kind::{NotificationEvent, NotificationKind};
+            let firing = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Value));
+            assert_eq!(firing.kind, NotificationKind::Anomaly);
+            assert_eq!(firing.event, NotificationEvent::Firing);
+            assert_eq!(firing.episode_id.as_deref(), Some("id1"));
+            assert_eq!(firing.alert_status, "firing");
+            assert_eq!(
+                firing.alert_description,
+                super::super::anomaly_alert_body(&ctx(AnomalyAlertKind::Value))
+            );
+            let recovery =
+                super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Recovery));
+            assert_eq!(recovery.event, NotificationEvent::Resolved);
+            assert_eq!(recovery.episode_id.as_deref(), Some("id1"));
+            assert_eq!(recovery.alert_status, "resolved");
+        }
+
+        #[test]
+        fn a_generic_webhook_keeps_todays_json_until_a_template_or_payload_format_applies() {
+            use crate::alerts::notifications::notify::{Route, route};
+            let c = ctx(AnomalyAlertKind::Value);
+            let n = super::super::anomaly_notification_context(&c);
+            let link = super::super::anomaly_detail_link(&c.org_id, &c.anomaly_id);
+            let Route::Legacy(body) = route(&resolved_for(http("", None)), &n).unwrap() else {
+                panic!("expected the legacy body");
+            };
+            assert_eq!(body["text"], anomaly_alert_message(&c, &link));
+            assert_eq!(body["alert_type"], "anomaly_detection");
+            assert_eq!(
+                route(&resolved_for(http("", Some("rendered"))), &n).unwrap(),
+                Route::Render
+            );
+            assert_eq!(
+                route(&resolved_for(http("slack", None)), &n).unwrap(),
+                Route::Render
+            );
+        }
+
+        #[test]
+        fn platforms_get_a_keyed_trigger_and_one_resolve_on_recovery() {
+            use crate::alerts::notifications::{
+                notify::{Route, route},
+                platform::Platform,
+            };
+            let firing = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Value));
+            assert_eq!(
+                route(&resolved_for(http("pagerduty", None)), &firing).unwrap(),
+                Route::Render
+            );
+            let recovery =
+                super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Recovery));
+            for (name, platform) in [
+                ("pagerduty", Platform::PagerDuty),
+                ("opsgenie", Platform::Opsgenie),
+                ("servicenow", Platform::ServiceNow),
+            ] {
+                assert_eq!(
+                    route(&resolved_for(http(name, None)), &recovery).unwrap(),
+                    Route::PlatformResolve(platform)
+                );
+            }
+        }
+
+        #[test]
+        fn a_pagerduty_trigger_carries_the_anomaly_id_as_dedup_key() {
+            let firing = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Value));
+            let dest = http("pagerduty", None);
+            let body = crate::alerts::notifications::send::stamp_platform_key(
+                &dest,
+                &firing,
+                r#"{"event_action":"trigger","payload":{}}"#.to_string(),
+            );
+            let body: serde_json::Value = serde_json::from_str(&body).unwrap();
+            assert_eq!(body["dedup_key"], "id1");
         }
 
         #[test]
