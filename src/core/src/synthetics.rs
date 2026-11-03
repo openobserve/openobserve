@@ -863,6 +863,39 @@ mod tests {
     }
 
     #[test]
+    fn a_location_down_skips_platforms_and_keeps_todays_text_on_webhooks() {
+        use crate::alerts::notifications::notify::{NotifyError, Route, SkipReason, route};
+        let loc = infra::table::synthetics_locations::SyntheticsLocationRecord {
+            id: "loc_1".into(),
+            org_id: Some("default".into()),
+            kind: "private".into(),
+            provider: "self".into(),
+            region: "dc-1".into(),
+            label: "rack 4".into(),
+            pool: "p".into(),
+            enabled: true,
+            created_at: 0,
+            updated_at: 0,
+        };
+        let ctx = location_down_context("default", &loc, 3, 120);
+        assert_eq!(ctx.episode_id, None);
+        assert!(matches!(
+            route(&resolved_for("pagerduty"), &ctx),
+            Err(NotifyError::Skipped(SkipReason::PlatformNotForKind))
+        ));
+        assert_eq!(route(&resolved_for("slack"), &ctx).unwrap(), Route::Render);
+        let Route::Legacy(body) = route(&resolved_for(""), &ctx).unwrap() else {
+            panic!("expected the legacy body");
+        };
+        assert!(
+            body["text"]
+                .as_str()
+                .unwrap()
+                .starts_with("Private location rack 4 (dc-1) is down")
+        );
+    }
+
+    #[test]
     fn the_title_is_todays_subject_line() {
         let ctx = synthetics_notification_context(&recovered());
         assert_eq!(
@@ -1128,7 +1161,7 @@ mod tests {
     }
 }
 
-/// Sends the "location down" notification through the shared path, keyed by the location id.
+/// Sends the "location down" notification through the shared path.
 #[cfg(feature = "enterprise")]
 async fn notify_location_down(
     org_id: &str,
@@ -1152,7 +1185,7 @@ async fn notify_location_down(
     }
 }
 
-/// Context for a private location down message; nothing is sent when it comes back (D4).
+/// Context for a private location down message; Informational, so platforms skip it (D8).
 #[cfg(feature = "enterprise")]
 fn location_down_context(
     org_id: &str,
@@ -1185,7 +1218,6 @@ fn location_down_context(
         alert_name: loc.label.clone(),
         alert_level: "critical".to_string(),
         alert_status: STATUS_FIRING.to_string(),
-        episode_id: Some(loc.id.clone()),
         alert_url: locations_url(org_id),
         alert_trigger_time: now,
         alert_trigger_time_str: crate::anomaly_detection::fmt_local_us(now),
@@ -1200,7 +1232,7 @@ fn location_down_context(
         ],
         level: Some(AlertLevel::Critical),
         kind: NotificationKind::Synthetics,
-        event: NotificationEvent::Firing,
+        event: NotificationEvent::Informational,
         cluster_name: config::get_cluster_name(),
         legacy_payload: Some(LegacyPayload::new(move || legacy.clone())),
         render_hints: RenderHints {
