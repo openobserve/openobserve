@@ -24,6 +24,25 @@ use super::admin::{feature_gate, map_err};
 use crate::service::auth::UserEmail;
 
 /// GET /{org_id}/settings/public_dashboards
+#[utoipa::path(
+    get,
+    path = "/{org_id}/settings/public_dashboards",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "GetOrgPublicDashboardSettings",
+    summary = "Get public dashboard settings of an organization",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn get(Path(org_id): Path<String>, Headers(user): Headers<UserEmail>) -> Response {
     if let Some(r) = admin_gate(&org_id, &user.user_id).await {
         return r;
@@ -35,6 +54,26 @@ pub async fn get(Path(org_id): Path<String>, Headers(user): Headers<UserEmail>) 
 }
 
 /// PUT /{org_id}/settings/public_dashboards — a lower limit stops new links only.
+#[utoipa::path(
+    put,
+    path = "/{org_id}/settings/public_dashboards",
+    context_path = "/api",
+    tag = "Public Dashboards",
+    operation_id = "UpdateOrgPublicDashboardSettings",
+    summary = "Update public dashboard settings of an organization",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = OrgPublicDashboardSettings, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn put(
     Path(org_id): Path<String>,
     Headers(user): Headers<UserEmail>,

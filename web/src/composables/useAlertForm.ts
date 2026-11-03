@@ -1829,7 +1829,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         // schema (it reads them off the form); resetForm below re-seeds anyway.
         setF("stream_type", data.stream_type);
         setF("stream_name", data.stream_name);
-        await updateStreams(false);
+        // A stream this org has not ingested yet has no schema; the rest of the prefill still applies.
+        await Promise.resolve(updateStreams(false)).catch(() => undefined);
       }
 
       if (prefill.queryType === "promql") {

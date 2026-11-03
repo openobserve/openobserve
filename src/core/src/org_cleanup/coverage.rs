@@ -137,6 +137,7 @@ pub const COVERAGE: &[Coverage] = &[
     table("llm_remote_tasks", DB),
     table("llm_secrets", DB),
     table("model_pricing", DB),
+    table("oncall_chat_messages", DB),
     table("oncall_delivery_reads", DB),
     table("oncall_overrides", DB),
     table("oncall_ownership_rules", DB),

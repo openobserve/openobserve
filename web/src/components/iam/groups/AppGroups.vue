@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="group_name"
           :loading="loading"
           :forbidden="forbidden"
+          forbidden-resource="groups"
           :selected-ids="selectedGroupNames"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"

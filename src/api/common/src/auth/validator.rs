@@ -2174,7 +2174,10 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // The same marker backed by a real assume_service_account session still authenticates.
         let session_id = "session-forged-marker-test";
         USER_SESSIONS.insert(session_id.to_string(), format!("Basic {credentials}"));
-        USER_SESSIONS_EXPIRY.insert(session_id.to_string(), Utc::now().timestamp() + 3600);
+        USER_SESSIONS_EXPIRY.insert(
+            session_id.to_string(),
+            Utc::now().timestamp_micros() + 3_600_000_000,
+        );
         let genuine = AuthExtractor {
             auth: format!("{SESSION_AUTH_MARKER}{session_id}::Basic {credentials}"),
             ..plain.clone()

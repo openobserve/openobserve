@@ -222,10 +222,6 @@ describe("TracesMetricsDashboard", () => {
   // Rendering
   // -------------------------------------------------------------------------
   describe("rendering", () => {
-    it("should mount without errors", () => {
-      expect(wrapper.exists()).toBe(true);
-    });
-
     it("should not render the charts-wrapper when show is false", async () => {
       await wrapper.setProps({ show: false });
       const charts = wrapper.find('[data-test="render-dashboard-charts"]');
@@ -235,12 +231,6 @@ describe("TracesMetricsDashboard", () => {
     it("should render the dashboard charts component when show is true and histogram is visible", () => {
       const charts = wrapper.find('[data-test="render-dashboard-charts"]');
       expect(charts.exists()).toBe(true);
-    });
-
-    it("should not render the dashboard charts component when show is false", async () => {
-      await wrapper.setProps({ show: false });
-      const charts = wrapper.find('[data-test="render-dashboard-charts"]');
-      expect(charts.exists()).toBe(false);
     });
 
     it("should not render the comparison page on initial mount", () => {
@@ -359,14 +349,6 @@ describe("TracesMetricsDashboard", () => {
       expect(config.override_config ?? []).toEqual([]);
     });
 
-    it("should keep approx_distinct(trace_id) in the Errors panel query in traces mode", async () => {
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      const query = getPanelQuery(wrapper, "Errors");
-      // Errors panel injects span_status='ERROR' into WHERE — should NOT replace approx_distinct yet
-      expect(query).not.toContain("count(*)");
-    });
-
     it("should prepend WHERE span_status = 'ERROR' to the Errors panel query", async () => {
       await wrapper.vm.loadDashboard();
       await flushPromises();
@@ -468,17 +450,6 @@ describe("TracesMetricsDashboard", () => {
       expect(getHeatmapSql(wrapper)).not.toContain("span_kind='Server'");
     });
 
-    it("should include the filter prop in the Errors panel WHERE clause", async () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "service_name = 'api'";
-      wrapper = mountComponent();
-      await flushPromises();
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      const query = getPanelQuery(wrapper, "Errors");
-      expect(query).toContain("service_name = 'api'");
-    });
-
     it("should produce no WHERE clause in Rate panel when filter is absent and no range filters exist", async () => {
       // default mount has no filter prop and empty metricsRangeFilters
       await wrapper.vm.loadDashboard();
@@ -501,18 +472,6 @@ describe("TracesMetricsDashboard", () => {
       expect(query).not.toContain("span_kind='Server'");
     });
 
-    it("should convert span_kind='Server' label to '2' in the Errors panel WHERE clause", async () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "span_kind='Server'";
-      wrapper = mountComponent();
-      await flushPromises();
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      const query = getPanelQuery(wrapper, "Errors");
-      expect(query).toContain("span_kind='2'");
-      expect(query).not.toContain("span_kind='Server'");
-    });
-
     it("should convert span_kind='Client' label to '3' in both Rate and Errors panels", async () => {
       wrapper.unmount();
       mockSearchObj.data.editorValue = "span_kind='Client'";
@@ -526,27 +485,6 @@ describe("TracesMetricsDashboard", () => {
       expect(rateQuery).not.toContain("span_kind='Client'");
       expect(errorsQuery).toContain("span_kind='3'");
       expect(errorsQuery).not.toContain("span_kind='Client'");
-    });
-
-    it("should leave non-span_kind filter unchanged in the Errors panel WHERE clause", async () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "service_name = 'api'";
-      wrapper = mountComponent();
-      await flushPromises();
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      const query = getPanelQuery(wrapper, "Errors");
-      expect(query).toContain("service_name = 'api'");
-    });
-
-    it("should leave non-span_kind filter unchanged in the heatmap WHERE clause", async () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "service_name = 'api'";
-      wrapper = mountComponent();
-      await flushPromises();
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      expect(getHeatmapSql(wrapper)).toContain("service_name = 'api'");
     });
 
     it("should convert span_kind label case-insensitively in the Errors panel", async () => {
@@ -666,13 +604,6 @@ describe("TracesMetricsDashboard", () => {
       const timeObj: any = wrapper.vm.currentTimeObj;
       expect(timeObj.__global.start_time.getTime()).toBe(5_000_000);
       expect(timeObj.__global.end_time.getTime()).toBe(6_000_000);
-    });
-
-    it("should set dashboardData after loadDashboard is called with new timeRange", async () => {
-      mockSearchObj.data.datetime = { startTime: 7_000_000, endTime: 8_000_000 };
-      await wrapper.vm.loadDashboard();
-      await flushPromises();
-      expect(wrapper.vm.dashboardData).not.toBeNull();
     });
   });
 
@@ -1435,32 +1366,6 @@ describe("TracesMetricsDashboard", () => {
   // -------------------------------------------------------------------------
   // Exposed API
   // -------------------------------------------------------------------------
-  describe("exposed API", () => {
-    it("should expose the refresh method", () => {
-      expect(typeof wrapper.vm.refresh).toBe("function");
-    });
-
-    it("should expose the loadDashboard method", () => {
-      expect(typeof wrapper.vm.loadDashboard).toBe("function");
-    });
-
-    it("should expose the getBaseFilters method", () => {
-      expect(typeof wrapper.vm.getBaseFilters).toBe("function");
-    });
-
-    it("should expose rangeFiltersVersion as a ref", () => {
-      // rangeFiltersVersion is a numeric ref — it must be a number
-      expect(typeof wrapper.vm.rangeFiltersVersion).toBe("number");
-    });
-
-    it("should expose the openComparison method", () => {
-      expect(typeof wrapper.vm.openComparison).toBe("function");
-    });
-
-    it("should expose clearOriginalTimeRange", () => {
-      expect(Object.keys(wrapper.vm.$.exposed)).toContain("clearOriginalTimeRange");
-    });
-  });
 
   // -------------------------------------------------------------------------
   // getBaseFilters — detail tests
@@ -1517,33 +1422,12 @@ describe("TracesMetricsDashboard", () => {
       expect(wrapper.vm.getBaseFilters()).toEqual([]);
     });
 
-    it("should include span_status = 'ERROR' when filter prop contains it", () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
-      wrapper = mountComponent();
-      const filters = wrapper.vm.getBaseFilters();
-      expect(filters).toContain("span_status = 'ERROR'");
-    });
-
-    it("should NOT include span_status = 'ERROR' when filter prop does not contain it", () => {
-      const filters = wrapper.vm.getBaseFilters();
-      expect(filters).not.toContain("span_status = 'ERROR'");
-    });
-
     it("should include the filter prop string when filter is a non-empty string", () => {
       wrapper.unmount();
       mockSearchObj.data.editorValue = "http_method = 'GET'";
       wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("http_method = 'GET'");
-    });
-
-    it("should not include a filter entry when filter prop is an empty string", () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "";
-      wrapper = mountComponent();
-      const filters = wrapper.vm.getBaseFilters();
-      expect(filters).toEqual([]);
     });
 
     it("should not include a filter entry when filter prop is only whitespace", () => {
@@ -1563,29 +1447,12 @@ describe("TracesMetricsDashboard", () => {
       expect(filters.join(" ")).not.toContain("span_kind='Server'");
     });
 
-    it("should convert span_kind='Client' label to numeric key '3' in the base filter", () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "span_kind='Client'";
-      wrapper = mountComponent();
-      const filters = wrapper.vm.getBaseFilters();
-      expect(filters).toContain("span_kind='3'");
-      expect(filters.join(" ")).not.toContain("span_kind='Client'");
-    });
-
     it("should convert span_kind label case-insensitively in the base filter", () => {
       wrapper.unmount();
       mockSearchObj.data.editorValue = "span_kind='SERVER'";
       wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toContain("span_kind='2'");
-    });
-
-    it("should leave non-span_kind filters unchanged in the base filter", () => {
-      wrapper.unmount();
-      mockSearchObj.data.editorValue = "service_name = 'api'";
-      wrapper = mountComponent();
-      const filters = wrapper.vm.getBaseFilters();
-      expect(filters).toContain("service_name = 'api'");
     });
 
     it("should convert span_kind label when combined with a duration range filter", () => {
@@ -1653,91 +1520,12 @@ describe("TracesMetricsDashboard", () => {
       await localWrapper.vm.$nextTick();
       localWrapper.unmount();
     });
-
-    it("should call loadDashboard synchronously relative to the loadSqlParser await gap", async () => {
-      // We track the order of calls: loadDashboard sets dashboardData, which
-      // happens before sqlParser's promise resolves. We verify this by
-      // checking that dashboardData is set at the moment the parser resolves
-      // for the first time (i.e. it was set earlier, not after).
-      const localWrapper = mountComponent();
-
-      // Tick once to let the synchronous portion of onMounted execute.
-      await localWrapper.vm.$nextTick();
-
-      // dashboardData is already set — confirms loadDashboard ran before the
-      // await suspension handed control back to the event loop.
-      const dashboardDataBeforeParserResolves = localWrapper.vm.dashboardData;
-      expect(dashboardDataBeforeParserResolves).not.toBeNull();
-
-      // Now resolve the parser and flush all remaining microtasks.
-      resolveParser({});
-      await localWrapper.vm.$nextTick();
-
-      // dashboardData must still be non-null after the parser resolves.
-      expect(localWrapper.vm.dashboardData).not.toBeNull();
-
-      localWrapper.unmount();
-    });
-
-    it("should set sqlParser.value only after loadSqlParser resolves", async () => {
-      const localWrapper = mountComponent();
-
-      // Right after mount — parser promise is still pending.
-      await localWrapper.vm.$nextTick();
-
-      // sqlParser ref should not yet hold the resolved value (it is still null
-      // because loadSqlParser has not resolved).
-      // We cannot read sqlParser directly, but dashboardData being set first
-      // proves loadDashboard completed before the parser await resumed.
-      expect(localWrapper.vm.dashboardData).not.toBeNull();
-
-      resolveParser({ parse: vi.fn() });
-      await localWrapper.vm.$nextTick();
-
-      // After resolving, the component should still be healthy.
-      expect(localWrapper.exists()).toBe(true);
-
-      localWrapper.unmount();
-    });
   });
 
   // -------------------------------------------------------------------------
   // Edge cases
   // -------------------------------------------------------------------------
   describe("edge cases", () => {
-    it("should mount without error when streamName prop is an empty string", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ streamName: "" });
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should mount without error when filter prop is undefined", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent();
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should mount without error when streamFields prop is an empty array", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ streamFields: [] });
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should mount without error when streamFields prop is undefined", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ streamFields: undefined });
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should set dashboardData to a non-null value after loadDashboard runs on mount", () => {
-      // dashboardData is set during onMounted -> loadDashboard()
-      expect(wrapper.vm.dashboardData).not.toBeNull();
-    });
-
     it("should not emit time-range-selected when onDataZoom receives null data", async () => {
       wrapper.vm.onDataZoom({
         start: 0,

@@ -1159,6 +1159,14 @@ describe("OnCallTeamDetail", () => {
       expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).props("priority")).toBe(3);
     });
 
+    // The Slack channel card names `/o2 oncall here {team}`.
+    it("hands the drawer the team's name", async () => {
+      const wrapper = await openEscalation();
+      expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).props("teamName")).toBe(
+        "Platform",
+      );
+    });
+
     /// Closing from inside the drawer (× / Escape / Cancel) has to reach the
     /// page state, or the drawer reopens itself on the next render.
     it("closes when the drawer asks to close", async () => {
@@ -1401,7 +1409,11 @@ describe("OnCallTeamDetail", () => {
     const expiries = [
       { queryKey: oncallKeys.all("default"), exact: false, refetchType: "none" },
       { queryKey: userKeys.users("default"), exact: true, refetchType: "none" },
-      { queryKey: destinationKeys.list("default", "alert"), exact: true, refetchType: "none" },
+      {
+        queryKey: destinationKeys.list("default", "alert", false, ["jira"]),
+        exact: true,
+        refetchType: "none",
+      },
       { queryKey: serviceStreamKeys.all("default"), exact: false, refetchType: "none" },
     ];
     const pageReads = () => [

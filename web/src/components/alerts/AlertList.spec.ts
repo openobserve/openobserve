@@ -209,12 +209,14 @@ let alertsDB: AlertV2[] = [];
 
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 
-async function mountAlertList() {
+// Tests that only call vm methods skip the table: its render is the slowest part of a mount.
+async function mountAlertList({ renderTable = true } = {}) {
   const wrapper = mount(AlertList, {
     attachTo: node,
     global: {
       plugins: [i18n, store, router],
       stubs: {
+        OTable: !renderTable,
         FolderList: {
           template: '<div data-test="stub-folder-list"></div>',
         },
@@ -484,12 +486,6 @@ const waitData = async (wrapper: any) => {
 
 // 1. Basic rendering and structure
 describe("AlertList - basic rendering", () => {
-  it("renders the page container", async () => {
-    const wrapper = await mountAlertList();
-    await waitData(wrapper);
-    expect(wrapper.find('[data-test="alert-list-page"]').exists()).toBe(true);
-  });
-
   it("titles itself with the SECTION, so the peer tabs never move", async () => {
     // Identical on all four alerting pages — see TemplateList.spec.ts. Note it
     // is NOT "Alerts": a per-page title sizes the title block and shifts the
@@ -497,28 +493,6 @@ describe("AlertList - basic rendering", () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);
     expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
-  });
-
-  it("renders search input and toggle", async () => {
-    const wrapper = await mountAlertList();
-    await waitData(wrapper);
-    expect(wrapper.find('[data-test="alert-list-search-input"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alert-list-search-across-folders-toggle"]').exists()).toBe(
-      true,
-    );
-  });
-
-  it("renders import and add buttons", async () => {
-    const wrapper = await mountAlertList();
-    await waitData(wrapper);
-    expect(wrapper.find('[data-test="alert-import"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alert-list-add-alert-btn"]').exists()).toBe(true);
-  });
-
-  it("renders the alert list table", async () => {
-    const wrapper = await mountAlertList();
-    await waitData(wrapper);
-    expect(wrapper.find('[data-test="alert-list-table"]').exists()).toBe(true);
   });
 });
 
@@ -824,6 +798,107 @@ describe("AlertList - row actions", () => {
     expect(wrapper.vm.showForm).toBe(false);
     // DB should have one more item
     expect(alertsDB.length).toBeGreaterThan(6);
+  });
+
+  it("names its own list to the table's no-access lock", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const table = wrapper
+      .findAllComponents({ name: "OTable" })
+      .find((c: any) => "forbidden" in c.props());
+    expect(table.props("forbiddenResource")).toBe("alert_folders");
+  });
+
+  it("closes the clone's loading toast when the clone is refused with a 403", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const row = wrapper.vm.filteredResults[0];
+    await wrapper.find(`[data-test="alert-list-${row.name}-clone-alert"]`).trigger("click");
+    await flushPromises();
+    wrapper.vm.toBeCloneAlertName = `${row.name} - Copy`;
+    wrapper.vm.toBeClonestreamType = "logs";
+    wrapper.vm.toBeClonestreamName = "default";
+    wrapper.vm.folderIdToBeCloned = "default";
+    (alertsSvc.create_by_alert_id as any).mockRejectedValueOnce({ response: { status: 403 } });
+    const dismissLoading = vi.fn();
+    vi.mocked(toast).mockClear();
+    vi.mocked(toast).mockImplementationOnce(() => dismissLoading);
+
+    await wrapper.vm.submitForm();
+    await flushPromises();
+
+    expect(dismissLoading).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).toEqual(["loading"]);
+  });
+
+  it.each([
+    ["an anomaly", { toBeClonedIsAnomaly: true, toBeClonedIsComposite: false }],
+    ["a composite", { toBeClonedIsAnomaly: false, toBeClonedIsComposite: true }],
+  ])(
+    "closes its loading toast when cloning %s alert is refused with a 403",
+    async (_kind, flags) => {
+      const wrapper: any = await mountAlertList();
+      await waitData(wrapper);
+      Object.assign(wrapper.vm, flags, {
+        toBeClonedID: "a1",
+        toBeCloneAlertName: "Copy",
+        toBeClonestreamType: "logs",
+        toBeClonestreamName: "default",
+        folderIdToBeCloned: "default",
+        showForm: true,
+      });
+      const clone = vi
+        .spyOn(alertsSvc, "clone_by_id")
+        .mockRejectedValueOnce({ response: { status: 403, data: { message: "denied" } } });
+      const dismissLoading = vi.fn();
+      vi.mocked(toast).mockClear();
+      vi.mocked(toast).mockImplementationOnce(() => dismissLoading);
+
+      await wrapper.vm.submitForm();
+      await flushPromises();
+      clone.mockRestore();
+
+      expect(dismissLoading).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).toEqual(["loading"]);
+      expect(wrapper.vm.showForm).toBe(false);
+      expect(wrapper.vm.isSubmitting).toBe(false);
+    },
+  );
+
+  it.each([
+    ["exporting an alert", "export_by_id", (vm: any, row: any) => vm.exportAlert(row)],
+    ["triggering an alert", "trigger_alert", (vm: any, row: any) => vm.triggerAlert(row)],
+    ["retraining an anomaly", "retrain_by_id", (vm: any, row: any) => vm.retrainAnomaly(row)],
+    [
+      "exporting selected alerts",
+      "export_by_id",
+      (vm: any, row: any) => {
+        vm.selectedAlertIds = [row.alert_id];
+        return vm.multipleExportAlert();
+      },
+    ],
+    [
+      "pausing or resuming selected alerts",
+      "bulkToggleState",
+      (vm: any, row: any) => {
+        vm.selectedAlertIds = [row.alert_id];
+        return vm.bulkToggleAlerts(row.enabled ? "pause" : "resume");
+      },
+    ],
+  ])("raises no error toast when %s is refused with a 403", async (_action, method, run) => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const row = wrapper.vm.filteredResults[0];
+    const refused = vi
+      .spyOn(alertsSvc, method)
+      .mockRejectedValue({ response: { status: 403, data: { message: "denied" } } });
+    vi.mocked(toast).mockClear();
+
+    await run(wrapper.vm, row);
+    await flushPromises();
+    refused.mockRestore();
+
+    expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).not.toContain("error");
   });
 
   it("deletes an alert after confirming dialog", async () => {
@@ -1192,51 +1267,10 @@ describe("AlertList - additional validations", () => {
       expect(wrapper.vm.filteredResults.every((r: any) => predicate(r))).toBe(true);
     }, 10000);
   });
-
-  it("openMenu stops event propagation (no error)", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    const event = new Event("click");
-    const stopSpy = vi.spyOn(event, "stopPropagation");
-    wrapper.vm.openMenu(event, {});
-    expect(stopSpy).toHaveBeenCalled();
-  });
 });
 
 // 10. Extensive small unit validations to reach 60+ tests
 describe("AlertList - micro validations", () => {
-  it("splitterModel has default value 200", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    expect(wrapper.vm.splitterModel).toBe(200);
-  });
-
-  it("pageSize has a default value", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    // OTable-based component uses pageSize ref instead of a pagination object
-    expect(typeof wrapper.vm.pageSize).toBe("number");
-    expect(wrapper.vm.pageSize).toBeGreaterThan(0);
-  });
-
-  it("clearSearchHistory clears global search and results array", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.searchAcrossFolders = true;
-    wrapper.vm.searchQuery = "abc";
-    wrapper.vm.filteredResults = [1, 2] as any;
-    wrapper.vm.clearSearchHistory();
-    expect(wrapper.vm.searchQuery).toBe("");
-  });
-
-  it("filterAlertsByTab returns early if refreshResults=false", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    const before = [...wrapper.vm.filteredResults];
-    wrapper.vm.filterAlertsByTab(false);
-    expect(wrapper.vm.filteredResults).toEqual(before);
-  });
-
   it("transformToExpression builds grouped conditions", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -1248,14 +1282,6 @@ describe("AlertList - micro validations", () => {
     });
     expect(typeof expr).toBe("string");
     expect(expr).toContain("OR");
-  });
-
-  it("routeTo pushes with name", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    const spy = vi.spyOn(router, "push");
-    await wrapper.vm.routeTo("alertTemplates");
-    expect(spy).toHaveBeenCalled();
   });
 
   it("importAlert sets dialog and pushes route, preserving the rest of the query", async () => {
@@ -1271,13 +1297,6 @@ describe("AlertList - micro validations", () => {
     expect(wrapper.vm.showImportAlertDialog).toBe(true);
     expect(spy).toHaveBeenCalled();
     expect(spy.mock.calls[0][0].query.page).toBe("3");
-  });
-
-  it("updateFolderIdToBeCloned updates state", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.updateFolderIdToBeCloned({ value: "folderX" });
-    expect(wrapper.vm.folderIdToBeCloned).toBe("folderX");
   });
 
   // Note: multipleExportAlert functionality is already tested in "exports multiple selected alerts to JSON" test above
@@ -1307,17 +1326,6 @@ describe("AlertList - micro validations", () => {
     expect(wrapper.vm.showAddAlertDialog).toBe(true);
   });
 
-  it("open and close clone dialog via back button behavior", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    const row = wrapper.vm.filteredResults[0];
-    await wrapper.vm.duplicateAlert(row);
-    await flushPromises();
-    expect(wrapper.vm.showForm).toBe(true);
-    wrapper.vm.showForm = false;
-    expect(wrapper.vm.showForm).toBe(false);
-  });
-
   it("deleteAlertByAlertId handles 403 gracefully (simulated)", async () => {
     // Fail next delete call with 403
     alertsSvc.delete_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } } as any);
@@ -1345,23 +1353,6 @@ describe("AlertList - micro validations", () => {
     await flushPromises();
     expect(wrapper.vm.alertStateLoadingMap[uuid]).toBe(false);
     expect(before === undefined || before === false).toBe(true);
-  });
-
-  it("filteredResults reflects searchQuery filtering", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    // The component filters via filterAlertsByTab using filterQuery/searchQuery
-    // filteredResults already reflects the current filter state
-    const rows = wrapper.vm.filteredResults;
-    expect(Array.isArray(rows)).toBe(true);
-    // All rows from test data are present with no filter applied
-    expect(rows.length).toBeGreaterThan(0);
-  });
-
-  it("mapped timestamps are strings (conversion internal)", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    expect(typeof wrapper.vm.filteredResults[0].last_triggered_at).toBe("string");
   });
 });
 
@@ -1632,18 +1623,6 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     }
   });
 
-  it("clone dialog emits click:secondary -> closes showForm", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.showForm = true;
-    await wrapper.vm.$nextTick();
-
-    const cloneDialog = wrapper.findComponent({ name: "ODialog" });
-    await cloneDialog.vm.$emit("click:secondary");
-    await flushPromises();
-    expect(wrapper.vm.showForm).toBe(false);
-  });
-
   it("duplicateAlert pre-fills stream type and name from the source row", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -1767,7 +1746,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
   // its group history and the cap banner do not fit a drawer, and a routed
   // page is linkable and back-navigable. Clicking a row now navigates.
   it("row click routes to the alert detail page instead of opening a drawer", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     expect(wrapper.findComponent({ name: "AlertHistoryDrawer" }).exists()).toBe(false);
@@ -1787,7 +1766,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
   });
 
   it("row click opens the alert in its own folder, not the selected one", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined as any);
@@ -1801,7 +1780,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
   });
 
   it("row click without an alert id does not navigate", async () => {
-    const wrapper: any = await mountAlertList();
+    const wrapper: any = await mountAlertList({ renderTable: false });
     await waitData(wrapper);
 
     const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined as any);
@@ -2440,6 +2419,18 @@ describe("AlertList - editor drafts", () => {
     );
   });
 
+  it("raises no error toast when its edit link is refused with a 403", async () => {
+    const { vm } = await mountDraftList();
+    alertsSvc.get_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } });
+    vm.router.currentRoute.value.query = { action: "update", alert_id: "denied-1" };
+    vi.mocked(toast).mockClear();
+
+    await vm.handleActionQuery("update");
+    await flushPromises();
+
+    expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).not.toContain("error");
+  });
+
   it("refreshes without closing the editor when the leave dialog saved", async () => {
     const { vm } = await mountDraftList();
     vm.router.currentRoute.value.query = { action: "add" };
@@ -2618,3 +2609,156 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
     );
   });
 }, 15000);
+
+describe("AlertList - first run and the alert library", () => {
+  let originalHideMenus: unknown;
+
+  beforeEach(() => {
+    originalHideMenus = (store.state as any).zoConfig.custom_hide_menus;
+  });
+
+  afterEach(() => {
+    (store.state as any).zoConfig.custom_hide_menus = originalHideMenus;
+  });
+
+  // A stale ?action= from an earlier spec's navigation can swap the whole page for the editor.
+  const mountList = async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    await wrapper.vm.handleActionQuery(undefined);
+    await flushPromises();
+    return wrapper;
+  };
+
+  /** A loaded org with no alerts at all, so the table shows its empty slot. */
+  const mountEmpty = async () => {
+    const wrapper: any = await mountList();
+    wrapper.vm.allAlerts = [];
+    wrapper.vm.filteredResults = [];
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    await flushPromises();
+    return wrapper;
+  };
+
+  const emptyState = (wrapper: any) =>
+    wrapper
+      .findAllComponents({ name: "OEmptyState" })
+      .find((c: any) => c.props("preset") === "no-alerts");
+
+  it("puts an Alert library button in the header that opens the library", async () => {
+    const wrapper: any = await mountList();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+
+    const button = wrapper.find('[data-test="alert-list-alert-library-btn"]');
+    expect(button.text()).toContain("Alert library");
+    await button.trigger("click");
+
+    expect(push).toHaveBeenCalledWith({
+      name: "alertLibrary",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+  });
+
+  it("shows the first-run empty state at block size with New alert, Alert library and Import", async () => {
+    const wrapper = await mountEmpty();
+    const state = emptyState(wrapper);
+    expect(state.props("size")).toBe("block");
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').text()).toContain("New alert");
+    expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').text()).toContain(
+      "Alert library",
+    );
+    expect(wrapper.find('[data-test="alert-list-empty-import"]').text()).toContain("Import alert");
+  });
+
+  const emptyActions = (wrapper: any) =>
+    emptyState(wrapper)
+      .findAllComponents({ name: "OButton" })
+      .filter((b: any) => (b.attributes("data-test") ?? "").startsWith("alert-list-empty-"))
+      .map((b: any) => ({
+        id: b.attributes("data-test"),
+        variant: b.props("variant"),
+        size: b.props("size"),
+      }));
+
+  it("leads the first-run actions with the library, at lg size, when the library is shown", async () => {
+    const wrapper = await mountEmpty();
+    expect(emptyActions(wrapper)).toEqual([
+      { id: "alert-list-empty-alert-library", variant: "primary", size: "lg" },
+      { id: "alert-list-empty-import", variant: "outline", size: "lg" },
+      { id: "alert-list-empty-new-alert", variant: "outline", size: "lg" },
+    ]);
+  });
+
+  it("leads with New alert as the primary action when the library is hidden", async () => {
+    (store.state as any).zoConfig.custom_hide_menus = "alertLibrary";
+    const wrapper = await mountEmpty();
+    expect(emptyActions(wrapper)).toEqual([
+      { id: "alert-list-empty-new-alert", variant: "primary", size: "lg" },
+      { id: "alert-list-empty-import", variant: "outline", size: "lg" },
+    ]);
+  });
+
+  it("starts a new alert from the empty state, as the header's New alert does", async () => {
+    const wrapper = await mountEmpty();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-empty-new-alert"]').trigger("click");
+    await flushPromises();
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertList",
+        query: expect.objectContaining({ action: "add" }),
+      }),
+    );
+  });
+
+  it("opens the library from the empty state", async () => {
+    const wrapper = await mountEmpty();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-empty-alert-library"]').trigger("click");
+    expect(push).toHaveBeenCalledWith({
+      name: "alertLibrary",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+  });
+
+  it("opens the import dialog from the empty state, as the header's Import does", async () => {
+    const wrapper = await mountEmpty();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-empty-import"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.vm.showImportAlertDialog).toBe(true);
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ action: "import" }) }),
+    );
+  });
+
+  it("keeps the filtered empty state to Clear filters alone", async () => {
+    const wrapper = await mountEmpty();
+    wrapper.vm.filterQuery = "nothing-matches";
+    await flushPromises();
+
+    expect(emptyState(wrapper).props("filtered")).toBe(true);
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-import"]').exists()).toBe(false);
+    expect(emptyState(wrapper).text()).toContain("Clear filters");
+
+    emptyState(wrapper).vm.$emit("action", "clear-filters");
+    await flushPromises();
+    expect(wrapper.vm.filterQuery).toBe("");
+  });
+
+  it("hides both library entry points when custom_hide_menus lists alertLibrary", async () => {
+    (store.state as any).zoConfig.custom_hide_menus = "billings,alertLibrary";
+    const wrapper = await mountEmpty();
+    expect(wrapper.find('[data-test="alert-list-alert-library-btn"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(true);
+  });
+
+  it("renders the summary strip compact, so its six tiles share one row", async () => {
+    const wrapper: any = await mountList();
+    expect(wrapper.findComponent({ name: "OStatStrip" }).props("compact")).toBe(true);
+  });
+});

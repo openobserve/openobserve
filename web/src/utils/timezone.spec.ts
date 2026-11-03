@@ -403,6 +403,19 @@ describe("getFunctionErrorMessage", () => {
     expect(result).toContain("Some error");
   });
 
+  it("prints the backend's message list as lines, not as a JSON array", () => {
+    const result = getFunctionErrorMessage(
+      ["Query duration is modified due to query range restriction of 1 hour", "Second note"],
+      1_700_000_000_000_000,
+      1_700_003_600_000_000,
+      "UTC",
+    );
+    expect(result).toContain(
+      "Query duration is modified due to query range restriction of 1 hour\nSecond note (Data returned for:",
+    );
+    expect(result).not.toContain("[");
+  });
+
   it("returns original message when timestampToTimezoneDate throws (invalid timezone)", () => {
     // Pass an invalid timezone string to make luxon throw inside timestampToTimezoneDate
     const result = getFunctionErrorMessage(

@@ -75,8 +75,9 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     await pm.alertDestinationsPage.clickNewDestination();
     await pm.alertDestinationsPage.expectStep1Visible();
     await pm.alertDestinationsPage.expectDestinationSelectorVisible();
-    await pm.alertDestinationsPage.expectDestinationCardsVisible(8); // 7 prebuilt + 1 custom
-    testLogger.info('✓ Step 1 displays correctly with 8 destination type cards');
+    await pm.alertDestinationsPage.expectDestinationCardsVisible(10); // Slack app + 8 prebuilt + custom
+    await expect(pm.alertDestinationsPage.getDestinationTypeCard('jira')).toBeVisible();
+    testLogger.info('✓ Step 1 displays correctly with 10 destination type cards, including Jira');
 
     // ----- PART 3: Verify type selection shows indicator -----
     testLogger.info('Part 3: Testing selected destination indicator');

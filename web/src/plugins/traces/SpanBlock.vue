@@ -325,9 +325,15 @@ export default defineComponent({
 
     // Clusters re-derive whenever the row is resized, so the bucket width
     // tracks the timeline the user is actually looking at.
-    const eventClusters = computed(() =>
-      clusterSpanEventMarkers(eventMarkers.value, spanBlockWidth.value),
-    );
+    const eventClusters = computed(() => {
+      const barEnd = leftPosition.value + spanWidth.value;
+      // An event stamped past the bar's end would land on the duration label, which sits just after it.
+      const onBar = eventMarkers.value.map((marker) => ({
+        ...marker,
+        left: Math.min(marker.left, barEnd),
+      }));
+      return clusterSpanEventMarkers(onBar, spanBlockWidth.value);
+    });
 
     const clusterLabel = (cluster: SpanEventCluster) =>
       cluster.events.length > 1

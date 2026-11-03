@@ -62,6 +62,10 @@ fn source_priority(source: &PricingSource) -> u8 {
         (status = 200, description = "Success", content_type = "application/json", body = Vec<ModelPricingDefinition>),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list(
     Path(org_id): Path<String>,
@@ -181,6 +185,10 @@ pub async fn list(
         (status = 200, description = "Success", content_type = "application/json", body = ModelPricingDefinition),
         (status = 404, description = "Not found"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get(
     Path((org_id, model_id)): Path<(String, String)>,
@@ -233,6 +241,10 @@ pub async fn get(
         (status = 201, description = "Created", content_type = "application/json", body = ModelPricingDefinition),
         (status = 400, description = "Bad request"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn create(
     Path(org_id): Path<String>,
@@ -317,6 +329,10 @@ pub async fn create(
         (status = 400, description = "Bad request"),
         (status = 404, description = "Not found"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn update(
     Path((org_id, model_id)): Path<(String, String)>,
@@ -386,9 +402,13 @@ pub async fn update(
         ("model_id" = String, Path, description = "Model pricing definition ID"),
     ),
     responses(
-        (status = 200, description = "Success"),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "Not found"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete(
     Path((org_id, model_id)): Path<(String, String)>,
@@ -468,9 +488,13 @@ pub struct BuiltInModelPricingResponse {
         ("search" = Option<String>, Query, description = "Filter by name"),
     ),
     responses(
-        (status = 200, description = "Success"),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_built_in(
     Path(_org_id): Path<String>,
@@ -559,9 +583,13 @@ fn map_set_error(e: anyhow::Error) -> Response {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success"),
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn refresh_built_in(
     Path(_org_id): Path<String>,
@@ -825,6 +853,10 @@ fn captured_models(
         (status = 200, description = "Success", content_type = "application/json", body = TestModelMatchResponse),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "LLM", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn test_model_match(
     Path(org_id): Path<String>,

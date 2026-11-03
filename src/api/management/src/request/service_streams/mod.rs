@@ -226,6 +226,7 @@ pub async fn list_services(
 #[utoipa::path(
     post,
     path = "/{org_id}/service_streams/_correlate",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "CorrelateServiceStreams",
     params(
@@ -566,19 +567,25 @@ pub async fn save_identity_config(
 #[utoipa::path(
     delete,
     path = "/{org_id}/service_streams/_reset",
+    context_path = "/api",
     tag = "Service Streams",
     operation_id = "ResetServiceStreams",
+    summary = "Reset service stream discovery",
     params(
         ("org_id" = String, Path, description = "Organization ID")
     ),
     responses(
-        (status = 200, description = "Services reset successfully"),
+        (status = 200, description = "Services reset successfully", content_type = "application/json", body = Object),
         (status = 401, description = "Unauthorized - Authentication required"),
         (status = 403, description = "Forbidden - Enterprise feature"),
         (status = 500, description = "Internal server error")
     ),
     security(
         ("Authorization" = [])
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn reset_services(

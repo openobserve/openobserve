@@ -59,49 +59,12 @@ describe("API Keys Service", () => {
   });
 
   describe("listRUMTokens", () => {
-    it("should list RUM tokens with correct URL and organization", async () => {
+    it("reads the org's RUM token without raising the global access notice on a 403", async () => {
       await apiKeys.listRUMTokens("test-org");
 
-      expect(mockHttp.get).toHaveBeenCalledWith("/api/test-org/rumtoken");
-    });
-
-    it("should handle different organization identifiers", async () => {
-      const organizations = [
-        "simple-org",
-        "org-with-dashes",
-        "org_with_underscores",
-        "production.environment",
-        "12345",
-        "ORG-UPPERCASE",
-      ];
-
-      for (const org of organizations) {
-        await apiKeys.listRUMTokens(org);
-        expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/rumtoken`);
-      }
-
-      expect(mockHttp.get).toHaveBeenCalledTimes(organizations.length);
-    });
-
-    it("should handle empty organization string", async () => {
-      await apiKeys.listRUMTokens("");
-
-      expect(mockHttp.get).toHaveBeenCalledWith("/api//rumtoken");
-    });
-
-    it("should handle organization with special characters", async () => {
-      const specialOrgs = [
-        "org@domain.com",
-        "org#hash",
-        "org$dollar",
-        "org%percent",
-        "org&ampersand",
-      ];
-
-      for (const org of specialOrgs) {
-        await apiKeys.listRUMTokens(org);
-        expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/rumtoken`);
-      }
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/test-org/rumtoken", {
+        silentForbidden: true,
+      });
     });
   });
 
@@ -473,7 +436,6 @@ describe("API Keys Service", () => {
       // Update RUM token
       await apiKeys.updateRUMToken(org, tokenId);
 
-      expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/rumtoken`);
       expect(mockHttp.post).toHaveBeenCalledWith(`/api/${org}/rumtoken`);
       expect(mockHttp.put).toHaveBeenCalledWith(`/api/${org}/rumtoken`);
     });
@@ -501,7 +463,6 @@ describe("API Keys Service", () => {
       expect(mockHttp.delete).toHaveBeenCalledWith(`/api/usertoken/${keyId}`);
 
       // Verify RUM token endpoints use consistent pattern
-      expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/rumtoken`);
       expect(mockHttp.post).toHaveBeenCalledWith(`/api/${org}/rumtoken`);
       expect(mockHttp.put).toHaveBeenCalledWith(`/api/${org}/rumtoken`);
     });

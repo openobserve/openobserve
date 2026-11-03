@@ -15,8 +15,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_TUNABLES, coerceTunable, readTunables } from "./libraryTunables";
-import type { AlertLibraryFile } from "@/types/alertLibrary";
+import { DEFAULT_TUNABLES, coerceTunable, fileForInstall, readTunables } from "./libraryTunables";
+import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 
 // Trimmed from the real library files (verified against the live bucket).
 const promqlFile = (): AlertLibraryFile => ({
@@ -152,5 +152,22 @@ describe("coerceTunable", () => {
     expect(tunables.frequency).toBe(1);
     expect(tunables.threshold).toBe(1);
     expect(tunables.silence).toBe(0);
+  });
+});
+
+describe("fileForInstall", () => {
+  const entry = { id: "k8s/x", alert_type: "scheduled" } as AlertLibraryEntry;
+
+  it("floors a scheduled file so it cannot be added as an alert that never fires", () => {
+    const zeroed = promqlFile();
+    (zeroed.trigger_condition as Record<string, unknown>).period = 0;
+    const tuned = fileForInstall(entry, zeroed);
+    expect((tuned.trigger_condition as Record<string, unknown>).period).toBeGreaterThan(0);
+  });
+
+  it("hands an anomaly body over untouched, so it never gains a trigger_condition", () => {
+    const anomaly = { alert_type: "anomaly_detection", anomaly_config: {} } as AlertLibraryFile;
+    expect(fileForInstall({ ...entry, alert_type: "anomaly_detection" }, anomaly)).toBe(anomaly);
+    expect(fileForInstall(entry, anomaly)).toBe(anomaly);
   });
 });

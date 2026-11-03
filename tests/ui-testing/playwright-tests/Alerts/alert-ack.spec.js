@@ -131,16 +131,16 @@ test.describe('Alert acknowledge and mute — alert screens', { tag: ['@alerts',
 
     await ack.openDetail(multi.id);
     await ack.openGroupsTab();
-    await expect(ack.ackButton()).toContainText('Acknowledge 2 firing groups');
+    await expect(await ack.ackHint()).toContainText('All 2 firing groups');
     await ack.groupAction(key, 'ack');
     await expect(ack.groupOutcome(key)).toContainText('Acknowledged', { timeout: 15000 });
-    await expect(ack.ackButton()).toContainText('Acknowledge 1 firing group');
+    await expect(await ack.ackHint()).toContainText('All 1 firing group');
     const rows = await acks(page, multi.id);
     expect(rows.map((r) => r.group_key)).toEqual([key]);
     await shoot(page, 'mk2-groups-one-acked');
 
     await ack.groupAction(key, 'unack');
-    await expect(ack.ackButton()).toContainText('Acknowledge 2 firing groups', { timeout: 15000 });
+    await expect(await ack.ackHint()).toContainText('All 2 firing groups', { timeout: 15000 });
     expect(await acks(page, multi.id)).toHaveLength(0);
   });
 

@@ -21,6 +21,10 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
+// The default 1 s waitFor flakes when a coverage-instrumented shard mounts the whole page.
+vi.setConfig({ testTimeout: 15_000 });
+const waitFor = (assertion: () => unknown) => vi.waitFor(assertion, { timeout: 10_000 });
+
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
@@ -253,7 +257,7 @@ describe("Traces page load states", () => {
     it("shows the onboarding once the stream list settles with no streams", async () => {
       mockGetStreams.mockResolvedValue({ list: [] });
       wrapper = mount(Index, { attachTo: node, global: globalOptions });
-      await vi.waitFor(() => expect(searchObj.loadingStream).toBe(false));
+      await waitFor(() => expect(searchObj.loadingStream).toBe(false));
       await nextTick();
 
       expect(wrapper.find('[data-test="traces-no-streams-in-org-text"]').exists()).toBe(true);
@@ -263,7 +267,7 @@ describe("Traces page load states", () => {
       vi.spyOn(console, "error").mockImplementation(() => {});
       mockLoadTracesParser.mockRejectedValue(new Error("chunk"));
       wrapper = mount(Index, { attachTo: node, global: globalOptions });
-      await vi.waitFor(() => expect(searchObj.loadingStream).toBe(false));
+      await waitFor(() => expect(searchObj.loadingStream).toBe(false));
 
       expect(mockGetStreams).toHaveBeenCalledTimes(1);
     });
@@ -273,7 +277,7 @@ describe("Traces page load states", () => {
     const mountSearching = async () => {
       setRouteQuery({ stream: "default" });
       wrapper = mount(Index, { attachTo: node, global: globalOptions });
-      await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
     };
     const countHits = (n: number) => ({
       content: { results: { hits: [{ trace_count: n, span_count: n, error_count: 1 }] } },
@@ -425,7 +429,7 @@ describe("Traces page load states", () => {
 
   describe("kept alive behind a trace detail page", () => {
     const settleSearch = async () => {
-      await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
       lastCall("main")[1].complete(null);
       lastCall("count")[1].complete(null);
     };
@@ -504,13 +508,13 @@ describe("Traces page load states", () => {
       await leaveAndReturn(show, { stream: "default", period: "1h" });
 
       expect(mockGetStreams).toHaveBeenCalledTimes(1);
-      await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
     });
 
     it("cancels a search in flight when it leaves and runs it again on return", async () => {
       setRouteQuery({ stream: "default" });
       const { show } = mountKeptAlive();
-      await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
       const inFlightId = lastCall("main")[0].traceId;
 
       show.value = false;
@@ -527,7 +531,7 @@ describe("Traces page load states", () => {
     it("re-runs a search it left mid-run on the page the user left", async () => {
       setRouteQuery({ stream: "default" });
       const { show } = mountKeptAlive();
-      await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
       searchObj.data.resultGrid.currentPage = 2;
 
       show.value = false;
@@ -546,7 +550,7 @@ describe("Traces page load states", () => {
     it("re-fetches only the count when it left while the count was running", async () => {
       setRouteQuery({ stream: "default" });
       const { show } = mountKeptAlive();
-      await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
       lastCall("main")[1].complete(null);
       mockFetch.mockClear();
 
@@ -560,7 +564,7 @@ describe("Traces page load states", () => {
       try {
         setRouteQuery({ stream: "default" });
         const { show } = mountKeptAlive();
-        await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+        await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
         lastCall("main")[1].complete(null);
         mockFetch.mockClear();
         store.state.zoConfig.auto_query_enabled = true;
@@ -568,7 +572,7 @@ describe("Traces page load states", () => {
 
         await leaveAndReturn(show, { period: "1h" });
 
-        await vi.waitFor(() => expect(searchObj.data.queryResults.countPending).toBe(false));
+        await waitFor(() => expect(searchObj.data.queryResults.countPending).toBe(false));
         expect(mockFetch).not.toHaveBeenCalled();
       } finally {
         delete store.state.zoConfig.auto_query_enabled;
@@ -599,7 +603,7 @@ describe("Traces page load states", () => {
 
       show.value = true;
       await flushPromises();
-      await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
       expect(mockGetStreams).toHaveBeenCalledTimes(1);
       expect(searchObj.data.stream.selectedStream.value).toBe("default");
     });
@@ -609,7 +613,7 @@ describe("Traces page load states", () => {
       const streams = deferred<typeof streamList>();
       mockGetStreams.mockReturnValueOnce(streams.promise);
       const { show } = mountKeptAlive();
-      await vi.waitFor(() => expect(mockGetStreams).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(mockGetStreams).toHaveBeenCalledTimes(1));
 
       show.value = false;
       await flushPromises();
@@ -622,7 +626,7 @@ describe("Traces page load states", () => {
 
       show.value = true;
       await flushPromises();
-      await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
       expect(mockGetStreams).toHaveBeenCalledTimes(2);
       expect(searchObj.data.stream.selectedStream.value).toBe("default");
     });
@@ -634,7 +638,7 @@ describe("Traces page load states", () => {
       const streams = deferred<typeof streamList>();
       mockGetStreams.mockReturnValueOnce(streams.promise);
       const { show } = mountKeptAlive();
-      await vi.waitFor(() => expect(mockGetStreams).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(mockGetStreams).toHaveBeenCalledTimes(1));
 
       show.value = false;
       await flushPromises();
@@ -644,7 +648,7 @@ describe("Traces page load states", () => {
 
       show.value = true;
       await flushPromises();
-      await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
       lastCall("main")[1].complete(null);
       await flushPromises();
 
@@ -679,7 +683,7 @@ describe("Traces page load states", () => {
       const streams = deferred<typeof streamList>();
       mockGetStreams.mockReturnValueOnce(streams.promise);
       const { show } = mountKeptAlive();
-      await vi.waitFor(() => expect(mockGetStreams).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(mockGetStreams).toHaveBeenCalledTimes(1));
 
       show.value = false;
       await flushPromises();
@@ -688,7 +692,7 @@ describe("Traces page load states", () => {
       mockTakeLanding.mockReturnValueOnce({ run: true });
       show.value = true;
       await flushPromises();
-      await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
       lastCall("main")[1].complete(null);
       await flushPromises();
 
@@ -700,7 +704,7 @@ describe("Traces page load states", () => {
       const schema = deferred<(typeof streamList.list)[number]>();
       mockGetStream.mockReturnValueOnce(schema.promise);
       const { show } = mountKeptAlive();
-      await vi.waitFor(() => expect(mockGetStream).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(mockGetStream).toHaveBeenCalledTimes(1));
 
       show.value = false;
       await flushPromises();
@@ -716,7 +720,7 @@ describe("Traces page load states", () => {
 
       show.value = true;
       await flushPromises();
-      await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
       expect(searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0);
     });
 
@@ -732,7 +736,7 @@ describe("Traces page load states", () => {
       await flushPromises();
       setRouteQuery({ stream: "default", filter: "service_name='api'" });
       show.value = true;
-      await vi.waitFor(() => expect(mockGetStreams).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(mockGetStreams).toHaveBeenCalledTimes(2));
       show.value = false;
       await flushPromises();
       streams.resolve(streamList);
@@ -760,7 +764,7 @@ describe("Traces page load states", () => {
     it("drops a late batch from a search cancelled by leaving the page", async () => {
       setRouteQuery({ stream: "default" });
       wrapper = mount(Index, { attachTo: node, global: globalOptions });
-      await vi.waitFor(() => expect(callsOfType("main")).toHaveLength(1));
+      await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
       const lateBatch = lastCall("main")[1].data;
 
       wrapper.unmount();

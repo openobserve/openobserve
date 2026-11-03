@@ -17,7 +17,7 @@ use axum::{extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
+use openobserve_core::auth::{ReadCheck, UserEmail, UserReads};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -45,7 +45,7 @@ const PROVIDER_TEST_FAILURE_MESSAGE: &str = "Provider connection test failed";
         (status = 200, description = "Success", body = inline(ListProvidersResponseBody)),
         (status = 500, description = "Internal Server Error", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "list"})),
     ),
 )]
@@ -96,7 +96,7 @@ pub async fn list_providers(
         (status = 400, description = "Bad Request", body = ()),
         (status = 500, description = "Internal Server Error", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "create"})),
     ),
 )]
@@ -137,7 +137,7 @@ pub async fn create_provider(
         (status = 200, body = inline(ProviderResponseBody)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "get"})),
     ),
 )]
@@ -170,7 +170,7 @@ pub async fn get_provider(Path((org_id, provider_id)): Path<(String, String)>) -
         (status = 200, description = "Updated", body = inline(ProviderResponseBody)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "update"})),
     ),
 )]
@@ -206,10 +206,10 @@ pub async fn update_provider(
         ("provider_id" = String, Path, description = "Provider ID"),
     ),
     responses(
-        (status = 200, description = "Deleted", body = String),
+        (status = 200, description = "Deleted", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "delete"})),
     ),
 )]
@@ -235,8 +235,8 @@ pub async fn delete_provider(Path((org_id, provider_id)): Path<(String, String)>
         (status = 200, description = "Connection succeeded", body = inline(MetaHttpResponse)),
         (status = 400, description = "Invalid configuration or connection failed", body = inline(MetaHttpResponse)),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "test"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "create"})),
     ),
 )]
 pub async fn test_provider_config(
@@ -282,15 +282,10 @@ async fn require_provider_visibility(
     provider_id: &str,
     user_id: &str,
 ) -> Result<(), Response> {
-    let permitted = openobserve_api_common::auth::validator::list_objects_for_user(
-        org_id, user_id, "GET", "provider",
-    )
-    .await
-    .map_err(|error| {
-        log::warn!("[Provider] failed to load provider permissions: {error}");
-        MetaHttpResponse::forbidden("Not allowed to use this provider")
-    })?;
-    if is_ofga_object_visible(org_id, "provider", provider_id, permitted.as_deref()) {
+    if (UserReads { org_id, user_id })
+        .can_read("providers", provider_id)
+        .await
+    {
         Ok(())
     } else {
         Err(MetaHttpResponse::forbidden(

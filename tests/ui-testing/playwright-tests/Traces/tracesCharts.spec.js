@@ -10,6 +10,8 @@ const DURATION_FILTER_PATTERN = /duration\s*(>=|<)\s*'\d+(us|ms|s)'/;
 // The Drill down query fails server-side when that string is not decoded back to µs.
 const CAST_ERROR_PATTERN = /Cannot cast string|simplify_expressions|Arrow error/i;
 const RED_PANELS = ['Rate', 'Errors', 'Duration'];
+// Lands inside the default Duration box (about 3 to 12 minutes ago) for several minutes of test runtime.
+const SEED_IN_BOX_AGE_MS = 6 * 60 * 1000;
 
 test.describe("Traces Charts testcases", () => {
   let pm;
@@ -25,9 +27,12 @@ test.describe("Traces Charts testcases", () => {
     try {
       const errors = await ingestTraces(page, 6, { forceScenario: 'error' });
       const success = await ingestTraces(page, 10, { forceScenario: 'success' });
+      // The default Duration box spans the middle of the 15m range, so spans stamped now fall outside it.
+      const boxed = await ingestTraces(page, 6, { forceScenario: 'error', ageMs: SEED_IN_BOX_AGE_MS });
       testLogger.info('Seeded traces for chart tests', {
         errors: errors.successful,
         success: success.successful,
+        boxed: boxed.successful,
       });
     } catch (e) {
       testLogger.warn('Chart trace seeding failed (continuing)', { error: e.message });

@@ -26,7 +26,7 @@ use o2_enterprise::enterprise::ai::toolsets::{
     validate_data,
 };
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::auth::UserEmail;
+use openobserve_core::auth::{UserEmail, check_permissions};
 use serde::Deserialize;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
@@ -41,6 +41,9 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     context_path = "/api",
     tag = "AI",
     operation_id = "CreateAiToolset",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Create an AI toolset",
     description = "Creates a new AI toolset (MCP server, CLI tool, skill, or generic config). \
                    The `data` field is encrypted at rest using per-org envelope encryption. \
@@ -50,12 +53,13 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         description = "Toolset configuration",
         content_type = "application/json",
     ),
+    security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Toolset created", content_type = "application/json"),
+        (status = 200, description = "Toolset created", content_type = "application/json", body = Object),
         (status = 400, description = "Invalid request", content_type = "application/json"),
         (status = 409, description = "Toolset with this name already exists", content_type = "application/json"),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "create"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn create(
     Path(org_id): Path<String>,
@@ -121,17 +125,26 @@ pub async fn create(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Toolset id (KSUID)"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Toolset details", content_type = "application/json"),
+        (status = 200, description = "Toolset details", content_type = "application/json", body = Object),
         (status = 404, description = "Toolset not found", content_type = "application/json"),
         (status = 403, description = "Feature not supported", content_type = "application/json"),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "get"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
-pub async fn get(Path(path): Path<(String, String)>) -> Response {
+pub async fn get(
+    Path(path): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     let (org_id, id) = path;
     match infra::table::org_ai_toolsets::get(&org_id, &id).await {
-        Ok(Some(t)) => Json(ToolsetResponse::from_toolset(t)).into_response(),
+        Ok(Some(t)) => {
+            let mut toolsets = [ToolsetResponse::from_toolset(t)];
+            hide_mcp_urls(&org_id, &user_email.user_id, &mut toolsets).await;
+            let [toolset] = toolsets;
+            Json(toolset).into_response()
+        }
         Ok(None) => MetaHttpResponse::not_found(format!("toolset '{id}' not found")),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
@@ -166,25 +179,31 @@ pub struct ListQuery {
         ("kind"   = Option<String>, Query, description = "Exact filter on kind: mcp | cli | skill | generic"),
         ("limit"  = Option<i64>,   Query, description = "Maximum number of results"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (status = 200, description = "List of toolsets", content_type = "application/json"),
+        (status = 200, description = "List of toolsets", content_type = "application/json", body = Object),
         (status = 403, description = "Feature not supported", content_type = "application/json"),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "list"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
-pub async fn list(Path(org_id): Path<String>, Query(params): Query<ListQuery>) -> Response {
+pub async fn list(
+    Path(org_id): Path<String>,
+    Query(params): Query<ListQuery>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     let filter = infra::table::org_ai_toolsets::ListFilter {
         name: params.name,
         kind: params.kind,
     };
     match infra::table::org_ai_toolsets::list(&org_id, filter, params.limit).await {
         Ok(toolsets) => {
-            let res = ToolsetListResponse {
+            let mut res = ToolsetListResponse {
                 toolsets: toolsets
                     .into_iter()
                     .map(ToolsetResponse::from_toolset)
                     .collect(),
             };
+            hide_mcp_urls(&org_id, &user_email.user_id, &mut res.toolsets).await;
             Json(res).into_response()
         }
         Err(e) => MetaHttpResponse::internal_error(e),
@@ -214,12 +233,13 @@ pub async fn list(Path(org_id): Path<String>, Query(params): Query<ListQuery>) -
         description = "Fields to update",
         content_type = "application/json",
     ),
+    security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Toolset updated", content_type = "application/json"),
+        (status = 200, description = "Toolset updated", content_type = "application/json", body = Object),
         (status = 400, description = "Invalid request", content_type = "application/json"),
         (status = 404, description = "Toolset not found", content_type = "application/json"),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn update(
     Path(path): Path<(String, String)>,
@@ -282,12 +302,13 @@ pub async fn update(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Toolset id (KSUID)"),
     ),
+    security(("Authorization" = [])),
     responses(
-        (status = 200, description = "Toolset deleted", content_type = "application/json"),
+        (status = 200, description = "Toolset deleted", content_type = "application/json", body = Object),
         (status = 404, description = "Toolset not found", content_type = "application/json"),
         (status = 403, description = "Feature not supported", content_type = "application/json"),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "delete"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn delete(Path(path): Path<(String, String)>) -> Response {
     let (org_id, id) = path;
@@ -311,4 +332,31 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
         )),
     )
         .into_response()
+}
+
+/// An MCP URL can carry its key in the userinfo, path or query; only toolset writers see it whole.
+async fn hide_mcp_urls(org_id: &str, user_id: &str, toolsets: &mut [ToolsetResponse]) {
+    if !toolsets.iter().any(|t| t.kind == ToolsetKind::Mcp)
+        || check_permissions(
+            org_id,
+            org_id,
+            user_id,
+            "ai_toolsets",
+            "PUT",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await
+    {
+        return;
+    }
+    for toolset in toolsets.iter_mut().filter(|t| t.kind == ToolsetKind::Mcp) {
+        if let Some(url) = toolset.data.as_mut().and_then(|d| d.get_mut("url"))
+            && let Some(raw) = url.as_str()
+        {
+            *url = serde_json::Value::String(config::utils::str::url_origin(raw));
+        }
+    }
 }
