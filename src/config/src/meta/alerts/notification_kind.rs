@@ -74,6 +74,11 @@ impl NotificationKind {
                 PlatformAction::Skip
             }
             (_, NotificationEvent::Firing) => PlatformAction::Trigger,
+            // A resolve only where the module sends a recovery today (strict D8).
+            (
+                NotificationKind::Incident | NotificationKind::OnCall,
+                NotificationEvent::Resolved,
+            ) => PlatformAction::Skip,
             (_, NotificationEvent::Resolved) => PlatformAction::Resolve,
         }
     }
@@ -145,7 +150,7 @@ mod tests {
             (Anomaly, Firing, Trigger),
             (Anomaly, Resolved, Resolve),
             (Incident, Firing, Trigger),
-            (Incident, Resolved, Resolve),
+            (Incident, Resolved, Skip),
             (Synthetics, Firing, Trigger),
             (Synthetics, Resolved, Resolve),
             (Synthetics, Informational, Skip),
@@ -153,7 +158,7 @@ mod tests {
             (Downtime, Resolved, Skip),
             (Downtime, Informational, Skip),
             (OnCall, Firing, Trigger),
-            (OnCall, Resolved, Resolve),
+            (OnCall, Resolved, Skip),
             (OnCall, Informational, Skip),
         ];
         for (kind, event, want) in cases {

@@ -4280,6 +4280,7 @@ async fn build_notification_context(
         level,
         chart_url: None,
         chart_png: None,
+        cluster_name: config::get_cluster_name(),
         ..Default::default()
     }
 }

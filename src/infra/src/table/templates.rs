@@ -310,9 +310,18 @@ pub struct ReservedRename {
     pub to: String,
 }
 
-/// A shipped seed row: the default org, written by the seeder (not `is_default`), Content.
-fn is_shipped_seed(org: &str, is_default: bool, kind: &str) -> bool {
-    org == DEFAULT_ORG && !is_default && kind == TemplateKind::Content.to_string()
+/// The rows the seeder writes in the default org; any other reserved name is a user row.
+const SHIPPED_SEEDS: [&str; 5] = [
+    "o2_default_content",
+    "o2_default_incident",
+    "o2_default_anomaly",
+    "o2_default_synthetics",
+    "o2_default_on_call",
+];
+
+/// A shipped seed row: the default org, one of the seeded names, Content.
+fn is_shipped_seed(org: &str, name: &str, kind: &str) -> bool {
+    org == DEFAULT_ORG && SHIPPED_SEEDS.contains(&name) && kind == TemplateKind::Content.to_string()
 }
 
 /// Renames user rows under `o2_default_` to `user_{name}` and moves their references.
@@ -327,7 +336,7 @@ where
         .await?
         .into_iter()
         .filter(|m| m.name.starts_with(RESERVED_PREFIX))
-        .filter(|m| !is_shipped_seed(&m.org, m.is_default, &m.kind))
+        .filter(|m| !is_shipped_seed(&m.org, &m.name, &m.kind))
         .collect();
     // Other orgs first, so a reference left on the old name afterwards reads the default row.
     rows.sort_by_key(|m| (m.org == DEFAULT_ORG, m.org.clone(), m.name.clone()));
@@ -819,6 +828,8 @@ mod tests {
         insert_row(&db, "acme", "o2_default_anomaly", false, "custom").await;
         insert_row(&db, "acme", "user_o2_default_anomaly", false, "custom").await;
         insert_row(&db, DEFAULT_ORG, "o2_default_mine", true, "content").await;
+        // A root user's Content row in the default org is not a seed.
+        insert_row(&db, DEFAULT_ORG, "o2_default_foo", false, "content").await;
         insert_row(&db, "acme", "ops-card", false, "content").await;
         insert_alert(&db, "alerts", "acme", "acme-alert", "o2_default_anomaly").await;
         insert_alert(&db, "alerts", "other", "other-alert", "o2_default_anomaly").await;
@@ -856,6 +867,11 @@ mod tests {
                 },
                 ReservedRename {
                     org: DEFAULT_ORG.to_string(),
+                    from: "o2_default_foo".to_string(),
+                    to: "user_o2_default_foo".to_string(),
+                },
+                ReservedRename {
+                    org: DEFAULT_ORG.to_string(),
                     from: "o2_default_mine".to_string(),
                     to: "user_o2_default_mine".to_string(),
                 },
@@ -874,6 +890,7 @@ mod tests {
             vec![
                 "o2_default_anomaly",
                 "o2_default_content",
+                "user_o2_default_foo",
                 "user_o2_default_mine"
             ]
         );

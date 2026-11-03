@@ -128,13 +128,7 @@ pub async fn send_to_destination(
                 }
                 _ => fallback.cloned().unwrap_or_else(|| template.name.clone()),
             };
-            let (email_subject, sns_subject) = match subject {
-                Subject::Alert(name) => (title, name.to_string()),
-                Subject::Kind(given) => {
-                    let s = given.map(str::to_string).unwrap_or(title);
-                    (s.clone(), s)
-                }
-            };
+            let (email_subject, sns_subject) = custom_subjects(subject, title);
             match dest_type {
                 DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
                 DestinationType::Email(email) => {
@@ -192,10 +186,7 @@ async fn send_content(
             },
             DestinationType::Email(email),
         ) => {
-            let email_subject = match subject {
-                Subject::Kind(Some(given)) => given.to_string(),
-                _ => rendered_subject,
-            };
+            let (email_subject, _) = content_subjects(subject, rendered_subject, "");
             let (email, skipped) = org_member_email(org_id, email).await?;
             send_email_notification_with_inline_png(
                 &email_subject,
@@ -208,16 +199,33 @@ async fn send_content(
             .map(|resp| note_skipped(resp, &skipped))
         }
         (RenderedMessage::Sns { message, .. }, DestinationType::Sns(aws_sns)) => {
-            let sns_subject = match subject {
-                Subject::Alert(name) | Subject::Kind(Some(name)) => name.to_string(),
-                Subject::Kind(None) => content.title.clone(),
-            };
+            let (_, sns_subject) = content_subjects(subject, String::new(), &content.title);
             send_sns_notification(&sns_subject, aws_sns, message).await
         }
         (rendered, dest_type) => Err(SendError::Render(format!(
             "Rendered message {rendered:?} does not match destination type {dest_type:?}"
         ))
         .into()),
+    }
+}
+
+/// `(email, SNS)` subjects of a Custom template send; `title` is its email title or fallback.
+fn custom_subjects(subject: Subject<'_>, title: String) -> (String, String) {
+    match subject {
+        Subject::Alert(name) => (title, name.to_string()),
+        Subject::Kind(given) => {
+            let s = given.map(str::to_string).unwrap_or(title);
+            (s.clone(), s)
+        }
+    }
+}
+
+/// `(email, SNS)` subjects of a Content template send, from its rendered subject and title.
+fn content_subjects(subject: Subject<'_>, rendered: String, title: &str) -> (String, String) {
+    match subject {
+        Subject::Alert(name) => (rendered, name.to_string()),
+        Subject::Kind(Some(given)) => (given.to_string(), given.to_string()),
+        Subject::Kind(None) => (rendered, title.to_string()),
     }
 }
 
@@ -241,6 +249,37 @@ fn members_to_send(kept: Vec<String>, skipped: &[String]) -> Result<Email, SendE
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_subject_rule_per_template_kind() {
+        let s = |a: &str, b: &str| (a.to_string(), b.to_string());
+        let title = || "Email title".to_string();
+        assert_eq!(
+            custom_subjects(Subject::Alert("cpu"), title()),
+            s("Email title", "cpu")
+        );
+        assert_eq!(
+            custom_subjects(Subject::Kind(Some("[opened] db")), title()),
+            s("[opened] db", "[opened] db")
+        );
+        assert_eq!(
+            custom_subjects(Subject::Kind(None), title()),
+            s("Email title", "Email title")
+        );
+        let rendered = || "Rendered".to_string();
+        assert_eq!(
+            content_subjects(Subject::Alert("cpu"), rendered(), "Card"),
+            s("Rendered", "cpu")
+        );
+        assert_eq!(
+            content_subjects(Subject::Kind(Some("[opened] db")), rendered(), "Card"),
+            s("[opened] db", "[opened] db")
+        );
+        assert_eq!(
+            content_subjects(Subject::Kind(None), rendered(), "Card"),
+            s("Rendered", "Card")
+        );
+    }
 
     #[test]
     fn test_members_to_send() {

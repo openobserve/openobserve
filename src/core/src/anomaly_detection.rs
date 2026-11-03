@@ -3535,11 +3535,8 @@ pub async fn send_anomaly_alert(
         Ok(_) => Ok(true),
         Err(NotifyError::Skipped(SkipReason::NoOrgMemberRecipient)) => Ok(false),
         Err(NotifyError::Skipped(_)) => Ok(true),
-        Err(NotifyError::DestinationNotFound(_)) => {
-            log::warn!(
-                "[anomaly_detection {}] destination '{destination_id}' not found",
-                actx.anomaly_id
-            );
+        Err(e @ (NotifyError::DestinationNotFound(_) | NotifyError::NotAlertDestination(_))) => {
+            log::warn!("[anomaly_detection {}] {e}", actx.anomaly_id);
             Ok(false)
         }
         Err(NotifyError::Rejected { status, body }) => Err(

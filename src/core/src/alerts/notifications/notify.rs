@@ -96,7 +96,6 @@ impl NotifyError {
 pub enum SkipReason {
     NoOrgMemberRecipient,
     PlatformNotForKind,
-    PlatformNoAck,
 }
 
 impl SkipReason {
@@ -104,7 +103,6 @@ impl SkipReason {
         match self {
             SkipReason::NoOrgMemberRecipient => "NoOrgMemberRecipient",
             SkipReason::PlatformNotForKind => "PlatformNotForKind",
-            SkipReason::PlatformNoAck => "PlatformNoAck",
         }
     }
 }
@@ -305,10 +303,13 @@ async fn platform_resolve(
     endpoint: &config::meta::destinations::Endpoint,
     key: &str,
 ) -> Result<String, NotifyError> {
-    let e = match platform::send_resolve(platform, endpoint, key).await {
-        Ok(text) => return Ok(text),
-        Err(e) => e,
-    };
+    platform::send_resolve(platform, endpoint, key)
+        .await
+        .or_else(|e| resolve_answer(platform, e))
+}
+
+/// A rejected resolve as `notify` reports it; Opsgenie's 404 on close means nothing to close.
+fn resolve_answer(platform: Platform, e: anyhow::Error) -> Result<String, NotifyError> {
     match e.downcast_ref::<PlatformRejected>() {
         Some(r) if platform == Platform::Opsgenie && r.status == reqwest::StatusCode::NOT_FOUND => {
             Ok(format!("{NOTHING_TO_CLOSE}: {e}"))
@@ -513,6 +514,31 @@ mod tests {
         let e = NotifyError::from_send(SendError::Blocked("ssrf".into()).into());
         assert!(!e.is_retryable());
         assert!(NotifyError::from_send(anyhow::anyhow!("smtp down")).is_retryable());
+    }
+
+    #[test]
+    fn a_resolve_with_nothing_to_close_is_a_success() {
+        let rejected = |status: u16| {
+            anyhow::Error::from(PlatformRejected {
+                status: reqwest::StatusCode::from_u16(status).unwrap(),
+                body: Some("no alert".into()),
+            })
+        };
+        assert!(resolve_answer(Platform::Opsgenie, rejected(404)).is_ok());
+        for platform in [Platform::PagerDuty, Platform::ServiceNow] {
+            assert!(matches!(
+                resolve_answer(platform, rejected(404)),
+                Err(NotifyError::Rejected { status: 404, .. })
+            ));
+        }
+        assert!(matches!(
+            resolve_answer(Platform::Opsgenie, rejected(500)),
+            Err(NotifyError::Rejected { status: 500, .. })
+        ));
+        assert!(matches!(
+            resolve_answer(Platform::PagerDuty, anyhow::anyhow!("timeout")),
+            Err(NotifyError::Transport(_))
+        ));
     }
 
     #[test]

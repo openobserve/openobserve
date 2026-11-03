@@ -461,6 +461,7 @@ async fn send_incident_notifications_inner(
         "{}/web/alerts/incidents/{incident_id}?org_identifier={org_id}",
         cfg.common.web_url
     );
+    let subject = format!("[{event}] {title}");
     let incident_template = incident_override(org_id).await;
 
     let mut success_parts: Vec<String> = Vec::new();
@@ -487,7 +488,7 @@ async fn send_incident_notifications_inner(
                 org_id,
                 dest_name,
                 &explicit,
-                None,
+                Some(&subject),
                 &mut send.ctx,
             )
             .await
@@ -532,36 +533,6 @@ async fn incident_override(org_id: &str) -> Option<config::meta::destinations::T
             );
             None
         }
-    }
-}
-
-/// Close the incident's platform records (D8); no other destination hears of a resolve (D4).
-#[cfg(feature = "enterprise")]
-async fn resolve_platform_destinations(org_id: &str, incident_id: &str) {
-    use config::meta::alerts::notification_kind::{NotificationEvent, NotificationKind};
-
-    use crate::alerts::notifications::{NotificationContext, notify, platform::platform_of};
-
-    let mut ctx = NotificationContext {
-        kind: NotificationKind::Incident,
-        event: NotificationEvent::Resolved,
-        episode_id: Some(incident_id.to_string()),
-        incident_id: incident_id.to_string(),
-        ..Default::default()
-    };
-    for dest_name in collect_incident_destinations(org_id, incident_id, &[]).await {
-        let resolved = match notify::resolve(org_id, &dest_name, &[], NotificationKind::Incident)
-            .await
-        {
-            Ok(r) if platform_of(&r.destination_type).is_some() => r,
-            Ok(_) => continue,
-            Err(e) => {
-                log::warn!("[incidents] resolve of {org_id}/{incident_id} skips {dest_name}: {e}");
-                continue;
-            }
-        };
-        // Best effort: `send` logs the outcome and nothing retries it.
-        let _ = notify::send(org_id, &resolved, None, &mut ctx).await;
     }
 }
 
@@ -3247,12 +3218,6 @@ pub async fn update_status_as(
     ) && infra::table::alert_incidents::get(org_id, incident_id)
         .await?
         .is_some_and(|m| m.muted_by_downtime_id.is_some());
-    // The status write has no guard, so a second resolve must not close the records again.
-    #[cfg(feature = "enterprise")]
-    let was_resolved = status == "resolved"
-        && infra::table::alert_incidents::get(org_id, incident_id)
-            .await?
-            .is_some_and(|m| m.status == "resolved");
     let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
 
     let muted = status_change_is_muted(
@@ -3304,11 +3269,6 @@ pub async fn update_status_as(
             config::meta::alerts::rca_runs::RunTrigger::AutoReopen,
         )
         .await;
-    }
-
-    #[cfg(feature = "enterprise")]
-    if status == "resolved" && !muted && !was_resolved {
-        resolve_platform_destinations(org_id, incident_id).await;
     }
 
     publish_status(org_id, incident_id, status).await;
@@ -3524,10 +3484,13 @@ mod tests {
         let route =
             crate::alerts::notifications::notify::route(&pagerduty_resolved(), &ctx).unwrap();
         assert_eq!(route, crate::alerts::notifications::notify::Route::Render);
+        // Strict D8: an incident sends no recovery today, so a platform hears nothing on resolve.
         ctx.event = NotificationEvent::Resolved;
         assert!(matches!(
-            crate::alerts::notifications::notify::route(&pagerduty_resolved(), &ctx).unwrap(),
-            crate::alerts::notifications::notify::Route::PlatformResolve(_)
+            crate::alerts::notifications::notify::route(&pagerduty_resolved(), &ctx),
+            Err(crate::alerts::notifications::notify::NotifyError::Skipped(
+                _
+            ))
         ));
     }
 

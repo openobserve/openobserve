@@ -536,6 +536,57 @@ mod tests {
         }
     }
 
+    /// Nothing else in this test module migrates the meta store the settings read.
+    async fn meta_store() {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn a_missing_default_templates_row_is_cached_until_a_real_row_replaces_it() {
+        meta_store().await;
+        let org = "org_default_templates_miss";
+        assert_eq!(
+            get_default_templates(org)
+                .await
+                .get(NotificationKind::Incident),
+            None
+        );
+        let cached =
+            system_settings::get(&SettingScope::Org, Some(org), None, DEFAULT_TEMPLATES_KEY)
+                .await
+                .unwrap()
+                .expect("the miss is cached");
+        assert_eq!(cached.id, None, "the placeholder is not a stored row");
+
+        // The placeholder does not stop the backfill from writing the real row.
+        init_default_templates(org).await.unwrap();
+        let stored =
+            system_settings::get(&SettingScope::Org, Some(org), None, DEFAULT_TEMPLATES_KEY)
+                .await
+                .unwrap()
+                .unwrap();
+        assert!(stored.id.is_some());
+
+        system_settings::set(&default_templates_setting(
+            org,
+            serde_json::json!({"incident": "ops-card"}),
+        ))
+        .await
+        .unwrap();
+        assert_eq!(
+            get_default_templates(org)
+                .await
+                .get(NotificationKind::Incident),
+            Some("ops-card")
+        );
+    }
+
     #[tokio::test]
     async fn resolve_effective_template_explicit_short_circuits() {
         let explicit = tpl("my_template", TemplateKind::Content, TemplateType::Http);
