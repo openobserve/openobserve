@@ -223,6 +223,42 @@ describe("useSearchBar Composable", () => {
     });
   });
 
+  describe("getQueryData — license-locked signal", () => {
+    const lock = (features: Record<string, string>, streamType: string) => {
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamLists = [{ label: "app", value: "app" }];
+      searchObj.data.stream.selectedStream = ["app"];
+      searchObj.data.stream.streamType = streamType;
+      searchObj.loading = true;
+      store.state.zoConfig = { ...store.state.zoConfig, features };
+      return searchObj;
+    };
+
+    afterEach(() => {
+      store.state.zoConfig = { ...store.state.zoConfig, features: {} };
+      searchState().searchObj.data.stream.streamType = "logs";
+    });
+
+    it("sends no search for a locked stream type and clears the loading state", async () => {
+      const searchObj = lock({ traces: "locked" }, "traces");
+      await (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).not.toHaveBeenCalled();
+      expect(searchObj.loading).toBe(false);
+    });
+
+    it("sends no search for logs while logs is locked", async () => {
+      lock({ logs: "locked" }, "logs");
+      await (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).not.toHaveBeenCalled();
+    });
+
+    it("still searches a stream type that is not locked", async () => {
+      lock({ traces: "locked" }, "logs");
+      await (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).toHaveBeenCalled();
+    });
+  });
+
   describe("getQueryData — drawer-close rule and selection reset (4a §3.2.5, §3.2.7)", () => {
     const prime = (pending: boolean) => {
       const { searchObj } = searchState();
