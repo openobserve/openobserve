@@ -1955,6 +1955,23 @@ describe("OnCallResponseDetail — responding", () => {
     );
   });
 
+  /// A closed page's state tag says it once; the escalation phrase would only repeat it.
+  it("tags a resolved page's state beside its priority, without the ladder phrase", async () => {
+    const wrapper = await renderWith({ state: "resolved", closed_at: 1_700_000_300_000_000 });
+
+    const state = wrapper.find('[data-test="oncall-response-state-tag"]');
+    expect(state.exists()).toBe(true);
+    expect(state.findComponent({ name: "OTag" }).attributes("value")).toBe("resolved");
+    expect(wrapper.find('[data-test="oncall-response-phrase"]').exists()).toBe(false);
+  });
+
+  it("keeps the ladder phrase beside the state tag while the page is open", async () => {
+    const wrapper = await renderWith();
+
+    expect(wrapper.find('[data-test="oncall-response-state-tag"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-response-phrase"]').exists()).toBe(true);
+  });
+
   /// The header must not say "Not paged yet" before the ladder's progress has answered.
   it("makes no paging claim in the header while the progress is still loading", async () => {
     service.escalationProgress.mockReturnValue(new Promise(() => {}) as any);

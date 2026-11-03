@@ -15,7 +15,6 @@
 -->
 <template>
   <div class="flex flex-col gap-2" data-test="oncall-delivery-ledger">
-
     <OInnerLoading v-if="loading" showing />
 
     <OEmptyState

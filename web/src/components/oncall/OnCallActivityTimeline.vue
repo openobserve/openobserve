@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ActivityTimeline
     ref="timelineRef"
-    :class="pinComposer ? 'max-h-[min(40rem,70vh)]' : ''"
+    :class="pinComposer ? 'h-[min(40rem,70vh)]!' : ''"
     :events="visibleEvents"
     :submitting="submitting"
     :show-scroll-buttons="showScrollButtons"
@@ -66,7 +66,6 @@ import ActivityTimeline from "@/components/shared/ActivityTimeline.vue";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatMicrosDuration } from "@/utils/formatters";
 import { getActivityAvatarColor } from "@/utils/activityTimeline";
 import {
   DEFAULT_ACTIVITY_KINDS,
@@ -84,7 +83,7 @@ interface Props {
   showScrollButtons?: boolean;
   /** Micros the page opened at, for the "+2m" offset beside each clock time. */
   openedAt?: number | null;
-  /** Bounds the feed so the note box stays at the panel's foot with the newest event above it. */
+  /** Fixes the feed's height so the note box sits at the panel's foot with the newest event above it. */
   pinComposer?: boolean;
   /** The policy step a rung delay belongs to, or null when the policy no longer has it. */
   stepOf?: (rungMicros: number) => number | null;
@@ -214,16 +213,36 @@ const esc = (s: string) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-const getInlineHtml = (event: OnCallResponseEvent): string => {
-  let html = esc(timelineSentence(event, { nameOf, teamNameOf: props.teamNameOf }, t));
+// Names can repeat across an org, so each one carries its email on hover; tokens survive escaping where markup would not.
+const PERSON_TOKEN = /\uE000(\d+)\uE000/g;
 
-  if (event.rung_micros !== null && event.rung_micros !== undefined) {
-    const step = props.stepOf(event.rung_micros);
-    html += ` <span class="text-text-secondary">(${esc(
-      step === null
-        ? t("oncall.atRung", { delay: formatMicrosDuration(event.rung_micros) })
-        : t("oncall.tlStep", { n: step }),
-    )})</span>`;
+function sentenceWithPeople(event: OnCallResponseEvent): string {
+  const people: string[] = [];
+  const tokenFor = (email: string) => {
+    people.push(email);
+    return `\uE000${people.length - 1}\uE000`;
+  };
+  const sentence = esc(
+    timelineSentence(event, { nameOf: tokenFor, teamNameOf: props.teamNameOf }, t),
+  );
+  return sentence.replace(PERSON_TOKEN, (_, index: string) => {
+    const email = people[Number(index)];
+    const name = nameOf(email);
+    if (name === email) return esc(name);
+    return `<span class="underline decoration-dotted underline-offset-2" title="${esc(`${name} · ${email}`)}">${esc(name)}</span>`;
+  });
+}
+
+const getInlineHtml = (event: OnCallResponseEvent): string => {
+  let html = sentenceWithPeople(event);
+
+  // Without the policy the delay is the only clue, and beside the clock offset it reads as a second, different time.
+  const step =
+    event.rung_micros === null || event.rung_micros === undefined
+      ? null
+      : props.stepOf(event.rung_micros);
+  if (step !== null) {
+    html += ` <span class="text-text-secondary">(${esc(t("oncall.tlStep", { n: step }))})</span>`;
   }
   if (rungStillRetrying(event, props.events)) {
     html += ` <span style="font-weight: 600; color: var(--color-error-500);">— ${esc(

@@ -375,10 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="px-page-edge flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5 max-md:sticky max-md:left-0 max-md:w-[100cqw]"
           :data-test="`oncall-section-header-${sectionKey}`"
         >
-          <span
-            class="text-2xs font-semibold tracking-wide uppercase"
-            :class="sectionTone(sectionKey)"
-          >
+          <span class="text-2xs font-semibold" :class="sectionTone(sectionKey)">
             {{ t(`oncall.section_${sectionKey}`) }}
           </span>
           <OTag variant="default-soft" size="sm" :data-test="`oncall-section-count-${sectionKey}`">
@@ -702,7 +699,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="check-circle" size="sm" aria-hidden="true" />
               <OTooltip :content="ackTooltip(row)" />
             </OButton>
-            <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
+            <span
+              v-else-if="hasUnresolved(row)"
+              class="size-8 shrink-0 max-md:hidden"
+              aria-hidden="true"
+            />
             <OButton
               v-if="hasUnresolved(row)"
               variant="ghost-primary"
@@ -716,7 +717,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="task-alt" size="sm" aria-hidden="true" />
               <OTooltip :content="t('oncall.resolve')" />
             </OButton>
-            <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
             <ODropdown v-if="canAcknowledge(row) || hasUnresolved(row)" side="bottom" align="end">
               <template #trigger>
                 <OButton
@@ -761,15 +761,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ option.label }}
                 </ODropdownItem>
               </ODropdownGroup>
-              <ODropdownItem
-                icon-left="format-list-bulleted"
-                :data-test="`oncall-row-timeline-${row.rowKey}`"
-                @select="openResponse(row)"
-              >
-                {{ t("oncall.timeline") }}
-              </ODropdownItem>
             </ODropdown>
-            <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
+            <!-- Holds the ⋯ slot on desktop so Resolve stays in the same column as on ringing rows. -->
+            <span
+              v-if="hasUnresolved(row) && !canAcknowledge(row)"
+              class="size-8 shrink-0 max-md:hidden"
+              aria-hidden="true"
+            />
           </template>
         </div>
       </template>
@@ -1149,7 +1147,14 @@ const showChecklist = computed(
 /// Whether this org has ever paged anybody — read from what was FETCHED, not
 /// from the filtered rows, so narrowing the table to nothing does not swap the
 /// page's whole shape underneath the reader.
-const hasPages = computed(() => responses.value.length > 0);
+// A server-side narrowing (open-only tab, team, cause) can fetch nothing, and hiding the toolbar then would strand the reader in it.
+const hasPages = computed(
+  () =>
+    responses.value.length > 0 ||
+    !includeResolved.value ||
+    teamFilter.value !== "all" ||
+    !!causeFilter.value,
+);
 
 /// Setup is the entire screen.
 ///
@@ -1281,7 +1286,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     pinned: "right",
     sortable: false,
     size: 112,
-    meta: { align: "center", actionCount: 3 },
+    meta: { align: "center", actionCount: 2 },
   },
 ]);
 

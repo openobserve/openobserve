@@ -752,8 +752,7 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(true);
     });
 
-    /// A resolved row has nothing left to do to it, so the action becomes a
-    /// way to read what happened — and it is the LABELLED one, not a menu item.
+    /// Pages are forward-only, so a resolved row has no action at all.
     it("offers nothing on a resolved row: the arrow expands it and the row opens it", async () => {
       const wrapper = await withPages([
         page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
@@ -788,7 +787,7 @@ describe("OnCallResponses", () => {
       expect(ringing.find('[data-test="oncall-row-resolve-alert:al_ckt-menu"]').exists()).toBe(
         true,
       );
-      expect(ringing.find('[data-test="oncall-row-timeline-alert:al_ckt"]').exists()).toBe(true);
+      expect(ringing.find('[data-test^="oncall-row-timeline-"]').exists()).toBe(false);
     });
 
     it("keeps an empty slot where a row has no Acknowledge, so the icons line up", async () => {
@@ -1252,6 +1251,14 @@ describe("OnCallResponses", () => {
       w
         .findAllComponents({ name: "OToggleGroup" })
         .find((c) => c.attributes("data-test") === "oncall-responses-filter-tabs")!;
+
+    /// An open-only tab fetches without resolved pages, so an empty answer must not take away the tabs that widen it.
+    it("keeps the filter bar when an open-only tab fetches nothing", async () => {
+      Object.assign(seed(), { activeFilter: "ringing" });
+      const wrapper = await withPages([]);
+
+      expect(tabs(wrapper)?.exists()).toBe(true);
+    });
 
     /// The Status column is gone, and a view saved while sorted by it must still load.
     it("falls back to the default sort when the saved view sorted by Status", async () => {

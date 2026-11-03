@@ -119,7 +119,6 @@ export class OnCallPagesListPage {
   rowIncident(rowKey) { return `[data-test="oncall-row-incident-${rowKey}"]`; }
   rowMore(rowKey) { return `[data-test="oncall-row-more-${rowKey}"]`; }
   rowTeam(rowKey) { return `[data-test="oncall-row-team-${rowKey}"]`; }
-  rowTimeline(rowKey) { return `[data-test="oncall-row-timeline-${rowKey}"]`; }
   rowLadderStarted(rowKey) { return `[data-test="oncall-ladder-started-${rowKey}"]`; }
   rowSnooze(rowKey, minutes) {
     return `[data-test="oncall-row-snooze-${rowKey}-${minutes}"]`;

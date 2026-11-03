@@ -60,8 +60,13 @@
     <template #title-trail>
       <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
       <template v-if="response && lgUp">
+        <span class="inline-flex" data-test="oncall-response-state-tag">
+          <OTag type="oncallResponseState" :value="response.state" size="sm" />
+          <OTooltip v-if="closedAfter" :content="closedAfter" />
+        </span>
         <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-        <span data-test="oncall-response-phrase">
+        <!-- A closed page's state tag already says it; the phrase is only news while the ladder runs. -->
+        <span v-if="isOpenState" data-test="oncall-response-phrase">
           <OnCallEscalationCell
             :response-id="response.id"
             :record="response"
@@ -328,8 +333,12 @@
           class="mb-3 flex flex-wrap items-center gap-2"
           data-test="oncall-response-meta"
         >
+          <span class="inline-flex" data-test="oncall-response-state-tag">
+            <OTag type="oncallResponseState" :value="response.state" size="sm" />
+            <OTooltip v-if="closedAfter" :content="closedAfter" />
+          </span>
           <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-          <span data-test="oncall-response-phrase">
+          <span v-if="isOpenState" data-test="oncall-response-phrase">
             <OnCallEscalationCell
               :response-id="response.id"
               :record="response"
@@ -445,7 +454,7 @@
                  analysis panel that sits empty forever. -->
             <OnCallVerdictCard :events="events" />
 
-            <OCard variant="glass" class="flex-1" data-test="oncall-response-tabs">
+            <OCard variant="glass" data-test="oncall-response-tabs">
               <OCardSection role="body" dense>
                 <OTabPanels v-model="activeDetailTab">
                   <OTabPanel name="activity" data-test="oncall-response-activity">
@@ -1089,6 +1098,13 @@ const title = computed(() =>
 // Every action hangs off this. It asks "is this still somebody's problem",
 // not "is the ladder running" — an acknowledged page still needs resolving.
 const isOpenState = computed(() => !!response.value && isUnresolved(response.value.state));
+
+/// How long a closed page stayed open, said on hover of its state tag.
+const closedAfter = computed(() => {
+  const r = response.value;
+  if (!r?.closed_at || isOpenState.value) return null;
+  return t("oncall.resolvedAfter", { duration: formatMicrosDuration(r.closed_at - r.opened_at) });
+});
 
 /// Only an escalating page can be claimed. Once it is owned, Acknowledge and
 /// Snooze are gone and Resolve becomes the primary action.

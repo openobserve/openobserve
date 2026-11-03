@@ -99,6 +99,27 @@ describe("OnCallActivityTimeline", () => {
     expect(text.match(/stopped firing/g)).toHaveLength(1);
   });
 
+  /// Display names can repeat in an org, so each one carries its email on hover.
+  it("puts the email behind each person's name", async () => {
+    const wrapper = await render();
+    const person = wrapper.find('span[title="Ana Ruiz · ana@o2.ai"]');
+
+    expect(person.exists()).toBe(true);
+    expect(person.text()).toBe("Ana Ruiz");
+  });
+
+  /// Without the policy the rung delay would sit beside the clock offset as a second, different time.
+  it("says no delay when the step cannot be named", async () => {
+    const wrapper = mount(OnCallActivityTimeline, {
+      props: { events, commentText: "", openedAt: OPENED, stepOf: () => null },
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain("(at +");
+    expect(wrapper.text()).not.toContain("(step");
+  });
+
   it("stamps lines with the clock time and the offset from opening", async () => {
     store.state.timezone = "UTC";
     const text = (await render()).text();

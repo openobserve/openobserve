@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("oncall.myDeliveriesUnread", { count: unread }, unread) }}
           </OTag>
 
-          <span v-if="rows.length || unreadOnly" class="ms-auto flex flex-wrap items-center gap-2">
+          <span v-if="unread || unreadOnly" class="ms-auto flex flex-wrap items-center gap-2">
             <OCheckbox
               :model-value="unreadOnly"
               :label="t('oncall.myDeliveriesUnreadOnly')"
@@ -200,24 +200,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-end">
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                :icon-left="row.unread ? 'check-circle-outline' : 'circle'"
-                :aria-label="
-                  row.unread ? t('oncall.myDeliveriesMarkRead') : t('oncall.myDeliveriesMarkUnread')
-                "
-                :data-test="`oncall-my-delivery-toggle-${row.latest.event_id}`"
-                @click.stop="toggleRead(row)"
-              >
-                <OTooltip
-                  :content="
+              <!-- A resolved page never counts as unread, so there is nothing to mark on one. -->
+              <ODropdown v-if="canMark(row)" side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    variant="ghost"
+                    size="icon-sm"
+                    icon-left="more-vert"
+                    :loading="marking"
+                    :aria-label="t('oncall.moreActions')"
+                    :data-test="`oncall-my-delivery-more-${row.latest.event_id}`"
+                    @click.stop
+                  >
+                    <OTooltip side="bottom" :content="t('oncall.moreActions')" />
+                  </OButton>
+                </template>
+                <ODropdownItem
+                  :icon-left="row.unread ? 'check-circle' : 'mail'"
+                  :data-test="`oncall-my-delivery-toggle-${row.latest.event_id}`"
+                  @select="toggleRead(row)"
+                >
+                  {{
                     row.unread
-                      ? t('oncall.myDeliveriesMarkRead')
-                      : t('oncall.myDeliveriesMarkUnread')
-                  "
-                />
-              </OButton>
+                      ? t("oncall.myDeliveriesMarkRead")
+                      : t("oncall.myDeliveriesMarkUnread")
+                  }}
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
         </OTable>
@@ -246,6 +255,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -340,6 +351,8 @@ const teamName = (id: string) => props.teamNames[id] ?? id;
 
 const countsAsUnread = (row: MyDelivery) => !row.read && row.response_state !== "resolved";
 
+const canMark = (row: HistoryRow) => row.unread || row.latest.response_state !== "resolved";
+
 /// The open pages, one row per page with its newest send.
 const openRows = computed<MyDelivery[]>(() => {
   const byPage = new Map<string, MyDelivery>();
@@ -409,18 +422,23 @@ const historyColumns = computed<OTableColumnDef<HistoryRow>[]>(() => [
     sortable: false,
     meta: { isName: true, flex: true },
   },
-  { id: "state", header: t("oncall.myDeliveriesStatus"), size: 128, sortable: false },
-  { id: "channels", header: t("oncall.myDeliveriesChannels"), size: 120, sortable: false },
+  { id: "state", header: t("oncall.myDeliveriesStatus"), size: 120, sortable: false },
+  { id: "channels", header: t("oncall.myDeliveriesChannels"), size: 96, sortable: false },
   { id: "at", header: t("oncall.myDeliveriesLast"), size: 120, sortable: false },
-  {
-    id: "actions",
-    header: t("oncall.actions"),
-    isAction: true,
-    pinned: "right",
-    sortable: false,
-    size: 64,
-    meta: { align: "center", actionCount: 1 },
-  },
+  // An all-resolved history has nothing to mark, so an empty Actions column would only take width.
+  ...(historyRows.value.some(canMark)
+    ? [
+        {
+          id: "actions",
+          header: t("oncall.actions"),
+          isAction: true,
+          pinned: "right" as const,
+          sortable: false,
+          size: 64,
+          meta: { align: "center" as const, actionCount: 1 },
+        },
+      ]
+    : []),
 ]);
 
 const markWrite = useMutation(() => markDeliveriesReadMutation(orgId.value));

@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCardSection>
 
     <OCardSection role="body" dense>
-
       <!-- Reserves the list's shape while the fetch is in flight, so it does
            not flash "no history yet" — the wrong answer — for a moment before
            the real one arrives. -->

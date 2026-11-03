@@ -63,6 +63,13 @@ const stubs = {
     emits: ["click"],
     template: `<button @click="$emit('click', $event)"><slot /></button>`,
   },
+  ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+  ODropdownItem: {
+    name: "ODropdownItem",
+    props: ["iconLeft"],
+    emits: ["select"],
+    template: `<button @click="$emit('select')"><slot /></button>`,
+  },
   OCheckbox: {
     name: "OCheckbox",
     props: ["modelValue", "label"],
@@ -246,7 +253,7 @@ describe("OnCallMyDeliveries", () => {
   });
 
   it("asks for unread only when the filter is on", async () => {
-    answer([delivery()]);
+    answer([delivery({ read: false })]);
     const wrapper = render();
     await flushPromises();
 
@@ -254,6 +261,15 @@ describe("OnCallMyDeliveries", () => {
     await flushPromises();
 
     expect(service.myDeliveries.mock.calls.at(-1)![0]).toMatchObject({ unread_only: true });
+  });
+
+  /// Resolved pages are never unread, so an all-resolved inbox has nothing to filter or mark.
+  it("offers no unread filter and no row menu when every page is resolved", async () => {
+    answer([delivery({ read: true, response_state: "resolved" })]);
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-my-deliveries-unread-toggle"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-my-delivery-more-ev_88"]').exists()).toBe(false);
   });
 
   /// An empty list has nothing to narrow, so it offers no filter.
@@ -265,7 +281,7 @@ describe("OnCallMyDeliveries", () => {
 
   /// Unticking answers from the cache at once, so the slower "unread only" answer must not narrow a widened inbox.
   it("ignores a slower answer for a filter the reader has already left", async () => {
-    answer([delivery()]);
+    answer([delivery({ read: false })]);
     const wrapper = render();
     await flushPromises();
     let answerUnread: (value: unknown) => void = () => {};
@@ -321,7 +337,7 @@ describe("OnCallMyDeliveries", () => {
       );
     });
 
-    it("reads every send of an unread alert with its icon button", async () => {
+    it("reads every send of an unread alert from its row menu", async () => {
       answer([
         delivery({ event_id: "ev_1", read: false, at: AT + 1 }),
         delivery({ event_id: "ev_2", read: false, channel: "sms" }),
@@ -330,7 +346,7 @@ describe("OnCallMyDeliveries", () => {
       await flushPromises();
 
       const toggle = wrapper.findComponent('[data-test="oncall-my-delivery-toggle-ev_1"]');
-      expect(toggle.props("iconLeft")).toBe("check-circle-outline");
+      expect(toggle.props("iconLeft")).toBe("check-circle");
       await toggle.trigger("click");
       await flushPromises();
 

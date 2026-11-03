@@ -87,6 +87,21 @@ describe("timelineSentence", () => {
       "AI triage took too long — paged as usual",
     ],
     ["sys", "escalated on request by ana@o2.ai", "Ana Ruiz escalated to the next step"],
+    [
+      "sys",
+      `routed to ${TEAM} by ownership rule service=checkout`,
+      "Routed to Checkout by ownership rule service=checkout",
+    ],
+    [
+      "sys",
+      "routed to 3LMMZqmKH4Gmb1vCuuyiagLPocX by ownership rule service=sv-core-a",
+      "Routed to a deleted team by ownership rule service=sv-core-a",
+    ],
+    [
+      "sys",
+      "routed to Payments by the alert's own setting",
+      "Routed to Payments by the alert's own setting",
+    ],
   ] as [ResponseEventKind, string, string][])("%s: %s", (kind, body, expected) => {
     expect(say(kind, body)).toBe(expected);
   });
@@ -128,6 +143,13 @@ describe("timelineStamp", () => {
 
   it("adds the offset from when the page opened", () => {
     expect(timelineStamp(OPENED + 120_000_000, OPENED, NOW, "UTC")).toBe("14:39 · +2m");
+  });
+
+  /// The opening line already carries the date, so a later line of an old page is just its clock.
+  it("drops the date from later lines of a page opened on an earlier day", () => {
+    const later = NOW + 5 * 86_400_000_000;
+    expect(timelineStamp(OPENED, OPENED, later, "UTC")).toBe("Nov 3, 2026, 14:37");
+    expect(timelineStamp(OPENED + 120_000_000, OPENED, later, "UTC")).toBe("14:39 · +2m");
   });
 });
 

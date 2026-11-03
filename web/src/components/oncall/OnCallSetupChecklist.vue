@@ -107,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="step.state === 'done'"
             variant="outline"
             size="xs"
+            icon-left="edit"
             :data-test="`oncall-setup-change-${step.key}`"
             @click="step.review()"
           >

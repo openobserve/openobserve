@@ -2156,6 +2156,13 @@ function humanizeBody(body: string, ctx: TimelineContext): string {
   return named.charAt(0).toUpperCase() + named.slice(1);
 }
 
+/** A team the line names by id or name; an id nobody can resolve any more belongs to a deleted team. [pure] */
+function teamLabel(idOrName: string, ctx: TimelineContext, t: TranslateFn): I18nText {
+  const name = ctx.teamNameOf(idOrName);
+  if (name) return raw(name);
+  return /^[0-9A-Za-z]{27}$/.test(idOrName) ? t("oncall.tlDeletedTeam") : raw(idOrName);
+}
+
 function namesOf(list: string, ctx: TimelineContext): string {
   return list
     .split(", ")
@@ -2206,9 +2213,13 @@ function stateLine(body: string, t: TranslateFn): I18nText | null {
 function sysLine(body: string, ctx: TimelineContext, t: TranslateFn): I18nText | null {
   let m = body.match(/^opened for [a-z_]+\/\S+#(\d+): /);
   if (m) return t("oncall.tlOpened", { n: Number(m[1]) });
+  m = body.match(/^routed to (.+?) by ownership rule (.+)$/);
+  if (m) return t("oncall.tlRoutedByRule", { team: teamLabel(m[1], ctx, t), rule: raw(m[2]) });
+  m = body.match(/^routed to (.+?) by the alert's own setting$/);
+  if (m) return t("oncall.tlRoutedByAlert", { team: teamLabel(m[1], ctx, t) });
   m = body.match(/so it went to the default team (\S+)$/);
   if (m) {
-    const team = raw(ctx.teamNameOf(m[1]) ?? m[1]);
+    const team = teamLabel(m[1], ctx, t);
     const covers = body.match(/^no ownership rule covers (.+?); /);
     if (covers) return t("oncall.tlDefaultTeamFor", { dims: raw(covers[1]), team });
     return t("oncall.tlDefaultTeam", { team });
@@ -2282,7 +2293,11 @@ export function timelineStamp(
   if (openedAtMicros === null) return clock;
   const offset = atMicros - openedAtMicros;
   if (offset < MICROS_PER_MINUTE) return clock;
-  return `${clock} · +${formatMicrosDurationShort(offset)}`;
+  const day = (us: number) => formatTimestampInTimezone(us, "yyyy-MM-dd", zone);
+  // The opening line carries the date; a later line on the same day only needs its clock.
+  const sameDay = day(atMicros) === day(openedAtMicros);
+  const time = sameDay ? formatTimestampInTimezone(atMicros, "HH:mm", zone) : clock;
+  return `${time} · +${formatMicrosDurationShort(offset)}`;
 }
 
 /** Whole units only, so an offset stays short beside a clock time. [pure] */

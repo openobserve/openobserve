@@ -125,6 +125,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`oncall-mine-shift-${team.team_id}`"
             >
               {{ shiftLine(team.team_id, team.on_call_now) }}
+              <!-- Names can repeat across an org, so the next person's email is one hover away. -->
+              <OTooltip
+                v-if="team.on_call_now === true && shifts[team.team_id]?.next"
+                :content="nextPersonLabel(shifts[team.team_id]!.next!)"
+              />
             </OText>
             <OText
               v-if="(shifts[team.team_id]?.roles.length ?? 0) > 1"
@@ -148,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('oncall.mineCoverShiftHint')" />
             </OButton>
             <OButton variant="outline" size="sm" data-test="oncall-mine-away" @click="openAway">
-              <OIcon name="event" size="sm" />{{ t("oncall.mineAway") }}
+              <OIcon name="event-busy" size="sm" />{{ t("oncall.mineAway") }}
             </OButton>
           </span>
         </template>
@@ -395,6 +400,11 @@ function shiftLine(teamId: string, onCall: boolean | null): I18nText | "" {
     return t("oncall.mineNextShift", { time: raw(at(facts.nextShiftAt)) });
   }
   return "";
+}
+
+function nextPersonLabel(email: string): I18nText {
+  const name = nameOf(email);
+  return raw(name === email ? email : `${name} · ${email}`);
 }
 
 /// The current stretch the reader holds, merged across back-to-back segments, and who takes it next.
