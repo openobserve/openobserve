@@ -610,7 +610,14 @@ function lastErrorOf(row: EvalJob): EvalJobLastError | undefined {
 
 function healthLabel(row: EvalJob): I18nText {
   const health = healthOf(row);
-  return health ? t(HEALTH_LABELS[health.state]) : raw("—");
+  if (!health) return raw("—");
+  // Health measures a 15-minute window; a job that scored earlier in the
+  // 24-hour lookback says when it last scored instead of a bare "Healthy".
+  // (One whose newest outcome there is an error is degraded, not healthy.)
+  if (health.state === "healthy" && !health.recentRuns && health.lastSuccessAt) {
+    return t("onlineEvals.job.health.lastScored", { time: microsAgo(health.lastSuccessAt) });
+  }
+  return t(HEALTH_LABELS[health.state]);
 }
 
 function healthSummary(row: EvalJob): I18nText {

@@ -151,6 +151,9 @@ impl GenAiExtensions {
     pub const USAGE_COST_CACHE_READ_SAVINGS: &'static str = "gen_ai.usage.cost.cache_read_savings";
     /// Net cost impact after cache reads and writes (Float64). OO extension.
     pub const USAGE_COST_NET_CACHE_IMPACT: &'static str = "gen_ai.usage.cost.net_cache_impact";
+    /// How ingest priced the span (`unpriced` / `approximate`); unset for exact prices and
+    /// client-reported costs. Flattens to `config::meta::model_pricing::COST_STATUS_COLUMN`.
+    pub const USAGE_COST_STATUS: &'static str = "gen_ai.usage.cost_status";
 }
 
 pub struct LLMAttributes;

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { parseRawDiff, sizeReasons } from "../src/auto-approve.mjs";
-import { fetchDiff, fetchPinnedDiff, localDiff, pinDiff, prefixDiffPaths } from "../src/pr-diff.mjs";
+import { diffFingerprint, fetchDiff, fetchPinnedDiff, hunksLocatable, localDiff, pinDiff, prefixDiffPaths } from "../src/pr-diff.mjs";
 
 const DIFF = [
   "diff --git a/src/lib.rs b/src/lib.rs",
@@ -198,4 +198,115 @@ test("a renamed symlink or submodule whose header carries no mode cannot pass as
   });
   assert.match(edited, /^index \S+ 100644$/m);
   assert.deepEqual(parseRawDiff(edited).problems, []);
+});
+
+test("a rebase that moves the PR's lines keeps its diff fingerprint, a changed line does not", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ai-review-fingerprint-"));
+  const git = (...args) => execFileSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], { encoding: "utf-8" });
+  try {
+    git("init", "-q", "-b", "main");
+    const lines = Array.from({ length: 40 }, (_, i) => `line ${i}`);
+    writeFileSync(join(dir, "a.rs"), `${lines.join("\n")}\n`);
+    git("add", ".");
+    git("commit", "-qm", "base");
+    git("checkout", "-qb", "pr");
+    writeFileSync(join(dir, "a.rs"), `${lines.map((l, i) => (i === 30 ? "line 30 changed" : l)).join("\n")}\n`);
+    git("commit", "-qam", "pr change");
+    const before = localDiff(dir, "main", "pr");
+    git("checkout", "-q", "main");
+    writeFileSync(join(dir, "a.rs"), `head 1\nhead 2\nhead 3\n${lines.join("\n")}\n`);
+    git("commit", "-qam", "main moves on");
+    git("checkout", "-q", "pr");
+    git("rebase", "-q", "main");
+    const after = localDiff(dir, "main", "pr");
+    assert.notEqual(before, after, "the rebase must change hunk numbers and blob ids, or this test proves nothing");
+    assert.equal(diffFingerprint(after), diffFingerprint(before));
+    writeFileSync(join(dir, "a.rs"), `head 1\nhead 2\nhead 3\n${lines.map((l, i) => (i === 30 ? "line 30 changed again" : l)).join("\n")}\n`);
+    git("commit", "-qam", "another change");
+    assert.notEqual(diffFingerprint(localDiff(dir, "main", "pr")), diffFingerprint(before));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the fingerprint ignores only blob ids and hunk numbers", () => {
+  const base = "diff --git a/a b/a\nindex 1111111..2222222 100644\n--- a/a\n+++ b/a\n@@ -1,2 +1,2 @@ fn x\n ctx\n-old\n+new\n";
+  assert.equal(diffFingerprint(base.replace("1111111..2222222", "3333333..4444444").replace("-1,2 +1,2 @@ fn x", "-9,2 +12,2 @@ fn x")), diffFingerprint(base));
+  assert.notEqual(diffFingerprint(base.replace("@@ fn x", "@@ fn y")), diffFingerprint(base), "the function a hunk sits in is part of what was reviewed");
+  assert.notEqual(diffFingerprint(base.replace("+new", "+newer")), diffFingerprint(base));
+  assert.notEqual(diffFingerprint(base.replace("diff --git a/a b/a", "diff --git a/b b/b")), diffFingerprint(base));
+  assert.match(diffFingerprint(base), /^[0-9a-f]{64}$/);
+});
+
+test("the same lines changed inside a different function get a different fingerprint", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ai-review-fingerprint-"));
+  const git = (...args) => execFileSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], { encoding: "utf-8" });
+  const fn = (name, allowed = "user.active") => `function ${name}(user) {\n  const id = user.id;\n  const name = user.name;\n  const role = user.role;\n  const group = user.group;\n  const allowed = ${allowed};\n  const details = { id, name, role, group };\n  const present = Boolean(details);\n  const result = Boolean(allowed);\n  return present && result;\n}\n`;
+  try {
+    git("init", "-q", "-b", "main");
+    writeFileSync(join(dir, "rules.js"), `${fn("preview")}\n${fn("authorize")}`);
+    git("add", ".");
+    git("commit", "-qm", "base");
+    git("checkout", "-qb", "safe");
+    writeFileSync(join(dir, "rules.js"), `${fn("preview", "true")}\n${fn("authorize")}`);
+    git("commit", "-qam", "safe");
+    git("checkout", "-qb", "unsafe", "main");
+    writeFileSync(join(dir, "rules.js"), `${fn("preview")}\n${fn("authorize", "true")}`);
+    git("commit", "-qam", "unsafe");
+    const safe = localDiff(dir, "main", "safe");
+    const unsafe = localDiff(dir, "main", "unsafe");
+    assert.match(safe, /^@@ .* @@ function preview\(user\) \{$/m);
+    assert.match(unsafe, /^@@ .* @@ function authorize\(user\) \{$/m);
+    assert.notEqual(diffFingerprint(unsafe), diffFingerprint(safe));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an edit to one of two identical blocks in a function cannot be located, so it is never taken for the reviewed one", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ai-review-fingerprint-"));
+  const git = (...args) => execFileSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], { encoding: "utf-8" });
+  const block = (flag, allowed) => [`  if (${flag}) {`, "    const a = 1;", "    const b = 2;", "    const c = 3;", `    ok = ${allowed};`, "    const d = 4;", "    const e = 5;", "    const f = 6;", "  }"];
+  const source = (first, second) => ["function check(user, internal) {", "  let ok = false;", ...block("internal", first), ...block("!internal", second), "  return ok;", "}", ""].join("\n");
+  const readBase = ref => path => { try { return execFileSync("git", ["-C", dir, "cat-file", "blob", `${ref}:${path}`], { encoding: "utf-8" }); } catch { return null; } };
+  try {
+    git("init", "-q", "-b", "main");
+    writeFileSync(join(dir, "check.js"), source("user.admin", "user.admin"));
+    git("add", ".");
+    git("commit", "-qm", "base");
+    git("checkout", "-qb", "internal");
+    writeFileSync(join(dir, "check.js"), source("true", "user.admin"));
+    git("commit", "-qam", "internal");
+    git("checkout", "-qb", "external", "main");
+    writeFileSync(join(dir, "check.js"), source("user.admin", "true"));
+    git("commit", "-qam", "external");
+    const internal = localDiff(dir, "main", "internal");
+    const external = localDiff(dir, "main", "external");
+    assert.notEqual(internal, external);
+    assert.equal(hunksLocatable(external, readBase("main")), false, "the edited block's old text sits twice in the base");
+    assert.equal(hunksLocatable(internal, readBase("main")), false);
+    writeFileSync(join(dir, "other.js"), "a\nb\nc\nd\ne\nf\ng\n");
+    git("add", "other.js");
+    git("commit", "-qm", "unique");
+    writeFileSync(join(dir, "other.js"), "a\nb\nc\nD\ne\nf\ng\n");
+    git("commit", "-qam", "edit unique");
+    const unique = localDiff(dir, "HEAD~1", "HEAD");
+    assert.equal(hunksLocatable(unique, readBase("HEAD~1")), true);
+    assert.equal(hunksLocatable(unique, () => null), false, "an unreadable base file cannot locate the edit");
+    assert.equal(hunksLocatable("diff --git a/n b/n\nnew file mode 100644\n--- /dev/null\n+++ b/n\n@@ -0,0 +1 @@\n+x\n", () => null), true, "a new file has nothing to locate");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a changed binary file or trailing space on the last line changes the fingerprint", () => {
+  const bin = id => `diff --git a/m.wasm b/m.wasm\nindex 1111111..${id} 100644\nBinary files a/m.wasm and b/m.wasm differ\n`;
+  assert.notEqual(diffFingerprint(bin("2222222")), diffFingerprint(bin("3333333")));
+  const csv = tail => `diff --git a/a.csv b/a.csv\nindex 1111111..2222222 100644\n--- a/a.csv\n+++ b/a.csv\n@@ -1 +1 @@\n-x\n+secret${tail}\n`;
+  assert.notEqual(diffFingerprint(csv(" ")), diffFingerprint(csv("  ")));
+});
+
+test("a file mode change keeps a different fingerprint", () => {
+  const d = mode => `diff --git a/l b/l\nindex 1111111..2222222 ${mode}\n--- a/l\n+++ b/l\n@@ -1 +1 @@\n-old-target\n\\ No newline at end of file\n+new-target\n\\ No newline at end of file\n`;
+  assert.notEqual(diffFingerprint(d("100644")), diffFingerprint(d("120000")));
 });
