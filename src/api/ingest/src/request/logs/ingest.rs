@@ -70,7 +70,7 @@ fn kinesis_error_status(e: &infra::errors::Error) -> StatusCode {
     }
 }
 
-/// Firehose and Pub/Sub push ack on a 200, so a write that kept nothing must not return one.
+/// Firehose and Pub/Sub push ack on a 200, so rows lost to a rejection or a failed write get none.
 fn undelivered_status(resp: &IngestionResponse) -> Option<(StatusCode, String)> {
     if resp.write_failed {
         return Some((
@@ -366,7 +366,8 @@ pub async fn json(
     request_body(content = inline(KinesisFHRequest), description = "Ingest data (json array)", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(KinesisFHIngestionResponse), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f","timestamp": 1578090903599_i64})),
-        (status = 500, description = "Failure", content_type = "application/json", body = (), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "error processing request"})),
+        (status = 400, description = "Request rejected, or no record stored because every record was rejected", content_type = "application/json", body = inline(KinesisFHIngestionResponse), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "stream logs: Stream name too long"})),
+        (status = 500, description = "Write to storage failed, or the stream started deleting mid-write", content_type = "application/json", body = inline(KinesisFHIngestionResponse), example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "write to storage failed"})),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
