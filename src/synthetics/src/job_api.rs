@@ -93,6 +93,8 @@ pub(crate) mod billing {
         pub now_us: i64,
         /// See the call site in [`super::ack`].
         pub region: Option<String>,
+        /// A confirm job re-tests a failure; it is our cost of a correct answer, so never billed.
+        pub confirm: bool,
     }
 
     /// What one ack bills, and which of the two guards fired.
@@ -294,6 +296,7 @@ pub(crate) mod billing {
             retries: live_retries,
             now_us,
             region,
+            confirm: super::is_confirm_job(row),
         }
     }
 
@@ -371,9 +374,10 @@ pub(crate) mod billing {
         // e. Clamp + zero fallback.
         let steps = resolve_billable(flags, &i);
 
-        // Queue, control plane and config errors never ran: nothing billed, no zero-fallback
-        // warning.
-        if i.error_source == "queue"
+        // Queue, control plane and config errors never ran, and confirm jobs are ours: nothing
+        // billed, no zero-fallback warning.
+        if i.confirm
+            || i.error_source == "queue"
             || i.error_source == crate::alerting::ERROR_SOURCE_CONTROL_PLANE
             || i.error_source == crate::alerting::ERROR_SOURCE_CONFIG
         {
@@ -1649,6 +1653,62 @@ fn stale_lease_response(
     }
 }
 
+/// Whether a leased job is a confirm job, which re-tests another job's failure.
+pub(crate) fn is_confirm_job(row: &synthetics_jobs::LeasedRow) -> bool {
+    serde_json::from_str::<synthetics_jobs::JobMetadata>(&row.metadata)
+        .is_ok_and(|m| m.confirm_of.is_some())
+}
+
+/// Whether a failed ack earns a confirm job: a target-side failure of a scheduled job that is not
+/// itself a confirm job, on a check that confirms failures.
+pub(crate) fn wants_confirm_job(
+    status_db: i32,
+    error_source: &str,
+    status_reason: Option<&str>,
+    probe_trigger_type: &str,
+    run_trigger_type: &str,
+    confirm_failures: bool,
+    is_confirm: bool,
+) -> bool {
+    status_db == config::meta::synthetics::SyntheticStatus::Failed.to_db()
+        && confirm_failures
+        && !is_confirm
+        && probe_trigger_type != "manual"
+        && (run_trigger_type == synthetics_runs::TRIGGER_SCHEDULE
+            || run_trigger_type == synthetics_runs::TRIGGER_GAP_RETRY)
+        && error_source != crate::alerting::ERROR_SOURCE_CONFIG
+        && !synthetics_runs::is_not_measured_source(error_source, status_reason)
+}
+
+/// Delay before the one extra run that fills a Not measured gap.
+const GAP_RETRY_DELAY_US: i64 = 60_000_000;
+
+/// Everything a finalized run owes: the replicated check row, and the one extra run after a Not
+/// measured gap.
+pub(crate) async fn after_run_finalized(done: &synthetics_runs::RunFinalized) {
+    let run_id = done.run_id.as_str();
+    publish_check_status(done).await;
+    if !done.gap_retry {
+        return;
+    }
+    let conn = get_orm_client_rw().await;
+    let now_us = config::utils::time::now_micros();
+    match synthetics_runs::add_gap_retry_run(conn, run_id, now_us, GAP_RETRY_DELAY_US).await {
+        Ok(Some(new_run)) => tracing::info!(
+            synthetics_id = %done.synthetics_id,
+            run_id = %run_id,
+            new_run_id = %new_run,
+            "[synthetics] Not measured run: one extra run scheduled"
+        ),
+        Ok(None) => {}
+        Err(e) => tracing::warn!(
+            synthetics_id = %done.synthetics_id,
+            run_id = %run_id,
+            "[synthetics] gap retry run: {e}"
+        ),
+    }
+}
+
 async fn run_trigger_type<C: sea_orm::ConnectionTrait>(conn: &C, run_id: &str) -> String {
     synthetics_runs::get_run(conn, run_id)
         .await
@@ -1678,6 +1738,8 @@ pub(crate) async fn publish_check_status(done: &synthetics_runs::RunFinalized) {
                 _streaks.down_runs,
                 _streaks.up_runs,
                 _streaks.run_ts,
+                _streaks.run_class,
+                _streaks.run_class_at,
             )
             .await
     {
@@ -1726,6 +1788,16 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
 
     let now_us = config::utils::time::now_micros();
 
+    // An error records where it came from, so finalization can tell "not measured" from a
+    // config error.
+    let result_json = (job_status == 6).then(|| {
+        serde_json::json!({
+            "error_source": req.error_source,
+            "status_reason": req.status_reason,
+        })
+        .to_string()
+    });
+
     // Mark job complete. `None` means the ack did not apply: the job was no longer
     // Claimed (a duplicate ack), or it is claimed by a different agent now (a late
     // ack from a holder the reaper already evicted).
@@ -1733,7 +1805,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         conn,
         &req.job_id,
         job_status,
-        None,
+        result_json.as_deref(),
         now_us,
         req.claimed_by.as_deref(),
     )
@@ -1753,6 +1825,44 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
             "[synthetics] stale_lease: ack dropped, job is no longer claimed by this agent"
         );
         return Ok(stale_lease_response(req.job_id, req.trigger_type, check));
+    }
+
+    // A failure waits for one confirm job from a second location before it counts. The confirm
+    // job joins the run before this job is counted, so the run cannot complete without it.
+    if status_db == config::meta::synthetics::SyntheticStatus::Failed.to_db() {
+        let confirm_failures =
+            synthetics_checks::get_cached(conn, &check.org_id, &check.synthetics_id)
+                .await
+                .ok()
+                .flatten()
+                .is_some_and(|c| c.confirm_failures);
+        let run_trigger = run_trigger_type(conn, &check.run_id).await;
+        if wants_confirm_job(
+            status_db,
+            &req.error_source,
+            req.status_reason.as_deref(),
+            &req.trigger_type,
+            &run_trigger,
+            confirm_failures,
+            is_confirm_job(&check),
+        ) {
+            match synthetics_runs::add_confirm_job(conn, &req.job_id, now_us).await {
+                Ok(Some(confirm_id)) => tracing::info!(
+                    synthetics_id = %check.synthetics_id,
+                    run_id = %check.run_id,
+                    job_id = %req.job_id,
+                    confirm_job_id = %confirm_id,
+                    "[synthetics] failure: confirm job enqueued"
+                ),
+                Ok(None) => {}
+                // The failure still counts without its confirm job.
+                Err(e) => tracing::warn!(
+                    run_id = %check.run_id,
+                    job_id = %req.job_id,
+                    "[synthetics] add_confirm_job: {e}"
+                ),
+            }
+        }
     }
 
     // Some only for the ack that completed the run; the check row is already written by then.
@@ -1775,7 +1885,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         None => (None, 1),
     };
     if let Some(done) = &run_completion {
-        publish_check_status(done).await;
+        after_run_finalized(done).await;
     }
 
     // Fetch synthetic for type, target, and destinations — all definition
@@ -1825,14 +1935,26 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
     // location for the same outage, and would advance the failure streak by the
     // fan-out factor rather than by one.
     let (alert, consecutive_failures, suppressed_by) = if run_complete {
+        // A confirm job's ack completes the run, but the run's answer is the merged vote: its own
+        // error source must not silence the failure it confirms.
+        let confirmed_flaky = run_completion.as_ref().is_some_and(|d| d.confirmed_flaky);
+        let completed_by_confirm = is_confirm_job(&check);
         resolve_alert(
             conn,
             &check.synthetics_id,
             RunOutcome {
                 status: run_status.as_deref(),
                 attempts: req.attempts,
-                status_reason: req.status_reason.as_deref(),
-                error_source: &req.error_source,
+                status_reason: if confirmed_flaky {
+                    Some(crate::alerting::REASON_FLAKY)
+                } else {
+                    req.status_reason.as_deref()
+                },
+                error_source: if completed_by_confirm {
+                    ""
+                } else {
+                    &req.error_source
+                },
             },
             &synthetic,
             now_us,
@@ -2239,6 +2361,61 @@ mod tests {
     }
 
     // Step billing. Every guard is a pure function, so these need no database.
+    #[test]
+    fn only_a_scheduled_target_failure_gets_a_confirm_job() {
+        let want = |status, source: &str, reason, probe, run, on, confirm| {
+            super::wants_confirm_job(status, source, reason, probe, run, on, confirm)
+        };
+        assert!(want(3, "", None, "scheduled", "schedule", true, false));
+        assert!(want(
+            3,
+            "probe",
+            None,
+            "scheduled",
+            "gap_retry",
+            true,
+            false
+        ));
+        assert!(
+            !want(1, "", None, "scheduled", "schedule", true, false),
+            "a pass"
+        );
+        assert!(
+            !want(4, "", None, "scheduled", "schedule", true, false),
+            "an error"
+        );
+        assert!(
+            !want(3, "", None, "manual", "schedule", true, false),
+            "a manual run"
+        );
+        assert!(
+            !want(3, "", None, "scheduled", "schedule", false, false),
+            "setting off"
+        );
+        assert!(
+            !want(3, "", None, "scheduled", "schedule", true, true),
+            "a confirm job"
+        );
+        assert!(!want(
+            3,
+            "config",
+            None,
+            "scheduled",
+            "schedule",
+            true,
+            false
+        ));
+        assert!(!want(
+            3,
+            "control_plane",
+            None,
+            "scheduled",
+            "schedule",
+            true,
+            false
+        ));
+    }
+
     #[cfg(feature = "cloud")]
     mod billing {
         use config::meta::{
@@ -2286,6 +2463,7 @@ mod tests {
                 retries,
                 now_us: NOW_US,
                 region: None,
+                confirm: false,
             }
         }
 
@@ -2662,6 +2840,22 @@ mod tests {
                 },
             );
             assert!(events.is_empty());
+        }
+
+        #[test]
+        fn a_confirm_job_is_not_billed() {
+            let events = events_for_ack(
+                LIVE,
+                BillingInputs {
+                    confirm: true,
+                    ..browser(14, 1, 0, 14)
+                },
+            );
+            assert!(events.is_empty());
+            let mut row = leased_row();
+            row.metadata = r#"{"confirm_of":"job-1"}"#.to_string();
+            assert!(super::super::is_confirm_job(&row));
+            assert!(!super::super::is_confirm_job(&leased_row()));
         }
 
         /// A Lambda invoke failure DOES bill — the invocation cost us money.

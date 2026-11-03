@@ -194,6 +194,15 @@ pub struct Synthetic {
     /// Denormalised status from the most recent completed check. Updated by ack handler.
     #[serde(default)]
     pub last_check_status: SyntheticStatus,
+    /// [`RunClass`] of the newest finalized run, as its DB integer. Server-managed.
+    #[serde(default)]
+    pub last_run_class: i32,
+    /// `scheduled_ts` of the first run in the current `last_run_class`, in microseconds.
+    #[serde(default)]
+    pub last_run_class_at: i64,
+    /// Re-test a failed scheduled job once from a second location before the failure counts.
+    #[serde(default = "default_true")]
+    pub confirm_failures: bool,
 
     /// Email of the user who created this synthetic. Set on create, never updated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -529,6 +538,12 @@ pub struct SyntheticSettings {
     pub start: Option<i64>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub environments: Vec<String>,
+    #[serde(default = "default_true")]
+    pub confirm_failures: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_wait_before_retry_secs_i32() -> i32 {
@@ -547,6 +562,56 @@ pub enum TriggerType {
     Scheduled,
     /// Manually triggered via the "Run Test" button in the UI.
     Manual,
+}
+
+// ── Run class ────────────────────────────────────────────────────────────────────
+
+/// The answer one finalized run gives, stored as `synthetics.last_run_class`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RunClass {
+    /// No finalized run yet.
+    #[default]
+    Unknown,
+    /// Tested from enough locations, and it works.
+    Up,
+    /// Failed in some locations, below quorum.
+    Partial,
+    /// Failed at quorum or more.
+    Down,
+    /// No location tested the site; the cause is ours.
+    NotMeasured,
+    /// A config error the owner must fix.
+    Misconfigured,
+}
+
+impl RunClass {
+    pub fn to_db(self) -> i32 {
+        match self {
+            RunClass::Unknown => 0,
+            RunClass::Up => 1,
+            RunClass::Partial => 2,
+            RunClass::Down => 3,
+            RunClass::NotMeasured => 4,
+            RunClass::Misconfigured => 5,
+        }
+    }
+
+    pub fn from_db(v: i32) -> Self {
+        match v {
+            1 => RunClass::Up,
+            2 => RunClass::Partial,
+            3 => RunClass::Down,
+            4 => RunClass::NotMeasured,
+            5 => RunClass::Misconfigured,
+            _ => RunClass::Unknown,
+        }
+    }
+
+    /// Whether uptime counts the run. Only runs that tested the site do.
+    pub fn counts_for_uptime(self) -> bool {
+        matches!(self, RunClass::Up | RunClass::Partial | RunClass::Down)
+    }
 }
 
 // ── List response (synthetic + computed fields) ─────────────────────────────────
@@ -571,6 +636,12 @@ pub struct SyntheticListItem {
 
     // runtime fields — current status only; uptime/history fetched separately via search
     pub status: SyntheticStatus,
+    /// [`RunClass`] of the newest finalized run; 0 until one finalizes.
+    #[serde(default)]
+    pub last_run_class: i32,
+    /// `scheduled_ts` of the first run in the current class, in microseconds.
+    #[serde(default)]
+    pub last_run_class_at: i64,
     pub last_check_at: Option<i64>,
     pub last_response_ms: Option<f64>,
     /// Executed (expanded) steps, browser only: what bills and draws down the pool (§5.11).
@@ -4688,6 +4759,8 @@ mod tests {
             updated_at: 0,
             last_triggered_at: 0,
             status: SyntheticStatus::Unknown,
+            last_run_class: 0,
+            last_run_class_at: 0,
             last_check_at: None,
             last_response_ms: None,
             steps: Some(1),

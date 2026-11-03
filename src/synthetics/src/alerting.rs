@@ -101,9 +101,16 @@ pub fn classify(
     error_source: &str,
     status_reason: Option<&str>,
 ) -> RunClass {
-    // Our own fault, checked before anything else: a queue-dropped job never ran,
-    // so it is evidence about our scheduling and nothing at all about the target.
-    if error_source == ERROR_SOURCE_QUEUE || error_source == ERROR_SOURCE_CONTROL_PLANE {
+    // Our own fault, checked before anything else: a queue-dropped, undispatched or
+    // orphaned job never ran, so it is evidence about our scheduling and nothing at
+    // all about the target.
+    if matches!(
+        error_source,
+        ERROR_SOURCE_QUEUE
+            | ERROR_SOURCE_CONTROL_PLANE
+            | ERROR_SOURCE_DISPATCH
+            | ERROR_SOURCE_ORPHAN
+    ) {
         return RunClass::NotMeasured;
     }
     // A child still replicating to this region is lag of ours, like a queue drop.
@@ -141,8 +148,8 @@ pub const REASON_FLAKY: &str = "flaky";
 /// Set by the probe when the TTL guard drops a job that waited past its own
 /// `valid_until`. Distinct from `dispatch` (the probe was never invoked),
 /// `probe` (the probe ran and crashed) and [`ERROR_SOURCE_ORPHAN`] (no job was
-/// ever created), because those first two are real signals about the check and
-/// this one is a signal about us.
+/// ever created). `probe` is a real signal about the check; `queue`, `dispatch`
+/// and `orphan` are signals about us, so all three are Not measured.
 pub const ERROR_SOURCE_QUEUE: &str = "queue";
 
 /// `error_source` for a probe that could not reach the job API, so it never checked the target.
@@ -475,12 +482,23 @@ mod tests {
             classify(Some("error"), 1, ERROR_SOURCE_QUEUE, None),
             RunClass::NotMeasured
         );
-        // The other two error sources are real signals and stay Failing.
-        assert_eq!(
-            classify(Some("error"), 1, "dispatch", None),
-            RunClass::Failing
-        );
+        // A crashed probe is a real signal and stays Failing.
         assert_eq!(classify(Some("error"), 1, "probe", None), RunClass::Failing);
+    }
+
+    #[test]
+    fn dispatch_and_orphan_errors_are_not_measured() {
+        for source in [ERROR_SOURCE_DISPATCH, ERROR_SOURCE_ORPHAN] {
+            assert_eq!(
+                classify(Some("error"), 1, source, None),
+                RunClass::NotMeasured,
+                "{source}"
+            );
+        }
+        let before = state(2, 0, false);
+        let (outcome, after) = decide(before, RunClass::NotMeasured, 3, 0, 1010 * MIN);
+        assert_eq!(outcome, AlertOutcome::Silent);
+        assert_eq!(after.consecutive_failures, 2);
     }
 
     #[test]

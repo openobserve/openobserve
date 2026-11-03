@@ -19,10 +19,18 @@
 //! Each job acks via `finalize_run`; when `jobs_done = job_count` the run is
 //! complete, `completed_at` is set, and the run result reaches the check row.
 
-use sea_orm::{ConnectionTrait, Statement, TransactionTrait, Value};
+use config::meta::synthetics::RunClass;
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Statement, TransactionTrait, Value,
+};
+use svix_ksuid::KsuidLike as _;
 
-use super::synthetics_checks;
 pub use super::synthetics_checks::StatusStreaks;
+use super::{
+    entity::{synthetics_checks as checks_entity, synthetics_jobs as jobs_entity},
+    synthetics_checks, synthetics_jobs,
+    synthetics_jobs::JobMetadata,
+};
 use crate::errors;
 
 /// Status page streaks stop growing here, so a steady check stops writing its row.
@@ -39,6 +47,17 @@ const JOB_PASSED: i32 = 3;
 const JOB_FAILED: i32 = 4;
 const JOB_WARNING: i32 = 5;
 const JOB_ERROR: i32 = 6;
+/// `synthetics_runs.trigger_type` of a scheduled run.
+pub const TRIGGER_SCHEDULE: &str = "schedule";
+/// `synthetics_runs.trigger_type` of the one extra run that fills a Not measured gap.
+pub const TRIGGER_GAP_RETRY: &str = "gap_retry";
+/// `error_source` values for a job that never tested the site because of us. Mirrors
+/// `synthetics::alerting::classify`.
+const NOT_MEASURED_SOURCES: [&str; 4] = ["queue", "control_plane", "dispatch", "orphan"];
+/// The subset of [`NOT_MEASURED_SOURCES`] that earns one extra run.
+const GAP_RETRY_SOURCES: [&str; 2] = ["control_plane", "dispatch"];
+const SOURCE_CONFIG: &str = "config";
+const REASON_CONFIG_REFERENCE_PENDING: &str = "config_reference_pending";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -82,14 +101,137 @@ pub enum Verdict {
 /// The completed run, with the check row to replicate when it changed.
 #[derive(Debug, Clone)]
 pub struct RunFinalized {
+    pub run_id: String,
     pub synthetics_id: String,
     pub org_id: String,
     /// Worst job result on the SyntheticStatus DB scale.
     pub run_result: i32,
     pub job_count: i32,
     pub verdict: Verdict,
-    /// `Some` only when the badge or a streak changed.
+    pub run_class: RunClass,
+    /// A confirm job passed, so a failed location counts as up (`flaky`).
+    pub confirmed_flaky: bool,
+    /// The run earns one extra run: it is a scheduled run that measured nothing because the probe
+    /// could not reach the job API or could not be dispatched.
+    pub gap_retry: bool,
+    /// `Some` only when the badge, a streak or the run class changed.
     pub check_update: Option<StatusStreaks>,
+}
+
+/// One job of a run, as finalization reads it.
+#[derive(Debug, Clone, Default)]
+pub struct JobOutcome {
+    pub id: String,
+    /// `synthetics_jobs.status`.
+    pub status: i32,
+    pub error_source: Option<String>,
+    pub status_reason: Option<String>,
+    /// The job this one confirms, for a confirm job.
+    pub confirm_of: Option<String>,
+}
+
+/// What a run's jobs add up to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Tally {
+    pub verdict: Verdict,
+    pub class: RunClass,
+    /// The worst result after confirm pairs merge, on the SyntheticStatus DB scale. `None` when
+    /// the run has no confirm job, so the stored `run_result` stands.
+    pub run_result: Option<i32>,
+    pub confirmed_flaky: bool,
+    /// Some job measured nothing because of [`GAP_RETRY_SOURCES`].
+    pub gap_cause: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Vote {
+    Healthy,
+    Failed,
+    NotMeasured,
+    Config,
+}
+
+impl JobOutcome {
+    fn vote(&self) -> Vote {
+        match self.status {
+            JOB_PASSED | JOB_WARNING => Vote::Healthy,
+            JOB_FAILED => Vote::Failed,
+            JOB_ERROR
+                if self.error_source.as_deref() == Some(SOURCE_CONFIG)
+                    && self.status_reason.as_deref() != Some(REASON_CONFIG_REFERENCE_PENDING) =>
+            {
+                Vote::Config
+            }
+            // Dead letters, our own errors, probe crashes and unfinished jobs did not test the
+            // site.
+            _ => Vote::NotMeasured,
+        }
+    }
+
+    fn is_gap_cause(&self) -> bool {
+        self.status == JOB_DEAD
+            || (self.status == JOB_ERROR
+                && self
+                    .error_source
+                    .as_deref()
+                    .is_some_and(|s| GAP_RETRY_SOURCES.contains(&s)))
+    }
+}
+
+/// Whether an `error_source` means we never tested the site.
+pub fn is_not_measured_source(error_source: &str, status_reason: Option<&str>) -> bool {
+    NOT_MEASURED_SOURCES.contains(&error_source)
+        || (error_source == SOURCE_CONFIG && status_reason == Some(REASON_CONFIG_REFERENCE_PENDING))
+}
+
+/// Adds up a run's jobs. A confirm job and the job it confirms are one vote, a failure only when
+/// the confirm job fails too; a confirm job that did not test the site leaves the failure standing.
+pub fn tally(job_count: i32, jobs: &[JobOutcome]) -> Tally {
+    let confirms: Vec<&JobOutcome> = jobs.iter().filter(|j| j.confirm_of.is_some()).collect();
+    let mut failed = 0;
+    let mut healthy = 0;
+    let mut config = 0;
+    let mut confirmed_flaky = false;
+    let mut worst = 0;
+    for job in jobs.iter().filter(|j| j.confirm_of.is_none()) {
+        let mut vote = job.vote();
+        let mut result = job_to_status(job.status);
+        if vote == Vote::Failed
+            && let Some(confirm) = confirms
+                .iter()
+                .find(|c| c.confirm_of.as_deref() == Some(job.id.as_str()))
+            && confirm.vote() == Vote::Healthy
+        {
+            vote = Vote::Healthy;
+            result = 2;
+            confirmed_flaky = true;
+        }
+        worst = worst.max(result);
+        match vote {
+            Vote::Healthy => healthy += 1,
+            Vote::Failed => failed += 1,
+            Vote::Config => config += 1,
+            Vote::NotMeasured => {}
+        }
+    }
+    let voters = job_count - confirms.len() as i32;
+    let verdict = run_verdict(voters, failed, healthy);
+    let class = match verdict {
+        _ if failed + healthy == 0 && config > 0 => RunClass::Misconfigured,
+        _ if failed + healthy == 0 => RunClass::NotMeasured,
+        Verdict::Down => RunClass::Down,
+        Verdict::Up => RunClass::Up,
+        Verdict::NoVerdict if failed > 0 => RunClass::Partial,
+        // Only healthy locations tested the site, too few for a verdict.
+        Verdict::NoVerdict => RunClass::Up,
+    };
+    Tally {
+        verdict,
+        class,
+        run_result: (!confirms.is_empty() && worst > 0).then_some(worst),
+        confirmed_flaky,
+        gap_cause: jobs.iter().any(JobOutcome::is_gap_cause),
+    }
 }
 
 // ── Scheduler ─────────────────────────────────────────────────────────────────
@@ -326,6 +468,7 @@ pub fn next_streaks(
     cur: &StatusStreaks,
     run_result: i32,
     verdict: Verdict,
+    run_class: RunClass,
     run_ts: i64,
 ) -> Option<StatusStreaks> {
     if cur.run_ts >= run_ts {
@@ -337,11 +480,20 @@ pub fn next_streaks(
         // An unknown verdict cannot prove recovery, so it breaks an Up streak.
         Verdict::NoVerdict => (cur.down_runs, 0),
     };
+    let run_class = run_class.to_db();
+    // `run_class_at` marks when the current class began, so a steady check stops writing.
+    let run_class_at = if cur.run_class == run_class && cur.run_class_at > 0 {
+        cur.run_class_at
+    } else {
+        run_ts
+    };
     Some(StatusStreaks {
         last_check_status: run_result,
         down_runs,
         up_runs,
         run_ts,
+        run_class,
+        run_class_at,
     })
 }
 
@@ -360,29 +512,34 @@ async fn finalize<C: ConnectionTrait + TransactionTrait>(
         txn.commit().await?;
         return Ok(None);
     };
-    let statuses = job_statuses(&txn, run_id).await?;
-    let failed = statuses.iter().filter(|s| **s == JOB_FAILED).count() as i32;
-    let healthy = statuses
-        .iter()
-        .filter(|s| **s == JOB_PASSED || **s == JOB_WARNING)
-        .count() as i32;
-    let verdict = run_verdict(run.job_count, failed, healthy);
-    let run_result = run.run_result.or(job_result).unwrap_or(STATUS_ERROR);
+    let t = tally(run.job_count, &job_outcomes(&txn, run_id).await?);
+    let run_result = t
+        .run_result
+        .or(run.run_result)
+        .or(job_result)
+        .unwrap_or(STATUS_ERROR);
     let check_update = write_check_row(
         &txn,
         &run.synthetics_id,
         run_result,
-        verdict,
+        t.verdict,
+        t.class,
         run.scheduled_ts,
     )
     .await?;
     txn.commit().await?;
     Ok(Some(RunFinalized {
+        run_id: run.id,
         synthetics_id: run.synthetics_id,
         org_id: run.org_id,
         run_result,
         job_count: run.job_count,
-        verdict,
+        verdict: t.verdict,
+        run_class: t.class,
+        confirmed_flaky: t.confirmed_flaky,
+        gap_retry: t.class == RunClass::NotMeasured
+            && t.gap_cause
+            && run.trigger_type == TRIGGER_SCHEDULE,
         check_update,
     }))
 }
@@ -456,6 +613,43 @@ async fn claim_completion<C: ConnectionTrait>(
     Ok(claimed > 0)
 }
 
+/// The jobs of a run with what their acks recorded.
+pub async fn job_outcomes<C: ConnectionTrait>(
+    conn: &C,
+    run_id: &str,
+) -> Result<Vec<JobOutcome>, errors::Error> {
+    #[derive(serde::Deserialize, Default)]
+    struct AckResult {
+        error_source: Option<String>,
+        status_reason: Option<String>,
+    }
+    let rows = conn
+        .query_all(Statement::from_sql_and_values(
+            conn.get_database_backend(),
+            "SELECT id, status, result, metadata FROM synthetics_jobs WHERE run_id = $1",
+            [Value::from(run_id.to_owned())],
+        ))
+        .await?;
+    rows.into_iter()
+        .map(|row| {
+            let result: Option<String> = row.try_get("", "result")?;
+            let metadata: String = row.try_get("", "metadata")?;
+            let ack: AckResult = result
+                .and_then(|r| serde_json::from_str(&r).ok())
+                .unwrap_or_default();
+            let meta: JobMetadata = serde_json::from_str(&metadata).unwrap_or_default();
+            Ok(JobOutcome {
+                id: row.try_get("", "id")?,
+                status: row.try_get("", "status")?,
+                error_source: ack.error_source,
+                status_reason: ack.status_reason,
+                confirm_of: meta.confirm_of,
+            })
+        })
+        .collect::<Result<_, sea_orm::DbErr>>()
+        .map_err(errors::Error::from)
+}
+
 async fn job_statuses<C: ConnectionTrait>(
     conn: &C,
     run_id: &str,
@@ -481,6 +675,7 @@ async fn write_check_row<C: ConnectionTrait>(
     synthetics_id: &str,
     run_result: i32,
     verdict: Verdict,
+    run_class: RunClass,
     run_ts: i64,
 ) -> Result<Option<StatusStreaks>, errors::Error> {
     // Retried because a concurrent run of the same check can win the swap between read and write.
@@ -488,7 +683,7 @@ async fn write_check_row<C: ConnectionTrait>(
         let Some(cur) = synthetics_checks::lock_status_streaks(conn, synthetics_id).await? else {
             return Ok(None);
         };
-        let next = match next_streaks(&cur, run_result, verdict, run_ts) {
+        let next = match next_streaks(&cur, run_result, verdict, run_class, run_ts) {
             Some(next) => next,
             // A run that finishes after a newer one rebuilds the streaks in run order.
             None => replay_streaks(conn, synthetics_id, &cur).await?,
@@ -499,7 +694,8 @@ async fn write_check_row<C: ConnectionTrait>(
         if synthetics_checks::swap_status_streaks(conn, synthetics_id, &cur, &next).await? {
             let changed = cur.last_check_status != next.last_check_status
                 || cur.down_runs != next.down_runs
-                || cur.up_runs != next.up_runs;
+                || cur.up_runs != next.up_runs
+                || cur.run_class != next.run_class;
             return Ok(changed.then_some(next));
         }
     }
@@ -537,14 +733,8 @@ async fn replay_streaks<C: ConnectionTrait>(
         let id: String = row.try_get("", "id")?;
         let scheduled_ts: i64 = row.try_get("", "scheduled_ts")?;
         let job_count: i32 = row.try_get("", "job_count")?;
-        let statuses = job_statuses(conn, &id).await?;
-        let failed = statuses.iter().filter(|s| **s == JOB_FAILED).count() as i32;
-        let healthy = statuses
-            .iter()
-            .filter(|s| **s == JOB_PASSED || **s == JOB_WARNING)
-            .count() as i32;
-        let verdict = run_verdict(job_count, failed, healthy);
-        if let Some(next) = next_streaks(&replayed, 0, verdict, scheduled_ts) {
+        let t = tally(job_count, &job_outcomes(conn, &id).await?);
+        if let Some(next) = next_streaks(&replayed, 0, t.verdict, t.class, scheduled_ts) {
             replayed = next;
         }
     }
@@ -553,7 +743,195 @@ async fn replay_streaks<C: ConnectionTrait>(
         down_runs: replayed.down_runs,
         up_runs: replayed.up_runs,
         run_ts: cur.run_ts,
+        run_class: cur.run_class,
+        run_class_at: cur.run_class_at,
     })
+}
+
+// ── Confirm jobs and gap retries ──────────────────────────────────────────────
+
+fn confirm_of(job: &jobs_entity::Model) -> Option<String> {
+    serde_json::from_str::<JobMetadata>(&job.metadata)
+        .ok()
+        .and_then(|m| m.confirm_of)
+}
+
+/// A browser job's `browser_devices` with new execution ids, so a copied job writes its own rows.
+fn fresh_execution_ids(json: &str) -> String {
+    let Ok(mut entries) = serde_json::from_str::<Vec<serde_json::Value>>(json) else {
+        return json.to_owned();
+    };
+    for e in &mut entries {
+        if let Some(obj) = e.as_object_mut() {
+            obj.insert(
+                "execution_id".to_owned(),
+                svix_ksuid::Ksuid::new(None, None).to_string().into(),
+            );
+        }
+    }
+    serde_json::to_string(&entries).unwrap_or_else(|_| json.to_owned())
+}
+
+/// Adds one confirm job for the failed job `job_id` to its run, so the run waits for it.
+///
+/// The confirm job runs at once from another location of the same environment, one that passed
+/// or did not fail if there is one, else from the same location. Returns the new job id, or `None`
+/// when `job_id` is a confirm job, already has one, or its run already completed.
+pub async fn add_confirm_job<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    job_id: &str,
+    now_us: i64,
+) -> Result<Option<String>, errors::Error> {
+    let txn = conn.begin().await?;
+    let Some(orig) = jobs_entity::Entity::find_by_id(job_id).one(&txn).await? else {
+        txn.commit().await?;
+        return Ok(None);
+    };
+    let meta: JobMetadata = serde_json::from_str(&orig.metadata).unwrap_or_default();
+    let siblings = jobs_entity::Entity::find()
+        .filter(jobs_entity::Column::RunId.eq(orig.run_id.as_str()))
+        .all(&txn)
+        .await?;
+    if meta.confirm_of.is_some()
+        || siblings
+            .iter()
+            .any(|j| confirm_of(j).as_deref() == Some(job_id))
+    {
+        txn.commit().await?;
+        return Ok(None);
+    }
+    let others = || {
+        siblings
+            .iter()
+            .filter(|j| j.env == orig.env && j.location != orig.location && confirm_of(j).is_none())
+    };
+    let source = others()
+        .find(|j| j.status == JOB_PASSED || j.status == JOB_WARNING)
+        .or_else(|| others().find(|j| j.status != JOB_FAILED))
+        .unwrap_or(&orig);
+    let bumped = txn
+        .execute(Statement::from_sql_and_values(
+            txn.get_database_backend(),
+            "UPDATE synthetics_runs SET job_count = job_count + 1 \
+             WHERE id = $1 AND completed_at IS NULL",
+            [Value::from(orig.run_id.clone())],
+        ))
+        .await?
+        .rows_affected();
+    if bumped == 0 {
+        txn.rollback().await?;
+        return Ok(None);
+    }
+    let metadata = serde_json::to_string(&JobMetadata {
+        confirm_of: Some(job_id.to_owned()),
+        ..meta
+    })
+    .map_err(|e| errors::Error::Message(e.to_string()))?;
+    let browser_devices = orig.browser_devices.as_deref().map(fresh_execution_ids);
+    let id = synthetics_jobs::enqueue(
+        &txn,
+        synthetics_jobs::EnqueueParams {
+            synthetics_id: &orig.synthetics_id,
+            synthetics_name: &orig.synthetics_name,
+            org_id: &orig.org_id,
+            location: &source.location,
+            env: orig.env.as_deref(),
+            pool: &source.pool,
+            scheduled_ts: now_us,
+            valid_until: now_us + (orig.valid_until - orig.scheduled_ts),
+            run_id: &orig.run_id,
+            browser_devices: browser_devices.as_deref(),
+            steps_configured: orig.steps_configured,
+            metadata: &metadata,
+        },
+    )
+    .await?;
+    // `ON CONFLICT DO NOTHING` inserts nothing on a slot clash; the run must not wait for it.
+    if jobs_entity::Entity::find_by_id(id.as_str())
+        .one(&txn)
+        .await?
+        .is_none()
+    {
+        txn.rollback().await?;
+        return Ok(None);
+    }
+    txn.commit().await?;
+    Ok(Some(id))
+}
+
+/// Schedules one extra run of a scheduled run's locations `delay_us` from now, to fill a Not
+/// measured gap. Returns the new run id, or `None` when the run is not a scheduled run, the check
+/// is paused, or the scheduler fires the check by then anyway.
+pub async fn add_gap_retry_run<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    run_id: &str,
+    now_us: i64,
+    delay_us: i64,
+) -> Result<Option<String>, errors::Error> {
+    let txn = conn.begin().await?;
+    let Some(run) = get_run(&txn, run_id).await? else {
+        txn.commit().await?;
+        return Ok(None);
+    };
+    let scheduled_ts = now_us + delay_us;
+    let check = checks_entity::Entity::find_by_id(run.synthetics_id.as_str())
+        .one(&txn)
+        .await?;
+    let due_anyway = check
+        .as_ref()
+        .is_none_or(|c| !c.enabled || (c.next_run_at > 0 && c.next_run_at <= scheduled_ts));
+    if run.trigger_type != TRIGGER_SCHEDULE || due_anyway {
+        txn.commit().await?;
+        return Ok(None);
+    }
+    let jobs: Vec<_> = jobs_entity::Entity::find()
+        .filter(jobs_entity::Column::RunId.eq(run_id))
+        .all(&txn)
+        .await?
+        .into_iter()
+        .filter(|j| confirm_of(j).is_none())
+        .collect();
+    if jobs.is_empty() {
+        txn.commit().await?;
+        return Ok(None);
+    }
+    let new_id = svix_ksuid::Ksuid::new(None, None).to_string();
+    insert_run(
+        &txn,
+        InsertRunParams {
+            id: &new_id,
+            synthetics_id: &run.synthetics_id,
+            org_id: &run.org_id,
+            scheduled_ts,
+            trigger_type: TRIGGER_GAP_RETRY,
+            job_count: jobs.len() as i32,
+            created_at: now_us,
+        },
+    )
+    .await?;
+    for j in &jobs {
+        let browser_devices = j.browser_devices.as_deref().map(fresh_execution_ids);
+        synthetics_jobs::enqueue(
+            &txn,
+            synthetics_jobs::EnqueueParams {
+                synthetics_id: &j.synthetics_id,
+                synthetics_name: &j.synthetics_name,
+                org_id: &j.org_id,
+                location: &j.location,
+                env: j.env.as_deref(),
+                pool: &j.pool,
+                scheduled_ts,
+                valid_until: scheduled_ts + (j.valid_until - j.scheduled_ts),
+                run_id: &new_id,
+                browser_devices: browser_devices.as_deref(),
+                steps_configured: j.steps_configured,
+                metadata: &j.metadata,
+            },
+        )
+        .await?;
+    }
+    txn.commit().await?;
+    Ok(Some(new_id))
 }
 
 /// Maps a `synthetics_jobs.status` to the SyntheticStatus DB scale; non-terminal jobs map to 0.
@@ -627,6 +1005,9 @@ mod tests {
         ] {
             db.execute(backend.build(&stmt)).await.unwrap();
         }
+        db.execute_unprepared(&synthetics_jobs::dedup_index_sql(backend))
+            .await
+            .unwrap();
         let check = checks::Model {
             id: "mon-1".to_string(),
             org_id: "org1".to_string(),
@@ -654,6 +1035,8 @@ mod tests {
             status_down_runs: 0,
             status_up_runs: 0,
             status_run_ts: 0,
+            last_run_class: 0,
+            last_run_class_at: 0,
             owner: None,
             created_at: 0,
             updated_at: 0,
@@ -758,6 +1141,8 @@ mod tests {
                 down_runs: m.status_down_runs,
                 up_runs: m.status_up_runs,
                 run_ts: m.status_run_ts,
+                run_class: m.last_run_class,
+                run_class_at: m.last_run_class_at,
             },
             m.updated_at,
         )
@@ -796,18 +1181,18 @@ mod tests {
     fn streaks_cap_at_ten_and_no_verdict_resets_only_up() {
         let mut cur = StatusStreaks::default();
         for ts in 1..=15 {
-            cur = next_streaks(&cur, 3, Verdict::Down, ts).unwrap();
+            cur = next_streaks(&cur, 3, Verdict::Down, RunClass::Down, ts).unwrap();
         }
         assert_eq!((cur.down_runs, cur.up_runs), (STREAK_CAP, 0));
-        let after = next_streaks(&cur, 3, Verdict::NoVerdict, 16).unwrap();
+        let after = next_streaks(&cur, 3, Verdict::NoVerdict, RunClass::Partial, 16).unwrap();
         assert_eq!((after.down_runs, after.up_runs), (STREAK_CAP, 0));
-        let up = next_streaks(&after, 1, Verdict::Up, 17).unwrap();
+        let up = next_streaks(&after, 1, Verdict::Up, RunClass::Up, 17).unwrap();
         assert_eq!((up.down_runs, up.up_runs), (0, 1));
         assert!(
-            next_streaks(&up, 3, Verdict::Down, 17).is_none(),
+            next_streaks(&up, 3, Verdict::Down, RunClass::Down, 17).is_none(),
             "same run_ts is not newer"
         );
-        let split = next_streaks(&up, 3, Verdict::NoVerdict, 18).unwrap();
+        let split = next_streaks(&up, 3, Verdict::NoVerdict, RunClass::Partial, 18).unwrap();
         assert_eq!(
             (split.down_runs, split.up_runs),
             (0, 0),
@@ -839,7 +1224,9 @@ mod tests {
                 last_check_status: 3,
                 down_runs: 0,
                 up_runs: 0,
-                run_ts: 100
+                run_ts: 100,
+                run_class: RunClass::Partial.to_db(),
+                run_class_at: 100,
             }
         );
         assert_eq!(done.check_update, Some(row));
@@ -971,7 +1358,9 @@ mod tests {
                 last_check_status: 3,
                 down_runs: 1,
                 up_runs: 0,
-                run_ts: 100
+                run_ts: 100,
+                run_class: RunClass::Down.to_db(),
+                run_class_at: 100,
             }
         );
         let run = get_run(&db, "r1").await.unwrap().unwrap();
@@ -981,6 +1370,365 @@ mod tests {
                 .await
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    fn job(id: &str, status: i32) -> JobOutcome {
+        JobOutcome {
+            id: id.to_string(),
+            status,
+            ..Default::default()
+        }
+    }
+
+    fn errored(id: &str, source: &str) -> JobOutcome {
+        JobOutcome {
+            error_source: Some(source.to_string()),
+            ..job(id, JOB_ERROR)
+        }
+    }
+
+    fn confirm(id: &str, of: &str, status: i32) -> JobOutcome {
+        JobOutcome {
+            confirm_of: Some(of.to_string()),
+            ..job(id, status)
+        }
+    }
+
+    #[test]
+    fn tally_gives_each_class() {
+        use RunClass::*;
+        let cases: Vec<(&str, i32, Vec<JobOutcome>, RunClass)> = vec![
+            (
+                "all pass",
+                2,
+                vec![job("a", JOB_PASSED), job("b", JOB_WARNING)],
+                Up,
+            ),
+            (
+                "all fail",
+                2,
+                vec![job("a", JOB_FAILED), job("b", JOB_FAILED)],
+                Down,
+            ),
+            (
+                "1 of 2 fails",
+                2,
+                vec![job("a", JOB_FAILED), job("b", JOB_PASSED)],
+                Partial,
+            ),
+            (
+                "fail + ours",
+                2,
+                vec![job("a", JOB_FAILED), errored("b", "control_plane")],
+                Partial,
+            ),
+            (
+                "pass + ours",
+                2,
+                vec![job("a", JOB_PASSED), errored("b", "queue")],
+                Up,
+            ),
+            (
+                "nothing tested",
+                2,
+                vec![errored("a", "control_plane"), job("b", JOB_DEAD)],
+                NotMeasured,
+            ),
+            ("probe crash", 1, vec![errored("a", "probe")], NotMeasured),
+            (
+                "config",
+                2,
+                vec![errored("a", "config"), errored("b", "config")],
+                Misconfigured,
+            ),
+            (
+                "2 of 3 fail",
+                3,
+                vec![
+                    job("a", JOB_FAILED),
+                    job("b", JOB_FAILED),
+                    job("c", JOB_PASSED),
+                ],
+                Down,
+            ),
+        ];
+        for (name, n, jobs, want) in cases {
+            assert_eq!(tally(n, &jobs).class, want, "{name}");
+        }
+        let pending = JobOutcome {
+            status_reason: Some(REASON_CONFIG_REFERENCE_PENDING.to_string()),
+            ..errored("a", "config")
+        };
+        assert_eq!(
+            tally(1, &[pending]).class,
+            NotMeasured,
+            "replication lag is ours"
+        );
+    }
+
+    #[test]
+    fn tally_merges_a_confirm_pair_into_one_vote() {
+        // One location, its failure confirmed: job_count is 2 with the confirm job.
+        let both_fail = tally(2, &[job("a", JOB_FAILED), confirm("c", "a", JOB_FAILED)]);
+        assert_eq!(
+            (both_fail.verdict, both_fail.class),
+            (Verdict::Down, RunClass::Down)
+        );
+        assert_eq!(both_fail.run_result, Some(3));
+        assert!(!both_fail.confirmed_flaky);
+
+        let confirm_passes = tally(2, &[job("a", JOB_FAILED), confirm("c", "a", JOB_PASSED)]);
+        assert_eq!(
+            (confirm_passes.verdict, confirm_passes.class),
+            (Verdict::Up, RunClass::Up)
+        );
+        assert_eq!(
+            confirm_passes.run_result,
+            Some(2),
+            "a flaky pass is a warning"
+        );
+        assert!(confirm_passes.confirmed_flaky);
+
+        // A timed-out confirm job measured nothing, so the failure keeps its vote.
+        let timed_out = tally(2, &[job("a", JOB_FAILED), confirm("c", "a", JOB_DEAD)]);
+        assert_eq!(
+            (timed_out.verdict, timed_out.class),
+            (Verdict::Down, RunClass::Down)
+        );
+        assert!(!timed_out.gap_cause || timed_out.class != RunClass::NotMeasured);
+
+        // Two locations, one failure that its confirm job clears: 2 of 2 healthy.
+        let two = tally(
+            3,
+            &[
+                job("a", JOB_FAILED),
+                job("b", JOB_PASSED),
+                confirm("c", "a", JOB_PASSED),
+            ],
+        );
+        assert_eq!((two.verdict, two.class), (Verdict::Up, RunClass::Up));
+        // No confirm job: the stored run result stands.
+        assert_eq!(tally(1, &[job("a", JOB_FAILED)]).run_result, None);
+    }
+
+    #[test]
+    fn gap_cause_is_control_plane_or_dispatch_only() {
+        assert!(tally(1, &[errored("a", "control_plane")]).gap_cause);
+        assert!(tally(1, &[errored("a", "dispatch")]).gap_cause);
+        assert!(tally(1, &[job("a", JOB_DEAD)]).gap_cause);
+        assert!(!tally(1, &[errored("a", "queue")]).gap_cause);
+        assert!(!tally(1, &[errored("a", "probe")]).gap_cause);
+    }
+
+    #[test]
+    fn uptime_counts_only_runs_that_tested_the_site() {
+        for (class, counted) in [
+            (RunClass::Unknown, false),
+            (RunClass::Up, true),
+            (RunClass::Partial, true),
+            (RunClass::Down, true),
+            (RunClass::NotMeasured, false),
+            (RunClass::Misconfigured, false),
+        ] {
+            assert_eq!(class.counts_for_uptime(), counted, "{class:?}");
+            assert_eq!(RunClass::from_db(class.to_db()), class);
+        }
+    }
+
+    async fn set_job(db: &DatabaseConnection, job_id: &str, status: i32, result: Option<&str>) {
+        db.execute(Statement::from_sql_and_values(
+            db.get_database_backend(),
+            "UPDATE synthetics_jobs SET status = $1, result = $2, completed_at = 1 WHERE id = $3",
+            [
+                Value::from(status),
+                Value::from(result.map(str::to_owned)),
+                Value::from(job_id.to_owned()),
+            ],
+        ))
+        .await
+        .unwrap();
+    }
+
+    async fn stored_class(db: &DatabaseConnection) -> (i32, i64) {
+        let m = checks::Entity::find_by_id("mon-1")
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap();
+        (m.last_run_class, m.last_run_class_at)
+    }
+
+    #[tokio::test]
+    async fn finalize_stores_the_run_class_and_when_it_began() {
+        let db = db().await;
+        run_with_jobs(&db, "a", 100, 1).await;
+        let done = ack(&db, "a", 0, 1, 150).await.unwrap();
+        assert_eq!(done.run_class, RunClass::Up);
+        assert_eq!(stored_class(&db).await, (1, 100));
+        run_with_jobs(&db, "b", 200, 1).await;
+        ack(&db, "b", 0, 1, 250).await.unwrap();
+        assert_eq!(
+            stored_class(&db).await,
+            (1, 100),
+            "same class keeps its start"
+        );
+
+        run_with_jobs(&db, "c", 300, 1).await;
+        set_job(
+            &db,
+            "c-job-0",
+            JOB_ERROR,
+            Some(r#"{"error_source":"control_plane"}"#),
+        )
+        .await;
+        let done = finalize_run(&db, "c", 4, 350).await.unwrap().unwrap();
+        assert_eq!(done.run_class, RunClass::NotMeasured);
+        assert!(done.gap_retry);
+        assert_eq!(stored_class(&db).await, (4, 300));
+        assert_eq!(done.check_update.map(|u| u.run_class), Some(4));
+    }
+
+    #[tokio::test]
+    async fn an_older_run_cannot_overwrite_a_newer_run_class() {
+        let db = db().await;
+        run_with_jobs(&db, "old", 100, 1).await;
+        run_with_jobs(&db, "new", 200, 1).await;
+        ack(&db, "new", 0, 1, 300).await.unwrap();
+        set_job(
+            &db,
+            "old-job-0",
+            JOB_ERROR,
+            Some(r#"{"error_source":"dispatch"}"#),
+        )
+        .await;
+        let late = finalize_run(&db, "old", 4, 400).await.unwrap().unwrap();
+        assert_eq!(late.run_class, RunClass::NotMeasured);
+        assert_eq!(stored_class(&db).await, (1, 200));
+    }
+
+    async fn job_count(db: &DatabaseConnection, run_id: &str) -> i32 {
+        get_run(db, run_id).await.unwrap().unwrap().job_count
+    }
+
+    #[tokio::test]
+    async fn a_failure_gets_one_confirm_job_from_a_passing_location() {
+        let db = db().await;
+        run_with_jobs(&db, "r", 100, 2).await;
+        ack(&db, "r", 1, 1, 150).await;
+        complete_job(&db, "r", 0, 3, 200).await;
+        let id = add_confirm_job(&db, "r-job-0", 200)
+            .await
+            .unwrap()
+            .expect("a failed job gets a confirm job");
+        assert_eq!(job_count(&db, "r").await, 3);
+        let confirm_row = jobs::Entity::find_by_id(id.as_str())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            confirm_row.location, "loc-1",
+            "runs from the location that passed"
+        );
+        assert_eq!(confirm_row.status, 0);
+        assert_eq!(confirm_row.scheduled_ts, 200, "runs at once");
+        assert!(
+            add_confirm_job(&db, "r-job-0", 210)
+                .await
+                .unwrap()
+                .is_none(),
+            "one confirm job per failed job"
+        );
+        assert!(
+            add_confirm_job(&db, &id, 210).await.unwrap().is_none(),
+            "a confirm job never gets its own"
+        );
+
+        // The failed job's ack does not complete the run: it waits for the confirm job.
+        assert!(finalize_run(&db, "r", 3, 200).await.unwrap().is_none());
+        set_job(&db, &id, JOB_PASSED, None).await;
+        let done = finalize_run(&db, "r", 1, 300).await.unwrap().unwrap();
+        assert_eq!(done.run_class, RunClass::Up);
+        assert!(done.confirmed_flaky);
+        assert_eq!(done.run_result, 2);
+    }
+
+    #[tokio::test]
+    async fn a_single_location_confirms_from_itself_and_a_timeout_keeps_the_failure() {
+        let db = db().await;
+        run_with_jobs(&db, "r", 100, 1).await;
+        complete_job(&db, "r", 0, 3, 200).await;
+        let id = add_confirm_job(&db, "r-job-0", 200).await.unwrap().unwrap();
+        let row = jobs::Entity::find_by_id(id.as_str())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.location, "loc-0");
+        assert!(finalize_run(&db, "r", 3, 200).await.unwrap().is_none());
+        // The reaper dead-letters the confirm job.
+        set_job(&db, &id, JOB_DEAD, None).await;
+        let done = finalize_run(&db, "r", 4, 900).await.unwrap().unwrap();
+        assert_eq!(done.run_class, RunClass::Down);
+        assert_eq!(done.verdict, Verdict::Down);
+        assert!(!done.gap_retry, "the site was tested");
+    }
+
+    #[tokio::test]
+    async fn a_completed_run_gets_no_confirm_job() {
+        let db = db().await;
+        run_with_jobs(&db, "r", 100, 1).await;
+        ack(&db, "r", 0, 3, 200).await.unwrap();
+        assert!(
+            add_confirm_job(&db, "r-job-0", 300)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(job_count(&db, "r").await, 1);
+    }
+
+    #[tokio::test]
+    async fn a_not_measured_run_gets_one_extra_run_that_never_chains() {
+        let db = db().await;
+        run_with_jobs(&db, "r", 100, 2).await;
+        let new_run = add_gap_retry_run(&db, "r", 1_000, MIN)
+            .await
+            .unwrap()
+            .expect("one extra run");
+        let extra = get_run(&db, &new_run).await.unwrap().unwrap();
+        assert_eq!(extra.trigger_type, TRIGGER_GAP_RETRY);
+        assert_eq!(extra.scheduled_ts, 1_000 + MIN);
+        assert_eq!(extra.job_count, 2);
+        let jobs = jobs::Entity::find()
+            .filter(jobs::Column::RunId.eq(new_run.as_str()))
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(jobs.len(), 2);
+
+        // The extra run measures nothing either: it is not a scheduled run, so no further run.
+        for j in &jobs {
+            set_job(
+                &db,
+                &j.id,
+                JOB_ERROR,
+                Some(r#"{"error_source":"control_plane"}"#),
+            )
+            .await;
+        }
+        let done = finalize_stuck_runs(&db, 1_000 + 10 * MIN, 2 * MIN)
+            .await
+            .unwrap();
+        let extra_done = done.iter().find(|d| d.run_id == new_run).unwrap();
+        assert_eq!(extra_done.run_class, RunClass::NotMeasured);
+        assert!(!extra_done.gap_retry);
+        assert!(
+            add_gap_retry_run(&db, &new_run, 2_000, MIN)
+                .await
+                .unwrap()
+                .is_none()
         );
     }
 }

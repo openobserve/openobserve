@@ -395,6 +395,8 @@ pub async fn list_synthetics(
             updated_at: m.updated_at,
             last_triggered_at: m.last_triggered_at,
             status: m.last_check_status,
+            last_run_class: m.last_run_class,
+            last_run_class_at: m.last_run_class_at,
             last_check_at: (m.last_triggered_at > 0).then_some(m.last_triggered_at),
             last_response_ms: None,
             steps,

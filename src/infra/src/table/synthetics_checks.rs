@@ -158,6 +158,9 @@ impl TryFrom<synthetics_checks::Model> for Synthetic {
             next_run_at: m.next_run_at,
             last_triggered_at: m.last_triggered_at,
             last_check_status,
+            last_run_class: m.last_run_class,
+            last_run_class_at: m.last_run_class_at,
+            confirm_failures: settings.confirm_failures,
             owner: m.owner,
             created_at: m.created_at,
             updated_at: m.updated_at,
@@ -951,6 +954,10 @@ pub struct StatusStreaks {
     pub up_runs: i32,
     /// `scheduled_ts` of the run that wrote these values, in microseconds.
     pub run_ts: i64,
+    /// `RunClass` DB integer of that run.
+    pub run_class: i32,
+    /// `scheduled_ts` of the first run in the current `run_class`, in microseconds.
+    pub run_class_at: i64,
 }
 
 /// Reads the badge and run streaks of one check. `None` when the check is not in this region.
@@ -964,15 +971,19 @@ pub async fn get_status_streaks<C: ConnectionTrait>(
         .column(Column::StatusDownRuns)
         .column(Column::StatusUpRuns)
         .column(Column::StatusRunTs)
-        .into_tuple::<(i32, i32, i32, i64)>()
+        .column(Column::LastRunClass)
+        .column(Column::LastRunClassAt)
+        .into_tuple::<(i32, i32, i32, i64, i32, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
-        |(last_check_status, down_runs, up_runs, run_ts)| StatusStreaks {
+        |(last_check_status, down_runs, up_runs, run_ts, run_class, run_class_at)| StatusStreaks {
             last_check_status,
             down_runs,
             up_runs,
             run_ts,
+            run_class,
+            run_class_at,
         },
     ))
 }
@@ -989,16 +1000,20 @@ pub async fn lock_status_streaks<C: ConnectionTrait>(
         .column(Column::StatusDownRuns)
         .column(Column::StatusUpRuns)
         .column(Column::StatusRunTs)
+        .column(Column::LastRunClass)
+        .column(Column::LastRunClassAt)
         .lock_exclusive()
-        .into_tuple::<(i32, i32, i32, i64)>()
+        .into_tuple::<(i32, i32, i32, i64, i32, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
-        |(last_check_status, down_runs, up_runs, run_ts)| StatusStreaks {
+        |(last_check_status, down_runs, up_runs, run_ts, run_class, run_class_at)| StatusStreaks {
             last_check_status,
             down_runs,
             up_runs,
             run_ts,
+            run_class,
+            run_class_at,
         },
     ))
 }
@@ -1015,7 +1030,9 @@ pub async fn swap_status_streaks<C: ConnectionTrait>(
         .col_expr(Column::LastCheckStatus, Expr::value(next.last_check_status))
         .col_expr(Column::StatusDownRuns, Expr::value(next.down_runs))
         .col_expr(Column::StatusUpRuns, Expr::value(next.up_runs))
-        .col_expr(Column::StatusRunTs, Expr::value(next.run_ts));
+        .col_expr(Column::StatusRunTs, Expr::value(next.run_ts))
+        .col_expr(Column::LastRunClass, Expr::value(next.run_class))
+        .col_expr(Column::LastRunClassAt, Expr::value(next.run_class_at));
     if streaks_differ(expected, next) {
         q = q.col_expr(
             Column::UpdatedAt,
@@ -1028,6 +1045,8 @@ pub async fn swap_status_streaks<C: ConnectionTrait>(
         .filter(Column::StatusDownRuns.eq(expected.down_runs))
         .filter(Column::StatusUpRuns.eq(expected.up_runs))
         .filter(Column::StatusRunTs.eq(expected.run_ts))
+        .filter(Column::LastRunClass.eq(expected.run_class))
+        .filter(Column::LastRunClassAt.eq(expected.run_class_at))
         .exec(conn)
         .await?;
     Ok(res.rows_affected > 0)
@@ -1048,6 +1067,8 @@ pub async fn apply_replicated_streaks<C: ConnectionTrait>(
         .col_expr(Column::StatusDownRuns, Expr::value(next.down_runs))
         .col_expr(Column::StatusUpRuns, Expr::value(next.up_runs))
         .col_expr(Column::StatusRunTs, Expr::value(next.run_ts))
+        .col_expr(Column::LastRunClass, Expr::value(next.run_class))
+        .col_expr(Column::LastRunClassAt, Expr::value(next.run_class_at))
         .col_expr(
             Column::UpdatedAt,
             Expr::value(config::utils::time::now_micros()),
@@ -1245,6 +1266,7 @@ fn pack_settings(check: &Synthetic) -> Result<serde_json::Value, errors::Error> 
         session_replay: check.session_replay,
         start: check.start,
         environments: check.environments.clone(),
+        confirm_failures: check.confirm_failures,
     })?)
 }
 
@@ -1335,6 +1357,7 @@ fn streaks_differ(a: &StatusStreaks, b: &StatusStreaks) -> bool {
     a.last_check_status != b.last_check_status
         || a.down_runs != b.down_runs
         || a.up_runs != b.up_runs
+        || a.run_class != b.run_class
 }
 
 fn check_type_to_str(t: &SyntheticType) -> &'static str {
@@ -1407,6 +1430,8 @@ pub(crate) mod tests {
             status_down_runs: 0,
             status_up_runs: 0,
             status_run_ts: 0,
+            last_run_class: 0,
+            last_run_class_at: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
