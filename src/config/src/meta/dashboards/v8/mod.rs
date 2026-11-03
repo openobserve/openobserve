@@ -1261,6 +1261,10 @@ pub struct VariableList {
     pub tabs: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub panels: Option<Vec<String>>,
+    /// A date variable's output when its placeholder names no format: `iso`, `dmy`, `mdy`,
+    /// `epoch`, `epochms` or `epochus`; `iso` when unset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_format: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -1890,6 +1894,17 @@ mod tests {
         assert!(json.contains("hideOnDashboard"));
         assert!(json.contains("selectAllValueForMultiSelect"));
         assert!(json.contains("customMultiSelectValue"));
+    }
+
+    #[test]
+    fn test_variable_list_keeps_a_date_variable_s_format() {
+        let vl: VariableList =
+            serde_json::from_str(r#"{"type":"date","name":"day","dateFormat":"epochus"}"#).unwrap();
+        assert_eq!(vl.date_format.as_deref(), Some("epochus"));
+        let json = serde_json::to_string(&vl).unwrap();
+        assert!(json.contains(r#""dateFormat":"epochus""#));
+        let json = serde_json::to_string(&VariableList::default()).unwrap();
+        assert!(!json.contains("dateFormat"));
     }
 
     #[test]
