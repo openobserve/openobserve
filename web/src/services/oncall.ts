@@ -511,6 +511,18 @@ const oncall = {
       { minutes },
     ),
 
+  /// Ends a snooze now; the ladder continues from the step it paused on.
+  unsnoozeResponse: ({
+    org_identifier,
+    response_id,
+  }: {
+    org_identifier: string;
+    response_id: string;
+  }) =>
+    http().post<OnCallResponse>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/unsnooze`,
+    ),
+
   addNote: ({
     org_identifier,
     response_id,

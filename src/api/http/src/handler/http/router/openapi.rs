@@ -1328,6 +1328,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::oncall::snooze_response,
     openobserve_api_management::request::oncall::test_team_slack_channel,
     openobserve_api_management::request::oncall::unacknowledge_response,
+    openobserve_api_management::request::oncall::unsnooze_response,
     openobserve_api_management::request::oncall::update_ownership_rule,
     openobserve_api_management::request::oncall::update_team,
     openobserve_api_management::request::oncall::who_is_on_call,

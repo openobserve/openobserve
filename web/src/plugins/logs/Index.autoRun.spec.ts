@@ -243,8 +243,12 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
   });
 
   describe("re-applied query links (AI chat, search history)", () => {
-    const reApply = async (query: Record<string, string>) => {
-      store.state.zoConfig = { ...originalZoConfig, auto_query_enabled: true };
+    const reApply = async (
+      query: Record<string, string>,
+      zoConfig: Record<string, unknown> = {},
+      logs?: Mock,
+    ) => {
+      store.state.zoConfig = { ...originalZoConfig, auto_query_enabled: true, ...zoConfig };
       (store.state as any).logs = { isInitialized: false, logs: {} };
       vi.spyOn(store, "dispatch").mockResolvedValue(undefined as any);
       (getFieldsFromQuery as Mock).mockResolvedValue({ fields: [], filters: [], streamName: "" });
@@ -253,6 +257,7 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
         attachTo: "#app",
         global: { provide: { store }, plugins: [i18n, router] },
       });
+      if (logs) wrapper.vm.autoRun.setExecutors({ logs });
       await vi.waitFor(
         () => expect(wrapper.vm.searchObj.data.stream.streamLists.length).toBeGreaterThan(0),
         { timeout: 10000 },
@@ -282,6 +287,61 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
         expect(wrapper.vm.searchObj.data.filterErrMsg).toBe("");
       },
     );
+
+    it.each(["ai_chat_query", "search_history_re_apply"])(
+      "%s loaded without running shows the run-query prompt, not an empty result grid",
+      async (type) => {
+        await reApply(
+          { type, stream: "k8s_json", stream_type: "logs", period: "15m" },
+          { auto_query_enabled: false, query_on_stream_selection: true },
+        );
+        await vi.waitFor(() =>
+          expect(wrapper.vm.searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+        );
+        await flushPromises();
+        expect(wrapper.vm.searchObj.meta.searchApplied).toBe(false);
+        expect(wrapper.find('[data-test="logs-search-apply-search-text"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="logs-search-search-result"]').exists()).toBe(false);
+      },
+    );
+
+    it("a search Auto Run starts during a re-apply keeps its hits", async () => {
+      const logs = vi.fn(async () => {
+        wrapper.vm.searchObj.data.queryResults = { hits: [{ _timestamp: 1, body: "row" }] };
+        wrapper.vm.searchObj.meta.searchApplied = true;
+      });
+      await reApply(
+        { type: "search_history_re_apply", stream: "k8s_json", stream_type: "logs", period: "15m" },
+        { auto_query_enabled: true, query_on_stream_selection: false },
+        logs,
+      );
+      await vi.waitFor(() =>
+        expect(wrapper.vm.searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+      );
+      await vi.waitFor(() => expect(logs).toHaveBeenCalled());
+      await flushPromises();
+      expect(wrapper.vm.searchObj.data.queryResults.hits).toHaveLength(1);
+      expect(wrapper.find('[data-test="logs-search-apply-search-text"]').exists()).toBe(false);
+    });
+
+    it("a search Auto Run starts during a re-apply keeps loading, not the run-query prompt, while it is pending", async () => {
+      const logs = vi.fn(() => {
+        wrapper.vm.searchObj.loading = true;
+        return new Promise(() => {});
+      });
+      await reApply(
+        { type: "search_history_re_apply", stream: "k8s_json", stream_type: "logs", period: "15m" },
+        { auto_query_enabled: true, query_on_stream_selection: false },
+        logs,
+      );
+      await vi.waitFor(() =>
+        expect(wrapper.vm.searchObj.data.stream.selectedStreamFields.length).toBeGreaterThan(0),
+      );
+      await vi.waitFor(() => expect(logs).toHaveBeenCalled());
+      await flushPromises();
+      expect(wrapper.vm.searchObj.loading).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-apply-search-text"]').exists()).toBe(false);
+    });
 
     it("a re-applied query loaded without running lets the user's edited run push history", async () => {
       await router.replace({ name: "home" });

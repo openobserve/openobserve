@@ -39,6 +39,7 @@ vi.mock("@/services/oncall", () => ({
     unacknowledgeResponse: vi.fn(),
     confirmRecovery: vi.fn(),
     snoozeResponse: vi.fn(),
+    unsnoozeResponse: vi.fn(),
     addNote: vi.fn(),
     handoffResponse: vi.fn(),
     resolveResponse: vi.fn(),
@@ -659,6 +660,29 @@ describe("OnCallResponseDetail", () => {
     queryClient.clear();
     const lapsed = await renderWith({ snoozed_until: (Date.now() - 60_000) * 1000 });
     expect(lapsed.find('[data-test="oncall-response-snoozed-banner"]').exists()).toBe(false);
+  });
+
+  /// Snooze means paused, then continues; while it is paused the same control continues it now.
+  it("swaps Snooze for Unsnooze while snoozed, and the banner offers it too", async () => {
+    const wrapper = await renderWith({ snoozed_until: (Date.now() + 30 * 60_000) * 1000 });
+    service.unsnoozeResponse.mockResolvedValue({ data: {} } as any);
+
+    expect(wrapper.find('[data-test="oncall-response-snooze-btn"]').exists()).toBe(false);
+    for (const button of [
+      "oncall-response-unsnooze-btn",
+      "oncall-response-snoozed-banner-unsnooze",
+    ]) {
+      service.unsnoozeResponse.mockClear();
+      toastSpy.mockClear();
+      await wrapper.find(`[data-test="${button}"]`).trigger("click");
+      await flushPromises();
+      expect(service.unsnoozeResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ response_id: "resp_1" }),
+      );
+      expect(toastSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "Snooze ended · paging continues" }),
+      );
+    }
   });
 
   it("adds a note and clears the box", async () => {
@@ -1582,6 +1606,19 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
       await flushPromises();
 
       expect(service.snoozeResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ response_id: "resp_1" }),
+      );
+    });
+
+    it("unsnoozes from the menu while snoozed", async () => {
+      const wrapper = await renderWith({ snoozed_until: (Date.now() + 30 * 60_000) * 1000 });
+      service.unsnoozeResponse.mockResolvedValue({ data: {} } as any);
+
+      expect(wrapper.find('[data-test="oncall-response-snooze-30-menu"]').exists()).toBe(false);
+      await wrapper.find('[data-test="oncall-response-unsnooze-btn-menu"]').trigger("click");
+      await flushPromises();
+
+      expect(service.unsnoozeResponse).toHaveBeenCalledWith(
         expect.objectContaining({ response_id: "resp_1" }),
       );
     });
