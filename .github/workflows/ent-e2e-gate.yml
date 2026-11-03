@@ -156,9 +156,8 @@ jobs:
               if [ "$RAN" = "0" ]; then IGNORE=$(jq -c --argjson i "$ID" '. + [$i]' <<<"$IGNORE"); continue; fi
             fi
             if [ "$STATUS" = "completed" ]; then break; fi
-            # Waiting would hold a runner for the whole gate, and a green here would override the running gate.
-            echo "::error::Gate check $ID on $HEAD_SHA is still running — re-run this check once it finishes."
-            exit 1
+            # This check is newer than the running gate, so it must end with the gate's result, not before it.
+            ERRORS=0; sleep 30
           done
           echo "::notice::Mirroring gate check $ID on $HEAD_SHA: $CONCL."
           [ "$CONCL" = "success" ] || { echo "::error::The gate's current result on this head is '$CONCL'."; exit 1; }
