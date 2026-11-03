@@ -273,18 +273,19 @@ function stripRunnerLines(text) {
 
 // Generic id words that would blank ordinary review prose if redacted.
 const GENERIC_ID_WORDS = new Set(["review", "flash", "preview", "latest", "chat", "mini", "lite", "fast", "turbo"]);
+// Words this repo's own tooling is named after (CLAUDE.md, .claude/, claude-code-action); redacting them breaks real file and action references.
+const REPO_TOOLING_WORDS = new Set(["claude"]);
 
-// Every vendor and family word of both ids goes too, so "Claude Sonnet" and a bare "Anthropic" are caught; longest first because alternation is first-match.
+// Full ids match anywhere; a vendor or family word matches only between non-letters, so "api.anthropic.com" goes but "anthropics/" stays.
 export function redactProviderIdentity(text, { providerId, modelId }) {
-  const words = [providerId, modelId]
-    .flatMap(id => String(id ?? "").toLowerCase().split(/[^a-z]+/))
-    .filter(word => word.length >= 4 && !GENERIC_ID_WORDS.has(word));
-  const terms = [...new Set([providerId, modelId, ...words].filter(Boolean))]
-    .sort((a, b) => b.length - a.length)
-    .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const escape = t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const ids = [providerId, modelId].map(id => String(id ?? "")).filter(Boolean);
+  const words = [...new Set(ids.flatMap(id => id.toLowerCase().split(/[^a-z]+/)))]
+    .filter(word => word.length >= 4 && !GENERIC_ID_WORDS.has(word) && !REPO_TOOLING_WORDS.has(word));
+  const terms = [...ids.map(escape), ...words.map(word => `(?<![a-z])${escape(word)}(?![a-z])`)];
   if (terms.length === 0) return text;
-  // A term inside a longer word or a file name is left alone, so "CLAUDE.md", ".claude/" and "anthropics" stay readable.
-  return text.replace(new RegExp(`(?<![a-z0-9.])(?:${terms.join("|")})(?![a-z0-9]|\\.[a-z])`, "gi"), "[redacted]");
+  const byLength = [...ids, ...words].map((t, i) => [t.length, terms[i]]).sort((a, b) => b[0] - a[0]).map(([, t]) => t);
+  return text.replace(new RegExp(byLength.join("|"), "gi"), "[redacted]");
 }
 
 function unwrapJsonBody(body) {

@@ -86,7 +86,7 @@ test("the marker survives a secret scrub and stays single when the model echoes 
 });
 
 test("redaction cannot rebuild a marker that the first strip missed", () => {
-  const posted = sanitize(`${REVIEW}\n<!-- ai-code-review-tool_x -->`, { ...IDS, modelId: "tool_x", providerId: "" });
+  const posted = sanitize(`${REVIEW}\n<!-- ai-code-review.tool.x -->`, { ...IDS, modelId: ".tool.x", providerId: "" });
   assert.equal(posted.match(/<!--\s*ai-code-review/g).length, 1);
 });
 
@@ -289,17 +289,17 @@ test("redaction takes the longest id first", () => {
   assert.equal(redactProviderIdentity("deepseek-flash and DeepSeek", { providerId: "deepseek-review", modelId: "deepseek-flash" }), "[redacted] and [redacted]");
 });
 
-test("redaction strips every vendor and family name of the review model", () => {
+test("redaction strips the review model's ids, vendor and family names", () => {
   const ids = { providerId: "anthropic-review", modelId: "claude-sonnet-5-5" };
-  const text = "I am Claude Sonnet 5.5 by Anthropic (anthropic-review/claude-sonnet-5-5, CLAUDE_SONNET). SONNET agrees.";
+  const text = "Sonnet 5.5 by Anthropic (anthropic-review/claude-sonnet-5-5, SONNET_X); request to https://api.anthropic.com/v1/messages failed.";
   const redacted = redactProviderIdentity(text, ids);
-  assert.doesNotMatch(redacted, /claude|anthropic|sonnet/i);
-  assert.equal(redacted, "I am [redacted] [redacted] 5.5 by [redacted] ([redacted]/[redacted], [redacted]_[redacted]). [redacted] agrees.");
+  assert.doesNotMatch(redacted, /anthropic(?!s)|sonnet/i);
+  assert.equal(redacted, "[redacted] 5.5 by [redacted] ([redacted]/[redacted], [redacted]_X); request to https://api.[redacted].com/v1/messages failed.");
 });
 
-test("redaction leaves file names and generic id words readable", () => {
+test("redaction leaves the repo's own Claude tooling references readable", () => {
   const ids = { providerId: "anthropic-review", modelId: "claude-sonnet-5-5" };
-  const text = "Update CLAUDE.md, .claude/skills and the claude.yml workflow; this review is done.";
+  const text = "Update CLAUDE.md, .claude/skills, claude_desktop_config.json and uses: anthropics/claude-code-action@v1; this review is done.";
   assert.equal(redactProviderIdentity(text, ids), text);
 });
 
