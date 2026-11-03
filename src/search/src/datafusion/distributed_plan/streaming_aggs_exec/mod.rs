@@ -159,7 +159,7 @@ impl Default for StreamingAggsCache {
     fn default() -> Self {
         Self::new(
             config::get_config()
-                .limit
+                .memory
                 .datafusion_streaming_aggs_cache_max_entries,
         )
     }

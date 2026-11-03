@@ -41,8 +41,8 @@ pub async fn cache_files(
     }
 
     let cfg = get_config();
-    let cache_type = if cfg.memory_cache.enabled
-        && scan_stats.compressed_size < cfg.memory_cache.skip_size as i64
+    let cache_type = if cfg.memory.file_cache_enabled
+        && scan_stats.compressed_size < cfg.memory.file_cache_skip_size as i64
     {
         file_data::CacheType::Memory
     } else if !is_local_disk_storage()
@@ -442,7 +442,10 @@ mod tests {
                 );
                 let mut cfg = config::config::init();
                 cfg.common.is_local_storage = false;
-                let skip = cfg.memory_cache.skip_size.max(cfg.disk_cache.skip_size);
+                let skip = cfg
+                    .memory
+                    .file_cache_skip_size
+                    .max(cfg.disk_cache.skip_size);
                 config::CONFIG.store(Arc::new(cfg));
                 let mut stats = ScanStats {
                     compressed_size: skip as i64,
@@ -516,7 +519,7 @@ mod tests {
         let reads = Arc::clone(&store.reads);
         infra::storage::add_account("cache-inspection", Box::new(store)).await;
         let mut cfg = config::config::init();
-        cfg.memory_cache.enabled = memory;
+        cfg.memory.file_cache_enabled = memory;
         cfg.disk_cache.enabled = disk;
         cfg.common.is_local_storage = !remote;
         cfg.limit.file_download_enable_priority_queue = priority;

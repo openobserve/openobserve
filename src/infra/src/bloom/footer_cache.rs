@@ -44,7 +44,7 @@ const SIZE_HEADER_LEN: usize = 8;
 /// Global cache. Sized via [`config::Config::search::bloom_footer_cache_max_size`]
 /// (env: `ZO_BLOOM_FOOTER_CACHE_MAX_SIZE`).
 pub static BLOOM_FOOTER_CACHE: LazyLock<BloomFooterCache> = LazyLock::new(|| {
-    let max = config::get_config().search.bloom_footer_cache_max_size;
+    let max = config::get_config().memory.bloom_footer_cache_max_size;
     BloomFooterCache::new(max)
 });
 

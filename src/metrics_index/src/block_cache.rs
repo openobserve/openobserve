@@ -229,7 +229,7 @@ impl CacheWeight {
 
 pub fn cache_limit() -> usize {
     config::get_config()
-        .search
+        .memory
         .metrics_blocks_cache_max_size
         .saturating_mul(1024 * 1024)
 }

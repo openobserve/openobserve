@@ -55,7 +55,7 @@ pub const PAUSE_SLEEP_DURATION: u64 = 60;
 /// // Basic usage (sleep before, pause when <= 0)
 /// spawn_pausable_job!(
 ///     "memory_cache_gc",
-///     get_config().memory_cache.gc_interval,
+///     get_config().memory.file_cache_gc_interval,
 ///     {
 ///         if let Err(e) = gc().await {
 ///             log::error!("gc error: {}", e);

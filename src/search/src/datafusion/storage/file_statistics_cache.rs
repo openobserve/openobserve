@@ -186,7 +186,7 @@ impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
         }
 
         let max_bytes = config::get_config()
-            .limit
+            .memory
             .datafusion_file_stat_cache_max_size;
         if self.current_memory.load(Ordering::Relaxed) > max_bytes as i64 {
             self.evict(max_bytes);
@@ -225,7 +225,7 @@ impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
 
     fn cache_limit(&self) -> usize {
         config::get_config()
-            .limit
+            .memory
             .datafusion_file_stat_cache_max_size
     }
 

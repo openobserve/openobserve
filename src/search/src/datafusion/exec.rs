@@ -160,17 +160,17 @@ pub async fn create_runtime_env(trace_id: &str, memory_limit: usize) -> Result<R
     let cfg = get_config();
     let mut builder =
         RuntimeEnvBuilder::new().with_object_store_registry(Arc::new(object_store_registry));
-    if cfg.limit.datafusion_file_stat_cache_max_size > 0 {
+    if cfg.memory.datafusion_file_stat_cache_max_size > 0 {
         let cache_config = CacheManagerConfig::default();
         let cache_config = cache_config
             .with_file_statistics_cache(Some(file_statistics_cache::GLOBAL_CACHE.clone()))
-            .with_file_statistics_cache_limit(cfg.limit.datafusion_file_stat_cache_max_size);
+            .with_file_statistics_cache_limit(cfg.memory.datafusion_file_stat_cache_max_size);
         builder = builder.with_cache_manager(cache_config);
     }
 
     let memory_size = std::cmp::max(DATAFUSION_MIN_MEM, memory_limit);
-    let mem_pool = super::MemoryPoolType::from_str(&cfg.memory_cache.datafusion_memory_pool)
-        .map_err(|e| {
+    let mem_pool =
+        super::MemoryPoolType::from_str(&cfg.memory.datafusion_pool_type).map_err(|e| {
             DataFusionError::Execution(format!("Invalid datafusion memory pool type: {e}"))
         })?;
     let memory_pool = match mem_pool {
@@ -263,8 +263,7 @@ impl<'a> DataFusionContextBuilder<'a> {
 
     pub async fn build(self, target_partitions: usize) -> Result<SessionContext, DataFusionError> {
         let cfg = get_config();
-        let (target_partitions, memory_size) =
-            (target_partitions, cfg.memory_cache.datafusion_max_size);
+        let (target_partitions, memory_size) = (target_partitions, cfg.memory.datafusion_pool_size);
         #[cfg(feature = "enterprise")]
         let (target_partitions, memory_size) = get_cpu_and_mem_limit(
             self.trace_id,
@@ -619,7 +618,7 @@ impl TableBuilder {
             &session.id,
             session.work_group.clone(),
             target_partitions,
-            cfg.memory_cache.datafusion_max_size,
+            cfg.memory.datafusion_pool_size,
         )
         .await?;
 

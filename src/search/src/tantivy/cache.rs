@@ -179,7 +179,7 @@ impl Default for TantivyResultCache {
     fn default() -> Self {
         Self::new(
             config::get_config()
-                .search
+                .memory
                 .inverted_index_result_cache_max_entries,
         )
     }

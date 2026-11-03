@@ -46,7 +46,7 @@ static CACHE_KEY_SUFFIX: Lazy<AtomicI64> = Lazy::new(|| AtomicI64::new(now_micro
 
 static GLOBAL_CACHE: Lazy<Vec<RwLock<MetricsIndex>>> = Lazy::new(|| {
     // metrics_result_cache_max_size is resolved to bytes in check_config
-    let max_bytes = get_config().limit.metrics_result_cache_max_size;
+    let max_bytes = get_config().memory.metrics_result_cache_max_size;
     let mut metrics = Vec::with_capacity(METRICS_INDEX_CACHE_BUCKETS);
     for _ in 0..METRICS_INDEX_CACHE_BUCKETS {
         metrics.push(RwLock::new(MetricsIndex::new(

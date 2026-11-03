@@ -63,7 +63,7 @@ static LABEL_CACHE: Lazy<LabelCache> = Lazy::new(|| {
     let shard_count = (cfg.limit.cpu_num * 4)
         .next_power_of_two()
         .clamp(MIN_SHARDS, MAX_SHARDS);
-    LabelCache::new(cfg.limit.metrics_label_cache_max_size, shard_count)
+    LabelCache::new(cfg.memory.metrics_label_cache_max_size, shard_count)
 });
 
 /// The series a query still has to recover from a label scan after the cache

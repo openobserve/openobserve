@@ -192,7 +192,7 @@ pub async fn search(
         } else {
             None
         };
-        let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
+        let memory_limit = cfg.memory.datafusion_pool_size; // bytes
         let group_step = grouping_step(step, query.query_exemplars);
         let group = match generate_search_groups(
             memory_limit,
@@ -340,7 +340,7 @@ pub async fn data(
 
     // 2. generate search group with max records stream
     let start_ts = std::time::Instant::now();
-    let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
+    let memory_limit = cfg.memory.datafusion_pool_size; // bytes
     let group_step = grouping_step(step, query.query_exemplars);
     let group = match generate_search_group(memory_limit, plan.files, start, end, group_step).await
     {

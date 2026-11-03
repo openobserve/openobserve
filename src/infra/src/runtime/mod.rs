@@ -79,7 +79,7 @@ pub static WAL_RUNTIME: Lazy<Option<Arc<Runtime>>> = Lazy::new(|| {
     let thread_num = if cfg.limit.wal_runtime_worker_num > 0 {
         cfg.limit.wal_runtime_worker_num
     } else {
-        cfg.limit.mem_table_bucket_num
+        cfg.memory.mem_table_bucket_num
     };
     // Ensure the number of worker threads less than the total number of CPU cores
     let thread_num = thread_num.min(total_cpus);

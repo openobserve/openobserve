@@ -106,7 +106,7 @@ impl Default for MemoryQueue {
     fn default() -> Self {
         let cfg = config::get_config();
         // already converted from MB to bytes during config validation
-        Self::new(cfg.common.memory_queue_max_size as u64)
+        Self::new(cfg.memory.queue_max_size as u64)
     }
 }
 

@@ -309,10 +309,10 @@ async fn download_file(
         file_data::CacheType::Memory => {
             let mut disk_exists = false;
             let mem_exists = file_data::memory::exist(file_name).await;
-            if !mem_exists && !cfg.memory_cache.skip_disk_check {
+            if !mem_exists && !cfg.memory.file_cache_skip_disk_check {
                 disk_exists = file_data::disk::exist(file_name).await;
             }
-            if !mem_exists && (cfg.memory_cache.skip_disk_check || !disk_exists) {
+            if !mem_exists && (cfg.memory.file_cache_skip_disk_check || !disk_exists) {
                 file_data::memory::download(account, file_name, size).await
             } else {
                 Ok(0)
@@ -674,7 +674,7 @@ fn should_prioritize_file(ts: i64, window_secs: i64) -> bool {
 pub fn exceeds_cache_max_age(ts: i64, cache_type: file_data::CacheType) -> bool {
     let cfg = get_config();
     let max_age_days = match cache_type {
-        file_data::CacheType::Memory => cfg.memory_cache.max_age_days,
+        file_data::CacheType::Memory => cfg.memory.file_cache_max_age_days,
         file_data::CacheType::Disk => cfg.disk_cache.max_age_days,
         file_data::CacheType::None => 0,
     };

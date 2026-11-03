@@ -196,7 +196,7 @@ pub async fn download(
     size: Option<usize>,
 ) -> Result<usize, anyhow::Error> {
     let cfg = config::get_config();
-    if cfg.memory_cache.enabled {
+    if cfg.memory.file_cache_enabled {
         memory::download(account, file, size).await
     } else if cfg.disk_cache.enabled {
         disk::download(account, file, size).await
@@ -353,7 +353,7 @@ async fn download_from_storage(
 pub async fn set(key: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
     let cfg = config::get_config();
     // set the data to the memory cache
-    if cfg.memory_cache.enabled {
+    if cfg.memory.file_cache_enabled {
         memory::set(key, data).await
     } else if cfg.disk_cache.enabled {
         disk::set(key, data).await
@@ -382,7 +382,7 @@ pub async fn get_opts(
 ) -> object_store::Result<GetResult> {
     let cfg = config::get_config();
     // get from memory cache
-    if cfg.memory_cache.enabled
+    if cfg.memory.file_cache_enabled
         && let Ok(ret) = memory::get_opts(file, options.clone()).await
     {
         return Ok(ret);
@@ -416,7 +416,7 @@ pub async fn get_size(account: &str, file: &str) -> object_store::Result<usize> 
 pub async fn get_size_opts(account: &str, file: &str, remote: bool) -> object_store::Result<usize> {
     let cfg = config::get_config();
     // get from memory cache
-    if cfg.memory_cache.enabled
+    if cfg.memory.file_cache_enabled
         && let Some(v) = memory::get_size(file).await
     {
         return Ok(v);
@@ -449,7 +449,7 @@ pub async fn get_ranges_opts(
 ) -> object_store::Result<Vec<Bytes>> {
     let cfg = config::get_config();
     crate::storage::get_ranges_opt(ranges, |fetched_ranges| async move {
-        if cfg.memory_cache.enabled
+        if cfg.memory.file_cache_enabled
             && let Some(v) = memory::get_ranges(file, &fetched_ranges).await
         {
             return Ok(v);

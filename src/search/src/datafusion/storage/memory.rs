@@ -476,7 +476,7 @@ mod tests {
             );
             assert_eq!(range_calls.load(Ordering::Relaxed), 1);
         }
-        if config::get_config().memory_cache.enabled {
+        if config::get_config().memory.file_cache_enabled {
             let (location, _, option_calls) = range_tracking_fixture().await;
             let (account, key) = format_location(&location);
             let key = key.to_string();

@@ -44,7 +44,7 @@ use crate::{
 
 static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
     let cfg = get_config();
-    let writer_num = cfg.limit.mem_table_bucket_num + MEM_TABLE_INDIVIDUAL_STREAMS.len();
+    let writer_num = cfg.memory.mem_table_bucket_num + MEM_TABLE_INDIVIDUAL_STREAMS.len();
     let mut writers = Vec::with_capacity(writer_num);
     for _ in 0..writer_num {
         writers.push(RwMap::default());
@@ -67,7 +67,7 @@ pub fn check_memtable_size() -> Result<()> {
     let cur_mem = metrics::INGEST_MEMTABLE_ARROW_BYTES
         .with_label_values::<&str>(&[])
         .get();
-    if cur_mem >= get_config().limit.mem_table_max_size as i64 {
+    if cur_mem >= get_config().memory.mem_table_max_size as i64 {
         Err(Error::MemoryTableOverflowError {})
     } else {
         Ok(())
@@ -77,13 +77,13 @@ pub fn check_memtable_size() -> Result<()> {
 // check total memory size
 pub fn check_memory_circuit_breaker() -> Result<()> {
     let cfg = get_config();
-    if !cfg.common.memory_circuit_breaker_enabled || cfg.common.memory_circuit_breaker_ratio == 0 {
+    if !cfg.memory.circuit_breaker_enabled || cfg.memory.circuit_breaker_ratio == 0 {
         return Ok(());
     }
     let cur_mem = metrics::NODE_MEMORY_USAGE
         .with_label_values::<&str>(&[])
         .get() as usize;
-    if cur_mem > cfg.limit.mem_total / 100 * cfg.common.memory_circuit_breaker_ratio {
+    if cur_mem > cfg.limit.mem_total / 100 * cfg.memory.circuit_breaker_ratio {
         Err(Error::MemoryCircuitBreakerError {})
     } else {
         Ok(())
@@ -195,7 +195,7 @@ pub async fn read_from_memtable(
 ) -> Result<(HashSet<u64>, Vec<ReadRecordBatchEntry>)> {
     let cfg = get_config();
     // fast past
-    if cfg.limit.mem_table_bucket_num <= 1 {
+    if cfg.memory.mem_table_bucket_num <= 1 {
         let idx = get_table_idx(0, org_id, stream_name);
         let key = WriterKey::new(idx, org_id, stream_type);
         let w = WRITERS[idx].read().await;
@@ -213,7 +213,7 @@ pub async fn read_from_memtable(
     // slow path
     let mut ids = HashSet::new();
     let mut batches = Vec::new();
-    let mut visited = HashSet::with_capacity(cfg.limit.mem_table_bucket_num);
+    let mut visited = HashSet::with_capacity(cfg.memory.mem_table_bucket_num);
     for thread_id in 0..cfg.limit.http_worker_num {
         let idx = get_table_idx(thread_id, org_id, stream_name);
         if visited.contains(&idx) {
