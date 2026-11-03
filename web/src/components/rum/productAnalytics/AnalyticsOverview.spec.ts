@@ -352,6 +352,66 @@ describe("AnalyticsOverview", () => {
     expect(sqls().some((s) => s.includes("AS dau"))).toBe(false);
   });
 
+  it("keeps every KPI tile loading until the identity resolves, never reading 'No user id set' (#3167)", async () => {
+    const facets = held();
+    routes = [[/env AS value/, facets.fn], ...baseRoutes()];
+    const { performanceState } = usePerformance();
+    performanceState.data.streams._rumdata = {
+      name: "_rumdata",
+      schema: { usr_email: { name: "usr_email" }, env: { name: "env" } },
+    };
+    respond();
+    await mountOverview();
+    await settle();
+    expect(facets.pending()).toBe(1);
+    const users = wrapper!.find('[data-test="rum-analytics-kpi-users"]');
+    expect(users.find('[data-test="o-stat-card-value-skeleton"]').exists()).toBe(true);
+    expect(users.text()).not.toContain("No user id set");
+    facets.release([]);
+    await settle();
+    const settled = wrapper!.find('[data-test="rum-analytics-kpi-users"]');
+    expect(settled.find('[data-test="o-stat-card-value-skeleton"]').exists()).toBe(false);
+    expect(settled.text()).toContain("usr_email");
+  });
+
+  it("shows no chip counts until Pages and Clicks have answered (#3167)", async () => {
+    const pages = held();
+    routes = withRoute(/AS views/, pages.fn);
+    respond();
+    await mountOverview();
+    await settle();
+    const chip = (name: string) =>
+      wrapper!.find(`[data-test="rum-analytics-overview-chip-${name}"]`).text();
+    expect(chip("rising")).not.toContain("0");
+    expect(chip("all")).not.toContain("·");
+    pages.release(PAGES);
+    await settle();
+    expect(chip("all")).toContain("·");
+  });
+
+  it("shows no chip counts when Clicks fails with no rows (#3167)", async () => {
+    routes = withRoute(/AS clicks/, (() =>
+      Promise.reject({ response: { status: 429, data: { message: "queue full" } } })) as never);
+    respond();
+    await mountOverview();
+    await settle();
+    expect(wrapper!.find('[data-test="rum-analytics-overview-chip-all"]').text()).not.toContain(
+      "·",
+    );
+  });
+
+  it("shows no chip counts while the Entry view's rows are still loading (#3167)", async () => {
+    await mountOverview();
+    const entry = held();
+    routes = withRoute(/entry_sessions/, entry.fn);
+    respond();
+    await wrapper!.find('[data-test="rum-analytics-overview-pages-view-entry"]').trigger("click");
+    await settle();
+    expect(wrapper!.find('[data-test="rum-analytics-overview-chip-all"]').text()).not.toContain(
+      "·",
+    );
+  });
+
   it("shows DAU, WAU and MAU when an identity resolves (AC-49)", async () => {
     await mountOverview();
     expect(wrapper!.find('[data-test="rum-analytics-active-users-dau"]').text()).toContain("3");
