@@ -819,11 +819,8 @@ pub async fn get_uds_and_original_data_streams(
         );
 
         if !stream_settings.defined_schema_fields.is_empty() {
-            let mut fields =
-                HashSet::<_>::from_iter(stream_settings.defined_schema_fields.iter().cloned());
-            if !fields.contains(TIMESTAMP_COL_NAME) {
-                fields.insert(TIMESTAMP_COL_NAME.to_string());
-            }
+            let fields =
+                uds_pack_fields(stream.stream_type, &stream_settings.defined_schema_fields);
             user_defined_schema_map.insert(stream.stream_name.to_string(), Some(fields));
         } else {
             user_defined_schema_map.insert(stream.stream_name.to_string(), None);
@@ -888,6 +885,19 @@ pub fn refactor_map(
     }
 
     new_map
+}
+
+fn uds_pack_fields(stream_type: StreamType, defined_schema_fields: &[String]) -> HashSet<String> {
+    let mut fields = HashSet::<_>::from_iter(defined_schema_fields.iter().cloned());
+    fields.insert(TIMESTAMP_COL_NAME.to_string());
+    // a required column first seen after the UDS was saved must not end up in `_all`
+    fields.extend(
+        stream_type
+            .uds_required_columns()
+            .iter()
+            .map(|f| f.to_string()),
+    );
+    fields
 }
 
 /// The downtime that silences a real-time firing, only when every ingested row is muted.
@@ -1076,6 +1086,23 @@ mod tests {
     use transform::compile_vrl_function;
 
     use super::*;
+
+    #[test]
+    fn test_uds_pack_fields_keeps_required_columns_missing_from_the_saved_list() {
+        let saved = ["foo".to_string()];
+        let metrics = uds_pack_fields(StreamType::Metrics, &saved);
+        assert!(metrics.contains("foo") && metrics.contains(TIMESTAMP_COL_NAME));
+        assert!(metrics.contains("le") && metrics.contains("__hash__"));
+        let profiles = uds_pack_fields(StreamType::Profiles, &saved);
+        assert!(profiles.contains("trace_id") && profiles.contains("stack"));
+        for stream_type in [StreamType::Logs, StreamType::Traces] {
+            let fields = uds_pack_fields(stream_type, &saved);
+            assert_eq!(
+                fields,
+                HashSet::from(["foo".to_string(), TIMESTAMP_COL_NAME.to_string()])
+            );
+        }
+    }
 
     #[test]
     fn test_only_the_fail_closed_refusal_is_recognised() {

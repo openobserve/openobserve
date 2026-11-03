@@ -556,7 +556,10 @@ fn queryable_field_names(schema: &Schema) -> Vec<String> {
             *name != column_all
                 && (defined_schema_fields.is_empty()
                     || *name == TIMESTAMP_COL_NAME
-                    || defined_schema_fields.contains(name))
+                    || defined_schema_fields.contains(name)
+                    || StreamType::Profiles
+                        .uds_required_columns()
+                        .contains(&name.as_str()))
         })
         .cloned()
         .collect()
@@ -749,6 +752,7 @@ mod tests {
             "service_name",
             "k8s_pod_name",
             "k8s_node_name",
+            "trace_id",
             "_all",
         ]
         .map(|name| Field::new(name, DataType::Utf8, true));
@@ -777,6 +781,7 @@ mod tests {
                 "k8s_pod_name",
                 "service_name",
                 "stack",
+                "trace_id",
                 "value"
             ]
         );
