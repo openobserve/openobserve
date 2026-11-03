@@ -63,7 +63,7 @@ export function diffFingerprint(diff) {
   const keepBlobIds = /^(Binary files .* differ|GIT binary patch)$/m.test(text);
   const normalized = text
     .split("\n")
-    .filter(line => keepBlobIds || !/^index [0-9a-f]+\.\.[0-9a-f]+/.test(line))
+    .map(line => (keepBlobIds ? line : line.replace(/^index [0-9a-f]+\.\.[0-9a-f]+/, "index")))
     .map(line => line.replace(/^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/, "@@"))
     .join("\n")
     .replace(/\n+$/, "");

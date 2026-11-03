@@ -1460,7 +1460,7 @@ function riskTierFns() {
 
 test("test-only and CI-only PRs of any size get their narrow reviewer set, unless a path or the file count escalates to full", () => {
   const { RISK_TIERS, assessRiskTier } = riskTierFns();
-  assert.deepEqual(RISK_TIERS["test-only"].agents, ["qa", "correctness"]);
+  assert.deepEqual(RISK_TIERS["test-only"].agents, ["correctness", "code-quality"]);
   assert.deepEqual(RISK_TIERS["ci-only"].agents, ["security", "release"]);
   const diff = (paths, lines = 500) => ({ files: paths.map(newPath => ({ oldPath: newPath, newPath })), totalAdded: lines, totalRemoved: 0 });
   assert.equal(assessRiskTier(diff(["tests/ui-testing/playwright-tests/a.spec.js"])), "test-only");

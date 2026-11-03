@@ -270,7 +270,8 @@ const RISK_TIERS = {
     coordinatorAgent: COORDINATOR_AGENT,
   },
   "test-only": {
-    agents: ["qa", "correctness"],
+    // qa reviews Playwright only, and is added by CONDITIONAL_AGENTS when those files change.
+    agents: ["correctness", "code-quality"],
     coordinatorAgent: COORDINATOR_AGENT,
   },
   "ci-only": {

@@ -305,3 +305,8 @@ test("a changed binary file or trailing space on the last line changes the finge
   const csv = tail => `diff --git a/a.csv b/a.csv\nindex 1111111..2222222 100644\n--- a/a.csv\n+++ b/a.csv\n@@ -1 +1 @@\n-x\n+secret${tail}\n`;
   assert.notEqual(diffFingerprint(csv(" ")), diffFingerprint(csv("  ")));
 });
+
+test("a file mode change keeps a different fingerprint", () => {
+  const d = mode => `diff --git a/l b/l\nindex 1111111..2222222 ${mode}\n--- a/l\n+++ b/l\n@@ -1 +1 @@\n-old-target\n\\ No newline at end of file\n+new-target\n\\ No newline at end of file\n`;
+  assert.notEqual(diffFingerprint(d("100644")), diffFingerprint(d("120000")));
+});

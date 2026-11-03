@@ -46,7 +46,7 @@ so the review costs about M times one pass; reviewer spans carry `review.pass`.
 security-sensitive (`auth`, `token`, `secret`, `crypto`, `password`, `oauth`, `unsafe`, `acme`,
 `cert`), is `full`. Otherwise a PR whose every file is test code (`tests/`, `test/`, `e2e/`,
 `fixtures/`, `*.spec.*`, `*.test.*`, `*_test.rs`; `isTestOnlyPath` in `src/selection.mjs`) is
-`test-only` and runs qa and correctness, whatever its size; a rename counts by both its source and
+`test-only` and runs correctness and code-quality, whatever its size (qa joins when Playwright files change); a rename counts by both its source and
 its destination, so code moved from `src/` into `tests/` is not test-only. A PR whose every file is CI
 definition (`.github/workflows/**`, `.github/actions/**` or a top-level `.github/*.yml`;
 `isCiOnlyPath`) is `ci-only` and runs security and release. Scripts, including this engine and the
