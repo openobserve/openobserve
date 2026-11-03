@@ -73,7 +73,13 @@ const ok = (data: unknown) => Promise.resolve({ data });
 const fullEnvelope = () => ({
   // One row deliberately carries no `calls` — legal per the response contract
   // (an idle instance's row omits it); the fold treats it as 0.
-  databases: { hits: [{ calls: 800 }, { calls: 400 }, {}] },
+  databases: {
+    hits: [
+      { db_system: "postgresql", db_instance: "pg-orders", db_namespace: "orders", calls: 800 },
+      { db_system: "postgresql", db_instance: "pg-billing", db_namespace: "billing", calls: 400 },
+      { db_system: "redis", db_instance: "valkey-cart", db_namespace: "" },
+    ],
+  },
   queries: { total: 42 },
   activity: { by_state: [{ state: "active", sessions: 7 }], hits: [{ session_pid: 1 }] },
   deadlocks: { total: 90, truncated: true },
@@ -581,19 +587,14 @@ describe("no page re-fetches the badges the shell already owns", () => {
 /**
  * The coverage caveat under each open database.
  *
- * `showsShortfall` is unit-tested in breakdownRows.spec.ts; what is pinned here
- * is that the page ASKS it. The defect was never in the arithmetic — the
+ * `showsShortfall` is unit-tested in breakdownRows.spec.ts; dbmDatabasesSchemaScope.spec.ts
+ * pins that the page ASKS it. The defect was never in the arithmetic — the
  * per-row percentages were always distinct — it was that the page gated the
  * caveat on `shortfall !== null` directly, which is true even when nothing was
  * attributed and every row therefore reported the identical 100%.
  */
 describe("DatabasesPage gates the coverage caveat on the shared rule", () => {
   const source = read("DatabasesPage.vue");
-
-  it("asks showsShortfall rather than reading shortfall itself", () => {
-    expect(source).toContain('from "@/utils/dbm/breakdownRows"');
-    expect(source).toMatch(/const hasShortfall[\s\S]{0,400}showsShortfall\(/);
-  });
 
   it("no longer gates the caveat on a bare non-null shortfall", () => {
     expect(source).not.toMatch(/hasShortfall[\s\S]{0,200}breakdown\.shortfall !== null/);
