@@ -291,6 +291,9 @@ mod tests {
                 alerting BOOLEAN NOT NULL DEFAULT 0,
                 degraded_notified_at BIGINT NOT NULL DEFAULT 0,
                 template TEXT,
+                status_down_runs INTEGER NOT NULL DEFAULT 0,
+                status_up_runs INTEGER NOT NULL DEFAULT 0,
+                status_run_ts BIGINT NOT NULL DEFAULT 0,
                 owner TEXT NULL,
                 created_at BIGINT NOT NULL,
                 updated_at BIGINT NOT NULL

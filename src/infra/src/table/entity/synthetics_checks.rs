@@ -50,6 +50,12 @@ pub struct Model {
     pub degraded_notified_at: i64,
     /// Template override by name for this check's messages; NULL uses the destination's.
     pub template: Option<String>,
+    /// Consecutive status page Down verdicts, capped at 10.
+    pub status_down_runs: i32,
+    /// Consecutive status page Up verdicts, capped at 10.
+    pub status_up_runs: i32,
+    /// `scheduled_ts` of the last run applied to the streaks, in microseconds.
+    pub status_run_ts: i64,
     pub owner: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -91,6 +97,9 @@ mod tests {
             alerting: false,
             degraded_notified_at: 0,
             template: None,
+            status_down_runs: 0,
+            status_up_runs: 0,
+            status_run_ts: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
