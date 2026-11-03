@@ -63,6 +63,40 @@ fn resolve_updated_auth_config(
     }
 }
 
+/// Whether a test may reuse `saved`'s stored key for `requested`: only for the same provider
+/// type and the same resolved endpoint, so the key never goes to a caller-chosen host.
+pub fn may_reuse_saved_key(
+    requested: &table::providers::Provider,
+    saved: &table::providers::Provider,
+) -> bool {
+    if !requested
+        .provider_type
+        .trim()
+        .eq_ignore_ascii_case(saved.provider_type.trim())
+    {
+        return false;
+    }
+    let mut requested = requested.clone();
+    let mut saved = saved.clone();
+    requested.provider_type = saved.provider_type.clone();
+    #[cfg(feature = "enterprise")]
+    if normalize_provider_endpoint(&mut requested).is_err()
+        || normalize_provider_endpoint(&mut saved).is_err()
+    {
+        return false;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    for provider in [&mut requested, &mut saved] {
+        provider.endpoint = provider
+            .endpoint
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+    }
+    requested.endpoint == saved.endpoint
+}
+
 #[cfg(feature = "enterprise")]
 fn validate_provider_config(provider: &table::providers::Provider) -> Result<(), ProviderError> {
     o2_enterprise::enterprise::llm_evaluations::providers::PreparedProvider::parse(provider.into())
@@ -370,6 +404,58 @@ mod tests {
 
         assert!(scorer_uses_provider(&scorer, "provider-1"));
         assert!(!scorer_uses_provider(&scorer, "provider-2"));
+    }
+
+    #[test]
+    fn test_saved_key_is_reused_only_for_the_saved_type_and_endpoint() {
+        let provider = |provider_type: &str, endpoint: Option<&str>| table::providers::Provider {
+            provider_type: provider_type.to_string(),
+            endpoint: endpoint.map(str::to_string),
+            id: String::new(),
+            org_id: String::new(),
+            name: String::new(),
+            default_model: String::new(),
+            available_models: vec![],
+            auth_config: serde_json::Value::Null,
+            rate_limits: None,
+            is_default: false,
+            created_at: 0,
+            updated_at: 0,
+        };
+        let saved = provider("openai", Some("https://api.openai.com/v1/chat/completions"));
+        assert!(may_reuse_saved_key(&saved.clone(), &saved));
+        assert!(may_reuse_saved_key(
+            &provider(
+                "OpenAI ",
+                Some(" https://api.openai.com/v1/chat/completions ")
+            ),
+            &saved
+        ));
+        assert!(!may_reuse_saved_key(
+            &provider(
+                "openai",
+                Some("https://attacker.example/v1/chat/completions")
+            ),
+            &saved
+        ));
+        assert!(!may_reuse_saved_key(&provider("openai", None), &saved));
+        assert!(!may_reuse_saved_key(
+            &provider(
+                "anthropic",
+                Some("https://api.openai.com/v1/chat/completions")
+            ),
+            &saved
+        ));
+
+        let saved_default = provider("openai", None);
+        assert!(may_reuse_saved_key(
+            &provider("openai", Some("  ")),
+            &saved_default
+        ));
+        assert!(!may_reuse_saved_key(
+            &provider("openai", Some("https://attacker.example")),
+            &saved_default
+        ));
     }
 
     #[test]
