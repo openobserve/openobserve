@@ -149,7 +149,7 @@ const hasIssue = (group: FilterGroup) =>
       <div
         v-if="item.kind === 'group' && isFolded(item.id)"
         :class="[
-          'group/line rounded-default border-border-subtle flex min-w-80 flex-1 items-start gap-1.5 border p-1',
+          'group/line rounded-default border-border-subtle flex min-w-44 flex-1 items-start gap-1.5 border p-1',
           level % 2 ? 'bg-surface-subtle' : 'bg-surface-base',
         ]"
         data-folded
@@ -259,7 +259,7 @@ const hasIssue = (group: FilterGroup) =>
         v-else
         :class="[
           'group/line flex flex-1 items-center gap-1 contain-inline-size',
-          level > 1 ? 'min-w-80' : 'min-w-0',
+          level > 1 ? 'min-w-44' : 'min-w-0',
         ]"
       >
         <FilterBarChip
@@ -292,7 +292,8 @@ const hasIssue = (group: FilterGroup) =>
   <slot v-if="caretAt(items.length)" name="caret" :group-id="groupId" :index="items.length" />
   <div v-if="path" class="flex min-w-0 items-start gap-1.5">
     <span class="w-10 shrink-0" aria-hidden="true" />
-    <div class="flex items-center gap-1">
+    <!-- A top-level group's actions wrap in a narrow field; deeper ones stay on one line and the tree scrolls. -->
+    <div :class="['flex items-center gap-1', level > 2 ? '' : 'min-w-0 flex-wrap']">
       <span class="inline-flex">
         <OButton
           variant="ghost"

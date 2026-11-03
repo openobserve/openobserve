@@ -84,6 +84,23 @@ describe("OChipInput", () => {
     expect(caret().classList).toContain("flex-1");
   });
 
+  it("lets a resting caret narrow to nothing so it never widens a full line", async () => {
+    const Host = defineComponent({
+      setup() {
+        return () =>
+          h(
+            OChipInput,
+            { modelValue: "", open: false, suggestions, inlineCaret: true, dataTest: "ci" },
+            { default: ({ caret: Caret }: { caret: Component }) => [h(Caret, { shrink: true })] },
+          );
+      },
+    });
+    wrapper = mount(Host, { attachTo: document.body });
+    await flushPromises();
+    expect(caret().classList).toContain("min-w-0");
+    expect(caret().classList).not.toContain("min-w-24");
+  });
+
   it("moves the caret with Left and Right only while nothing is typed", async () => {
     const input = mountInput();
     await key("ArrowLeft");
@@ -228,6 +245,15 @@ describe("OChipInput", () => {
       mountInput({}, { default: chipSlot });
       const lines = scroller(0);
       Object.defineProperty(lines, "scrollWidth", { value: 300, configurable: true });
+      chip("far").focus();
+      expect(lines.scrollLeft).toBe(0);
+    });
+
+    it("does not scroll a chip the pointer pressed, so the click lands on it", () => {
+      layout({ far: [390, 520] });
+      mountInput({}, { default: chipSlot });
+      const lines = scroller(0);
+      chip("far").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
       chip("far").focus();
       expect(lines.scrollLeft).toBe(0);
     });

@@ -550,7 +550,7 @@ const draftOperator = computed(() => {
             <OTooltip v-if="limitReason" :content="limitReason" />
           </span>
         </template>
-        <component :is="caret" v-if="!caretLine" />
+        <component :is="caret" v-if="!caretLine" shrink />
       </div>
     </template>
     <template #trailing>

@@ -613,7 +613,7 @@ describe("FilterBuilder", () => {
       const lines = document.body.querySelector<HTMLElement>("[data-o-chip-lines]")!;
       expect(lines.classList).toContain("overflow-x-auto");
       expect(lines.firstElementChild!.classList).toContain("min-w-min");
-      expect(lineOf("service").classList).toContain("min-w-80");
+      expect(lineOf("service").classList).toContain("min-w-44");
       expect(lineOf("service").classList).toContain("contain-inline-size");
       // A top-level line still fits the field, so a shallow tree is laid out as before.
       expect(lineOf("level").classList).toContain("min-w-0");
@@ -626,6 +626,15 @@ describe("FilterBuilder", () => {
       expect(actions.classList).not.toContain("flex-wrap");
       expect(actions.textContent).toContain("Add group");
       expect(actions.textContent).toContain("Ungroup");
+    });
+
+    it("lets a shallow tree fit a narrow field: its group's actions wrap and the resting caret shrinks", async () => {
+      mountBuilder("alert", v2(leaf("level", "error"), nested(1)));
+      await flushPromises();
+      const actions = find("add-condition-1").element.closest("div")!;
+      expect(actions.classList).toContain("flex-wrap");
+      expect(input()!.classList).toContain("min-w-0");
+      expect(input()!.classList).not.toContain("min-w-24");
     });
 
     it("scrolls a deep chip into view when it takes focus", async () => {

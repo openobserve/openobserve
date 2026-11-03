@@ -158,8 +158,21 @@ function revealInLines(target: Element | null | undefined) {
   }
 }
 
+// The control under a press, until the press's own focus has landed.
+let pressed: Node | null = null;
+
+function onLinesPointerDown(event: PointerEvent) {
+  pressed = event.target as Node | null;
+  setTimeout(() => {
+    pressed = null;
+  });
+}
+
+// A pressed control is already in view; scrolling it under the pointer would move the click off it.
 function onLinesFocusIn(event: FocusEvent) {
-  revealInLines(event.target as Element | null);
+  const target = event.target as Element | null;
+  if (pressed && target?.contains(pressed)) return;
+  revealInLines(target);
 }
 
 watch(anchorElement, async (element) => {
@@ -180,13 +193,14 @@ function onCaretBlur(event: FocusEvent) {
 
 interface CaretHost {
   element: HTMLElement | null;
-  props: { grow: boolean };
+  props: { grow: boolean; shrink: boolean };
 }
 
 // The most recently placed caret slot holds the one input; it moves there instead of being remounted.
 const caretHosts = shallowRef<CaretHost[]>([]);
 const caretHost = computed(() => (props.inlineCaret ? (caretHosts.value.at(-1) ?? null) : null));
 const caretGrow = computed(() => caretHost.value?.props.grow ?? true);
+const caretShrink = computed(() => caretHost.value?.props.shrink ?? false);
 const endHostRef = ref<HTMLElement | null>(null);
 const caretTarget = computed(() => caretHost.value?.element ?? endHostRef.value);
 // A moved input loses focus, and a surrounding dialog's focus trap would take it; this keeps the edit open meanwhile.
@@ -197,6 +211,8 @@ const Caret = defineComponent({
   props: {
     /** Fill the rest of the line; off between chips, where the caret sizes to its text. */
     grow: { type: Boolean, default: true },
+    /** May narrow to nothing on a full line; for a resting caret whose typing moves to a line of its own. */
+    shrink: { type: Boolean, default: false },
   },
   setup(caretProps) {
     const host: CaretHost = { element: null, props: caretProps };
@@ -263,7 +279,8 @@ const CaretInput = defineComponent({
           placeholder: caretPlaceholder.value,
           "data-test": testId("input"),
           class: [
-            "text-text-body placeholder:text-text-secondary h-6 min-w-24 border-0 bg-transparent px-1 outline-none disabled:cursor-not-allowed",
+            "text-text-body placeholder:text-text-secondary h-6 border-0 bg-transparent px-1 outline-none disabled:cursor-not-allowed",
+            caretShrink.value ? "min-w-0" : "min-w-24",
             caretGrow.value ? "flex-1" : "field-sizing-content max-w-full flex-none",
           ],
           onInput: onCaretInput,
@@ -533,6 +550,7 @@ function onFieldFocusOut() {
           ]"
           :style="capStyle"
           data-o-chip-lines
+          @pointerdown.capture="onLinesPointerDown"
           @focusin="onLinesFocusIn"
         >
           <slot :caret="Caret" />
