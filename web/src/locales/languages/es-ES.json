@@ -762,6 +762,7 @@
     "dragToReorder": "Arrastra para reordenar",
     "timeAmount": "Cantidad de tiempo",
     "timeUnit": "Unidad de tiempo",
+    "unitFor": "Unidad de {label}",
     "queryEditorAriaLabel": "Editor de consultas. Pulse Escape para pasar al siguiente control.",
     "queryEditorEscapeAction": "Mover el foco al siguiente control",
     "inlineEdit": {
@@ -11956,6 +11957,7 @@
       "budgetLabel": "Presupuesto de alertas",
       "budgetPerDay": "por día",
       "budgetPerWeek": "por semana",
+      "budgetPeriod": "Periodo de presupuesto de alertas",
       "budgetRange": "Introduce un número mayor que 0",
       "chartsTab": "Gráficos",
       "checkEvery": "Compruebe cada",
@@ -11965,6 +11967,7 @@
       "sendsToStatus": "Envía a {targets} cada vez que se detecta una anomalía.",
       "detectionAlreadyRunning": "La detección ya está en curso; inténtalo de nuevo en breve.",
       "detectionCharts": "Resultados de detección",
+      "detectionFunctionField": "Campo de la función de detección",
       "detectionFunctionTooltip": "Qué medir en cada intervalo de tiempo. count vigila cuántos registros llegan; avg, min, max y sum vigilan un campo numérico. p50, p95 y p99 vigilan la distribución de ese campo; p. ej., p95 de response_time_ms detecta que la latencia empeora para las solicitudes más lentas incluso cuando el tráfico se mantiene estable.",
       "detectionResolution": "Resolución de detección",
       "detectionResolutionTooltip": "Qué tan granular es cada punto de datos. Por ejemplo, «5 m» significa que las anomalías se detectan con una resolución de 5 minutos.",

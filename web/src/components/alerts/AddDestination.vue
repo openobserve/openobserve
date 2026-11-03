@@ -198,6 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`add-destination-header-${header['key']}-key-input`"
                         :name="`apiHeaders[${index}].key`"
                         :placeholder="t('alert_destinations.api_header')"
+                        :aria-label="t('alert_destinations.api_header')"
                         tabindex="0"
                       />
                     </div>
@@ -206,6 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`add-destination-header-${header['key']}-value-input`"
                         :name="`apiHeaders[${index}].value`"
                         :placeholder="t('alert_destinations.api_header_value')"
+                        :aria-label="t('alert_destinations.api_header_value')"
                         tabindex="0"
                       />
                     </div>
@@ -361,6 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`add-destination-header-${header['key']}-key-input`"
                       :name="`apiHeaders[${index}].key`"
                       :placeholder="t('alert_destinations.api_header')"
+                      :aria-label="t('alert_destinations.api_header')"
                       tabindex="0"
                     />
                   </div>
@@ -369,6 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`add-destination-header-${header['key']}-value-input`"
                       :name="`apiHeaders[${index}].value`"
                       :placeholder="t('alert_destinations.api_header_value')"
+                      :aria-label="t('alert_destinations.api_header_value')"
                       tabindex="0"
                     />
                   </div>
