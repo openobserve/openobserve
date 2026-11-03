@@ -1041,6 +1041,7 @@ const buildSegmentRequest = (sql: string, from: number, size: number, window: Qu
 };
 
 // A stream error keeps its status or code so the retry policy can tell a lost connection from a bad query.
+// The message is the server's own text (it may name a missing column), as the one-shot search error carried it.
 const queryErrorFrom = (response: any) => {
   const content = response?.content ?? {};
   const code = Number(content.code);
@@ -1052,17 +1053,21 @@ const queryErrorFrom = (response: any) => {
         : undefined;
   const errorCode =
     content.code === undefined || content.code === null ? undefined : String(content.code);
-  return createQueryError(content.message || "session replay query failed", status, errorCode);
+  const message = [content.message, content.error, content.error_detail].find(
+    (part) => typeof part === "string" && part,
+  );
+  return createQueryError(message || "session replay query failed", status, errorCode);
 };
 
-const runSegmentQuery = (
-  sql: string,
-  from: number,
-  size: number,
-  window: QueryWindow,
-): Promise<any[]> =>
+// One streamed search page. `complete` is false when any event of the stream reported a partial result or a function
+// error (they ride on the `results` of the metadata events). Every request is tracked in liveTraceIds, so unmount cancels it.
+const runStreamQuery = (
+  queryReq: any,
+  pageType: "logs" | "traces",
+): Promise<{ hits: any[]; complete: boolean }> =>
   new Promise((resolve, reject) => {
     const hits: any[] = [];
+    let complete = true;
     const traceId = generateTraceContext()?.traceId || getUUID();
     const orgId = store.state.selectedOrganization.identifier;
     let settled = false;
@@ -1084,25 +1089,39 @@ const runSegmentQuery = (
 
     void fetchQueryDataWithHttpStream(
       {
-        queryReq: buildSegmentRequest(sql, from, size, window),
+        queryReq,
         type: "search",
         traceId,
         org_id: orgId,
-        pageType: "logs",
+        pageType,
         searchType: "RUM",
       },
       {
         data: (_req: any, response: any) => {
-          if (response?.type === "search_response_hits") {
-            hits.push(...(response.content?.results?.hits ?? []));
+          const results = response?.content?.results;
+          if (response?.type === "search_response_hits") hits.push(...(results?.hits ?? []));
+          if (
+            (response?.type === "search_response_hits" ||
+              response?.type === "search_response_metadata") &&
+            !isCompleteResponse(results)
+          ) {
+            complete = false;
           }
         },
         error: (_req: any, response: any) => settle(() => reject(queryErrorFrom(response))),
-        complete: () => settle(() => resolve(hits)),
+        complete: () => settle(() => resolve({ hits, complete })),
         onActivity: () => timer.touch(),
       },
     );
   });
+
+const runSegmentQuery = async (
+  sql: string,
+  from: number,
+  size: number,
+  window: QueryWindow,
+): Promise<any[]> =>
+  (await runStreamQuery(buildSegmentRequest(sql, from, size, window), "logs")).hits;
 
 // A manifest truncated by the per-request size cap corrupts the snapshot-anchor search, so page past it.
 const fetchAllPages = async (
@@ -1680,29 +1699,25 @@ const fetchServerSpans = async (
   let complete = true;
   for (let page = 0; page < MAX_SERVER_SPAN_PAGES; page++) {
     if (cancelled) return { rows, complete: false };
-    const res: any = await withRetries(
+    const res = await withRetries(
       () =>
-        searchService.search(
+        runStreamQuery(
           {
-            org_identifier: store.state.selectedOrganization.identifier,
             query: {
-              query: {
-                sql: serverSpansSql(stream, columns, traceIds),
-                start_time: window.start,
-                end_time: window.end,
-                from: page * SERVER_SPAN_PAGE_SIZE,
-                size: SERVER_SPAN_PAGE_SIZE,
-              },
+              sql: serverSpansSql(stream, columns, traceIds),
+              start_time: window.start,
+              end_time: window.end,
+              from: page * SERVER_SPAN_PAGE_SIZE,
+              size: SERVER_SPAN_PAGE_SIZE,
             },
-            page_type: "traces",
           },
-          "RUM",
+          "traces",
         ),
       { isCancelled: () => cancelled },
     );
-    const hits = res?.data?.hits ?? [];
+    const hits = res.hits;
     rows.push(...hits);
-    if (!isCompleteResponse(res?.data)) complete = false;
+    if (!res.complete) complete = false;
     if (hits.length < SERVER_SPAN_PAGE_SIZE) return { rows, complete };
   }
   return { rows, complete: false };

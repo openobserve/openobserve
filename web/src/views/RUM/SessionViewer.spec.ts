@@ -162,17 +162,51 @@ vi.mock("@/services/search", async (importOriginal) => {
 
 // The replay-segment fetches go over HTTP streaming; capture their SQL and answer them here.
 // A responder returns hits, { error } to fail the request, or "hang" to leave it open and silent.
-const streaming = vi.hoisted(() => ({
-  sqls: [] as string[],
-  requests: [] as any[],
-  responder: (_sql: string, _from: number): any => [],
-  cancel: null as any,
-}));
+// The server-span queries (span_kind) go over the same stream but are kept apart, in spanRequests: they answer
+// through spanResponder, which gets { page_type, query: { query } } and returns { data: { hits, is_partial?,
+// function_error? } } (also as a promise), "hang", or throws an error carrying a message and a status.
+const streaming = vi.hoisted(() => {
+  const noSpans = (_params: any): any => ({ data: { hits: [] } });
+  return {
+    sqls: [] as string[],
+    requests: [] as any[],
+    responder: (_sql: string, _from: number): any => [],
+    spanRequests: [] as any[],
+    noSpans,
+    spanResponder: noSpans as (params: any) => any,
+    cancel: null as any,
+  };
+});
 
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: async (data: any, handlers: any) => {
       const sql = data.queryReq.query.sql as string;
+      if (sql.includes("span_kind")) {
+        streaming.spanRequests.push(data);
+        let answer: any;
+        try {
+          answer = await streaming.spanResponder({
+            page_type: data.pageType,
+            query: data.queryReq,
+          });
+        } catch (error: any) {
+          // A failed stream carries the server's message and, for an HTTP failure, its status.
+          handlers.error(data, {
+            type: "error",
+            content: { message: error?.message, status: error?.status },
+          });
+          return;
+        }
+        if (answer === "hang") return;
+        const { hits = [], ...results } = answer?.data ?? {};
+        handlers.onActivity?.();
+        // As the server streams it: the metadata (is_partial, function_error) first, then the hits.
+        handlers.data(data, { type: "search_response_metadata", content: { results } });
+        handlers.data(data, { type: "search_response_hits", content: { results: { hits } } });
+        handlers.complete(data, null);
+        return;
+      }
       streaming.sqls.push(sql);
       streaming.requests.push({ data, handlers });
       const result = streaming.responder(sql, data.queryReq.query.from);
@@ -1114,6 +1148,8 @@ async function mountLoaded(query: Record<string, string> = {}) {
 function resetStreaming(responder: (sql: string, from: number) => any) {
   streaming.sqls = [];
   streaming.requests = [];
+  streaming.spanRequests = [];
+  streaming.spanResponder = streaming.noSpans;
   streaming.responder = responder;
   streaming.cancel?.mockClear();
 }
@@ -2187,7 +2223,44 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     };
   }
 
+  // The span answers come over the stream, see `streaming` at the top.
+  function serveSpans() {
+    streaming.spanResponder = (params: any) => {
+      const query = params.query.query;
+      const sql: string = query.sql;
+      if (server.spanHandler) return server.spanHandler(params);
+      if (server.spanError) throw server.spanError;
+      const selected = selectedColumns(sql);
+      const missing = server.spanColumns
+        ? selected.find(
+            (column) => !["trace_id", "start_time", ...(server.spanColumns ?? [])].includes(column),
+          )
+        : undefined;
+      if (missing) throw Object.assign(new Error(server.spanColumnError(missing)), { status: 400 });
+      // Span start_time is ns; the request's bounds are µs, as on the server. Only the selected columns come back.
+      return {
+        data: {
+          hits: server.spans
+            .filter(
+              (span) =>
+                sql.includes(`'${span.trace_id}'`) &&
+                span.start_time / 1000 >= query.start_time &&
+                span.start_time / 1000 <= query.end_time,
+            )
+            .map((span) =>
+              Object.fromEntries(
+                Object.entries(span).filter(
+                  ([key]) => key === "trace_id" || key === "start_time" || selected.includes(key),
+                ),
+              ),
+            ),
+        },
+      };
+    };
+  }
+
   function serve(endTime: number) {
+    serveSpans();
     vi.mocked(searchService.search).mockImplementation(async (params: any) => {
       const query = params?.query?.query ?? {};
       const sql: string = query.sql ?? "";
@@ -2195,38 +2268,6 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
       const size = Number(query.size) || 150;
       if (sql.includes("min(start)")) return { data: { hits: [lookupRow(endTime)] } } as any;
       if (sql.includes("type='resource'") && server.failedError) throw server.failedError;
-      if (sql.includes("span_kind")) {
-        if (server.spanHandler) return server.spanHandler(params);
-        if (server.spanError) throw server.spanError;
-        const selected = selectedColumns(sql);
-        const missing = server.spanColumns
-          ? selected.find(
-              (column) =>
-                !["trace_id", "start_time", ...(server.spanColumns ?? [])].includes(column),
-            )
-          : undefined;
-        if (missing)
-          throw Object.assign(new Error(server.spanColumnError(missing)), { status: 400 });
-        // Span start_time is ns; the request's bounds are µs, as on the server. Only the selected columns come back.
-        return {
-          data: {
-            hits: server.spans
-              .filter(
-                (span) =>
-                  sql.includes(`'${span.trace_id}'`) &&
-                  span.start_time / 1000 >= query.start_time &&
-                  span.start_time / 1000 <= query.end_time,
-              )
-              .map((span) =>
-                Object.fromEntries(
-                  Object.entries(span).filter(
-                    ([key]) => key === "trace_id" || key === "start_time" || selected.includes(key),
-                  ),
-                ),
-              ),
-          },
-        } as any;
-      }
       const rows = sql.includes("_rumlog")
         ? server.logs
         : sql.includes("type='resource'")
@@ -2292,6 +2333,7 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     streamsMock.getStream = null;
     vi.useRealTimers();
     vi.mocked(searchService.search).mockImplementation(originalSearch);
+    streaming.spanResponder = streaming.noSpans;
     tracesStream.resolve = async (ids) =>
       Object.fromEntries(ids.map((id) => [id, { stream: "default" }]));
     tracesStream.outcome = { failed: false, streams: ["default"] };
@@ -2638,11 +2680,12 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
         _timestamp: (NOW - ageMs) * 1000,
       });
       const ENDED = NOW - ACTIVE_WINDOW_MS - 1;
+      // The span queries, as { page_type, query: { query } } (the shape the streaming mock hands the span answer).
       const spanSearches = () =>
-        vi
-          .mocked(searchService.search)
-          .mock.calls.map((call: any[]) => call[0])
-          .filter((params) => params.query.query.sql.includes("span_kind"));
+        streaming.spanRequests.map((data: any) => ({
+          page_type: data.pageType,
+          query: data.queryReq,
+        }));
       const idsIn = (sql: string) => sql.match(/'[0-9a-f]{32}'/g) ?? [];
       const failedEvents = (vm: any) =>
         vm.segmentEvents.filter((event: any) => event.type === "failed_request");
@@ -3515,6 +3558,22 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
           expect(vi.getTimerCount()).toBeLessThan(timersWithRetry);
           await wait(200_000);
           expect(spanSearches()).toHaveLength(1);
+        });
+
+        it("cancels an in-flight span query on unmount", async () => {
+          traceSchema("trace_id", "http_response_status_code");
+          server.failed = [youngTraced("doc0", 0, "abc1")];
+          server.spanHandler = () => "hang";
+          const wrapper = await mountLive(ENDED);
+          expect(spanSearches()).toHaveLength(1);
+          const [request] = streaming.spanRequests;
+          expect(streaming.cancel).not.toHaveBeenCalled();
+
+          wrapper.unmount();
+
+          expect(streaming.cancel).toHaveBeenCalledWith(
+            expect.objectContaining({ trace_id: request.traceId }),
+          );
         });
 
         it("registers its visibility listener when the page mounts and removes the same one on unmount", async () => {
