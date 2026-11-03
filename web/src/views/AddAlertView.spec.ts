@@ -5,6 +5,8 @@ import { createRouter, createWebHistory } from "vue-router";
 import AddAlertView from "./AddAlertView.vue";
 import destinationService from "@/services/alert_destination";
 import alertsService from "@/services/alerts";
+import templateService from "@/services/alert_templates";
+import { queryClient } from "@/composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   readEditorDraft,
@@ -31,6 +33,15 @@ vi.mock("@/services/alerts", async (importOriginal) => {
   return overlayServiceMock(await importOriginal(), {
     default: {
       get_by_alert_id: vi.fn(),
+    },
+  });
+});
+
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(() => Promise.resolve({ data: [] })),
     },
   });
 });
@@ -274,6 +285,49 @@ describe("AddAlertView.vue", () => {
     const addAlert = wrapper.findComponent({ name: "AddAlert" });
     expect(addAlert.props("destinations")).toEqual(mockDestinations);
     expect(addAlert.props("isUpdated")).toBe(false);
+  });
+
+  describe("templates", () => {
+    const TemplatesStub = {
+      name: "AddAlert",
+      props: ["templates"],
+      emits: ["refresh:templates"],
+      template: '<div class="add-alert-stub"></div>',
+    };
+    const mountWithTemplates = async () => {
+      vi.mocked(destinationService.list).mockResolvedValue({ data: [] } as any);
+      const wrapper = mount(AddAlertView, {
+        global: { plugins: [store, router], stubs: { AddAlert: TemplatesStub } },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    beforeEach(() => queryClient.clear());
+
+    it("hands the org's templates to the form so Template Override has options", async () => {
+      vi.mocked(templateService.list).mockResolvedValue({
+        data: [{ name: "pagerduty_default" }],
+      } as any);
+      const wrapper = await mountWithTemplates();
+
+      expect(wrapper.findComponent({ name: "AddAlert" }).props("templates")).toEqual([
+        { name: "pagerduty_default" },
+      ]);
+    });
+
+    it("reads the templates from the server again when the form asks for a refresh", async () => {
+      vi.mocked(templateService.list).mockResolvedValue({ data: [{ name: "a" }] } as any);
+      const wrapper = await mountWithTemplates();
+      vi.mocked(templateService.list).mockResolvedValue({
+        data: [{ name: "a" }, { name: "b" }],
+      } as any);
+
+      wrapper.findComponent({ name: "AddAlert" }).vm.$emit("refresh:templates");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "AddAlert" }).props("templates")).toHaveLength(2);
+    });
   });
 
   describe("edit mode", () => {

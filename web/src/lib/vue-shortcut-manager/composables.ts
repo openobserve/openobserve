@@ -70,6 +70,7 @@ function resolveShortcuts(
           whenFocused: input.whenFocused,
           allowInInput: def.allowInInput,
           skipInInput: def.skipInInput,
+          skipInOverlay: def.skipInOverlay,
         });
       });
     } else {

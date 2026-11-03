@@ -32,7 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   in the parent (AlertSettings) so the two alert-type layouts keep their chrome.
 -->
 <template>
-  <div class="flex items-center max-md:flex-wrap max-md:gap-y-2">
+  <div
+    :class="['flex items-center max-md:flex-wrap max-md:gap-y-2', wrap ? 'flex-wrap gap-y-2' : '']"
+  >
     <OSelect
       :model-value="model"
       :aria-label="t('alerts.destination')"
@@ -128,6 +130,8 @@ const props = defineProps<{
   workflowsLockMessage?: I18nText;
   error?: boolean;
   placeholder?: I18nText;
+  /** Let the buttons drop to a second line when the row is narrower than the controls. */
+  wrap?: boolean;
 }>();
 
 const emit = defineEmits<{

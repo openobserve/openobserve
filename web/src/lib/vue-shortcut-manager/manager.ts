@@ -6,6 +6,9 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 // Manager is created on the first composable call and lives for the app lifetime.
 // ---------------------------------------------------------------------------
 
+const OVERLAY =
+  '[role="dialog"], [role="alertdialog"], [role="listbox"], [role="menu"], [data-o-popover-content]';
+
 // Store state on window so it survives Vite HMR module replacement.
 // Module-level variables reset on every hot-reload, but window persists.
 const _KEY = "__vue_shortcut_manager__";
@@ -265,9 +268,15 @@ export class ShortcutManager {
     return key.includes("ctrl+") || key.includes("meta+") || key.includes("alt+");
   }
 
+  private static belongsToWidget(e: KeyboardEvent, target: EventTarget | null): boolean {
+    if (e.defaultPrevented || isInputFocused(target)) return true;
+    return target instanceof Element && !!target.closest(OVERLAY);
+  }
+
   private triggerShortcut(shortcut: RegisteredShortcut, e: KeyboardEvent): void {
     const target = e.composedPath?.()[0] ?? e.target;
     if (shortcut.skipInInput && isInputFocused(target)) return;
+    if (shortcut.skipInOverlay && ShortcutManager.belongsToWidget(e, target)) return;
 
     // Guard: never intercept single-letter shortcuts while the user is typing
     // in an input/textarea/contenteditable. Modifier-key shortcuts (Ctrl+S,

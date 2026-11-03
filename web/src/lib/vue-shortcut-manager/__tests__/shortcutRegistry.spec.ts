@@ -281,3 +281,22 @@ describe("row navigation entries (item 4a)", () => {
     );
   });
 });
+
+describe("alert editor paging entries", () => {
+  const page = SHORTCUT_REGISTRY.find((g) => g.scope === "sectioned-form");
+
+  it("lists them under Alerts in the cheatsheet, not Global", () => {
+    const moduleOf = (key: string) => SHORTCUT_MODULES.find((m) => m.pages.includes(key as never));
+    expect(page?.pageKey).toBe("shortcuts.pages.alertEditor");
+    expect(moduleOf("shortcuts.pages.alertEditor")?.titleKey).toBe("shortcuts.modules.alerts");
+    expect(SHORTCUT_MODULES.find((m) => m.titleKey === "shortcuts.modules.global")?.pages).toEqual([
+      "shortcuts.pages.global",
+    ]);
+  });
+
+  it("yields to dialogs, drawers, popovers and fields", () => {
+    for (const e of page?.shortcuts ?? []) {
+      expect(getShortcutDef(e.id)?.skipInOverlay, e.id).toBe(true);
+    }
+  });
+});

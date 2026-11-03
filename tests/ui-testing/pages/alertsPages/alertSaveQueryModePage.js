@@ -3,6 +3,7 @@
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+import { expandAlertSettingGroups, goToAlertSection, settleIntoView } from './alertSectionHelpers.js';
 
 /**
  * AlertSaveQueryModePage — the "Choose Query Mode" dialog Save opens when more
@@ -35,10 +36,9 @@ export class AlertSaveQueryModePage {
       threshold: '[data-test="alert-trigger-threshold-input-field"]',
       realtimeTab: '[data-test="add-alert-type-tab-true"]',
       scheduledTab: '[data-test="add-alert-type-tab-false"]',
-      alertRulesTab: '[data-test="add-alert-tab-condition"]',
-      advancedTab: '[data-test="add-alert-tab-advanced"]',
+      watchSectionTitle: '[data-test="add-alert-section-watch-title"]',
       streamTypeTrigger: '[data-test="add-alert-stream-type-select-dropdown-trigger"]',
-      // Compare-with-Past lives on the Advanced tab, not Alert Rules.
+      // Compare-with-Past is a tucked setting of "When is it a problem?".
       multiWindowAdd: '[data-test="multi-time-range-alerts-add-btn"]',
       multiWindowDelete: '[data-test="multi-time-range-alerts-delete-btn"]',
       modeToggle: '[data-test="step2-query-tabs"]',
@@ -83,6 +83,7 @@ export class AlertSaveQueryModePage {
 
   /** Reka's listbox renders into a portal, so options are addressed by role. */
   async #pickFromDropdown(trigger, optionName) {
+    await settleIntoView(this.page, this.page.locator(trigger));
     await this.page.locator(trigger).click();
     const choice = this.page.getByRole('option', { name: optionName, exact: true });
     await choice.waitFor({ state: 'visible', timeout: 15000 });
@@ -133,11 +134,12 @@ export class AlertSaveQueryModePage {
   }
 
   async openAdvancedTab() {
-    await this.page.locator(this.locators.advancedTab).click();
+    await expandAlertSettingGroups(this.page, ['condition']);
+    await goToAlertSection(this.page, 'condition');
     await expect(this.page.locator(this.locators.multiWindowAdd)).toBeVisible({ timeout: 20000 });
   }
 
-  /** Compare-with-Past reference window. Requires the Advanced tab to be open. */
+  /** Compare-with-Past reference window. Requires openAdvancedTab() first. */
   async addCompareWithPastWindow() {
     const before = await this.page.locator(this.locators.multiWindowDelete).count();
     await this.page.locator(this.locators.multiWindowAdd).click();
@@ -177,7 +179,7 @@ export class AlertSaveQueryModePage {
     }).toPass({ timeout: 40000 });
     // Click away afterwards: the stream-name sync runs off the committed value,
     // which is why #15091/#15092 both say "click outside the editor and wait".
-    await this.page.locator(this.locators.alertRulesTab).click();
+    await this.page.locator(this.locators.watchSectionTitle).click();
   }
 
   // ── dialog actions ─────────────────────────────────────────────────────
