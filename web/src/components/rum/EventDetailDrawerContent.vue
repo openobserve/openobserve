@@ -858,11 +858,12 @@ const failedRequestFields = computed(() => {
       formatBytes(size),
   ]);
 
+  const actionIds = requestActionIds(raw.action_id);
   add("initiated-by", t("rum.playerEvents.initiatedBy"), [
-    raw.action_id &&
+    actionIds.length > 0 &&
       (raw.action_type && raw.action_target_name
         ? t("rum.actionOnTarget", { action: raw.action_type, target: raw.action_target_name })
-        : String(raw.action_id)),
+        : actionIds.join(", ")),
     raw.view_url && `${t("rum.playerEvents.view")}: ${raw.view_url}`,
   ]);
   return fields;

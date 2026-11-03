@@ -1486,6 +1486,18 @@ describe("EventDetailDrawerContent: failed_request", () => {
     wrapper.unmount();
   });
 
+  it("reads the action_id list in Initiated by: the ids of a list, nothing for an empty one", async () => {
+    const listed = await mountFailed(failedEvent(), failedRaw({ action_id: '["act-1","act-2"]' }));
+    expect(rowText(listed, "initiated-by")).toContain("act-1, act-2");
+    expect(rowText(listed, "initiated-by")).not.toContain("[");
+    listed.unmount();
+
+    const empty = await mountFailed(failedEvent(), failedRaw({ action_id: "[]" }));
+    expect(rowText(empty, "initiated-by")).not.toContain("[]");
+    expect(rowText(empty, "initiated-by")).toContain("https://app.example.com/page");
+    empty.unmount();
+  });
+
   it("shows status 0 as No response with the server status and the aborted flag", async () => {
     const wrapper = await mountFailed(
       failedEvent({

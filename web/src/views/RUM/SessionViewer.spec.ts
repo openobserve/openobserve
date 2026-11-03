@@ -164,7 +164,8 @@ vi.mock("@/services/search", async (importOriginal) => {
 // A responder returns hits, { error } to fail the request, or "hang" to leave it open and silent.
 // The server-span queries (span_kind) go over the same stream but are kept apart, in spanRequests: they answer
 // through spanResponder, which gets { page_type, query: { query } } and returns { data: { hits, is_partial?,
-// function_error? } } (also as a promise), "hang", or throws an error carrying a message and a status.
+// function_error? } } (also as a promise), "hang", "cut" (the stream ends with no event, as a cancelled one does), or
+// throws an error carrying a message and a status, or the server's own error `content`.
 const streaming = vi.hoisted(() => {
   const noSpans = (_params: any): any => ({ data: { hits: [] } });
   return {
@@ -194,11 +195,15 @@ vi.mock("@/composables/useStreamingSearch", () => ({
           // A failed stream carries the server's message and, for an HTTP failure, its status.
           handlers.error(data, {
             type: "error",
-            content: { message: error?.message, status: error?.status },
+            content: error?.content ?? { message: error?.message, status: error?.status },
           });
           return;
         }
         if (answer === "hang") return;
+        if (answer === "cut") {
+          handlers.complete(data, null);
+          return;
+        }
         const { hits = [], ...results } = answer?.data ?? {};
         handlers.onActivity?.();
         // As the server streams it: the metadata (is_partial, function_error) first, then the hits.
@@ -2886,6 +2891,44 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
         await wait(170_000);
         expect(spanSearches().length).toBeGreaterThanOrEqual(3);
         expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        wrapper.unmount();
+      });
+
+      it("does not record a miss when the stream ends before its metadata, as a cancelled one does", async () => {
+        traceSchema("trace_id", "http_response_status_code");
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spanHandler = () => "cut";
+        const wrapper = await mountLive();
+
+        await wait(170_000);
+        expect(spanSearches().length).toBeGreaterThanOrEqual(3);
+        expect(lookups(wrapper.vm)).toEqual(["unknown"]);
+        wrapper.unmount();
+      });
+
+      it("narrows the columns on the server's own missing-field error event", async () => {
+        noSchema();
+        server.failed = [traced("doc0", 0, 30, "abc1")];
+        server.spans = [span("abc1", { http_status_code: "503" })];
+        server.spanHandler = (params) => {
+          if (params.query.query.sql.includes("http_response_status_code"))
+            throw Object.assign(new Error("stream error"), {
+              content: {
+                code: 400,
+                message:
+                  "Search field not found: No field named http_response_status_code. Valid fields are traces.trace_id, traces.start_time.",
+              },
+            });
+          return answer(server.spans);
+        };
+        const wrapper = await mountLive();
+
+        const sqls = selects();
+        expect(sqls).toHaveLength(2);
+        expect(sqls[1]).toContain(
+          "select trace_id, start_time, http_status_code, service_name from",
+        );
+        expect(names(wrapper.vm)).toEqual(["No response · 503 GET https://example.test/doc0"]);
         wrapper.unmount();
       });
 

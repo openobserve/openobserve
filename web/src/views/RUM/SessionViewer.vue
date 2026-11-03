@@ -1053,14 +1053,17 @@ const queryErrorFrom = (response: any) => {
         : undefined;
   const errorCode =
     content.code === undefined || content.code === null ? undefined : String(content.code);
-  const message = [content.message, content.error, content.error_detail].find(
+  const parts = [content.message, content.error, content.error_detail].filter(
     (part) => typeof part === "string" && part,
   );
+  const message = [...new Set(parts)].join(" ");
   return createQueryError(message || "session replay query failed", status, errorCode);
 };
 
 // One streamed search page. `complete` is false when any event of the stream reported a partial result or a function
-// error (they ride on the `results` of the metadata events). Every request is tracked in liveTraceIds, so unmount cancels it.
+// error (they ride on the `results` of the metadata events), or when no metadata arrived: the server sends it first,
+// even for no hits, and a cancelled or cut stream still ends as a normal finish. Every request is tracked in liveTraceIds,
+// so unmount cancels it.
 const runStreamQuery = (
   queryReq: any,
   pageType: "logs" | "traces",
@@ -1068,6 +1071,7 @@ const runStreamQuery = (
   new Promise((resolve, reject) => {
     const hits: any[] = [];
     let complete = true;
+    let sawMetadata = false;
     const traceId = generateTraceContext()?.traceId || getUUID();
     const orgId = store.state.selectedOrganization.identifier;
     let settled = false;
@@ -1100,6 +1104,7 @@ const runStreamQuery = (
         data: (_req: any, response: any) => {
           const results = response?.content?.results;
           if (response?.type === "search_response_hits") hits.push(...(results?.hits ?? []));
+          if (response?.type === "search_response_metadata") sawMetadata = true;
           if (
             (response?.type === "search_response_hits" ||
               response?.type === "search_response_metadata") &&
@@ -1109,7 +1114,7 @@ const runStreamQuery = (
           }
         },
         error: (_req: any, response: any) => settle(() => reject(queryErrorFrom(response))),
-        complete: () => settle(() => resolve({ hits, complete })),
+        complete: () => settle(() => resolve({ hits, complete: complete && sawMetadata })),
         onActivity: () => timer.touch(),
       },
     );
