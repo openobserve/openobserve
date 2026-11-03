@@ -941,13 +941,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
             </OButtonGroup>
             <RecentSearchesButton
-              source="logs"
-              :examples="recentExamples"
+              class="me-1 size-[2.125rem]!"
               data-test="logs-search-bar-recent-searches-btn"
-              @run="(entry, when) => restoreRecent(entry, when, true)"
-              @load="(entry, when) => restoreRecent(entry, when, false)"
               @view-all="openRecentSearches"
-              @example="applyRecentExample"
             />
             <div
               v-if="
