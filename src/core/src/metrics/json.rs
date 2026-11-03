@@ -554,7 +554,7 @@ pub async fn ingest(
     )
     .await?;
 
-    ingest::observe_request(ENDPOINT, org_id, &start);
+    ingest::observe_request(ENDPOINT, org_id, &start, http::StatusCode::OK);
     ingest::spawn_triggers(stream_trigger_map);
 
     Ok(IngestionResponse::new(

@@ -713,7 +713,7 @@ pub async fn handle_otlp_request(
     } else {
         "/api/otlp/v1/metrics"
     };
-    ingest::observe_request(ep, org_id, &start);
+    ingest::observe_request(ep, org_id, &start, http::StatusCode::OK);
     ingest::spawn_triggers(stream_trigger_map);
 
     format_response(partial_success, req_type)

@@ -474,10 +474,15 @@ pub(super) async fn write_streams(
 }
 
 /// Records a successful request against `endpoint` in the HTTP metrics.
-pub(super) fn observe_request(endpoint: &str, org_id: &str, start: &Instant) {
+pub(super) fn observe_request(
+    endpoint: &str,
+    org_id: &str,
+    start: &Instant,
+    status: http::StatusCode,
+) {
     let labels = [
         endpoint,
-        "200",
+        status.as_str(),
         org_id,
         StreamType::Metrics.as_str(),
         "",
