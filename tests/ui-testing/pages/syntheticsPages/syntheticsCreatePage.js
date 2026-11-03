@@ -126,6 +126,8 @@ export class SyntheticsCreatePage {
       operator: SYNTHETICS_OPERATOR_IDS[operator] ?? operator,
       values: [String(value)],
     });
+    // The picker stays open for the next condition and would swallow the next click on the form.
+    await this.assertions().close();
     await expect(this.assertions().chips).toHaveCount(before + 1, { timeout: 10000 });
   }
 
