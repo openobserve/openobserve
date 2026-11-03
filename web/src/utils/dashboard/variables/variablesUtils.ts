@@ -1,6 +1,16 @@
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
-export const VARIABLE_FORMATS = ["csv", "pipe", "doublequote", "singlequote"] as const;
+/** List formats, for multi-value variables. */
+export const LIST_VARIABLE_FORMATS = ["csv", "pipe", "doublequote", "singlequote"] as const;
+
+/** Date formats, for `date` variables. Longer epoch names first so the placeholder regex tries them before `epoch`. */
+export const DATE_VARIABLE_FORMATS = ["iso", "dmy", "mdy", "epochms", "epochus", "epoch"] as const;
+
+export type DateVariableFormat = (typeof DATE_VARIABLE_FORMATS)[number];
+
+export const DEFAULT_DATE_VARIABLE_FORMAT: DateVariableFormat = "iso";
+
+export const VARIABLE_FORMATS = [...LIST_VARIABLE_FORMATS, ...DATE_VARIABLE_FORMATS] as const;
 
 const HTML_ENTITIES: Record<string, string> = {
   "&": "&amp;",
@@ -34,6 +44,65 @@ export interface VariablePlaceholder<F extends string = VariableFormat> {
   /** Index of the placeholder in the text. */
   offset: number;
 }
+
+export const isDateVariableFormat = (format: unknown): format is DateVariableFormat =>
+  (DATE_VARIABLE_FORMATS as readonly unknown[]).includes(format);
+
+const DATE_VALUE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** Formats a stored `YYYY-MM-DD` value; the epoch formats are 00:00 UTC of that day. Undefined when the value is not a real calendar date. */
+export const formatDateVariableValue = (
+  value: unknown,
+  format: DateVariableFormat | string | undefined,
+): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const match = DATE_VALUE_RE.exec(value);
+  if (!match) return undefined;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const check = new Date(Date.UTC(year, month - 1, day));
+  // Date.UTC rolls 02-30 over to March, so compare the parts back
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() !== month - 1 ||
+    check.getUTCDate() !== day
+  ) {
+    return undefined;
+  }
+
+  switch (format) {
+    case "dmy":
+      return `${match[3]}/${match[2]}/${match[1]}`;
+    case "mdy":
+      return `${match[2]}/${match[3]}/${match[1]}`;
+    case "epoch":
+    case "epochms":
+    case "epochus": {
+      const ms = check.getTime();
+      if (format === "epoch") return String(Math.floor(ms / 1000));
+      return format === "epochms" ? String(ms) : String(ms * 1000);
+    }
+    default:
+      return value;
+  }
+};
+
+/**
+ * The text a date variable prints at a placeholder, or undefined when it is not a date variable
+ * or its value is empty or malformed (callers then render the value as they always did).
+ * A date format on the placeholder wins; any other placeholder format uses the variable's own `dateFormat`.
+ */
+export const formatDateVariable = (
+  variable: { type?: string; value?: unknown; dateFormat?: string } | null | undefined,
+  placeholderFormat?: string,
+): string | undefined => {
+  if (variable?.type !== "date") return undefined;
+  const format = isDateVariableFormat(placeholderFormat)
+    ? placeholderFormat
+    : isDateVariableFormat(variable.dateFormat)
+      ? variable.dateFormat
+      : DEFAULT_DATE_VARIABLE_FORMAT;
+  return formatDateVariableValue(variable.value, format);
+};
 
 export const formatInterval = (interval: any) => {
   switch (true) {
@@ -430,8 +499,10 @@ export const processVariableContent = (
   const resolvedVariables = resolveVariablesWithPrecedence(variablesData, context);
 
   const valuesByName = new Map<string, any>();
+  const variablesByName = new Map<string, any>();
   variablesData.values.forEach((variable: any) => {
     if (!variable.name || valuesByName.has(variable.name)) return;
+    variablesByName.set(variable.name, variable);
     valuesByName.set(
       variable.name,
       context && Object.prototype.hasOwnProperty.call(resolvedVariables, variable.name)
@@ -446,6 +517,8 @@ export const processVariableContent = (
     valuesByName.keys(),
     ({ name, format, offset }) => {
       let value = valuesByName.get(name);
+      // a date variable prints in its effective format, then the rest applies to that text
+      value = formatDateVariable({ ...variablesByName.get(name), value }, format) ?? value;
       const isUrlFormat = format === "percentencode" || format === "queryparam";
       const inQueryValue = QUERY_VALUE_PREFIX.test(
         processedContent.slice(Math.max(0, offset - 256), offset),

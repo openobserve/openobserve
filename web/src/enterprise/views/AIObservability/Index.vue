@@ -34,7 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <section class="h-full min-h-0 min-w-0 overflow-y-auto">
-      <router-view />
+      <OnlineEvalsDisabled v-if="onlineEvalsRouteOff" />
+      <router-view v-else />
     </section>
   </OPageLayout>
 </template>
@@ -50,7 +51,15 @@ import type { SectionHubGroup, SectionHubItem } from "@/components/common/Sectio
 import { navSection } from "./navSection";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
-import { AI_OBSERVABILITY_SECTIONS } from "@/composables/shared/useAIObservabilityRoutes";
+import {
+  AI_OBSERVABILITY_SECTIONS,
+  ONLINE_EVAL_FEATURE_KEYS,
+} from "@/composables/shared/useAIObservabilityRoutes";
+import {
+  hidesOnlineEvalEntries,
+  useOnlineEvalsRouteOff,
+} from "@/composables/shared/useOnlineEvalsGate";
+import OnlineEvalsDisabled from "@/components/OnlineEvalsDisabled.vue";
 
 /** The same mark the primary nav uses for this module, so the collapsed rail
  *  still says which module it belongs to. */
@@ -95,6 +104,9 @@ const orgQuery = computed(() => ({
 
 const activeSection = computed<string>(() => navSection(route.name, route.query.tab));
 
+// A deep link to an evaluation page with evaluations off renders the disabled state instead.
+const onlineEvalsRouteOff = useOnlineEvalsRouteOff();
+
 // Single source of truth for the rail items (groups) AND the breadcrumb
 // switcher, derived from AI_OBSERVABILITY_SECTIONS — the SAME list the OSS
 // and enterprise routers build their /ai routes from (see
@@ -106,10 +118,17 @@ const activeSection = computed<string>(() => navSection(route.name, route.query.
 // Settings/IAM rail pattern.
 const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => {
   const featureGateCtx = buildFeatureGateContext(store.state.zoConfig);
+  // With online evaluations off the server serves no evaluation sections, so drop them.
+  const hideEvalSections = hidesOnlineEvalEntries(store.state.zoConfig);
   // Memoized per featureKey, not per nav item — the four Evaluate entries
   // share one key and would otherwise recompute the same access check 4x.
   const accessByFeatureKey = new Map<string, ReturnType<typeof checkFeatureAccess>>();
-  return AI_OBSERVABILITY_SECTIONS.map((section) => {
+  const sections = hideEvalSections
+    ? AI_OBSERVABILITY_SECTIONS.filter(
+        (section) => !section.featureKey || !ONLINE_EVAL_FEATURE_KEYS[section.featureKey],
+      )
+    : AI_OBSERVABILITY_SECTIONS;
+  return sections.map((section) => {
     let locked: boolean | undefined;
     let lockedMessage: I18nText | undefined;
     if (section.featureKey) {

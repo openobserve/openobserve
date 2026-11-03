@@ -62,7 +62,7 @@ const ODialogStub = {
   template: "<div v-if='open'><slot /></div>",
 };
 
-function mountDrawer(initialVersion = 1, initialTab = "labels") {
+function mountDrawer(initialVersion = 1, initialTab = "labels", showPlayground?: boolean) {
   return shallowMount(PromptDetailDrawer, {
     props: {
       open: true,
@@ -71,6 +71,7 @@ function mountDrawer(initialVersion = 1, initialTab = "labels") {
       initialTab,
       initialVersion,
       protectedLabels: ["production"],
+      ...(showPlayground === undefined ? {} : { showPlayground }),
     },
     global: {
       stubs: {
@@ -193,5 +194,19 @@ describe("prompt detail navigation and labels", () => {
     (wrapper.vm as unknown as { swapCompared: () => void }).swapCompared();
     await flushPromises();
     expect(wrapper.findComponent(PromptVersionDiff).props("left").version).toBe(3);
+  });
+});
+
+describe("prompt detail Playground entry", () => {
+  it("shows the Playground action by default", async () => {
+    const wrapper = mountDrawer();
+    await flushPromises();
+    expect(wrapper.find('[data-test="prompt-detail-playground"]').exists()).toBe(true);
+  });
+
+  it("hides the Playground action when Playground is unavailable", async () => {
+    const wrapper = mountDrawer(1, "labels", false);
+    await flushPromises();
+    expect(wrapper.find('[data-test="prompt-detail-playground"]').exists()).toBe(false);
   });
 });
