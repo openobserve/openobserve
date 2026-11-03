@@ -6030,13 +6030,13 @@
       "codingAgent": {
         "tabAgent": "With a coding agent",
         "tabSteps": "Step by step",
-        "step": "Step {n}",
         "streamLabel": "Traces Stream Name",
         "streamHelp": "The agent writes traces to this stream and checks it.",
         "envTitle": "Download your .env",
         "envHelp": "Save it in the project root. The skill reads the token from this file, so it never goes into the chat.",
         "envButton": "Download .env",
         "promptTitle": "Paste this into {client1}, {client2} or {client3}",
+        "promptLabel": "Prompt",
         "promptCopied": "Prompt copied"
       }
     },

@@ -12,10 +12,13 @@ import CodingAgentSetup from "./CodingAgentSetup.vue";
 import store from "@/test/unit/helpers/store";
 
 const SUBS = { url: "https://api.example.com", org: "team1", token: "dG9rZW4=" };
+const startCheck = vi.fn();
 const FIRST_EVENT_STUB = {
   name: "FirstEventStatus",
   template: '<div data-test="first-event-status-stub" />',
   props: ["org", "signal", "targetStream", "match", "filter", "guideName", "docUrl"],
+  emits: ["copy-command"],
+  methods: { start: startCheck, probeNow: vi.fn() },
 };
 
 describe("CodingAgentSetup", () => {
@@ -53,6 +56,22 @@ describe("CodingAgentSetup", () => {
     expect(wrapper.findComponent(FIRST_EVENT_STUB).props("targetStream")).toBe("ai_traces");
   });
 
+  it("starts the first-span check when the prompt is copied, as the status row says", async () => {
+    wrapper = mountSetup({ detect: { streamType: "traces" } });
+    wrapper.findComponent({ name: "OCodeBlock" }).vm.$emit("copy", { partial: false });
+    expect(startCheck).toHaveBeenCalledWith("copy");
+  });
+
+  it("re-copies through the prompt block when the status bar asks for the command", async () => {
+    wrapper = mountSetup({ detect: { streamType: "traces" } });
+    const click = vi.fn();
+    wrapper
+      .find('[data-test="ai-coding-agent-prompt-copy-btn"]')
+      .element.addEventListener("click", click);
+    wrapper.findComponent(FIRST_EVENT_STUB).vm.$emit("copy-command");
+    expect(click).toHaveBeenCalled();
+  });
+
   it("downloads the card's .env plus the chosen stream and the web UI root", async () => {
     wrapper = mountSetup();
     await wrapper.find('[data-test="ai-coding-agent-stream-input"] input').setValue("ai_traces");
@@ -71,7 +90,7 @@ describe("CodingAgentSetup", () => {
 
   it("names the coding agents in the prompt step title from code, not the translation", () => {
     wrapper = mountSetup();
-    const title = wrapper.find('[data-test="ai-coding-agent-prompt-step"] h3').text();
+    const title = wrapper.find('[data-test="ai-coding-agent-prompt-step"]').text();
     expect(title).toContain("Claude Code, Cursor or Codex");
     expect(title).not.toContain("{client");
   });

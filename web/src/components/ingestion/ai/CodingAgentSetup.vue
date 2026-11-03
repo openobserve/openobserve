@@ -27,6 +27,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import FirstEventStatus from "@/components/ingestion/FirstEventStatus.vue";
 import { downloadEnvFile } from "@/components/ingestion/setupCard/envFile";
 import { getPath } from "@/utils/zincutils";
@@ -58,6 +60,21 @@ const streamNameError = computed(() =>
 const effectiveStream = computed(() => streamName.value.trim() || props.defaultStream);
 
 const prompt = computed(() => buildCodingAgentPrompt(props.subs.org, effectiveStream.value));
+const promptTitle = computed(() =>
+  t("ingestion.ai.codingAgent.promptTitle", {
+    client1: raw("Claude Code"),
+    client2: raw("Cursor"),
+    client3: raw("Codex"),
+  }),
+);
+
+const root = ref<HTMLElement | null>(null);
+const statusBar = ref<InstanceType<typeof FirstEventStatus> | null>(null);
+// Copying the prompt is the go signal, so the first-span check starts then, as on the stepped card.
+const onPromptCopy = () => statusBar.value?.start("copy");
+// The status bar's copy button re-copies through the prompt block, so the clipboard and toast match.
+const copyPrompt = () =>
+  root.value?.querySelector<HTMLElement>('[data-test="ai-coding-agent-prompt-copy-btn"]')?.click();
 
 // Beyond the card's three keys: the stream the prompt names (the SDK reads this
 // name) and the web UI root (the skill appends /web/…), so its trace and fix
@@ -70,37 +87,41 @@ const downloadEnv = () =>
 </script>
 
 <template>
-  <div class="flex max-w-[61.25rem] flex-col gap-6 py-4" data-test="ai-coding-agent-setup">
-    <OInput
-      v-model="streamName"
-      :label="t('ingestion.ai.codingAgent.streamLabel')"
-      :placeholder="raw(defaultStream)"
-      :help-text="!streamNameError ? t('ingestion.ai.codingAgent.streamHelp') : undefined"
-      :error="!!streamNameError"
-      :error-message="streamNameError"
-      size="sm"
-      width="md"
-      data-test="ai-coding-agent-stream-input"
-    />
-
-    <section class="flex flex-col gap-2" data-test="ai-coding-agent-env-step">
-      <h3 class="m-0 text-base font-semibold">
-        <span class="text-text-secondary me-2 text-sm font-normal">{{
-          t("ingestion.ai.codingAgent.step", { n: 1 })
-        }}</span>
-        {{ t("ingestion.ai.codingAgent.envTitle") }}
-      </h3>
-      <OBanner
-        v-if="passcodeForbidden"
-        variant="warning"
-        data-test="ai-coding-agent-passcode-forbidden"
-        :content="t('ingestion.passcodeForbiddenMessage')"
+  <div
+    ref="root"
+    class="text-text-heading max-w-[61.25rem] px-1 py-4 text-sm"
+    data-test="ai-coding-agent-setup"
+  >
+    <div class="mb-7 [&_.text-input-hint]:whitespace-nowrap [&_label]:mb-0.5">
+      <OInput
+        v-model="streamName"
+        :label="t('ingestion.ai.codingAgent.streamLabel')"
+        :placeholder="raw(defaultStream)"
+        :help-text="!streamNameError ? t('ingestion.ai.codingAgent.streamHelp') : undefined"
+        :error="!!streamNameError"
+        :error-message="streamNameError"
+        size="sm"
+        width="md"
+        data-test="ai-coding-agent-stream-input"
       />
-      <template v-else>
-        <p class="text-text-secondary m-0 text-sm">
-          {{ t("ingestion.ai.codingAgent.envHelp") }}
-        </p>
-        <div>
+    </div>
+
+    <OStepper :model-value="1" orientation="vertical" expanded :animated="false">
+      <OStep
+        :name="1"
+        :title="t('ingestion.ai.codingAgent.envTitle')"
+        data-test="ai-coding-agent-env-step"
+      >
+        <OBanner
+          v-if="passcodeForbidden"
+          variant="warning"
+          data-test="ai-coding-agent-passcode-forbidden"
+          :content="t('ingestion.passcodeForbiddenMessage')"
+        />
+        <template v-else>
+          <p class="text-text-secondary text-compact mt-0 mb-2.5 leading-[1.45]">
+            {{ t("ingestion.ai.codingAgent.envHelp") }}
+          </p>
           <OButton
             variant="outline"
             size="sm"
@@ -110,41 +131,34 @@ const downloadEnv = () =>
           >
             {{ t("ingestion.ai.codingAgent.envButton") }}
           </OButton>
-        </div>
-      </template>
-    </section>
+        </template>
+      </OStep>
 
-    <section class="flex flex-col gap-2" data-test="ai-coding-agent-prompt-step">
-      <h3 class="m-0 text-base font-semibold">
-        <span class="text-text-secondary me-2 text-sm font-normal">{{
-          t("ingestion.ai.codingAgent.step", { n: 2 })
-        }}</span>
-        {{
-          t("ingestion.ai.codingAgent.promptTitle", {
-            client1: raw("Claude Code"),
-            client2: raw("Cursor"),
-            client3: raw("Codex"),
-          })
-        }}
-      </h3>
-      <OCodeBlock
-        :code="prompt"
-        lang="text"
-        wrap
-        :copy-message="t('ingestion.ai.codingAgent.promptCopied')"
-        data-test="ai-coding-agent-prompt"
-      />
-    </section>
-
-    <FirstEventStatus
-      v-if="detect"
-      :org="subs.org"
-      :signal="detect.streamType"
-      :target-stream="effectiveStream"
-      :match="detect.match"
-      :filter="detect.filter || undefined"
-      :guide-name="guideName"
-      :doc-url="docUrl ? safeHttpUrl(docUrl) : undefined"
-    />
+      <OStep :name="2" :title="promptTitle" data-test="ai-coding-agent-prompt-step">
+        <OCodeBlock
+          :code="prompt"
+          lang="text"
+          chrome="editor"
+          :filename="t('ingestion.ai.codingAgent.promptLabel')"
+          wrap
+          :copy-message="t('ingestion.ai.codingAgent.promptCopied')"
+          data-test="ai-coding-agent-prompt"
+          @copy="onPromptCopy"
+        />
+        <FirstEventStatus
+          v-if="detect"
+          ref="statusBar"
+          class="mt-3"
+          :org="subs.org"
+          :signal="detect.streamType"
+          :target-stream="effectiveStream"
+          :match="detect.match"
+          :filter="detect.filter || undefined"
+          :guide-name="guideName"
+          :doc-url="docUrl ? safeHttpUrl(docUrl) : undefined"
+          @copy-command="copyPrompt"
+        />
+      </OStep>
+    </OStepper>
   </div>
 </template>
