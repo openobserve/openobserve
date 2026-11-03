@@ -450,6 +450,8 @@ pub async fn handle_kinesis_request(
     request_body(content = inline(GCPIngestionRequest), description = "Pub/Sub push envelope", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Request rejected, or no record stored because the message was rejected", content_type = "application/json", body = Object, example = json!({"code": 400, "message": "stream logs: Stream name too long"})),
+        (status = 500, description = "Write to storage failed, or the stream started deleting mid-write", content_type = "application/json", body = Object, example = json!({"code": 500, "message": "write to storage failed"})),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
