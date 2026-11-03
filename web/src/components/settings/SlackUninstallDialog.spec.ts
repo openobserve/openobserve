@@ -70,12 +70,12 @@ afterEach(() => {
 });
 
 describe("SlackUninstallDialog: Disconnect this org (row 17)", () => {
-  it("AC-12.2 says what stops for on-call, keeps links, counts this org's destinations, then lists the ones that stopped", async () => {
+  it("AC-12.2 says in one line what stops for on-call, counts this org's destinations, then lists the ones that stopped", async () => {
     mountDialog("disconnect");
     await flushPromises();
     expect(body().text()).toContain("Disconnect this org from Acme Corp?");
     expect(body().text()).toContain("on-call pages stop posting to team channels");
-    expect(body().text()).toContain("everyone's links stay");
+    expect(body().text()).toContain("Acknowledge and Resolve in Slack stop working");
     expect(body().text()).toContain("4 alert destinations in this org stop posting.");
 
     await primary()!.trigger("click");

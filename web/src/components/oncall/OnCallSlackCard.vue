@@ -16,30 +16,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- LN-1: whether the reader's Slack DMs can reach them. It links nothing itself; linking is /o2 link. -->
 <template>
-  <div class="flex min-h-8 items-center gap-3 py-1" data-test="oncall-slack-card">
-    <span class="flex w-16 shrink-0 items-center gap-1.5">
-      <img :src="slackLogo" alt="" class="size-4" />
-      <OText variant="body">{{ t("oncall.mineSlackTitle") }}</OText>
-    </span>
+  <OnCallReachRow
+    :label="t('oncall.mineSlackTitle')"
+    :icon-src="slackLogo"
+    data-test="oncall-slack-card"
+  >
+    <template #value>
+      <!-- A failed read is not "Not linked": that would send a linked person to link again. -->
+      <OText v-if="links.isError.value" variant="meta" data-test="oncall-slack-load-failed">
+        {{ t("oncall.mineSlackLoadFailed") }}
+      </OText>
+      <!-- SA-8: no workspace serves this org, so no link can page the reader. -->
+      <OText
+        v-else-if="links.data.value && !links.data.value.slack_serves_org"
+        variant="meta"
+        data-test="oncall-slack-not-set-up"
+      >
+        {{ t("oncall.phoneNotAvailable") }}
+      </OText>
+      <template v-else-if="links.data.value">
+        <OTruncatedText
+          v-if="links.data.value.links.length"
+          class="text-text-body text-sm"
+          data-test="oncall-slack-linked"
+        >
+          {{ raw(links.data.value.links.map((link) => link.team_name).join(", ")) }}
+        </OTruncatedText>
+        <OText v-else variant="meta" data-test="oncall-slack-not-linked">
+          {{ t("oncall.mineSlackLinkHow") }}
+        </OText>
+      </template>
+    </template>
 
-    <!-- A failed read is not "Not linked": that would send a linked person to link again. -->
-    <OText
-      v-if="links.isError.value"
-      variant="meta"
-      class="flex-1"
-      data-test="oncall-slack-load-failed"
-    >
-      {{ t("oncall.mineSlackLoadFailed") }}
-    </OText>
-    <!-- SA-8: no workspace serves this org, so no link can page the reader. -->
-    <template v-else-if="links.data.value && !links.data.value.slack_serves_org">
-      <span class="flex min-w-0 flex-1 items-center gap-1" data-test="oncall-slack-not-set-up">
-        <OText variant="meta">{{ t("oncall.mineSlackNotSetUp") }}</OText>
-        <span v-if="!admin" class="inline-flex" data-test="oncall-slack-ask-admin">
-          <OIcon name="info" size="sm" class="text-text-secondary" />
-          <OTooltip :content="t('oncall.mineSlackAskAdmin')" />
-        </span>
-      </span>
+    <template v-if="links.data.value && !links.isError.value" #status>
+      <OTag
+        v-if="!links.data.value.slack_serves_org"
+        variant="default-soft"
+        size="sm"
+        data-test="oncall-slack-state"
+      >
+        {{ t("oncall.reachNotSetUp") }}
+      </OTag>
+      <OTag
+        v-else-if="links.data.value.links.length"
+        variant="success-soft"
+        size="sm"
+        data-test="oncall-slack-state"
+      >
+        {{ t("oncall.reachLinked") }}
+      </OTag>
+      <OTag v-else variant="default-soft" size="sm" data-test="oncall-slack-state">
+        {{ t("oncall.reachNotLinked") }}
+      </OTag>
+    </template>
+
+    <template v-if="links.data.value && !links.data.value.slack_serves_org" #action>
       <OButton
         v-if="admin"
         variant="outline"
@@ -47,35 +78,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-slack-settings-link"
         @click="openSlackSettings"
       >
-        <OIcon name="settings" size="sm" />{{ t("oncall.mineSlackSetUp") }}
+        <OIcon name="settings" size="sm" />{{ t("oncall.reachSetUp") }}
+        <OTooltip :content="t('oncall.mineSlackSetUpHint')" />
       </OButton>
-    </template>
-    <template v-else-if="links.data.value">
-      <span class="flex min-w-0 flex-1 flex-col">
-        <OText
-          v-for="link in links.data.value.links"
-          :key="link.id"
-          variant="body"
-          :data-test="`oncall-slack-linked-${link.id}`"
-        >
-          {{ t("oncall.mineSlackLinked", { email: raw(email), workspace: raw(link.team_name) }) }}
-        </OText>
-        <OText
-          v-if="!links.data.value.links.length"
-          variant="meta"
-          data-test="oncall-slack-not-linked"
-        >
-          {{ t("oncall.mineSlackNotLinked") }}
-        </OText>
+      <span v-else class="inline-flex" data-test="oncall-slack-ask-admin">
+        <OIcon name="info" size="sm" class="text-text-secondary" />
+        <OTooltip :content="t('oncall.mineSlackAskAdmin')" />
       </span>
-      <OIcon
-        v-if="links.data.value.links.length"
-        name="check-circle"
-        size="sm"
-        class="text-status-success-text shrink-0"
-      />
     </template>
-  </div>
+  </OnCallReachRow>
 </template>
 
 <script setup lang="ts">
@@ -85,10 +96,13 @@ import { useStore } from "vuex";
 
 import { useRouter } from "vue-router";
 
+import OnCallReachRow from "@/components/oncall/OnCallReachRow.vue";
 import { useTheme } from "@/composables/useTheme";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { slackMyLinksQuery } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -108,7 +122,6 @@ const router = useRouter();
 const { isDark } = useTheme();
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
-const email = computed<string>(() => store.state.userInfo?.email ?? "");
 // My on-call shows this card only while Slack is on.
 const links = useQuery(() => Object.assign(slackMyLinksQuery(org.value), { enabled: !!org.value }));
 

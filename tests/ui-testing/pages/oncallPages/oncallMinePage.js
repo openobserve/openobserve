@@ -43,6 +43,9 @@ export class OnCallMinePage {
       teamsCard: '[data-test="oncall-mine-teams"]',
       onCallTag: '[data-test="oncall-mine-on-call"]',
       noTeams: '[data-test="oncall-mine-no-teams"]',
+      shiftsTable: '[data-test="oncall-mine-shifts-table"]',
+      away: '[data-test="oncall-mine-away"]',
+      reach: '[data-test="oncall-mine-reach"]',
 
       deliveries: '[data-test="oncall-my-deliveries"]',
       deliveriesTable: '[data-test="oncall-my-deliveries-table"]',
@@ -57,6 +60,10 @@ export class OnCallMinePage {
 
   teamRow(teamId) { return `[data-test="oncall-mine-team-${teamId}"]`; }
   dutyTag(teamId) { return `[data-test="oncall-mine-duty-${teamId}"]`; }
+  shiftUntil(teamId) { return `[data-test="oncall-mine-shift-${teamId}"]`; }
+  nextPerson(teamId) { return `[data-test="oncall-mine-next-${teamId}"]`; }
+  coverButton(teamId) { return `[data-test="oncall-mine-cover-${teamId}"]`; }
+  testPageButton(teamId) { return `[data-test="oncall-mine-test-page-${teamId}"]`; }
   deliveryUnreadTag(eventId) { return `[data-test="oncall-my-delivery-unread-${eventId}"]`; }
   deliveryToggle(eventId) { return `[data-test="oncall-my-delivery-toggle-${eventId}"]`; }
 

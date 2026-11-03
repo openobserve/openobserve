@@ -23,9 +23,10 @@ import addToSlackImage2x from "@/assets/images/common/add_to_slack@2x.png";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useSlackOAuthPopup } from "@/composables/slack/useSlackOAuthPopup";
-import useBreakpoint from "@/composables/useBreakpoint";
 import {
   confirmConnectionMutation,
   connectInstallationMutation,
@@ -60,7 +61,6 @@ const emit = defineEmits<{ setup: []; installed: [confirmation: SlackInstallConf
 
 const { t } = useI18nTyped();
 const store = useStore();
-const { isMobile } = useBreakpoint();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const orgName = computed<string>(() => store.state.selectedOrganization?.label || org.value);
 
@@ -172,35 +172,20 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
           detail: t("slackApp.connect.stepLinkDetail"),
         },
       ]
-    : isMobile.value
-      ? [
-          {
-            title: t("slackApp.connect.stepCheckTitle"),
-            detail: t("slackApp.connect.stepCheckDetailShort"),
-          },
-          {
-            title: t("slackApp.connect.stepCreateTitle"),
-            detail: t("slackApp.connect.stepCreateDetailShort"),
-          },
-          {
-            title: t("slackApp.connect.stepInstallTitle"),
-            detail: t("slackApp.connect.stepInstallDetailShort"),
-          },
-        ]
-      : [
-          {
-            title: t("slackApp.connect.stepCheckTitle"),
-            detail: t("slackApp.connect.stepCheckDetail"),
-          },
-          {
-            title: t("slackApp.connect.stepCreateTitle"),
-            detail: t("slackApp.connect.stepCreateDetail"),
-          },
-          {
-            title: t("slackApp.connect.stepInstallTitle"),
-            detail: t("slackApp.connect.stepInstallDetail"),
-          },
-        ],
+    : [
+        {
+          title: t("slackApp.connect.stepCheckTitle"),
+          detail: t("slackApp.connect.stepCheckDetailShort"),
+        },
+        {
+          title: t("slackApp.connect.stepCreateTitle"),
+          detail: t("slackApp.connect.stepCreateDetailShort"),
+        },
+        {
+          title: t("slackApp.connect.stepInstallTitle"),
+          detail: t("slackApp.connect.stepInstallDetailShort"),
+        },
+      ],
 );
 </script>
 
@@ -310,7 +295,7 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
           {{ t("slackApp.connect.existingTitle") }}
         </h2>
         <p class="text-text-secondary m-0 text-sm">
-          {{ t("slackApp.connect.existingDescription") }}
+          {{ t("slackApp.connect.existingDescriptionShort") }}
         </p>
       </div>
       <div
@@ -337,9 +322,7 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
         size="block"
         illustration="connect"
         :title="t('slackApp.connect.title')"
-        :description="
-          isCloud ? t('slackApp.connect.description') : t('slackApp.connect.descriptionSelfHosted')
-        "
+        :description="t('slackApp.connect.description')"
         :backdrop="false"
       >
         <template #actions>
@@ -401,18 +384,21 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
           <span v-if="!isCloud && instance" class="text-text-secondary text-xs">
             {{ t("slackApp.connect.setupAppOtherTeam", { team: instance.team_name }) }}
           </span>
-          <span class="text-text-secondary text-xs">
+          <!-- What Slack may read is a privacy fact worth one hover, not a paragraph under the steps. -->
+          <span class="text-text-secondary flex items-center gap-1 text-xs">
             {{ t("slackApp.connect.permissionHint") }}
+            <span class="inline-flex" data-test="slack-connect-consent">
+              <OIcon name="info" size="sm" />
+              <OTooltip max-width="24rem">
+                <template #content>
+                  <span class="flex flex-col gap-1">
+                    <span>{{ t("slackApp.connect.consent") }}</span>
+                    <span v-if="!isCloud">{{ t("slackApp.connect.selfHostedPrivacy") }}</span>
+                  </span>
+                </template>
+              </OTooltip>
+            </span>
           </span>
-          <OBanner
-            variant="info"
-            dense
-            icon="verified-user"
-            class="w-full max-w-2xl text-start"
-            data-test="slack-connect-consent"
-          >
-            {{ t("slackApp.connect.consent") }}
-          </OBanner>
         </template>
       </OEmptyState>
     </OCard>

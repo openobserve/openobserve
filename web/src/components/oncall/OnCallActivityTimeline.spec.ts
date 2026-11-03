@@ -37,6 +37,12 @@ const events: OnCallResponseEvent[] = [
     kind: "sys",
     at: OPENED,
     actor: "o2-engine",
+    body: "opened for alert/3KGMcsdq6K4B29SoZ1XLpyUMpmY#1: checkout-errors",
+  },
+  {
+    kind: "sys",
+    at: OPENED,
+    actor: "o2-engine",
     body: `no ownership rule covers service=test; no ownership rule matched, so it went to the default team ${TEAM}`,
   },
   {
@@ -77,6 +83,9 @@ async function render() {
   return wrapper;
 }
 
+const personTip = (wrapper: Awaited<ReturnType<typeof render>>) =>
+  wrapper.findAllComponents({ name: "OTooltip" }).find((tip) => tip.props("anchor") !== undefined)!;
+
 describe("OnCallActivityTimeline", () => {
   it("reads each line in plain words, with names and steps instead of ids and delays", async () => {
     store.state.timezone = "UTC";
@@ -100,12 +109,38 @@ describe("OnCallActivityTimeline", () => {
   });
 
   /// Display names can repeat in an org, so each one carries its email on hover.
-  it("puts the email behind each person's name", async () => {
+  it("puts the email behind each person's name in a tooltip, not a native title", async () => {
     const wrapper = await render();
-    const person = wrapper.find('span[title="Ana Ruiz · ana@o2.ai"]');
+    const person = wrapper.find('[data-oncall-person="ana@o2.ai"]');
 
     expect(person.exists()).toBe(true);
     expect(person.text()).toBe("Ana Ruiz");
+    expect(wrapper.find("span[title]").exists()).toBe(false);
+
+    await person.trigger("pointerover");
+    const tooltip = personTip(wrapper);
+    expect(tooltip.props("open")).toBe(true);
+    expect(tooltip.props("content")).toBe("Ana Ruiz (ana@o2.ai)");
+    expect(tooltip.props("anchor")).toBe(person.element);
+  });
+
+  /// The "Acknowledged" line leads with the actor, whose name needs the same email.
+  it("gives the acting person's name the same tooltip", async () => {
+    const wrapper = await render();
+    const actor = wrapper.findAll("span.font-semibold").find((span) => span.text() === "Ana Ruiz");
+
+    await actor!.trigger("pointerover");
+    expect(personTip(wrapper).props("content")).toBe("Ana Ruiz (ana@o2.ai)");
+    await actor!.trigger("pointerout");
+    expect(personTip(wrapper).props("open")).toBe(false);
+  });
+
+  /// Every page is firing #1 at first, so the number only shows once it repeats.
+  it("drops the firing number on a first firing", async () => {
+    const text = (await render()).text();
+
+    expect(text).toContain("Opened");
+    expect(text).not.toContain("firing #1");
   });
 
   /// Without the policy the rung delay would sit beside the clock offset as a second, different time.

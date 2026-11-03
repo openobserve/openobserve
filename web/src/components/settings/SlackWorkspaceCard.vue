@@ -33,7 +33,9 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useSlackOAuthPopup } from "@/composables/slack/useSlackOAuthPopup";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import {
   installExchangeMutation,
   installStartMutation,
@@ -74,6 +76,7 @@ const props = defineProps<{
 const emit = defineEmits<{ disconnect: []; uninstall: [] }>();
 
 const { t } = useI18nTyped();
+const { nameOf } = useOrgUserNames();
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const orgName = computed<string>(() => store.state.selectedOrganization?.label || org.value);
@@ -234,7 +237,7 @@ const orgRows = computed<ConnectedOrgRow[]>(() => [
     org: t("slackApp.card.thisOrg", { org: orgName.value }),
     connected: t("slackApp.card.connectedOn", {
       date: connectedDate.value,
-      user: props.installation.this_org.connected_by,
+      user: nameOf(props.installation.this_org.connected_by),
     }),
     destinations: props.installation.this_org.destination_count,
   },
@@ -268,10 +271,22 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
               <template v-else>
                 {{
                   t("slackApp.card.connectedBy", {
-                    user: installation.this_org.connected_by,
+                    user: nameOf(installation.this_org.connected_by),
                     date: connectedDate,
                   })
                 }}
+                <OTooltip
+                  v-if="
+                    nameOf(installation.this_org.connected_by) !==
+                    installation.this_org.connected_by
+                  "
+                  :content="
+                    t('oncall.personNameWithEmail', {
+                      name: raw(nameOf(installation.this_org.connected_by)),
+                      email: raw(installation.this_org.connected_by),
+                    })
+                  "
+                />
               </template>
             </span>
           </div>

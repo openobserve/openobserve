@@ -96,6 +96,7 @@ export class OnCallResponseDetailPage {
       ledger: '[data-test="oncall-delivery-ledger"]',
       ledgerEmpty: '[data-test="oncall-deliveries-empty"]',
       ledgerTruncated: '[data-test="oncall-deliveries-truncated"]',
+      ackedBy: '[data-test="oncall-who-is-on-acked-by"]',
 
       // Resolve.
       resolveDialog: '[data-test="oncall-resolve-dialog"]',

@@ -29,8 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <template v-else>
-      <section v-if="openRows.length" class="flex flex-col gap-2" data-test="oncall-my-needs-you">
-        <OText variant="panel-title">{{ t("oncall.myNeedsYouTitle") }}</OText>
+      <section
+        v-if="openRows.length"
+        class="rounded-surface bg-surface-base border-border-default flex min-w-0 flex-col border"
+        data-test="oncall-my-needs-you"
+      >
+        <div class="flex min-h-12 items-center px-4 py-2">
+          <OText variant="card-title" as="h2">{{ t("oncall.myNeedsYouTitle") }}</OText>
+        </div>
         <OTable
           :data="openRows"
           :columns="openColumns"
@@ -87,9 +93,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
       </section>
 
-      <section class="flex flex-col gap-2" data-test="oncall-my-history">
-        <div class="flex flex-wrap items-center gap-2">
-          <OText variant="panel-title">{{ t("oncall.myHistoryTitle") }}</OText>
+      <section
+        class="rounded-surface bg-surface-base border-border-default flex min-w-0 flex-col border"
+        data-test="oncall-my-history"
+      >
+        <div class="flex min-h-12 flex-wrap items-center gap-2 px-4 py-2">
+          <OText variant="card-title" as="h2">{{ t("oncall.myHistoryTitle") }}</OText>
           <OTag
             v-if="unread"
             variant="primary-soft"
@@ -127,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="key"
           :frame="false"
           :loading="loading"
-          pagination="client"
+          :pagination="historyRows.length > pageSize ? 'client' : 'none'"
           :page-size="pageSize"
           :current-page="currentPage"
           :show-global-filter="false"
@@ -150,13 +159,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTruncatedText class="text-text-body min-w-0">
                 {{ raw(row.latest.title || row.latest.subject_id) }}
               </OTruncatedText>
-              <OTag v-if="row.pages > 1" variant="default-soft" size="sm">
+              <OTag
+                v-if="row.pages > 1"
+                variant="default-soft"
+                size="sm"
+                :data-test="`oncall-my-delivery-count-${row.latest.event_id}`"
+              >
                 {{ raw(`×${row.pages}`) }}
               </OTag>
-              <OTruncatedText class="text-text-secondary min-w-0 text-xs">
-                {{ raw(row.teams.map(teamName).join(", ")) }}
-              </OTruncatedText>
             </span>
+          </template>
+          <template #cell-team="{ row }">
+            <OTruncatedText class="text-text-body">
+              {{ raw(row.teams.map(teamName).join(", ")) }}
+            </OTruncatedText>
           </template>
           <template #cell-state="{ row }">
             <OTag type="oncallResponseState" :value="row.latest.response_state" size="sm" />
@@ -189,14 +205,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </span>
           </template>
+          <!-- The clock time, not "2 months ago": a page is placed against a deploy or a shift by its minute. -->
           <template #cell-at="{ row }">
-            <OTimeCell
-              :value="row.latest.at"
-              unit="us"
-              mode="relative"
-              :timezone="store.state.timezone"
-              :empty-label="raw('—')"
-            />
+            <span class="whitespace-nowrap tabular-nums">
+              {{ raw(clock(row.latest.at)) }}
+            </span>
           </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-end">
@@ -236,7 +249,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="block"
           icon="notifications-active"
           :title="unreadOnly ? t('oncall.myDeliveriesNoUnread') : t('oncall.myDeliveriesNone')"
-          :action-label="!unreadOnly && canTest ? t('oncall.mineTestTeamPage') : undefined"
+          :description="!unreadOnly && !canTest ? t('oncall.myDeliveriesNoneHint') : undefined"
+          :action-label="
+            unreadOnly || !canTest
+              ? undefined
+              : testTeamName
+                ? t('oncall.mineTestTeam', { team: raw(testTeamName) })
+                : t('oncall.mineTestTeamPage')
+          "
           data-test="oncall-my-deliveries-empty"
           @action="emit('test-page')"
         />
@@ -276,7 +296,8 @@ import {
 import type { Channel, MyDeliveries, MyDelivery } from "@/ts/interfaces/oncall";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { isEscalating } from "@/utils/oncall";
+import { useOnCallClock } from "@/composables/useOnCallClock";
+import { formatOnCallInstant, isEscalating } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -284,8 +305,10 @@ const props = withDefaults(
     teamNames?: Record<string, string>;
     /** Whether the empty history offers the team test page as its next step. */
     canTest?: boolean;
+    /** The team that test page goes to, named on the button so it is never ambiguous. */
+    testTeamName?: string | null;
   }>(),
-  { teamNames: () => ({}), canTest: false },
+  { teamNames: () => ({}), canTest: false, testTeamName: null },
 );
 
 const emit = defineEmits<{ unread: [count: number]; "test-page": [] }>();
@@ -314,6 +337,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+const nowMicros = useOnCallClock();
 
 const rows = ref<MyDelivery[]>([]);
 const unread = ref(0);
@@ -367,7 +391,8 @@ const openRows = computed<MyDelivery[]>(() => {
 const historyRows = computed<HistoryRow[]>(() => {
   const groups = new Map<string, MyDelivery[]>();
   for (const row of rows.value) {
-    const key = `${row.subject_type}:${row.subject_id}`;
+    // The id carries the firing ("…#2"); without it every firing of one alert is its own row.
+    const key = `${row.subject_type}:${row.subject_id.replace(/#\d+$/, "")}`;
     groups.set(key, [...(groups.get(key) ?? []), row]);
   }
   return [...groups.entries()]
@@ -414,17 +439,22 @@ const openColumns = computed<OTableColumnDef<MyDelivery>[]>(() => [
 ]);
 
 const historyColumns = computed<OTableColumnDef<HistoryRow>[]>(() => [
-  { id: "unread", header: raw(""), size: 32, sortable: false },
+  // Only while something is unread: a column of empty dots says nothing.
+  ...(historyRows.value.some((row) => row.unread)
+    ? [{ id: "unread", header: raw(""), size: 32, sortable: false }]
+    : []),
   {
     id: "page",
     header: t("oncall.myDeliveriesPage"),
     accessorFn: (row: HistoryRow) => row.latest.title ?? row.latest.subject_id,
     sortable: false,
+    size: 280,
     meta: { isName: true, flex: true },
   },
-  { id: "state", header: t("oncall.myDeliveriesStatus"), size: 120, sortable: false },
-  { id: "channels", header: t("oncall.myDeliveriesChannels"), size: 96, sortable: false },
-  { id: "at", header: t("oncall.myDeliveriesLast"), size: 120, sortable: false },
+  { id: "team", header: t("oncall.team"), size: 176, sortable: false },
+  { id: "state", header: t("oncall.myDeliveriesStatus"), size: 128, sortable: false },
+  { id: "channels", header: t("oncall.myDeliveriesChannels"), size: 104, sortable: false },
+  { id: "at", header: t("oncall.myDeliveriesWhen"), size: 176, sortable: false },
   // An all-resolved history has nothing to mark, so an empty Actions column would only take width.
   ...(historyRows.value.some(canMark)
     ? [
@@ -440,6 +470,10 @@ const historyColumns = computed<OTableColumnDef<HistoryRow>[]>(() => [
       ]
     : []),
 ]);
+
+function clock(micros: number): string {
+  return formatOnCallInstant(micros, nowMicros.value, store.state.timezone);
+}
 
 const markWrite = useMutation(() => markDeliveriesReadMutation(orgId.value));
 

@@ -66,7 +66,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODescriptionList dense>
           <ODescriptionItem :label="closed ? t('oncall.onCallThen') : t('oncall.onCallNow')">
             <span class="flex w-full items-center gap-2">
-              <OUserCell class="min-w-0 font-medium" :value="primary.user_email" />
+              <OnCallPersonName
+                class="min-w-0 truncate font-medium"
+                :email="primary.user_email"
+                data-test="oncall-who-is-on-primary"
+              />
               <OTag
                 v-if="reachOf(primary.user_email)"
                 :variant="reachOf(primary.user_email) === 'landed' ? 'success-soft' : 'error-soft'"
@@ -88,7 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="raw(entry.rotation_name)"
           >
             <span class="flex w-full items-center gap-2">
-              <OUserCell class="min-w-0" :value="entry.user_email" />
+              <OnCallPersonName
+                class="min-w-0 truncate"
+                :email="entry.user_email"
+                :data-test="`oncall-who-is-on-person-${entry.rotation_id}`"
+              />
               <OTag
                 v-if="reachOf(entry.user_email)"
                 :variant="reachOf(entry.user_email) === 'landed' ? 'success-soft' : 'error-soft'"
@@ -114,7 +122,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                so before it happens. -->
           <ODescriptionItem :label="t('oncall.shiftHandover')">
             <span class="flex w-full flex-wrap items-center gap-x-1 gap-y-1">
-              <OUserCell v-if="handoverTo" class="min-w-0" :value="handoverTo" />
+              <OnCallPersonName
+                v-if="handoverTo"
+                class="min-w-0"
+                :email="handoverTo"
+                data-test="oncall-who-is-on-handover-to"
+              />
               <span class="text-text-secondary text-xs whitespace-nowrap">
                 {{ raw(`(${handoverInLabel})`) }}
               </span>
@@ -129,7 +142,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSeparator class="my-3" />
         <ODescriptionList dense>
           <ODescriptionItem :label="t('oncall.ackedBy')">
-            <OUserCell class="min-w-0" :value="ackedBy" />
+            <OnCallPersonName
+              class="min-w-0 truncate"
+              :email="ackedBy"
+              data-test="oncall-who-is-on-acked-by"
+            />
           </ODescriptionItem>
         </ODescriptionList>
       </template>
@@ -140,11 +157,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";

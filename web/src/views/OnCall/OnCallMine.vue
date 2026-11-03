@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The reader's own on-call: their shift, how pages reach them, and what has been sent to them. -->
+<!-- The reader's own on-call: their shifts, how pages reach them, and what has been sent to them. -->
 <template>
   <OPageLayout
     bleed
@@ -25,6 +25,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     scroll
   >
     <template #actions>
+      <!-- Personal and org-wide, so it heads the page rather than sitting under one team. -->
+      <OButton
+        v-if="loaded && !unavailable"
+        variant="outline"
+        size="sm"
+        data-test="oncall-mine-away"
+        @click="openAway"
+      >
+        <OIcon name="event-busy" size="sm" />{{ t("oncall.mineAway") }}
+      </OButton>
       <ORefreshButton
         v-if="loaded && !unavailable"
         layout="inline"
@@ -45,160 +55,233 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-mine-unavailable"
     />
 
-    <OContent v-else y class="flex max-w-3xl flex-col gap-5">
-      <!-- The shift first: "am I on call, and until when" is the question this page opens on. -->
-      <section
-        class="rounded-surface bg-surface-base border-border-default flex flex-col gap-3 border px-4 py-3"
-        data-test="oncall-mine-teams"
-      >
-        <OEmptyState
-          v-if="loadError !== null"
-          size="inline"
-          variant="error"
-          :title="t('oncall.mineTeamsLoadFailed')"
-          :description="raw(loadError)"
-          :action-label="t('oncall.retry')"
-          data-test="oncall-mine-teams-error"
-          @action="refreshPage"
-        />
-
-        <template v-else-if="loaded">
-          <span class="flex flex-wrap items-center gap-2">
-            <OText variant="panel-title" data-test="oncall-mine-shift-headline">
-              {{ mine?.on_call_now ? t("oncall.mineShiftOn") : t("oncall.mineShiftOff") }}
+    <OContent v-else y class="flex flex-col gap-5">
+      <div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+        <!-- The shift first: "am I on call, and until when" is the question this page opens on. -->
+        <section
+          class="rounded-surface bg-surface-base border-border-default flex min-w-0 flex-col border"
+          data-test="oncall-mine-teams"
+        >
+          <div class="flex min-h-12 flex-wrap items-center gap-2 px-4 py-2">
+            <OText variant="card-title" as="h2" data-test="oncall-mine-shift-headline">
+              {{ t("oncall.mineShiftsTitle") }}
             </OText>
             <OTag
-              v-if="mine?.on_call_now"
-              variant="success-soft"
+              v-if="loaded && loadError === null && (mine?.teams ?? []).length"
+              :variant="mine?.on_call_now ? 'success-soft' : 'default-soft'"
               size="sm"
               data-test="oncall-mine-on-call"
             >
-              {{ t("oncall.mineDutyOn") }}
+              {{ mine?.on_call_now ? t("oncall.mineDutyOn") : t("oncall.mineDutyOff") }}
             </OTag>
-          </span>
-
-          <OText v-if="!(mine?.teams ?? []).length" variant="meta" data-test="oncall-mine-no-teams">
-            {{ t("oncall.mineNoTeams") }}
-          </OText>
-
-          <div
-            v-for="team in mine?.teams ?? []"
-            :key="team.team_id"
-            class="flex flex-wrap items-center gap-x-2 gap-y-1"
-            :data-test="`oncall-mine-team-${team.team_id}`"
-          >
-            <router-link
-              class="text-accent text-sm font-medium hover:underline"
-              :to="teamRoute(team.team_id)"
-              :data-test="`oncall-mine-open-team-${team.team_id}`"
-            >
-              {{ raw(team.team_name) }}
-            </router-link>
-            <!-- Null with an unresolved schedule is "we could not work it out", never "off duty". -->
-            <OTag
-              v-if="team.on_call_now === true"
-              variant="success-soft"
-              size="sm"
-              :data-test="`oncall-mine-duty-${team.team_id}`"
-            >
-              {{ rolesLabel(team.team_id) }}
-            </OTag>
-            <OTag
-              v-else-if="team.on_call_now === false"
-              variant="default-soft"
-              size="sm"
-              :data-test="`oncall-mine-duty-${team.team_id}`"
-            >
-              {{ t("oncall.mineDutyOff") }}
-            </OTag>
-            <OTag
-              v-else
-              variant="amber-soft"
-              size="sm"
-              :data-test="`oncall-mine-duty-${team.team_id}`"
-            >
-              {{ t("oncall.mineDutyUnknown") }}
-            </OTag>
-            <OText
-              v-if="shiftLine(team.team_id, team.on_call_now)"
-              variant="meta"
-              :data-test="`oncall-mine-shift-${team.team_id}`"
-            >
-              {{ shiftLine(team.team_id, team.on_call_now) }}
-              <!-- Names can repeat across an org, so the next person's email is one hover away. -->
-              <OTooltip
-                v-if="team.on_call_now === true && shifts[team.team_id]?.next"
-                :content="nextPersonLabel(shifts[team.team_id]!.next!)"
-              />
-            </OText>
-            <OText
-              v-if="(shifts[team.team_id]?.roles.length ?? 0) > 1"
-              variant="meta"
-              class="text-status-warning-text"
-              :data-test="`oncall-mine-no-backup-${team.team_id}`"
-            >
-              {{ t("oncall.mineNoBackup") }}
-            </OText>
           </div>
 
-          <span v-if="(mine?.teams ?? []).length" class="flex flex-wrap items-center gap-2">
-            <OButton
-              v-if="shiftTeamId"
-              variant="outline"
-              size="sm"
-              data-test="oncall-mine-cover"
-              @click="openSchedule(shiftTeamId)"
-            >
-              <OIcon name="calendar-month" size="sm" />{{ t("oncall.mineCoverShift") }}
-              <OTooltip :content="t('oncall.mineCoverShiftHint')" />
-            </OButton>
-            <OButton variant="outline" size="sm" data-test="oncall-mine-away" @click="openAway">
-              <OIcon name="event-busy" size="sm" />{{ t("oncall.mineAway") }}
-            </OButton>
-          </span>
-        </template>
-      </section>
+          <OEmptyState
+            v-if="loadError !== null"
+            size="inline"
+            variant="error"
+            :title="t('oncall.mineTeamsLoadFailed')"
+            :description="raw(loadError)"
+            :action-label="t('oncall.retry')"
+            data-test="oncall-mine-teams-error"
+            @action="refreshPage"
+          />
 
-      <section
-        class="rounded-surface bg-surface-base border-border-default flex flex-col gap-1 border px-4 py-3"
-        data-test="oncall-mine-reach"
-      >
-        <OText variant="panel-title" class="mb-1">{{ t("oncall.mineReachTitle") }}</OText>
-        <div class="flex min-h-8 items-center gap-3" data-test="oncall-mine-reach-email">
-          <OText variant="body" class="w-16 shrink-0">{{ t("oncall.channel_email") }}</OText>
-          <OText variant="meta" class="min-w-0 flex-1 truncate">{{ raw(viewerEmail) }}</OText>
-          <OIcon name="check-circle" size="sm" class="text-status-success-text shrink-0" />
-        </div>
-        <OnCallPhoneCard ref="phoneRef" :admin="isAdmin" />
-        <OnCallSlackCard v-if="slackOffered" ref="slackRef" :admin="isAdmin" />
-        <span v-if="testTeam" class="mt-2 flex">
-          <OButton
-            variant="outline"
-            size="sm"
-            :loading="testing"
-            data-test="oncall-mine-test-page"
-            @click="testConfirmOpen = true"
+          <OEmptyState
+            v-else-if="loaded && !shiftRows.length"
+            size="inline"
+            icon="group"
+            :title="t('oncall.mineNoTeams')"
+            :action-label="t('oncall.mineOpenTeams')"
+            data-test="oncall-mine-no-teams"
+            @action="openTeams"
+          />
+
+          <OTable
+            v-else
+            :data="shiftRows"
+            :columns="shiftColumns"
+            row-key="team_id"
+            :frame="false"
+            :loading="!loaded"
+            :show-global-filter="false"
+            pagination="none"
+            table-id="oncall-mine-shifts"
+            data-test="oncall-mine-shifts-table"
           >
-            <OIcon name="campaign" size="sm" />{{ t("oncall.mineTestTeamPage") }}
-          </OButton>
-        </span>
-      </section>
+            <template #cell-team="{ row }">
+              <router-link
+                class="text-accent inline-block max-w-full text-sm font-medium hover:underline"
+                :to="teamRoute(row.team_id)"
+                :data-test="`oncall-mine-team-${row.team_id}`"
+              >
+                <OTruncatedText class="block">{{ raw(row.team_name) }}</OTruncatedText>
+              </router-link>
+            </template>
+            <!-- Null with an unresolved schedule is "we could not work it out", never "off duty". -->
+            <template #cell-seat="{ row }">
+              <span class="flex flex-wrap items-center gap-1">
+                <OTag
+                  :variant="
+                    row.on_call_now === true
+                      ? 'success-soft'
+                      : row.on_call_now === false
+                        ? 'default-soft'
+                        : 'amber-soft'
+                  "
+                  size="sm"
+                  :data-test="`oncall-mine-duty-${row.team_id}`"
+                >
+                  {{ seatLabel(row) }}
+                </OTag>
+                <span
+                  v-if="row.roles.length > 1"
+                  class="inline-flex"
+                  :data-test="`oncall-mine-no-backup-${row.team_id}`"
+                >
+                  <OIcon name="warning" size="sm" class="text-status-warning-text" />
+                  <OTooltip :content="t('oncall.mineNoBackup')" />
+                </span>
+              </span>
+            </template>
+            <template #cell-until="{ row }">
+              <span
+                v-if="untilLine(row)"
+                class="flex min-w-0 flex-col"
+                :data-test="`oncall-mine-shift-${row.team_id}`"
+              >
+                <OText variant="body" as="span">{{ untilLine(row) }}</OText>
+                <OText v-if="countdown(row)" variant="meta" as="span">
+                  {{ t("oncall.mineShiftLeft", { left: raw(countdown(row)) }) }}
+                </OText>
+              </span>
+              <OText v-else variant="meta" as="span">{{ raw("—") }}</OText>
+            </template>
+            <template #cell-then="{ row }">
+              <OnCallPersonName
+                v-if="row.on_call_now === true && row.next"
+                class="block min-w-0 truncate"
+                :email="row.next"
+                :data-test="`oncall-mine-next-${row.team_id}`"
+              />
+              <OText v-else variant="meta" as="span">{{ raw("—") }}</OText>
+            </template>
+            <template #cell-actions="{ row }">
+              <div class="flex items-center justify-end">
+                <!-- Only a shift the reader holds now, with a known end, has a window to hand over. -->
+                <OButton
+                  v-if="row.on_call_now === true && row.until !== null"
+                  variant="ghost"
+                  size="icon-sm"
+                  class="max-md:hidden"
+                  :loading="coverLoadingId === row.team_id"
+                  :aria-label="t('oncall.mineCoverShift')"
+                  :data-test="`oncall-mine-cover-${row.team_id}`"
+                  @click="openCover(row)"
+                >
+                  <OIcon name="person-add" size="sm" aria-hidden="true" />
+                  <OTooltip :content="t('oncall.mineCoverShift')" />
+                </OButton>
+                <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  class="max-md:hidden"
+                  :loading="testingId === row.team_id"
+                  :aria-label="t('oncall.mineTestTeam', { team: raw(row.team_name) })"
+                  :data-test="`oncall-mine-test-page-${row.team_id}`"
+                  @click="askTestPage(row.team_id)"
+                >
+                  <OIcon name="campaign" size="sm" aria-hidden="true" />
+                  <OTooltip :content="t('oncall.mineTestTeam', { team: raw(row.team_name) })" />
+                </OButton>
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      variant="ghost"
+                      size="icon-sm"
+                      icon-left="more-vert"
+                      class="md:hidden"
+                      :loading="coverLoadingId === row.team_id || testingId === row.team_id"
+                      :aria-label="t('oncall.moreActions')"
+                      :data-test="`oncall-mine-row-menu-${row.team_id}`"
+                    />
+                  </template>
+                  <ODropdownItem
+                    v-if="row.on_call_now === true && row.until !== null"
+                    icon-left="person-add"
+                    :data-test="`oncall-mine-cover-${row.team_id}-menu`"
+                    @select="openCover(row)"
+                  >
+                    {{ t("oncall.mineCoverShift") }}
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="campaign"
+                    :data-test="`oncall-mine-test-page-${row.team_id}-menu`"
+                    @select="askTestPage(row.team_id)"
+                  >
+                    {{ t("oncall.mineTestTeam", { team: raw(row.team_name) }) }}
+                  </ODropdownItem>
+                </ODropdown>
+              </div>
+            </template>
+          </OTable>
+        </section>
+
+        <section
+          class="rounded-surface bg-surface-base border-border-default flex min-w-0 flex-col border px-4 pt-2 pb-3"
+          data-test="oncall-mine-reach"
+        >
+          <div class="flex min-h-10 items-center">
+            <OText variant="card-title" as="h2">{{ t("oncall.mineReachTitle") }}</OText>
+          </div>
+          <OnCallReachRow
+            :label="t('oncall.channel_email')"
+            icon="mail"
+            data-test="oncall-mine-reach-email"
+          >
+            <template #value>
+              <OTruncatedText class="text-text-body text-sm">{{ raw(viewerEmail) }}</OTruncatedText>
+            </template>
+            <template #status>
+              <OTag variant="success-soft" size="sm">{{ t("oncall.reachAlwaysOn") }}</OTag>
+            </template>
+          </OnCallReachRow>
+          <OnCallPhoneCard ref="phoneRef" :admin="isAdmin" />
+          <OnCallSlackCard v-if="slackOffered" ref="slackRef" :admin="isAdmin" />
+        </section>
+      </div>
 
       <OnCallMyDeliveries
         ref="deliveriesRef"
         :team-names="teamNames"
+        :test-team-name="testTeam?.team_name ?? null"
         :can-test="!!testTeam"
-        @test-page="testConfirmOpen = true"
+        @test-page="askTestPage(testTeam?.team_id ?? '')"
       />
     </OContent>
 
     <ConfirmDialog
       :model-value="testConfirmOpen"
       :title="t('oncall.testPageConfirmTitle')"
-      :message="t('oncall.setupTestConfirm', { team: raw(testTeam?.team_name ?? '') })"
+      :message="t('oncall.setupTestConfirm', { team: raw(testTarget?.team_name ?? '') })"
       :ok-label="t('oncall.setupStep5Cta')"
       @update:ok="sendTestPage"
       @update:cancel="testConfirmOpen = false"
+    />
+
+    <OnCallCoverForm
+      v-model:open="coverOpen"
+      :members="coverMembers"
+      :timezone="coverTeam?.timezone ?? 'UTC'"
+      :viewer-timezone="store.state.timezone"
+      :team-name="coverTeam?.team_name ?? ''"
+      :saving="coverSaving"
+      :current-holder="viewerEmail"
+      :gap="coverGap"
+      :rotations="coverRotations"
+      :default-rotation="coverTeam?.rotationId ?? ''"
+      @save="saveCover"
     />
 
     <ODialog
@@ -272,11 +355,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQuery } from "@tanstack/vue-query";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OnCallCoverForm from "@/components/oncall/OnCallCoverForm.vue";
 import OnCallMyDeliveries from "@/components/oncall/OnCallMyDeliveries.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallPhoneCard from "@/components/oncall/OnCallPhoneCard.vue";
+import OnCallReachRow from "@/components/oncall/OnCallReachRow.vue";
 import OnCallSlackCard from "@/components/oncall/OnCallSlackCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -285,25 +371,42 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODate from "@/lib/forms/Date/ODate.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { queryClient } from "@/composables/query/queryClient";
-import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import {
+  createOverrideMutation,
   createUnavailabilityMutation,
   myOnCallQuery,
   oncallTeamsQuery,
   resolvedScheduleQuery,
+  teamMembersQuery,
+  teamScheduleQuery,
   testPageMutation,
   whoIsOnCallQuery,
 } from "@/services/oncall.queries";
-import type { MyOnCall, OnCallPosition, OnCallTeam, ResolvedSegment } from "@/ts/interfaces/oncall";
+import { orgUsersQuery } from "@/services/users.queries";
+import type {
+  MyOnCall,
+  MyOnCallTeam,
+  OnCallPosition,
+  OnCallSchedule,
+  OnCallTeam,
+  OnCallTeamMember,
+  ResolvedSegment,
+  Rotation,
+} from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
 import {
@@ -320,22 +423,34 @@ const SHIFT_LOOKAHEAD_MICROS = 14 * 24 * 60 * 60 * 1_000_000;
 /** What the schedule says about the reader on one team; every field is absent when its read was refused. */
 interface ShiftFacts {
   roles: string[];
+  rotationId: string | null;
   until: number | null;
   next: string | null;
   nextShiftAt: number | null;
 }
 
+/** One row of "Your shifts": the team as the server reports it, plus what its schedule said. */
+type ShiftRow = MyOnCallTeam & ShiftFacts;
+
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const nowMicros = useOnCallClock();
-const { nameOf } = useOrgUserNames();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const viewerEmail = computed(() => String(store.state.userInfo?.email ?? ""));
-// Visibility only: the server is the gate, this decides whether a setup button would help or 403.
-const isAdmin = computed(() =>
-  ["admin", "root"].includes(String(store.state.currentuser?.role ?? "").toLowerCase()),
+
+const orgUsers = useQuery(() =>
+  Object.assign(orgUsersQuery(orgId.value), { enabled: !!orgId.value }),
 );
+// Visibility only: the server is the gate, this decides whether a setup button would help or 403.
+const isAdmin = computed(() => {
+  const me = viewerEmail.value.toLowerCase();
+  const listed = (orgUsers.data.value ?? []).find(
+    (user: { email?: string }) => String(user.email ?? "").toLowerCase() === me,
+  );
+  const role = String(listed?.role ?? store.state.currentuser?.role ?? "").toLowerCase();
+  return role === "admin" || role === "root";
+});
 
 const mine = ref<MyOnCall | null>(null);
 const shifts = ref<Record<string, ShiftFacts>>({});
@@ -361,12 +476,45 @@ async function fetchTeamNames(force = false) {
   }
 }
 
-/// The team whose shift the card counts down: the one the reader is on call for now.
-const shiftTeamId = computed(
-  () => (mine.value?.teams ?? []).find((team) => team.on_call_now === true)?.team_id ?? null,
+const NO_FACTS: ShiftFacts = {
+  roles: [],
+  rotationId: null,
+  until: null,
+  next: null,
+  nextShiftAt: null,
+};
+
+const shiftRows = computed<ShiftRow[]>(() =>
+  (mine.value?.teams ?? []).map((team) => ({
+    ...team,
+    ...(shifts.value[team.team_id] ?? NO_FACTS),
+  })),
 );
 
-/// The team test page goes to: one the reader is on call for, else their first team.
+const shiftColumns = computed<OTableColumnDef<ShiftRow>[]>(() => [
+  {
+    id: "team",
+    header: t("oncall.team"),
+    accessorFn: (row: ShiftRow) => row.team_name,
+    size: 160,
+    sortable: false,
+    meta: { isName: true, flex: true },
+  },
+  { id: "seat", header: t("oncall.mineSeat"), size: 136, sortable: false },
+  { id: "until", header: t("oncall.mineUntil"), size: 176, sortable: false },
+  { id: "then", header: t("oncall.mineThen"), size: 160, sortable: false },
+  {
+    id: "actions",
+    header: t("oncall.actions"),
+    isAction: true,
+    pinned: "right",
+    sortable: false,
+    size: 96,
+    meta: { align: "center", actionCount: 2 },
+  },
+]);
+
+/// The test page goes to a team the reader is on call for, else their first team.
 const testTeam = computed(
   () =>
     (mine.value?.teams ?? []).find((team) => team.on_call_now === true) ??
@@ -374,37 +522,31 @@ const testTeam = computed(
     null,
 );
 
-function rolesLabel(teamId: string): I18nText {
-  const roles = shifts.value[teamId]?.roles ?? [];
-  return roles.length ? raw(roles.join(" + ")) : t("oncall.mineDutyOn");
+function seatLabel(row: ShiftRow): I18nText {
+  if (row.on_call_now === true) {
+    return row.roles.length ? raw(row.roles.join(" + ")) : t("oncall.mineDutyOn");
+  }
+  return row.on_call_now === false ? t("oncall.mineDutyOff") : t("oncall.mineDutyUnknown");
 }
 
 function at(micros: number): string {
   return formatOnCallInstant(micros, nowMicros.value, store.state.timezone);
 }
 
-/// "until Mon 10:00 (5d 19h) → then Raj" while on call, "Next shift Thu 09:00" while off.
-function shiftLine(teamId: string, onCall: boolean | null): I18nText | "" {
-  const facts = shifts.value[teamId];
-  if (!facts) return "";
-  if (onCall === true && facts.until !== null) {
-    const until = t("oncall.mineShiftUntil", {
-      time: raw(at(facts.until)),
-      left: raw(formatMicrosDuration(facts.until - nowMicros.value)),
-    });
-    return facts.next
-      ? t("oncall.mineShiftUntilThen", { until, who: raw(nameOf(facts.next)) })
-      : until;
-  }
-  if (onCall === false && facts.nextShiftAt !== null) {
-    return t("oncall.mineNextShift", { time: raw(at(facts.nextShiftAt)) });
+/// When the held stretch ends while on call, when the next one starts while off.
+function untilLine(row: ShiftRow): I18nText | "" {
+  if (row.on_call_now === true && row.until !== null) return raw(at(row.until));
+  if (row.on_call_now === false && row.nextShiftAt !== null) {
+    return t("oncall.mineNextShift", { time: raw(at(row.nextShiftAt)) });
   }
   return "";
 }
 
-function nextPersonLabel(email: string): I18nText {
-  const name = nameOf(email);
-  return raw(name === email ? email : `${name} · ${email}`);
+/// Empty once the end has passed, so a stale row never reads "(—)" before the refresh lands.
+function countdown(row: ShiftRow): string {
+  if (row.on_call_now !== true || row.until === null) return "";
+  const left = row.until - nowMicros.value;
+  return left > 0 ? formatMicrosDuration(left) : "";
 }
 
 /// The current stretch the reader holds, merged across back-to-back segments, and who takes it next.
@@ -465,6 +607,7 @@ async function fetchShifts(force = false) {
           team.team_id,
           {
             roles: [...new Set(held.map((p) => p.rotation_name))],
+            rotationId: held[0]?.rotation_id ?? null,
             ...shiftFromSegments(segments, me, now),
           },
         ];
@@ -508,23 +651,92 @@ function teamRoute(teamId: string) {
   return { name: "onCallTeamDetail", params: { teamId }, query: { org_identifier: orgId.value } };
 }
 
-function openSchedule(teamId: string) {
-  router.push({
-    name: "onCallTeamDetail",
-    params: { teamId, tab: "schedule" },
-    query: { org_identifier: orgId.value },
-  });
+function openTeams() {
+  router.push({ name: "onCallTeams", query: { org_identifier: orgId.value } });
+}
+
+const coverOpen = ref(false);
+const coverTeam = ref<ShiftRow | null>(null);
+const coverMembers = ref<OnCallTeamMember[]>([]);
+const coverRotations = ref<Rotation[]>([]);
+const coverGap = ref<{ from: number; to: number } | null>(null);
+const coverLoadingId = ref("");
+const coverSaving = ref(false);
+const coverWrite = useMutation(() =>
+  createOverrideMutation(orgId.value, coverTeam.value?.team_id ?? ""),
+);
+
+/// Opens the team's cover form on the reader's own seat, from now to the end of the shift.
+async function openCover(row: ShiftRow) {
+  if (row.until === null) return;
+  coverLoadingId.value = row.team_id;
+  try {
+    const [members, schedule] = await Promise.all([
+      read<OnCallTeamMember[]>(teamMembersQuery(orgId.value, row.team_id), false),
+      read<OnCallSchedule | null>(teamScheduleQuery(orgId.value, row.team_id), false),
+    ]);
+    coverTeam.value = row;
+    coverMembers.value = members;
+    coverRotations.value = schedule?.rotations ?? [];
+    coverGap.value = { from: Math.max(Date.now() * 1000, nowMicros.value), to: row.until };
+    coverOpen.value = true;
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message:
+        err?.response?.status === 403
+          ? t("oncall.configDenied")
+          : raw(err?.response?.data?.message) || t("oncall.coverSaveFailed"),
+    });
+  } finally {
+    coverLoadingId.value = "";
+  }
+}
+
+async function saveCover(value: {
+  user_email: string;
+  start_at: number;
+  end_at: number;
+  rotation_id?: string;
+}) {
+  coverSaving.value = true;
+  try {
+    await coverWrite.mutateAsync(value);
+    coverOpen.value = false;
+    toast({ variant: "success", message: t("oncall.mineCoverSaved") });
+    await fetchMine(true);
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message:
+        err?.response?.status === 403
+          ? t("oncall.configDenied")
+          : raw(err?.response?.data?.message) || t("oncall.coverSaveFailed"),
+    });
+  } finally {
+    coverSaving.value = false;
+  }
 }
 
 const testConfirmOpen = ref(false);
-const testing = ref(false);
+const testTargetId = ref("");
+const testingId = ref("");
 const testWrite = useMutation(() => testPageMutation(orgId.value));
+const testTarget = computed(
+  () => (mine.value?.teams ?? []).find((team) => team.team_id === testTargetId.value) ?? null,
+);
+
+function askTestPage(teamId: string) {
+  if (!teamId) return;
+  testTargetId.value = teamId;
+  testConfirmOpen.value = true;
+}
 
 async function sendTestPage() {
   testConfirmOpen.value = false;
-  const team = testTeam.value;
+  const team = testTarget.value;
   if (!team) return;
-  testing.value = true;
+  testingId.value = team.team_id;
   try {
     const res = await testWrite.mutateAsync({ teamId: team.team_id });
     const outcome = testPageOutcome(res.data, t);
@@ -538,7 +750,7 @@ async function sendTestPage() {
           : raw(err?.response?.data?.message) || t("oncall.testPageFailed"),
     });
   } finally {
-    testing.value = false;
+    testingId.value = "";
   }
 }
 

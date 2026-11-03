@@ -460,8 +460,9 @@
                   <OTabPanel name="activity" data-test="oncall-response-activity">
                     <div class="flex justify-end pt-2">
                       <OButton
-                        variant="ghost-primary"
+                        variant="ghost"
                         size="sm"
+                        :icon-left="showAllActivity ? 'visibility-off' : 'visibility'"
                         data-test="oncall-response-activity-toggle-all"
                         @click="showAllActivity = !showAllActivity"
                       >
@@ -868,6 +869,7 @@ import type {
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import {
   DEFAULT_ACTIVITY_KINDS,
   isEscalating,
@@ -887,6 +889,7 @@ import { formatTimestampInTimezone } from "@/utils/date";
 const HOLD_RECHECK_MS = 10_000;
 
 const { t } = useI18nTyped();
+const { nameOf } = useOrgUserNames();
 const { lgUp } = useBreakpoint();
 const nowMicros = useOnCallClock();
 const store = useStore();
@@ -1205,18 +1208,6 @@ const topStats = computed<StatItem[]>(() => {
       dataTest: "oncall-response-stat-ack",
     });
   }
-  const step = headerReachedStep.value;
-  const total = prioritySteps.value?.length ?? null;
-  if (step !== null && total !== null) {
-    stats.push({
-      key: "rung",
-      label: t("oncall.statPagedUpTo"),
-      value: t("oncall.statStepOf", { n: step, total }),
-      icon: "trending-up",
-      tone: "neutral",
-      dataTest: "oncall-response-stat-rung",
-    });
-  }
   if (firingHistory.value.length) {
     stats.push({
       key: "firing",
@@ -1523,10 +1514,17 @@ async function fetchHandoffTargets() {
     const members = teamId
       ? await read<OnCallTeamMember[]>(teamMembersQuery(orgId.value, teamId), false)
       : [];
-    memberOptions.value = members.map((m) => ({
-      label: raw(m.user_email),
-      value: m.user_email,
-    }));
+    // Names can repeat, so the email rides along in the option itself.
+    memberOptions.value = members.map((m) => {
+      const name = nameOf(m.user_email);
+      return {
+        label:
+          name === m.user_email
+            ? raw(name)
+            : t("oncall.personNameWithEmail", { name: raw(name), email: raw(m.user_email) }),
+        value: m.user_email,
+      };
+    });
   } catch {
     memberOptions.value = [];
   }

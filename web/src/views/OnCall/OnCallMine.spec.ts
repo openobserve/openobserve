@@ -30,6 +30,9 @@ vi.mock("@/services/oncall", () => ({
     resolvedSchedule: vi.fn(),
     createUnavailability: vi.fn(),
     testPage: vi.fn(),
+    listMembers: vi.fn(),
+    getSchedule: vi.fn(),
+    createOverride: vi.fn(),
   },
 }));
 vi.mock("@/services/users", () => ({
@@ -51,6 +54,15 @@ const stubs = {
     template: "<div><slot name='actions' /><slot /></div>",
   },
   OContent: { name: "OContent", template: "<div><slot /></div>" },
+  OTable: {
+    name: "OTable",
+    props: ["data", "columns"],
+    template: `<div>
+      <div v-for="(row, i) in (data || [])" :key="i">
+        <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
+      </div>
+    </div>`,
+  },
   OEmptyState: { name: "OEmptyState", template: "<div />" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OButton: {
@@ -86,6 +98,12 @@ const stubs = {
     template: "<div v-if='modelValue' data-test='confirm'>{{ message }}</div>",
   },
   OText: { name: "OText", template: "<span><slot /></span>" },
+  OnCallCoverForm: {
+    name: "OnCallCoverForm",
+    props: ["open", "gap", "currentHolder", "defaultRotation", "teamName", "rotations", "members"],
+    emits: ["save", "update:open"],
+    template: "<div v-if='open' data-test='cover-form' />",
+  },
   // Stubbed out: it reads its own endpoint, which this spec's service mock does
   // not carry, and its fetch would throw into its own catch for the wrong reason.
   OnCallMyDeliveries: {
@@ -170,9 +188,37 @@ describe("OnCallMine", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-test="oncall-mine-duty-team_1"]').text()).toBe("Primary");
-    const line = wrapper.find('[data-test="oncall-mine-shift-team_1"]').text();
-    expect(line).toContain("until");
-    expect(line).toContain("then raj@o2.ai");
+    const until = wrapper.find('[data-test="oncall-mine-shift-team_1"]').text();
+    expect(until).toMatch(/\d{2}:\d{2}/);
+    expect(until).toMatch(/left$/);
+    expect(until).not.toContain("—");
+    expect(wrapper.find('[data-test="oncall-mine-next-team_1"]').text()).toBe("raj@o2.ai");
+  });
+
+  /// The cover form opens on the reader's own seat, from now until their shift ends.
+  it("opens the cover form on the reader's own shift", async () => {
+    const me = store.state.userInfo.email;
+    const now = Date.now() * 1000;
+    const end = now + 3_600_000_000;
+    service.whoIsOnCall.mockResolvedValue({
+      data: [{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: me }],
+    } as any);
+    service.resolvedSchedule.mockResolvedValue({
+      data: [{ rotation_id: "r1", from: now - 1_000_000, to: end, user_email: me }],
+    } as any);
+    service.listMembers.mockResolvedValue({ data: [] } as any);
+    service.getSchedule.mockResolvedValue({ data: { rotations: [{ id: "r1" }] } } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    await wrapper.find('[data-test="oncall-mine-cover-team_1"]').trigger("click");
+    await flushPromises();
+
+    const form = wrapper.findComponent({ name: "OnCallCoverForm" });
+    expect(form.props("open")).toBe(true);
+    expect(form.props("gap").to).toBe(end);
+    expect(form.props("currentHolder")).toBe(me);
+    expect(form.props("defaultRotation")).toBe("r1");
   });
 
   /// A role that may not read the schedule sees the duty tag alone, never a wrong shift end.
@@ -226,7 +272,7 @@ describe("OnCallMine", () => {
     const wrapper = render();
     await flushPromises();
 
-    await wrapper.find('[data-test="oncall-mine-test-page"]').trigger("click");
+    await wrapper.find('[data-test="oncall-mine-test-page-team_1"]').trigger("click");
     expect(service.testPage).not.toHaveBeenCalled();
     wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
     await flushPromises();

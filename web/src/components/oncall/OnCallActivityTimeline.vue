@@ -24,38 +24,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   after a note is added) — this component only renders.
 -->
 <template>
-  <ActivityTimeline
-    ref="timelineRef"
-    :class="pinComposer ? 'h-[min(40rem,70vh)]!' : ''"
-    :events="visibleEvents"
-    :submitting="submitting"
-    :show-scroll-buttons="showScrollButtons"
-    v-model:comment-text="commentTextModel"
-    :is-comment-event="isCommentEvent"
-    :get-user-id="getUserId"
-    :get-avatar-color="getAvatarColor"
-    :get-timestamp="(event: OnCallResponseEvent) => event.at"
-    :format-relative-time="formatRelativeTime"
-    :get-event-icon="getEventIcon"
-    :get-event-badge-color="getEventBadgeColor"
-    :get-event-badge-text="getEventBadgeText"
-    :get-event-layout="getEventLayout"
-    :get-inline-html="getInlineHtml"
-    :get-comment-body="getCommentBody"
-    :current-user-id="currentUserId"
-    :empty-title="showAll ? t('oncall.timelineEmpty') : t('oncall.timelineNoHumanEvents')"
-    :empty-subtitle="raw('')"
-    :comment-placeholder="t('oncall.notePlaceholder')"
-    :commented-prefix="t('oncall.activityNotedPrefix')"
-    :send-tooltip="t('oncall.activitySendNote')"
-    :scroll-top-tooltip="t('oncall.activityScrollToTop')"
-    :scroll-bottom-tooltip="t('oncall.activityScrollToBottom')"
-    data-test-scroll-top="oncall-response-activity-scroll-top"
-    data-test-scroll-bottom="oncall-response-activity-scroll-bottom"
-    data-test-comment-input="oncall-response-note-input"
-    data-test-comment-send="oncall-response-note-submit"
-    @submit="$emit('submit')"
-  />
+  <!-- One tooltip serves every name in the feed: the names live in rendered markup a per-name tooltip cannot reach. -->
+  <div
+    class="contents"
+    data-test="oncall-activity-people"
+    @pointerover="onPointerOver"
+    @pointerout="onPointerOut"
+  >
+    <ActivityTimeline
+      ref="timelineRef"
+      :class="pinComposer ? 'h-[min(40rem,70vh)]!' : ''"
+      :events="visibleEvents"
+      :submitting="submitting"
+      :show-scroll-buttons="showScrollButtons"
+      v-model:comment-text="commentTextModel"
+      :is-comment-event="isCommentEvent"
+      :get-user-id="getUserId"
+      :get-avatar-color="getAvatarColor"
+      :get-timestamp="(event: OnCallResponseEvent) => event.at"
+      :format-relative-time="formatRelativeTime"
+      :get-event-icon="getEventIcon"
+      :get-event-badge-color="getEventBadgeColor"
+      :get-event-badge-text="getEventBadgeText"
+      :get-event-layout="getEventLayout"
+      :get-inline-html="getInlineHtml"
+      :get-comment-body="getCommentBody"
+      :current-user-id="currentUserId"
+      :empty-title="showAll ? t('oncall.timelineEmpty') : t('oncall.timelineNoHumanEvents')"
+      :empty-subtitle="raw('')"
+      :comment-placeholder="t('oncall.notePlaceholder')"
+      :commented-prefix="t('oncall.activityNotedPrefix')"
+      :send-tooltip="t('oncall.activitySendNote')"
+      :scroll-top-tooltip="t('oncall.activityScrollToTop')"
+      :scroll-bottom-tooltip="t('oncall.activityScrollToBottom')"
+      data-test-scroll-top="oncall-response-activity-scroll-top"
+      data-test-scroll-bottom="oncall-response-activity-scroll-bottom"
+      data-test-comment-input="oncall-response-note-input"
+      data-test-comment-send="oncall-response-note-submit"
+      @submit="$emit('submit')"
+    />
+    <OTooltip
+      :anchor="personAnchor"
+      :open="!!personAnchor"
+      side="bottom"
+      :content="personTooltip"
+    />
+  </div>
 </template>
 
 <script lang="ts" setup>
@@ -63,9 +77,10 @@ import { computed, nextTick, ref, watch } from "vue";
 import DOMPurify from "dompurify";
 import { useStore } from "vuex";
 import ActivityTimeline from "@/components/shared/ActivityTimeline.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
 import { getActivityAvatarColor } from "@/utils/activityTimeline";
 import {
   DEFAULT_ACTIVITY_KINDS,
@@ -205,6 +220,49 @@ const getEventBadgeText = (event: OnCallResponseEvent): string =>
 // The icon's colour already says the kind, so a "System" or "Page" tag on every line was noise.
 const getEventLayout = (): "no-badge" | "before" | "after" => "no-badge";
 
+// Every page opens as firing #1, so that number is only news from the second firing on.
+const sentenceT = ((key: string, ...rest: unknown[]) => {
+  const named = rest[0] as Record<string, unknown> | undefined;
+  if (key === "oncall.tlOpened" && Number(named?.n ?? 0) <= 1) return t("oncall.tlOpenedFirst");
+  return (t as (k: string, ...a: unknown[]) => I18nText)(key, ...rest);
+}) as TranslateFn;
+
+const personAnchor = ref<HTMLElement | null>(null);
+const personTooltip = ref<I18nText>(raw(""));
+
+/// Actor names render as the same display name `getUserId` returned, so the name leads back to its email.
+const actorEmailByName = computed(() => {
+  const map = new Map<string, string>();
+  for (const event of props.events) {
+    if (HUMAN_KINDS.includes(event.kind) && event.actor) map.set(nameOf(event.actor), event.actor);
+  }
+  return map;
+});
+
+function personUnder(target: EventTarget | null): { el: HTMLElement; email: string } | null {
+  if (!(target instanceof HTMLElement)) return null;
+  const inline = target.closest<HTMLElement>("[data-oncall-person]");
+  if (inline?.dataset.oncallPerson) return { el: inline, email: inline.dataset.oncallPerson };
+  const actor = target.closest<HTMLElement>("span.font-semibold");
+  const email = actor ? actorEmailByName.value.get((actor.textContent ?? "").trim()) : undefined;
+  return actor && email ? { el: actor, email } : null;
+}
+
+function onPointerOver(e: PointerEvent) {
+  const hit = personUnder(e.target);
+  if (!hit) return;
+  const name = nameOf(hit.email);
+  if (name === hit.email) return;
+  personTooltip.value = t("oncall.personNameWithEmail", { name: raw(name), email: raw(hit.email) });
+  personAnchor.value = hit.el;
+}
+
+function onPointerOut(e: PointerEvent) {
+  if (!personAnchor.value) return;
+  if (e.relatedTarget instanceof Node && personAnchor.value.contains(e.relatedTarget)) return;
+  personAnchor.value = null;
+}
+
 const esc = (s: string) =>
   String(s)
     .replace(/&/g, "&amp;")
@@ -223,13 +281,13 @@ function sentenceWithPeople(event: OnCallResponseEvent): string {
     return `\uE000${people.length - 1}\uE000`;
   };
   const sentence = esc(
-    timelineSentence(event, { nameOf: tokenFor, teamNameOf: props.teamNameOf }, t),
+    timelineSentence(event, { nameOf: tokenFor, teamNameOf: props.teamNameOf }, sentenceT),
   );
   return sentence.replace(PERSON_TOKEN, (_, index: string) => {
     const email = people[Number(index)];
     const name = nameOf(email);
     if (name === email) return esc(name);
-    return `<span class="underline decoration-dotted underline-offset-2" title="${esc(`${name} · ${email}`)}">${esc(name)}</span>`;
+    return `<span class="underline decoration-dotted underline-offset-2" data-oncall-person="${esc(email)}">${esc(name)}</span>`;
   });
 }
 

@@ -73,13 +73,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-responder="{ row }">
-        <span v-if="row.acked_by && row.acked_at" class="text-text-secondary text-sm">
+        <span
+          v-if="row.acked_by && row.acked_at"
+          class="text-text-secondary text-sm"
+          :data-test="`oncall-recent-pages-responder-${row.id}`"
+        >
           {{
             t("oncall.teamAckedByIn", {
-              who: raw(row.acked_by),
+              who: raw(nameOf(row.acked_by)),
               took: raw(formatMicrosDuration(row.acked_at - row.opened_at)),
             })
           }}
+          <OTooltip :content="personTooltip(row.acked_by)" />
         </span>
         <span v-else class="text-text-secondary text-sm">{{ t("oncall.neverAcknowledged") }}</span>
       </template>
@@ -112,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -121,6 +127,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OnCallPolicy, OnCallResponse } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -147,6 +154,15 @@ const props = withDefaults(
 const emit = defineEmits<{ open: [page: OnCallResponse]; "view-all": [] }>();
 
 const { t } = useI18nTyped();
+const { nameOf } = useOrgUserNames();
+
+/// Names can repeat across an org, so the email is one hover away.
+function personTooltip(email: string): I18nText {
+  const name = nameOf(email);
+  return name === email
+    ? raw(email)
+    : t("oncall.personNameWithEmail", { name: raw(name), email: raw(email) });
+}
 const { isMobile } = useBreakpoint();
 
 /// The ladder's steps for this record's priority, earliest first.
