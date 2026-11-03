@@ -76,6 +76,7 @@ const dropIndicatorClass = computed<string>(() => {
 const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
   md: "h-9 gap-2 px-3 text-sm max-md:px-2",
   sm: "h-7 gap-1.5 px-2.5 text-xs max-md:px-1.5",
+  toolbar: "h-7 gap-1.5 px-3 text-xs max-[85.5rem]:px-2.5 max-md:px-1.5",
   xs: "h-5 gap-2 px-1.5 text-xs max-md:px-1",
 };
 
@@ -83,6 +84,7 @@ const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
 const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | "md"> = {
   md: "md",
   sm: "sm",
+  toolbar: "sm",
   xs: "xs",
 };
 </script>
@@ -147,11 +149,12 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
         'cursor-pointer outline-none',
         // Hover (inactive only) — scoped to data-state=off so hovering the
         // active item never repaints over the sliding indicator / active fill.
-        'data-[state=off]:hover:bg-toggle-item-hover-bg',
+        'data-[state=off]:hover:bg-toggle-item-hover-bg data-[state=off]:hover:text-text-heading',
         // Active fill: normally painted per-item. When the group animates the
         // selection (opt-in), a single sliding indicator paints the fill instead,
         // so suppress the per-item background and just keep the active text colour.
-        !isAnimated && 'data-[state=on]:bg-toggle-item-active-bg',
+        !isAnimated &&
+          'data-[state=on]:bg-toggle-item-active-bg data-[state=on]:ring-toggle-item-active-border data-[state=on]:shadow-xs data-[state=on]:ring-1 data-[state=on]:ring-inset',
         'data-[state=on]:text-toggle-item-active-text',
         // Sit above the sliding indicator so the icon/label stay readable.
         isAnimated && 'relative z-10',
@@ -194,7 +197,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
         v-else-if="props.iconRight"
         :name="props.iconRight"
         :size="iconSize[props.size]"
-        :class="props.iconRight === 'lock' ? 'text-warning-600' : ''"
+        :class="props.iconRight === 'lock' ? 'text-text-secondary' : ''"
       />
     </ToggleGroupItem>
     <span v-if="unavailable && props.tooltip" :id="reasonId" aria-hidden="true" class="sr-only">{{

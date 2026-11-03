@@ -64,8 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OToggleGroupItem
               data-test="logs-logs-toggle"
+              :aria-label="t('common.search')"
               value="logs"
-              size="sm"
+              size="toolbar"
               :tooltip="toolbarToggleIconOnly ? t('common.search') : undefined"
             >
               <template #icon-left>
@@ -90,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : undefined
               "
               value="visualize"
-              size="sm"
+              size="toolbar"
             >
               <template #icon-left>
                 <OIcon name="timeline" size="sm" class="shrink-0" />
@@ -100,18 +101,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OToggleGroupItem
               data-test="logs-build-toggle"
+              :aria-label="t('search.buildQuery')"
               value="build"
-              size="sm"
+              size="toolbar"
               :tooltip="toolbarToggleIconOnly ? t('search.buildQuery') : undefined"
             >
               <template #icon-left>
-                <OIcon name="build" size="sm" class="shrink-0" />
+                <OIcon name="show-chart" size="sm" class="shrink-0" />
               </template>
               <span v-if="!toolbarToggleIconOnly">{{ t("search.buildQuery") }}</span>
             </OToggleGroupItem>
 
             <OToggleGroupItem
               data-test="logs-drilldown-toggle"
+              :aria-label="t('search.drillDown')"
               :disabled="searchObj.meta.sqlMode"
               :tooltip="
                 searchObj.meta.sqlMode
@@ -121,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : undefined
               "
               value="drilldown"
-              size="sm"
+              size="toolbar"
             >
               <template #icon-left>
                 <OIcon name="query-stats" size="sm" class="shrink-0" />
@@ -131,20 +134,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OToggleGroupItem
               data-test="logs-patterns-toggle"
+              :aria-label="t('search.showPatternsLabel')"
               value="patterns"
-              size="sm"
-              :tooltip="
-                patternsAccess.allowed && toolbarToggleIconOnly
-                  ? t('search.showPatternsLabel')
-                  : undefined
-              "
+              size="toolbar"
+              :tooltip="toolbarToggleIconOnly ? t('search.showPatternsLabel') : undefined"
             >
               <template #icon-left>
                 <OIcon name="layers" size="sm" class="shrink-0" />
               </template>
               <span v-if="!toolbarToggleIconOnly">{{ t("search.showPatternsLabel") }}</span>
               <template v-if="!patternsAccess.allowed" #icon-right>
-                <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
+                <OIcon name="lock" size="xs" class="text-text-secondary shrink-0" />
               </template>
             </OToggleGroupItem>
           </OToggleGroup>
@@ -2424,7 +2424,8 @@ export default defineComponent({
     // Approximate rendered widths (px) of each pinned control and of the fixed
     // left-section content, used only to decide how many pinned items fit before
     // they would clip. Hidden pinned items stay reachable inside the More menu.
-    const PIN_ITEM_WIDTH = { histogram: 72, sqlMode: 72, quickMode: 72, savedViews: 93 };
+    const PIN_BUTTON_WIDTH = computed(() => (windowWidth.value < 1366 ? 72 : 84));
+    const SAVED_VIEWS_PIN_WIDTH = 93;
     const SYNTAX_GUIDE_LABEL_WIDTH = 108;
     const SYNTAX_GUIDE_ICON_WIDTH = 40;
     const PIN_ITEM_GAP = 8;
@@ -2434,10 +2435,10 @@ export default defineComponent({
     const baseReservedWidth = computed(() => {
       let w = 0;
       if (toolbarToggleAsDropdown.value) w += 120;
-      else if (toolbarToggleIconOnly.value) w += 230;
-      else w += 440;
+      else if (toolbarToggleIconOnly.value) w += 186;
+      else w += 400;
       if (!toolbarMoveResetToMenu.value) w += shouldHideToolbarButtonText.value ? 34 : 80;
-      w += 76; // More button (always visible)
+      w += windowWidth.value < 1366 ? 76 : 84; // More button (always visible)
       w += 24; // inter-item gaps / padding buffer
       return w;
     });
@@ -2467,10 +2468,10 @@ export default defineComponent({
         }
         return false;
       };
-      if (isPinned("histogram")) res.histogram = tryFit(PIN_ITEM_WIDTH.histogram);
-      if (isPinned("sqlMode")) res.sqlMode = tryFit(PIN_ITEM_WIDTH.sqlMode);
-      if (isPinned("quickMode")) res.quickMode = tryFit(PIN_ITEM_WIDTH.quickMode);
-      if (isPinned("savedViews")) res.savedViews = tryFit(PIN_ITEM_WIDTH.savedViews);
+      if (isPinned("histogram")) res.histogram = tryFit(PIN_BUTTON_WIDTH.value);
+      if (isPinned("sqlMode")) res.sqlMode = tryFit(PIN_BUTTON_WIDTH.value);
+      if (isPinned("quickMode")) res.quickMode = tryFit(PIN_BUTTON_WIDTH.value);
+      if (isPinned("savedViews")) res.savedViews = tryFit(SAVED_VIEWS_PIN_WIDTH);
       if (isPinned("syntaxGuide")) {
         if (tryFit(SYNTAX_GUIDE_LABEL_WIDTH)) {
           res.syntaxGuide = true;
@@ -2507,7 +2508,7 @@ export default defineComponent({
             },
           ]
         : []),
-      { value: "build", icon: "build", label: t("search.buildQuery"), disabled: false },
+      { value: "build", icon: "show-chart", label: t("search.buildQuery"), disabled: false },
       {
         value: "drilldown",
         icon: "query-stats",

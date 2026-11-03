@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabs
           :model-value="tabName(section)"
           orientation="vertical"
-          class="w-full shrink-0 md:w-60"
+          class="w-full shrink-0 px-1 md:w-60"
           data-test="autoobserve-policy-tabs"
           @update:model-value="select"
         >

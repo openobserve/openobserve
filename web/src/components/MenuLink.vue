@@ -263,13 +263,11 @@ export default defineComponent({
 
     const activePillClass = computed(() => {
       if (slideActive.value) {
-        return isDark.value
-          ? "text-tabs-active-text border-s-2 border-transparent"
-          : "text-accent border-s-2 border-transparent";
+        return isDark.value ? "text-tabs-active-text" : "text-accent";
       }
       return isDark.value
-        ? "text-tabs-active-text bg-tabs-active-bg border-s-2 border-accent"
-        : "text-accent bg-surface-base border-s-2 border-accent";
+        ? "text-tabs-active-text bg-tabs-active-bg"
+        : "text-accent bg-surface-base shadow-xs";
     });
     const activeIconClass = computed(() =>
       isDark.value ? "text-tabs-active-text!" : "text-accent!",
@@ -396,10 +394,10 @@ export default defineComponent({
       // Sit above the rail's sliding pill so icon/label stay readable.
       slideActive.value ? "z-10" : "",
       props.locked
-        ? "cursor-pointer text-tabs-inactive-text border-s-2 border-transparent bg-transparent hover:bg-tabs-hover-bg"
+        ? "cursor-pointer text-tabs-inactive-text bg-transparent hover:bg-tabs-hover-bg dark:hover:bg-tabs-rail-hover-bg"
         : isActive.value
           ? activePillClass.value
-          : "text-tabs-inactive-text border-s-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",
+          : "text-tabs-inactive-text bg-transparent hover:bg-tabs-hover-bg dark:hover:bg-tabs-rail-hover-bg",
       isActive.value ? "nav-menu-item--active" : "",
       props.title === "Functions" ? "menu-link-function" : "",
       // Reset native <button> chrome so the trigger looks EXACTLY like a link.
