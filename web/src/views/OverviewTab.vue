@@ -344,20 +344,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @retry="() => loadAll(true)"
     />
 
-    <!-- Locked: Services shares the Incidents license gate — same bundle, no
-         separate upsell story of its own. -->
-    <section v-else-if="!incidentsAccess.allowed" class="mb-5" data-test="overview-services-locked">
+    <!-- Locked: Services shares the Incidents license gate, and its data comes from traces,
+         so a license without traces locks it too. -->
+    <section
+      v-else-if="!incidentsAccess.allowed || tracesLock.locked.value"
+      class="mb-5"
+      data-test="overview-services-locked"
+    >
       <div class="mb-2 flex items-center justify-between ps-1">
         <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
           {{ t("overview.services") }}
         </div>
       </div>
       <div
-        class="border-border-default bg-surface-subtle rounded-default flex cursor-pointer items-center gap-3 border border-[0.0625em] px-4 py-5"
-        @click="openUpgradeDialog"
+        class="border-border-default bg-surface-subtle rounded-default flex items-center gap-3 border border-[0.0625em] px-4 py-5"
+        :class="{ 'cursor-pointer': !servicesLicenseLocked }"
+        @click="!servicesLicenseLocked && openUpgradeDialog()"
       >
         <OIcon name="lock" size="md" class="lock-chip shrink-0" />
-        <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
+        <span class="text-text-secondary text-sm">{{
+          incidentsAccess.allowed ? tracesLock.lockedReason.value : incidentsAccess.message
+        }}</span>
       </div>
     </section>
 
@@ -579,9 +586,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :hide-action="true"
       data-test="overview-all-clear-empty-state"
     >
-      <template #title>{{ t("overview.allClear") }}</template>
+      <template #title>{{
+        uncheckedAreas.length ? t("overview.allClearPartial") : t("overview.allClear")
+      }}</template>
       <template #description>{{
-        flagOn ? t("overview.allClearDescScoped") : t("overview.allClearDesc")
+        uncheckedAreas.length
+          ? t("overview.allClearPartialDesc", { areas: raw(uncheckedAreas.join(", ")) })
+          : flagOn
+            ? t("overview.allClearDescScoped")
+            : t("overview.allClearDesc")
       }}</template>
       <template #actions>
         <OTooltip
@@ -707,6 +720,19 @@ const anomalyLock = useLicenseLock("anomaly_detection");
 const anomalyLocked = anomalyLock.locked;
 const logsLock = useLicenseLock("logs");
 const tracesLock = useLicenseLock("traces");
+// a license lock on traces locks Services too
+const servicesLicenseLocked = computed(
+  () => incidentsLicenseLocked.value || (incidentsAccess.value.allowed && tracesLock.locked.value),
+);
+// areas the license keeps the page from reading, so "all clear" must not claim them
+const uncheckedAreas = computed<string[]>(() => {
+  const areas: string[] = [];
+  if (alertsLocked.value) areas.push(t("overview.areaAlerts"));
+  if (anomalyLocked.value) areas.push(t("overview.areaAnomalies"));
+  if (incidentsLicenseLocked.value) areas.push(t("overview.areaIncidents"));
+  if (servicesLicenseLocked.value) areas.push(t("overview.areaServices"));
+  return areas;
+});
 const anomalyEnabled = computed(
   () => store.state.zoConfig?.anomaly_detection_enabled === true && !anomalyLocked.value,
 );
@@ -834,7 +860,7 @@ const attemptedSections = computed<SectionKey[]>(() => {
   if (!alertsLocked.value) keys.push("recentEvents");
   if (anomalyEnabled.value) keys.push("anomalies");
   if (isIncidentsEnabled.value) keys.push("incidents");
-  if (incidentsAccess.value.allowed) keys.push("services");
+  if (incidentsAccess.value.allowed && !tracesLock.locked.value) keys.push("services");
   return keys;
 });
 const isFailed = (key: SectionKey) =>
@@ -1208,7 +1234,7 @@ const loadIncidents = async (force = false) => {
 };
 
 const loadServiceGraph = async (force = false) => {
-  if (!incidentsAccess.value.allowed) return;
+  if (!incidentsAccess.value.allowed || tracesLock.locked.value) return;
   sectionFailure.services = null;
   try {
     graphStream.value = "all";
