@@ -1665,18 +1665,22 @@ async fn handle_composite_alert_trigger(
 
         // Outside the deliverable branch: a silenced composite never reaches correlation.
         #[cfg(feature = "enterprise")]
-        if o2_enterprise::enterprise::oncall::is_enabled()
-            && !composite_incident_handled
-            && downtime.is_none()
-        {
-            let notification_alert =
-                crate::alerts::composite::notification_alert(&definition.definition);
-            let rows = [composite_notification_row(
-                &definition.definition.expression,
-                evaluated.result,
-                &evaluated.children,
-            )];
-            page_for_alert_firing(trace_id, &notification_alert, &rows).await;
+        if !composite_incident_handled && downtime.is_none() {
+            if o2_enterprise::enterprise::oncall::is_enabled() {
+                let notification_alert =
+                    crate::alerts::composite::notification_alert(&definition.definition);
+                let rows = [composite_notification_row(
+                    &definition.definition.expression,
+                    evaluated.result,
+                    &evaluated.children,
+                )];
+                page_for_alert_firing(trace_id, &notification_alert, &rows).await;
+            }
+            delivery_error = crate::alerts::alert::with_unlicensed_page_reason(
+                delivery_error,
+                o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(&trigger.org)
+                    .await,
+            );
         }
     }
 
