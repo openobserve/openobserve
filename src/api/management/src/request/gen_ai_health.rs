@@ -31,12 +31,13 @@ use std::{
 use axum::{extract::Path, response::Response};
 use config::{
     meta::{
-        model_pricing::{COST_STATUS_COLUMN, CostStatus},
+        model_pricing::{COST_STATUS_COLUMN, CostStatus, MatchKind},
         search::{Query as SearchQuery, Request as SearchRequest, RequestEncoding},
         stream::StreamType,
     },
     utils::{json, time::now_micros},
 };
+use db::model_pricing::DefinitionMatch;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
@@ -381,15 +382,76 @@ fn model_from(hit: &json::Value) -> Option<String> {
         .map(str::to_string)
 }
 
-fn unpriced_models_sql(stream: &str, base: &str, pred: &str, cols: &Columns) -> String {
+fn unpriced_models_sql(
+    stream: &str,
+    base: &str,
+    pred: &str,
+    cols: &Columns,
+    limit: usize,
+) -> String {
     let (select, model) = model_grouping(cols);
     let group = model.map(|m| format!(" GROUP BY {m}")).unwrap_or_default();
     format!(
         "SELECT {select}COUNT(*) AS spans, {} AS tokens FROM {} \
-         WHERE {base} AND {pred}{group} ORDER BY tokens DESC LIMIT {MAX_MODELS}",
+         WHERE {base} AND {pred}{group} ORDER BY tokens DESC LIMIT {limit}",
         cols.tokens_expr(),
         quote_ident(stream)
     )
+}
+
+/// A model's pricing gap is closed when today's definitions match its name exactly; a
+/// family-pattern match only approximates it. Pricing gaps marks such rows "Priced for new
+/// spans" by the same rule, so the check and the page agree.
+pub(crate) fn priced_now(resolved: Option<&DefinitionMatch>) -> bool {
+    resolved.is_some_and(|r| r.match_kind == MatchKind::Exact)
+}
+
+/// `pred` without the spans of `models`; spans with no model name stay in.
+fn exclude_models(pred: Pred, model_column: &str, models: &[String]) -> Pred {
+    match pred {
+        Pred::Sql(p) if !models.is_empty() => {
+            let list = models
+                .iter()
+                .map(|m| quote_str(m))
+                .collect::<Vec<_>>()
+                .join(", ");
+            Pred::Sql(format!(
+                "{p} AND ({model_column} IS NULL OR {model_column} NOT IN ({list}))"
+            ))
+        }
+        other => other,
+    }
+}
+
+/// The unpriced check's filter minus the models that have a price now. Their older spans
+/// keep the $0 ingest recorded, but there is nothing left to fix, so the check passes once
+/// every model it found is priced.
+// ponytail: resolves the MAX_UNPRICED_ROWS models with the most unpriced tokens; a priced
+// model past that stays counted until it moves up.
+async fn unpriced_check_pred(
+    org_id: &str,
+    user_id: &str,
+    stream: &str,
+    base: &str,
+    cols: &Columns,
+    window: &Window,
+    pred: Pred,
+) -> Result<Pred, anyhow::Error> {
+    let (Pred::Sql(p), Some(model_column)) = (&pred, cols.model_column()) else {
+        return Ok(pred);
+    };
+    let sql = unpriced_models_sql(stream, base, p, cols, MAX_UNPRICED_ROWS);
+    let hits = run_sql(org_id, user_id, sql, window, MAX_UNPRICED_ROWS).await?;
+    let entries = db::model_pricing::get_org_pricing_entries(org_id);
+    let now = now_micros();
+    let priced: Vec<String> = hits
+        .iter()
+        .filter_map(model_from)
+        .filter(|m| {
+            priced_now(db::model_pricing::find_pricing_sync_at(&entries, m, Some(now)).as_ref())
+        })
+        .collect();
+    Ok(exclude_models(pred, model_column, &priced))
 }
 
 /// The uncapped totals behind a capped per-model breakdown of the spans matching `filter`:
@@ -580,7 +642,7 @@ fn follow_up_sql(
         vec![]
     };
     let unpriced = match (&preds[0], checks[0].affected > 0) {
-        (Pred::Sql(p), true) => Some(unpriced_models_sql(stream, base, p, cols)),
+        (Pred::Sql(p), true) => Some(unpriced_models_sql(stream, base, p, cols, MAX_MODELS)),
         _ => None,
     };
     (samples, unpriced)
@@ -604,12 +666,25 @@ async fn populate_samples(
         return Ok(());
     };
     let pricing_enabled = config::get_config().common.model_pricing_enabled;
+    let unpriced = unpriced_check_pred(
+        org_id,
+        user_id,
+        &query.stream_name,
+        &base,
+        &cols,
+        window,
+        check_pred(CheckId::UnpricedModels, &cols, pricing_enabled),
+    )
+    .await?;
     let jobs = checks
         .iter()
         .enumerate()
         .filter(|(_, check)| check.affected > 0)
         .map(|(i, check)| {
-            let pred = check_pred(check.id, &cols, pricing_enabled);
+            let pred = match check.id {
+                CheckId::UnpricedModels => unpriced.clone(),
+                id => check_pred(id, &cols, pricing_enabled),
+            };
             let sql = samples_sql(&query.stream_name, &base, &pred);
             async move {
                 (
@@ -640,10 +715,21 @@ async fn compute_checks(
     };
     let stream = &query.stream_name;
     let pricing_enabled = config::get_config().common.model_pricing_enabled;
-    let preds: Vec<Pred> = CHECK_IDS
+    let mut preds: Vec<Pred> = CHECK_IDS
         .iter()
         .map(|&id| check_pred(id, &cols, pricing_enabled))
         .collect();
+    // CHECK_IDS[0] is the unpriced check; its counts, models and samples skip priced models.
+    preds[0] = unpriced_check_pred(
+        org_id,
+        user_id,
+        stream,
+        &base,
+        &cols,
+        window,
+        preds[0].clone(),
+    )
+    .await?;
 
     let rows = run_sql(
         org_id,
@@ -1202,6 +1288,18 @@ mod tests {
     }
 
     #[test]
+    fn priced_models_drop_out_of_the_unpriced_check() {
+        let p = Pred::Sql("s = 'unpriced'".into());
+        assert_eq!(exclude_models(p.clone(), "m", &[]), p);
+        assert_eq!(
+            exclude_models(p, "m", &["a".into(), "o'k".into()]),
+            Pred::Sql("s = 'unpriced' AND (m IS NULL OR m NOT IN ('a', 'o''k'))".into())
+        );
+        assert_eq!(exclude_models(Pred::Never, "m", &["a".into()]), Pred::Never);
+        assert!(!priced_now(None));
+    }
+
+    #[test]
     fn unpriced_check_passes_when_pricing_is_disabled() {
         let c = cols(FULL);
         assert!(matches!(
@@ -1362,7 +1460,7 @@ mod tests {
         let sql = unpriced_list_sql("default", &c).unwrap();
         assert!(sql.starts_with("SELECT gen_ai_usage_cost_status AS status,"));
         assert!(sql.contains("GROUP BY gen_ai_usage_cost_status ORDER BY"));
-        let sql = unpriced_models_sql("default", "b", "p", &c);
+        let sql = unpriced_models_sql("default", "b", "p", &c, MAX_MODELS);
         assert!(sql.starts_with("SELECT COUNT(*) AS spans,"));
         assert!(!sql.contains("GROUP BY"));
         assert_eq!(model_from(&json::json!({"spans": 2})), None);

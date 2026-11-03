@@ -685,7 +685,7 @@ fn resolve_unpriced(
             .model
             .as_deref()
             .and_then(|m| model_pricing::find_pricing_sync_at(entries, m, Some(now_micros)));
-        let priced_now = matches!(&resolved, Some(r) if r.match_kind == MatchKind::Exact);
+        let priced_now = crate::request::gen_ai_health::priced_now(resolved.as_ref());
         // A model seen both unpriced and approximate (a price was added mid-window) is one row.
         if let Some(existing) = by_model.get_mut(&row.model) {
             existing.row.spans += row.spans;
