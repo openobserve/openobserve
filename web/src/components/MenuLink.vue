@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           ref="labelRef"
-          class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal text-ellipsis [hyphens:none] transition-colors duration-250 max-md:text-start max-md:text-sm max-md:leading-snug"
+          class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-normal break-normal wrap-normal text-ellipsis [hyphens:none] transition-colors duration-250 max-md:text-start max-md:text-sm max-md:leading-snug"
           :class="labelClass"
         >
           {{ title }}
@@ -275,17 +275,15 @@ export default defineComponent({
         return isDark.value ? "text-tabs-active-text" : "text-accent";
       }
       return isDark.value
-        ? "text-tabs-active-text bg-tabs-active-bg"
-        : "text-accent bg-surface-base shadow-xs";
+        ? "text-tabs-active-text bg-tabs-active-bg ring-1 ring-inset ring-accent"
+        : "text-accent bg-surface-base shadow-xs ring-1 ring-inset ring-accent";
     });
     const activeIconClass = computed(() =>
       isDark.value ? "text-tabs-active-text!" : "text-accent!",
     );
     // Light active and hover labels use the darker label token; the icon keeps the accent.
     const activeLabelClass = computed(() =>
-      isDark.value
-        ? "font-semibold text-tabs-active-text!"
-        : "font-semibold text-nav-label-accent!",
+      isDark.value ? "font-medium text-tabs-active-text!" : "font-medium text-nav-label-accent!",
     );
     const iconClass = computed(() => {
       if (props.paywalled) return "text-text-secondary";
