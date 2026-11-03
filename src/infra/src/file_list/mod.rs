@@ -284,6 +284,13 @@ pub trait FileList: Sync + Send + 'static {
         stream: &str,
         offset_range: (i64, i64),
     ) -> Result<bool>;
+    async fn is_job_running(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream: &str,
+        offset: i64,
+    ) -> Result<bool>;
     async fn set_job_pending(&self, ids: &[i64], offsets: i64, stream: Option<&str>)
     -> Result<u64>;
     async fn set_job_done(&self, ids: &[i64]) -> Result<()>;
@@ -794,6 +801,19 @@ pub async fn has_unfinished_jobs(
 ) -> Result<bool> {
     CLIENT
         .has_unfinished_jobs(org_id, stream_type, stream, offset_range)
+        .await
+}
+
+/// Whether the stream's job at `offset` is running.
+#[inline]
+pub async fn is_job_running(
+    org_id: &str,
+    stream_type: StreamType,
+    stream: &str,
+    offset: i64,
+) -> Result<bool> {
+    CLIENT
+        .is_job_running(org_id, stream_type, stream, offset)
         .await
 }
 

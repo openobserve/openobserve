@@ -1158,8 +1158,9 @@ DO UPDATE SET
         let sql = if fast_mode {
             r#"SELECT stream, id, 0 as num FROM file_list_jobs WHERE status = $1 ORDER BY offsets DESC LIMIT $2;"#
         } else {
+            // the newest hour first; sqlite takes the bare id from the row holding max(offsets)
             r#"
-SELECT stream, max(id) as id, COUNT(*) AS num
+SELECT stream, id, max(offsets) AS offsets, COUNT(*) AS num
     FROM file_list_jobs
     WHERE status = $1
     GROUP BY stream
@@ -1246,6 +1247,26 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         .bind(offset_range.0)
         .bind(offset_range.1)
         .bind(super::FileListJobStatus::Done)
+        .fetch_optional(&client)
+        .await?;
+        Ok(ret.is_some())
+    }
+
+    async fn is_job_running(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream: &str,
+        offset: i64,
+    ) -> Result<bool> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream}");
+        let client = CLIENT_RO.clone();
+        let ret = sqlx::query(
+            "SELECT id FROM file_list_jobs WHERE stream = $1 AND offsets = $2 AND status = $3 LIMIT 1;",
+        )
+        .bind(stream_key)
+        .bind(offset)
+        .bind(super::FileListJobStatus::Running)
         .fetch_optional(&client)
         .await?;
         Ok(ret.is_some())
@@ -2333,6 +2354,43 @@ mod tests {
             std::mem::size_of_val(&default_list),
             std::mem::size_of_val(&new_list)
         );
+    }
+
+    /// A stream's newest hour is claimed first, even when an older row was added after it.
+    #[tokio::test]
+    async fn test_get_pending_jobs_claims_the_newest_offset_of_a_stream() {
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).unwrap();
+        create_table().await.unwrap();
+        let list = SqliteFileList::new();
+        // the sqlite file outlives a test run
+        let stream = format!("pending_{}", config::ider::generate());
+        let day = config::utils::time::day_micros(20_000);
+        let hour23 = day + config::utils::time::hour_micros(23);
+        let hour23_job = list
+            .add_job("o", StreamType::Logs, &stream, hour23)
+            .await
+            .unwrap();
+        let day_job = list
+            .add_job("o", StreamType::Logs, &stream, day)
+            .await
+            .unwrap();
+        assert!(day_job > hour23_job);
+
+        let key = format!("o/logs/{stream}");
+        let claimed = list
+            .get_pending_jobs("node", 10_000, false)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|job| job.stream == key)
+            .map(|job| job.id)
+            .collect::<Vec<_>>();
+        assert_eq!(claimed, vec![hour23_job]);
+        let running = |offset| list.is_job_running("o", StreamType::Logs, &stream, offset);
+        assert!(running(hour23).await.unwrap());
+        assert!(!running(day).await.unwrap());
+        list.set_job_done(&[hour23_job, day_job]).await.unwrap();
+        assert!(!running(hour23).await.unwrap());
     }
 
     #[tokio::test]

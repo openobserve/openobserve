@@ -325,11 +325,18 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             need_done_ids.push(job.id); // the data will be deleted by retention, just skip
             continue;
         }
+        let dynamic_merge =
+            get_stream_setting_dynamic_merge(stream_type, &Some(stream_settings.as_ref()));
         // the day's merge job reads every hour of the day: the day's other jobs go first
-        if is_dynamic_day_job(
-            job.offsets,
-            get_stream_setting_dynamic_merge(stream_type, &Some(stream_settings.as_ref())),
-        ) && day_jobs_unfinished(&org_id, stream_type, &stream_name, job.offsets).await
+        if is_dynamic_day_job(job.offsets, dynamic_merge)
+            && day_jobs_unfinished(&org_id, stream_type, &stream_name, job.offsets).await
+        {
+            need_release_ids.push(job.id);
+            continue;
+        }
+        // and while it runs, an old-data job must not rewrite an hour under it
+        if is_dynamic_hour_job(job.offsets, dynamic_merge)
+            && day_job_running(&org_id, stream_type, &stream_name, job.offsets).await
         {
             need_release_ids.push(job.id);
             continue;
@@ -485,9 +492,33 @@ async fn day_jobs_unfinished(
     }
 }
 
+/// Whether the 00:00 job of the hour's day is running; a failed lookup counts as running.
+async fn day_job_running(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    offset: i64,
+) -> bool {
+    let day_start = offset - offset % day_micros(1);
+    match infra_file_list::is_job_running(org_id, stream_type, stream_name, day_start).await {
+        Ok(running) => running,
+        Err(e) => {
+            log::error!(
+                "[COMPACTOR] is_job_running [{org_id}/{stream_type}/{stream_name}] failed: {e}"
+            );
+            true
+        }
+    }
+}
+
 /// The 00:00 job of an enabled stream's closed day: the one that merges the day into `DD/00`.
 pub(crate) fn is_dynamic_day_job(offset: i64, dynamic_merge: bool) -> bool {
     dynamic_merge && offset % day_micros(1) == 0 && is_past_day(offset)
+}
+
+/// An hour job of an enabled stream's closed day: only old data enqueues one.
+pub(crate) fn is_dynamic_hour_job(offset: i64, dynamic_merge: bool) -> bool {
+    dynamic_merge && offset % day_micros(1) != 0 && is_past_day(offset)
 }
 
 /// A day is closed once its last hour is past: no hour of it can receive files any more.
@@ -530,5 +561,21 @@ mod tests {
         assert!(unfinished().await);
         infra_file_list::set_job_done(&[hour23]).await.unwrap();
         assert!(!unfinished().await);
+    }
+
+    /// Of a closed day only 00:00 is the day job; the other hours are its hour jobs.
+    #[test]
+    fn test_dynamic_day_and_hour_jobs_split_a_closed_day() {
+        let day = day_micros(20_000);
+        let hour15 = day + hour_micros(15);
+        assert!(is_dynamic_day_job(day, true));
+        assert!(!is_dynamic_hour_job(day, true));
+        assert!(is_dynamic_hour_job(hour15, true));
+        assert!(!is_dynamic_day_job(hour15, true));
+        assert!(!is_dynamic_hour_job(hour15, false));
+        // an open day has neither
+        let open = now_micros() + hour_micros(1);
+        assert!(!is_dynamic_day_job(open, true));
+        assert!(!is_dynamic_hour_job(open, true));
     }
 }

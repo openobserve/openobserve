@@ -1473,19 +1473,20 @@ DO UPDATE SET
         let sql = if fast_mode {
             r#"SELECT stream, id, 0::BIGINT AS num FROM file_list_jobs WHERE status = $1 ORDER BY offsets DESC LIMIT $2 FOR UPDATE SKIP LOCKED;"#
         } else {
-            // a stream whose max(id) row is lock-skipped is skipped whole until the peer commits
+            // newest hour first: a re-armed row never blocks later hours; locked rows skip the
+            // stream
             r#"
     WITH candidates AS (
-        SELECT stream, max(id) AS id, COUNT(*)::BIGINT AS num
+        SELECT stream, max(offsets) AS offsets, COUNT(*)::BIGINT AS num
             FROM file_list_jobs
             WHERE status = $1
             GROUP BY stream
             ORDER BY num DESC
             LIMIT $2
     )
-    SELECT c.stream, c.id, c.num
+    SELECT c.stream, j.id, c.num
         FROM candidates c
-        JOIN file_list_jobs j ON j.id = c.id
+        JOIN file_list_jobs j ON j.stream = c.stream AND j.offsets = c.offsets
         WHERE j.status = $1
         ORDER BY c.num DESC
         FOR UPDATE OF j SKIP LOCKED;"#
@@ -1583,6 +1584,29 @@ DO UPDATE SET
         .bind(offset_range.0)
         .bind(offset_range.1)
         .bind(super::FileListJobStatus::Done)
+        .fetch_optional(&pool)
+        .await?;
+        Ok(ret.is_some())
+    }
+
+    async fn is_job_running(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream: &str,
+        offset: i64,
+    ) -> Result<bool> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream}");
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["query", "file_list_jobs"])
+            .inc();
+        let ret = sqlx::query(
+            "SELECT id FROM file_list_jobs WHERE stream = $1 AND offsets = $2 AND status = $3 LIMIT 1;",
+        )
+        .bind(stream_key)
+        .bind(offset)
+        .bind(super::FileListJobStatus::Running)
         .fetch_optional(&pool)
         .await?;
         Ok(ret.is_some())
