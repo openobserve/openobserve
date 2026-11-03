@@ -13,12 +13,16 @@ import {
   moveMessage,
   nextMessageRole,
   playgroundId,
+  promptConfigFor,
   renderTemplate,
   renderedMessages,
+  runParams,
   scorerEvidence,
+  seedModel,
   snapshotPayload,
   starterDraft,
   variantLabel,
+  variantSettingsFromPrompt,
   withFieldInserted,
   withRole,
   withSampledVars,
@@ -26,6 +30,7 @@ import {
   type PlaygroundResults,
   type PlaygroundVariant,
 } from "./playgroundDraft";
+import type { PromptConfig } from "@/services/llm-prompts.service";
 
 function variantWith(contents: string[]): PlaygroundVariant {
   const variant = emptyVariant("provider-1", "gpt-4o-mini");
@@ -274,6 +279,170 @@ describe("snapshots", () => {
     expect(draftFromSnapshot(wire)?.draft).toEqual(draft);
     expect(draftFromSnapshot({ version: 1 })).toBeNull();
     expect(draftFromSnapshot(null)).toBeNull();
+  });
+});
+
+describe("prompt config round trip", () => {
+  const tuned: PromptConfig = {
+    model: "gpt-4o",
+    params: { temperature: 0.3, max_tokens: 256, top_p: 0.9, stop: ["###", "END"], seed: 7 },
+    tools: [
+      {
+        type: "function",
+        function: { name: "lookup", description: "Find it", parameters: { type: "object" } },
+        strict: true,
+      },
+    ],
+    responseFormat: { type: "json_object" },
+  };
+  const bare: PromptConfig = { model: null, params: null, tools: null, responseFormat: null };
+
+  function opened(config: PromptConfig): PlaygroundVariant {
+    return { ...emptyVariant(), ...variantSettingsFromPrompt(config) };
+  }
+
+  it("saves an untouched prompt back exactly as stored, unknown keys included", () => {
+    expect(promptConfigFor(opened(tuned), "gpt-4o-mini")).toEqual(tuned);
+  });
+
+  // Session, recent drafts and snapshots all store the draft as JSON.
+  it("still saves it back exactly after the draft is stored and restored", () => {
+    const restored = JSON.parse(JSON.stringify(opened(tuned))) as PlaygroundVariant;
+    expect(promptConfigFor(restored, "gpt-4o-mini")).toEqual(tuned);
+  });
+
+  it("adds no temperature and no seeded default model to a prompt that had neither", () => {
+    const variant = opened(bare);
+    expect(variant.temperature).toBe("");
+    // What seeding the default provider does to the bench.
+    variant.providerId = "p1";
+    seedModel(variant, "gpt-4o-mini");
+
+    expect(variant.model).toBe("gpt-4o-mini");
+    expect(promptConfigFor(variant, "gpt-4o-mini")).toEqual(bare);
+  });
+
+  it("leaves the seeded model out even after the provider's default changes", () => {
+    const variant = opened(bare);
+    seedModel(variant, "gpt-4o-mini");
+
+    expect(promptConfigFor(variant, "gpt-4.1").model).toBeNull();
+    // Providers not loaded yet, or the provider was deleted.
+    expect(promptConfigFor(variant).model).toBeNull();
+  });
+
+  it("leaves the seeded model out of a draft stored and restored as JSON", () => {
+    const variant = opened(bare);
+    seedModel(variant, "gpt-4o-mini");
+    const restored = JSON.parse(JSON.stringify(variant)) as PlaygroundVariant;
+
+    expect(promptConfigFor(restored, "gpt-4.1")).toEqual(bare);
+  });
+
+  it("saves a model the user picked over the seeded one", () => {
+    const variant = opened(bare);
+    seedModel(variant, "gpt-4o-mini");
+    variant.model = "gpt-4.1";
+
+    expect(promptConfigFor(variant, "gpt-4o-mini").model).toBe("gpt-4.1");
+  });
+
+  it("saves the current default picked for a prompt that was never seeded", () => {
+    const variant = opened(bare);
+    variant.model = "gpt-4o-mini";
+
+    expect(promptConfigFor(variant, "gpt-4o-mini").model).toBe("gpt-4o-mini");
+  });
+
+  it("does not seed over a model the prompt names", () => {
+    const variant = opened(tuned);
+    seedModel(variant, "gpt-4o-mini");
+
+    expect(variant.model).toBe("gpt-4o");
+    expect(promptConfigFor(variant, "gpt-4o-mini").model).toBe("gpt-4o");
+  });
+
+  // Drafts stored before the seeded model was recorded carry no `seededModel`.
+  it("treats the current default as seeded in a draft that never recorded one", () => {
+    const legacy = opened(bare);
+    delete legacy.promptBasis?.seededModel;
+    legacy.model = "gpt-4o-mini";
+    const restored = JSON.parse(JSON.stringify(legacy)) as PlaygroundVariant;
+
+    expect(promptConfigFor(restored, "gpt-4o-mini").model).toBeNull();
+    expect(promptConfigFor(restored, "gpt-4.1").model).toBe("gpt-4o-mini");
+  });
+
+  it("writes back what the user edited and nothing else", () => {
+    const variant = opened(tuned);
+    variant.temperature = "0.8";
+    variant.model = "gpt-4.1";
+    variant.tools = [{ name: "search", description: "", parameters: "{}" }];
+
+    expect(promptConfigFor(variant, "gpt-4o-mini")).toEqual({
+      ...tuned,
+      model: "gpt-4.1",
+      params: { ...tuned.params, temperature: 0.8 },
+      tools: [{ type: "function", function: { name: "search", description: "", parameters: {} } }],
+    });
+  });
+
+  it("keeps a model picked for a prompt that named none", () => {
+    const variant = opened(bare);
+    variant.model = "gpt-4.1";
+    expect(promptConfigFor(variant, "gpt-4o-mini").model).toBe("gpt-4.1");
+  });
+
+  it("drops a temperature the user cleared", () => {
+    const variant = opened(tuned);
+    variant.temperature = "";
+    const { temperature: _temperature, ...rest } = tuned.params ?? {};
+    expect(promptConfigFor(variant).params).toEqual(rest);
+  });
+
+  it("saves a non-numeric temperature verbatim but leaves it out of the run", () => {
+    const variant = opened({ ...bare, params: { temperature: "0.3" } });
+    expect(variant.temperature).toBe("");
+    expect(promptConfigFor(variant).params).toEqual({ temperature: "0.3" });
+    expect(runParams(variant)).toEqual({});
+  });
+
+  it("saves null sampling params verbatim but leaves them out of the run", () => {
+    const stored = { temperature: null, max_tokens: null, top_p: 0.9 };
+    const variant = opened({ ...bare, params: stored });
+    expect(promptConfigFor(variant).params).toEqual(stored);
+    expect(runParams(variant)).toEqual({ top_p: 0.9 });
+  });
+
+  it("runs only max tokens the server accepts, preferring max_tokens", () => {
+    const run = (params: Record<string, unknown>) => runParams(opened({ ...bare, params }));
+    expect(run({ max_tokens: "256" })).toEqual({});
+    expect(run({ maxTokens: -1 })).toEqual({});
+    expect(run({ max_tokens: 1.5 })).toEqual({});
+    expect(run({ maxTokens: 128 })).toEqual({ maxTokens: 128 });
+    expect(run({ max_tokens: 256, maxTokens: 128 })).toEqual({ max_tokens: 256 });
+    expect(run({ max_tokens: "x", maxTokens: 128 })).toEqual({ maxTokens: 128 });
+  });
+
+  it("runs with every stored param", () => {
+    expect(runParams(opened(tuned))).toEqual(tuned.params);
+  });
+
+  it("runs without a temperature when none is set, leaving the server's default", () => {
+    expect(runParams(opened(bare))).toEqual({});
+  });
+
+  // Drafts stored before params were carried have only the temperature field.
+  it("runs and saves a variant that carries no params", () => {
+    const variant = emptyVariant("p1", "gpt-4o-mini");
+    variant.temperature = "0.5";
+    expect(runParams(variant)).toEqual({ temperature: 0.5 });
+    expect(promptConfigFor(variant, "gpt-4o-mini")).toEqual({
+      model: "gpt-4o-mini",
+      params: { temperature: 0.5 },
+      tools: [],
+      responseFormat: null,
+    });
   });
 });
 

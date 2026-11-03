@@ -80,7 +80,7 @@ use crate::{
         evaluate_trigger, get_thread_id, grpc::get_val, write_file,
     },
     logs::IngestJsonData,
-    traces::otel::{OtelIngestionProcessor, is_llm_trace},
+    traces::otel::{OtelIngestionProcessor, SpanContext, is_llm_trace},
 };
 
 const SERVICE_NAME: &str = "service.name";
@@ -972,7 +972,14 @@ pub async fn handle_otlp_request(
                         scope_name,
                         &events,
                         org_pricing_entries.as_deref().map(Vec::as_slice),
-                        start_time,
+                        SpanContext {
+                            name: &span.name,
+                            start_nanos: start_time,
+                            is_error: span
+                                .status
+                                .as_ref()
+                                .is_some_and(|s| s.code == StatusCode::Error as i32),
+                        },
                         &gen_ai_agent_mapping_config,
                     );
 
@@ -3985,6 +3992,146 @@ mod tests {
         )
         .await;
         assert_eq!(names, ["svc-a", "llm-svc", "unknown_service"]);
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_otlp_request_llm_processing_sees_span_name_and_error_status() {
+        use arrow::{
+            array::{Array, StringArray},
+            compute::cast,
+            datatypes::DataType,
+        };
+        use opentelemetry_proto::tonic::{
+            collector::trace::v1::ExportTraceServiceRequest,
+            common::v1::InstrumentationScope,
+            resource::v1::Resource,
+            trace::v1::{ResourceSpans, ScopeSpans, Span, Status, status::StatusCode},
+        };
+
+        let org_id = "test_llm_span_context_org";
+        let stream = "test_llm_span_context";
+        let now = chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64;
+        let call_attrs = || {
+            vec![
+                string_kv("ai.model.id", "gpt-4o"),
+                string_kv(
+                    "ai.prompt.messages",
+                    r#"[{"role":"user","content":"Say hello to everyone"}]"#,
+                ),
+            ]
+        };
+        let span = |id: u8, name: &str, attributes, status| Span {
+            trace_id: vec![7; 16],
+            span_id: vec![id; 8],
+            name: name.to_string(),
+            start_time_unix_nano: now,
+            end_time_unix_nano: now + 1000,
+            attributes,
+            status,
+            ..Default::default()
+        };
+        let wrapper = span(
+            1,
+            "ai.generateText",
+            vec![
+                string_kv("ai.model.id", "gpt-4o"),
+                string_kv("ai.prompt", r#"{"prompt":"Say hello to everyone"}"#),
+                string_kv("ai.response.text", "Hello everyone!"),
+            ],
+            None,
+        );
+        let failed = span(
+            2,
+            "ai.generateText.doGenerate",
+            call_attrs(),
+            Some(Status {
+                code: StatusCode::Error as i32,
+                message: "upstream 500".to_string(),
+            }),
+        );
+        let succeeded = span(3, "ai.generateText.doGenerate", call_attrs(), None);
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: Some(Resource {
+                    attributes: vec![string_kv(super::SERVICE_NAME, "svc")],
+                    ..Default::default()
+                }),
+                scope_spans: vec![ScopeSpans {
+                    scope: Some(InstrumentationScope {
+                        name: "ai".to_string(),
+                        ..Default::default()
+                    }),
+                    spans: vec![wrapper, failed, succeeded],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let resp = super::handle_otlp_request(
+            org_id,
+            request,
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+            Some(stream),
+            ingestion_common::IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+
+        let (_, batches) = ingester::read_from_memtable(
+            org_id,
+            config::meta::stream::StreamType::Traces.as_str(),
+            stream,
+            None,
+            &[],
+        )
+        .await
+        .unwrap();
+        // span_id -> (operation, input tokens, response model)
+        let mut rows = std::collections::BTreeMap::new();
+        for entry in batches.into_iter().flat_map(|(_, entries)| entries) {
+            let column = |name: &str| {
+                entry
+                    .data
+                    .column_by_name(name)
+                    .map(|c| cast(c, &DataType::Utf8).unwrap())
+            };
+            let value = |col: &Option<arrow::array::ArrayRef>, row: usize| {
+                col.as_ref().and_then(|c| {
+                    let c = c.as_any().downcast_ref::<StringArray>().unwrap();
+                    (!c.is_null(row)).then(|| c.value(row).to_string())
+                })
+            };
+            let (span_ids, ops, input_tokens, response_models) = (
+                column("span_id"),
+                column("gen_ai_operation_name"),
+                column("gen_ai_usage_input_tokens"),
+                column("gen_ai_response_model"),
+            );
+            for row in 0..entry.data.num_rows() {
+                rows.insert(
+                    value(&span_ids, row).unwrap(),
+                    (
+                        value(&ops, row),
+                        value(&input_tokens, row)
+                            .map(|v| v.parse::<i64>().unwrap())
+                            .unwrap_or(0),
+                        value(&response_models, row),
+                    ),
+                );
+            }
+        }
+        let rows: Vec<_> = rows.into_values().collect();
+        // The wrapper is recognised by its span name alone and is not estimated.
+        assert_eq!(rows[0].0.as_deref(), Some("invoke_workflow"));
+        assert_eq!(rows[0].1, 0);
+        // The ERROR call without usage gets no estimate and no request-derived response model.
+        assert_eq!(rows[1], (Some("chat".to_string()), 0, None));
+        // The same call without an error status is estimated.
+        assert_eq!(rows[2].0.as_deref(), Some("chat"));
+        assert!(rows[2].1 > 0);
+        assert_eq!(rows[2].2.as_deref(), Some("gpt-4o"));
     }
 
     // cloud builds reject the unknown test org at the trial check before the columns check

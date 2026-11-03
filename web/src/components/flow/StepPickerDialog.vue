@@ -96,6 +96,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="text-text-secondary py-8 text-center text-sm">
           {{ emptyText }}
         </div>
+
+        <div
+          v-if="footnote"
+          class="border-border-default text-text-secondary flex shrink-0 items-start gap-2 border-t px-3 py-2 text-xs leading-snug"
+          :data-test="footnoteTestId || `${testPrefix}-footnote`"
+        >
+          <OIcon v-if="footnoteIcon" :name="footnoteIcon" size="xs" class="mt-0.5 shrink-0" />
+          <span>{{ footnote }}</span>
+        </div>
       </div>
     </div>
   </Teleport>
@@ -124,6 +133,10 @@ const props = withDefaults(
     testPrefix?: string;
     /** Viewport point to open at (usually the click). Null = screen-centred. */
     anchor?: { x: number; y: number } | null;
+    /** One line under the cards; unset renders nothing. */
+    footnote?: I18nText;
+    footnoteIcon?: string;
+    footnoteTestId?: string;
   }>(),
   {
     anchor: null,

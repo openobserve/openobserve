@@ -1066,10 +1066,11 @@ const kpiCards = computed<KpiCard[]>(() => {
   const errorRate =
     kpi.value.traceCount > 0 ? (kpi.value.errorCount / kpi.value.traceCount) * 100 : 0;
 
-  // Cost comes straight from SUM(gen_ai_usage_cost) on the KPI summary. Spans
-  // whose model has no price carry no cost, so when the data health check finds
-  // unpriced tokens the tile reads as a lower bound ("≥ $X"), or "cost unknown"
-  // when none of the window's tokens were priced, with the token count under it.
+  // Cost is the KPI summary's gen_ai_usage_cost sum over LLM-call spans
+  // (llmCallUsageSum). Spans whose model has no price carry no cost, so when the
+  // data health check finds unpriced tokens the tile reads as a lower bound
+  // ("≥ $X"), or "cost unknown" when none of the window's tokens were priced,
+  // with the token count under it.
   const u = unpriced.value;
   const kind = costKind(kpi.value.totalCost, kpi.value.totalTokens, u?.tokens ?? 0);
   const costCard: KpiCard = {

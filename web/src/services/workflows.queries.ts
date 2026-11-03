@@ -13,8 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
-import workflows from "./workflows";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
+import workflows, {
+  type HttpTriggerState,
+  type OverlapSeconds,
+  type PutHttpTriggerPayload,
+} from "./workflows";
 import { workflowKeys } from "./workflows.querykeys";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import { quantizeRange } from "@/composables/query/queryClient";
@@ -70,3 +74,68 @@ export const workflowRunsQuery = (
     staleTime: NORMAL_STALE_TIME,
   });
 };
+
+export const workflowHttpTriggerQuery = (org: string, id: string) =>
+  queryOptions<HttpTriggerState>({
+    queryKey: workflowKeys.httpTrigger(org, id),
+    queryFn: () => workflows.getHttpTrigger({ org_identifier: org, id }),
+    staleTime: NORMAL_STALE_TIME,
+    // Last call, Last used and rejections change while the panel is closed.
+    refetchOnMount: "always",
+    enabled: !!org && !!id,
+  });
+
+/** Secret-bearing writes share this key, so a reader can drop their settled entries from the MutationCache. */
+export const httpTriggerSecretMutationKey = (org: string, id: string) =>
+  [...workflowKeys.httpTrigger(org, id), "secret"] as const;
+
+// The list page reads the folder and search lists, not `list`, so all three carry the endpoint flag.
+const listScopes = (org: string) => [
+  workflowKeys.list(org),
+  workflowKeys.folders(org),
+  workflowKeys.searches(org),
+];
+
+export const putHttpTriggerMutation = (org: string, id: string) =>
+  mutationOptions({
+    mutationKey: httpTriggerSecretMutationKey(org, id),
+    mutationFn: (payload: PutHttpTriggerPayload) =>
+      workflows.putHttpTrigger({ org_identifier: org, id, payload }),
+    meta: {
+      invalidates: [workflowKeys.httpTrigger(org, id), ...listScopes(org)],
+      silentError: true,
+    },
+  });
+
+export const deleteHttpTriggerMutation = (org: string, id: string) =>
+  mutationOptions({
+    mutationFn: () => workflows.deleteHttpTrigger({ org_identifier: org, id }),
+    meta: {
+      invalidates: [workflowKeys.httpTrigger(org, id), ...listScopes(org)],
+      silentError: true,
+    },
+  });
+
+export const rotateHttpCredentialMutation = (org: string, id: string) =>
+  mutationOptions({
+    mutationKey: httpTriggerSecretMutationKey(org, id),
+    mutationFn: (vars: { overlap_seconds: OverlapSeconds }) =>
+      workflows.rotateHttpCredential({ org_identifier: org, id, ...vars }),
+    meta: { invalidates: [workflowKeys.httpTrigger(org, id)], silentError: true },
+  });
+
+export const revokeHttpCredentialMutation = (org: string, id: string) =>
+  mutationOptions({
+    mutationFn: (vars: { credential_id: string }) =>
+      workflows.revokeHttpCredential({ org_identifier: org, id, ...vars }),
+    meta: { invalidates: [workflowKeys.httpTrigger(org, id)], silentError: true },
+  });
+
+// No meta.invalidates, no persister; the composable reads the value and calls reset() at once (AC-WEB-10).
+export const revealHttpCredentialSecretMutation = (org: string, id: string) =>
+  mutationOptions({
+    mutationKey: httpTriggerSecretMutationKey(org, id),
+    mutationFn: (vars: { credential_id: string }) =>
+      workflows.revealHttpCredentialSecret({ org_identifier: org, id, ...vars }),
+    meta: { silentError: true },
+  });
