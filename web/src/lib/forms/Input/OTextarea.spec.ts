@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import OTextarea from "./OTextarea.vue";
 
@@ -9,6 +9,9 @@ describe("OTextarea", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("renders without errors", () => {
@@ -58,5 +61,28 @@ describe("OTextarea", () => {
       props: { maxlength: 200, modelValue: "hello" },
     });
     expect(wrapper.text()).toContain("5/200");
+  });
+
+  it("routes aria-* attrs to the real control, not the wrapper", () => {
+    wrapper = mount(OTextarea, {
+      attrs: { "aria-label": "Name", "aria-labelledby": "lbl", "aria-describedby": "desc" },
+    });
+    const control = wrapper.find("textarea");
+    expect(control.attributes("aria-label")).toBe("Name");
+    expect(control.attributes("aria-labelledby")).toBe("lbl");
+    expect(control.attributes("aria-describedby")).toBe("desc");
+    expect(wrapper.element.getAttribute("aria-label")).toBeNull();
+    expect(wrapper.element.getAttribute("aria-labelledby")).toBeNull();
+    expect(wrapper.element.getAttribute("aria-describedby")).toBeNull();
+  });
+
+  it("warns when mounted without a label or aria name", () => {
+    vi.stubEnv("MODE", "development");
+    vi.stubGlobal("CSS", { escape: (v: string) => v });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mount(OTextarea).unmount();
+    mount(OTextarea, { attrs: { "aria-label": "Name" } }).unmount();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("OTextarea"));
   });
 });

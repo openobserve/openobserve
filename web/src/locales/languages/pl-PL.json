@@ -762,6 +762,7 @@
     "dragToReorder": "Przeciągnij, aby zmienić kolejność",
     "timeAmount": "Wartość czasu",
     "timeUnit": "Jednostka czasu",
+    "unitFor": "Jednostka {label}",
     "queryEditorAriaLabel": "Edytor zapytań. Naciśnij Escape, aby przejść do następnego elementu sterującego.",
     "queryEditorEscapeAction": "Przenieś fokus do następnego elementu sterującego",
     "inlineEdit": {
@@ -11956,6 +11957,7 @@
       "budgetLabel": "Budżet alertów",
       "budgetPerDay": "dziennie",
       "budgetPerWeek": "tygodniowo",
+      "budgetPeriod": "Okres budżetu alertu",
       "budgetRange": "Wprowadź liczbę większą od 0",
       "chartsTab": "Wykresy",
       "checkEvery": "Sprawdzaj co",
@@ -11965,6 +11967,7 @@
       "sendsToStatus": "Wysyła do {targets} przy każdym wykryciu anomalii.",
       "detectionAlreadyRunning": "Wykrywanie już trwa; spróbuj ponownie za chwilę.",
       "detectionCharts": "Wyniki wykrywania",
+      "detectionFunctionField": "Pole funkcji wykrywania",
       "detectionFunctionTooltip": "Co mierzyć w każdym przedziale czasowym. count śledzi, ile rekordów napływa; avg, min, max i sum śledzą pole liczbowe. p50, p95 i p99 śledzą rozkład tego pola — np. p95 dla response_time_ms wychwytuje rosnące opóźnienia najwolniejszych żądań, nawet gdy ruch pozostaje stały.",
       "detectionResolution": "Rozdzielczość wykrywania",
       "detectionResolutionTooltip": "Jak szczegółowy jest każdy punkt danych. Np. \"5m\" oznacza, że anomalie są wykrywane z rozdzielczością 5 minut.",

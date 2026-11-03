@@ -191,6 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OFormInput
               data-test="domain-management-new-domain-input"
               name="newDomain"
+              :aria-label="t('settings.addDomain')"
               class="domain-input"
               :placeholder="t('settings.domainPlaceholder', { example: raw('example.com') })"
             />
@@ -307,6 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OFormInput
                       :data-test="`domain-management-allow-email-input-${domain.name}`"
                       name="newEmail"
+                      :aria-label="t('settings.emailPlaceholder', { domain: '@' + domain.name })"
                       class="email-input min-w-62.5"
                     />
                     <OButton
@@ -357,6 +359,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OFormInput
                       :data-test="`domain-management-block-email-input-${domain.name}`"
                       name="newEmail"
+                      :aria-label="
+                        t('settings.blockedEmailPlaceholder', { domain: '@' + domain.name })
+                      "
                       class="email-input min-w-62.5"
                     />
                     <OButton

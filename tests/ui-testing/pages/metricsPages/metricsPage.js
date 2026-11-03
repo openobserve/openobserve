@@ -156,8 +156,6 @@ export class MetricsPage {
         this.toastMessage = page.locator('[data-test="o-toast-message"]');
 
         this.historyButton = page.locator('[data-test="metrics-history-btn"]');
-        this.historyPopover = page.locator('[data-test="recent-searches-popover"]');
-        this.historyViewAll = this.historyPopover.locator('[data-test="recent-searches-view-all"]');
         this.historyDrawer = page.locator('[data-test="recent-searches-drawer"]');
         this.historySearch = this.historyDrawer.locator('[data-test="recent-searches-search"] input');
         this.historyStarredOnly = this.historyDrawer.locator('[data-test="recent-searches-starred-only"]');
@@ -698,7 +696,8 @@ export class MetricsPage {
         );
         await this.enterMetricsQuery(query);
         await this.clickApplyButton();
-        const body = await (await response).text();
+        // The UI can abort its own event stream after the last event, and Chrome keeps no body for an aborted request.
+        const body = await (await this.page.request.get((await response).url())).text();
         const series = new Set();
         const points = new Set();
         for (const line of body.split('\n')) {
@@ -2806,7 +2805,6 @@ export class MetricsPage {
 
     async openQueryHistory() {
         await this.historyButton.click();
-        await this.historyViewAll.click();
         await this.historyDrawer.waitFor({ state: 'visible', timeout: 15000 });
     }
 

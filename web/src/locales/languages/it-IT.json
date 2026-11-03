@@ -762,6 +762,7 @@
     "dragToReorder": "Trascina per riordinare",
     "timeAmount": "Quantità di tempo",
     "timeUnit": "Unità di tempo",
+    "unitFor": "{label} unità",
     "queryEditorAriaLabel": "Editor di query. Premi Escape per passare al controllo successivo.",
     "queryEditorEscapeAction": "Sposta il focus al controllo successivo",
     "inlineEdit": {
@@ -11956,6 +11957,7 @@
       "budgetLabel": "Budget avvisi",
       "budgetPerDay": "al giorno",
       "budgetPerWeek": "a settimana",
+      "budgetPeriod": "Periodo budget avvisi",
       "budgetRange": "Inserisci un numero maggiore di 0",
       "chartsTab": "Grafici",
       "checkEvery": "Controlla ogni",
@@ -11965,6 +11967,7 @@
       "sendsToStatus": "Invia a {targets} ogni volta che viene rilevata un'anomalia.",
       "detectionAlreadyRunning": "Il rilevamento è già in corso; riprova tra poco.",
       "detectionCharts": "Risultati del rilevamento",
+      "detectionFunctionField": "Campo funzione di rilevamento",
       "detectionFunctionTooltip": "Cosa misurare in ogni intervallo temporale. count osserva quanti record arrivano; avg, min, max e sum osservano un campo numerico. p50, p95 e p99 osservano la distribuzione di quel campo — ad esempio p95 di response_time_ms rileva un peggioramento della latenza per le richieste più lente anche quando il traffico rimane stabile.",
       "detectionResolution": "Risoluzione di rilevamento",
       "detectionResolutionTooltip": "Quanto è granulare ogni punto dati. Ad esempio, «5m» significa che le anomalie vengono rilevate con una risoluzione di 5 minuti.",

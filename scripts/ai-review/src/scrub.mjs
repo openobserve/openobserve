@@ -11,7 +11,7 @@ const SECRET_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/g,
 ];
 const AUTH_HEADER_RE = /(Authorization:)[^\n]*/gi;
-const MARKER_RE = /<!--(\s*o2-review)/gi;
+const MARKER_RE = /<!--(\s*o2-(?:review|paired-pointer))/gi;
 const MENTION_RE = /(^|[^\w`@/])@([A-Za-z0-9](?:[A-Za-z0-9-]{0,38})(?:\/[A-Za-z0-9][\w.-]*)?)/g;
 
 export function secretValues(env) {

@@ -1042,6 +1042,45 @@ describe("AnomalyDetectionConfig", () => {
       expect(group.attributes("aria-label")).toBe("Sensitivity");
     });
 
+    it("names the time-unit selects after their row so they are distinguishable", async () => {
+      wrapper = mountConfig({ filters: [{ field: "level", operator: "=", value: "error" }] });
+      await flushPromises();
+      const label = (testId: string) =>
+        wrapper.find(`[data-test="${testId}"]`).find("[aria-label]").attributes("aria-label");
+
+      const units = [
+        label("anomaly-histogram-interval-unit"),
+        label("anomaly-schedule-interval-unit"),
+        label("anomaly-detection-window-unit"),
+      ];
+      expect(units).toEqual([
+        "Detection Resolution unit",
+        "Check Every unit",
+        "Look Back Window unit",
+      ]);
+      expect(new Set(units).size).toBe(units.length);
+
+      expect(label("anomaly-filter-field-0")).toBe("Field");
+      expect(label("anomaly-filter-operator-0")).toBe("Operator");
+      expect(label("anomaly-filter-value-0")).toBe("Value");
+      expect(label("anomaly-detection-function")).toBe("Detection Function");
+      expect(label("anomaly-histogram-interval-value")).toBe("Detection Resolution");
+      expect(label("anomaly-schedule-interval-value")).toBe("Check Every");
+      expect(label("anomaly-detection-window-value")).toBe("Look Back Window");
+      expect(label("anomaly-training-window")).toBe("Training Window");
+    });
+
+    it("names the custom-SQL detection resolution unit after its row", async () => {
+      wrapper = mountConfig({ query_mode: "custom_sql" });
+      await flushPromises();
+      expect(
+        wrapper
+          .find('[data-test="anomaly-histogram-interval-unit"]')
+          .find("[aria-label]")
+          .attributes("aria-label"),
+      ).toBe("Detection Resolution unit");
+    });
+
     it("exposes no mark-line or series-max machinery", async () => {
       wrapper = mountConfig();
       await flushPromises();

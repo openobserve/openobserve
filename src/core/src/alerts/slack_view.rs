@@ -33,6 +33,7 @@ use config::meta::{
         AlertMessagePhase, AlertMessageView, GoneKind, MessageIncident, MessagePage, MuteView,
     },
 };
+use sea_orm::ConnectionTrait;
 use svix_ksuid::Ksuid;
 
 /// Everything the view is built from, so the decision is a pure function.
@@ -59,13 +60,9 @@ pub async fn alert_message_view(
         return Ok(None);
     };
     let conn = infra::db::get_orm_client_ro().await;
-    let found = db::alerts::alert::get_by_id(conn, org_id, id).await?;
+    let (folder_id, alert) = alert_or_composite(conn, org_id, id).await?;
     let state = infra::table::alert_states::get(alert_id, group_key).await?;
     let ack = infra::table::alert_acks::get(org_id, alert_id, group_key).await?;
-    let (folder_id, alert) = match found {
-        Some((folder, alert)) => (folder.folder_id, Some(alert)),
-        None => (String::new(), None),
-    };
     let now = config::utils::time::now_micros();
     let mute = live_mute(org_id, alert_id, &folder_id, group_key, now);
     let other_groups_unacked = other_groups_unacked(org_id, alert_id, group_key).await;
@@ -166,6 +163,26 @@ pub fn open_url(org_id: &str, alert_id: &str) -> String {
         "{}{}/web/alerts?org_identifier={org_id}&alert_id={alert_id}",
         cfg.common.web_url, cfg.common.base_uri
     )
+}
+
+/// The scheduled alert with this id, else the composite, with the folder its mutes match on.
+async fn alert_or_composite<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: Ksuid,
+) -> anyhow::Result<(String, Option<Alert>)> {
+    if let Some((folder, alert)) = db::alerts::alert::get_by_id(conn, org_id, id).await? {
+        return Ok((folder.folder_id, Some(alert)));
+    }
+    let composite =
+        infra::table::alert_composites::get_by_id(conn, org_id, &id.to_string()).await?;
+    Ok(composite.map_or_else(
+        || (String::new(), None),
+        |c| {
+            let alert = crate::alerts::composite::notification_alert(&c.definition);
+            (c.definition.folder_id, Some(alert))
+        },
+    ))
 }
 
 #[cfg(feature = "enterprise")]
@@ -353,14 +370,101 @@ async fn other_groups_unacked(org_id: &str, alert_id: &str, group_key: &str) -> 
     u32::try_from(unacked).unwrap_or(u32::MAX)
 }
 
-#[cfg(all(test, feature = "enterprise"))]
+#[cfg(test)]
 mod tests {
+    #[cfg(feature = "enterprise")]
     use config::meta::oncall::target::EscalationTarget;
+    use infra::table::entity::{alert_composite_children, alert_composites, alerts, folders};
+    use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, EntityTrait, Schema};
+    use svix_ksuid::KsuidLike as _;
 
     use super::*;
 
     const START: i64 = 1_000_000;
 
+    async fn composite_db(enabled: bool) -> (DatabaseConnection, Ksuid) {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(folders::Entity),
+            schema.create_table_from_entity(alerts::Entity),
+            schema.create_table_from_entity(alert_composites::Entity),
+            schema.create_table_from_entity(alert_composite_children::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        let id = Ksuid::new(None, None);
+        let model = alert_composites::Model {
+            id: id.to_string(),
+            org: "acme".into(),
+            folder_id: "f-ops".into(),
+            name: "checkout-composite".into(),
+            description: None,
+            expression: "{a} AND {b}".into(),
+            warning_counts_as_firing: false,
+            stale_child_policy: 0,
+            destinations: serde_json::json!([]),
+            template: None,
+            context_attributes: None,
+            enabled,
+            silence_seconds: 0,
+            creates_incident: false,
+            workflows: serde_json::json!([]),
+            priority: None,
+            tags: None,
+            owner: None,
+            last_edited_by: Some("lin@acme.test".into()),
+            updated_at: Some(START + 5),
+            evaluation_generation: 0,
+            pending_period_sec: 0,
+        };
+        let row: alert_composites::ActiveModel = model.into();
+        alert_composites::Entity::insert(row.reset_all())
+            .exec(&db)
+            .await
+            .unwrap();
+        (db, id)
+    }
+
+    async fn composite_view(enabled: bool, lookup: Option<Ksuid>) -> (String, AlertMessageView) {
+        let (db, id) = composite_db(enabled).await;
+        let id = lookup.unwrap_or(id);
+        let (folder_id, alert) = alert_or_composite(&db, "acme", id).await.unwrap();
+        let state = AlertState {
+            firing_started_at: Some(START),
+            ..AlertState::empty(&id.to_string(), ROLLUP_GROUP_KEY)
+        };
+        let inputs = ViewInputs {
+            alert,
+            state: Some(state),
+            ..Default::default()
+        };
+        let view = view_from("acme", &id.to_string(), ROLLUP_GROUP_KEY, START, inputs);
+        (folder_id, view)
+    }
+
+    #[tokio::test]
+    async fn a_composite_id_reads_its_composite_and_an_unknown_id_reads_deleted() {
+        let (folder_id, firing) = composite_view(true, None).await;
+        assert_eq!(firing.phase, AlertMessagePhase::Firing);
+        assert_eq!(firing.alert_name, "checkout-composite");
+        assert_eq!(folder_id, "f-ops");
+
+        let (_, disabled) = composite_view(false, None).await;
+        assert_eq!(
+            disabled.phase,
+            AlertMessagePhase::Disabled {
+                by: "lin@acme.test".into(),
+                at: START + 5,
+            }
+        );
+
+        let (_, gone) = composite_view(true, Some(Ksuid::new(None, None))).await;
+        assert_eq!(gone.phase, AlertMessagePhase::Gone(GoneKind::AlertDeleted));
+    }
+
+    #[cfg(feature = "enterprise")]
     fn ladder() -> Vec<LadderStep> {
         [0, 600_000_000, 1_800_000_000]
             .into_iter()
@@ -368,6 +472,7 @@ mod tests {
             .collect()
     }
 
+    #[cfg(feature = "enterprise")]
     fn paged(rung: i64, run: i32) -> ResponseEvent {
         let mut e = ResponseEvent::new(ResponseEventKind::Page, START + rung, "engine", "paged");
         e.rung_micros = Some(rung);
@@ -397,6 +502,7 @@ mod tests {
         assert_eq!(view.mute, Some(mute));
     }
 
+    #[cfg(feature = "enterprise")]
     #[test]
     fn a_fresh_page_is_on_step_one_and_names_the_next_rung() {
         assert_eq!(
@@ -405,6 +511,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     #[test]
     fn the_deepest_rung_paged_in_the_current_run_sets_the_step() {
         let timeline = [paged(0, 1), paged(600_000_000, 1), paged(1_800_000_000, 0)];
@@ -419,6 +526,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     #[test]
     fn an_acknowledged_or_empty_ladder_escalates_nowhere() {
         assert_eq!(

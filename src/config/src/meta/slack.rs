@@ -232,6 +232,18 @@ pub struct InstallationHealth {
     /// Age of the oldest waiting alert message, computed when read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub outbound_oldest_age_secs: Option<i64>,
+    /// `None` when no alert post failed for the viewing org in the last 24 h.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refused_posts: Option<RefusedPosts>,
+}
+
+/// Alert posts that failed in the last 24 h for one org on one installation, for any reason.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct RefusedPosts {
+    pub count: u32,
+    pub last_reason: String,
+    pub last_destination: String,
+    pub last_at: i64,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

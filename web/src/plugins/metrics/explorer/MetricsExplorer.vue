@@ -129,10 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @view-all="(status) => historyDrawerRef?.show(status)"
           />
           <RecentSearchesButton
-            source="metrics"
             data-test="metrics-history-btn"
-            @run="(entry, when) => historyDrawerRef?.restore(entry, when, true)"
-            @load="(entry, when) => historyDrawerRef?.restore(entry, when, false)"
             @view-all="(status) => historyDrawerRef?.show(status)"
           />
           <OButtonGroup>

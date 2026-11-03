@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-variables-key-input"
             :name="`${namePrefix}[${index}].key`"
             :placeholder="t('common.name')"
+            :aria-label="t('common.name')"
             tabindex="0"
           />
         </div>
@@ -72,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-variables-value-input"
             :name="`${namePrefix}[${index}].value`"
             :placeholder="t('common.value')"
+            :aria-label="t('common.value')"
             tabindex="0"
             style="min-width: 15.625rem"
           />

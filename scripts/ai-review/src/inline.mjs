@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 
-export const INLINE_SEVERITIES = new Set(["critical", "warning"]);
+import { isKnownSeverity, normalizeSeverity, severityRank } from "./severity.mjs";
+
+export const INLINE_SEVERITIES = new Set(["p0", "p1", "p2"]);
 export const MAX_INLINE_COMMENTS = 10;
 // A model that wraps the block in a code fence leaves an empty fence behind once the block is cut out.
 const EMPTY_FENCE_RE = /^[ \t]*(`{3,}|~{3,})[a-z]*[ \t]*\n\s*\1[ \t]*$/gim;
 const FINGERPRINT_RE = /<!--\s*ai-review-fp:([0-9a-f]{40})\s*-->/g;
-const SEVERITY_LABEL = { critical: "🔴 Blocker", warning: "🟡 Warning" };
+const SEVERITY_LABEL = { p0: "🔴 P0", p1: "🟠 P1", p2: "🟡 P2" };
 
 // Lines a review comment may anchor to with side RIGHT: added and context lines of each hunk, keyed by new path.
 export function rightSideLines(diff) {
@@ -63,7 +65,7 @@ function normalizeFinding(raw) {
   return {
     file: String(raw.file ?? "").trim().replace(/^\.?\//, ""),
     line: Number.parseInt(raw.line, 10) || 0,
-    severity: String(raw.severity ?? "").trim().toLowerCase(),
+    severity: normalizeSeverity(raw.severity),
     category: stripComments(raw.category),
     title,
     body: stripComments(raw.body ?? raw.description),
@@ -79,7 +81,11 @@ function findInlineBlocks(source) {
   while ((start = startRe.exec(source)) !== null) {
     const bodyAt = start.index + start[0].length;
     let end = source.indexOf("-->", bodyAt);
-    if (end === -1) break;
+    // Nothing closes it, so its findings cannot be read: it still counts as a block, and only the opener is cut so a reader sees the rest.
+    if (end === -1) {
+      blocks.push({ from: start.index, to: bodyAt, json: null, raw: "" });
+      continue;
+    }
     const firstEnd = end;
     let json = null;
     while (end !== -1) {
@@ -97,7 +103,7 @@ function findInlineBlocks(source) {
   return blocks;
 }
 
-// Cuts every inline block out of the coordinator output and parses the first one.
+// Cuts every inline block out of the coordinator output and parses the first one; a further block is never counted, so it makes the count unknown.
 export function extractInlineBlock(text) {
   const source = String(text ?? "");
   const blocks = findInlineBlocks(source);
@@ -108,7 +114,10 @@ export function extractInlineBlock(text) {
   const parsed = blocks[0].json;
   if (parsed === null) return { text: stripped, findings: [], error: "inline block is not valid JSON" };
   if (!Array.isArray(parsed)) return { text: stripped, findings: [], error: "inline block is not a JSON array" };
-  return { text: stripped, findings: parsed.map(normalizeFinding).filter(Boolean), error: null };
+  const findings = parsed.map(normalizeFinding).filter(Boolean);
+  // The list backs "no blockers", so a lost or ungraded entry makes the count unknown even though the rest still post.
+  const countable = blocks.length === 1 && findings.length === parsed.length && parsed.every(raw => isKnownSeverity(raw.severity));
+  return { text: stripped, findings, error: countable ? null : "inline block has entries that cannot be counted" };
 }
 
 export function normalizeTitle(title) {
@@ -133,12 +142,12 @@ export function existingFingerprints(comments, botLogin) {
   return found;
 }
 
-// Keeps critical/warning findings whose anchor is a RIGHT-side line of the PR diff, skips ones already posted, caps the count.
+// GitHub rejects a whole review if one comment anchors outside the RIGHT side of the diff, so such findings are dropped here.
 export function selectInlineComments(findings, rightLines, posted = new Set(), max = MAX_INLINE_COMMENTS) {
   const selected = [];
   const dropped = { severity: 0, anchor: 0, duplicate: 0, cap: 0 };
   const seen = new Set(posted);
-  const ranked = [...findings].sort((a, b) => (a.severity === "critical" ? 0 : 1) - (b.severity === "critical" ? 0 : 1));
+  const ranked = [...findings].sort((a, b) => severityRank(a.severity) - severityRank(b.severity));
   for (const f of ranked) {
     if (!INLINE_SEVERITIES.has(f.severity)) { dropped.severity += 1; continue; }
     if (!f.file || !(f.line > 0) || !rightLines.get(f.file)?.has(f.line)) { dropped.anchor += 1; continue; }
