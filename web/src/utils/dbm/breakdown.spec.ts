@@ -17,7 +17,13 @@ import { describe, expect, it } from "vitest";
 
 import type { QueryStatsRow } from "@/services/db_monitoring";
 
-import { buildDatabaseBreakdown, rowNamespace, rowService, SHORTFALL_FLOOR } from "./breakdown";
+import {
+  buildDatabaseBreakdown,
+  namesNoSchema,
+  rowNamespace,
+  rowService,
+  SHORTFALL_FLOOR,
+} from "./breakdown";
 
 /**
  * The lab shape, verbatim from the live endpoint: the merged rows carry
@@ -52,6 +58,25 @@ describe("rowNamespace", () => {
 
   it("is null when the row spans several schemas, rather than picking one", () => {
     expect(rowNamespace(row({ namespaces: ["a", "b"] }))).toBeNull();
+  });
+});
+
+describe("namesNoSchema", () => {
+  it("tells a row with no schema from one spanning several", () => {
+    expect(namesNoSchema(row())).toBe(true);
+    expect(namesNoSchema(row({ namespaces: ["", ""] }))).toBe(true);
+    expect(namesNoSchema(row({ namespaces: ["a", "b"] }))).toBe(false);
+    expect(namesNoSchema(row({ namespaces: ["a"] }))).toBe(false);
+  });
+
+  it("keeps a multi-schema row out of the unnamed services", () => {
+    const result = buildDatabaseBreakdown([
+      row({ fingerprint: "m", namespaces: ["a", "b"], services: ["multi"] }),
+      row({ fingerprint: "n", services: ["noschema"], total_time_ns: 400 }),
+    ]);
+    expect(result.unnamed.map((node) => [node.name, node.totalTimeNs, node.share])).toEqual([
+      ["noschema", 400, 1],
+    ]);
   });
 });
 

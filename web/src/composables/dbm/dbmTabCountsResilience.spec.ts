@@ -219,6 +219,58 @@ describe("the databases fallback counts the same refs the fleet union renders", 
     // The client vantage answered 1; the fallback must not override it.
     expect(counts.databaseCount).toBe(1);
   });
+
+  it("counts servers, not schemas, and honours the Schema filter", async () => {
+    const databases = {
+      hits: [
+        { db_system: "postgresql", db_instance: "o2dev", db_namespace: "o2dev" },
+        { db_system: "postgresql", db_instance: "o2dev", db_namespace: "postgres" },
+        { db_system: "postgresql", db_instance: "o2dev", db_namespace: "o2alpha" },
+        { db_system: "postgresql", db_instance: "o2-introspection", db_namespace: "postgres" },
+      ],
+    };
+    const data = {
+      databases,
+      queries: { total: 0, hits: [] },
+      activity: null,
+      deadlocks: null,
+      blocking: null,
+      table_health: null,
+    };
+    service.getBadges.mockResolvedValueOnce({ data });
+    expect((await fetchDbmTabCounts("acme", WINDOW)).databaseCount).toBe(2);
+
+    queryClient.clear();
+    service.getBadges.mockResolvedValueOnce({ data });
+    expect((await fetchDbmTabCounts("acme", WINDOW, { namespace: "o2alpha" })).databaseCount).toBe(
+      1,
+    );
+  });
+
+  it("does not badge server-known instances under a Schema filter no traffic matched", async () => {
+    service.getBadges.mockResolvedValueOnce({
+      data: {
+        databases: {
+          hits: [{ db_system: "postgresql", db_instance: "o2dev", db_namespace: "o2dev" }],
+        },
+        queries: { total: 0, hits: [] },
+        activity: {
+          by_state: [],
+          hits: [{ db_system: "postgresql", db_instance: "o2-introspection" }],
+        },
+        deadlocks: null,
+        blocking: null,
+        table_health: null,
+        server_queries: {
+          hits: [{ db_system: "postgresql", db_instance: "o2dev" }],
+          truncated: false,
+        },
+        server_samples: { hits: [], truncated: false },
+      },
+    });
+    const counts = await fetchDbmTabCounts("acme", WINDOW, { namespace: "stale-schema" });
+    expect(counts.databaseCount).toBe(0);
+  });
 });
 
 describe("one dead slice must not blank a badge the last window answered", () => {
@@ -329,6 +381,40 @@ describe("what one page learns is visible from every tab", () => {
 
     expect(service.getBadges).toHaveBeenCalledTimes(2);
     expect(badgeCount(counts.value.databaseCount)).toBe("6");
+  });
+
+  it("keeps a count the page publishes once the cached unfiltered scope is back", async () => {
+    const twoTraced = {
+      ...envelope(),
+      databases: {
+        hits: [
+          { db_system: "postgresql", db_instance: "pg-orders", db_namespace: "orders" },
+          { db_system: "postgresql", db_instance: "pg-billing", db_namespace: "billing" },
+        ],
+      },
+    };
+    service.getBadges.mockResolvedValue({ data: twoTraced });
+    const { counts, load, publishOwnCount } = useDbmTabCounts();
+    await load("acme", RANGE, WINDOW, {});
+    await load("acme", RANGE, WINDOW, { namespace: "orders" });
+    publishOwnCount("databaseCount", 1);
+
+    // Schema chip cleared: the URL settles first, so the shell re-keys before the page republishes.
+    await load("acme", RANGE, WINDOW, {});
+    publishOwnCount("databaseCount", 3);
+
+    expect(service.getBadges).toHaveBeenCalledTimes(2);
+    expect(badgeCount(counts.value.databaseCount)).toBe("3");
+  });
+
+  it("still drops a count published under the scope the strip is leaving", async () => {
+    service.getBadges.mockResolvedValue({ data: envelope() });
+    const { counts, load, publishOwnCount } = useDbmTabCounts();
+    await load("acme", RANGE, WINDOW, { namespace: "orders" });
+    publishOwnCount("databaseCount", 6);
+    await load("acme", RANGE, WINDOW, {});
+
+    expect(badgeCount(counts.value.databaseCount)).toBe("1");
   });
 
   it("treats an empty breakdown beside total:0 as a MEASURED zero, not an unknown", async () => {
