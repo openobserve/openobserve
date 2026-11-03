@@ -508,6 +508,61 @@ describe("OnCallPolicyEditor", () => {
       );
     });
 
+    it("saves the template override and null once cleared", async () => {
+      service.setPolicy.mockResolvedValue({ data: {} } as any);
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy: { ...webhookPolicy, template: "ops-card" }, open: true },
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            ...stubs,
+            TemplateOverridePicker: {
+              name: "TemplateOverridePicker",
+              props: ["kind", "modelValue", "destinations"],
+              template: "<div />",
+            },
+          },
+        },
+      });
+      await flushPromises();
+      const picker = wrapper.findComponent({ name: "TemplateOverridePicker" });
+      expect(picker.props("kind")).toBe("on_call");
+      expect(picker.props("modelValue")).toBe("ops-card");
+
+      await picker.vm.$emit("update:modelValue", null);
+      await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+      await flushPromises();
+      expect(service.setPolicy).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ template: null }) }),
+      );
+    });
+
+    it("tells the team once that an email destination now receives pages", async () => {
+      destinations.list.mockResolvedValue({
+        data: [{ name: "slack-oncall" }, { name: "ops-mail", type: "email" }],
+      } as any);
+      localStorage.removeItem("oncall-mail-banner:team_1");
+      const mount_ = () =>
+        mount(OnCallPolicyEditor, {
+          props: {
+            teamId: "team_1",
+            policy: { ...webhookPolicy, destinations: ["slack-oncall", "ops-mail"] },
+            open: true,
+          },
+          global: { plugins: [i18n, store], stubs },
+        });
+      const wrapper = mount_();
+      await flushPromises();
+      const banner = wrapper.find('[data-test="oncall-policy-mail-banner"]');
+      expect(banner.text()).toContain("ops-mail");
+
+      await wrapper.find('[data-test="oncall-policy-mail-banner-dismiss"]').trigger("click");
+      expect(wrapper.find('[data-test="oncall-policy-mail-banner"]').exists()).toBe(false);
+      const again = mount_();
+      await flushPromises();
+      expect(again.find('[data-test="oncall-policy-mail-banner"]').exists()).toBe(false);
+    });
+
     /// The editor is still worth using when the destination list is unreachable.
     it("still renders when destinations cannot be loaded", async () => {
       destinations.list.mockRejectedValue(new Error("boom"));

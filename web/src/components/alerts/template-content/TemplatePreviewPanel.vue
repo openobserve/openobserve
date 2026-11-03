@@ -47,6 +47,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex flex-wrap items-end gap-3">
           <OSelect
+            v-model="previewKind"
+            :label="t('alert_templates.previewAs')"
+            :options="kindOptions"
+            width="sm"
+            :searchable="false"
+            data-test="template-preview-panel-kind-select"
+          />
+          <OSelect
             v-model="channel"
             :label="t('alert_templates.previewChannel')"
             :options="channelOptions"
@@ -55,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="template-preview-panel-channel-select"
           />
           <OSelect
+            v-if="severityOptions.length"
             v-model="severity"
             :label="t('alert_templates.previewSeverity')"
             :options="severityOptions"
@@ -64,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <div class="border-border-default flex flex-col gap-1 border-s ps-4">
+      <div v-if="!forbidden" class="border-border-default flex flex-col gap-1 border-s ps-4">
         <div class="text-text-tertiary text-xs">
           {{ t("alert_templates.testSendGroupLabel") }}
         </div>
@@ -98,6 +107,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="template-preview-panel-test-send-confirm-dialog"
       @update:ok="runTestSend"
     />
+
+    <div
+      v-if="forbidden"
+      class="text-text-secondary text-sm"
+      role="status"
+      data-test="template-preview-panel-forbidden"
+    >
+      {{ t("alert_templates.previewForbidden") }}
+    </div>
+    <div
+      v-else-if="previewError"
+      class="border-border-default bg-surface-panel rounded-default flex flex-wrap items-center gap-2 border p-2 text-sm"
+      role="alert"
+      data-test="template-preview-panel-error"
+    >
+      <span class="text-input-error-text">{{
+        t("alert_templates.previewFailed", { message: previewError })
+      }}</span>
+      <OButton
+        variant="outline"
+        size="sm-action"
+        data-test="template-preview-panel-retry-btn"
+        @click="fetchPreview"
+        >{{ t("common.retry") }}</OButton
+      >
+    </div>
 
     <div
       v-if="unknownVariables.length > 0"
@@ -274,6 +309,12 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import templateService from "@/services/alert_templates";
 import destinationService from "@/services/alert_destination";
 import type { ContentSpec } from "./contentSpec";
+import {
+  NOTIFICATION_KINDS,
+  kindLabelKey,
+  type NotificationKind,
+  type VariableGroup,
+} from "@/utils/alerts/notificationKinds";
 
 // Wire values the backend documents for POST …/templates/preview. Kept local
 // (not exported) — no other module needs these literal strings.
@@ -315,10 +356,20 @@ interface PreviewResponseData {
   payload: unknown;
   preview_model: PreviewModel;
   unknown_variables: string[];
+  variable_groups?: VariableGroup[];
 }
 
-const props = defineProps<{
-  spec: ContentSpec;
+const props = withDefaults(
+  defineProps<{
+    spec: ContentSpec;
+    /** The kinds the template applies to; [] previews as any of the six. */
+    kinds?: NotificationKind[];
+  }>(),
+  { kinds: () => [] },
+);
+
+const emit = defineEmits<{
+  (e: "variable-groups", groups: VariableGroup[]): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -376,16 +427,65 @@ const fidelityNote = computed(() => {
   }
 });
 
-const severityOptions = computed(() => [
-  { label: t("alert_templates.previewSeveritySingle"), value: "single_level" },
-  { label: t("alert_templates.severityCritical"), value: "critical" },
-  { label: t("alert_templates.severityWarning"), value: "warning" },
-  { label: t("alert_templates.severityOk"), value: "ok" },
-  { label: t("alert_templates.severityNoData"), value: "no_data" },
-]);
+const kindOptions = computed(() =>
+  (props.kinds.length ? props.kinds : [...NOTIFICATION_KINDS]).map((kind) => ({
+    label: t(kindLabelKey(kind)),
+    value: kind,
+  })),
+);
+const previewKind = ref<NotificationKind>(kindOptions.value[0].value);
+// The select lists only the selected kinds, so a removed kind falls back to the first.
+watch(kindOptions, (options) => {
+  if (!options.some((o) => o.value === previewKind.value)) previewKind.value = options[0].value;
+});
+
+// Each kind's own severity words, sent as the level the backend sample renders with.
+const severityOptions = computed(() => {
+  const option = (label: I18nText, value: string) => ({ label, value });
+  switch (previewKind.value) {
+    case "incident":
+      return [
+        option(raw("P1"), "critical"),
+        option(raw("P2"), "warning"),
+        option(raw("P3"), "single_level"),
+        option(raw("P4"), "no_data"),
+      ];
+    case "synthetics":
+      return [
+        option(t("alert_templates.severityFailed"), "critical"),
+        option(t("alert_templates.severityDegraded"), "warning"),
+        option(t("alert_templates.severityFlaky"), "no_data"),
+        option(t("alert_templates.severityRecovered"), "ok"),
+      ];
+    case "downtime":
+      return [];
+    case "on_call":
+      return [
+        option(raw("P1"), "critical"),
+        option(raw("P2"), "warning"),
+        option(raw("P3"), "single_level"),
+      ];
+    default:
+      return [
+        option(t("alert_templates.previewSeveritySingle"), "single_level"),
+        option(t("alert_templates.severityCritical"), "critical"),
+        option(t("alert_templates.severityWarning"), "warning"),
+        option(t("alert_templates.severityOk"), "ok"),
+        option(t("alert_templates.severityNoData"), "no_data"),
+      ];
+  }
+});
+watch(severityOptions, (options) => {
+  if (!options.some((o) => o.value === severity.value)) {
+    severity.value = (options[0]?.value ?? "single_level") as PreviewSeverityOption;
+  }
+});
 
 const previewData = ref<PreviewResponseData | null>(null);
 const isLoading = ref(false);
+// A failed request keeps the last good preview and shows this message instead.
+const previewError = ref<string | null>(null);
+const forbidden = ref(false);
 
 const previewModel = computed(() => previewData.value?.preview_model ?? null);
 const unknownVariables = computed(() => previewData.value?.unknown_variables ?? []);
@@ -446,13 +546,24 @@ const fetchPreview = async () => {
         definition: props.spec,
         channel: channel.value,
         severity: requestSeverity(),
+        kind: previewKind.value,
       },
     });
     if (seq !== requestSeq) return; // superseded by a newer request
     previewData.value = response.data as PreviewResponseData;
-  } catch {
+    previewError.value = null;
+    forbidden.value = false;
+    if (previewData.value.variable_groups) {
+      emit("variable-groups", previewData.value.variable_groups);
+    }
+  } catch (err: any) {
     if (seq !== requestSeq) return;
-    previewData.value = null;
+    if (err?.response?.status === 403) {
+      forbidden.value = true;
+      return;
+    }
+    previewError.value =
+      err?.response?.data?.message ?? err?.response?.data?.error ?? String(err?.message ?? err);
   } finally {
     if (seq === requestSeq) isLoading.value = false;
   }
@@ -467,7 +578,7 @@ const schedulePreview = () => {
 };
 
 watch(() => props.spec, schedulePreview, { deep: true, immediate: true });
-watch([channel, severity], schedulePreview);
+watch([channel, severity, previewKind], schedulePreview);
 
 onBeforeUnmount(() => {
   if (debounceTimer) clearTimeout(debounceTimer);
@@ -522,7 +633,7 @@ const runTestSend = async () => {
     await destinationService.testSend({
       org_identifier: store.state.selectedOrganization?.identifier,
       destination_name: selectedDestination.value,
-      data: { definition: props.spec },
+      data: { definition: props.spec, kind: previewKind.value },
     });
     toast({ variant: "success", message: t("alert_templates.testSendSuccess") });
   } catch (err: any) {
@@ -536,5 +647,14 @@ const runTestSend = async () => {
   }
 };
 
-defineExpose({ channel, severity, view, selectedDestination, runTestSend });
+defineExpose({
+  channel,
+  severity,
+  view,
+  selectedDestination,
+  runTestSend,
+  previewKind,
+  previewError,
+  forbidden,
+});
 </script>

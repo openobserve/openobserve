@@ -256,4 +256,58 @@ describe("TemplatePreviewPanel", () => {
     expect(button.exists()).toBe(true);
     expect(button.text()).toBe("View in OpenObserve");
   });
+
+  it("previews as the first selected kind and sends kind on each request", async () => {
+    const previewSpy = vi
+      .spyOn(templateService, "preview")
+      .mockResolvedValue(makePreviewResponse() as any);
+    const w = mount(TemplatePreviewPanel, {
+      props: { spec: emptyContentSpec(), kinds: ["incident", "anomaly"] },
+      global: { plugins: [i18n, makeStore()] },
+    });
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    const kindSelect = w
+      .find('[data-test="template-preview-panel-kind-select"]')
+      .findComponent({ name: "OSelect" });
+    expect((kindSelect.props("options") as any[]).map((o) => o.value)).toEqual([
+      "incident",
+      "anomaly",
+    ]);
+    expect(previewSpy.mock.calls.at(-1)?.[0].data.kind).toBe("incident");
+
+    await kindSelect.vm.$emit("update:modelValue", "anomaly");
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(previewSpy.mock.calls.at(-1)?.[0].data.kind).toBe("anomaly");
+  });
+
+  it("keeps the last good preview and shows a banner when a request fails", async () => {
+    const previewSpy = vi
+      .spyOn(templateService, "preview")
+      .mockResolvedValueOnce(makePreviewResponse() as any)
+      .mockRejectedValueOnce({ response: { status: 500, data: { message: "boom" } } });
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(w.find('[data-test="template-preview-panel-body"]').exists()).toBe(true);
+
+    await w.setProps({ spec: { ...emptyContentSpec(), title: "changed" } });
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    expect(previewSpy).toHaveBeenCalledTimes(2);
+    expect(w.find('[data-test="template-preview-panel-error"]').text()).toContain("boom");
+    expect(w.find('[data-test="template-preview-panel-body"]').exists()).toBe(true);
+  });
+
+  it("shows the permission text and hides test send on 403", async () => {
+    vi.spyOn(templateService, "preview").mockRejectedValue({ response: { status: 403 } });
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(w.find('[data-test="template-preview-panel-forbidden"]').exists()).toBe(true);
+    expect(w.find('[data-test="template-preview-panel-test-send-btn"]').exists()).toBe(false);
+  });
 });
