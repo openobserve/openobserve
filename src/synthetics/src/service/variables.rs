@@ -2924,6 +2924,9 @@ mod tests {
             "status_run_ts",
             "last_run_class",
             "last_run_class_at",
+            "gap_since",
+            "gap_runs",
+            "gap_notified_at",
         ] {
             let start = checks.find(&format!("\"{col}\"")).unwrap();
             let at = start + checks[start..].find("NOT NULL").unwrap() + "NOT NULL".len();

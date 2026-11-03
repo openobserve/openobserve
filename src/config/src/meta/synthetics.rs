@@ -203,6 +203,10 @@ pub struct Synthetic {
     /// Re-test a failed scheduled job once from a second location before the failure counts.
     #[serde(default = "default_true")]
     pub confirm_failures: bool,
+    /// Which runs fire a failure alert. `None` on a check saved before the rule existed, which
+    /// keeps alerting on any location; a new check is created with [`AlertOn::Down`].
+    #[serde(default)]
+    pub alert_on: Option<AlertOn>,
 
     /// Email of the user who created this synthetic. Set on create, never updated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -540,6 +544,26 @@ pub struct SyntheticSettings {
     pub environments: Vec<String>,
     #[serde(default = "default_true")]
     pub confirm_failures: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_on: Option<AlertOn>,
+}
+
+/// Which runs fire a failure alert.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AlertOn {
+    /// A failure in any location, below quorum too ("Failing in 1 of 2 locations").
+    AnyLocation,
+    /// Only a run that failed at quorum or more.
+    Down,
+}
+
+impl Synthetic {
+    /// Whether a partial run (failing below quorum) fires. A check from before the rule keeps
+    /// alerting on any location, so no one loses an alert on upgrade.
+    pub fn alerts_on_partial(&self) -> bool {
+        self.alert_on.unwrap_or(AlertOn::AnyLocation) == AlertOn::AnyLocation
+    }
 }
 
 fn default_true() -> bool {

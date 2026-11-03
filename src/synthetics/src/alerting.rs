@@ -234,6 +234,12 @@ pub fn suppressed_state(prior: AlertState, next: AlertState) -> AlertState {
         last_alert_at: prior.last_alert_at,
         alerting: prior.alerting && next.alerting,
         degraded_notified_at: prior.degraded_notified_at,
+        // A muted gap notice is not sent, so no resumed notice may follow it either.
+        gap_notified_at: if next.gap_since == 0 {
+            0
+        } else {
+            prior.gap_notified_at
+        },
         ..next
     }
 }
@@ -279,6 +285,7 @@ pub fn decide(
                 alerting: false,
                 // The target is up, so any degradation has cleared too.
                 degraded_notified_at: 0,
+                ..prior
             };
 
             // Closing an incident takes precedence over reporting flakiness. The
@@ -316,6 +323,7 @@ pub fn decide(
                 last_alert_at: prior.last_alert_at,
                 alerting: prior.alerting,
                 degraded_notified_at: prior.degraded_notified_at,
+                ..prior
             };
             let reminder = cooldown_us.max(DEGRADED_REMINDER_US);
             let first_time = prior.degraded_notified_at == 0;
@@ -344,6 +352,7 @@ pub fn decide(
                 // longer the headline, and re-entering the degraded state later
                 // is worth saying again.
                 degraded_notified_at: 0,
+                ..prior
             };
 
             if consecutive_failures < threshold {
@@ -369,6 +378,163 @@ pub fn decide(
     }
 }
 
+// ── Run coverage and the Not measured gap (spec S7) ─────────────────────────
+
+/// Not measured runs in a row that send the "Monitoring gap" notice.
+pub const GAP_NOTICE_RUNS: i32 = 3;
+
+/// A gap at least this old sends its notice on the next Not measured run, whatever the count.
+pub const GAP_NOTICE_AFTER_US: i64 = 15 * MICROS_PER_MINUTE;
+
+/// The alert class of a finalized run, from its stored run class where that is sure.
+///
+/// The stored class comes from every job of the run, while `acked` reads one ack: a run that no
+/// location tested is Not measured whatever the last ack said, and a run that a location tested is
+/// measured even when the last ack was our own error. A partial run fires only when the check
+/// alerts on any location; under "down only" it counts as up.
+pub fn class_for_run(
+    stored: config::meta::synthetics::RunClass,
+    alerts_on_partial: bool,
+    acked: RunClass,
+) -> RunClass {
+    use config::meta::synthetics::RunClass as Stored;
+    match stored {
+        Stored::Unknown => acked,
+        Stored::NotMeasured => RunClass::NotMeasured,
+        Stored::Partial if !alerts_on_partial => RunClass::Healthy,
+        Stored::Up if acked == RunClass::NotMeasured => RunClass::Healthy,
+        Stored::Partial | Stored::Down | Stored::Misconfigured
+            if acked == RunClass::NotMeasured =>
+        {
+            RunClass::Failing
+        }
+        Stored::Up | Stored::Partial | Stored::Down | Stored::Misconfigured => acked,
+    }
+}
+
+/// "Failing in 1 of 2 locations (aws-us-east-1)" for a partial run, "Failing in 2 of 2
+/// locations" for a down one. `None` for any other class, or when nothing is known to count.
+pub fn coverage_line(
+    stored: config::meta::synthetics::RunClass,
+    failed_locations: &[String],
+    voters: i32,
+) -> Option<String> {
+    use config::meta::synthetics::RunClass as Stored;
+    let failed = failed_locations.len();
+    if failed == 0 || voters <= 0 {
+        return None;
+    }
+    let total = (voters as usize).max(failed);
+    let noun = if total == 1 { "location" } else { "locations" };
+    match stored {
+        Stored::Partial => Some(format!(
+            "Failing in {failed} of {total} {noun} ({})",
+            failed_locations.join(", ")
+        )),
+        Stored::Down => Some(format!("Failing in {failed} of {total} {noun}")),
+        _ => None,
+    }
+}
+
+/// A notice about our own ability to test the site, separate from the check result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GapNotice {
+    /// "Monitoring gap": no run tested the site since `since` (microseconds).
+    Opened { since: i64 },
+    /// "Monitoring resumed": a run tested the site again after a gap that sent its notice.
+    Resumed { since: i64, until: i64 },
+}
+
+/// Moves the gap state for one finalized run and says which notice it owes, if any.
+///
+/// Each gap sends one notice pair: "Monitoring gap" after [`GAP_NOTICE_RUNS`] Not measured runs
+/// in a row or [`GAP_NOTICE_AFTER_US`], and "Monitoring resumed" on the next run that is not Not
+/// measured, only if the gap notice went out. The state lives on the check row, so a restart or
+/// another node continues the same gap.
+pub fn decide_gap(
+    prior: AlertState,
+    not_measured: bool,
+    now_us: i64,
+) -> (Option<GapNotice>, AlertState) {
+    if !not_measured {
+        let next = AlertState {
+            gap_since: 0,
+            gap_runs: 0,
+            gap_notified_at: 0,
+            ..prior
+        };
+        let notice =
+            (prior.gap_since > 0 && prior.gap_notified_at > 0).then_some(GapNotice::Resumed {
+                since: prior.gap_since,
+                until: now_us,
+            });
+        return (notice, next);
+    }
+    let since = if prior.gap_since > 0 {
+        prior.gap_since
+    } else {
+        now_us
+    };
+    let mut next = AlertState {
+        gap_since: since,
+        gap_runs: prior.gap_runs.saturating_add(1),
+        ..prior
+    };
+    let due = next.gap_runs >= GAP_NOTICE_RUNS || now_us - since >= GAP_NOTICE_AFTER_US;
+    if prior.gap_notified_at == 0 && due {
+        next.gap_notified_at = now_us;
+        return (Some(GapNotice::Opened { since }), next);
+    }
+    (None, next)
+}
+
+/// "10:36 UTC", the clock time a notice names.
+pub fn utc_clock(micros: i64) -> String {
+    chrono::DateTime::from_timestamp_micros(micros)
+        .map(|dt| dt.format("%H:%M UTC").to_string())
+        .unwrap_or_else(|| micros.to_string())
+}
+
+/// "23 minutes", "2 hours 5 minutes", "less than a minute".
+pub fn gap_length(micros: i64) -> String {
+    let mins = micros.max(0) / MICROS_PER_MINUTE;
+    let plural = |n: i64, unit: &str| {
+        if n == 1 {
+            format!("1 {unit}")
+        } else {
+            format!("{n} {unit}s")
+        }
+    };
+    match (mins / 60, mins % 60) {
+        (0, 0) => "less than a minute".to_string(),
+        (0, m) => plural(m, "minute"),
+        (h, 0) => plural(h, "hour"),
+        (h, m) => format!("{} {}", plural(h, "hour"), plural(m, "minute")),
+    }
+}
+
+/// The subject and body of a gap notice, in the spec S7 wording.
+pub fn gap_notice_text(notice: GapNotice, check_name: &str, target: &str) -> (String, String) {
+    match notice {
+        GapNotice::Opened { since } => (
+            format!("[OpenObserve Synthetics] Monitoring gap: {check_name}"),
+            format!(
+                "We could not test {target} from {}. This is a problem on our side. Your site was not tested.",
+                utc_clock(since)
+            ),
+        ),
+        GapNotice::Resumed { since, until } => (
+            format!("[OpenObserve Synthetics] Monitoring resumed: {check_name}"),
+            format!(
+                "We test {target} again. The monitoring gap lasted {}, from {} to {}.",
+                gap_length(until - since),
+                utc_clock(since),
+                utc_clock(until)
+            ),
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -381,7 +547,7 @@ mod tests {
             consecutive_failures: failures,
             last_alert_at,
             alerting,
-            degraded_notified_at: 0,
+            ..Default::default()
         }
     }
 
@@ -899,5 +1065,245 @@ mod tests {
     #[test]
     fn nothing_registered_means_no_org_can_mute() {
         assert!(!may_mute("org"));
+    }
+    // ── S7: coverage, the any-location rule, gap notices ─────────────────────
+
+    use config::meta::synthetics::RunClass as Stored;
+
+    fn locs(names: &[&str]) -> Vec<String> {
+        names.iter().map(|n| n.to_string()).collect()
+    }
+
+    #[test]
+    fn a_failure_alert_states_its_coverage() {
+        assert_eq!(
+            coverage_line(Stored::Partial, &locs(&["aws-us-east-1"]), 2).as_deref(),
+            Some("Failing in 1 of 2 locations (aws-us-east-1)")
+        );
+        assert_eq!(
+            coverage_line(Stored::Down, &locs(&["aws-us-east-1", "aws-us-west-1"]), 2).as_deref(),
+            Some("Failing in 2 of 2 locations")
+        );
+        assert_eq!(
+            coverage_line(Stored::Down, &locs(&["aws-us-east-1"]), 1).as_deref(),
+            Some("Failing in 1 of 1 location")
+        );
+        // Nothing failed, nothing counted, or a class with no coverage: no line.
+        assert_eq!(coverage_line(Stored::Partial, &[], 2), None);
+        assert_eq!(coverage_line(Stored::Down, &locs(&["a"]), 0), None);
+        assert_eq!(coverage_line(Stored::Up, &locs(&["a"]), 2), None);
+        assert_eq!(coverage_line(Stored::Misconfigured, &locs(&["a"]), 2), None);
+    }
+
+    #[test]
+    fn a_partial_run_fires_only_under_the_any_location_rule() {
+        assert_eq!(
+            class_for_run(Stored::Partial, true, RunClass::Failing),
+            RunClass::Failing
+        );
+        assert_eq!(
+            class_for_run(Stored::Partial, false, RunClass::Failing),
+            RunClass::Healthy,
+            "down only: a failure below quorum is up"
+        );
+        for any in [true, false] {
+            assert_eq!(
+                class_for_run(Stored::Down, any, RunClass::Failing),
+                RunClass::Failing
+            );
+        }
+        // Under "down only" a partial run closes an incident a down run opened.
+        let (outcome, _) = decide(
+            state(1, 10 * MIN, true),
+            class_for_run(Stored::Partial, false, RunClass::Failing),
+            1,
+            0,
+            20 * MIN,
+        );
+        assert_eq!(outcome, AlertOutcome::Recovered);
+    }
+
+    #[test]
+    fn the_stored_class_corrects_what_one_ack_cannot_know() {
+        // No location tested the site, whatever the last ack said.
+        assert_eq!(
+            class_for_run(Stored::NotMeasured, true, RunClass::Failing),
+            RunClass::NotMeasured
+        );
+        // The last ack was our own error, but another location tested the site.
+        assert_eq!(
+            class_for_run(Stored::Up, true, RunClass::NotMeasured),
+            RunClass::Healthy
+        );
+        assert_eq!(
+            class_for_run(Stored::Down, false, RunClass::NotMeasured),
+            RunClass::Failing
+        );
+        // No stored class: the ack decides, as before.
+        assert_eq!(
+            class_for_run(Stored::Unknown, false, RunClass::Degraded),
+            RunClass::Degraded
+        );
+    }
+
+    #[test]
+    fn existing_rules_keep_any_location_and_new_rules_are_down_only() {
+        use config::meta::synthetics::{AlertOn, SyntheticSettings};
+        // A settings row saved before the rule existed.
+        let legacy: SyntheticSettings =
+            serde_json::from_value(serde_json::json!({"retries": 1, "alert_if_fails": 2})).unwrap();
+        assert_eq!(legacy.alert_on, None);
+        let mut check = config::meta::synthetics::Synthetic {
+            alert_on: legacy.alert_on,
+            ..Default::default()
+        };
+        assert!(check.alerts_on_partial());
+        check.alert_on = Some(AlertOn::Down);
+        assert!(!check.alerts_on_partial());
+        check.alert_on = Some(AlertOn::AnyLocation);
+        assert!(check.alerts_on_partial());
+        assert_eq!(
+            serde_json::to_value(AlertOn::AnyLocation).unwrap(),
+            serde_json::json!("any_location")
+        );
+    }
+
+    /// Runs `classes` (true = Not measured) through the gap state from `state`, one per minute
+    /// from `start`, and returns the notices with the final state.
+    fn run_gap(
+        mut state: AlertState,
+        start: i64,
+        classes: &[bool],
+    ) -> (Vec<GapNotice>, AlertState) {
+        let mut notices = Vec::new();
+        for (i, not_measured) in classes.iter().enumerate() {
+            let (notice, next) = decide_gap(state, *not_measured, start + i as i64 * MIN);
+            notices.extend(notice);
+            state = next;
+        }
+        (notices, state)
+    }
+
+    #[test]
+    fn a_gap_sends_one_notice_pair() {
+        let t0 = 600 * MIN;
+        let (notices, state) = run_gap(
+            AlertState::default(),
+            t0,
+            &[true, true, true, true, true, false, false],
+        );
+        assert_eq!(
+            notices,
+            vec![
+                GapNotice::Opened { since: t0 },
+                GapNotice::Resumed {
+                    since: t0,
+                    until: t0 + 5 * MIN
+                },
+            ]
+        );
+        assert_eq!(
+            (state.gap_since, state.gap_runs, state.gap_notified_at),
+            (0, 0, 0)
+        );
+    }
+
+    #[test]
+    fn a_short_gap_sends_nothing() {
+        let (notices, state) = run_gap(AlertState::default(), 0, &[true, true, false]);
+        assert!(notices.is_empty(), "{notices:?}");
+        assert_eq!(state, AlertState::default());
+    }
+
+    #[test]
+    fn a_long_interval_gap_notices_after_fifteen_minutes() {
+        let t0 = 60 * MIN;
+        let first = decide_gap(AlertState::default(), true, t0);
+        assert_eq!(first.0, None);
+        let (notice, _) = decide_gap(first.1, true, t0 + 15 * MIN);
+        assert_eq!(notice, Some(GapNotice::Opened { since: t0 }));
+    }
+
+    #[test]
+    fn the_gap_pair_survives_a_restart() {
+        // The state is written to the check row after each run; a restart or another node
+        // reads it back and carries on with the same gap.
+        let t0 = 100 * MIN;
+        let (before, persisted) = run_gap(AlertState::default(), t0, &[true, true, true]);
+        assert_eq!(before, vec![GapNotice::Opened { since: t0 }]);
+        let (after, _) = run_gap(persisted, t0 + 3 * MIN, &[true, true, false]);
+        assert_eq!(
+            after,
+            vec![GapNotice::Resumed {
+                since: t0,
+                until: t0 + 5 * MIN
+            }],
+            "no second gap notice, one resumed notice"
+        );
+    }
+
+    #[test]
+    fn the_gap_state_leaves_the_alert_state_alone() {
+        let prior = state(2, 5 * MIN, true);
+        let (_, during) = decide_gap(prior, true, 10 * MIN);
+        let (_, after) = decide_gap(during, false, 11 * MIN);
+        assert_eq!(after, prior);
+    }
+
+    #[test]
+    fn a_muted_gap_notice_sends_no_resumed_notice() {
+        let (notice, next) = run_gap(AlertState::default(), 0, &[true, true, true]);
+        assert_eq!(notice.len(), 1);
+        let before_last = run_gap(AlertState::default(), 0, &[true, true]).1;
+        let muted = suppressed_state(before_last, next);
+        assert_eq!(muted.gap_notified_at, 0);
+        assert_eq!(muted.gap_runs, 3);
+        let (resumed, _) = decide_gap(muted, false, 4 * MIN);
+        assert_eq!(resumed, None);
+    }
+
+    #[test]
+    fn gap_notices_use_the_spec_wording() {
+        let since = 1_785_000_000_000_000 - (1_785_000_000_000_000 % (60 * MIN)) + 36 * MIN;
+        let (subject, body) =
+            gap_notice_text(GapNotice::Opened { since }, "Checkout", "example.com");
+        assert_eq!(subject, "[OpenObserve Synthetics] Monitoring gap: Checkout");
+        assert_eq!(
+            body,
+            format!(
+                "We could not test example.com from {}. This is a problem on our side. Your site was not tested.",
+                utc_clock(since)
+            )
+        );
+        assert!(
+            utc_clock(since).ends_with(":36 UTC"),
+            "{}",
+            utc_clock(since)
+        );
+        let (subject, body) = gap_notice_text(
+            GapNotice::Resumed {
+                since,
+                until: since + 23 * MIN,
+            },
+            "Checkout",
+            "example.com",
+        );
+        assert_eq!(
+            subject,
+            "[OpenObserve Synthetics] Monitoring resumed: Checkout"
+        );
+        assert!(
+            body.starts_with("We test example.com again. The monitoring gap lasted 23 minutes"),
+            "{body}"
+        );
+    }
+
+    #[test]
+    fn gap_length_reads_naturally() {
+        assert_eq!(gap_length(30 * 1_000_000), "less than a minute");
+        assert_eq!(gap_length(MIN), "1 minute");
+        assert_eq!(gap_length(23 * MIN), "23 minutes");
+        assert_eq!(gap_length(60 * MIN), "1 hour");
+        assert_eq!(gap_length(125 * MIN), "2 hours 5 minutes");
     }
 }

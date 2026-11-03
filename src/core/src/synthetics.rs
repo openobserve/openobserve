@@ -74,6 +74,8 @@ pub struct CheckNotification {
     pub passing_locations: Vec<String>,
     /// Environments that did not pass, worst first.
     pub failing_environments: Vec<String>,
+    /// "Failing in 1 of 2 locations (aws-us-east-1)" on a firing partial or down run.
+    pub coverage: Option<String>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -114,6 +116,7 @@ impl CheckNotification {
             failing_locations: resp.failing_locations.clone(),
             failing_environments: resp.failing_environments.clone(),
             passing_locations: resp.passing_locations.clone(),
+            coverage: resp.coverage.clone(),
         }
     }
 }
@@ -128,11 +131,119 @@ pub fn notify_finalized_run(
         if resp.destinations.is_empty() {
             return;
         }
+        if let Some(gap) = GapNotification::from_ack(&resp) {
+            notify_gap(gap).await;
+        }
+        if matches!(
+            resp.alert,
+            openobserve_synthetics::job_api::AlertDecision::Silent
+        ) {
+            return;
+        }
         let checked_at = config::utils::time::now_micros();
         let status = resp.run_status.clone().unwrap_or_default();
         let n = CheckNotification::from_ack(&resp, &status, None, String::new(), checked_at);
         notify_check_result(n).await;
     })
+}
+
+/// A gap notice owed by a run, with what it names. Owned, so it can move into a spawned task.
+#[cfg(feature = "enterprise")]
+pub struct GapNotification {
+    pub org_id: String,
+    pub synthetics_id: String,
+    pub synthetics_name: String,
+    pub target: String,
+    pub destinations: Vec<String>,
+    pub notice: openobserve_synthetics::alerting::GapNotice,
+}
+
+#[cfg(feature = "enterprise")]
+impl GapNotification {
+    /// `None` when the run owes no gap notice or the check has nowhere to send one.
+    pub fn from_ack(resp: &openobserve_synthetics::job_api::AckResponse) -> Option<Self> {
+        let notice = resp.gap_notice?;
+        if resp.destinations.is_empty() {
+            return None;
+        }
+        Some(Self {
+            org_id: resp.org_id.clone(),
+            synthetics_id: resp.synthetics_id.clone(),
+            synthetics_name: resp.synthetics_name.clone(),
+            target: resp.target.clone(),
+            destinations: resp.destinations.clone(),
+            notice,
+        })
+    }
+}
+
+/// Sends a "Monitoring gap" or "Monitoring resumed" notice to every destination of the check.
+///
+/// Low severity: it says our side could not test the site, not that the site failed. When the
+/// unified notification templates land (openobserve#16323), this becomes two template events.
+#[cfg(feature = "enterprise")]
+pub async fn notify_gap(resp: GapNotification) {
+    use config::meta::destinations::Module;
+
+    let (subject, body) = openobserve_synthetics::alerting::gap_notice_text(
+        resp.notice,
+        &resp.synthetics_name,
+        &resp.target,
+    );
+    for dest_name in &resp.destinations {
+        let dest =
+            match crate::alerts::destinations::get_with_template(&resp.org_id, dest_name).await {
+                Ok((dest, _tpl)) => dest,
+                Err(e) => {
+                    log::error!(
+                        "[synthetics] load dest={dest_name} org={}: {e}",
+                        resp.org_id
+                    );
+                    continue;
+                }
+            };
+        let Module::Alert {
+            destination_type, ..
+        } = &dest.module
+        else {
+            continue;
+        };
+        let msg = gap_message(destination_type, &subject, &body);
+        if let Err(e) = crate::alerts::alert::dispatch_notification(
+            &resp.org_id,
+            destination_type,
+            &subject,
+            msg,
+        )
+        .await
+        {
+            log::error!(
+                "[synthetics] gap notice dest={dest_name} check={}: {e}",
+                resp.synthetics_id
+            );
+        }
+    }
+}
+
+/// The gap notice body in the shape each destination type takes.
+#[cfg(feature = "enterprise")]
+fn gap_message(
+    destination_type: &config::meta::destinations::DestinationType,
+    subject: &str,
+    body: &str,
+) -> String {
+    use config::meta::destinations::DestinationType;
+    match destination_type {
+        DestinationType::Email(_) => format!(
+            r#"<div style="font-family:sans-serif;max-width:560px;"><h3 style="color:#555;">{}</h3><p>{}</p></div>"#,
+            html_escape(subject),
+            html_escape(body)
+        ),
+        DestinationType::Sns(_) => format!("{subject}\n{body}"),
+        DestinationType::Http(_) | DestinationType::SlackApp(_) => {
+            serde_json::json!({ "text": format!("*{subject}*\n{body}") }).to_string()
+        }
+    }
 }
 
 /// Fires once per run (when all jobs have completed) for non-passing runs.
@@ -191,6 +302,12 @@ pub async fn notify_check_result(n: CheckNotification) {
                     }
                 } else if n.flaky {
                     format!("[OpenObserve Synthetics] 🔁 {} is FLAKY", n.check_name)
+                } else if let Some(coverage) = &n.coverage {
+                    format!(
+                        "[OpenObserve Synthetics] {} {}: {coverage}",
+                        status_emoji(&n),
+                        n.check_name
+                    )
                 } else {
                     format!(
                         "[OpenObserve Synthetics] {} {} is {}",
@@ -287,6 +404,9 @@ fn status_headline(n: &CheckNotification) -> String {
             "{} passed only after retries (flaky) — it recovered on its own",
             n.check_name
         );
+    }
+    if let Some(coverage) = &n.coverage {
+        return format!("{}: {coverage}", n.check_name);
     }
     match n.status.as_str() {
         "warning" => format!("{} passed only after retries (flaky)", n.check_name),
@@ -812,6 +932,7 @@ mod tests {
             failing_locations: vec!["aws-us-east-1".into(), "aws-us-west-1".into()],
             passing_locations: vec!["aws-eu-central-1".into()],
             failing_environments: vec![],
+            coverage: None,
         }
     }
 
