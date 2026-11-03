@@ -90,7 +90,7 @@ export default defineComponent({
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "recommended") {
-        router.push({
+        router.replace({
           name: "ingestFromKubernetes",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
@@ -102,7 +102,7 @@ export default defineComponent({
 
     onUpdated(() => {
       if (router.currentRoute.value.name === "recommended") {
-        router.push({
+        router.replace({
           name: "ingestFromKubernetes",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,

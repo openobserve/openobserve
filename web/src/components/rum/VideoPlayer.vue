@@ -226,6 +226,7 @@ import {
   type StaleSpan,
 } from "@/utils/rum/sessionReplayViews";
 import { resolveRelativeLinks } from "@/utils/rum/sessionReplayUrls";
+import { buildReplayCanvasPlaceholderRule } from "@/utils/rum/replayCanvasPlaceholder";
 import { MAX_ATTEMPTS } from "@/utils/rum/sessionReplayLoader";
 import {
   canResume,
@@ -670,7 +671,7 @@ function calculatePlayerDimensions(): { width: number; height: number } {
   return { width: playerWidth, height: playerHeight };
 }
 
-const decorateRecord = (record: any) => {
+const decorateRecord = (record: any, cssRewrites: Promise<void>[]) => {
   let segCopy = record;
   if (segCopy.type === 8) {
     segCopy = {
@@ -690,7 +691,7 @@ const decorateRecord = (record: any) => {
   ) {
     decoratedSnapshots.add(segCopy.data);
     try {
-      decorateSnapshotNode(segCopy.data.node);
+      decorateSnapshotNode(segCopy.data.node, cssRewrites);
     } catch (e) {
       console.log(e);
     }
@@ -698,7 +699,7 @@ const decorateRecord = (record: any) => {
   return segCopy;
 };
 
-const decorateSnapshotNode = (node: any) => {
+const decorateSnapshotNode = (node: any, cssRewrites: Promise<void>[]) => {
   resolveRelativeLinks(node, runPageHref);
   node.childNodes.forEach((child: any) => {
     if (child.type !== 2 || child.tagName !== "html") return;
@@ -714,9 +715,11 @@ const decorateSnapshotNode = (node: any) => {
           __child.attributes._cssText
         ) {
           workerProcessId.value++;
-          processCss(__child.attributes._cssText, workerProcessId.value).then((res: any) => {
-            __child.attributes._cssText = res.updatedCssString;
-          });
+          cssRewrites.push(
+            processCss(__child.attributes._cssText, workerProcessId.value).then((res) => {
+              __child.attributes._cssText = res.updatedCssString;
+            }),
+          );
         }
       });
     });
@@ -730,14 +733,18 @@ const syncDecoderState = (decoder: MultiViewDecoder) => {
 };
 
 // One decoder serves the whole forward-only run, so per-view converter state survives every batch.
-const convertSegments = (segments: any[], decoder: MultiViewDecoder) => {
+const convertSegments = async (segments: any[], decoder: MultiViewDecoder) => {
   decoder.setViewEnds(props.viewEnds);
   const { events, skippedRecords } = decoder.push(segments, props.watermark);
   if (skippedRecords) {
     console.warn(`Session replay: ${skippedRecords} record(s) could not be converted`);
   }
   syncDecoderState(decoder);
-  return events.map(decorateRecord);
+  const cssRewrites: Promise<void>[] = [];
+  const decorated = events.map((event: any) => decorateRecord(event, cssRewrites));
+  // The player builds a snapshot as soon as it gets it, and a snapshot built before its rewrite loads fonts cross-origin, which the browser blocks.
+  await Promise.all(cssRewrites);
+  return decorated;
 };
 
 const setupSession = async () => {
@@ -750,7 +757,7 @@ const setupSession = async () => {
 
   const decoder = createMultiViewDecoder();
   const consumed = props.segments.length;
-  session.value = convertSegments(props.segments.slice(0, consumed), decoder);
+  session.value = await convertSegments(props.segments.slice(0, consumed), decoder);
   // A push held wholly behind the watermark yields only a clock record; rrweb-player needs a snapshot, so retry on the next change with a fresh decoder.
   if (!session.value.some((event: any) => event.type === 2)) return;
 
@@ -778,6 +785,7 @@ const setupSession = async () => {
       props: {
         events: session.value,
         UNSAFE_replayCanvas: false,
+        insertStyleRules: [buildReplayCanvasPlaceholderRule(t("rum.replayCanvasNotRecorded"))],
         mouseTail: false,
         autoPlay: false,
         showController: false,
@@ -817,9 +825,11 @@ const setupSession = async () => {
 const appendSegments = async (newSegments: any[], takenAfter: number) => {
   if (!player.value || !runDecoder) return;
 
-  const records = convertSegments(newSegments, runDecoder).sort(
+  const records = (await convertSegments(newSegments, runDecoder)).sort(
     (a: any, b: any) => a.timestamp - b.timestamp,
   );
+  // The component may have unmounted while the stylesheets were rewritten.
+  if (!player.value) return;
 
   // The player applies an event at or before the playhead at once, so this is a conservative proxy for its private baselineTime.
   const meta = player.value.getMetaData?.();
@@ -882,7 +892,7 @@ const getEventMarkerClass = (event: any) => {
   if (event.frustration_types && event.frustration_types.length > 0) {
     return "bg-badge-orange-solid-bg! shadow-glow shadow-badge-orange-solid-bg/60";
   }
-  if (event.type === "error") {
+  if (event.type === "error" || event.type === "failed_request") {
     return "bg-badge-error-solid-bg!";
   }
   return "bg-badge-teal-solid-bg!";
@@ -1094,24 +1104,34 @@ const initializeWorker = () => {
   }
 };
 
+// The session waits on these rewrites, so a missing, failed or silent worker keeps the recorded CSS instead of stalling it.
+const CSS_REWRITE_TIMEOUT_MS = 5000;
+
 const processCss = (cssString: string, id: string | number) => {
-  return new Promise((resolve, reject) => {
-    if (worker.value) {
-      const handleWorkerMessage = (event: any) => {
-        if (event.data.id === id) {
-          if (worker.value) worker.value.removeEventListener("message", handleWorkerMessage);
-          resolve(event.data);
-        }
-      };
-      worker.value.addEventListener("message", handleWorkerMessage);
-      worker.value.postMessage({
-        cssString: cssString,
-        proxyUrl: `${store.state.API_ENDPOINT}/proxy/${store.state.selectedOrganization.identifier}`,
-        id,
-      });
-    } else {
-      reject("Worker not initialized");
+  return new Promise<{ updatedCssString: string }>((resolve) => {
+    const activeWorker = worker.value;
+    if (!activeWorker) {
+      resolve({ updatedCssString: cssString });
+      return;
     }
+    const finish = (updatedCssString: string) => {
+      clearTimeout(timer);
+      activeWorker.removeEventListener("message", handleWorkerMessage);
+      activeWorker.removeEventListener("error", handleWorkerError);
+      resolve({ updatedCssString });
+    };
+    const handleWorkerMessage = (event: any) => {
+      if (event.data.id === id) finish(event.data.updatedCssString);
+    };
+    const handleWorkerError = () => finish(cssString);
+    const timer = setTimeout(() => finish(cssString), CSS_REWRITE_TIMEOUT_MS);
+    activeWorker.addEventListener("message", handleWorkerMessage);
+    activeWorker.addEventListener("error", handleWorkerError);
+    activeWorker.postMessage({
+      cssString: cssString,
+      proxyUrl: `${store.state.API_ENDPOINT}/proxy/${store.state.selectedOrganization.identifier}`,
+      id,
+    });
   });
 };
 

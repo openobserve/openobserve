@@ -159,6 +159,7 @@ export const SKIP_SEED_TYPES = [
   "heatmap",
   "alert-list",
   "flame-graph",
+  "logs",
 ];
 
 /**
@@ -193,6 +194,11 @@ export const buildDefaultBuilderFields = (
   if (chartType === "sunburst") return { x: [], y };
   // One stage per label, so a time bucket is not a useful default label.
   if (chartType === "funnel") return { x: [], y };
+  // A box plot summarises a numeric column, so it starts from one, never a count or the timestamp.
+  if (chartType === "boxplot") {
+    const column = firstNumericField(groupedFields, streamName, timestampColumn);
+    return { x: [], y: column ? [rawValueYField(column)] : [] };
+  }
   // A time bucket is not an entity; the user picks the entity field.
   if (chartType === "hostmap") return { x: [], y };
   return { x, y };

@@ -117,6 +117,7 @@ const updateSelectedIds = (ids: string[]): void => {
 };
 
 const validateDraft = async (): Promise<void> => {
+  const sequence = ++validationSequence;
   const local = validateExpression(
     draft.value.composite_condition.expression,
     selectedChildren.value,
@@ -127,7 +128,6 @@ const validateDraft = async (): Promise<void> => {
     return;
   }
 
-  const sequence = ++validationSequence;
   const request: CompositeAlertValidationRequest = {
     composite_condition: draft.value.composite_condition,
     ...(draft.value.id ? { composite_id: draft.value.id } : {}),

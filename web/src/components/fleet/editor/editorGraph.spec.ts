@@ -153,6 +153,71 @@ service:
     expect(load(graphToYaml(graph!))).toEqual(load(yaml));
   });
 
+  it("keeps quoted text that reads as a boolean, number or null a string", () => {
+    const yaml = `exporters:
+  otlphttp:
+    headers:
+      flag: "true"
+      code: "123"
+      nothing: "null"
+      on: true
+      port: 8080
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [otlphttp]
+receivers:
+  otlp: {}
+`;
+    const graph = yamlToGraph(yaml);
+    expect(graph?.components["exporter:otlphttp"].settings).toMatchObject({
+      "headers.flag": '"true"',
+      "headers.code": '"123"',
+      "headers.nothing": '"null"',
+      "headers.on": "true",
+      "headers.port": "8080",
+    });
+    expect(load(graphToYaml(graph!))).toEqual(load(yaml));
+    graph!.components["exporter:otlphttp"].settings["headers.typed"] = '"false"';
+    graph!.components["exporter:otlphttp"].settings["headers.label"] = '"plain text"';
+    const headers = (load(graphToYaml(graph!)) as any).exporters.otlphttp.headers;
+    expect(headers.typed).toBe("false");
+    expect(headers.label).toBe("plain text");
+  });
+
+  it("writes a quoted value's text literally and keeps quotes that are part of the value", () => {
+    const yaml = `exporters:
+  otlphttp:
+    headers:
+      etag: '"abc"'
+      single: "'x'"
+      path: 'C:\\temp'
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [otlphttp]
+receivers:
+  otlp: {}
+`;
+    const graph = yamlToGraph(yaml);
+    expect(graph).not.toBeNull();
+    expect(load(graphToYaml(graph!))).toEqual(load(yaml));
+    const settings = graph!.components["exporter:otlphttp"].settings;
+    settings["headers.pattern"] = '"^\\d+$"';
+    settings["headers.dir"] = '"C:\\temp"';
+    settings["headers.typed"] = "'true'";
+    const headers = (load(graphToYaml(graph!)) as any).exporters.otlphttp.headers;
+    expect(headers).toMatchObject({
+      etag: '"abc"',
+      single: "'x'",
+      pattern: "^\\d+$",
+      dir: "C:\\temp",
+      typed: "true",
+    });
+  });
+
   it("quotes a key that holds a dot or other path syntax and writes it back", () => {
     const yaml = `receivers:
   hostmetrics:
@@ -243,7 +308,6 @@ service:
     ["a null leaf in settings", MINIMAL.replace("debug: {}", "debug:\n    timeout: null")],
     ["connectors", MINIMAL + "connectors:\n  count: {}\n"],
     ["service.telemetry", MINIMAL + "  telemetry:\n    logs:\n      level: debug\n"],
-    ["a quoted number", MINIMAL.replace("debug: {}", 'debug:\n    sampling: "5"')],
     ["a top-level list", "- a\n- b\n"],
     ["unparseable YAML", "receivers: [otlp\n"],
   ])("cannot represent %s", (_name, src) => {

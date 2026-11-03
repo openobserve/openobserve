@@ -46,6 +46,10 @@ pub const CHECK_STATUS_UNKNOWN: i32 = 0;
 pub const CHECK_STATUS_UP: i32 = 1;
 pub const CHECK_STATUS_WARNING: i32 = 2;
 pub const CHECK_STATUS_DOWN: i32 = 3;
+/// The probe could not produce a verdict (dispatch dead-letter, expired lease,
+/// infra fault). Says nothing about the target: it never opens an incident and
+/// never counts toward recovery. Written by the dispatcher and the reaper.
+pub const CHECK_STATUS_ERROR: i32 = 4;
 
 const MICROS_PER_MIN: i64 = 60 * 1_000_000;
 const MICROS_PER_DAY: i64 = 86_400 * 1_000_000;
@@ -169,14 +173,14 @@ pub enum EngineAction {
 // (R-6). `password` on the request is plaintext-in, Argon2id-at-rest, never
 // echoed back.
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct CreatePageRequest {
     pub name: String,
     #[serde(default)]
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, utoipa::ToSchema)]
 pub struct UpdatePageRequest {
     pub name: Option<String>,
     pub description: Option<String>,
@@ -255,7 +259,7 @@ pub struct ComponentView {
 /// One component in the bulk component-replace PUT. `check_ids` are the
 /// synthetics checks it maps; the handler MUST verify folder-level synthetics
 /// read on each before writing (R-1 — top build risk).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ComponentInput {
     /// Present = update in place (stable id); absent = create.
     pub id: Option<String>,
@@ -266,12 +270,12 @@ pub struct ComponentInput {
     pub check_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct SetComponentsRequest {
     pub components: Vec<ComponentInput>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct CreateNoticeRequest {
     /// 0 incident, 1 maintenance, 2 info.
     pub kind: i32,
@@ -290,7 +294,7 @@ pub struct CreateNoticeRequest {
 /// resolve path; auto-incidents are otherwise owned by the rebuilder and this
 /// must not race it (the handler rejects editing state on an auto-sourced
 /// notice — see R-4 in the design).
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, utoipa::ToSchema)]
 pub struct UpdateNoticeRequest {
     pub impact: Option<i32>,
     pub title: Option<String>,
@@ -301,12 +305,12 @@ pub struct UpdateNoticeRequest {
     pub state: Option<i32>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct NoticeUpdateRequest {
     pub body: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct MarkFalsePositiveRequest {
     /// Hours to snooze the underlying check org-wide (default 6, per mockup
     /// B1's "snooze 6h").
@@ -431,7 +435,7 @@ pub struct PreviewResponse {
     pub history: SnapshotHistory,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct CreateDomainRequest {
     pub domain: String,
 }
@@ -553,11 +557,32 @@ pub fn incident_actions(
     th: &Thresholds,
     now: i64,
 ) -> Vec<EngineAction> {
+    incident_actions_with(
+        checks,
+        open_by_check,
+        recently_resolved,
+        snoozed,
+        |_| *th,
+        now,
+    )
+}
+
+/// [`incident_actions`] with per-check thresholds (each check is judged by the
+/// confirmation settings of the page(s) it is mapped to).
+pub fn incident_actions_with(
+    checks: &[EngineCheck],
+    open_by_check: &HashMap<String, OpenAutoIncident>,
+    recently_resolved: &HashMap<String, (String, i64)>,
+    snoozed: &HashSet<String>,
+    th_for: impl Fn(&str) -> Thresholds,
+    now: i64,
+) -> Vec<EngineAction> {
     let mut actions = Vec::new();
     for check in checks {
+        let th = th_for(&check.id);
         match open_by_check.get(&check.id) {
-            Some(open) => handle_open(check, open, th, now, &mut actions),
-            None => handle_closed(check, recently_resolved, snoozed, th, now, &mut actions),
+            Some(open) => handle_open(check, open, &th, now, &mut actions),
+            None => handle_closed(check, recently_resolved, snoozed, &th, now, &mut actions),
         }
     }
     actions
@@ -775,6 +800,73 @@ mod tests {
             first_fail_at: None,
             failing_since: None,
         }
+    }
+
+    /// Replays the `up_runs` each tick sees against an open incident; returns whether it resolved.
+    fn replay(up_runs_per_tick: &[i32], th: Thresholds) -> bool {
+        let mut streak = 0;
+        for &up_runs in up_runs_per_tick {
+            let acts = incident_actions(
+                &[check("c1", 0, up_runs)],
+                &open_incident(streak),
+                &HashMap::new(),
+                &HashSet::new(),
+                &th,
+                0,
+            );
+            for a in acts {
+                match a {
+                    EngineAction::Resolve { .. } => return true,
+                    EngineAction::RecoveryProgress { streak: s, .. } => streak = s,
+                    _ => panic!("unexpected {a:?}"),
+                }
+            }
+        }
+        false
+    }
+
+    fn th(failures: i32, recovery: i32) -> Thresholds {
+        Thresholds {
+            confirm_failures: failures,
+            confirm_recovery: recovery,
+            confirm_after_micros: None,
+        }
+    }
+
+    #[test]
+    fn up_error_up_does_not_resolve_with_recovery_two() {
+        // An error run is NoVerdict, which resets `up_runs` at finalization.
+        assert!(!replay(&[1, 0, 1], th(3, 2)));
+        assert!(replay(&[1, 0, 1, 2], th(3, 2)));
+    }
+
+    #[test]
+    fn error_never_opens_an_incident() {
+        let acts = incident_actions(
+            &[check("c1", 0, 0)],
+            &HashMap::new(),
+            &HashMap::new(),
+            &HashSet::new(),
+            &th(1, 1),
+            0,
+        );
+        assert!(acts.is_empty());
+    }
+
+    #[test]
+    fn seven_failures_four_recoveries() {
+        let t = th(7, 4);
+        let none = HashMap::new();
+        let quiet = HashSet::new();
+        let six = [check("c1", 6, 0)];
+        assert!(incident_actions(&six, &none, &HashMap::new(), &quiet, &t, 0).is_empty());
+        let seven = [check("c1", 7, 0)];
+        assert_eq!(
+            incident_actions(&seven, &none, &HashMap::new(), &quiet, &t, 0).len(),
+            1
+        );
+        assert!(!replay(&[1, 2, 3], t));
+        assert!(replay(&[1, 2, 3, 4], t));
     }
 
     #[test]

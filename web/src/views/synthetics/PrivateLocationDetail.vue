@@ -204,6 +204,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <div
+        v-else-if="!loading && loadError"
+        class="flex flex-col items-center gap-3 p-6"
+        data-test="synthetics-private-location-detail-error"
+      >
+        <p class="text-status-error-text text-sm">
+          {{ t("synthetics.privateLocations.detail.loadFailed") }}
+        </p>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="refresh"
+          data-test="synthetics-private-location-detail-retry-btn"
+          @click="load"
+        >
+          {{ t("synthetics.privateLocations.detail.retry") }}
+        </OButton>
+      </div>
+
       <div v-else-if="!loading" class="p-6">
         <OEmptyState
           size="block"
@@ -269,6 +288,9 @@ const backTo = computed(() => syntheticsListRoute(navContext.value, { section: "
 
 const detail = ref<SyntheticLocationDetail | null>(null);
 const loading = ref(false);
+/** True after a retryable failure (network error, timeout, 5xx). 403/404 keep
+ *  the not-found/forbidden handling instead. */
+const loadError = ref(false);
 const showSetup = ref(false);
 const agentSetup = ref<AgentSetup | null>(null);
 const setupAgentName = ref<string | null>(null);
@@ -308,11 +330,15 @@ const agentsEmptyMessage = computed(() =>
 
 async function load() {
   loading.value = true;
+  loadError.value = false;
   try {
     const res = await syntheticsService.getLocation(orgIdentifier.value, String(route.params.id));
     detail.value = res.data as SyntheticLocationDetail;
   } catch (err) {
     detail.value = null;
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    // No response (network/timeout) or 5xx is retryable; 403/404/other 4xx are not.
+    loadError.value = status === undefined || status >= 500;
     console.error("[synthetics] failed to load location detail", err);
   } finally {
     loading.value = false;

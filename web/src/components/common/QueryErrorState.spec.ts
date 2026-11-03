@@ -204,3 +204,77 @@ describe("QueryErrorState free-text cards", () => {
     }
   });
 });
+
+describe("QueryErrorState plain-language errors", () => {
+  const PARSER_EOF =
+    'Error# SQL error: ParserError("Expected: identifier, found: EOF") <br><span class="text-subtitle1">TraceID: 01a18663607a</span>';
+  const tr = (key: string, params: Record<string, string> = {}) =>
+    (i18n.global as unknown as { t: (k: string, p: object) => string }).t(key, params);
+
+  it("leads with a plain sentence and keeps the raw text and trace id behind the toggle", async () => {
+    const wrapper = mountState({
+      errorMsg: PARSER_EOF,
+      query: "SELECT * FROM",
+      resourceName: "app_logs",
+    });
+
+    const expected = tr("queryError.explain.missingStream", {
+      from: "FROM",
+      example: 'FROM "app_logs"',
+    });
+    expect(wrapper.text()).toContain(expected);
+    expect(wrapper.text()).toContain(tr("queryError.sqlError"));
+    expect(wrapper.find('[data-test="error-detail-summary"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="error-detail-trace-id"]').text()).toContain("01a18663607a");
+    expect(wrapper.find('[data-test="error-detail-body"]').exists()).toBe(false);
+
+    await wrapper.find('[data-test="error-detail-toggle-btn"]').trigger("click");
+    const body = wrapper.find('[data-test="error-detail-body"]').text();
+    expect(body).toContain("ParserError");
+    expect(body).not.toContain("TraceID");
+  });
+
+  it("draws no divider above the toggle when the summary row is absent", () => {
+    const toggleRow = (errorMsg: string) =>
+      mountState({ errorMsg, query: "SELECT * FROM", resourceName: "app_logs" }).find(
+        '[data-test="error-detail-toggle-btn"]',
+      ).element.parentElement!.classList;
+
+    expect(
+      toggleRow('Error# SQL error: ParserError("Expected: identifier, found: EOF")'),
+    ).not.toContain("border-t");
+    expect(toggleRow(PARSER_EOF)).toContain("border-t");
+  });
+
+  it("names the field the backend reported", () => {
+    const wrapper = mountState({
+      errorMsg: "Search field not found: Schema error: No field named nosuchfield.",
+      errorDetail: "",
+    });
+    expect(wrapper.text()).toContain(
+      tr("queryError.explain.unknownField", { name: '"nosuchfield"' }),
+    );
+  });
+
+  it("keeps the generic sentence and the raw summary for an error it does not recognise", () => {
+    const wrapper = mountState({
+      errorMsg: "Search SQL execute error",
+      errorDetail: "something new",
+    });
+
+    expect(wrapper.text()).toContain(tr("queryError.genericDesc"));
+    expect(wrapper.find('[data-test="error-detail-summary"]').text()).toBe(
+      "Search SQL execute error",
+    );
+  });
+
+  it("shows the plain sentence as the summary in the compact layout", () => {
+    const wrapper = mountState({
+      size: "block",
+      errorMsg: "Search stream not found: nosuch",
+    });
+    expect(wrapper.find('[data-test="query-error-summary"]').text()).toBe(
+      tr("queryError.explain.streamNotFound", { name: '"nosuch"' }),
+    );
+  });
+});

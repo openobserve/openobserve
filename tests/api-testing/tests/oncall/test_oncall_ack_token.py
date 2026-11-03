@@ -170,8 +170,9 @@ def minted_ack_token(oncall):
     marker = email.split("@")[0]
 
     team_id = oncall.team_id(uniq("oncall_ack_team"))
-    oncall.set_schedule(team_id, [rotation("R1", "Primary", [shift_rule("L1", [email])])])
     oncall.add_member(team_id, email)
+    resp = oncall.set_schedule(team_id, [rotation("R1", "Primary", [shift_rule("L1", [email])])])
+    assert resp.status_code == 200, f"schedule refused: {resp.status_code} {resp.text}"
 
     page = oncall.open_pages_for([team_id], priority=2)[0]
     link = ack_link_for(marker)

@@ -153,7 +153,7 @@ pub async fn create_ingestion_token(
         (status = 404, description = "Not Found", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Ingestion Token", "operation": "toggle"})),
+        ("x-o2-ratelimit" = json!({"module": "Ingestion Token", "operation": "update"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]

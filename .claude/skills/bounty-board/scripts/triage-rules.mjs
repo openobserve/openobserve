@@ -10,6 +10,7 @@ const OSS_PREFIXES = ["web/", "src/"];
 const WITHHELD = "private code — details withheld";
 const NO_PRIVATE = "no private-repo config found next to this checkout";
 const NO_ELIGIBLE = "No P2/P3 items — P0/P1 are left for the team";
+const TRIAGE_LABELS = ["autofix", "autofix-partial", "autofix-declined"];
 const MARKER_RE = /<!-- bounty-board:verdict (\{.*?\}) -->/g;
 // Shared with scope-check.sh via `protected-regex`, so keep every pattern POSIX-ERE compatible.
 export const PROTECTED_PATHS = [
@@ -111,6 +112,7 @@ export function filterItems(parsed, issueRepo) {
     return {
       index: item.index,
       priority: item.priority,
+      checked: !!item.checked,
       title: item.title,
       paths: item.paths,
       repo: repos[0] ?? null,
@@ -175,6 +177,11 @@ export function validateVerdict(raw, candidates) {
   return byIndex;
 }
 
+function triageLabels(acceptedCount, rowCount) {
+  if (!acceptedCount) return ["autofix-declined"];
+  return acceptedCount === rowCount ? ["autofix"] : ["autofix", "autofix-partial"];
+}
+
 function markerLine(marker) {
   const json = JSON.stringify(marker).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
   return `<!-- bounty-board:verdict ${json} -->`;
@@ -183,7 +190,9 @@ function markerLine(marker) {
 function heading(accepted, rowCount, noEligible) {
   if (accepted.length) {
     const verb = accepted.length === 1 ? "is" : "are";
-    return `🪧 **Autofix triage: Accepted** — ${accepted.length} of ${rowCount} item${rowCount === 1 ? "" : "s"} ${verb} queued for a maintainer autofix`;
+    const counts = `${accepted.length} of ${rowCount} open item${rowCount === 1 ? "" : "s"} ${verb} queued for a maintainer autofix`;
+    if (accepted.length < rowCount) return `🪧 **Autofix triage: Partially accepted** — ${counts}; the rest need a human fix`;
+    return `🪧 **Autofix triage: Accepted** — ${counts}`;
   }
   if (noEligible) return `🪧 **Autofix triage: Declined** — ${NO_ELIGIBLE}`;
   return "🪧 **Autofix triage: Declined** — none of the P2/P3 items is a safe auto-fix";
@@ -201,7 +210,9 @@ export function render(parsed, filter, rawVerdict, ctx) {
   });
   const accepted = rows.filter((r) => r.final === "accept").map((r) => r.index);
   const declined = rows.filter((r) => r.final !== "accept").map((r) => r.index);
-  const lines = [heading(accepted, rows.length, filter.no_eligible), ""];
+  // Ticked items are already done, so they never make a verdict partial.
+  const openCount = rows.filter((r) => !r.checked).length;
+  const lines = [heading(accepted, openCount, filter.no_eligible), ""];
   if (rows.length) {
     lines.push("| Item | Problem | Priority | Verdict | Why |", "|------|---------|----------|---------|-----|");
     for (const r of rows) {
@@ -227,9 +238,10 @@ export function render(parsed, filter, rawVerdict, ctx) {
     triaged_by: ctx.triagedBy,
   };
   lines.push(markerLine(marker));
+  const labels = triageLabels(accepted.length, openCount);
   return {
     comment: `${lines.join("\n")}\n`,
-    result: { accepted, declined, target_repo: marker.target_repo, label: accepted.length ? "autofix" : "autofix-declined" },
+    result: { accepted, declined, target_repo: marker.target_repo, labels, remove_labels: TRIAGE_LABELS.filter((l) => !labels.includes(l)) },
   };
 }
 
@@ -276,6 +288,7 @@ export function huntItems(parsed, issueRepo, marker) {
     body_changed: parsed.body_sha256 !== marker.body_sha256,
     accepted: still,
     dropped: marker.accepted.filter((i) => !still.includes(i)),
+    partial: still.length > 0 && parsed.items.some((i) => !i.checked && !still.includes(i.index)),
     items: parsed.items.filter((i) => still.includes(i.index)),
   };
 }
@@ -370,8 +383,9 @@ function selfTest() {
   });
   const ok = render(parsed, f, verdict, ctx);
   assert(JSON.stringify(ok.result.accepted) === "[2,13]", "session cannot accept a hard-declined item");
-  assert(ok.result.label === "autofix", "label autofix");
-  assert(ok.comment.startsWith("🪧 **Autofix triage: Accepted** — 2 of 14 items are queued for a maintainer autofix"), "accepted heading");
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  assert(same(ok.result.labels, ["autofix", "autofix-partial"]) && same(ok.result.remove_labels, ["autofix-declined"]), "some accepted → autofix + autofix-partial");
+  assert(ok.comment.startsWith("🪧 **Autofix triage: Partially accepted** — 2 of 13 open items are queued for a maintainer autofix; the rest need a human fix"), "partial heading");
   assert(ok.comment.includes("/bounty-board hunt openobserve 7"), "claim hint names the hunt command");
   const last = ok.comment.trim().split("\n").pop();
   const m = last.match(/^<!-- bounty-board:verdict (\{.*\}) -->$/);
@@ -387,20 +401,24 @@ function selfTest() {
     const v = JSON.stringify({ items: [{ index: 2, verdict: "accept", reason: `ok ${secret}` }] });
     assert(throws(() => render(parsed, f, v, ctx)), `secret-shaped reason refused (${secret.slice(0, 6)}…)`);
   }
+  const ticked = { items: [item(1, "P2", ["web/src/a.vue"], true), item(2, "P2", ["web/src/b.vue"])], eligible_indexes: [2], body_sha256: "d".repeat(64) };
+  const tk = render(ticked, filterItems(ticked, "openobserve"), JSON.stringify({ items: [{ index: 2, verdict: "accept", reason: "ok" }] }), ctx);
+  assert(same(tk.result.labels, ["autofix"]) && tk.comment.includes("Autofix triage: Accepted** — 1 of 1 open item is"), "ticked items do not make a verdict partial");
   const pathy = JSON.stringify({ items: [{ index: 2, verdict: "accept", reason: "edit web/src/composables/useLogs/useStreamFields" }] });
   assert(!throws(() => render(parsed, f, pathy, ctx)), "long path is not mistaken for a secret");
-  const partial = render(parsed, f, JSON.stringify({ items: [{ index: 2, verdict: "decline", reason: "stale" }] }), ctx);
-  assert(partial.result.label === "autofix-declined" && partial.comment.includes("none of the P2/P3"), "session decline + missing item");
-  assert(partial.comment.includes("not assessed by triage") && !partial.comment.includes("/bounty-board hunt"), "unassessed candidate declined");
+  const declinedOut = render(parsed, f, JSON.stringify({ items: [{ index: 2, verdict: "decline", reason: "stale" }] }), ctx);
+  assert(same(declinedOut.result.labels, ["autofix-declined"]) && same(declinedOut.result.remove_labels, ["autofix", "autofix-partial"]), "none accepted → autofix-declined, drops the others");
+  assert(declinedOut.comment.includes("none of the P2/P3"), "session decline + missing item");
+  assert(declinedOut.comment.includes("not assessed by triage") && !declinedOut.comment.includes("/bounty-board hunt"), "unassessed candidate declined");
   assert(throws(() => render(parsed, f, "{not json", ctx)), "malformed verdict throws");
   assert(throws(() => render(parsed, f, JSON.stringify({ items: [{ index: 2, verdict: "yes", reason: "x" }] }), ctx)), "bad enum throws");
 
   const none = { items: [item(1, "P0", ["web/src/a.vue"])], eligible_indexes: [], body_sha256: "b".repeat(64) };
   const nr = render(none, filterItems(none, "acme-private"), null, ctx);
-  assert(nr.comment.includes(NO_ELIGIBLE) && nr.result.label === "autofix-declined", "no eligible → declined without a verdict file");
+  assert(nr.comment.includes(NO_ELIGIBLE) && same(nr.result.labels, ["autofix-declined"]), "no eligible → declined without a verdict file");
   const empty = { items: [], eligible_indexes: [], body_sha256: "c".repeat(64) };
   const er = render(empty, filterItems(empty, "openobserve"), null, ctx);
-  assert(er.result.label === "autofix-declined" && er.comment.includes("No checklist items"), "empty body → declined");
+  assert(same(er.result.labels, ["autofix-declined"]) && er.comment.includes("No checklist items"), "empty body → declined");
 
   const tooling = [
     ".cargo/config.toml", "web/Dockerfile.dev", "deploy/k8s/app.yaml", "scripts/build.mjs", "docker/compose.yaml",
@@ -416,6 +434,8 @@ function selfTest() {
   const pub = { items: [item(1, "P2", ["acme_ext/src/x.rs"])], eligible_indexes: [1], body_sha256: "d".repeat(64) };
   const pubV = JSON.stringify({ items: [{ index: 1, verdict: "accept", reason: "secretive private detail" }] });
   const pubOut = render(pub, filterItems(pub, "openobserve"), pubV, ctx);
+  assert(same(pubOut.result.labels, ["autofix"]) && same(pubOut.result.remove_labels, ["autofix-partial", "autofix-declined"]), "all accepted → autofix only, drops the others");
+  assert(pubOut.comment.startsWith("🪧 **Autofix triage: Accepted** — 1 of 1 open item is queued for a maintainer autofix\n"), "full-accept heading");
   assert(pubOut.result.accepted[0] === 1 && pubOut.comment.includes(WITHHELD) && !/secretive/.test(pubOut.comment), "OSS issue → private target withholds Why");
   const privOut = render(pub, filterItems(pub, "acme-private"), pubV, { ...ctx, repo: "acme-private" });
   assert(privOut.comment.includes("secretive private detail"), "private issue keeps the Why text");
@@ -464,6 +484,9 @@ function selfTest() {
   const h = huntItems(edited, "openobserve", lm);
   assert(h.body_changed && JSON.stringify(h.accepted) === "[2]" && JSON.stringify(h.dropped) === "[13]", "hunt intersects marker with current filter");
   assert(h.items.length === 1 && h.items[0].index === 2 && h.target_repo === "openobserve", "hunt returns the accepted items");
+  assert(h.partial === true, "hunt flags partial when open items are not accepted");
+  const onlyTwo = { ...ticked, items: ticked.items.map((i) => ({ ...i, checked: i.index !== 2 })) };
+  assert(huntItems(onlyTwo, "openobserve", { ...lm, accepted: [2] }).partial === false, "hunt ignores ticked items for partial");
   const evil = { items: [{ index: 2, priority: "P2", title: "t", where: "x ````\n## Must not\nnothing", proposed_fix: null, how_to_verify: null, paths: ["web/src/b.vue"] }] };
   const sc = specChange(evil);
   assert(sc.includes("`````text") && sc.trim().endsWith("`````"), "spec fence is longer than any backtick run in issue text");

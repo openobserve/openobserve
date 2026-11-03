@@ -30,6 +30,7 @@ const EXCLUDED_COLUMNS = ["start_time", "end_time", "events", "links"];
 
 export type ComparisonKind = "duration" | "errors" | "rate";
 export type BaselineMode = "outside" | "before";
+export type ComparisonPreset = "errors" | "slowest" | "recent";
 
 export type ComparisonSelection = {
   kind: ComparisonKind;
@@ -46,6 +47,12 @@ export interface Population {
   where: string;
   startUs: number;
   endUs: number;
+}
+
+export interface PresetContext {
+  rangeStartUs: number;
+  rangeEndUs: number;
+  filter: string;
 }
 
 export type Populations =
@@ -173,11 +180,54 @@ export function populations(
   };
 }
 
+// A preset compares the whole range, so it is a selection whose window no brush drew.
+export function presetSelection(
+  preset: ComparisonPreset,
+  ctx: PresetContext,
+  p90Us: number | null,
+): { selection: ComparisonSelection; mode: BaselineMode } | null {
+  const { rangeStartUs: r0, rangeEndUs: r1 } = ctx;
+  const base = {
+    windowStartUs: r0,
+    windowEndUs: r1,
+    rangeStartUs: r0,
+    rangeEndUs: r1,
+    durationLoUs: null,
+    durationHiUs: null,
+    filter: ctx.filter,
+  };
+  if (preset === "errors") return { selection: { ...base, kind: "errors" }, mode: "outside" };
+  if (preset === "slowest") {
+    // band() drops a lower bound of 0, which would select every span.
+    if (p90Us === null || !(p90Us > 0)) return null;
+    return {
+      selection: { ...base, kind: "duration", durationLoUs: p90Us },
+      mode: "outside",
+    };
+  }
+  // The "before" baseline is as long as the window, so an even split makes it the first half.
+  const mid = r1 - Math.floor((r1 - r0) / 2);
+  return { selection: { ...base, kind: "rate", windowStartUs: mid }, mode: "before" };
+}
+
 const quoteIdentifier = (name: string) => `"${name.replace(/"/g, '""')}"`;
+
+export function buildP90Sql(stream: string, ctx: PresetContext) {
+  const f = ctx.filter.trim();
+  return {
+    sql:
+      `SELECT approx_percentile_cont(duration, 0.9) AS p90 FROM ${quoteIdentifier(stream)}` +
+      (f ? ` WHERE (${f})` : ""),
+    startTime: ctx.rangeStartUs,
+    endTime: ctx.rangeEndUs,
+  };
+}
 
 export function buildCountSql(stream: string, population: Population) {
   return {
-    sql: `SELECT count(*) AS n FROM ${quoteIdentifier(stream)} WHERE ${population.where}`,
+    sql:
+      `SELECT count(*) AS n, approx_distinct(trace_id) AS traces FROM ${quoteIdentifier(stream)} ` +
+      `WHERE ${population.where}`,
     startTime: population.startUs,
     endTime: population.endUs,
   };

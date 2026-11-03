@@ -213,7 +213,8 @@ export const azureIntegrations: AzureIntegration[] = [
 export const generateARMTemplateURL = (
   integration: AzureIntegration,
   endpoint: string,
-  accessKey: string,
+  username: string,
+  password: string,
 ): string => {
   if (!integration.armTemplate) return "";
 
@@ -221,7 +222,8 @@ export const generateARMTemplateURL = (
   const parameters = encodeURIComponent(
     JSON.stringify({
       openObserveEndpoint: { value: endpoint },
-      openObserveAccessKey: { value: accessKey },
+      openObserveUsername: { value: username },
+      openObservePassword: { value: password },
     }),
   );
 

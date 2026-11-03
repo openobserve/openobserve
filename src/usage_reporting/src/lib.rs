@@ -684,6 +684,7 @@ mod tests {
             ack_source: None,
             taken_over_from: None,
             delivery_attempted: None,
+            repeat_suppressed: None,
             trigger_source: None,
             triggered_by: None,
             recipient_count: None,

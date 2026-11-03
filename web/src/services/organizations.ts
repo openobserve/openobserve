@@ -16,6 +16,48 @@
 import http from "./http";
 import analytics from "./product_analytics";
 
+// verification_state: 0 pending, 1 verified, 2 failed; failure reason: 0 record missing, 1 value mismatch, 2 DNS failure.
+export interface OrgDomainOwnership {
+  id: string;
+  org_id: string;
+  domain: string;
+  verification_token: string;
+  verification_state: 0 | 1 | 2;
+  verification_failure_reason: 0 | 1 | 2 | null;
+  verified_at: number | null;
+  last_checked_at: number | null;
+  created_at: number;
+  updated_at: number;
+  /** Linked by an approved link request instead of a DNS record, so it is never re-verified. */
+  meta_mapped: boolean;
+}
+
+// status: 0 pending, 1 approved, 2 rejected.
+export interface OrgDomainRequest {
+  id: string;
+  org_id: string;
+  domain: string;
+  created_at: number;
+  updated_at: number;
+  requested_by: string;
+  answered_by: string | null;
+  status: 0 | 1 | 2;
+  reason: string | null;
+}
+
+export interface OrgDomainMapping {
+  domain: string;
+  org_id: string;
+  base_role: string;
+  role_claim_name?: string | null;
+  create_missing_roles: boolean;
+}
+
+export interface BillingGroupMember {
+  member_org_id: string;
+  member_org_name: string;
+}
+
 const organizations = {
   os_list: (
     page_num: number,
@@ -89,6 +131,39 @@ const organizations = {
   },
   post_organization_settings: (orgIdentifier: string, data: any) => {
     return http().post(`/api/${orgIdentifier}/settings`, data);
+  },
+  list_org_domains: (orgIdentifier: string) => {
+    return http().get(`/api/${orgIdentifier}/settings/domains`);
+  },
+  link_org_domain: (orgIdentifier: string, domain: string) => {
+    return http().post(`/api/${orgIdentifier}/settings/domains`, { domain });
+  },
+  unlink_org_domain: (orgIdentifier: string, domain: string) => {
+    return http().delete(`/api/${orgIdentifier}/settings/domains/${encodeURIComponent(domain)}`);
+  },
+  verify_org_domain: (orgIdentifier: string, domain: string) => {
+    return http().post(
+      `/api/${orgIdentifier}/settings/domains/verify/${encodeURIComponent(domain)}`,
+      {},
+    );
+  },
+  list_org_domain_requests: (orgIdentifier: string) => {
+    return http().get(`/api/${orgIdentifier}/settings/domains/requests`);
+  },
+  raise_org_domain_request: (orgIdentifier: string, domain: string) => {
+    return http().post(`/api/${orgIdentifier}/settings/domains/requests`, { domain });
+  },
+  approve_org_domain_request: (orgIdentifier: string, id: string, reason: string) => {
+    return http().post(
+      `/api/${orgIdentifier}/settings/domain/request/${encodeURIComponent(id)}/approve`,
+      { reason },
+    );
+  },
+  reject_org_domain_request: (orgIdentifier: string, id: string, reason: string) => {
+    return http().post(
+      `/api/${orgIdentifier}/settings/domain/request/${encodeURIComponent(id)}/reject`,
+      { reason },
+    );
   },
   get_admin_org: (orgIdentifier: string) => {
     return http().get(`/api/${orgIdentifier}/organizations?page_size=1000000`);

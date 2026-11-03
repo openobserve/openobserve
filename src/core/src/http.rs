@@ -99,12 +99,14 @@ impl From<AlertError> for Response {
             | AlertError::TzOffsetOutOfRange
             | AlertError::CronHasNoFutureOccurrence { .. }
             | AlertError::RecoveryOnRealtimeAlert
+            | AlertError::RepeatSuppressionOnRealtimeAlert
             | AlertError::RecoveryDestinationsWithoutRecovery
             | AlertError::RecoveryDestinationIsPlatform { .. }
             | AlertError::RecoveryNeedsJsonPayload { .. }
             | AlertError::RecoveryNeedsRoutingKey { .. }
             | AlertError::MultiAlertGroupingError(_)
-            | AlertError::GroupByColumnNotFound { .. } => MetaHttpResponse::bad_request(value),
+            | AlertError::GroupByColumnNotFound { .. }
+            | AlertError::JiraDestinationNotSupported { .. } => MetaHttpResponse::bad_request(value),
             // S-16 PR 4. A conflict, not a bad request: the alert being sent is
             // fine on its own terms — it is the SLOs that already exist and
             // measure from it that the request collides with. Both messages

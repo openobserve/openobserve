@@ -47,17 +47,17 @@ use infra::{
 
 use crate::{MAX_DISPATCH_ATTEMPTS as MAX_ATTEMPTS, alerting::ERROR_SOURCE_DISPATCH};
 const TICK: Duration = Duration::from_secs(30);
-/// A run whose last job completed this long ago, still without `completed_at`, lost its
-/// finalization.
+/// A run still open this long after its last job ended lost its finalization.
 const STUCK_RUN_GRACE_US: i64 = 120_000_000;
-/// A run whose last job completed this long ago, still without `completed_at`, lost its
-/// finalization. const STUCK_RUN_GRACE_US: i64 = 120_000_000;
 
-pub async fn run() {
+pub async fn run(stop: crate::StopToken) {
     tracing::info!("[synthetics reaper] started");
 
     loop {
-        tokio::time::sleep(TICK).await;
+        if stop.sleep(TICK).await {
+            tracing::info!("[synthetics reaper] stopped");
+            return;
+        }
 
         let db = get_orm_client_rw().await;
 
@@ -179,21 +179,16 @@ async fn handle_dead_letter(
     // points at a dead agent or a location nothing polls; the other two point at
     // a probe that took the job and stopped talking. They need different
     // responses, so they should not read identically in the record.
-    let error_msg = match row.reason {
-        synthetics_jobs::DeadLetterReason::AttemptsExhausted => format!(
-            "probe did not respond after {} dispatch attempts",
-            row.dispatch_attempts
-        ),
-        synthetics_jobs::DeadLetterReason::Expired => format!(
-            "probe held the check but did not respond before its schedule window closed \
-             (after {} dispatch attempt(s)); the next scheduled run will retry",
-            row.dispatch_attempts
-        ),
-        synthetics_jobs::DeadLetterReason::NeverDispatched => {
-            "no probe claimed the check for this location before its schedule window closed"
-                .to_string()
-        }
-    };
+    // Phase, attempt count and the callback endpoint (o2-enterprise#3165): a
+    // timeout says the probe did not report, not why, so the message names
+    // where it was told to report and stops short of a cause.
+    //
+    // The endpoint is the one resolved NOW, not at dispatch: the job row does
+    // not store the dispatch-time endpoint. Capturing it needs a column
+    // (deferred); until then a config change between dispatch and reaping
+    // would show the new value.
+    let callback = crate::callback_endpoint::current_callback_endpoint();
+    let error_msg = dead_letter_message(row.reason, row.dispatch_attempts, &callback);
 
     // Above the token lookup, which returns early: the triggers half needs no token.
     usage_reporting::publish_triggers_usage(dead_letter_trigger(row, now_us, &error_msg));
@@ -223,6 +218,32 @@ async fn handle_dead_letter(
     let api_endpoint = config::meta::synthetics::api_endpoint();
 
     write_results_stream(row, &ingest_token, &api_endpoint, now_us, &error_msg).await;
+}
+
+/// The dead-letter text for one reason. `callback` must already be sanitized.
+fn dead_letter_message(
+    reason: synthetics_jobs::DeadLetterReason,
+    dispatch_attempts: i32,
+    callback: &str,
+) -> String {
+    match reason {
+        synthetics_jobs::DeadLetterReason::AttemptsExhausted => format!(
+            "probe did not respond after {dispatch_attempts} dispatch attempts \
+             (phase: claimed, no result before the lease ran out); the probe may be unable to reach \
+             the callback endpoint {callback}"
+        ),
+        synthetics_jobs::DeadLetterReason::Expired => format!(
+            "probe held the check but did not respond before its schedule window closed \
+             (phase: claimed, lease expired without a result; after {dispatch_attempts} dispatch attempt(s)); \
+             the probe may be unable to reach the callback endpoint {callback}; \
+             the next scheduled run will retry"
+        ),
+        synthetics_jobs::DeadLetterReason::NeverDispatched => format!(
+            "no probe claimed the check for this location before its schedule window closed \
+             (phase: never claimed; {dispatch_attempts} dispatch attempt(s)); a probe may be \
+             unable to reach the callback endpoint {callback}"
+        ),
+    }
 }
 
 async fn write_results_stream(
@@ -353,5 +374,22 @@ mod tests {
             wire["status"], "error",
             "an alert rule matches the SERIALIZED value, and this row writes `failed` today",
         );
+    }
+
+    #[test]
+    fn dead_letter_messages_name_phase_attempts_and_endpoint() {
+        use infra::table::synthetics_jobs::DeadLetterReason as R;
+        let ep = "https://o2.example.com/api";
+        for (reason, phase) in [
+            (R::AttemptsExhausted, "phase: claimed, no result"),
+            (R::Expired, "phase: claimed, lease expired"),
+            (R::NeverDispatched, "phase: never claimed"),
+        ] {
+            let msg = super::dead_letter_message(reason, 3, ep);
+            assert!(msg.contains(phase), "{msg}");
+            assert!(msg.contains("3 dispatch attempt"), "{msg}");
+            assert!(msg.contains(ep), "{msg}");
+            assert!(msg.contains("may be unable to reach"), "{msg}");
+        }
     }
 }

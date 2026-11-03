@@ -98,6 +98,149 @@ describe("useStreamFields Composable", () => {
       consoleError.mockRestore();
     });
 
+    it("should not apply a stream list fetched for an org the user has left", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.streamResults = { list: [] } as any;
+      const originalOrg = store.state.selectedOrganization.identifier;
+      const fetchQuery = vi.spyOn(queryClient, "fetchQuery").mockImplementationOnce((async () => {
+        store.state.selectedOrganization.identifier = "other-org";
+        return [{ name: "usage", stream_type: "logs" }];
+      }) as any);
+
+      try {
+        await wrapper.vm.getStreamList(false);
+        expect(searchObj.data.streamResults.list).toEqual([]);
+      } finally {
+        fetchQuery.mockRestore();
+        store.state.selectedOrganization.identifier = originalOrg;
+      }
+    });
+
+    it("refetches a cached stream list that lacks a stream the URL names", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamType = "logs";
+      searchObj.data.stream.selectedStream = ["fresh"];
+      searchObj.data.filterErrMsg = "";
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValueOnce([{ name: "old", stream_type: "logs" }] as any)
+        .mockResolvedValueOnce([
+          { name: "old", stream_type: "logs" },
+          { name: "fresh", stream_type: "logs" },
+        ] as any);
+
+      try {
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        expect(fetchQuery).toHaveBeenCalledTimes(2);
+        expect(searchObj.data.stream.selectedStream).toEqual(["fresh"]);
+        expect(searchObj.data.filterErrMsg).toBe("");
+      } finally {
+        fetchQuery.mockRestore();
+      }
+    });
+
+    it("still reports a URL stream that a fresh list does not have", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamType = "logs";
+      searchObj.data.stream.selectedStream = ["gone"];
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValue([{ name: "old", stream_type: "logs" }] as any);
+
+      try {
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        expect(fetchQuery).toHaveBeenCalledTimes(2);
+        expect(searchObj.data.stream.selectedStream).toEqual([]);
+        expect(searchObj.data.filterErrMsg).toContain("gone");
+      } finally {
+        fetchQuery.mockRestore();
+      }
+    });
+
+    it("keeps the cached list when the refetch fails", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamType = "logs";
+      searchObj.data.stream.selectedStream = ["flaky"];
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValueOnce([{ name: "old", stream_type: "logs" }] as any)
+        .mockRejectedValueOnce(new Error("network"));
+
+      try {
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        expect(searchObj.data.streamResults.list.map((s: any) => s.name)).toEqual(["old"]);
+        expect(searchObj.data.filterErrMsg).toContain("flaky");
+      } finally {
+        fetchQuery.mockRestore();
+      }
+    });
+
+    it("retries the refetch on the next load after one failed", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamType = "logs";
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValueOnce([{ name: "old", stream_type: "logs" }] as any)
+        .mockRejectedValueOnce(new Error("network"))
+        .mockResolvedValueOnce([{ name: "old", stream_type: "logs" }] as any)
+        .mockResolvedValueOnce([
+          { name: "old", stream_type: "logs" },
+          { name: "late", stream_type: "logs" },
+        ] as any);
+
+      try {
+        searchObj.data.stream.selectedStream = ["late"];
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        searchObj.data.stream.selectedStream = ["late"];
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        expect(fetchQuery).toHaveBeenCalledTimes(4);
+        expect(searchObj.data.stream.selectedStream).toEqual(["late"]);
+      } finally {
+        fetchQuery.mockRestore();
+      }
+    });
+
+    it("refetches once for a stream a fresh list already lacked", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamType = "logs";
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValue([{ name: "old", stream_type: "logs" }] as any);
+
+      try {
+        searchObj.data.stream.selectedStream = ["deleted"];
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        searchObj.data.stream.selectedStream = ["deleted"];
+        await wrapper.vm.getStreamList(true, { fromUrl: true });
+        expect(fetchQuery).toHaveBeenCalledTimes(3);
+      } finally {
+        fetchQuery.mockRestore();
+      }
+    });
+
+    it("does not refetch when the streams are not from the URL", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamType = "logs";
+      searchObj.data.stream.selectedStream = ["fresh"];
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValue([{ name: "old", stream_type: "logs" }] as any);
+
+      try {
+        await wrapper.vm.getStreamList(false);
+        expect(fetchQuery).toHaveBeenCalledTimes(1);
+      } finally {
+        fetchQuery.mockRestore();
+      }
+    });
+
     it("should have loadStreamFields function", () => {
       expect(typeof wrapper.vm.loadStreamFields).toBe("function");
     });
@@ -401,6 +544,22 @@ describe("useStreamFields Composable", () => {
       };
       await wrapper.vm.loadStreamLists(true);
       expect(searchObj.data.stream.selectedStream).toEqual(["newest"]);
+    });
+
+    it("carries the is_internal flag onto each picker option", async () => {
+      searchObj.data.streamResults = {
+        list: [
+          { name: "app", stats: { doc_time_max: 5 } },
+          { name: "_rumdata", is_internal: true, stats: { doc_time_max: 9 } },
+          { name: "audit", is_internal: false, stats: { doc_time_max: 1 } },
+        ],
+      } as any;
+      await wrapper.vm.loadStreamLists(false);
+      expect(searchObj.data.stream.streamLists).toEqual([
+        { label: "app", value: "app", internal: false },
+        { label: "_rumdata", value: "_rumdata", internal: true },
+        { label: "audit", value: "audit", internal: false },
+      ]);
     });
   });
 

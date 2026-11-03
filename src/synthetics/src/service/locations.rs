@@ -298,7 +298,7 @@ pub(crate) fn location_entry(
 
 // ── Location CRUD ─────────────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateLocationRequest {
     /// "public" (root only, visible to all orgs) | "private" (default).
     #[serde(default = "default_location_kind")]
@@ -329,11 +329,17 @@ fn default_true() -> bool {
     true
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UpdateLocationRequest {
     pub label: String,
-    #[serde(default = "default_true")]
-    pub enabled: bool,
+    /// Omitted keeps the stored value; an explicit `false` disables.
+    #[serde(default)]
+    pub enabled: Option<bool>,
+}
+
+/// The `enabled` value to store: the request's, else the row's current one.
+fn resolve_enabled(requested: Option<bool>, stored: bool) -> bool {
+    requested.unwrap_or(stored)
 }
 
 /// Legacy compat: old UIs sent bare AWS regions ("us-east-1") for public
@@ -380,8 +386,7 @@ pub(crate) async fn location_for_write(
     }
 }
 
-/// Response for a location create: private rows carry the org's `o2syn_`
-/// token and a ready-to-paste agent install command for the setup drawer.
+/// Private rows carry the org's `o2syn_` token, withheld without PUT on the default folder.
 #[derive(Debug, Serialize)]
 pub struct CreateLocationResponse {
     pub location: synthetics_locations::SyntheticsLocationRecord,
@@ -529,7 +534,7 @@ pub struct LocationDetail {
     pub location: LocationEntry,
     pub agents: Vec<LocationAgentInfo>,
     pub checks: Vec<LocationCheckSummary>,
-    /// Install command for private rows (setup drawer's "copy" action).
+    /// Install command for private rows; withheld without PUT on the default folder.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub install: Option<String>,
 }
@@ -595,8 +600,9 @@ pub async fn update_location(
     id: &str,
     req: UpdateLocationRequest,
 ) -> anyhow::Result<synthetics_locations::SyntheticsLocationRecord> {
-    location_for_write(org_id, is_root, id).await?;
-    synthetics_locations::update(id, &req.label, req.enabled).await?;
+    let existing = location_for_write(org_id, is_root, id).await?;
+    let enabled = resolve_enabled(req.enabled, existing.enabled);
+    synthetics_locations::update(id, &req.label, enabled).await?;
     // The two columns the write touched, not the row: sending a row would carry
     // `down_notified_at` with it, and that flag is the claim on the right to
     // send one "location down" notification.
@@ -606,9 +612,7 @@ pub async fn update_location(
         .enabled
     {
         o2_enterprise::enterprise::super_cluster::queue::synthetics_location_update(
-            id,
-            &req.label,
-            req.enabled,
+            id, &req.label, enabled,
         )
         .await?;
     }
@@ -724,6 +728,20 @@ async fn private_location_install(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn label_only_update_preserves_disabled() {
+        let req: UpdateLocationRequest = serde_json::from_str(r#"{"label":"new"}"#).unwrap();
+        assert_eq!(req.enabled, None);
+        assert!(!resolve_enabled(req.enabled, false));
+        assert!(resolve_enabled(req.enabled, true));
+        let req: UpdateLocationRequest =
+            serde_json::from_str(r#"{"label":"new","enabled":false}"#).unwrap();
+        assert!(!resolve_enabled(req.enabled, true));
+        let req: UpdateLocationRequest =
+            serde_json::from_str(r#"{"label":"new","enabled":true}"#).unwrap();
+        assert!(resolve_enabled(req.enabled, false));
+    }
 
     /// Moved from the enterprise config module with the reader it pins.
     ///

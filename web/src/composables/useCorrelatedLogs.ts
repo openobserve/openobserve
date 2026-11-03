@@ -131,7 +131,10 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps, t: TranslateFn) {
   const isLoading = computed(() => loading.value);
   const hasError = computed(() => !!error.value);
   const isEmpty = computed(() => !loading.value && !error.value && !hasResults.value);
-  const totalPages = computed(() => Math.ceil(searchResults.value.length / displayPageSize) || 1);
+  // Streams finish one by one, so the count (and the pager that shows it) waits for the last one.
+  const totalPages = computed(() =>
+    loading.value ? 1 : Math.ceil(searchResults.value.length / displayPageSize) || 1,
+  );
   const pagedResults = computed(() => {
     const start = (currentPage.value - 1) * displayPageSize;
     return searchResults.value.slice(start, start + displayPageSize);
@@ -232,6 +235,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps, t: TranslateFn) {
       const traceContext = generateTraceContext();
       const traceId = traceContext?.traceId || "";
       currentTraceId = traceId;
+      let arrivedTotal = 0;
 
       // Build search query with array of SQL queries
       // The streaming composable auto-detects multi-stream mode when sql is an array (not a string)
@@ -264,7 +268,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps, t: TranslateFn) {
               if (results) {
                 // Accumulate across multi-stream metadata events
                 // Each correlated stream emits its own metadata, so we sum totals and took
-                totalHits.value += results.total || 0;
+                arrivedTotal += results.total || 0;
                 took.value += results.took || 0;
               }
             }
@@ -272,7 +276,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps, t: TranslateFn) {
             // Handle hits event (this has the actual data)
             // Raw backend response: {"hits": [{...}, {...}]}
             // After wsMapper: response.content.results = {"hits": [{...}, {...}]}
-            if (response.type === "search_response_hits") {
+            if (response.type === "search_response_hits" && currentTraceId === traceId) {
               // The results object IS the hits container {"hits": [...]}
               const resultsObj = response.content?.results;
               const hits = resultsObj?.hits || [];
@@ -293,11 +297,13 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps, t: TranslateFn) {
             totalHits.value = 0;
           },
           complete: () => {
+            if (currentTraceId !== traceId) return;
             // Sort merged results from all streams by _timestamp descending
             // _search_multi_stream streams results per-query as they complete,
             // so hits arrive in arbitrary order and need a final global sort
             const timestamp = store.state.zoConfig.timestamp_column || "_timestamp";
             searchResults.value.sort((a, b) => b[timestamp] - a[timestamp]);
+            totalHits.value = arrivedTotal;
             loading.value = false;
             currentTraceId = null;
           },

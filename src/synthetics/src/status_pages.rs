@@ -91,11 +91,20 @@ pub async fn preview_snapshot(
             .push(u);
     }
 
+    // Same state read as the rebuilder, so a preview of an all-Error component
+    // shows NoData exactly as the published snapshot does.
+    let preview_check_ids: Vec<String> = mappings
+        .iter()
+        .map(|m| m.synthetics_id.clone())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    let (states, _) = table::get_check_states(conn, &preview_check_ids, None).await?;
     let data = TickData {
         pages: vec![page.clone()],
         components,
         mappings,
-        states: Vec::new(),
+        states,
         snoozed: HashSet::new(),
         notices: notices.clone(),
     };
@@ -146,7 +155,7 @@ pub async fn refresh_snapshot(org_id: &str, page_id: &str) -> Result<(), infra::
     .await
 }
 
-pub async fn run() {
+pub async fn run(stop: crate::StopToken) {
     let interval = config::get_config()
         .synthetics
         .status_page_rebuild_interval
@@ -158,7 +167,10 @@ pub async fn run() {
     // deletions and refreshes `last_triggered_at` for the dead-probe rule.
     let mut rt = RebuilderState::default();
     loop {
-        tokio::time::sleep(std::time::Duration::from_secs(interval)).await;
+        if stop.sleep(std::time::Duration::from_secs(interval)).await {
+            tracing::info!("[status_pages] rebuilder stopped");
+            return;
+        }
         if let Err(e) = tick(&mut hashes, &mut rt).await {
             tracing::error!("[status_pages] rebuild tick failed: {e}");
         }
@@ -177,6 +189,69 @@ struct RebuilderState {
     /// Highest `updated_at` consumed so far (the delta watermark).
     watermark: i64,
     tick_count: u64,
+}
+
+/// Per-check thresholds from the pages the check is mapped to. A check on
+/// several pages uses the STRICTEST settings (max of each value), so one
+/// result stream never opens or resolves an org-wide notice earlier than any
+/// of its pages allows.
+fn thresholds_by_check(data: &TickData) -> HashMap<String, engine::Thresholds> {
+    let page_of_component: HashMap<&str, &str> = data
+        .components
+        .iter()
+        .map(|c| (c.id.as_str(), c.status_page_id.as_str()))
+        .collect();
+    let page_th: HashMap<&str, engine::Thresholds> = data
+        .pages
+        .iter()
+        .map(|p| (p.id.as_str(), page_thresholds(p)))
+        .collect();
+    let mut out: HashMap<String, engine::Thresholds> = HashMap::new();
+    for m in &data.mappings {
+        let Some(th) = page_of_component
+            .get(m.component_id.as_str())
+            .and_then(|pid| page_th.get(pid))
+        else {
+            continue;
+        };
+        out.entry(m.synthetics_id.clone())
+            .and_modify(|cur| *cur = strictest(*cur, *th))
+            .or_insert(*th);
+    }
+    out
+}
+
+fn page_thresholds(p: &infra::table::entity::status_pages::Model) -> engine::Thresholds {
+    let d = engine::Thresholds::default();
+    engine::Thresholds {
+        confirm_failures: if p.confirm_failures > 0 {
+            p.confirm_failures
+        } else {
+            d.confirm_failures
+        },
+        confirm_recovery: if p.confirm_recovery > 0 {
+            p.confirm_recovery
+        } else {
+            d.confirm_recovery
+        },
+        confirm_after_micros: p
+            .confirm_after_secs
+            .filter(|s| *s > 0)
+            .and_then(|s| (s as i64).checked_mul(1_000_000)),
+    }
+}
+
+// One auto notice per check is shared by every page, so the strictest page's thresholds win.
+fn strictest(a: engine::Thresholds, b: engine::Thresholds) -> engine::Thresholds {
+    engine::Thresholds {
+        confirm_failures: a.confirm_failures.max(b.confirm_failures),
+        confirm_recovery: a.confirm_recovery.max(b.confirm_recovery),
+        // Only time-confirm when every page allows it; then the longest wait.
+        confirm_after_micros: match (a.confirm_after_micros, b.confirm_after_micros) {
+            (Some(x), Some(y)) => Some(x.max(y)),
+            _ => None,
+        },
+    }
 }
 
 async fn tick(
@@ -225,7 +300,8 @@ async fn load(
     // Delta by default; full sweep on the Nth tick. The sweep replaces the
     // cache wholesale (so deleted/unmapped checks drop out); the delta merges
     // only changed rows over the carried cache.
-    let full_sweep = rt.tick_count.is_multiple_of(FULL_SWEEP_TICKS);
+    // Always a full read: a few scalar columns of the mapped checks only.
+    let full_sweep = FULL_SWEEP_TICKS > 0;
     rt.tick_count = rt.tick_count.wrapping_add(1);
     let since = if full_sweep { None } else { Some(rt.watermark) };
     let (changed, max_updated) = table::get_check_states(conn, &check_ids, since).await?;
@@ -343,70 +419,19 @@ async fn apply_engine_actions(
         }
     }
 
-    let thresholds = thresholds_by_check(data);
-    let default_th = engine::Thresholds::default();
-    for check in &checks {
-        let th = thresholds.get(check.id.as_str()).unwrap_or(&default_th);
-        let actions = engine::incident_actions(
-            std::slice::from_ref(check),
-            &open_by_check,
-            &recently_resolved,
-            &data.snoozed,
-            th,
-            now,
-        );
-        for action in actions {
-            apply_one(conn, data, action, now).await?;
-        }
+    let th_by_check = thresholds_by_check(data);
+    let actions = engine::incident_actions_with(
+        &checks,
+        &open_by_check,
+        &recently_resolved,
+        &data.snoozed,
+        |id| th_by_check.get(id).copied().unwrap_or_default(),
+        now,
+    );
+    for action in actions {
+        apply_one(conn, data, action, now).await?;
     }
     Ok(())
-}
-
-/// The thresholds of the pages each check is mapped to; the strictest wins when pages disagree.
-fn thresholds_by_check(data: &TickData) -> HashMap<&str, engine::Thresholds> {
-    let pages: HashMap<&str, engine::Thresholds> = data
-        .pages
-        .iter()
-        .map(|p| {
-            let th = engine::Thresholds::from_page(
-                p.confirm_failures,
-                p.confirm_recovery,
-                p.confirm_after_secs,
-            );
-            (p.id.as_str(), th)
-        })
-        .collect();
-    let component_page: HashMap<&str, &str> = data
-        .components
-        .iter()
-        .map(|c| (c.id.as_str(), c.status_page_id.as_str()))
-        .collect();
-    let mut out: HashMap<&str, engine::Thresholds> = HashMap::new();
-    for m in &data.mappings {
-        let Some(th) = component_page
-            .get(m.component_id.as_str())
-            .and_then(|page_id| pages.get(page_id))
-        else {
-            continue;
-        };
-        out.entry(m.synthetics_id.as_str())
-            .and_modify(|cur| *cur = stricter(cur, th))
-            .or_insert(*th);
-    }
-    out
-}
-
-// One auto notice per check is shared by every page, so the strictest page's thresholds win.
-fn stricter(a: &engine::Thresholds, b: &engine::Thresholds) -> engine::Thresholds {
-    engine::Thresholds {
-        confirm_failures: a.confirm_failures.max(b.confirm_failures),
-        confirm_recovery: a.confirm_recovery.max(b.confirm_recovery),
-        // A page without a time rule waits for the run count, the stricter bar.
-        confirm_after_micros: a
-            .confirm_after_micros
-            .zip(b.confirm_after_micros)
-            .map(|(x, y)| x.max(y)),
-    }
 }
 
 async fn apply_one(
@@ -653,8 +678,19 @@ fn build_page_snapshot(
                 });
             }
         }
-        let has_checks = data.mappings.iter().any(|m| m.component_id == component.id);
-        if !has_checks {
+        let mapped: Vec<&str> = data
+            .mappings
+            .iter()
+            .filter(|m| m.component_id == component.id)
+            .map(|m| m.synthetics_id.as_str())
+            .collect();
+        if mapped.is_empty() {
+            status = engine::ComponentStatus::NoData;
+        } else if status == engine::ComponentStatus::Operational
+            && all_checks_in_error(&mapped, &data.states)
+        {
+            // Every probe is failing to produce a verdict: we cannot say the
+            // service is up, so show "no data" rather than plain Operational.
             status = engine::ComponentStatus::NoData;
         }
         current_components.push(engine::CurrentComponent {
@@ -686,7 +722,24 @@ fn build_page_snapshot(
         generated_at: now,
         components: history_components,
     };
-    (current, history, page_notice_ids.into_iter().collect())
+    // Sorted: HashSet order is random per process, and this list feeds the
+    // serialized snapshot whose hash decides whether to rewrite it.
+    (current, history, sorted_ids(page_notice_ids))
+}
+
+fn sorted_ids(set: HashSet<String>) -> Vec<String> {
+    let mut ids: Vec<String> = set.into_iter().collect();
+    ids.sort_unstable();
+    ids
+}
+
+fn all_checks_in_error(mapped: &[&str], states: &[table::CheckStateRow]) -> bool {
+    mapped.iter().all(|id| {
+        states
+            .iter()
+            .find(|s| s.id == *id)
+            .is_some_and(|s| s.last_check_status == engine::CHECK_STATUS_ERROR)
+    })
 }
 
 fn public_notice(
@@ -756,6 +809,64 @@ pub async fn run_domain_verifier() {
 
 #[cfg(not(feature = "enterprise"))]
 pub async fn run_domain_verifier() {}
+
+#[cfg(test)]
+mod fast_pass_tests {
+    use super::*;
+
+    fn row(id: &str, status: i32) -> table::CheckStateRow {
+        table::CheckStateRow {
+            id: id.into(),
+            org_id: "org".into(),
+            last_check_status: status,
+            down_runs: 0,
+            up_runs: 0,
+            last_triggered_at: 0,
+        }
+    }
+
+    #[test]
+    fn strictest_takes_max_and_requires_time_confirm_everywhere() {
+        let a = engine::Thresholds {
+            confirm_failures: 3,
+            confirm_recovery: 4,
+            confirm_after_micros: Some(10),
+        };
+        let b = engine::Thresholds {
+            confirm_failures: 7,
+            confirm_recovery: 2,
+            confirm_after_micros: None,
+        };
+        let s = strictest(a, b);
+        assert_eq!((s.confirm_failures, s.confirm_recovery), (7, 4));
+        assert_eq!(s.confirm_after_micros, None);
+        let c = engine::Thresholds {
+            confirm_after_micros: Some(30),
+            ..a
+        };
+        assert_eq!(strictest(a, c).confirm_after_micros, Some(30));
+    }
+
+    #[test]
+    fn notice_ids_serialize_in_a_stable_order() {
+        let ids = ["n3", "n1", "n2", "n9", "n0"];
+        let fwd: HashSet<String> = ids.iter().map(|s| s.to_string()).collect();
+        let rev: HashSet<String> = ids.iter().rev().map(|s| s.to_string()).collect();
+        let a = serde_json::to_string(&sorted_ids(fwd)).unwrap();
+        let b = serde_json::to_string(&sorted_ids(rev)).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(a, r#"["n0","n1","n2","n3","n9"]"#);
+    }
+
+    #[test]
+    fn all_error_component_is_not_operational() {
+        let e = engine::CHECK_STATUS_ERROR;
+        let states = vec![row("a", e), row("b", e), row("c", 1)];
+        assert!(all_checks_in_error(&["a", "b"], &states));
+        assert!(!all_checks_in_error(&["a", "c"], &states));
+        assert!(!all_checks_in_error(&["a", "missing"], &states));
+    }
+}
 
 #[cfg(test)]
 mod tests {

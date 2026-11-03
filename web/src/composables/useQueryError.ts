@@ -36,6 +36,7 @@ import DOMPurify from "dompurify";
 import { computed, ref, type ComputedRef, type Ref, type MaybeRefOrGetter, toValue } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import type { I18nKey } from "@/types/i18n";
+import { explainQueryError, type QueryErrorExplanation } from "@/utils/query/queryErrorExplain";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,10 @@ export interface QueryErrorInput {
   errorMsg?: MaybeRefOrGetter<string | undefined>;
   /** SQL parse positions, DataFusion detail, or other raw technical detail. */
   errorDetail?: MaybeRefOrGetter<string | undefined>;
+  /** The SQL the error was raised for; lets the plain-language reading name what is missing. */
+  query?: MaybeRefOrGetter<string | undefined>;
+  /** Stream used as the example in plain-language hints. */
+  streamName?: MaybeRefOrGetter<string | undefined>;
 }
 
 export interface QueryErrorResult {
@@ -78,6 +83,8 @@ export interface QueryErrorResult {
   defaultTitle: ComputedRef<string>;
   /** Default i18n description for the error code. */
   defaultDescription: ComputedRef<string>;
+  /** One plain sentence for a recognised error, or "" when the error is not recognised. */
+  explanation: ComputedRef<string>;
   /** UI toggle for the expandable detail section. */
   showDetail: Ref<boolean>;
   /** Copy all error detail to the clipboard. */
@@ -184,11 +191,20 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
     return msg.slice(0, 157) + "…";
   });
 
+  const explained = computed<QueryErrorExplanation | null>(() =>
+    explainQueryError([cleanMessage.value, rawDetail.value].filter(Boolean).join("\n"), {
+      query: toValue(input.query),
+      streamName: toValue(input.streamName),
+    }),
+  );
+
   /**
    * Everything past the first sentence + the raw errorDetail.
    * Displayed in the collapsible "Show details" panel.
    */
   const detailBody = computed<string>(() => {
+    // A recognised error shows its plain sentence instead, so the whole raw text moves here.
+    if (explained.value) return [cleanMessage.value, rawDetail.value].filter(Boolean).join("\n\n");
     const msg = cleanMessage.value;
     const dotIdx = msg.indexOf(". ");
     const remainder = dotIdx > 0 && dotIdx < 160 ? msg.slice(dotIdx + 2).trim() : "";
@@ -214,8 +230,11 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
       },
   );
 
-  const defaultTitle = computed(() => t(meta.value.titleKey));
+  const defaultTitle = computed(() => t(explained.value?.titleKey ?? meta.value.titleKey));
   const defaultDescription = computed(() => t(meta.value.descKey));
+  const explanation = computed<string>(() =>
+    explained.value ? t(explained.value.messageKey, explained.value.params) : "",
+  );
 
   // ── Clipboard ──────────────────────────────────────────────────────────
 
@@ -240,6 +259,7 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
     isQueryError,
     defaultTitle,
     defaultDescription,
+    explanation,
     showDetail,
     copyErrorDetails,
   };

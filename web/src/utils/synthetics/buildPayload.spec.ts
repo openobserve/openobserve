@@ -20,6 +20,7 @@ import {
   buildCreateProtocolCheckPayload,
   mapResponseToBrowserCheck,
 } from "./buildPayload";
+import { useLocalTimezone } from "../storage";
 
 function journey(): BrowserStep[] {
   return [
@@ -87,6 +88,69 @@ describe("buildCreateBrowserTestPayload", () => {
   });
 });
 
+describe("cron schedule timezone", () => {
+  // Not the runner's zone, so a browser-zone overwrite cannot pass by coincidence.
+  const zone = "Pacific/Chatham";
+  const cronSchedule = (): BrowserCheck["schedule"] => ({
+    type: "cron",
+    cron: "0 0 9 * * *",
+    timezone: zone,
+  });
+  const storedCron = {
+    name: "cron check",
+    target: "https://app.test",
+    enabled: true,
+    tags: [],
+    locations: ["us-east"],
+    frequency: { type: "cron", cron: "0 0 9 * * *", timezone: zone },
+    config: { steps: [] },
+  };
+
+  it("keeps the chosen zone on a scheduled-now browser create", () => {
+    const payload = buildCreateBrowserTestPayload(check({ schedule: cronSchedule() }));
+
+    expect(payload.frequency).toEqual({ type: "cron", cron: "0 0 9 * * *", timezone: zone });
+  });
+
+  it("keeps the stored zone when a browser cron check is edited", () => {
+    const loaded = mapResponseToBrowserCheck(storedCron);
+    const payload = buildCreateBrowserTestPayload({ ...loaded, name: "renamed" });
+
+    expect((payload.frequency as Record<string, unknown>).timezone).toBe(zone);
+  });
+
+  it("gives a zone-less cron the browser zone on create and edit", () => {
+    const browserZone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const created = buildCreateBrowserTestPayload(
+      check({ schedule: { type: "cron", cron: "0 0 9 * * *" } }),
+    );
+    expect((created.frequency as Record<string, unknown>).timezone).toBe(browserZone);
+
+    const loaded = mapResponseToBrowserCheck({
+      ...storedCron,
+      frequency: { type: "cron", cron: "0 0 9 * * *" },
+    });
+    const edited = buildCreateBrowserTestPayload({ ...loaded, name: "renamed" });
+    expect((edited.frequency as Record<string, unknown>).timezone).toBe(browserZone);
+  });
+
+  it("keeps the chosen zone on a protocol create and edit", () => {
+    const protocolCheck = {
+      ...check({ schedule: cronSchedule() }),
+      checkType: "tcp",
+      tcp: { port: 443, timeout_ms: 10000, response_contains: "" },
+    } as unknown as ProtocolCheck;
+    const created = buildCreateProtocolCheckPayload(protocolCheck);
+    expect((created.frequency as Record<string, unknown>).timezone).toBe(zone);
+
+    const edited = buildCreateProtocolCheckPayload({
+      ...protocolCheck,
+      schedule: mapResponseToBrowserCheck(storedCron).schedule,
+    });
+    expect((edited.frequency as Record<string, unknown>).timezone).toBe(zone);
+  });
+});
+
 describe("environments round-trip", () => {
   it("carries environments through the browser payload", () => {
     const payload = buildCreateBrowserTestPayload(check({ environments: ["env-1"] }));
@@ -113,5 +177,70 @@ describe("environments round-trip", () => {
     });
 
     expect(mapped.environments).toEqual(["env-1"]);
+  });
+});
+
+describe("browser config extras (UI-04)", () => {
+  const stored = {
+    name: "api made",
+    target: "https://app.test",
+    enabled: true,
+    tags: [],
+    locations: ["us-east"],
+    frequency: { type: "minutes", interval: 5, cron: "" },
+    config: {
+      steps: [],
+      timeout_ms: 90000,
+      journey_budget_ms: 120000,
+      test_id_attr: "data-qa",
+      runtime: "playwright-1.50",
+      capture: { screenshot: "always", trace: "on-fail", video: "on" },
+      headers: [{ name: "Authorization", value: "Bearer secret" }],
+      secret_blob: "do-not-spread",
+    },
+  };
+
+  it("uses defaults on create", () => {
+    const config = buildCreateBrowserTestPayload(check()).config as Record<string, any>;
+    expect(config.timeout_ms).toBe(30000);
+    expect(config.capture.video).toBe("off");
+    expect("journey_budget_ms" in config).toBe(false);
+    expect("test_id_attr" in config).toBe(false);
+    expect("runtime" in config).toBe(false);
+  });
+
+  it("preserves API-set fields across an unrelated name edit", () => {
+    const loaded = mapResponseToBrowserCheck(stored);
+    const config = buildCreateBrowserTestPayload({ ...loaded, name: "renamed" }).config as Record<
+      string,
+      any
+    >;
+    expect(config.timeout_ms).toBe(90000);
+    expect(config.journey_budget_ms).toBe(120000);
+    expect(config.test_id_attr).toBe("data-qa");
+    expect(config.runtime).toBe("playwright-1.50");
+    expect(config.capture.video).toBe("on");
+  });
+
+  it("does not leak unsupported config keys into the extras", () => {
+    const loaded = mapResponseToBrowserCheck(stored);
+    expect(Object.keys(loaded.browserConfigExtras ?? {}).sort()).toEqual([
+      "journey_budget_ms",
+      "runtime",
+      "test_id_attr",
+      "timeout_ms",
+      "video",
+    ]);
+    expect(JSON.stringify(loaded.browserConfigExtras)).not.toContain("do-not-spread");
+  });
+
+  it("still applies intentional capture edits", () => {
+    const loaded = mapResponseToBrowserCheck(stored);
+    const config = buildCreateBrowserTestPayload({
+      ...loaded,
+      capture: { screenshot: "off", trace: "off" },
+    }).config as Record<string, any>;
+    expect(config.capture.screenshot).toBe("off");
+    expect(config.capture.video).toBe("on");
   });
 });

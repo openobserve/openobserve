@@ -46,6 +46,10 @@ describe("SearchBar — Refresh Cache & Run Query dropdown visibility (#14488)",
         '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /></div>',
       emits: ["select"],
     },
+    ODropdownSub: {
+      name: "ODropdownSub",
+      template: '<div class="o-dropdown-sub-stub"><slot name="trigger" /><slot /></div>',
+    },
     ODropdownSeparator: {
       name: "ODropdownSeparator",
       template: '<div class="o-dropdown-separator-stub" />',

@@ -296,7 +296,7 @@ async fn is_scan_leader() -> bool {
 /// slow scan stalls run accounting, and runs that never complete never notify.
 /// A separate loop cannot do that, and it is free to run at a cadence that
 /// suits the threshold instead of the lease timers.
-pub async fn run() {
+pub async fn run(stop: crate::StopToken) {
     tracing::info!("[synthetics orphan] started");
     if !orphan_detection_enabled() {
         tracing::info!(
@@ -310,7 +310,10 @@ pub async fn run() {
     let mut last_reported: HashMap<String, i64> = HashMap::new();
 
     loop {
-        tokio::time::sleep(ORPHAN_TICK).await;
+        if stop.sleep(ORPHAN_TICK).await {
+            tracing::info!("[synthetics orphan] stopped");
+            return;
+        }
 
         // Read per pass, not captured here: the operator turning this off is
         // reacting to something happening now.

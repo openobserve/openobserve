@@ -40,14 +40,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex h-full min-w-0 flex-col gap-4 lg:overflow-y-auto lg:py-3"
           data-test="rum-analytics-funnel-rail-sections"
         >
+          <slot name="breakdown" />
           <FunnelFilterBar
             :def="def"
             :fields="filterFields"
             :field-types="filterFieldTypes"
             :values="filterValues"
+            :notice="filterNotice"
+            :unit-noun="unitNoun"
             stacked
             @update:def="(d) => emit('update:def', d)"
             @filter-values="(f) => emit('filter-values', f)"
+            @break-down="(f) => emit('break-down', f)"
           />
           <ExclusionSection
             :def="def"
@@ -71,24 +75,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @edit="emit('edit-app-filters')"
             />
           </div>
-          <FunnelSectionRow
-            :title="t('rum.analytics.funnel.railSettings')"
-            stacked
-            boxed
-            test-id="rum-analytics-funnel-rail-settings"
-          >
-            <template v-for="(s, i) in settings" :key="s.id">
-              <span v-if="i > 0" class="text-text-secondary" aria-hidden="true">{{
-                separator
-              }}</span>
-              <span
-                class="text-text-secondary"
-                :title="s.label"
-                :data-test="`rum-analytics-funnel-rail-setting-${s.id}`"
-                >{{ s.value }}</span
-              >
-            </template>
-          </FunnelSectionRow>
         </aside>
       </template>
       <template #separator>
@@ -164,7 +150,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex flex-col gap-2">
               <slot name="notices" />
-              <div v-if="!failed" class="flex min-w-0 flex-col" data-test="rum-analytics-funnel">
+              <slot v-if="trend" name="trend" />
+              <div
+                v-else-if="!failed"
+                class="flex min-w-0 flex-col overflow-x-auto"
+                data-test="rum-analytics-funnel"
+              >
                 <FunnelStepsTable
                   :def="def"
                   :result="result"
@@ -177,8 +168,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :unit-label="unitLabel"
                   :unit-noun="unitNoun"
                   :hide-time="hideTime"
+                  :compare="compare"
+                  :field-sample="fieldSample"
+                  :field-sample-state="fieldSampleState"
+                  :filter-values="filterValues"
                   @update:def="(d) => emit('update:def', d)"
                   @dropoff="(k) => emit('dropoff', k)"
+                  @filter-values="(f) => emit('filter-values', f)"
+                  @load-fields="emit('load-fields')"
+                  @break-down-step="(k) => emit('break-down-step', k)"
+                  @trend-from-step="(k) => emit('trend-from-step', k)"
                 />
               </div>
               <slot name="footer" />
@@ -202,7 +201,6 @@ import FunnelStepsTable from "@/components/rum/productAnalytics/funnelParts/Funn
 import FunnelAddStep from "@/components/rum/productAnalytics/funnelParts/FunnelAddStep.vue";
 import ExclusionSection from "@/components/rum/productAnalytics/funnelParts/ExclusionSection.vue";
 import FunnelFilterBar from "@/components/rum/productAnalytics/funnelParts/FunnelFilterBar.vue";
-import FunnelSectionRow from "@/components/rum/productAnalytics/funnelParts/FunnelSectionRow.vue";
 import AppFiltersSummary from "@/components/rum/productAnalytics/funnelParts/AppFiltersSummary.vue";
 import { removedByStep } from "@/components/rum/productAnalytics/funnelParts/funnelEdits";
 import type {
@@ -210,7 +208,7 @@ import type {
   FunnelLayoutProps,
   FunnelLayoutSlots,
 } from "@/components/rum/productAnalytics/funnelLayouts/types";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 defineOptions({ name: "FunnelLayoutRail" });
 
@@ -218,7 +216,6 @@ const props = defineProps<FunnelLayoutProps>();
 const emit = defineEmits<FunnelLayoutEmits>();
 defineSlots<FunnelLayoutSlots>();
 const { t } = useI18nTyped();
-const separator = raw("·");
 const COLLAPSED_KEY = "o2.rum.analytics.funnelRailCollapsed";
 const WIDTH_KEY = "o2.rum.analytics.funnelRailWidth";
 // Widths in rem, measured: below 17 the rail's switch label wraps; past 30 no chip gains anything.
@@ -226,8 +223,11 @@ const RAIL_MIN_REM = 17;
 const RAIL_DEFAULT_REM = 22;
 const RAIL_MAX_REM = 30;
 // The table's fixed columns plus a Step column that keeps a typical step name on one or two lines.
-const TABLE_MIN_REM = 55;
-const TABLE_MIN_NO_TIME_REM = 46;
+const TABLE_MIN_REM = 58.5;
+const TABLE_MIN_NO_TIME_REM = 49.5;
+// The previous-period and change columns; past the rail's minimum the table scrolls inside the card.
+const TABLE_COMPARE_EXTRA_REM = 13;
+const TREND_MIN_REM = 40;
 const SEPARATOR_REM = 2;
 
 const adding = ref(false);
@@ -251,6 +251,10 @@ const toggleCollapsed = () => {
   }
 };
 
+const expand = () => {
+  if (collapsed.value) toggleCollapsed();
+};
+
 const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 const frame = ref<HTMLElement | null>(null);
 const frameWidth = ref(0);
@@ -266,7 +270,10 @@ try {
 const limits = computed<[number, number]>(() => {
   const r = rem();
   const min = RAIL_MIN_REM * r;
-  const table = (props.hideTime ? TABLE_MIN_NO_TIME_REM : TABLE_MIN_REM) * r;
+  const steps =
+    (props.hideTime ? TABLE_MIN_NO_TIME_REM : TABLE_MIN_REM) +
+    (props.compare ? TABLE_COMPARE_EXTRA_REM : 0);
+  const table = (props.trend ? TREND_MIN_REM : steps) * r;
   const room = frameWidth.value ? frameWidth.value - SEPARATOR_REM * r - table : RAIL_MAX_REM * r;
   return [min, Math.max(min, Math.min(RAIL_MAX_REM * r, room))];
 });
@@ -304,4 +311,6 @@ watch(
     if (n > was) adding.value = false;
   },
 );
+
+defineExpose({ expand, collapsed: computed(() => collapsed.value) });
 </script>

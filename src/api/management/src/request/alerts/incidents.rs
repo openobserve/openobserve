@@ -267,6 +267,16 @@ pub async fn update_incident(
             }
         }
         UpdatePayload::Status { status } => {
+            if let Err(e) = openobserve_core::alerts::incidents::authorize_status(
+                &org_id,
+                &incident_id,
+                status.as_str(),
+                &user_id,
+            )
+            .await
+            {
+                return crate::request::alerts::ack::error_response(e);
+            }
             match openobserve_core::alerts::incidents::update_status(
                 &org_id,
                 &incident_id,
@@ -297,7 +307,7 @@ pub async fn update_incident(
     tag = "Incidents",
     operation_id = "GetExternalAlertPayload",
     summary = "Get the raw payload of an external alert",
-    description = "Retrieves the original, unmodified webhook payload received for an external alert event. Used to inspect exactly what a source system (Grafana, Alertmanager, etc.) sent.",
+    description = "Retrieves the original, unmodified webhook payload received for an external alert event. Used to inspect exactly what the source system sent.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -309,7 +319,7 @@ pub async fn update_incident(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get the raw payload of an external alert", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"enabled": false, "description": "Get the raw payload of an external alert", "category": "alerts"}))
     )
 )]
 pub async fn get_external_alert_payload(
@@ -1623,6 +1633,26 @@ pub async fn get_incident_rca_live_stream(
 
 /// Get incident events timeline
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/events",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentEvents",
+    summary = "Get the event timeline of an incident",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn get_incident_events(Path((org_id, incident_id)): Path<(String, String)>) -> Response {
     let events = match infra::table::incident_events::get(&org_id, &incident_id).await {
         Ok(events) => events,
@@ -1662,12 +1692,53 @@ pub async fn get_incident_events(Path((org_id, incident_id)): Path<(String, Stri
 
 /// Get incident events timeline (OSS)
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/events",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentEvents",
+    summary = "Get the event timeline of an incident",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn get_incident_events(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
 /// Post a comment on an incident
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/events/comment",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "AddIncidentComment",
+    summary = "Add a comment to an incident",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident id"),
+    ),
+    request_body(content = CommentRequest, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn post_incident_comment(
     Path((org_id, incident_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
@@ -1692,6 +1763,27 @@ pub async fn post_incident_comment(
 
 /// Post a comment (OSS)
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/events/comment",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "AddIncidentComment",
+    summary = "Add a comment to an incident",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident id"),
+    ),
+    request_body(content = CommentRequest, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn post_incident_comment(
     _path: Path<(String, String)>,
     _headers: Headers<UserEmail>,
@@ -1810,7 +1902,7 @@ pub async fn get_incident(_path: Path<(String, String)>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get the raw payload of an external alert", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"enabled": false, "description": "Get the raw payload of an external alert", "category": "alerts"}))
     )
 )]
 pub async fn get_external_alert_payload(_path: Path<(String, String)>) -> Response {

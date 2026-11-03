@@ -236,6 +236,7 @@ const step1Title = computed(() =>
 // omits keeps its schema default (used for edit prefill).
 function mergeObjects(base: any, updates: any) {
   for (const key in updates) {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
     if (updates[key] !== null && typeof updates[key] === "object" && !Array.isArray(updates[key])) {
       base[key] = mergeObjects(base[key] || {}, updates[key]);
     } else {

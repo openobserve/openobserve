@@ -64,7 +64,7 @@ import ActivityTimeline from "@/components/shared/ActivityTimeline.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { getActivityAvatarColor, formatActivityRelativeTime } from "@/utils/activityTimeline";
-import { DEFAULT_ACTIVITY_KINDS } from "@/utils/oncall";
+import { DEFAULT_ACTIVITY_KINDS, rungStillRetrying } from "@/utils/oncall";
 import type { OnCallResponseEvent, ResponseEventKind } from "@/ts/interfaces/oncall";
 
 interface Props {
@@ -188,7 +188,7 @@ const getInlineHtml = (event: OnCallResponseEvent): string => {
       t("oncall.atRung", { delay: formatMicrosDuration(event.rung_micros) }),
     )})</span>`;
   }
-  if (event.kind === "page" && event.delivered === false) {
+  if (rungStillRetrying(event, props.events)) {
     html += ` <span style="font-weight: 600; color: var(--color-error-500);">— ${esc(
       t("oncall.rungReachedNobodyRetrying"),
     )}</span>`;

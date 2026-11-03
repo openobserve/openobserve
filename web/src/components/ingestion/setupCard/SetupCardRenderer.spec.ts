@@ -747,6 +747,25 @@ describe("SetupCardRenderer — Linux install step tracing toggle", () => {
     expect(step().props("done")).toBe(true);
   });
 
+  it("shows the network flows command only once a CIDR is given, with no toggle", async () => {
+    wrapper = mountLinux();
+    const step = () => wrapper.find('[data-test="ai-step-network"]');
+    expect(step().find('[data-test="ai-variant-tabs"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-variant-require-network"]').exists()).toBe(true);
+    expect(step().findComponent(OCodeBlock).exists()).toBe(false);
+
+    await type("networkFlows", "10.0.1.5/32=web1,0.0.0.0/0=other");
+    expect(wrapper.find('[data-test="ai-variant-require-network"]').exists()).toBe(false);
+    expect(
+      step()
+        .findComponent(OCodeBlock)
+        .props("code")
+        .endsWith(`${BASE_TAIL} --network-flows '10.0.1.5/32=web1,0.0.0.0/0=other'`),
+    ).toBe(true);
+    // The install step is untouched by the network field.
+    expect(installBlock().props("code").endsWith(BASE_TAIL)).toBe(true);
+  });
+
   it("leaves step-level inputs where they were (Kubernetes cluster name)", async () => {
     wrapper = mount(SetupCardRenderer, {
       props: { content: kubernetesCard(LINUX_SUBS, gt), subs: LINUX_SUBS },
@@ -775,7 +794,12 @@ describe("SetupCardRenderer — Kubernetes instrument step (nested toggle)", () 
 helm --namespace openobserve-collector upgrade o2c openobserve/openobserve-collector \\
   --version '>=0.6.0' --reset-then-reuse-values \\
   --set ebpf.enabled=true`;
-  const codes = () => wrapper.findAllComponents(OCodeBlock).map((b) => b.props("code") as string);
+  // Scoped to the instrument step: the network flows step below also runs `upgrade o2c`.
+  const codes = () =>
+    wrapper
+      .find('[data-test="ai-step-instrument"]')
+      .findAllComponents(OCodeBlock)
+      .map((b) => b.props("code") as string);
   const instrumentCode = () =>
     codes().find((c) => c.includes("kubectl annotate") || c.includes("upgrade o2c"));
   const field = (id: string) => wrapper.find(`[data-test="ai-input-${id}"]`);

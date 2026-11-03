@@ -410,7 +410,10 @@ pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
 
 pub async fn update_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
     reject_unsupported_nodes(&workflow)?;
-    db::workflows::update_draft_record(workflow.clone()).await?;
+    // a 0-row update must not be replayed: peers would insert it as a new draft
+    if db::workflows::update_draft_record(&workflow.org_id, workflow.clone()).await? == 0 {
+        return Ok(());
+    }
     db::workflows::notify_draft_upsert(&workflow).await?;
     Ok(())
 }
@@ -634,7 +637,10 @@ pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error
 }
 
 pub async fn delete_draft(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
-    db::workflows::delete_draft_record(id).await?;
+    // a 0-row delete must not drop the owner's tuple or replay unscoped to peers
+    if db::workflows::delete_draft_record(org_id, id).await? == 0 {
+        return Ok(());
+    }
     remove_ownership(org_id, "workflows", Authz::new(id)).await;
     db::workflows::notify_draft_delete(id).await?;
     Ok(())

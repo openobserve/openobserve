@@ -95,6 +95,152 @@ jobs:
 
           echo "::endgroup::"
 
+      - name: Check rerun advice
+        id: advice
+        continue-on-error: true
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          COMMENT_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}   # PAT: comment as a human, not github-actions[bot]
+          OSS_REPO: openobserve/openobserve
+          RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          PR_BASE: ${{ github.event.workflow_run.pull_requests[0].base.ref }}
+        run: |
+          MARKER="<!-- playwright-rerun-advice -->"
+          if ! RUN=$(gh run view "$RUN_ID" --repo "$GH_REPO" --json name,attempt,event,headSha,headBranch,url); then
+            echo "::warning::Could not read run $RUN_ID; rerunning the failed jobs as before."
+            exit 0
+          fi
+          ATTEMPT=$(jq -r '.attempt' <<< "$RUN")
+          # A manual start meets attempt 2+ because the automatic path always reruns attempt 1 first.
+          if [ "$(jq -r '.name' <<< "$RUN")" != "Playwright UI Tests" ] || ! [[ "$ATTEMPT" =~ ^[0-9]+$ ]] ||
+             { [ "$EVENT_NAME" != "workflow_dispatch" ] && [ "$ATTEMPT" != "1" ]; }; then
+            echo "Rerun advice only covers Playwright UI Tests (first attempt, or the latest attempt when started by hand)."
+            exit 0
+          fi
+          RUN_EVENT=$(jq -r '.event' <<< "$RUN")
+          HEAD_SHA=$(jq -r '.headSha' <<< "$RUN")
+          PR=""
+          BASE=""
+          if [ "$RUN_EVENT" = "pull_request" ]; then
+            PR="$PR_NUMBER"
+            BASE="$PR_BASE"
+            # Fork PRs leave workflow_run.pull_requests empty and are not found by commits/{sha}/pulls.
+            if [ -z "$PR" ]; then
+              read -r PR BASE <<< "$(GH_TOKEN="$COMMENT_TOKEN" gh pr list --repo "$GH_REPO" --search "$HEAD_SHA" --state open \
+                --json number,baseRefName --jq '.[0] // empty | "\(.number) \(.baseRefName)"' 2>/dev/null)" || true
+            fi
+          else
+            BASE=$(jq -r '.headBranch' <<< "$RUN")
+          fi
+
+          newer_on_main() {
+            local latest status
+            latest=$(gh api "repos/$OSS_REPO/commits?sha=main&path=$1&per_page=1" --jq '.[0].sha // empty') || return 2
+            [ -n "$latest" ] || return 1
+            status=$(gh api "repos/$OSS_REPO/compare/$TESTED_SHA...$latest" --jq '.status') || return 2
+            # diverged: the tested commit is off main (a PR merge commit or a paired openobserve branch) and lacks that commit.
+            case "$status" in
+              ahead|diverged) return 0 ;;
+              behind|identical) return 1 ;;
+              *) return 2 ;;
+            esac
+          }
+
+          decide() {
+            local count files f rc newer="" all=true
+            if ! count=$(jq -r '.failed_count' "$1" 2>/dev/null) || ! [[ "$count" =~ ^[0-9]{1,6}$ ]]; then
+              NOTE="No rerun advice from this run (missing, unreadable or failed_count -1); rerunning the failed jobs as before."
+              return
+            fi
+            if [ "$count" -ge 25 ]; then
+              MESSAGE="$count tests failed at once, which usually means the server or runner broke rather than the tests; rerunning only the failed tests."
+              return
+            fi
+            # Release and feature branches lag main by design, so comparing them with main would skip every rerun.
+            if [ "$BASE" != "main" ]; then
+              NOTE="This run's base is '${BASE:-unknown}', not main, so the newer-on-main check is skipped; rerunning the failed jobs."
+              return
+            fi
+            if ! files=$(jq -r '.failed_files | if type == "array" and all(.[]; type == "string") then unique[] else error end' "$1" 2>/dev/null) ||
+               ! TESTED_SHA=$(jq -r '.tested_oss_sha' "$1") || ! [[ "$TESTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              NOTE="Rerun advice was unreadable; rerunning the failed jobs as before."
+              return
+            fi
+            mapfile -t FILES < <(printf '%s' "$files")
+            if [ "${#FILES[@]}" -eq 0 ] || [ "${#FILES[@]}" -gt "$count" ]; then
+              NOTE="No usable list of failed test files ($count failed tests); rerunning the failed jobs as before."
+              return
+            fi
+            for f in "${FILES[@]}"; do
+              # The artifact may come from a fork PR, so only well-formed paths reach the API and the comment.
+              if ! [[ "$f" =~ ^tests/ui-testing/[A-Za-z0-9._/-]+$ ]] || [[ "$f" == *..* ]]; then
+                NOTE="Rerun advice listed an unexpected file path; rerunning the failed jobs as before."
+                return
+              fi
+              rc=0
+              newer_on_main "$f" || rc=$?
+              case "$rc" in
+                0) newer+="- \`$f\`"$'\n' ;;
+                1) all=false ;;
+                *) NOTE="Could not compare the failed test files with main (GitHub API error); rerunning the failed jobs as before."
+                   return ;;
+              esac
+            done
+            if [ -z "$newer" ]; then
+              NOTE="No failed test file has a newer version on main than the copy this run tested; rerunning the failed jobs."
+            elif [ "$all" != true ]; then
+              MESSAGE="Rerunning the failed tests. Some failed test files have a newer version on main than the copy this run tested, so the rerun replays the old copies of these:"$'\n\n'"$newer"$'\n'"$HOW_TO_UPDATE to test them with the newer versions."
+            elif [ "$RUN_EVENT" != "pull_request" ]; then
+              MESSAGE="Rerunning the failed tests, because only pull request runs skip reruns (the PR comment explains the skip). Every failed test file has a newer version on main than the copy this run tested, so the rerun replays the old copies of these:"$'\n\n'"$newer"
+            else
+              SKIP=true
+              MESSAGE="Not rerunning. Every failed test file has a newer version on main than the copy this run tested:"$'\n\n'"$newer"$'\n'"A rerun would replay the old copies. $HOW_TO_UPDATE to test with the newer versions."
+            fi
+          }
+
+          upsert_comment() {
+            local me cid
+            # The PAT can edit anyone's comment, so only a marker comment it wrote itself is updated.
+            me=$(GH_TOKEN="$COMMENT_TOKEN" gh api user --jq .login) && [ -n "$me" ] || return 1
+            cid=$(GH_TOKEN="$COMMENT_TOKEN" gh api "repos/$GH_REPO/issues/$PR/comments" --paginate \
+                    -q ".[] | select(.user.login == \"$me\" and (.body | contains(\"$MARKER\"))) | .id") || return 1
+            cid=${cid%%$'\n'*}
+            if [ -n "$cid" ]; then
+              GH_TOKEN="$COMMENT_TOKEN" gh api -X PATCH "repos/$GH_REPO/issues/comments/$cid" -f body="$1" > /dev/null
+            else
+              GH_TOKEN="$COMMENT_TOKEN" gh api -X POST "repos/$GH_REPO/issues/$PR/comments" -f body="$1" > /dev/null
+            fi
+          }
+
+          HOW_TO_UPDATE="Push again or rebase (for Enterprise runs, the openobserve branch with the same name)"
+          SKIP=false
+          MESSAGE=""
+          NOTE=""
+          COMMENTED=false
+          DIR=$(mktemp -d)
+          gh run download "$RUN_ID" --repo "$GH_REPO" -n "rerun-advice-attempt-$ATTEMPT" -D "$DIR" > /dev/null 2>&1 || true
+          decide "$DIR/rerun-advice.json"
+          if [ -n "$MESSAGE" ] && [[ "$PR" =~ ^[0-9]+$ ]] && [ -n "$COMMENT_TOKEN" ]; then
+            BODY="$MARKER"$'\n'"### Playwright rerun advice"$'\n\n'"Run: $(jq -r '.url' <<< "$RUN") (commit \`${HEAD_SHA:0:10}\`)"$'\n\n'"$MESSAGE"
+            if upsert_comment "$BODY"; then
+              COMMENTED=true
+              echo "Upserted the rerun advice comment on PR #$PR."
+            else
+              echo "::warning::Could not post the rerun advice comment on PR #$PR."
+            fi
+          fi
+          # A silent skip leaves a red check nobody explains, so skipping needs the PR comment to land.
+          if [ "$SKIP" = true ] && [ "$COMMENTED" != true ]; then
+            SKIP=false
+            MESSAGE="Rerunning anyway, because this advice could not be posted on the PR. ${MESSAGE#Not rerunning. }"
+          fi
+          echo "skip_rerun=$SKIP" >> "$GITHUB_OUTPUT"
+          { echo "### Playwright rerun advice"; echo; echo "${MESSAGE:-$NOTE}"; } >> "$GITHUB_STEP_SUMMARY"
+          echo "${MESSAGE:-$NOTE}"
+
       - name: Verify workflow status and trigger rerun
         env:
           GH_REPO: ${{ github.repository }}
@@ -102,6 +248,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           WR_ID: ${{ github.event.workflow_run.id }}
           INPUT_RUN_ID: ${{ inputs.run_id }}
+          SKIP_RERUN: ${{ steps.advice.outputs.skip_rerun }}
         run: |
           echo "::group::Determining workflow run ID"
 
@@ -158,6 +305,11 @@ jobs:
 
           echo "::notice::✅ Workflow is eligible for rerun"
           echo "::endgroup::"
+
+          if [ "$SKIP_RERUN" = "true" ]; then
+            echo "::notice::Not rerunning: every failed test file has a newer version on main than the copy this run tested (see the job summary)."
+            exit 0
+          fi
 
           # Trigger the rerun
           echo "::group::Triggering workflow rerun"

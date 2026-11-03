@@ -81,6 +81,7 @@ use crate::{
             custom::{VarValue, process_variable_replace},
             derive_channel_format,
             format::ChannelFormat,
+            jira,
             modifiers::{PreparedTemplate, prepare_modifiers},
             platform::{self, platform_of},
             render,
@@ -327,6 +328,8 @@ pub enum AlertError {
     CronHasNoFutureOccurrence { cron: String },
     #[error("Realtime alerts cannot notify on recovery or keep firing")]
     RecoveryOnRealtimeAlert,
+    #[error("Realtime alerts cannot suppress repeat notifications")]
+    RepeatSuppressionOnRealtimeAlert,
     #[error("recovery destinations were set without notify_on_recovery, so nothing would use them")]
     RecoveryDestinationsWithoutRecovery,
     #[error(
@@ -352,6 +355,8 @@ pub enum AlertError {
     MultiAlertGroupingError(String),
     #[error("Group by column {column} not found on stream {stream_name}")]
     GroupByColumnNotFound { column: String, stream_name: String },
+    #[error("{reason}")]
+    JiraDestinationNotSupported { destination: String, reason: String },
 }
 
 /// What a manual trigger did: sent, with its messages, or held by an active downtime.
@@ -559,6 +564,33 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
                 destination: dest_name.clone(),
                 platform: format!("{platform:?}"),
                 template: template.name.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Jira keeps one issue per alert, so it refuses alerts that would send for several at once.
+pub(crate) async fn validate_jira_destinations(
+    org_id: &str,
+    alert: &Alert,
+) -> Result<(), AlertError> {
+    for dest_name in alert
+        .destinations
+        .iter()
+        .chain(&alert.recovery_destinations)
+    {
+        if let Ok(destination) = db::alerts::destinations::get(org_id, dest_name).await
+            && let Module::Alert {
+                destination_type: DestinationType::Http(endpoint),
+                ..
+            } = &destination.module
+            && jira::is_jira(endpoint)
+            && let Some(reason) = jira::save_refusal(alert, dest_name)
+        {
+            return Err(AlertError::JiraDestinationNotSupported {
+                destination: dest_name.clone(),
+                reason,
             });
         }
     }
@@ -860,7 +892,7 @@ async fn prepare_alert(
             if max_query_range > 0
                 && !alert.query_condition.promql_rule_mode
                 && !alert.is_real_time
-                && alert.trigger_condition.period > max_query_range * 60
+                && alert.trigger_condition.period > max_query_range.saturating_mul(60)
             {
                 return Err(AlertError::PeriodExceedsMaxQueryRange {
                     max_query_range_hours: max_query_range,
@@ -894,6 +926,10 @@ async fn prepare_alert(
     // that cannot arrive.
     if alert.is_real_time && (alert.notify_on_recovery || alert.keep_firing_for != 0) {
         return Err(AlertError::RecoveryOnRealtimeAlert);
+    }
+    // A realtime alert keeps no state row, so it has no last delivered state to compare against.
+    if alert.is_real_time && alert.suppress_repeats {
+        return Err(AlertError::RepeatSuppressionOnRealtimeAlert);
     }
 
     // Multi-level thresholds (alerts_2.md Feature 1). Rejected at write time so
@@ -1010,6 +1046,8 @@ async fn prepare_alert(
 
     validate_recovery_templates(org_id, alert).await?;
 
+    validate_jira_destinations(org_id, alert).await?;
+
     // PromQL carries a third threshold family: the condition value baked into
     // the query. Its warning needs the same §4.5 direction check, measured
     // against `promql_condition.operator`.
@@ -1055,7 +1093,7 @@ async fn prepare_alert(
                     let max_query_range = settings.max_query_range;
                     if max_query_range > 0
                         && !alert.is_real_time
-                        && alert.trigger_condition.period > max_query_range * 60
+                        && alert.trigger_condition.period > max_query_range.saturating_mul(60)
                     {
                         return Err(AlertError::PeriodExceedsMaxQueryRange {
                             max_query_range_hours: max_query_range,
@@ -3281,6 +3319,12 @@ async fn send_to_destination_type(
     template: &Template,
     ctx: &mut NotificationContext,
 ) -> Result<String, anyhow::Error> {
+    // Jira builds its own text and keeps one issue per alert, so no template is rendered for it.
+    if let DestinationType::Http(endpoint) = dest_type
+        && jira::is_jira(endpoint)
+    {
+        return jira::send(endpoint, ctx).await;
+    }
     let is_email = matches!(dest_type, DestinationType::Email(_));
     let empty_meta = hashbrown::HashMap::new();
     let metadata: &hashbrown::HashMap<String, String> = match dest_type {
@@ -3528,6 +3572,10 @@ fn members_to_send(kept: Vec<String>, skipped: &[String]) -> Result<Email, anyho
 }
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
+    // A plain body posted at a Jira site root does nothing, so senders without a Jira branch fail.
+    if jira::is_jira(endpoint) {
+        return Err(anyhow::anyhow!(jira::UNSUPPORTED_SENDER));
+    }
     // Block SSRF: validate the destination URL (including DNS resolution) before
     // making any outbound request. The client is built through `build_safe_destination_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.
@@ -4198,6 +4246,13 @@ async fn build_notification_context(
             alert.trigger_condition.warning_threshold.map(|w| w as f64),
         )
     };
+    let family_operator = if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+        agg.having.operator.to_string()
+    } else if let Some(pc) = alert.query_condition.promql_condition.as_ref() {
+        pc.operator.to_string()
+    } else {
+        alert.trigger_condition.operator.to_string()
+    };
     let mut vars = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
         for (key, value) in row.iter() {
@@ -4310,6 +4365,17 @@ async fn build_notification_context(
             // link must not cost a notification either way.
             None => String::new(),
         }
+    } else if alert.stream_type == StreamType::Traces {
+        // The traces page takes a filter expression in `query`, not SQL, so the query is left out.
+        format!(
+            "{}{}/web/traces?stream={}&from={}&to={}&org_identifier={}&tab=spans",
+            cfg.common.web_url,
+            cfg.common.base_uri,
+            alert.stream_name,
+            alert_start_time,
+            alert_end_time,
+            alert.org_id
+        )
     } else {
         match alert.query_condition.query_type {
             QueryType::SQL => {
@@ -4369,6 +4435,8 @@ async fn build_notification_context(
         stream_type: alert.stream_type.as_str().to_string(),
         stream_name: alert.stream_name.clone(),
         alert_name: alert.name.clone(),
+        alert_id: alert.id.map(|id| id.to_string()).unwrap_or_default(),
+        incident_id: String::new(),
         alert_type: alert_type.to_string(),
         alert_period: alert.trigger_condition.period.to_string(),
         alert_operator: alert.trigger_condition.operator.to_string(),
@@ -4404,6 +4472,7 @@ async fn build_notification_context(
             fmt_observed(family_crit)
         },
         alert_threshold_warn: family_warn.map(fmt_observed).unwrap_or_default(),
+        alert_threshold_operator: family_operator,
         alert_start_time: alert_start_time_str,
         alert_end_time: alert_end_time_str,
         alert_start_time_millis: epoch_millis_or_na(alert_start_time),
@@ -8854,6 +8923,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn prepare_alert_refuses_repeat_suppression_on_a_realtime_alert() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "test_org_alert_save_repeat_realtime";
+        let key = format!("{org_id}/{}/app", StreamType::Logs);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            key.clone(),
+            SchemaCache::new(arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+                "id",
+                DataType::Utf8,
+                true,
+            )])),
+        );
+        let mut alert = Alert::default();
+        alert.trigger_condition.frequency = 60;
+        alert.is_real_time = true;
+        alert.suppress_repeats = true;
+        let res = prepare_alert(org_id, "app", "realtime", &mut alert, true, false).await;
+        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
+
+        assert!(
+            matches!(res, Err(AlertError::RepeatSuppressionOnRealtimeAlert)),
+            "{res:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn prepare_alert_rejects_a_cron_with_no_future_occurrence() {
         let err = prepare_schedule(|a| {
             a.trigger_condition.frequency_type = FrequencyType::Cron;
@@ -9457,5 +9553,39 @@ mod rule_notification_tests {
             .await
             .unwrap_err();
         assert!(matches!(error, AlertError::PromqlMissingQuery));
+    }
+
+    #[tokio::test]
+    async fn traces_alert_url_opens_the_traces_page() {
+        let mut alert = Alert::default();
+        alert.org_id = "org".into();
+        alert.stream_type = StreamType::Traces;
+        alert.stream_name = "default".into();
+        alert.query_condition.query_type = QueryType::SQL;
+        alert.query_condition.sql = Some("SELECT span_id FROM \"default\"".into());
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+            episode_id: None,
+            resolved: false,
+        };
+        let context = build_notification_context("org", &alert, &[], &[], options, None).await;
+        let url = if let Some((_, suffix)) = context.alert_url.split_once("/web/short/") {
+            let id = suffix.split('?').next().unwrap();
+            short_url::retrieve(&alert.org_id, id).await.unwrap()
+        } else {
+            context.alert_url
+        };
+        assert!(url.contains("/web/traces?stream=default&"));
+        assert!(url.contains("&from=") && url.contains("&to="));
+        assert!(url.contains("&org_identifier=org&"));
+        assert!(url.ends_with("&tab=spans"));
+        assert!(!url.contains("/web/logs"));
+        assert!(!url.contains("sql_mode"));
+        assert!(!url.contains("query="));
     }
 }

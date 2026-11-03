@@ -7,9 +7,10 @@ import { isRowTimeline } from "./chartTypeGroups";
 // These draw no axes and no legend.
 const NO_AXIS_TYPES: string[] = ["bar-gauge", "treemap", "sunburst", "funnel", "node-graph"];
 // One series per panel, so a legend has nothing to tell apart.
-const NO_LEGEND_TYPES: string[] = [...NO_AXIS_TYPES];
+const NO_LEGEND_TYPES: string[] = [...NO_AXIS_TYPES, "boxplot"];
 // These lay out their own legend and axes, so the shared legend layout and axis width do not apply.
 const OWN_LAYOUT_TYPES: string[] = [
+  "boxplot",
   "bar-gauge",
   "hostmap",
   "distribution",
@@ -312,7 +313,7 @@ export const shouldShowCartesianAxisConfig = (dashboardPanelData: any): boolean 
  * @returns boolean indicating if axis label config should be displayed
  */
 export const shouldShowAxisLabelConfig = (dashboardPanelData: any): boolean => {
-  return ["area", "area-stacked", "bar", "line", "scatter", "stacked"].includes(
+  return ["area", "area-stacked", "bar", "line", "scatter", "stacked", "boxplot"].includes(
     dashboardPanelData.data.type,
   );
 };

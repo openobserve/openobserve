@@ -71,11 +71,11 @@ const variables = (...values: any[]) => ({ isVariablesLoading: false, values });
 describe("PanelContainer title variables", () => {
   let wrapper: VueWrapper<any> | undefined;
 
-  const mountPanel = (title: string, variablesData: any, id = "panel-1") =>
+  const mountPanel = (title: string, variablesData: any, id = "panel-1", config?: any) =>
     mount(PanelContainer, {
       attachTo: document.body,
       props: {
-        data: panel(title, id),
+        data: config ? { ...panel(title, id), config } : panel(title, id),
         variablesData,
         currentVariablesData: variablesData,
         selectedTimeDate: { start_time: new Date(0), end_time: new Date(1), type: "relative" },
@@ -244,5 +244,29 @@ describe("PanelContainer title variables", () => {
   it("lets the title take the cut before the freshness label", () => {
     wrapper = mountPanel("GPU — $cdu", variables({ name: "cdu", value: "cdu-1" }));
     expect(header().classes()).toContain("shrink-[1000]");
+  });
+
+  it("shows a stamped title meta once, right after the title, in the secondary style", () => {
+    wrapper = mountPanel("Rate", variables(), "panel-1", { title_meta: "spans/s" });
+    const metas = wrapper.findAll('[data-test="dashboard-panel-header-meta"]');
+    expect(metas).toHaveLength(1);
+    expect(metas[0].text()).toBe("spans/s");
+    expect(metas[0].classes()).toEqual(expect.arrayContaining(["text-text-secondary", "shrink-0"]));
+    expect(header().element.nextElementSibling).toBe(metas[0].element);
+    expect(header().text()).toBe("Rate");
+    expect(
+      wrapper.find('[data-test="dashboard-panel-container"]').attributes("data-test-panel-title"),
+    ).toBe("Rate");
+  });
+
+  it("renders the panel bar exactly as before when no title meta is stamped", () => {
+    wrapper = mountPanel("Rate", variables(), "panel-1", { unit: "custom", unit_custom: "" });
+    expect(wrapper.find('[data-test="dashboard-panel-header-meta"]').exists()).toBe(false);
+    expect(header().classes()).toContain("me-5");
+    expect(header().classes()).toEqual(
+      expect.arrayContaining(["min-w-0", "truncate", "text-text-heading", "shrink-[1000]"]),
+    );
+    expect(header().attributes("data-o-tooltip-trigger")).toBe("overflow");
+    expect(header().text()).toBe("Rate");
   });
 });

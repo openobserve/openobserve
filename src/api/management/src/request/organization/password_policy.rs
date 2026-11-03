@@ -222,6 +222,9 @@ mod tests {
         .unwrap();
 
         assert_eq!(body["users_flagged"], 12);
-        assert_eq!(body["policy"]["min_length"], 8);
+        assert_eq!(
+            body["policy"]["min_length"],
+            PasswordPolicy::default().min_length
+        );
     }
 }

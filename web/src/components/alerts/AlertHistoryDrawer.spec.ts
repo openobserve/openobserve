@@ -17,6 +17,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import DateTime from "@/components/DateTime.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -538,6 +539,18 @@ describe("AlertHistoryDrawer.vue", () => {
           alert_id: "alert-456",
         }),
       );
+    });
+
+    it("keys the table on the alert so a switch shows the skeleton, not the last alert's rows", async () => {
+      vi.mocked(alertsService.getHistory).mockResolvedValue({
+        data: { hits: [{ timestamp: 1, status: "firing" }], total: 1 },
+      } as any);
+      await mountComponent();
+      expect(wrapper.findComponent(OTable).props("loadingResetKey")).toBe("alert-123");
+
+      await wrapper.setProps({ alertId: "alert-456" });
+      await flushPromises();
+      expect(wrapper.findComponent(OTable).props("loadingResetKey")).toBe("alert-456");
     });
 
     it("should reset pagination when alertId changes", async () => {

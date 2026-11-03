@@ -77,8 +77,7 @@ pub enum Verdict {
     NoVerdict,
 }
 
-/// What the caller that completed a run needs: the run result for alerting, and the check row to
-/// publish to the super cluster when it changed.
+/// The completed run, with the check row to replicate when it changed.
 #[derive(Debug, Clone)]
 pub struct RunFinalized {
     pub synthetics_id: String,
@@ -259,14 +258,8 @@ pub async fn get_run<C: ConnectionTrait>(
         .map_err(errors::Error::from)
 }
 
-/// Records one job's outcome and, for the caller whose job completes the run, applies the run's
-/// result to the check row. Replaces the old `increment_jobs_done`.
-///
-/// `job_result` uses SyntheticStatus DB integers: 1=Passed, 2=Warning, 3=Failed, 4=Error.
-/// The increment, the `completed_at` claim and the check-row write share one transaction, so a
-/// stop between them cannot complete a run whose result never reaches the check row.
-/// `completed_at IS NULL` is the compare-and-swap that tells exactly one caller it completed the
-/// run.
+/// Counts the job and, for the caller that completes the run, writes the run result to the check
+/// row in the same transaction.
 pub async fn finalize_run<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     run_id: &str,
@@ -276,10 +269,8 @@ pub async fn finalize_run<C: ConnectionTrait + TransactionTrait>(
     finalize(conn, run_id, Some(job_result), now_us).await
 }
 
-/// Finalizes runs whose jobs are all terminal but whose finalization never committed.
-///
-/// That state is left by a stop between a job's `ack_complete` and its `finalize_run`. Only jobs
-/// that completed more than `grace_us` ago count, so an ack still in flight is left alone.
+/// Finalizes runs whose jobs all ended more than `grace_us` ago but whose finalization never
+/// committed.
 pub async fn finalize_stuck_runs<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     now_us: i64,
@@ -310,8 +301,11 @@ pub async fn finalize_stuck_runs<C: ConnectionTrait + TransactionTrait>(
     let mut done = Vec::new();
     for row in rows {
         let id: String = row.try_get("", "id")?;
-        if let Some(f) = finalize(conn, &id, None, now_us).await? {
-            done.push(f);
+        // One failing run must not drop the runs that already committed in this batch.
+        match finalize(conn, &id, None, now_us).await {
+            Ok(Some(f)) => done.push(f),
+            Ok(None) => {}
+            Err(e) => log::warn!("[synthetics] finalize stuck run {id}: {e}"),
         }
     }
     Ok(done)
@@ -342,7 +336,8 @@ pub fn next_streaks(
     let (down_runs, up_runs) = match verdict {
         Verdict::Down => ((cur.down_runs + 1).min(STREAK_CAP), 0),
         Verdict::Up => (0, (cur.up_runs + 1).min(STREAK_CAP)),
-        Verdict::NoVerdict => (cur.down_runs, cur.up_runs),
+        // An unknown verdict cannot prove recovery, so it breaks an Up streak.
+        Verdict::NoVerdict => (cur.down_runs, 0),
     };
     Some(StatusStreaks {
         last_check_status: run_result,
@@ -492,7 +487,7 @@ async fn write_check_row<C: ConnectionTrait>(
 ) -> Result<Option<StatusStreaks>, errors::Error> {
     // Retried because a concurrent run of the same check can win the swap between read and write.
     for _ in 0..SWAP_ATTEMPTS {
-        let Some(cur) = synthetics_checks::get_status_streaks(conn, synthetics_id).await? else {
+        let Some(cur) = synthetics_checks::lock_status_streaks(conn, synthetics_id).await? else {
             return Ok(None);
         };
         let Some(next) = next_streaks(&cur, run_result, verdict, run_ts) else {
@@ -748,7 +743,7 @@ mod tests {
     }
 
     #[test]
-    fn streaks_cap_at_ten_and_no_verdict_moves_nothing() {
+    fn streaks_cap_at_ten_and_no_verdict_resets_only_up() {
         let mut cur = StatusStreaks::default();
         for ts in 1..=15 {
             cur = next_streaks(&cur, 3, Verdict::Down, ts).unwrap();
@@ -761,6 +756,12 @@ mod tests {
         assert!(
             next_streaks(&up, 3, Verdict::Down, 17).is_none(),
             "same run_ts is not newer"
+        );
+        let split = next_streaks(&up, 3, Verdict::NoVerdict, 18).unwrap();
+        assert_eq!(
+            (split.down_runs, split.up_runs),
+            (0, 0),
+            "NoVerdict resets recovery"
         );
     }
 

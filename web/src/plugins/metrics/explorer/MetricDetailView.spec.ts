@@ -322,6 +322,17 @@ describe("MetricDetailView", () => {
       expect(chart().props("stepSeconds")).toBe(60);
     });
 
+    it("re-queries the overview when only its step is aligned, keeping the drawn chart", async () => {
+      wrapper = mountView({ overview: LINE, timeRange: WINDOW, stepSeconds: 72 });
+      await flushPromises();
+      const calls = runQuery.mock.calls.length;
+      runQuery.mockImplementation(() => new Promise(() => {}));
+      await wrapper.setProps({ stepSeconds: 120 });
+      await flushPromises();
+      expect(runQuery.mock.calls.length).toBeGreaterThan(calls);
+      expect(wrapper.findComponent({ name: "MetricCardChart" }).props("stepSeconds")).toBe(72);
+    });
+
     it("charts the earlier period when only it has samples", async () => {
       const EMPTY = { resultType: "matrix", result: [] };
       runQuery.mockImplementation((_expr: string, _signal: AbortSignal, _card: any, opts: any) =>
@@ -355,6 +366,23 @@ describe("MetricDetailView", () => {
       const select = compareSelect(wrapper)!;
       expect(select.element.closest("header")).toBeNull();
       expect(select.element.closest('[data-test="metrics-detail-chart-options"]')).not.toBeNull();
+    });
+
+    it.each([
+      ["metrics-detail-compare", "Compare to", "1 day ago"],
+      ["metrics-detail-forecast", "Forecast", "Smoothed trend"],
+    ])("makes %s one trigger holding its label, value and chevron", async (id, label, option) => {
+      wrapper = mountView({ overview: LINE, timeRange: WINDOW });
+      await flushPromises();
+      const trigger = wrapper.find(`[data-test="${id}-trigger"]`);
+      expect(trigger.text()).toContain(label);
+      expect(trigger.text()).toContain("Off");
+      expect(trigger.attributes("aria-label")).toBe(label);
+      expect(trigger.element.parentElement!.querySelector("svg")).not.toBeNull();
+      await trigger.trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      expect(trigger.attributes("aria-expanded")).toBe("true");
+      expect(document.body.textContent).toContain(option);
     });
 
     it("names the compared period beside the chart, and says when it has no data", async () => {

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
@@ -36,6 +36,7 @@ vi.mock("@/services/oncall", () => ({
     priorCauses: vi.fn(),
     responseHistory: vi.fn(),
     acknowledgeResponse: vi.fn(),
+    unacknowledgeResponse: vi.fn(),
     confirmRecovery: vi.fn(),
     snoozeResponse: vi.fn(),
     addNote: vi.fn(),
@@ -288,6 +289,9 @@ async function renderWith(overrides: Record<string, unknown> = {}) {
 // Every test mounts the full response page; on a loaded CI runner one mount can exceed the 5s default.
 vi.setConfig({ testTimeout: 20000 });
 
+// Every page watches the shared route, so a page left mounted reloads on each later route change and slows those tests.
+enableAutoUnmount(afterEach);
+
 describe("OnCallResponseDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -466,6 +470,119 @@ describe("OnCallResponseDetail", () => {
     // Two loads: mount, then the refresh that shows the new state.
     expect(service.getResponse).toHaveBeenCalledTimes(2);
     expect(analytics.track).toHaveBeenCalledWith("oncall_page_acknowledged", { count: 1 });
+  });
+
+  it("hints that Acknowledge stops paging the team and shows on the alert", async () => {
+    const wrapper = await renderWith();
+    const ack = wrapper.find('[data-test="oncall-response-ack-btn"]');
+    expect(ack.findComponent({ name: "OTooltip" }).props("content")).toBe(
+      "Stops paging Platform. Shows as acknowledged on the alert.",
+    );
+  });
+
+  it.each([
+    [{ team_id: null }, "Shows as acknowledged on the alert."],
+    [
+      { subject: { subject_type: "incident", source_id: "inc_1", firing: 1 } },
+      "Stops paging Platform. Shows as acknowledged on the incident.",
+    ],
+  ])("words the Acknowledge hint for a teamless or incident page %#", async (over, hint) => {
+    const wrapper = await renderWith(over);
+    const ack = wrapper.find('[data-test="oncall-response-ack-btn"]');
+    expect(ack.findComponent({ name: "OTooltip" }).props("content")).toBe(hint);
+  });
+
+  it("offers Unacknowledge and Take over on a page someone else acknowledged", async () => {
+    const wrapper = await renderWith({ state: "acknowledged", acked_by: "ana@acme.io" });
+    expect(wrapper.find('[data-test="oncall-response-ack-btn"]').exists()).toBe(false);
+    service.unacknowledgeResponse.mockResolvedValue({ data: {} } as any);
+    service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+
+    await wrapper.find('[data-test="oncall-response-take-over-btn"]').trigger("click");
+    await flushPromises();
+    expect(service.acknowledgeResponse).toHaveBeenCalledWith({
+      org_identifier: store.state.selectedOrganization.identifier,
+      response_id: "resp_1",
+      take_over: true,
+    });
+
+    await wrapper.find('[data-test="oncall-response-unack-btn"]').trigger("click");
+    await flushPromises();
+    expect(service.unacknowledgeResponse).toHaveBeenCalledWith({
+      org_identifier: store.state.selectedOrganization.identifier,
+      response_id: "resp_1",
+    });
+  });
+
+  it("says the page is already resolved when Acknowledge found it closed", async () => {
+    const wrapper = await renderWith();
+    service.acknowledgeResponse.mockResolvedValue({
+      data: { ...record({ state: "resolved", closed_at: 1 }), ack: { changed: false } },
+    } as any);
+    await wrapper.find('[data-test="oncall-response-ack-btn"]').trigger("click");
+    await flushPromises();
+    expect(toastSpy.mock.calls.at(-1)?.[0]).toEqual({
+      variant: "info",
+      message: "This page is already resolved",
+    });
+  });
+
+  it("says the page is already resolved when Unacknowledge found it closed", async () => {
+    const wrapper = await renderWith({
+      state: "acknowledged",
+      acked_by: store.state.userInfo.email,
+    });
+    service.unacknowledgeResponse.mockResolvedValue({
+      data: { ...record({ state: "resolved", closed_at: 1 }), ack: { changed: false } },
+    } as any);
+    await wrapper.find('[data-test="oncall-response-unack-btn"]').trigger("click");
+    await flushPromises();
+    expect(toastSpy.mock.calls.at(-1)?.[0]).toEqual({
+      variant: "info",
+      message: "This page is already resolved",
+    });
+  });
+
+  it("says who was faster when Acknowledge changed nothing", async () => {
+    const wrapper = await renderWith();
+    service.acknowledgeResponse.mockResolvedValue({
+      data: {
+        ...record({ state: "acknowledged", acked_by: "ana@acme.io" }),
+        ack: { changed: false },
+      },
+    } as any);
+    await wrapper.find('[data-test="oncall-response-ack-btn"]').trigger("click");
+    await flushPromises();
+    expect(toastSpy.mock.calls.at(-1)?.[0]).toEqual({
+      variant: "info",
+      message: "Already acknowledged by ana@acme.io",
+    });
+  });
+
+  it("says nothing was acknowledged when Unacknowledge changed nothing", async () => {
+    const wrapper = await renderWith({
+      state: "acknowledged",
+      acked_by: store.state.userInfo.email,
+      title: "checkout down",
+    });
+    service.unacknowledgeResponse.mockResolvedValue({
+      data: { ...record({ title: "checkout down" }), ack: { changed: false } },
+    } as any);
+    await wrapper.find('[data-test="oncall-response-unack-btn"]').trigger("click");
+    await flushPromises();
+    expect(toastSpy.mock.calls.at(-1)?.[0]).toEqual({
+      variant: "info",
+      message: "checkout down was not acknowledged",
+    });
+  });
+
+  it("does not offer to take over one's own acknowledgement", async () => {
+    const wrapper = await renderWith({
+      state: "acknowledged",
+      acked_by: store.state.userInfo.email,
+    });
+    expect(wrapper.find('[data-test="oncall-response-take-over-btn"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-response-unack-btn"]').exists()).toBe(true);
   });
 
   it("does not track an acknowledgement the server refused", async () => {

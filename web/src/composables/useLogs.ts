@@ -49,6 +49,7 @@ import { refreshFreeTextSchemas } from "@/composables/useLogs/freeTextSearch";
 import { decodeFtScan } from "@/utils/logs/freeTextScan";
 import {
   decodeColumns,
+  endLogsArrival,
   initShownSearchFromUrl,
   parseRowsParam,
   writeLogsUrl,
@@ -70,8 +71,14 @@ const useLogs = (t: TranslateFn) => {
 
   const { fnParsedSQL, fnUnparsedSQL, addTransformToQuery } = logsUtils();
 
-  const { updateFieldValues, extractFields, updateGridColumns, filterHitsColumns, getStreamList } =
-    useStreamFields();
+  const {
+    updateFieldValues,
+    extractFields,
+    updateGridColumns,
+    filterHitsColumns,
+    getStreamList,
+    prefetchSelectedStreamFields,
+  } = useStreamFields();
 
   const { showErrorNotification } = useNotifications();
   const { getStreams, getStream } = useStreams(t);
@@ -272,8 +279,11 @@ const useLogs = (t: TranslateFn) => {
       const query = router.currentRoute.value.query;
       const fromUrl = !options.ignoreUrl && (!!query.stream || query.sql_mode === "true");
       try {
-        await getStreamList(true, { fromUrl });
-        await getFunctions();
+        // The URL search waits on all of these, so they run side by side rather than one after another.
+        if (fromUrl) prefetchSelectedStreamFields();
+        const requestOrg = store.state.selectedOrganization.identifier;
+        await Promise.all([getStreamList(true, { fromUrl }), getFunctions()]);
+        if (store.state.selectedOrganization.identifier !== requestOrg) return;
         await extractFields();
       } finally {
         stopWatchingSends();
@@ -284,7 +294,6 @@ const useLogs = (t: TranslateFn) => {
         latest.id !== generationAtStart &&
         searchObj.meta.pendingExecution?.generation === latest.id;
       // A search the user sent meanwhile owns the loading state; its completion or cancel clears it.
-      if (!userSearchInFlight) searchObj.loading = false;
       if (searchObj.meta.jobId == "") {
         // A search the user sent while the stream metadata loaded, even one cancelled since, supersedes this landing run.
         const userSearchSent =
@@ -298,8 +307,16 @@ const useLogs = (t: TranslateFn) => {
           searchObj.data.stream.selectedStream.length > 0 && !userSearchSent
             ? autoRun.request(fromUrl ? "url" : reason, { origin: options.origin })
             : "skipped-ineligible";
-        if (result !== "scheduled" && result !== "dispatched") showNoQueryAppliedIfIdle();
+        // A run that is about to start keeps loading on, or the histogram flashes "No data" first.
+        if (result === "scheduled" && !userSearchInFlight)
+          releaseLoadingIfRunNeverStarts(latest?.id);
+        else if (result !== "scheduled" && result !== "dispatched") {
+          endLogsArrival();
+          if (!userSearchInFlight) searchObj.loading = false;
+          showNoQueryAppliedIfIdle();
+        }
       } else {
+        if (!userSearchInFlight) searchObj.loading = false;
         autoRun.engine.resetScope("job");
         await getJobData();
       }
@@ -307,6 +324,13 @@ const useLogs = (t: TranslateFn) => {
     } catch (e: any) {
       searchObj.loading = false;
     }
+  };
+
+  const releaseLoadingIfRunNeverStarts = (gridGenerationBefore: number | undefined) => {
+    setTimeout(() => {
+      const current = useLogsAutoRun().engine.currentGeneration("grid");
+      if (current?.id === gridGenerationBefore) searchObj.loading = false;
+    }, 0);
   };
 
   const showNoQueryAppliedIfIdle = () => {
@@ -539,7 +563,9 @@ const useLogs = (t: TranslateFn) => {
   const updateStreams = async () => {
     if (searchObj.data.streamResults?.list?.length) {
       const streamType = searchObj.data.stream.streamType || "logs";
+      const requestOrg = store.state.selectedOrganization.identifier;
       const streams: any = await getStreams(streamType, false);
+      if (store.state.selectedOrganization.identifier !== requestOrg) return;
       searchObj.data.streamResults["list"] = streams.list;
 
       searchObj.data.stream.streamLists = [];
@@ -547,6 +573,7 @@ const useLogs = (t: TranslateFn) => {
         const itemObj = {
           label: item.name,
           value: item.name,
+          internal: item.is_internal === true,
         };
         searchObj.data.stream.streamLists.push(itemObj);
       });

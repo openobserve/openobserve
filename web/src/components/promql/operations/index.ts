@@ -15,7 +15,15 @@
 
 import { gt, raw } from "@/types/i18n";
 
-import { PromqlStepSpec, PromqlStepId, PromqlStepGroup } from "../types";
+import { PromqlStepArgSpec, PromqlStepSpec, PromqlStepId, PromqlStepGroup } from "../types";
+
+/** Trails the `by` labels, so panels saved before it existed still read as `by`. */
+const WITHOUT_PARAM: PromqlStepArgSpec = {
+  name: gt("metrics.operationsList.params.withoutLabel"),
+  type: "boolean",
+  optional: true,
+  descriptionKey: "metrics.operationsList.params.withoutDesc",
+};
 
 /**
  * Get all operation definitions for PromQL query builder
@@ -233,6 +241,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
           descriptionKey: "metrics.operationsList.params.byLabelsDesc",
         },
+        WITHOUT_PARAM,
       ],
       defaultParams: [[]],
       group: PromqlStepGroup.Aggregation,
@@ -249,6 +258,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           options: true,
           placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
+        WITHOUT_PARAM,
       ],
       defaultParams: [[]],
       group: PromqlStepGroup.Aggregation,
@@ -265,6 +275,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           options: true,
           placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
+        WITHOUT_PARAM,
       ],
       defaultParams: [[]],
       group: PromqlStepGroup.Aggregation,
@@ -281,6 +292,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           options: true,
           placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
+        WITHOUT_PARAM,
       ],
       defaultParams: [[]],
       group: PromqlStepGroup.Aggregation,
@@ -297,6 +309,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           options: true,
           placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
+        WITHOUT_PARAM,
       ],
       defaultParams: [[]],
       group: PromqlStepGroup.Aggregation,
@@ -313,6 +326,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           options: true,
           placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
+        WITHOUT_PARAM,
       ],
       defaultParams: [[]],
       group: PromqlStepGroup.Aggregation,
@@ -335,6 +349,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           options: true,
           placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
+        WITHOUT_PARAM,
       ],
       defaultParams: [10, []],
       group: PromqlStepGroup.Aggregation,
@@ -356,6 +371,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           options: true,
           placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
+        WITHOUT_PARAM,
       ],
       defaultParams: [10, []],
       group: PromqlStepGroup.Aggregation,
@@ -378,6 +394,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           options: true,
           placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
+        WITHOUT_PARAM,
       ],
       defaultParams: [0.95, []],
       group: PromqlStepGroup.Aggregation,
@@ -570,6 +587,21 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
     },
 
     // ============ Time Functions ============
+    {
+      id: PromqlStepId.Offset,
+      name: raw("Offset"),
+      params: [
+        {
+          name: gt("metrics.operationsList.params.offsetLabel"),
+          type: "string",
+          placeholder: raw("1h"),
+          descriptionKey: "metrics.operationsList.params.offsetDesc",
+        },
+      ],
+      defaultParams: ["1h"],
+      group: PromqlStepGroup.TimeAndDate,
+      documentation: gt("promql.operations.offsetDoc"),
+    },
     {
       id: PromqlStepId.Hour,
       name: raw("Hour"),

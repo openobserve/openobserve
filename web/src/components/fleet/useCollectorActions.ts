@@ -26,7 +26,7 @@ import {
   type BulkResult,
 } from "@/services/fleet.queries";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { serverMessage, type CollectorRow } from "./useFleetApi";
+import { type CollectorRow, failureText } from "./useFleetApi";
 
 // One FleetRemoveDialog renders the request the table and the drawer raise.
 const removeRequest = shallowRef<RemoveRequest | null>(null);
@@ -52,7 +52,7 @@ export function useCollectorActions() {
   const failure = (err: unknown) =>
     toast({
       variant: "error",
-      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
+      message: failureText(err, t),
     });
 
   function bulkToast(res: BulkResult, total: number, done: (n: number) => I18nText) {
@@ -63,7 +63,7 @@ export function useCollectorActions() {
             message: t("fleet.collectors.partial", {
               done: res.succeeded.length,
               total,
-              reason: raw(serverMessage(res.firstError)) || t("fleet.common.requestFailed"),
+              reason: failureText(res.firstError, t),
             }),
           }
         : { variant: "success", message: done(res.succeeded.length) },

@@ -629,10 +629,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       await destOption.click();
       await page.keyboard.press("Escape");
 
-      // Step 5 (Dedup) → Skip, Continue
-      await continueBtn.click();
-
-      // Step 6 (Advanced) → Skip, Continue
+      // Step 5 (Advanced) → Skip, Continue
       await continueBtn.click();
 
       // Submit the alert

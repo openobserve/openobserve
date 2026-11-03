@@ -66,10 +66,10 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { createFleetTokenMutation } from "@/services/fleet.queries";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { makeTokenSchema, tokenDefaults, type TokenForm } from "./FleetTokenForm.schema";
 import { holdTokenSecret, secretsEpoch } from "./fleetTokenSecrets";
-import { serverMessage } from "./useFleetApi";
+import { failureText } from "./useFleetApi";
 
 const props = defineProps<{
   fleetId: string;
@@ -107,7 +107,7 @@ async function submitToken(value: TokenForm) {
   } catch (err) {
     toast({
       variant: "error",
-      message: raw(serverMessage(err)) || t("fleet.common.requestFailed"),
+      message: failureText(err, t),
     });
   } finally {
     // The mutation's own state carries the plaintext.

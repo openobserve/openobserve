@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { nextTick } from "vue";
 import i18nInstance from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -24,15 +25,17 @@ const t = (i18nInstance.global as any).t as TranslateFn;
 // ---------------------------------------------------------------------------
 
 const mockRouterPush = vi.fn();
+const mockRouterReplace = vi.fn();
 const mockCurrentRoute = {
   value: {
     query: { trace_id: "trace-abc", span_id: "span-xyz" },
-  },
+  } as { name?: string; query: Record<string, unknown> },
 };
 
 vi.mock("vue-router", () => ({
   useRouter: vi.fn(() => ({
     push: mockRouterPush,
+    replace: mockRouterReplace,
     currentRoute: mockCurrentRoute,
   })),
 }));
@@ -159,6 +162,7 @@ vi.mock("@/utils/traces/serviceColorRegistry", () => ({
 import { getSpanColorHex } from "@/utils/traces/traceColors";
 import { copyToClipboard } from "@/utils/clipboard";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "./useTraces";
+import { encodeColumns } from "@/composables/useLogs/useLogsUrl";
 
 // ---------------------------------------------------------------------------
 
@@ -231,6 +235,13 @@ describe("useTraces", () => {
       searchObj.data.errorMsg = "some error";
       resetSearchObj();
       expect(searchObj.data.errorMsg).toBe("");
+    });
+
+    it("forgets the last run, so a new org shows no pending Run", () => {
+      const { searchObj, resetSearchObj } = useTraces();
+      searchObj.meta.lastRunSignature = "ran";
+      resetSearchObj();
+      expect(searchObj.meta.lastRunSignature).toBeNull();
     });
 
     it("clears errorDetail", () => {
@@ -1780,6 +1791,231 @@ describe("useTraces", () => {
       const { searchObj } = freshUseTraces();
 
       expect(searchObj.meta.serviceGraphLayoutType).toBe("vertical");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // List view state in the URL (columns, rows, page, show_histogram, staged query)
+  // -------------------------------------------------------------------------
+  describe("list view URL state", () => {
+    const originalRoute = mockCurrentRoute.value;
+    const encodedColumns = (fields: string[]) => encodeColumns(fields);
+
+    afterEach(() => {
+      mockCurrentRoute.value = originalRoute;
+    });
+
+    const freshState = () => {
+      const inst = useTraces();
+      inst.resetSearchObj();
+      inst.searchObj.meta.searchMode = "traces";
+      inst.searchObj.meta.resultGrid.rowsPerPage = 25;
+      inst.searchObj.data.resultGrid.currentPage = 0;
+      inst.searchObj.meta.showHistogram = true;
+      inst.searchObj.data.stream.selectedFields = [...DEFAULT_TRACE_COLUMNS.traces];
+      return inst;
+    };
+
+    it("leaves every list key out of the URL while the view is at its defaults", () => {
+      const { getUrlQueryParams } = freshState();
+      const params = getUrlQueryParams();
+      for (const key of ["columns", "rows", "page", "show_histogram"]) {
+        expect(params).not.toHaveProperty(key);
+      }
+    });
+
+    it("carries the changed list state in the URL and the share link", () => {
+      const { searchObj, getUrlQueryParams } = freshState();
+      searchObj.meta.resultGrid.rowsPerPage = 50;
+      searchObj.data.resultGrid.currentPage = 1;
+      searchObj.meta.showHistogram = false;
+      searchObj.data.stream.selectedFields = ["service_name", "duration"];
+      for (const params of [getUrlQueryParams(), getUrlQueryParams(true)]) {
+        expect(params.rows).toBe(50);
+        expect(params.page).toBe(2);
+        expect(params.show_histogram).toBe(false);
+        expect(params.columns).toBeTruthy();
+      }
+    });
+
+    it("restores rows, histogram and columns from a link and returns its page", () => {
+      const { searchObj, applyUrlListState } = freshState();
+      const restored = applyUrlListState({
+        rows: "100",
+        page: "3",
+        show_histogram: "false",
+        columns: encodedColumns(["service_name", "http.method"]),
+      });
+      expect(restored.currentPage).toBe(2);
+      expect(searchObj.meta.resultGrid.rowsPerPage).toBe(100);
+      expect(searchObj.meta.showHistogram).toBe(false);
+      expect(searchObj.data.stream.selectedFields).toEqual(["service_name", "http.method"]);
+    });
+
+    it("opens an old link without list keys unchanged", () => {
+      const { searchObj, applyUrlListState } = freshState();
+      searchObj.data.stream.selectedFields = ["service_name"];
+      const restored = applyUrlListState({ stream: "s", period: "15m", query: "", tab: "traces" });
+      expect(restored.currentPage).toBeNull();
+      expect(searchObj.meta.resultGrid.rowsPerPage).toBe(25);
+      expect(searchObj.meta.showHistogram).toBe(true);
+      expect(searchObj.data.stream.selectedFields).toEqual(["service_name"]);
+    });
+
+    it("keeps a link's columns when the saved local columns load after the first search", () => {
+      const { searchObj, applyUrlListState, loadLocalLogFilterField } = freshState();
+      searchObj.organizationIdentifier = "org1";
+      searchObj.data.stream.selectedStream = { label: "s", value: "my-stream" };
+      localTraceFilterStore.value = { "org1_my-stream": { traces: ["operation_name"] } };
+      applyUrlListState({ columns: encodedColumns(["service_name", "http.method"]) });
+
+      loadLocalLogFilterField("traces");
+      expect(searchObj.data.stream.selectedFields).toEqual(["service_name", "http.method"]);
+      expect(localTraceFilterStore.value["org1_my-stream"].traces).toEqual(["operation_name"]);
+
+      loadLocalLogFilterField("spans");
+      expect(searchObj.data.stream.selectedFields).toEqual(DEFAULT_TRACE_COLUMNS.spans);
+    });
+
+    it("drops a link's columns once the stream changes, so they never follow to another stream", () => {
+      const { searchObj, applyUrlListState, loadLocalLogFilterField } = freshState();
+      searchObj.organizationIdentifier = "org1";
+      searchObj.data.stream.selectedStream = { label: "a", value: "stream-a" };
+      localTraceFilterStore.value = { "org1_stream-a": { traces: ["operation_name"] } };
+      applyUrlListState({ columns: encodedColumns(["service_name", "http.method"]) });
+
+      searchObj.data.stream.selectedStream = { label: "b", value: "stream-b" };
+      loadLocalLogFilterField("traces");
+      expect(searchObj.data.stream.selectedFields).toEqual(DEFAULT_TRACE_COLUMNS.traces);
+
+      searchObj.data.stream.selectedStream = { label: "a", value: "stream-a" };
+      loadLocalLogFilterField("traces");
+      expect(searchObj.data.stream.selectedFields).toEqual(["operation_name"]);
+    });
+
+    it("lets the user's own column change replace the link's columns", () => {
+      const inst = freshState();
+      inst.searchObj.organizationIdentifier = "org1";
+      inst.searchObj.data.stream.selectedStream = { label: "s", value: "my-stream" };
+      localTraceFilterStore.value = {};
+      inst.applyUrlListState({ columns: encodedColumns(["service_name", "http.method"]) });
+      inst.searchObj.data.stream.selectedFields = ["duration"];
+      inst.updatedLocalLogFilterField("traces");
+      inst.searchObj.data.stream.selectedFields = [];
+      inst.loadLocalLogFilterField("traces");
+      expect(inst.searchObj.data.stream.selectedFields).toEqual(["duration"]);
+    });
+
+    it("replaces the URL with the list state and the staged query, keeping other keys", async () => {
+      const { searchObj, patchUrlViewState } = freshState();
+      mockCurrentRoute.value = {
+        name: "traces",
+        query: { stream: "s", period: "15m", tab: "traces", query: "b64uni:old", rows: "50" },
+      };
+      searchObj.data.editorValue = "duration > 10";
+      searchObj.data.resultGrid.currentPage = 2;
+      await patchUrlViewState();
+      expect(mockRouterPush).not.toHaveBeenCalled();
+      expect(mockRouterReplace).toHaveBeenCalledWith({
+        query: {
+          stream: "s",
+          period: "15m",
+          tab: "traces",
+          query: "b64uni:duration > 10",
+          page: 3,
+        },
+      });
+    });
+
+    it("keeps the URL stream's columns while another stream is selected but not yet run", async () => {
+      const { searchObj, patchUrlViewState, applyUrlListState } = freshState();
+      const aColumns = encodedColumns(["service_name", "http.method"]);
+      mockCurrentRoute.value = {
+        name: "traces",
+        query: { stream: "stream-a", query: "b64uni:", columns: aColumns },
+      };
+      searchObj.data.stream.selectedStream = { label: "b", value: "stream-b" };
+      searchObj.data.stream.selectedFields = ["operation_name"];
+      searchObj.meta.resultGrid.rowsPerPage = 50;
+      await patchUrlViewState();
+      const written = mockRouterReplace.mock.calls.at(-1)![0].query;
+      expect(written).toEqual({
+        stream: "stream-a",
+        query: "b64uni:",
+        columns: aColumns,
+        rows: 50,
+      });
+
+      searchObj.data.stream.selectedStream = { label: "a", value: "stream-a" };
+      applyUrlListState(written);
+      expect(searchObj.data.stream.selectedFields).toEqual(["service_name", "http.method"]);
+    });
+
+    it("never writes the one-shot run-query flag back into the URL", async () => {
+      const { searchObj, patchUrlViewState } = freshState();
+      searchObj.data.stream.selectedStream = { label: "s", value: "s" };
+      mockCurrentRoute.value = {
+        name: "traces",
+        query: { stream: "s", query: "b64uni:old", "run-query": "true" },
+      };
+      searchObj.data.editorValue = "staged";
+      await patchUrlViewState();
+      expect(mockRouterReplace).toHaveBeenCalledWith({
+        query: { stream: "s", query: "b64uni:staged" },
+      });
+    });
+
+    it("does not touch the URL off the traces route or when nothing changed", async () => {
+      const { searchObj, patchUrlViewState } = freshState();
+      searchObj.data.editorValue = "a";
+      mockCurrentRoute.value = { name: "traceDetails", query: { trace_id: "t" } };
+      await patchUrlViewState();
+      mockCurrentRoute.value = { name: "traces", query: { stream: "s", query: "b64uni:a" } };
+      await patchUrlViewState();
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+    });
+
+    it("writes list and staged-query changes to the URL once they settle, with replace", async () => {
+      vi.useFakeTimers();
+      const { searchObj, syncUrlViewState } = freshState();
+      mockCurrentRoute.value = { name: "traces", query: { stream: "s", query: "b64uni:" } };
+      const stop = syncUrlViewState();
+      try {
+        searchObj.meta.resultGrid.rowsPerPage = 50;
+        searchObj.data.editorValue = "dur";
+        await nextTick();
+        searchObj.data.editorValue = "duration > 1";
+        await nextTick();
+        expect(mockRouterReplace).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(300);
+        expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+        expect(mockRouterReplace).toHaveBeenCalledWith({
+          query: { stream: "s", query: "b64uni:duration > 1", rows: 50 },
+        });
+        expect(mockRouterPush).not.toHaveBeenCalled();
+      } finally {
+        stop();
+        vi.useRealTimers();
+      }
+    });
+
+    it("writes a pending change at once when the sync stops, then stops writing", async () => {
+      vi.useFakeTimers();
+      const { searchObj, syncUrlViewState } = freshState();
+      mockCurrentRoute.value = { name: "traces", query: { stream: "s" } };
+      const stop = syncUrlViewState();
+      searchObj.meta.showHistogram = false;
+      await nextTick();
+      stop();
+      expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+      expect(mockRouterReplace).toHaveBeenCalledWith({
+        query: { stream: "s", query: "b64uni:", show_histogram: false },
+      });
+      searchObj.meta.resultGrid.rowsPerPage = 50;
+      await nextTick();
+      vi.advanceTimersByTime(300);
+      expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+      vi.useRealTimers();
     });
   });
 });

@@ -28,6 +28,56 @@ export interface SlackOAuthStartResponse {
   authorizationUrl: string;
 }
 
+export type JiraDeployment = "cloud" | "data_center";
+export type JiraSetupAction = "connect" | "issue_types" | "fields" | "test_issue";
+
+export interface JiraSetupRequest {
+  url: string;
+  deployment: JiraDeployment;
+  email: string;
+  token: string;
+  destination?: string;
+  action: JiraSetupAction;
+  project_key?: string;
+  issue_type_id?: string;
+  priority_id?: string;
+  fields?: Record<string, unknown>;
+}
+
+export interface JiraOption {
+  id: string;
+  name: string;
+}
+
+export interface JiraConnectResponse {
+  display_name: string;
+  projects: { key: string; name: string }[];
+}
+
+export interface JiraIssueTypesResponse {
+  issue_types: JiraOption[];
+}
+
+export type JiraFieldKind = "text" | "number" | "option" | "options" | "unsupported";
+
+export interface JiraRequiredField {
+  id: string;
+  name: string;
+  kind: JiraFieldKind;
+  options?: JiraOption[];
+}
+
+export interface JiraFieldsResponse {
+  has_labels: boolean;
+  priorities: JiraOption[];
+  required_fields: JiraRequiredField[];
+}
+
+export interface JiraTestIssueResponse {
+  key: string;
+  url: string;
+}
+
 const destination = {
   create: ({ org_identifier, data, module }: any) => {
     let url = `/api/${org_identifier}/alerts/destinations`;
@@ -117,6 +167,12 @@ const destination = {
         analytics.track("alert_destination_slack_connected");
         return res;
       }),
+  // The browser cannot call Jira directly, so lookups and the test issue go through the server.
+  jiraSetup: <T>(org_identifier: string, data: JiraSetupRequest) =>
+    http().post<T>(
+      `/api/${encodeURIComponent(org_identifier)}/alerts/destinations/jira/setup`,
+      data,
+    ),
   // Renders a content-template spec/saved template and DISPATCHES it to the
   // named destination's real channel, marked `[TEST] `. See Task 15 — unlike
   // `test()` above (which only exercises raw URL/webhook connectivity), this

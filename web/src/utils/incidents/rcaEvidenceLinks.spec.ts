@@ -86,7 +86,7 @@ describe("rcaEvidenceLink (03 VE29)", () => {
     });
   });
 
-  it("PromQL: metricsEditor with base64 query, query_type=promql and ms from/to", () => {
+  it("PromQL: metrics with base64 query, query_type=promql and ms from/to", () => {
     const promql = 'max(db_pool_in_use{db="orders"})';
     const link = rcaEvidenceLink(
       { signal: "metrics", streams: [], promql, start_us: START_US, end_us: END_US },
@@ -94,7 +94,7 @@ describe("rcaEvidenceLink (03 VE29)", () => {
     );
 
     expect(link?.page).toBe("metrics");
-    expect(routeOf(link).name).toBe("metricsEditor");
+    expect(routeOf(link).name).toBe("metrics");
     const q = routeOf(link).query;
     expect(q).toMatchObject({
       org_identifier: "default",

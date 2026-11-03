@@ -10,6 +10,8 @@ const DURATION_FILTER_PATTERN = /duration\s*(>=|<)\s*'\d+(us|ms|s)'/;
 // The Drill down query fails server-side when that string is not decoded back to µs.
 const CAST_ERROR_PATTERN = /Cannot cast string|simplify_expressions|Arrow error/i;
 const RED_PANELS = ['Rate', 'Errors', 'Duration'];
+// Lands inside the default Duration box (about 3 to 12 minutes ago) for several minutes of test runtime.
+const SEED_IN_BOX_AGE_MS = 6 * 60 * 1000;
 
 test.describe("Traces Charts testcases", () => {
   let pm;
@@ -25,9 +27,12 @@ test.describe("Traces Charts testcases", () => {
     try {
       const errors = await ingestTraces(page, 6, { forceScenario: 'error' });
       const success = await ingestTraces(page, 10, { forceScenario: 'success' });
+      // The default Duration box spans the middle of the 15m range, so spans stamped now fall outside it.
+      const boxed = await ingestTraces(page, 6, { forceScenario: 'error', ageMs: SEED_IN_BOX_AGE_MS });
       testLogger.info('Seeded traces for chart tests', {
         errors: errors.successful,
         success: success.successful,
+        boxed: boxed.successful,
       });
     } catch (e) {
       testLogger.warn('Chart trace seeding failed (continuing)', { error: e.message });
@@ -114,7 +119,7 @@ test.describe("Traces Charts testcases", () => {
     expect(text, 'Drill down must not fail casting the duration filter').not.toMatch(CAST_ERROR_PATTERN);
     expect(state, 'Drill down must compare the box').toBe(pm.tracesPage.comparisonPage);
 
-    await page.locator(pm.tracesPage.drillDownBackButton).click();
+    await pm.tracesPage.closeComparison();
   });
 
   // ─── P0 — Critical path ──────────────────────────────────────────────────────
@@ -172,12 +177,12 @@ test.describe("Traces Charts testcases", () => {
     // Without a box or brush there is nothing to compare, so the page asks for a selection.
     expect(await pm.tracesPage.openComparison()).toBe(pm.tracesPage.comparisonNoSelection);
 
-    await page.locator(pm.tracesPage.drillDownBackButton).click();
+    await pm.tracesPage.closeComparison();
   });
 
   // ─── P1 — Functional ─────────────────────────────────────────────────────────
 
-  test("P1: Duration zoom writes a duration filter into the query editor", {
+  test("P1: a Duration box opens its popover, and Filter to selection writes the duration filter", {
     tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
 
@@ -186,8 +191,12 @@ test.describe("Traces Charts testcases", () => {
     const before = await pm.tracesPage.getQueryEditorContent();
     expect(before, 'Editor must start without a duration filter').not.toMatch(DURATION_FILTER_PATTERN);
 
-    const zoomed = await pm.tracesPage.zoomDurationBand();
-    expect(zoomed, 'Duration panel must accept the zoom drag').toBeTruthy();
+    const boxed = await pm.tracesPage.boxDurationBand();
+    expect(boxed, 'A Duration box must open its popover').toBeTruthy();
+    const unapplied = await pm.tracesPage.getQueryEditorContent();
+    expect(unapplied, 'The box alone must not write a filter').not.toMatch(DURATION_FILTER_PATTERN);
+
+    await pm.tracesPage.filterToHeatmapSelection();
 
     const after = await pm.tracesPage.getQueryEditorContent();
     testLogger.info('Query editor after duration zoom', { after });

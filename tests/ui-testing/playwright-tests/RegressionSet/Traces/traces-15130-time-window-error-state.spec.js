@@ -232,7 +232,7 @@ test.describe('Traces search window and error state (#15130, ENT#2805, ENT#2806)
     await expect(pm.tracesPage.queryErrorPlannerText()).toHaveCount(0);
 
     await pm.tracesPage.replaceTraceQuery(ERROR_FILTER);
-    await pm.tracesPage.searchUntilResultCount('Traces Found');
+    await pm.tracesPage.searchUntilResultCount('traces with a matching span');
     await pm.tracesPage.expectQueryErrorCleared();
   });
 

@@ -287,6 +287,19 @@ describe("AppSessions.vue", () => {
       wrapper.vm.isLoading.pop();
     });
 
+    it("shows no segment counts while the page of sessions loads", async () => {
+      const chips = ["health-errors", "type-bounced", "device-desktop"].map(
+        (id) => () => wrapper.find(`[data-test="rum-app-sessions-${id}"]`).text(),
+      );
+      wrapper.vm.isLoading.splice(0, wrapper.vm.isLoading.length, true);
+      await nextTick();
+      chips.forEach((chip) => expect(chip()).not.toMatch(/\d/));
+
+      wrapper.vm.isLoading.splice(0);
+      await nextTick();
+      chips.forEach((chip) => expect(chip()).toMatch(/ · \d+$/));
+    });
+
     it("should render OTable when session replay is enabled and not loading", async () => {
       await nextTick();
 
@@ -1088,6 +1101,72 @@ describe("AppSessions.vue", () => {
       await nextTick();
     };
 
+    it("offers a View heatmap action on each session row that opens the heatmap, not the viewer", async () => {
+      wrapper.unmount();
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      wrapper = mount(AppSessions, {
+        props: { isSessionReplayEnabled: true },
+        global: {
+          plugins: [store, router, i18n],
+          stubs: {
+            ...buildPlatformStubs(),
+            // Passes the click event on, as OButton does, so .stop keeps the row from opening the viewer.
+            OButton: {
+              template:
+                '<button v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></button>',
+              emits: ["click"],
+            },
+            OTable: {
+              template:
+                '<div data-test="rum-sessions-table" @click="$emit(\'row-click\', data[0])"><div v-for="row in data" :key="row.session_id"><slot name="cell-session" :row="row" /></div></div>',
+              props: [
+                "data",
+                "columns",
+                "loading",
+                "rowKey",
+                "columnVisibility",
+                "getRowStatusColor",
+              ],
+              emits: ["row-click"],
+            },
+          },
+        },
+      });
+      await flushPromises();
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: { hits: [{ app: "web", url: "/home" }] },
+      } as any);
+      wrapper.vm.rows = [
+        {
+          session_id: "session-1",
+          start_time: 1000,
+          events: 2,
+          time_spent: 5000,
+          has_replay: true,
+        },
+      ];
+      await nextTick();
+
+      const button = wrapper.find('[data-test="rum-app-sessions-view-heatmap-btn"]');
+      expect(button.exists()).toBe(true);
+      expect(button.attributes("aria-label")).toBe("View heatmap");
+
+      await button.trigger("click");
+      await flushPromises();
+
+      expect(push).toHaveBeenCalledTimes(1);
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "productAnalyticsHeatmaps",
+          query: expect.objectContaining({ app: "web", page_url: "/home" }),
+        }),
+      );
+
+      wrapper.vm.rows = [{ session_id: "session-1", start_time: 1000, has_replay: false }];
+      await nextTick();
+      expect(wrapper.find('[data-test="rum-app-sessions-view-heatmap-btn"]').exists()).toBe(false);
+    });
+
     it("renders React Native as the platform label when source is react-native", async () => {
       // Act
       await setSessionRow("react-native");
@@ -1304,6 +1383,68 @@ describe("AppSessions.vue", () => {
           ],
         },
       });
+    });
+  });
+
+  describe("KPI strip while the window totals load", () => {
+    const sessionsTile = () =>
+      wrapper.find('[data-test="rum-sessions-metric-sessions-value"]').text();
+    const fixture = vi.mocked(searchService.search).getMockImplementation();
+
+    afterEach(() => {
+      if (fixture) vi.mocked(searchService.search).mockImplementation(fixture);
+    });
+
+    it("shows a dash instead of the page count, then the window total once", async () => {
+      let resolveTotals: (value: any) => void = () => {};
+      vi.mocked(searchService.search).mockImplementation(async (params: any) => {
+        const sql = params?.query?.query?.sql ?? "";
+        if (sql.includes("COUNT(DISTINCT session_id) AS total")) {
+          return new Promise((resolve) => {
+            resolveTotals = resolve;
+          });
+        }
+        if (sql.includes("GROUP BY session_id") && sql.includes("zo_sql_timestamp")) {
+          return {
+            data: { hits: [{ session_id: "s1", zo_sql_timestamp: 1672531200000, error_count: 0 }] },
+          };
+        }
+        return { data: { hits: [] } };
+      });
+
+      wrapper.vm.getSessions();
+      await flushPromises();
+      expect(wrapper.vm.rows).toHaveLength(1);
+      expect(sessionsTile()).toBe("—");
+
+      resolveTotals({ data: { hits: [{ total: 173, error_sessions: 3 }] } });
+      await flushPromises();
+      expect(sessionsTile()).toBe("173");
+    });
+
+    it("shows zero once a load finds no sessions", async () => {
+      vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } });
+
+      wrapper.vm.getSessions();
+      await flushPromises();
+
+      expect(sessionsTile()).toBe("0");
+    });
+
+    it("falls back to the page count when the window total fails", async () => {
+      vi.mocked(searchService.search).mockImplementation(async (params: any) => {
+        const sql = params?.query?.query?.sql ?? "";
+        if (sql.includes("COUNT(DISTINCT session_id) AS total")) throw new Error("boom");
+        if (sql.includes("GROUP BY session_id") && sql.includes("zo_sql_timestamp")) {
+          return { data: { hits: [{ session_id: "s1", zo_sql_timestamp: 1672531200000 }] } };
+        }
+        return { data: { hits: [] } };
+      });
+
+      wrapper.vm.getSessions();
+      await flushPromises();
+
+      expect(sessionsTile()).toBe("1");
     });
   });
 });

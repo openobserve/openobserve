@@ -496,6 +496,8 @@ async fn sidecar_append_once(
     }
     let (f, writes) = files.get_mut(path).unwrap();
     f.write_all(data.as_bytes()).await?;
+    // tokio's File finishes a write on a blocking thread; flush waits for it and surfaces its error
+    f.flush().await?;
     *writes += 1;
     if *writes >= CONSUMED_SYNC_EVERY {
         *writes = 0;

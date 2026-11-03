@@ -26,6 +26,7 @@
  *                                (e.g. `..._total`, `..._bucket`).
  *  - `matchesSearch`           — order-independent, multi-term substring matching
  *                                over a metric's name and help text.
+ *  - `matchesSearchName`       — the same terms, matched against the name alone.
  *
  * No app state (no store, no vue) — safe to unit test and reuse anywhere. The only
  * dependency is i18n, to translate the catch-all bucket's label.
@@ -282,14 +283,26 @@ export function matchesSearch(
   haystackHelp: string | undefined,
   rawQuery: string,
 ): boolean {
-  const terms = (rawQuery ?? "")
-    .split(/[^a-z0-9_:]+/i)
-    .filter((term) => term.length > 0)
-    .map((term) => term.toLowerCase());
+  const terms = searchTerms(rawQuery);
 
   if (terms.length === 0) return true;
 
   const haystack = `${haystackName ?? ""} ${haystackHelp ?? ""}`.toLowerCase();
 
   return terms.every((term) => haystack.includes(term));
+}
+
+/** Whether every {@link matchesSearch} term is in the name alone; `false` for a query with no terms. */
+export function matchesSearchName(haystackName: string, rawQuery: string): boolean {
+  const terms = searchTerms(rawQuery);
+  if (terms.length === 0) return false;
+  const name = (haystackName ?? "").toLowerCase();
+  return terms.every((term) => name.includes(term));
+}
+
+function searchTerms(rawQuery: string): string[] {
+  return (rawQuery ?? "")
+    .split(/[^a-z0-9_:]+/i)
+    .filter((term) => term.length > 0)
+    .map((term) => term.toLowerCase());
 }

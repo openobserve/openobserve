@@ -317,7 +317,7 @@ pub(super) fn user_email(req: &axum::extract::Request) -> Option<String> {
         (status = 200, description = "A page of conversations", body = inline(ChatListResponse)),
         (status = 400, description = "Invalid cursor", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "list"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn list(
     Path(org_id): Path<String>,
@@ -398,7 +398,7 @@ pub async fn list(
         (status = 404, description = "Unknown conversation", body = Object),
         (status = 503, description = "History temporarily unreadable", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "get"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn get(
     Path((org_id, session_id)): Path<(String, String)>,
@@ -494,7 +494,7 @@ pub async fn get(
         (status = 400, description = "Invalid title", body = Object),
         (status = 404, description = "Unknown conversation", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn rename(
     Path((org_id, session_id)): Path<(String, String)>,
@@ -556,7 +556,7 @@ pub async fn rename(
         (status = 200, description = "Deleted", body = Object),
         (status = 404, description = "Unknown conversation", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "delete"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn delete(
     Path((org_id, session_id)): Path<(String, String)>,
@@ -611,7 +611,7 @@ pub async fn delete(
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses((status = 200, description = "Deleted", body = Object)),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "delete"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn delete_all(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
     let Some(user_email) = user_email(&in_req) else {

@@ -58,7 +58,7 @@ function buildFrequency(s: BrowserCheckSchedule): BrowserCheckFrequency {
 /**
  * Computes the top-level `start` (microseconds) + tz_offset from the schedule.
  * NOTE: for "Schedule Now" this also writes the browser timezone back onto
- * `check.schedule.timezone` (pre-existing behavior the browser flow relies on).
+ * `check.schedule.timezone`, except over a cron schedule's own chosen zone.
  */
 function computeStart(check: BrowserCheck): { start: number; tz_offset: number } {
   const { schedule, tz_offset } = check;
@@ -83,7 +83,7 @@ function computeStart(check: BrowserCheck): { start: number; tz_offset: number }
   const min = String(now.getMinutes()).padStart(2, "0");
   const browserTz = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const converted = convertDateToTimestamp(`${dd}-${mm}-${yyyy}`, `${hh}:${min}`, browserTz);
-  check.schedule.timezone = browserTz;
+  if (schedule.type !== "cron" || !schedule.timezone) check.schedule.timezone = browserTz;
   return { start: converted.timestamp, tz_offset: converted.offset ?? tz_offset ?? 0 };
 }
 
@@ -102,6 +102,7 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
     url,
     folder,
     browserDevices,
+    browserConfigExtras: extras,
     retries,
     waitBeforeRetrySecs,
     cooldownMins,
@@ -146,11 +147,17 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
       // throws here — the save gate is what stops it getting this far.
       steps: buildV2Steps(journey),
       browser_devices: browserDevices ?? [{ browser: "chromium", device: "desktop" }],
-      timeout_ms: 30000,
+      // Defaults apply on create only; on edit the stored values win.
+      timeout_ms: extras?.timeout_ms ?? 30000,
+      ...(extras?.journey_budget_ms !== undefined && {
+        journey_budget_ms: extras.journey_budget_ms,
+      }),
+      ...(extras?.test_id_attr !== undefined && { test_id_attr: extras.test_id_attr }),
+      ...(extras?.runtime !== undefined && { runtime: extras.runtime }),
       capture: {
         screenshot: capture?.screenshot ?? "on-fail",
         trace: capture?.trace ?? "on-fail",
-        video: "off",
+        video: extras?.video ?? "off",
       },
       ...(secrets?.length && { secrets: secrets.map(({ id: _id, ...s }) => s) }),
       ...(headers?.length && { headers: headers.map(({ id: _id, ...h }) => h) }),
@@ -348,6 +355,18 @@ function mapFrequencyToSchedule(freq: any, start?: number): BrowserCheck["schedu
   };
 }
 
+function pickBrowserConfigExtras(config: any): BrowserCheck["browserConfigExtras"] {
+  if (!config) return undefined;
+  const out: NonNullable<BrowserCheck["browserConfigExtras"]> = {};
+  if (typeof config.journey_budget_ms === "number")
+    out.journey_budget_ms = config.journey_budget_ms;
+  if (typeof config.test_id_attr === "string") out.test_id_attr = config.test_id_attr;
+  if (typeof config.runtime === "string") out.runtime = config.runtime;
+  if (typeof config.timeout_ms === "number") out.timeout_ms = config.timeout_ms;
+  if (typeof config.capture?.video === "string") out.video = config.capture.video;
+  return Object.keys(out).length ? out : undefined;
+}
+
 export function mapResponseToBrowserCheck(data: Record<string, unknown>): BrowserCheck {
   const {
     config,
@@ -396,6 +415,9 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     cooldownMins: cooldown_mins ?? 0,
 
     browserDevices: config?.browser_devices,
+
+    // Allowlisted pick (not a spread of `config`, which can hold secrets).
+    browserConfigExtras: pickBrowserConfigExtras(config),
 
     // No `preserveWire`: a stored version-2 step is poorer than what
     // buildWireFromStep rebuilds from the UI fields, so keeping it would shadow

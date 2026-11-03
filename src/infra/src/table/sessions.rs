@@ -36,8 +36,8 @@ pub async fn get(session_id: &str) -> Result<Option<Model>, errors::Error> {
 /// # Arguments
 /// * `session_id` - Unique session identifier
 /// * `access_token` - Access token to store
-/// * `expires_at` - Expiration timestamp (seconds since epoch) All sessions must have an expiry -
-///   either from JWT or default 24 hours
+/// * `expires_at` - Expiration timestamp (microseconds since epoch) All sessions must have an
+///   expiry - either from JWT or default 24 hours
 pub async fn set_with_expiry(
     session_id: &str,
     access_token: &str,
@@ -94,7 +94,7 @@ pub async fn list() -> Result<Vec<Model>, errors::Error> {
 /// This is more efficient than deleting one at a time
 pub async fn delete_expired() -> Result<u64, errors::Error> {
     let client = get_orm_client_rw().await;
-    let now = chrono::Utc::now().timestamp();
+    let now = chrono::Utc::now().timestamp_micros();
 
     let result = Entity::delete_many()
         .filter(Column::ExpiresAt.lt(now))

@@ -656,7 +656,7 @@ mod tests {
             [
                 serde_json::json!("A"),
                 serde_json::Value::Null,
-                serde_json::json!("Formula")
+                serde_json::json!("F1")
             ]
         );
         assert_eq!(

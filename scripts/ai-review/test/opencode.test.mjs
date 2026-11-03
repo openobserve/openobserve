@@ -92,13 +92,12 @@ function fakeOpencode({ idleAfterMs = AGENT_RUN_MS, finalEvent = "session.execut
             time: { created: 1, completed: 2 },
             content: [{ type: "reasoning", text: "thinking" }, { type: "text", text: "<no-issues/>" }],
             finish: "stop",
-            cost: 0.001,
             ...(error && finalEvent === "session.execution.succeeded" ? { error } : {}),
           }],
         });
       }
       if (req.method === "GET" && req.url === "/api/session/ses_1/message?type=idle&order=desc&limit=1") return send(200, { data: idle ? [idle] : [] });
-      if (req.method === "GET" && req.url === "/api/session/ses_1") return send(200, { data: { id: "ses_1", cost: 0.003, tokens: { input: 2000, output: 200, reasoning: 0, cache: { read: 0, write: 0 } } } });
+      if (req.method === "GET" && req.url === "/api/session/ses_1") return send(200, { data: { id: "ses_1", tokens: { input: 2000, output: 200, reasoning: 0, cache: { read: 0, write: 0 } } } });
       if (req.method === "POST" && req.url === "/api/session/ses_1/permission/per_1/reply") {
         res.writeHead(204);
         res.end();
@@ -153,8 +152,7 @@ test("C12 regression: a blocking request dies on the headers timeout, the async 
 
     assert.equal(result.text, "<no-issues/>");
     assert.equal(result.responseId, "msg_a2");
-    assert.equal(result.info.cost, 0.003, "cost is the session total, not the last step");
-    assert.equal(result.info.tokens.input, 2000);
+    assert.equal(result.info.tokens.input, 2000, "tokens are the session total, not the last step");
     assert.equal(result.rejectedPermissions, 1);
     const reply = fake.calls.find(c => c.url === "/api/session/ses_1/permission/per_1/reply");
     assert.equal(reply.body.decision, "reject");

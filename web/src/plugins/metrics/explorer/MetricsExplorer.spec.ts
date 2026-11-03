@@ -34,9 +34,11 @@ const grid = vi.hoisted(() => {
     cards: { value: [] },
     sortedCards: { value: [] },
     pagedCards: { value: [] },
+    filteredCards: { value: [] },
     pageSlice: { value: [] },
     previews: { value: {} },
     hasMore: { value: false },
+    showingMore: { value: false },
     remainingCount: { value: 0 },
     loading: { value: false },
     loadError: { value: "" },
@@ -46,6 +48,10 @@ const grid = vi.hoisted(() => {
     selectedTypes: { value: new Set() },
     labelFilters: { value: [] },
     sortBy: { value: "a-z" },
+    usageFilters: { value: new Set() },
+    usageLoading: { value: false },
+    usageError: { value: false },
+    retryUsage: vi.fn(),
     viewMode: { value: "grid" },
     activeRail: { value: "prefix" },
     showFavoritesOnly: { value: false },
@@ -98,6 +104,7 @@ const grid = vi.hoisted(() => {
     loadStreams: vi.fn(async () => {}),
     isLabelEligible: vi.fn(() => true),
     inapplicableLabelFilters: vi.fn(() => []),
+    setLabelGroupNegated: vi.fn(),
     setTimeRange: vi.fn(),
     setRefreshInterval: vi.fn(),
     onOrgChange: vi.fn(),
@@ -146,6 +153,10 @@ vi.mock("vue-router", () => ({
   }),
 }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
+const showErrorNotification = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({ showErrorNotification }),
+}));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@tanstack/vue-virtual", () => ({
   useVirtualizer: () =>
@@ -295,6 +306,60 @@ describe("MetricsExplorer wiring", () => {
     });
   });
 
+  describe("the result count and an all-empty page", () => {
+    const many = (n: number, prefix: string) =>
+      Array.from({ length: n }, (_, i) => ({ ...CARD, name: `${prefix}_${i}` }));
+
+    afterEach(() => {
+      grid.cards.value = [];
+      grid.filteredCards.value = [];
+      grid.hasMore.value = false;
+      grid.emptyHiddenCount.value = 0;
+    });
+
+    it("counts every match, not just the cards loaded so far", () => {
+      grid.cards.value = many(3621, "m");
+      grid.filteredCards.value = many(41, "disk");
+      grid.pagedCards.value = many(8, "disk");
+      grid.hasMore.value = true;
+      const wrapper = mountExplorer();
+      expect(wrapper.find('[data-test="metrics-explorer-count"]').text()).toBe(
+        `${(41).toLocaleString()} of ${(3621).toLocaleString()}`,
+      );
+    });
+
+    it("keeps the bare total when everything matches", () => {
+      grid.cards.value = many(12, "m");
+      grid.filteredCards.value = grid.cards.value;
+      const wrapper = mountExplorer();
+      expect(wrapper.find('[data-test="metrics-explorer-count"]').text()).toBe(
+        (12).toLocaleString(),
+      );
+    });
+
+    it("offers Show more instead of a final no-match while candidates remain", () => {
+      grid.cards.value = many(3621, "m");
+      grid.filteredCards.value = many(33, "disk");
+      grid.pagedCards.value = [];
+      grid.hasMore.value = true;
+      grid.emptyHiddenCount.value = 8;
+      const wrapper = mountExplorer();
+      expect(wrapper.find('[data-test="metrics-explorer-no-match-yet"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-no-match"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-show-more"]').exists()).toBe(true);
+    });
+
+    it("shows the final no-match once nothing is left to check", () => {
+      grid.cards.value = many(3621, "m");
+      grid.pagedCards.value = [];
+      grid.hasMore.value = false;
+      const wrapper = mountExplorer();
+      expect(wrapper.find('[data-test="metrics-explorer-no-match"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-no-match-yet"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-show-more"]').exists()).toBe(false);
+    });
+  });
+
   describe("sort", () => {
     it("offers A–Z and Z–A, and no longer offers Recent", async () => {
       // "Recent" ranked by what you had opened — a handful of metrics out of
@@ -305,6 +370,47 @@ describe("MetricsExplorer wiring", () => {
       expect(wrapper.find('[data-test="metrics-explorer-sort-a-z"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="metrics-explorer-sort-z-a"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="metrics-explorer-sort-recent"]').exists()).toBe(false);
+    });
+
+    it("offers the usage sorts and the usage filter chips", () => {
+      const wrapper = mountExplorer();
+      for (const id of ["sort-dashboards", "sort-alerts", "usage-dashboards", "usage-alerts"]) {
+        expect(wrapper.find(`[data-test="metrics-explorer-${id}"]`).exists()).toBe(true);
+      }
+      expect(wrapper.find('[data-test="metrics-explorer-usage-slos"]').exists()).toBe(true);
+    });
+
+    it("hands a chip selection to the grid", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).onUsageFilterChange(["alerts", "slos"]);
+      expect([...grid.usageFilters.value]).toEqual(["alerts", "slos"]);
+      (wrapper.vm as any).onUsageFilterChange(undefined);
+      expect(grid.usageFilters.value.size).toBe(0);
+    });
+
+    it("shows the scan loading, and a retry once it fails", async () => {
+      grid.usageLoading.value = true;
+      const loading = mountExplorer();
+      expect(loading.find('[data-test="metrics-explorer-usage-loading"]').exists()).toBe(true);
+      expect(loading.find('[data-test="metrics-explorer-usage-retry"]').exists()).toBe(false);
+
+      grid.usageLoading.value = false;
+      grid.usageError.value = true;
+      const failed = mountExplorer();
+      expect(failed.find('[data-test="metrics-explorer-usage-loading"]').exists()).toBe(false);
+      expect(failed.find('[data-test="metrics-explorer-usage-retry"]').exists()).toBe(true);
+      grid.usageError.value = false;
+    });
+
+    it("restores a usage sort and chips from the URL, and writes them back", () => {
+      routerState.query = { sort: "alerts", usage: "slos,dashboards" };
+      const wrapper = mountExplorer();
+      expect(grid.sortBy.value).toBe("alerts");
+      expect([...grid.usageFilters.value].sort()).toEqual(["dashboards", "slos"]);
+      const state = wrapper.findComponent('[data-test="metrics-explorer-views"]').props("state");
+      expect(state).toMatchObject({ sort: "alerts", usage: "dashboards,slos" });
+      grid.sortBy.value = "a-z";
+      grid.usageFilters.value = new Set();
     });
   });
 
@@ -654,6 +760,50 @@ describe("MetricsExplorer wiring", () => {
     });
   });
 
+  describe("the facet rails wait for the first metric load", () => {
+    beforeEach(() => {
+      grid.cards.value = [];
+    });
+    afterEach(() => {
+      grid.loading.value = false;
+      grid.cards.value = [];
+      grid.activeRail.value = "prefix";
+    });
+
+    it.each(["prefix", "suffix"])(
+      "passes loading to the %s rail until the metrics settle",
+      (rail) => {
+        grid.activeRail.value = rail;
+        grid.loading.value = true;
+        expect(mountExplorer().findComponent({ name: "PrefixFilterPanel" }).props("loading")).toBe(
+          true,
+        );
+        grid.loading.value = false;
+        expect(mountExplorer().findComponent({ name: "PrefixFilterPanel" }).props("loading")).toBe(
+          false,
+        );
+      },
+    );
+
+    it("does not mark the rail loading on a reload that already has cards", () => {
+      grid.loading.value = true;
+      grid.cards.value = [CARD];
+      expect(mountExplorer().findComponent({ name: "PrefixFilterPanel" }).props("loading")).toBe(
+        false,
+      );
+    });
+
+    it("shows no type empty state while the metrics load, and shows it once they settle empty", () => {
+      grid.activeRail.value = "type";
+      grid.loading.value = true;
+      expect(mountExplorer().find('[data-test="metrics-explorer-type-empty"]').exists()).toBe(
+        false,
+      );
+      grid.loading.value = false;
+      expect(mountExplorer().find('[data-test="metrics-explorer-type-empty"]').exists()).toBe(true);
+    });
+  });
+
   describe("the type facet uses OCheckboxGroup over a Set<->array boundary", () => {
     it("exposes selectedTypes as an array for the group, and writes back a Set", () => {
       // The composable keeps selectedTypes as a Set (URL state + filtering depend
@@ -769,6 +919,34 @@ describe("MetricsExplorer wiring", () => {
       expect(refresh).toHaveBeenCalledTimes(1);
     });
 
+    it("keeps the grid's page for the zoom's date change, and only for that one", () => {
+      const wrapper = mountExplorer();
+      const vm = wrapper.vm as any;
+      vm.dateTimePickerRef = {
+        setCustomDate: vi.fn(),
+        refresh: () => vm.onDateChange(),
+        getConsumableDateTime: () => ({ startTime: 10, endTime: 20 }),
+      };
+      grid.setTimeRange.mockClear();
+
+      zoomOn(wrapper, {
+        start: new Date("2026-07-16T10:00:00.000Z").getTime(),
+        end: new Date("2026-07-16T10:30:00.000Z").getTime(),
+      });
+      expect(grid.setTimeRange).toHaveBeenCalledTimes(1);
+      expect(grid.setTimeRange).toHaveBeenLastCalledWith(
+        { start_time: 10, end_time: 20 },
+        { keepPage: true },
+      );
+
+      vm.onDateChange();
+      expect(grid.setTimeRange).toHaveBeenCalledTimes(2);
+      expect(grid.setTimeRange).toHaveBeenLastCalledWith(
+        { start_time: 10, end_time: 20 },
+        undefined,
+      );
+    });
+
     it("widens a click-without-drag (start === end) into a real window", () => {
       const wrapper = mountExplorer();
       const setCustomDate = vi.fn();
@@ -856,6 +1034,29 @@ describe("MetricsExplorer wiring", () => {
         expect(blob?.data?.type).toBe("line");
       });
 
+      it("freezes a relative window into the picker's absolute from/to, in µs", async () => {
+        routerState.query = { period: "15m" };
+        window.history.replaceState({}, "", "/metrics?period=15m");
+        const wrapper = mountExplorer({
+          DateTimePickerDashboard: {
+            setup: () => ({
+              getConsumableDateTime: () => ({
+                startTime: 1_700_000_000_000_000,
+                endTime: 1_700_000_900_000_000,
+              }),
+            }),
+            template: "<div />",
+          },
+        });
+        await enterVisualizeWith(wrapper, "up");
+
+        const params = new URL((wrapper.vm as any).shareUrl).searchParams;
+        expect(params.get("period")).toBeNull();
+        expect(params.get("from")).toBe("1700000000000000");
+        expect(params.get("to")).toBe("1700000900000000");
+        window.history.replaceState({}, "", "/");
+      });
+
       it("omits metrics_data on a blank Visualize (no query yet)", async () => {
         const wrapper = mountExplorer();
         visualizePanel = reactive({
@@ -905,6 +1106,15 @@ describe("MetricsExplorer wiring", () => {
         routerState.query = { mode: "visualize" };
         const wrapper = mountExplorer();
         expect((wrapper.vm as any).visualizeSeed).toBeNull();
+      });
+
+      it("says once that a link's label groups were dropped for passing the branch cap", () => {
+        showErrorNotification.mockClear();
+        const groups = Array.from({ length: 17 }, (_, i) => `${i + 1}:l${i}=v`);
+        routerState.query = { labels: ["job=api", ...groups] };
+        mountExplorer();
+        expect(showErrorNotification).toHaveBeenCalledTimes(1);
+        expect(grid.labelFilters.value).toEqual([{ label: "job", operator: "=", value: "api" }]);
       });
 
       it("ignores a malformed blob rather than throwing", () => {
@@ -999,6 +1209,78 @@ describe("MetricsExplorer wiring", () => {
         expect(routerState.push).not.toHaveBeenCalled();
       });
 
+      it("remounts Visualize on the URL's chart when Back/Forward moves between two blobs", async () => {
+        const first = encodeMetricsConfig(
+          getMetricsConfig({ data: { type: "line", queries: [{ query: "up", fields: {} }] } }),
+        );
+        const second = encodeMetricsConfig(
+          getMetricsConfig({
+            data: { type: "bar", queries: [{ query: "node_load1", fields: {} }] },
+          }),
+        );
+        visualizePanel = null;
+        routerState.query = { mode: "visualize", metrics_data: first };
+        const wrapper = mountExplorer();
+        const vm = wrapper.vm as any;
+        const mounted = vm.visualizeMount;
+
+        routerState.query = { mode: "visualize", metrics_data: second };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeSeed?.queries?.[0]?.query).toBe("node_load1");
+        expect(vm.visualizeMount).toBe(mounted + 1);
+
+        routerState.query = { mode: "visualize", metrics_data: first };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeSeed?.queries?.[0]?.query).toBe("up");
+        expect(vm.visualizeMount).toBe(mounted + 2);
+      });
+
+      it("does not remount on the blob the page itself wrote", async () => {
+        const wrapper = mountExplorer();
+        const vm = wrapper.vm as any;
+        await enterVisualizeWith(wrapper, "node_load1");
+        vi.advanceTimersByTime(300);
+        const wrote = blobWrites().at(-1);
+        expect(wrote).toBeTruthy();
+        const mounted = vm.visualizeMount;
+        vm.visualizeSeed = null;
+        // An edit inside the debounce means the chart has moved on from what was written.
+        visualizePanel.data.queries[0].query = "node_load5";
+        await wrapper.vm.$nextTick();
+
+        routerState.query = { mode: "visualize", metrics_data: wrote };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeMount).toBe(mounted);
+        expect(vm.visualizeSeed).toBeNull();
+      });
+
+      it("rehydrates on Back to a chart the page wrote itself before a shared link replaced it", async () => {
+        const wrapper = mountExplorer();
+        const vm = wrapper.vm as any;
+        await enterVisualizeWith(wrapper, "chart_b");
+        vi.advanceTimersByTime(300);
+        const written = blobWrites().at(-1);
+        expect(written).toBeTruthy();
+        routerState.query = { mode: "visualize", metrics_data: written };
+        vm.onRouteQueryChange();
+
+        const shared = encodeMetricsConfig(
+          getMetricsConfig({ data: { type: "bar", queries: [{ query: "chart_c", fields: {} }] } }),
+        );
+        routerState.query = { mode: "visualize", metrics_data: shared };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeSeed?.queries?.[0]?.query).toBe("chart_c");
+        visualizePanel.data.queries[0].query = "chart_c";
+        vm.visualizeSeed = null;
+        await wrapper.vm.$nextTick();
+        const mounted = vm.visualizeMount;
+
+        routerState.query = { mode: "visualize", metrics_data: written };
+        vm.onRouteQueryChange();
+        expect(vm.visualizeSeed?.queries?.[0]?.query).toBe("chart_b");
+        expect(vm.visualizeMount).toBe(mounted + 1);
+      });
+
       it("does not touch metrics_data while in a grid mode", async () => {
         const wrapper = mountExplorer();
         // A pure grid interaction (sort change) fires syncUrlState, never the
@@ -1027,6 +1309,7 @@ describe("MetricsExplorer wiring", () => {
       grid.labelFilters.value = [];
       grid.hideEmptyPanels.value = true;
       grid.sortBy.value = "a-z";
+      grid.usageFilters.value = new Set();
       grid.viewMode.value = "grid";
     });
     afterEach(() => {
@@ -1974,12 +2257,24 @@ describe("MetricsExplorer wiring", () => {
       const timeRange = { valueType: "relative", relativeTimePeriod: "6h" };
       wrapper
         .findComponent('[data-test="metrics-history"]')
-        .vm.$emit("load", { metricsData: "blob", timeRange });
-      expect(visualizeApplyPanelData).toHaveBeenCalledWith("blob", timeRange);
+        .vm.$emit("load", { metricsData: "blob", timeRange, run: true });
+      expect(visualizeApplyPanelData).toHaveBeenCalledWith("blob", timeRange, true);
       expect(analytics.track).toHaveBeenCalledWith(
         "metrics_explorer_history_loaded",
         expect.any(Object),
       );
+    });
+
+    it("passes a load-only pick through without running", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as unknown as { setMode: (mode: string) => void }).setMode("visualize");
+      await wrapper.vm.$nextTick();
+
+      const timeRange = { valueType: "relative", relativeTimePeriod: "6h" };
+      wrapper
+        .findComponent('[data-test="metrics-history"]')
+        .vm.$emit("load", { metricsData: "blob", timeRange, run: false });
+      expect(visualizeApplyPanelData).toHaveBeenCalledWith("blob", timeRange, false);
     });
 
     it("the pane's range change sets the toolbar picker", async () => {

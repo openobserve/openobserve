@@ -49,18 +49,6 @@ test.describe('Logs toolbar pins', () => {
     testLogger.info('Histogram renders pinned on a profile that never chose');
   });
 
-  test('saved views is pinned by default until the user decides', {
-    tag: ['@toolbarPins', '@logs', '@P0', '@all'],
-  }, async () => {
-    await pm.logsToolbarPinsPage.seedPinStorage();
-    await pm.logsToolbarPinsPage.navigateToLogs(getOrgIdentifier());
-
-    await pm.logsToolbarPinsPage.expectPinnedVisible('savedViews');
-    expect(await pm.logsToolbarPinsPage.readSavedViewsDecidedFlag()).toBeNull();
-
-    testLogger.info('Saved views renders pinned on a profile that never chose');
-  });
-
   test('unpinning the histogram survives a reload', {
     tag: ['@toolbarPins', '@logs', '@P0', '@all'],
   }, async () => {
@@ -138,7 +126,7 @@ test.describe('Logs toolbar pins', () => {
     // this moves by nav-rail click, never page.goto. The nav helpers assert a
     // document stamp survives, which enforces that.
     const pins = pm.logsToolbarPinsPage;
-    await pins.seedPinStorage({ pins: [], decided: true });
+    await pins.seedPinStorage();
     await pins.navigateToLogs(getOrgIdentifier());
     await pins.stampDocument();
 
@@ -147,15 +135,14 @@ test.describe('Logs toolbar pins', () => {
     expect(await pins.readPins()).toContain('quickMode');
 
     await pins.gotoTracesViaNav();
-    // Its own default being pinned proves the traces scope really instantiated.
-    await pins.expectTracesPinState('savedViews', true);
+    // Traces has no default pins, and logs' quickMode pin must not leak into it.
+    await pins.expectTracesPinState('savedViews', false);
     await pins.expectTracesPinState('histogram', false);
     await pins.expectTracesMetricsPinnedHidden();
 
     await pins.toggleTracesPin('histogram');
     const tracesPins = JSON.parse((await pins.readTracesPins()) ?? 'null');
-    expect(tracesPins).toContain('savedViews');
-    expect(tracesPins).toContain('histogram');
+    expect(tracesPins).toEqual(['histogram']);
     expect(tracesPins).not.toContain('quickMode');
 
     // Same document, so this reads the live shared map, not storage.

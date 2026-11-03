@@ -164,6 +164,7 @@
           :columns="columns"
           row-key="rowKey"
           :loading="loading || rowsLoading"
+          :loading-reset-key="experimentId"
           :show-global-filter="false"
           :default-columns="false"
           :enable-column-resize="true"

@@ -59,6 +59,8 @@ import type {
   TelephonyView,
   TelephonyStatus,
   OrgTelephonyView,
+  SetTeamChannelBody,
+  TeamSlackTestResult,
   TestPageResult,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
@@ -379,11 +381,23 @@ const oncall = {
   }: {
     org_identifier: string;
     team_id: string;
-    data: { destinations: string[] | null };
+    data: SetTeamChannelBody;
   }) =>
     http().put<TeamChannel>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/channel`,
       data,
+    ),
+
+  /// RO-6: one plain message to the team's Slack channel; the answer says what to fix.
+  testTeamSlackChannel: ({
+    org_identifier,
+    team_id,
+  }: {
+    org_identifier: string;
+    team_id: string;
+  }) =>
+    http().post<TeamSlackTestResult>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/slack/test`,
     ),
 
   /// Org-scoped, deliberately not per team. All three params optional; both
@@ -454,16 +468,31 @@ const oncall = {
     data: { oncall_team?: string; dimensions: Record<string, string> };
   }) => http().post<RoutingPreview>(`/api/${org_identifier}/oncall/routing/preview`, data),
 
-  /// Claims the page and stops the ladder.
+  /// Acknowledges the page's problem, which stops every page of it; `take_over` moves someone else's.
   acknowledgeResponse: ({
+    org_identifier,
+    response_id,
+    take_over,
+  }: {
+    org_identifier: string;
+    response_id: string;
+    take_over?: boolean;
+  }) =>
+    http().post<OnCallResponse & { ack?: { changed: boolean } | null }>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/acknowledge`,
+      ...(take_over ? [{ take_over }] : []),
+    ),
+
+  /// Clears the acknowledgement of the page's problem; the pages it stopped restart at step 1.
+  unacknowledgeResponse: ({
     org_identifier,
     response_id,
   }: {
     org_identifier: string;
     response_id: string;
   }) =>
-    http().post<OnCallResponse>(
-      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/acknowledge`,
+    http().post<OnCallResponse & { ack?: { changed: boolean } | null }>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/unacknowledge`,
     ),
 
   /// Quiets the page for a while WITHOUT claiming it — the record stays open
