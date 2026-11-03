@@ -18,13 +18,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col gap-4" data-test="oncall-ownership">
     <span class="flex flex-wrap items-center gap-x-2 gap-y-2" data-test="oncall-ownership-header">
-      <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+      <span class="flex min-w-0 flex-1 items-center gap-1">
         <OText variant="card-title" data-test="oncall-ownership-title">
           {{ t("oncall.teamRoutingTitle", { team: raw(teamName) }) }}
         </OText>
-        <OText variant="meta" data-test="oncall-ownership-precedence">
-          {{ t("oncall.routingPrecedence") }}
-        </OText>
+        <OIcon
+          name="info-outline"
+          size="sm"
+          class="text-text-secondary cursor-help"
+          data-test="oncall-ownership-precedence"
+        >
+          <OTooltip side="bottom" :content="t('oncall.routingPrecedence')" />
+        </OIcon>
       </span>
       <OButton
         v-if="canConfigure"
@@ -105,8 +110,10 @@ import OnCallOwnershipRules from "@/components/oncall/OnCallOwnershipRules.vue";
 import OnCallRuleEditor from "@/components/oncall/OnCallRuleEditor.vue";
 import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   dimensionAnalyticsQuery,
   semanticGroupsQuery,

@@ -102,14 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OInnerLoading v-if="loading" showing />
 
-      <!-- Pointer-only shortcut to Edit; the header's Edit button stays the keyboard path. -->
-      <div
-        v-else
-        class="rounded-b-surface flex flex-col"
-        :class="canConfigure ? 'hover:bg-table-row-hover-bg cursor-pointer transition-colors' : ''"
-        data-test="oncall-ladder-body"
-        @click="canConfigure && emit('edit')"
-      >
+      <div v-else class="rounded-b-surface flex flex-col" data-test="oncall-ladder-body">
         <!-- Every level of every priority aimed at the whole team, on a team that HAS rotations, is a policy minted before it had members. -->
         <span
           v-if="staleDefaultLadder"
@@ -263,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 icon-left="add"
                 data-test="oncall-ladder-add-rung"
-                @click.stop="emit('edit')"
+                @click="emit('edit')"
               >
                 {{ t("oncall.ladderAddStep") }}
               </OButton>

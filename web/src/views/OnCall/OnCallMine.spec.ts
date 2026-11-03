@@ -366,10 +366,74 @@ describe("OnCallMine", () => {
     }
   });
 
+  /// The header keeps its shape while loading, so nothing jumps when the read answers.
+  it("draws the header actions before the first read answers", async () => {
+    let answer: (value: unknown) => void = () => {};
+    service.myOnCall.mockReturnValueOnce(
+      new Promise((resolve) => (answer = resolve)) as ReturnType<typeof service.myOnCall>,
+    );
+    const wrapper = render();
+    await flushPromises();
+    const away = wrapper.find('[data-test="oncall-mine-away"]');
+    expect(away.exists()).toBe(true);
+    expect(away.attributes("disabled")).toBeDefined();
+
+    answer({ data: MINE });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-mine-away"]').attributes("disabled")).toBeUndefined();
+  });
+
   /// A top-level page has no back button.
   it("has no back button", async () => {
     const wrapper = render();
     await flushPromises();
     expect(wrapper.findComponent({ name: "OPageLayout" }).props("back")).toBeUndefined();
+  });
+
+  /// A reader on a hundred teams sees the five soonest, and the rest scroll inside the card once expanded.
+  it("shows the five soonest shifts and expands the rest inside a scrolling card", async () => {
+    const now = Date.now() * 1000;
+    const teams = Array.from({ length: 120 }, (_, i) => ({
+      team_id: `team_${i}`,
+      team_name: `Team ${String(i).padStart(3, "0")}`,
+      on_call_now: false,
+      on_call: [],
+    }));
+    type Response<T extends (...args: never[]) => unknown> = Awaited<ReturnType<T>>;
+    service.myOnCall.mockResolvedValue({
+      data: { on_call_now: false, teams },
+    } as unknown as Response<typeof service.myOnCall>);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as unknown as Response<
+      typeof service.whoIsOnCall
+    >);
+    const me = store.state.userInfo.email;
+    // Later teams start sooner, so the sort and not the server's order decides the first five.
+    service.resolvedSchedule.mockImplementation((args: { team_id: string }) => {
+      const from = now + (200 - Number(args.team_id.split("_")[1])) * 3_600_000_000;
+      return Promise.resolve({
+        data: [{ rotation_id: "r1", from, to: from + 3_600_000_000, user_email: me }],
+      } as unknown as Response<typeof service.resolvedSchedule>);
+    });
+    const wrapper = mount(OnCallMine, {
+      global: { plugins: [i18n, store], stubs: { ...stubs, OTable: false } },
+    });
+    await flushPromises();
+
+    const shown = () =>
+      wrapper.findAll('[data-test^="oncall-mine-team-"]').map((link) => link.text());
+    await vi.waitFor(() => expect(shown()).toHaveLength(5));
+    expect(shown()).toEqual(["Team 119", "Team 118", "Team 117", "Team 116", "Team 115"]);
+    const scroller = () => wrapper.find('[data-test="o2-table-scroll-container"]');
+    expect((scroller().element as HTMLElement).style.maxHeight).toBe("");
+
+    const toggle = wrapper.find('[data-test="oncall-mine-shifts-toggle"]');
+    expect(toggle.text()).toBe("Show all 120");
+    await toggle.trigger("click");
+    expect(shown()).toHaveLength(120);
+    expect((scroller().element as HTMLElement).style.maxHeight).toBe("30rem");
+    expect(scroller().classes()).toContain("overflow-y-auto");
+
+    await wrapper.find('[data-test="oncall-mine-shifts-toggle"]').trigger("click");
+    expect(shown()).toHaveLength(5);
   });
 });

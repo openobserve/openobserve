@@ -164,7 +164,7 @@ describe("TelephonySettings", () => {
       expect(body).toContain("This deployment's Twilio account");
       expect(cardText("status")).toBe("Connected");
       expect(cardText("meta")).toBe("From +18335550199");
-      expect(body).toContain(NOTE);
+      expect(body).not.toContain(NOTE);
       expect(text("press4")).toBe(PRESS4);
       expect(q("hero")).toBeNull();
 
@@ -224,7 +224,7 @@ describe("TelephonySettings", () => {
       expect(card("problem")).not.toBeNull();
       expect(card("problem-update")).toBeNull();
       expect(q("press4")).toBeNull();
-      expect(text("deployment")).toContain(NOTE);
+      expect(text("deployment")).not.toContain(NOTE);
       expect(text("deployment")).not.toContain("already work");
     });
 

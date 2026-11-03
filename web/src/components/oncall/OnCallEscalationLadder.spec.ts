@@ -728,19 +728,13 @@ describe("OnCallEscalationLadder", () => {
     expect(wrapper.emitted("edit")).toHaveLength(1);
   });
 
-  // The card body is a pointer shortcut to Edit, so it says so on hover and only for a reader who may edit.
-  it("opens Edit from anywhere on the ladder for a reader who may change it", async () => {
+  // Edit is the header button alone; the ladder body is read-only.
+  it("does not open Edit from a click on the ladder body", async () => {
     const editor = render({ canConfigure: true });
     const body = editor.find('[data-test="oncall-ladder-body"]');
-    expect(body.classes()).toContain("cursor-pointer");
+    expect(body.classes()).not.toContain("cursor-pointer");
     await body.trigger("click");
-    expect(editor.emitted("edit")).toHaveLength(1);
-
-    const reader = render();
-    const readOnly = reader.find('[data-test="oncall-ladder-body"]');
-    expect(readOnly.classes()).not.toContain("cursor-pointer");
-    await readOnly.trigger("click");
-    expect(reader.emitted("edit")).toBeUndefined();
+    expect(editor.emitted("edit")).toBeUndefined();
   });
 
   // Two people can share a name, so each name on a rung carries its email in a tooltip.

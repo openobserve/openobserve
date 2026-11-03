@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   that needs its threshold tuned.
 -->
 <template>
-  <OCard variant="glass" data-test="oncall-firing-history">
+  <OCard variant="glass" class="table-last-row-flush" data-test="oncall-firing-history">
     <OCardSection role="header" dense>
       <OText variant="card-title">{{ t("oncall.firingHistory") }}</OText>
     </OCardSection>

@@ -141,7 +141,9 @@ describe("OnCallOwnership", () => {
     expect(wrapper.find('[data-test="oncall-ownership-title"]').text()).toBe(
       "Alerts that come to Platform",
     );
-    expect(wrapper.find('[data-test="oncall-ownership-precedence"]').text()).toBe(
+    const precedence = wrapper.find('[data-test="oncall-ownership-precedence"]');
+    expect(precedence.text()).toBe("");
+    expect(precedence.findComponent({ name: "OTooltip" }).props("content")).toBe(
       String(i18n.global.t("oncall.routingPrecedence")),
     );
   });

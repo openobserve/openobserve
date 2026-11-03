@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     data-test="oncall-teams-page"
     :title="t('oncall.teamsTitle')"
-    :subtitle="t('oncall.teamsSubtitle')"
     icon="group-work"
   >
     <template #actions>

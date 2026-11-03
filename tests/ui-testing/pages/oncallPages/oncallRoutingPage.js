@@ -111,8 +111,8 @@ export class OnCallRoutingPage {
       simulatorPriority: '[data-test="oncall-simulator-priority"]',
       simulatorResult: '[data-test="oncall-simulator-result"]',
       simulatorAnswer: '[data-test="oncall-simulator-answer"]',
-      simulatorWhy: '[data-test="oncall-simulator-why"]',
       simulatorWon: '[data-test="oncall-simulator-won"]',
+      simulatorAlsoCount: '[data-test="oncall-simulator-also"]',
       simulatorTeam: '[data-test="oncall-simulator-team"]',
       simulatorResponder: '[data-test="oncall-simulator-responder"]',
       simulatorNext: '[data-test="oncall-simulator-next"]',
@@ -511,17 +511,13 @@ export class OnCallRoutingPage {
     await expect(this.page.locator(this.locators.simulatorAnswer)).toBeVisible({ timeout: 30000 });
   }
 
-  /** Every field of the rendered verdict, with Why opened so the winning rule is readable. */
+  /** Every field of the rendered verdict; the winning rule is an inline line under the answer. */
   async readSimulatorResult() {
     const textOf = async (selector) => {
       const node = this.page.locator(selector);
       if ((await node.count()) === 0) return null;
       return ((await node.first().innerText()) ?? '').replace(/\s+/g, ' ').trim();
     };
-    const why = this.page.locator(`${this.locators.simulatorWhy} button`).first();
-    if ((await why.count()) && !(await this.page.locator(this.locators.simulatorWon).count())) {
-      await why.click();
-    }
     return {
       matched: await textOf(this.locators.simulatorResult),
       specificity: null,

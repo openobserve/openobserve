@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     data-test="oncall-responses-page"
     :title="t('oncall.responsesTitle')"
-    :subtitle="t('oncall.responsesSubtitle')"
     icon="notifications-active"
   >
     <template #actions>
@@ -126,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- During an incident the list IS the work surface. Opening 200 pages
            one at a time to claim them is not triage. -->
-      <template v-if="hasPages && scopeDecided" #toolbar>
+      <template v-if="hasPages" #toolbar>
         <div class="flex w-full flex-wrap items-center gap-2 max-md:contents">
           <!-- First, and always on screen, so a list narrowed to the reader's own pages never looks empty for a hidden reason. -->
           <OToggleGroup
@@ -157,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             :model-value="activeFilter"
             :options="statusOptions"
+            :searchable="false"
             icon-key="icon"
             :aria-label="t('oncall.statusFilterLabel')"
             width="sm"
@@ -331,10 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag variant="default-soft" size="sm" :data-test="`oncall-section-count-${sectionKey}`">
             {{ raw(String(sectionCounts[sectionKey] ?? 0)) }}
           </OTag>
-          <OText v-if="sectionKey !== 'ringing' || unroutedRinging === 0" variant="meta">
-            {{ t(`oncall.sectionHint_${sectionKey}`) }}
-          </OText>
-          <template v-else>
+          <template v-if="sectionKey === 'ringing' && unroutedRinging > 0">
             <OText v-if="routedRinging > 0" variant="meta" data-test="oncall-section-hint-routed">
               {{ t("oncall.sectionHint_ringingRouted", { count: routedRinging }, routedRinging) }}
             </OText>
@@ -391,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             params: { teamId: row.latest.team_id },
             query: { org_identifier: orgId },
           }"
-          class="text-text-body inline-block max-w-full hover:underline"
+          class="text-text-body flex max-w-full min-w-0 hover:underline"
           :data-test="`oncall-row-team-${row.rowKey}`"
           @click.stop
         >
@@ -412,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             params: { id: row.latest.incident_id },
             query: { org_identifier: orgId },
           }"
-          class="text-text-body inline-block max-w-full hover:underline"
+          class="text-text-body flex max-w-full min-w-0 hover:underline"
           :data-test="`oncall-row-incident-${row.rowKey}`"
           @click.stop
         >
@@ -606,7 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <!-- Same slots and verbs as the Incidents list; an empty slot keeps its width so the icons line up down the column. -->
+      <!-- Three fixed slots, so icons line up down the column: acknowledge, resolve, then ⋯ on every row. -->
       <template #cell-actions="{ row }">
         <div class="flex items-center justify-end">
           <template v-if="!row.latest.team_id">
@@ -638,7 +635,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
             </ODropdown>
             <span class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
-            <span class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
           </template>
           <template v-else>
             <OButton
@@ -654,11 +650,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="check-circle" size="sm" aria-hidden="true" />
               <OTooltip :content="ackTooltip(row)" />
             </OButton>
-            <span
-              v-else-if="hasUnresolved(row)"
-              class="size-8 shrink-0 max-md:hidden"
-              aria-hidden="true"
-            />
+            <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
             <OButton
               v-if="hasUnresolved(row)"
               variant="ghost-primary"
@@ -672,58 +664,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="task-alt" size="sm" aria-hidden="true" />
               <OTooltip :content="t('oncall.resolve')" />
             </OButton>
-            <ODropdown v-if="canAcknowledge(row) || hasUnresolved(row)" side="bottom" align="end">
-              <template #trigger>
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  icon-left="more-vert"
-                  :class="canAcknowledge(row) ? '' : 'md:hidden'"
-                  :loading="busyId === row.rowKey"
-                  :aria-label="t('oncall.moreActions')"
-                  :data-test="`oncall-row-more-${row.rowKey}`"
-                  @click.stop
-                >
-                  <OTooltip side="bottom" :content="t('oncall.moreActions')" />
-                </OButton>
-              </template>
-              <ODropdownItem
-                v-if="canAcknowledge(row)"
-                icon-left="check-circle"
-                class="md:hidden"
-                :data-test="`oncall-row-ack-${row.rowKey}-menu`"
-                @select="acknowledgeRow(row)"
-              >
-                {{ t("oncall.acknowledge") }}
-              </ODropdownItem>
-              <ODropdownItem
-                v-if="hasUnresolved(row)"
-                icon-left="task-alt"
-                class="md:hidden"
-                :data-test="`oncall-row-resolve-${row.rowKey}-menu`"
-                @select="resolveRow(row)"
-              >
-                {{ t("oncall.resolve") }}
-              </ODropdownItem>
-              <ODropdownGroup v-if="canAcknowledge(row)" :label="t('oncall.snoozeFor')">
-                <ODropdownItem
-                  v-for="option in snoozeOptions"
-                  :key="option.minutes"
-                  icon-left="alarm"
-                  :data-test="`oncall-row-snooze-${row.rowKey}-${option.minutes}`"
-                  @select="snoozeRow(row, option.minutes)"
-                >
-                  {{ option.label }}
-                </ODropdownItem>
-              </ODropdownGroup>
-            </ODropdown>
-            <!-- Holds the ⋯ slot on desktop so Resolve stays in the same column as on ringing rows. -->
-            <span
-              v-if="hasUnresolved(row) && !canAcknowledge(row)"
-              class="size-8 shrink-0 max-md:hidden"
-              aria-hidden="true"
-            />
+            <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
           </template>
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                icon-left="more-vert"
+                :loading="busyId === row.rowKey"
+                :aria-label="t('oncall.moreActions')"
+                :data-test="`oncall-row-more-${row.rowKey}`"
+                @click.stop
+              >
+                <OTooltip side="bottom" :content="t('oncall.moreActions')" />
+              </OButton>
+            </template>
+            <ODropdownItem
+              v-if="row.latest.team_id && canAcknowledge(row)"
+              icon-left="check-circle"
+              class="md:hidden"
+              :data-test="`oncall-row-ack-${row.rowKey}-menu`"
+              @select="acknowledgeRow(row)"
+            >
+              {{ t("oncall.acknowledge") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="row.latest.team_id && hasUnresolved(row)"
+              icon-left="task-alt"
+              class="md:hidden"
+              :data-test="`oncall-row-resolve-${row.rowKey}-menu`"
+              @select="resolveRow(row)"
+            >
+              {{ t("oncall.resolve") }}
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="open-in-new"
+              :data-test="`oncall-row-open-${row.rowKey}`"
+              @select="openResponse(row)"
+            >
+              {{ t("oncall.rowOpenPage") }}
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="timeline"
+              :data-test="`oncall-row-show-timeline-${row.rowKey}`"
+              @select="toggleTimeline(row)"
+            >
+              {{
+                expandedIds.includes(row.rowKey)
+                  ? t("oncall.rowHideTimeline")
+                  : t("oncall.rowShowTimeline")
+              }}
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="link"
+              :data-test="`oncall-row-copy-link-${row.rowKey}`"
+              @select="copyRowLink(row)"
+            >
+              {{ t("oncall.rowCopyLink") }}
+            </ODropdownItem>
+            <ODropdownGroup
+              v-if="row.latest.team_id && canAcknowledge(row)"
+              :label="t('oncall.snoozeFor')"
+            >
+              <ODropdownItem
+                v-for="option in snoozeOptions"
+                :key="option.minutes"
+                icon-left="alarm"
+                :data-test="`oncall-row-snooze-${row.rowKey}-${option.minutes}`"
+                @select="snoozeRow(row, option.minutes)"
+              >
+                {{ option.label }}
+              </ODropdownItem>
+            </ODropdownGroup>
+          </ODropdown>
         </div>
       </template>
 
@@ -808,6 +822,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
+import { copyToClipboard } from "@/utils/clipboard";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
@@ -832,7 +847,6 @@ import {
   acknowledgeResponseMutation,
   addResponseNoteMutation,
   coverageGapsQuery,
-  myOnCallQuery,
   handoffResponseMutation,
   oncallTeamsQuery,
   ownershipRulesQuery,
@@ -858,7 +872,6 @@ import type {
   Channel,
   CoverageGaps,
   EscalationProgress,
-  MyOnCall,
   OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
@@ -978,10 +991,8 @@ const savedView = useListViewState("oncall-responses", {
   teamFilter: "all",
   priorityFilter: "all",
   mineOnly: false,
-  /** Set once the reader picks Mine or Everyone, so the on-call default never overrides a choice. */
-  mineChosen: false,
   grouped: true,
-  activeFilter: "open" as FilterTab,
+  activeFilter: "all" as FilterTab,
   causeFilter: "" as ResolutionCause | "",
   currentPage: 1,
   pageSize: 20,
@@ -996,7 +1007,6 @@ const selectedIds = ref<string[]>([]);
 const grouped = ref(savedView.grouped);
 /// `"all"` is the default tab, and "all" means all — resolved included —
 /// so the very first fetch already asks for resolved pages too.
-// "open" fetches resolved too, so "has this org ever paged anybody" is still answered by the first read.
 const includeResolved = ref(
   savedView.activeFilter !== "ringing" &&
     savedView.activeFilter !== "snoozed" &&
@@ -1297,8 +1307,8 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     isAction: true,
     pinned: "right",
     sortable: false,
-    size: 112,
-    meta: { align: "center", actionCount: 2 },
+    size: 128,
+    meta: { align: "center", actionCount: 3 },
   },
 ]);
 
@@ -1319,29 +1329,6 @@ const myTeamIds = computed(() => {
 
 function setMineOnly(on: boolean) {
   mineOnly.value = on;
-  savedView.mineChosen = true;
-}
-
-/// The scope toggle waits for this, so the default never flips under a reader who already sees the list.
-const scopeDecided = ref(savedView.mineChosen || route.query.mine !== undefined);
-
-// Someone holding a pager starts on their own pages, unless they already chose or a link asked.
-async function decideScope(force: boolean) {
-  if (scopeDecided.value) return;
-  try {
-    const mine = await read<MyOnCall>(myOnCallQuery(orgId.value), force);
-    if (mine?.on_call_now && !savedView.mineChosen) mineOnly.value = true;
-    scopeDecided.value = true;
-  } catch {
-    // Left undecided: the rotations read after the list answers the same question.
-  }
-}
-
-/// Without the my-on-call read, the rotations the list already loads say whether the reader holds a pager.
-function decideScopeFromRotations() {
-  if (scopeDecided.value) return;
-  if (myTeamIds.value.size > 0 && !savedView.mineChosen) mineOnly.value = true;
-  scopeDecided.value = true;
 }
 
 /// Inert until we know who is signed in — otherwise a stale toggle would hide
@@ -1446,8 +1433,11 @@ function selectFilterTab(tab: FilterTab) {
 const youLabel = computed(() => String(t("oncall.onCallYou")));
 const { nameOf } = useOrgUserNames();
 
+/// A name when the org has one, else the email's local part: the domain is the same on every row.
 function displayName(email: string): string {
-  return email.toLowerCase() === viewerEmail.value ? youLabel.value : nameOf(email);
+  if (email.toLowerCase() === viewerEmail.value) return youLabel.value;
+  const name = nameOf(email);
+  return name !== email ? name : email.split("@")[0] || email;
 }
 
 /// Names can repeat across an org, so the email is always one hover away.
@@ -2052,13 +2042,12 @@ const expandedResponseId = () =>
   rows.value.find((candidate) => candidate.rowKey === expandedIds.value[0])?.latest.id;
 
 async function loadAll(force = false) {
-  await Promise.all([fetchResponses({ force }), decideScope(force)]);
+  await fetchResponses({ force });
   // The probe answered "not here" — every further call would 404/403 the
   // same way, so stop asking.
   if (unavailable.value) return;
   await fetchContext(force);
   await fetchTeamContext(force);
-  decideScopeFromRotations();
   // The server creates the default ladder on first read, so a policy that answers is one that pages.
   setup.value.hasPolicy = Object.keys(policyByTeam.value).length > 0;
   // Set even when a call failed: the screen has to stop waiting either way; `teamsAvailable` says whether to trust it.
@@ -2095,11 +2084,25 @@ function createTeam() {
 }
 
 function openResponse(row: PageRow) {
-  router.push({
+  router.push(responseRoute(row));
+}
+
+function responseRoute(row: PageRow) {
+  return {
     name: "onCallResponseDetail",
     params: { responseId: row.latest.id },
     query: { org_identifier: orgId.value },
-  });
+  };
+}
+
+/// The row's own expansion is its timeline; one open at a time, like a click on the row chevron.
+function toggleTimeline(row: PageRow) {
+  expandedIds.value = expandedIds.value.includes(row.rowKey) ? [] : [row.rowKey];
+}
+
+async function copyRowLink(row: PageRow) {
+  const href = router.resolve(responseRoute(row)).href;
+  await copyToClipboard(new URL(href, window.location.origin).toString(), t);
 }
 
 function onEmptyAction(id?: string) {

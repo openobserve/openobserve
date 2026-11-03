@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <section
         v-if="openRows.length"
-        class="rounded-surface bg-surface-base border-border-default flex min-w-0 flex-col border"
+        class="rounded-surface bg-surface-base border-border-default table-last-row-flush flex min-w-0 flex-col overflow-hidden border"
         data-test="oncall-my-needs-you"
       >
         <div class="flex min-h-12 items-center px-4 py-2">
@@ -60,7 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag type="oncallResponseState" :value="row.response_state" size="sm" />
           </template>
           <template #cell-team="{ row }">
-            <OTruncatedText class="text-text-secondary">
+            <OSkeleton v-if="teamsPending(row.team_id)" class="h-4 w-24" />
+            <OTruncatedText v-else class="text-text-secondary">
               {{ raw(teamName(row.team_id)) }}
             </OTruncatedText>
           </template>
@@ -94,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </section>
 
       <section
-        class="rounded-surface bg-surface-base border-border-default flex min-w-0 flex-col border"
+        class="rounded-surface bg-surface-base border-border-default table-last-row-flush flex min-w-0 flex-col overflow-hidden border"
         data-test="oncall-my-history"
       >
         <div class="flex min-h-12 flex-wrap items-center gap-2 px-4 py-2">
@@ -170,7 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
           <template #cell-team="{ row }">
-            <OTruncatedText class="text-text-body">
+            <OSkeleton v-if="teamsPending(...row.teams)" class="h-4 w-24" />
+            <OTruncatedText v-else class="text-text-body">
               {{ raw(row.teams.map(teamName).join(", ")) }}
             </OTruncatedText>
           </template>
@@ -282,6 +284,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
@@ -303,12 +306,14 @@ const props = withDefaults(
   defineProps<{
     /** Team names, so a row reads as a team rather than an id. */
     teamNames?: Record<string, string>;
+    /** Where the org's team list stands: an unknown id is a deleted team only once it has loaded. */
+    teamsState?: "pending" | "loaded" | "failed";
     /** Whether the empty history offers the team test page as its next step. */
     canTest?: boolean;
     /** The team that test page goes to, named on the button so it is never ambiguous. */
     testTeamName?: string | null;
   }>(),
-  { teamNames: () => ({}), canTest: false, testTeamName: null },
+  { teamNames: () => ({}), teamsState: "loaded", canTest: false, testTeamName: null },
 );
 
 const emit = defineEmits<{ unread: [count: number]; "test-page": [] }>();
@@ -371,7 +376,15 @@ watch(loading, (isLoading) => {
   setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
 });
 
-const teamName = (id: string) => props.teamNames[id] ?? id;
+/// Never the raw id: a skeleton until the list answers, then the name, "a deleted team", or "—" when the list failed.
+function teamName(id: string): string {
+  const name = props.teamNames[id];
+  if (name) return name;
+  return props.teamsState === "loaded" ? String(t("oncall.deletedTeam")) : "—";
+}
+
+const teamsPending = (...ids: string[]) =>
+  props.teamsState === "pending" && ids.some((id) => !props.teamNames[id]);
 
 const countsAsUnread = (row: MyDelivery) => !row.read && row.response_state !== "resolved";
 

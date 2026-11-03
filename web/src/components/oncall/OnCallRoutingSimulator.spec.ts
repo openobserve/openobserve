@@ -296,7 +296,7 @@ describe("OnCallRoutingSimulator", () => {
     expect(wrapper.find('[data-test="oncall-simulator-responder"]').text()).toBe("Pages nobody");
   });
 
-  it("keeps the winning rule and the rules that lost under Why", () => {
+  it("says the winning rule inline and counts the less specific ones, with no expander", () => {
     const wrapper = render({
       seed: { service: "payments-api" },
       preview: preview({
@@ -312,12 +312,19 @@ describe("OnCallRoutingSimulator", () => {
         ],
       }),
     });
+    expect(wrapper.find('[data-test="oncall-simulator-why"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-simulator-won"]').text()).toBe(
-      "Matched the rule for Service payments-api",
+      "Matched rule: Service = payments-api",
     );
-    expect(wrapper.find('[data-test="oncall-simulator-also-r9"]').text()).toBe(
-      "Also matched K8s namespace payments → Checkout: less specific, so it lost",
+    expect(wrapper.find('[data-test="oncall-simulator-also"]').text()).toBe(
+      "Also matched, less specific: 1 rule",
     );
+  });
+
+  it("leaves out the less-specific line when no other rule matched", () => {
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    expect(wrapper.find('[data-test="oncall-simulator-won"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-simulator-also"]').exists()).toBe(false);
   });
 
   it("says a miss in plain words, never the engine's k=v note", () => {

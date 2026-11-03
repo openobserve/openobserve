@@ -20,9 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     data-test="oncall-routing-page"
     :title="t('oncall.routingTitle')"
-    :subtitle="t('oncall.routingPrecedence')"
     icon="alt-route"
   >
+    <template #title-trail>
+      <OIcon
+        name="info-outline"
+        size="sm"
+        class="text-text-secondary cursor-help"
+        data-test="oncall-routing-precedence-info"
+      >
+        <OTooltip side="bottom" :content="t('oncall.routingPrecedence')" />
+      </OIcon>
+    </template>
     <template #actions>
       <OButton
         v-if="ready && !isMobile"
@@ -378,6 +387,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -387,6 +397,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";

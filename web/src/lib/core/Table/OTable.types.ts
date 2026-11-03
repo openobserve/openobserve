@@ -471,6 +471,8 @@ export interface OTableProps<TData = any> {
   loading?: boolean;
   /** Show the skeleton on every load instead of keeping the last settled rows. */
   skeletonOnRefetch?: boolean;
+  /** Skeleton rows while loading, when the caller already knows how many rows will land; keeps the first paint the loaded height. */
+  skeletonRows?: number;
   /** Changing it drops the kept rows so the next load shows the skeleton; bind the folder or tab whose rows must not show under another. */
   loadingResetKey?: unknown;
   /** Data is arriving incrementally (SSE/WebSocket). Shows a pulsing indicator. */

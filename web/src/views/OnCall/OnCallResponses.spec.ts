@@ -133,6 +133,7 @@ const stubs = {
       "sectionOrder",
       "currentPage",
       "pageSize",
+      "expandedIds",
     ],
     emits: [
       "update:selectedIds",
@@ -245,7 +246,7 @@ const stubs = {
   },
   OSelect: {
     name: "OSelect",
-    props: ["options", "disabled", "width", "modelValue"],
+    props: ["options", "disabled", "width", "modelValue", "searchable"],
     template: "<select />",
   },
   OSearchInput: { name: "OSearchInput", template: "<input />" },
@@ -276,7 +277,7 @@ function render() {
   return mountTracked(OnCallResponses, { global: { plugins: [i18n, store], stubs } });
 }
 
-/// The default tab is "open"; the cause filter only exists on a tab that shows resolved pages.
+/// Picks "all" explicitly, so a test does not lean on the default tab.
 async function showAllTab(wrapper: any) {
   wrapper
     .findAllComponents({ name: "OSelect" })
@@ -586,11 +587,11 @@ describe("OnCallResponses", () => {
       );
     });
 
-    it("keeps the plain still-paging hint when every ringing page has a team", async () => {
+    it("adds no caption when every ringing page has a team", async () => {
       const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
 
       const text = wrapper.find(ringingHeader).text();
-      expect(text).toContain("nobody has acknowledged — these are still paging");
+      expect(text).not.toContain("nobody has acknowledged");
       expect(wrapper.find("[data-test='oncall-section-hint-unrouted']").exists()).toBe(false);
     });
 
@@ -766,16 +767,24 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(true);
     });
 
-    /// Pages are forward-only, so a resolved row has no action at all.
-    it("offers nothing on a resolved row: the arrow expands it and the row opens it", async () => {
+    /// Pages are forward-only, so a resolved row has no Acknowledge or Resolve, yet its ⋯ still opens, expands and links it.
+    it("gives a resolved row only the ⋯ menu: open, timeline, copy link", async () => {
       const wrapper = await withPages([
         page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
       ]);
 
       expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(false);
       expect(wrapper.find('[data-test^="oncall-row-resolve-"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test^="oncall-row-timeline-"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test^="oncall-row-more-"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-row-more-alert:al_ckt"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-row-open-alert:al_ckt"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-row-copy-link-alert:al_ckt"]').exists()).toBe(true);
+      const timeline = wrapper.findComponent('[data-test="oncall-row-show-timeline-alert:al_ckt"]');
+      expect(timeline.text()).toBe("Show timeline");
+      timeline.vm.$emit("select");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OTable" }).props("expandedIds")).toEqual([
+        "alert:al_ckt",
+      ]);
     });
 
     /// Every row shows the step it is actually on. "Acknowledge or nothing" left
@@ -1376,17 +1385,17 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test="oncall-responses-mine-btn"]').exists()).toBe(false);
     });
 
-    /// Somebody holding the pager opens on their own pages; filtering never navigates.
-    it("starts on Mine for someone on call, and filters in place", async () => {
+    /// Everyone is the default even while on call; Mine filters in place and never navigates.
+    it("starts on Everyone for someone on call, and filters in place on Mine", async () => {
       const wrapper = await withMyShift([
         page({ id: "a" }),
         page({ id: "b", team_id: "team_other" }, "al_pay"),
       ]);
-      expect(ids(wrapper)).toEqual(["a"]);
-
-      await pick(wrapper, "everyone");
-      expect(push).not.toHaveBeenCalled();
       expect(ids(wrapper)).toEqual(["a", "b"]);
+
+      await pick(wrapper, "mine");
+      expect(push).not.toHaveBeenCalled();
+      expect(ids(wrapper)).toEqual(["a"]);
     });
 
     it("starts on Everyone for someone not on call", async () => {
@@ -1397,43 +1406,24 @@ describe("OnCallResponses", () => {
       expect(ids(wrapper)).toEqual(["a", "b"]);
     });
 
-    /// The default is settled before the toggle is drawn, so it never flips under a reader already looking at it.
-    it("draws the scope toggle only once the reader's own duty has answered", async () => {
-      let answer: (value: unknown) => void = () => {};
-      service.myOnCall.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)) as any);
-      service.listTeams.mockResolvedValue({ data: [team] } as any);
-      service.listResponses.mockResolvedValue({
-        data: [page({ id: "a" }), page({ id: "b", team_id: "team_other" }, "al_pay")],
-      } as any);
-      const wrapper = render();
-      await flushPromises();
-      expect(wrapper.find(scopeToggle).exists()).toBe(false);
-
-      answer({ data: { on_call_now: true, teams: [] } });
-      await flushPromises();
-      expect(
-        wrapper.findComponent('[data-test="oncall-responses-scope"]').props("modelValue"),
-      ).toBe("mine");
-    });
-
-    it("starts on the open pages, not every page ever sent", async () => {
+    it("starts on every page, resolved included", async () => {
       const wrapper = await withPages([
         page({ id: "a" }),
         page({ id: "r", state: "resolved", closed_at: 1_700_000_100_000_000 }, "al_old"),
       ]);
-      expect(
-        wrapper.findComponent('[data-test="oncall-responses-filter-tabs"]').props("modelValue"),
-      ).toBe("open");
-      expect(ids(wrapper)).toEqual(["a"]);
+      const status = wrapper.findComponent('[data-test="oncall-responses-filter-tabs"]');
+      expect(status.props("modelValue")).toBe("all");
+      expect(status.props("searchable")).toBe(false);
+      expect(ids(wrapper).sort()).toEqual(["a", "r"]);
     });
 
-    it("keeps a choice the reader already made over the on-call default", async () => {
-      useListViewState("oncall-responses", {}).mineChosen = true;
+    it("keeps Mine once the reader picked it", async () => {
+      useListViewState("oncall-responses", {}).mineOnly = true;
       const wrapper = await withMyShift([
         page({ id: "a" }),
         page({ id: "b", team_id: "team_other" }, "al_pay"),
       ]);
-      expect(ids(wrapper)).toEqual(["a", "b"]);
+      expect(ids(wrapper)).toEqual(["a"]);
     });
 
     /// The section headings claim to describe the rows, so the scope applies before the counts.
@@ -1442,6 +1432,7 @@ describe("OnCallResponses", () => {
         page({ id: "a" }),
         page({ id: "b", team_id: "team_other" }, "al_pay"),
       ]);
+      await pick(wrapper, "mine");
       expect(sections(wrapper)).toEqual({ ringing: 1 });
       await pick(wrapper, "everyone");
       expect(sections(wrapper)).toEqual({ ringing: 2 });
@@ -1502,6 +1493,7 @@ describe("OnCallResponses", () => {
     /// Nothing of yours open is a real answer; "no pages at all" is not.
     it("offers to clear itself when it empties the list", async () => {
       const wrapper = await withMyShift([page({ id: "b", team_id: "team_other" }, "al_pay")]);
+      await pick(wrapper, "mine");
 
       const empty = wrapper
         .findAllComponents({ name: "OEmptyState" })
@@ -1934,13 +1926,15 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test="oncall-row-ack-alert:al_ckt-menu"]').exists()).toBe(false);
     });
 
-    /// A closed row has nothing left to do on a phone either: the row itself opens the page.
-    it("gives a closed row no menu on a phone", async () => {
+    /// A phone hides the inline icons, so a closed row still needs its ⋯ there.
+    it("keeps the ⋯ menu on a closed row", async () => {
       const wrapper = await withPages([
         page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
       ]);
 
-      expect(wrapper.find('[data-test^="oncall-row-more-"]').exists()).toBe(false);
+      const more = wrapper.find('[data-test="oncall-row-more-alert:al_ckt"]');
+      expect(more.exists()).toBe(true);
+      expect(more.classes()).not.toContain("md:hidden");
     });
   });
 });
@@ -2196,13 +2190,10 @@ describe("OnCallResponses — filtering by cause", () => {
   }
 
   /// A cause is written at resolve, so filtering an OPEN list by one can only
-  /// ever empty it. The default "open" tab hides resolved pages, so the filter
-  /// appears only once a tab that shows them is picked.
+  /// ever empty it. The default "all" tab shows resolved pages, so the filter
+  /// is there until a tab that hides them is picked.
   it("is offered only while the tab includes resolved pages", async () => {
     const wrapper = await open();
-    expect(cause(wrapper)).toBeUndefined();
-
-    await showResolved(wrapper, true);
     expect(cause(wrapper)).toBeDefined();
 
     await showResolved(wrapper, false);

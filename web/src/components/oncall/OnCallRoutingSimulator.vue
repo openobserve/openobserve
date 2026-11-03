@@ -26,9 +26,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="sm"
       searchable
       icon-key="icon"
+      :dropdown-style="START_PICKER_DROPDOWN_STYLE"
       data-test="oncall-simulator-start"
       @update:model-value="startFrom"
-    />
+    >
+      <template #option="{ option }">
+        <OnCallStartOption
+          :option="option"
+          :aliases="aliases"
+          :data-test="`oncall-simulator-start-option-${String(option.value)}`"
+        />
+      </template>
+    </OSelect>
 
     <div class="flex flex-col gap-2">
       <span class="flex items-center gap-1">
@@ -116,29 +125,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </p>
 
-      <OCollapsible :label="t('oncall.simulatorWhy')" data-test="oncall-simulator-why">
-        <div class="flex flex-col gap-1 pt-1">
-          <OText variant="meta" data-test="oncall-simulator-won">
-            {{ wonLine }}
-          </OText>
-          <OText
-            v-for="other in preview.also_matched ?? []"
-            :key="other.rule_id"
-            variant="meta"
-            :data-test="`oncall-simulator-also-${other.rule_id}`"
-          >
-            {{ alsoLine(other) }}
-          </OText>
-          <OText
-            v-for="(note, index) in matchedNotes"
-            :key="index"
-            variant="meta"
-            :data-test="`oncall-simulator-note-${index}`"
-          >
-            {{ raw(note) }}
-          </OText>
-        </div>
-      </OCollapsible>
+      <span class="-mt-2 flex flex-col gap-0.5">
+        <OText variant="meta" data-test="oncall-simulator-won">
+          {{ wonLine }}
+          <OTooltip v-if="matchedNotes.length" side="bottom">
+            <template #content>
+              <span class="flex flex-col" data-test="oncall-simulator-notes">
+                <span v-for="(note, index) in matchedNotes" :key="index">{{ raw(note) }}</span>
+              </span>
+            </template>
+          </OTooltip>
+        </OText>
+        <OText v-if="alsoMatched.length" variant="meta" data-test="oncall-simulator-also">
+          {{
+            t("oncall.simulatorAlsoMatchedCount", { count: alsoMatched.length }, alsoMatched.length)
+          }}
+          <OTooltip side="bottom">
+            <template #content>
+              <span class="flex flex-col" data-test="oncall-simulator-also-list">
+                <span
+                  v-for="other in alsoMatched"
+                  :key="other.rule_id"
+                  :data-test="`oncall-simulator-also-${other.rule_id}`"
+                  >{{ alsoLine(other) }}</span
+                >
+              </span>
+            </template>
+          </OTooltip>
+        </OText>
+      </span>
 
       <span v-if="preview.team_id" class="flex">
         <OButton
@@ -191,8 +206,8 @@ import { useStore } from "vuex";
 
 import OnCallConditionRows from "@/components/oncall/OnCallConditionRows.vue";
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
+import OnCallStartOption from "@/components/oncall/OnCallStartOption.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -218,8 +233,10 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
 import {
   SERVICE_DIMENSION,
+  START_PICKER_DROPDOWN_STYLE,
   claimableDimensions,
   dimensionsOfPath,
+  fieldLabel,
   ownershipPath,
   readableConditions,
 } from "@/utils/oncall";
@@ -300,15 +317,15 @@ const startOptions = computed<SelectOption[]>(() => {
       label: raw(readable(claimableDimensions(signal.dimensions)) || signal.path),
       value: `signal:${signal.id}`,
       icon: "notifications-active",
-      subLabel: t("oncall.routingFiresWindow", { count: signal.occurrences }, signal.occurrences),
-      subLabelInline: true,
+      dimensions: claimableDimensions(signal.dimensions),
+      meta: t("oncall.routingFiresWindow", { count: signal.occurrences }, signal.occurrences),
     }));
   const rules = props.rules.slice(0, STARTS_SHOWN).map((rule) => ({
     label: raw(readable(rule.dimensions)),
     value: `rule:${rule.rule_id}`,
     icon: "alt-route",
-    subLabel: raw(teamNameOf(rule.team_id) || rule.team_name || ""),
-    subLabelInline: true,
+    dimensions: rule.dimensions,
+    meta: raw(teamNameOf(rule.team_id) || rule.team_name || ""),
   }));
   const services = props.services.slice(0, STARTS_SHOWN).map((service) => ({
     label: raw(service.name),
@@ -400,12 +417,30 @@ const teamLabel = computed<I18nText>(() =>
 const wonLine = computed<I18nText>(() => {
   const path = props.preview?.decision?.path;
   if (typeof path === "string" && !props.preview?.landed_on_default) {
-    return t("oncall.simulatorWonPlain", { conditions: raw(readable(dimensionsOfPath(path))) });
+    return t("oncall.simulatorMatchedRuleLine", {
+      conditions: raw(listed(dimensionsOfPath(path))),
+    });
   }
   return props.preview?.team_id
     ? t("oncall.simulatorNoRuleDefault", { team: teamLabel.value })
     : t("oncall.simulatorNoRuleNobody");
 });
+
+/// Each condition as "Field = value", the way the owner reads a rule, joined on one line.
+function listed(dimensions: Record<string, string>): string {
+  return Object.keys(dimensions)
+    .sort()
+    .map((name) => {
+      const value = String(dimensions[name]);
+      const field = fieldLabel(name, props.aliases);
+      return value.endsWith("*")
+        ? `${String(t("oncall.ruleChipStartsWith", { field: raw(field) }))} ${value.slice(0, -1)}`
+        : `${field} = ${value}`;
+    })
+    .join(" · ");
+}
+
+const alsoMatched = computed<AlsoMatchedRule[]>(() => props.preview?.also_matched ?? []);
 
 /// The no-match note only restates `wonLine` in `k=v` form; a matched route's notes are real caveats.
 const matchedNotes = computed<string[]>(() => {
@@ -553,9 +588,9 @@ function attemptLine(attempt: TestPageAttempt): I18nText {
 
 /// A loser pointing at the same team changes nothing; one pointing elsewhere is a page on another team's phone.
 function alsoLine(other: AlsoMatchedRule): I18nText {
-  const conditions = raw(readable(dimensionsOfPath(other.path)));
-  if (other.same_team) return t("oncall.simulatorLostSameTeam", { conditions });
+  const conditions = raw(listed(dimensionsOfPath(other.path)));
+  if (other.same_team) return t("oncall.simulatorAlsoRuleSameTeam", { conditions });
   const team = raw(other.team_name || teamNameOf(other.team_id) || other.team_id);
-  return t("oncall.simulatorLostOtherTeam", { conditions, team });
+  return t("oncall.simulatorAlsoRuleOtherTeam", { conditions, team });
 }
 </script>

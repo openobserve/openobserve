@@ -130,3 +130,10 @@
     var(--color-status-negative)
   );
 }
+
+/* On a card wrapping an OTable: the card's edge is the table's last line, so the last row draws none. */
+@utility table-last-row-flush {
+  & tbody > tr:last-child > td {
+    border-bottom-width: 0;
+  }
+}

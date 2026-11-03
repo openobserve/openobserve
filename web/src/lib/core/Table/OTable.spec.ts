@@ -1212,6 +1212,13 @@ describe("OTable", () => {
       expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
     });
 
+    it("draws as many skeleton rows as skeletonRows asks for", () => {
+      wrapper = mount(OTable, {
+        props: { data: [], columns: makeColumns(), loading: true, skeletonRows: 2 },
+      });
+      expect(wrapper.findAll('[data-test="o2-table-skeleton-body"] > tr')).toHaveLength(2);
+    });
+
     it("shows loading overlay when loading is true with existing rows", () => {
       wrapper = mount(OTable, {
         props: {

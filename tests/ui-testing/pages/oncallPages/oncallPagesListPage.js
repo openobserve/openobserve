@@ -205,8 +205,8 @@ export class OnCallPagesListPage {
   /**
    * Narrow to one state.
    *
-   * The state is an OSelect ("Status: Open"), so this picks its option by the
-   * raw value on `data-test-value`, never the translated label.
+   * The state is an OSelect that opens on "Status: All" (no search box), so this
+   * picks its option by the raw value on `data-test-value`, never the translated label.
    *
    * @param {'open'|'all'|'ringing'|'handled'|'resolved'|'snoozed'} key
    */
@@ -311,7 +311,7 @@ export class OnCallPagesListPage {
     await this._settleList();
   }
 
-  /** Pick Mine or Everyone in the filter bar. Hidden when the viewer is unknown or nothing has paged yet. */
+  /** Pick Mine or Everyone in the filter bar; it opens on Everyone. Hidden when the viewer is unknown or nothing has paged yet. */
   async setScope(scope) {
     const item = this.page.locator(scope === 'mine' ? this.locators.scopeMine : this.locators.scopeEveryone);
     await item.waitFor({ state: 'visible', timeout: 20000 });

@@ -185,6 +185,7 @@ const SKELETON_ROW_STRATEGY = "fixed" as "fixed" | "pageSize";
 const FIXED_SKELETON_ROWS = 8;
 
 const skeletonRowCount = computed(() => {
+  if (props.skeletonRows && props.skeletonRows > 0) return props.skeletonRows;
   if (SKELETON_ROW_STRATEGY === "pageSize") {
     return props.pageSize ?? FIXED_SKELETON_ROWS;
   }

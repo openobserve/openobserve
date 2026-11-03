@@ -192,6 +192,18 @@ describe("OnCallMyDeliveries", () => {
     expect(wrapper.text()).not.toContain("team_platform");
   });
 
+  it("never shows a raw team id: a skeleton while teams load, then the deleted-team label", async () => {
+    answer([delivery()]);
+    const wrapper = render({ teamsState: "pending" });
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("team_platform");
+    expect(wrapper.findComponent({ name: "OSkeleton" }).exists()).toBe(true);
+
+    await wrapper.setProps({ teamsState: "loaded" });
+    expect(wrapper.text()).not.toContain("team_platform");
+    expect(wrapper.text()).toContain("Deleted team");
+  });
+
   describe("needs you now", () => {
     it("lists each open page once, with Acknowledge while it is still paging", async () => {
       answer([

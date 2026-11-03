@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container rounded-surface bg-surface-base border-border-default overflow-hidden border"
+    class="card-container rounded-surface bg-surface-base border-border-default table-last-row-flush overflow-hidden border"
     data-test="oncall-recent-pages"
   >
     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-3">

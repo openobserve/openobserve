@@ -223,6 +223,8 @@ export interface SelectSlots {
   chip?: (_scope: { label: string; value: SelectValue }) => unknown;
   /** Empty state — shown when no options match the search */
   empty?: () => unknown;
+  /** Listbox mode only: replaces an option row's label (its icon stays), handed the option as passed in. */
+  option?: (_scope: { option: SelectOption }) => unknown;
   /** Content before the options list */
   "before-options"?: () => unknown;
   /** Content after the options list */

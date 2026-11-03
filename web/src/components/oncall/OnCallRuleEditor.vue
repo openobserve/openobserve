@@ -39,9 +39,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         searchable
         icon-key="icon"
+        :dropdown-style="START_PICKER_DROPDOWN_STYLE"
         data-test="oncall-rule-editor-signals"
         @update:model-value="startFrom"
-      />
+      >
+        <template #option="{ option }">
+          <OnCallStartOption
+            :option="option"
+            :aliases="aliases"
+            :data-test="`oncall-rule-editor-signals-option-${String(option.value)}`"
+          />
+        </template>
+      </OSelect>
 
       <div class="flex flex-col gap-2">
         <span class="flex items-center gap-1">
@@ -110,6 +119,7 @@ import { useStore } from "vuex";
 
 import OnCallConditionRows from "@/components/oncall/OnCallConditionRows.vue";
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
+import OnCallStartOption from "@/components/oncall/OnCallStartOption.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -126,6 +136,7 @@ import type {
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
+  START_PICKER_DROPDOWN_STYLE,
   claimableDimensions,
   readableConditions,
   ownershipPath,
@@ -235,8 +246,8 @@ const startOptions = computed(() =>
     ),
     value: signal.id,
     icon: "notifications-active",
-    subLabel: t("oncall.routingFiresWindow", { count: signal.occurrences }, signal.occurrences),
-    subLabelInline: true,
+    dimensions: claimableDimensions(signal.dimensions),
+    meta: t("oncall.routingFiresWindow", { count: signal.occurrences }, signal.occurrences),
   })),
 );
 

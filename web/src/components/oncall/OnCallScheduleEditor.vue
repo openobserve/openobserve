@@ -128,7 +128,6 @@
       :open="editing"
       :width="60"
       :title="isNew ? t('oncall.rotationAddTitle') : t('oncall.rotationTitle')"
-      :subtitle="t('oncall.rotationDrawerHint')"
       :persistent="!draftsActive && wouldDiscardEdits"
       :close-guard="draftsActive ? guardDrawerClose : undefined"
       :show-close="false"

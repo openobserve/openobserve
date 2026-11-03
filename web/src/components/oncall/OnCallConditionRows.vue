@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <OButton
-      variant="ghost"
+      variant="outline"
       size="sm"
       icon-left="add"
       class="self-start"

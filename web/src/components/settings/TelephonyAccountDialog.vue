@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ? t('telephony.connectTitle', { provider: PROVIDER })
         : t('telephony.updateTitle', { provider: PROVIDER })
     "
-    :sub-title="t('telephony.dialogSubtitle')"
     :form-id="FORM_ID"
     :primary-button-label="primaryLabel"
     :secondary-button-label="t('common.cancel')"

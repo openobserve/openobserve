@@ -20,27 +20,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     data-test="oncall-mine-page"
     :title="t('oncall.mineTitle')"
-    :subtitle="t('oncall.mineSubtitle')"
     icon="person"
     scroll
   >
     <template #actions>
       <!-- Personal and org-wide, so it heads the page rather than sitting under one team. -->
       <OButton
-        v-if="loaded && !unavailable"
+        v-if="!unavailable"
         variant="outline"
         size="sm"
+        :disabled="!loaded"
         data-test="oncall-mine-away"
         @click="openAway"
       >
         <OIcon name="event-busy" size="sm" />{{ t("oncall.mineAway") }}
       </OButton>
       <ORefreshButton
-        v-if="loaded && !unavailable"
+        v-if="!unavailable"
         layout="inline"
         variant="outline"
         :last-run-at="lastFetchedAt"
-        :loading="refreshing"
+        :loading="refreshing || !loaded"
         data-test="oncall-mine-refresh"
         @click="refreshPage"
       />
@@ -56,18 +56,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <OContent v-else y class="flex flex-col gap-5">
-      <div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+      <div class="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-2">
         <!-- The shift first: "am I on call, and until when" is the question this page opens on. -->
         <section
-          class="rounded-surface bg-surface-base border-border-default flex min-w-0 flex-col border"
+          class="rounded-surface bg-surface-base border-border-default table-last-row-flush flex min-w-0 flex-col overflow-hidden border"
           data-test="oncall-mine-teams"
         >
           <div class="flex min-h-12 flex-wrap items-center gap-2 px-4 py-2">
             <OText variant="card-title" as="h2" data-test="oncall-mine-shift-headline">
               {{ t("oncall.mineShiftsTitle") }}
             </OText>
+            <OSkeleton v-if="!loaded" class="h-5 w-16 rounded-full" />
             <OTag
-              v-if="loaded && loadError === null && (mine?.teams ?? []).length"
+              v-else-if="loadError === null && (mine?.teams ?? []).length"
               :variant="mine?.on_call_now ? 'success-soft' : 'default-soft'"
               size="sm"
               data-test="oncall-mine-on-call"
@@ -99,11 +100,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OTable
             v-else
-            :data="shiftRows"
+            :data="visibleShiftRows"
             :columns="shiftColumns"
             row-key="team_id"
             :frame="false"
             :loading="!loaded"
+            :skeleton-rows="SHIFTS_SKELETON_ROWS"
+            :max-height="shiftsExpanded ? SHIFTS_MAX_HEIGHT : undefined"
             :show-global-filter="false"
             pagination="none"
             table-id="oncall-mine-shifts"
@@ -166,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OText v-else variant="meta" as="span">{{ raw("—") }}</OText>
             </template>
-            <template #cell-actions="{ row }">
+            <template #cell-row-actions="{ row }">
               <div class="flex items-center justify-end">
                 <!-- Only a shift the reader holds now, with a known end, has a window to hand over. -->
                 <OButton
@@ -226,6 +229,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
           </OTable>
+          <div
+            v-if="loaded && loadError === null && shiftRows.length > SHIFTS_PREVIEW"
+            class="border-border-default flex border-t px-2 py-1"
+          >
+            <OButton
+              variant="ghost"
+              size="sm"
+              data-test="oncall-mine-shifts-toggle"
+              @click="shiftsExpanded = !shiftsExpanded"
+            >
+              {{
+                shiftsExpanded
+                  ? t("oncall.mineShiftsShowLess")
+                  : t("oncall.mineShiftsShowAll", { count: shiftRows.length })
+              }}
+            </OButton>
+          </div>
         </section>
 
         <section
@@ -255,6 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OnCallMyDeliveries
         ref="deliveriesRef"
         :team-names="teamNames"
+        :teams-state="teamsState"
         :test-team-name="testTeam?.team_name ?? null"
         :can-test="!!testTeam"
         @test-page="askTestPage(testTeam?.team_id ?? '')"
@@ -372,6 +393,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -467,12 +489,16 @@ const teamNames = computed(() => ({
   ...Object.fromEntries((mine.value?.teams ?? []).map((team) => [team.team_id, team.team_name])),
 }));
 
+const teamsState = ref<"pending" | "loaded" | "failed">("pending");
+
 async function fetchTeamNames(force = false) {
   try {
     const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force);
     orgTeamNames.value = Object.fromEntries(teams.map((team) => [team.id, team.name]));
+    teamsState.value = "loaded";
   } catch {
     // Without the team list the reader's own teams still name themselves.
+    if (teamsState.value === "pending") teamsState.value = "failed";
   }
 }
 
@@ -484,11 +510,28 @@ const NO_FACTS: ShiftFacts = {
   nextShiftAt: null,
 };
 
+/// The instant the Until column shows: the end of a held shift, the start of the next one, else unknown.
+function untilAt(row: ShiftRow): number {
+  if (row.on_call_now === true && row.until !== null) return row.until;
+  if (row.on_call_now === false && row.nextShiftAt !== null) return row.nextShiftAt;
+  return Number.POSITIVE_INFINITY;
+}
+
 const shiftRows = computed<ShiftRow[]>(() =>
-  (mine.value?.teams ?? []).map((team) => ({
-    ...team,
-    ...(shifts.value[team.team_id] ?? NO_FACTS),
-  })),
+  (mine.value?.teams ?? [])
+    .map((team) => ({ ...team, ...(shifts.value[team.team_id] ?? NO_FACTS) }))
+    .sort((a, b) => untilAt(a) - untilAt(b) || a.team_name.localeCompare(b.team_name)),
+);
+
+/// Rows shown before "Show all"; a reader on many teams still sees their soonest handovers first.
+const SHIFTS_PREVIEW = 5;
+/// About ten rows under the sticky header, scrolled inside the card once expanded.
+const SHIFTS_MAX_HEIGHT = "30rem";
+const shiftsExpanded = ref(false);
+/// Most readers are on one or two teams, so the first paint is that shape rather than a tall skeleton that collapses.
+const SHIFTS_SKELETON_ROWS = 2;
+const visibleShiftRows = computed(() =>
+  shiftsExpanded.value ? shiftRows.value : shiftRows.value.slice(0, SHIFTS_PREVIEW),
 );
 
 const shiftColumns = computed<OTableColumnDef<ShiftRow>[]>(() => [
@@ -503,14 +546,13 @@ const shiftColumns = computed<OTableColumnDef<ShiftRow>[]>(() => [
   { id: "seat", header: t("oncall.mineSeat"), size: 136, sortable: false },
   { id: "until", header: t("oncall.mineUntil"), size: 176, sortable: false },
   { id: "then", header: t("oncall.mineThen"), size: 160, sortable: false },
+  // Not `isAction`/"actions": those pin the column, and a five-row card has nothing to scroll past.
   {
-    id: "actions",
+    id: "row-actions",
     header: t("oncall.actions"),
-    isAction: true,
-    pinned: "right",
     sortable: false,
     size: 96,
-    meta: { align: "center", actionCount: 2 },
+    meta: { align: "right" },
   },
 ]);
 

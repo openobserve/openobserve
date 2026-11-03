@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('telephony.title')"
-    :subtitle="t('telephony.subtitle')"
     icon="call"
     title-data-test="telephony-settings-title"
     scroll
@@ -61,7 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :read-only="readOnly"
         data-test="telephony-settings-deployment"
       >
-        <OText variant="meta">{{ t("telephony.deploymentOwner") }}</OText>
         <template #actions>
           <OButton
             variant="outline"

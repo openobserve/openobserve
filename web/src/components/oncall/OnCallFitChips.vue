@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-fit-chips-more"
     >
       <OTag variant="default-outline" size="sm">{{ raw(`+${items.length - shown}`) }}</OTag>
-      <OTooltip side="bottom" :content="tooltip" />
+      <OTooltip v-if="tooltip" side="bottom" :content="tooltip" />
     </span>
   </span>
 </template>
@@ -51,7 +51,9 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { I18nText } from "@/types/i18n";
 import { raw } from "@/types/i18n";
 
-const props = withDefaults(defineProps<{ items: T[]; tooltip: I18nText; dataTest?: string }>(), {
+/// `tooltip` may be left out when an ancestor already names every item, so "+N" never stacks a second tooltip.
+const props = withDefaults(defineProps<{ items: T[]; tooltip?: I18nText; dataTest?: string }>(), {
+  tooltip: undefined,
   dataTest: undefined,
 });
 

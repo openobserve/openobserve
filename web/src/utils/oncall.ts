@@ -2508,3 +2508,6 @@ export function formatCountdown(secs: number): string {
   if (hours > 0) return `${hours}:${pad(minutes)}:${pad(s % 60)}`;
   return `${minutes}:${pad(s % 60)}`;
 }
+
+/** Pins a start picker's dropdown to its field, so long condition rows fit chips to that width instead of stretching it. */
+export const START_PICKER_DROPDOWN_STYLE = { width: "var(--reka-popover-trigger-width)" };

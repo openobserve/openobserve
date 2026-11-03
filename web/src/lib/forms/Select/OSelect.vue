@@ -101,7 +101,7 @@ type NormalizedOption = {
   headerAction?: I18nText;
   headerActionAriaLabel?: I18nText;
   keepOnSearch?: boolean;
-  /** The header option as passed in, handed back by `header-action`. */
+  /** The option as passed in: handed back by `header-action`, and to the `#option` slot. */
   source?: SelectOption;
 };
 
@@ -280,6 +280,7 @@ function normalizeOption(input: unknown): NormalizedOption | null {
       : undefined,
     searchText:
       typeof option["searchText"] === "string" ? option["searchText"].toLowerCase() : undefined,
+    source: option as SelectOption,
   };
 }
 
@@ -1880,9 +1881,21 @@ const fieldWidthClass = computed(() => {
                             />
                           </template>
 
+                          <template v-if="$slots.option && filteredOptions[vRow.index].source">
+                            <OIcon
+                              v-if="filteredOptions[vRow.index].icon"
+                              :name="filteredOptions[vRow.index].icon"
+                              size="sm"
+                              class="shrink-0"
+                            />
+                            <span class="flex min-w-0 flex-1 items-center">
+                              <slot name="option" :option="filteredOptions[vRow.index].source!" />
+                            </span>
+                          </template>
+
                           <!-- Inline subLabel: name – url on a single row -->
                           <template
-                            v-if="
+                            v-else-if="
                               filteredOptions[vRow.index].subLabel &&
                               filteredOptions[vRow.index].subLabelInline
                             "
