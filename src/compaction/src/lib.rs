@@ -325,10 +325,16 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             need_done_ids.push(job.id); // the data will be deleted by retention, just skip
             continue;
         }
-        // every job of a dynamic stream's closed day reads the files the day's job merges
-        let dynamic_day = is_past_day(job.offsets)
-            && get_stream_setting_dynamic_merge(stream_type, &Some(stream_settings.clone()));
-        if partition_time_level == PartitionTimeLevel::Daily || dynamic_day {
+        // the day's merge job reads every hour of the day: the day's other jobs go first
+        if is_dynamic_day_job(
+            job.offsets,
+            get_stream_setting_dynamic_merge(stream_type, &Some(stream_settings.as_ref())),
+        ) && day_jobs_unfinished(&org_id, stream_type, &stream_name, job.offsets).await
+        {
+            need_release_ids.push(job.id);
+            continue;
+        }
+        if partition_time_level == PartitionTimeLevel::Daily {
             // check if this stream need process by this node
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
@@ -460,6 +466,30 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Whether a job of the day past its 00:00 is pending or running; a failed lookup counts as one.
+async fn day_jobs_unfinished(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    day_start: i64,
+) -> bool {
+    let range = (day_start + 1, day_start + day_micros(1) - 1);
+    match infra_file_list::has_unfinished_jobs(org_id, stream_type, stream_name, range).await {
+        Ok(unfinished) => unfinished,
+        Err(e) => {
+            log::error!(
+                "[COMPACTOR] has_unfinished_jobs [{org_id}/{stream_type}/{stream_name}] failed: {e}"
+            );
+            true
+        }
+    }
+}
+
+/// The 00:00 job of an enabled stream's closed day: the one that merges the day into `DD/00`.
+pub(crate) fn is_dynamic_day_job(offset: i64, dynamic_merge: bool) -> bool {
+    dynamic_merge && offset % day_micros(1) == 0 && is_past_day(offset)
+}
+
 /// A day is closed once its last hour is past: no hour of it can receive files any more.
 pub(crate) fn is_past_day(offset: i64) -> bool {
     let day = day_micros(1);
@@ -471,4 +501,34 @@ pub(crate) fn is_past_hour(offset: i64) -> bool {
     let hour = hour_micros(1);
     let offset_hour_end = offset - offset % hour + hour;
     now - offset_hour_end > second_micros(get_config().limit.max_file_retention_time as i64) * 3
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The day's merge job waits for the day's other jobs, never for its own row or a done one.
+    #[tokio::test]
+    async fn test_day_jobs_unfinished_sees_only_the_day_past_its_00_job() {
+        infra_file_list::create_table().await.unwrap();
+        // the sqlite file outlives a test run
+        let stream = &format!("day_jobs_{}", config::ider::generate());
+        let day = day_micros(20_000);
+        let unfinished = || day_jobs_unfinished("o", StreamType::Logs, stream, day);
+
+        infra_file_list::add_job("o", StreamType::Logs, stream, day)
+            .await
+            .unwrap();
+        infra_file_list::add_job("o", StreamType::Logs, stream, day + day_micros(1))
+            .await
+            .unwrap();
+        assert!(!unfinished().await);
+
+        let hour23 = infra_file_list::add_job("o", StreamType::Logs, stream, day + hour_micros(23))
+            .await
+            .unwrap();
+        assert!(unfinished().await);
+        infra_file_list::set_job_done(&[hour23]).await.unwrap();
+        assert!(!unfinished().await);
+    }
 }

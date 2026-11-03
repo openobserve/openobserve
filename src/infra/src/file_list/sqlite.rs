@@ -1230,6 +1230,27 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         Ok(ret)
     }
 
+    async fn has_unfinished_jobs(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream: &str,
+        offset_range: (i64, i64),
+    ) -> Result<bool> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream}");
+        let client = CLIENT_RO.clone();
+        let ret = sqlx::query(
+            "SELECT id FROM file_list_jobs WHERE stream = $1 AND offsets >= $2 AND offsets <= $3 AND status <> $4 LIMIT 1;",
+        )
+        .bind(stream_key)
+        .bind(offset_range.0)
+        .bind(offset_range.1)
+        .bind(super::FileListJobStatus::Done)
+        .fetch_optional(&client)
+        .await?;
+        Ok(ret.is_some())
+    }
+
     async fn set_job_pending(
         &self,
         ids: &[i64],

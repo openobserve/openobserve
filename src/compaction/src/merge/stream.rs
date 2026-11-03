@@ -19,10 +19,7 @@ use config::{
     cluster, get_config,
     meta::stream::{FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamType},
     metrics,
-    utils::{
-        parquet::parse_file_key_columns,
-        time::{day_micros, hour_micros},
-    },
+    utils::{parquet::parse_file_key_columns, time::hour_micros},
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{cache::file_data, file_list as infra_file_list};
@@ -36,7 +33,7 @@ use tokio::{
 };
 
 use super::{
-    dynamic::{DayPlan, day_prefix, plan_day},
+    dynamic::{day_prefix, plan_day},
     job::{JobScope, job_range_end, job_scope},
     plan::{BatchLimits, PlannedBatch, plan_batches},
 };
@@ -89,9 +86,10 @@ pub async fn merge_by_stream(
     let is_incremental = !crate::is_past_hour(offset);
 
     // check offset
-    let dynamic_day = offset % day_micros(1) == 0
-        && crate::is_past_day(offset)
-        && infra::schema::get_dynamic_merge(org_id, stream_name, stream_type).await;
+    let dynamic_day = crate::is_dynamic_day_job(
+        offset,
+        infra::schema::get_dynamic_merge(org_id, stream_name, stream_type).await,
+    );
     let scope = job_scope(
         stream_type,
         offset,
@@ -443,27 +441,22 @@ fn plan_partition(
     stream: &str,
     prefix: &str,
 ) -> Vec<PlannedBatch> {
-    let hourly = |files| {
-        plan_batches(
+    if scope != JobScope::DynamicDay {
+        return plan_batches(
             sort_by_strategy(files, limits.strategy),
             mode,
             limits,
             stream,
-        )
-    };
-    if scope != JobScope::DynamicDay {
-        return hourly(files);
+        );
     }
     let day_files = files.len();
-    match plan_day(files, mode, limits) {
-        DayPlan::Merge(batches) => {
-            log::info!(
-                "[COMPACTOR] merge_by_stream [{stream}] dynamic merge of {day_files} files into {prefix}"
-            );
-            batches
-        }
-        DayPlan::Hour00(files) => hourly(files),
+    let batches = plan_day(files, mode, limits);
+    if !batches.is_empty() {
+        log::info!(
+            "[COMPACTOR] merge_by_stream [{stream}] dynamic merge of {day_files} files into {prefix}"
+        );
     }
+    batches
 }
 
 /// The order the hourly planner groups files in.

@@ -1564,6 +1564,30 @@ DO UPDATE SET
         Ok(ret)
     }
 
+    async fn has_unfinished_jobs(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream: &str,
+        offset_range: (i64, i64),
+    ) -> Result<bool> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream}");
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["query", "file_list_jobs"])
+            .inc();
+        let ret = sqlx::query(
+            "SELECT id FROM file_list_jobs WHERE stream = $1 AND offsets >= $2 AND offsets <= $3 AND status <> $4 LIMIT 1;",
+        )
+        .bind(stream_key)
+        .bind(offset_range.0)
+        .bind(offset_range.1)
+        .bind(super::FileListJobStatus::Done)
+        .fetch_optional(&pool)
+        .await?;
+        Ok(ret.is_some())
+    }
+
     async fn set_job_pending(
         &self,
         ids: &[i64],

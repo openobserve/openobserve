@@ -13,18 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::{BTreeSet, HashMap};
+
 use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::stream::{PartitionTimeLevel, StreamType},
-    utils::time::{day_micros, hour_micros},
+    utils::time::{HourFormat, day_micros, get_ymdh_from_micros, hour_micros},
 };
 use infra::{
     cluster::get_node_by_uuid,
     dist_lock, file_list as infra_file_list,
-    schema::{get_dynamic_merge, get_partition_time_level, unwrap_stream_created_at},
+    schema::{
+        get_dynamic_merge, get_partition_time_level, get_stream_setting_dynamic_merge,
+        unwrap_stream_created_at,
+    },
 };
+
+use super::dynamic::merged_by_day;
 
 /// What the merge job at `offset` covers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -245,6 +252,10 @@ pub async fn generate_old_data_job_by_stream(
     .await?;
 
     // generate merging job
+    let dynamic_merge =
+        get_stream_setting_dynamic_merge(stream_type, &Some(stream_settings.as_ref()));
+    let mut merged_days = HashMap::new();
+    let mut offsets = BTreeSet::new();
     for hour in hours {
         let column = hour.split('/').collect::<Vec<_>>();
         if column.len() != 4 {
@@ -257,10 +268,18 @@ pub async fn generate_old_data_job_by_stream(
             column[0], column[1], column[2], column[3]
         ))?
         .with_timezone(&Utc);
-        let offset = offset.timestamp_micros();
+        let mut offset = offset.timestamp_micros();
+        if dynamic_merge {
+            offset =
+                merged_day_job_offset(org_id, stream_type, stream_name, offset, &mut merged_days)
+                    .await?;
+        }
         log::debug!(
             "[COMPACTOR] generate_old_data_job_by_stream [{org_id}/{stream_type}/{stream_name}] hours: {hour}, offset: {offset}"
         );
+        offsets.insert(offset);
+    }
+    for offset in offsets {
         if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
             return Err(anyhow::anyhow!(
                 "[COMPACTOR] add file_list_jobs for old data failed: {e}"
@@ -391,8 +410,40 @@ fn dynamic_merge_offset(offset: i64) -> Option<i64> {
     (offset % day_micros(1) == 0).then(|| offset - day_micros(1))
 }
 
+/// An old hour of a closed day merged by day re-arms the day's 00:00 job: its files go to `DD/00`.
+async fn merged_day_job_offset(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    offset: i64,
+    merged_days: &mut HashMap<i64, bool>,
+) -> Result<i64, anyhow::Error> {
+    let day = offset - offset % day_micros(1);
+    if offset == day || !crate::is_past_day(offset) {
+        return Ok(offset);
+    }
+    let merged = match merged_days.get(&day) {
+        Some(merged) => *merged,
+        None => {
+            let hour00 = get_ymdh_from_micros(day, HourFormat::Zero);
+            let files = infra_file_list::query_for_merge(
+                org_id,
+                stream_type,
+                stream_name,
+                (hour00.clone(), hour00),
+                i64::MAX,
+            )
+            .await?;
+            *merged_days.entry(day).or_insert(merged_by_day(&files))
+        }
+    };
+    Ok(if merged { day } else { offset })
+}
+
 #[cfg(test)]
 mod tests {
+    use config::meta::stream::{FileKey, FileMeta};
+
     use super::*;
 
     #[test]
@@ -470,5 +521,46 @@ mod tests {
         let day = day_start();
         assert_eq!(dynamic_merge_offset(day), Some(day - day_micros(1)));
         assert_eq!(dynamic_merge_offset(day + hour_micros(1)), None);
+    }
+
+    /// An old hour of a day merged by day re-arms the day's 00:00 job instead of its own.
+    #[tokio::test]
+    async fn test_merged_day_job_offset_follows_the_files_of_hour_00() {
+        infra_file_list::create_table().await.unwrap();
+        // the sqlite file outlives a test run
+        let stream = &format!("merged_day_{}", config::ider::generate());
+        let day = day_start();
+        let hour15 = day + hour_micros(15);
+        let hour00_file = |name: &str, max_ts: i64| {
+            FileKey::new(
+                0,
+                "default".to_string(),
+                format!("files/old/logs/{stream}/2026/08/18/00/{name}.parquet"),
+                FileMeta {
+                    min_ts: day + 1,
+                    max_ts,
+                    records: 1,
+                    original_size: 1,
+                    compressed_size: 1,
+                    ..Default::default()
+                },
+                false,
+            )
+        };
+        let offset = |offset: i64| async move {
+            merged_day_job_offset("old", StreamType::Logs, stream, offset, &mut HashMap::new())
+                .await
+                .unwrap()
+        };
+
+        // an hourly file of hour 00 does not make a merged day
+        let hourly = hour00_file("hourly", day + hour_micros(1) - 2);
+        infra_file_list::batch_add(&[hourly]).await.unwrap();
+        assert_eq!(offset(hour15).await, hour15);
+
+        let merged = hour00_file("merged", day + hour_micros(24) - 2);
+        infra_file_list::batch_add(&[merged]).await.unwrap();
+        assert_eq!(offset(hour15).await, day);
+        assert_eq!(offset(day).await, day);
     }
 }

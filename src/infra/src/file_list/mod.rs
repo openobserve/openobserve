@@ -277,6 +277,13 @@ pub trait FileList: Sync + Send + 'static {
         fast_mode: bool,
     ) -> Result<Vec<MergeJobRecord>>;
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>>;
+    async fn has_unfinished_jobs(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream: &str,
+        offset_range: (i64, i64),
+    ) -> Result<bool>;
     async fn set_job_pending(&self, ids: &[i64], offsets: i64, stream: Option<&str>)
     -> Result<u64>;
     async fn set_job_done(&self, ids: &[i64]) -> Result<()>;
@@ -775,6 +782,19 @@ pub async fn get_pending_jobs(
 #[inline]
 pub async fn get_pending_jobs_count() -> Result<stdHashMap<String, stdHashMap<String, i64>>> {
     CLIENT.get_pending_jobs_count().await
+}
+
+/// Whether a job of the stream with `offsets` in the inclusive range is pending or running.
+#[inline]
+pub async fn has_unfinished_jobs(
+    org_id: &str,
+    stream_type: StreamType,
+    stream: &str,
+    offset_range: (i64, i64),
+) -> Result<bool> {
+    CLIENT
+        .has_unfinished_jobs(org_id, stream_type, stream, offset_range)
+        .await
 }
 
 #[inline]

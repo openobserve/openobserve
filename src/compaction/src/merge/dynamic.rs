@@ -15,7 +15,10 @@
 
 //! Dynamic merge: what the 00:00 job of a closed day does with one partition of that day.
 
-use config::meta::stream::{FileKey, MergeStrategy};
+use config::{
+    meta::stream::{FileKey, MergeStrategy},
+    utils::time::{day_micros, hour_micros},
+};
 use search::datafusion::merge::MergeMode;
 
 use super::{
@@ -30,14 +33,6 @@ const DAY_MERGE_SLACK: usize = 4;
 /// Position of the hour directory in `files/{org}/{type}/{stream}/YYYY/MM/DD/HH/...`.
 const HOUR_SEGMENT: usize = 7;
 
-/// What the dynamic merge job does with one partition of its day.
-pub(super) enum DayPlan {
-    /// The day holds many more files than its size needs: these batches go to `DD/00`.
-    Merge(Vec<PlannedBatch>),
-    /// The day stays; its hour-00 files still get their hourly merge.
-    Hour00(Vec<FileKey>),
-}
-
 /// `prefix` with its hour directory replaced by `00`, where a merged day is written.
 pub(super) fn day_prefix(prefix: &str) -> String {
     prefix
@@ -48,9 +43,26 @@ pub(super) fn day_prefix(prefix: &str) -> String {
         .join("/")
 }
 
-pub(super) fn plan_day(files: Vec<FileKey>, mode: &MergeMode, limits: &BatchLimits<'_>) -> DayPlan {
-    if !should_merge_day(&files, limits.max_file_size) {
-        return DayPlan::Hour00(hour00_files(files, mode, limits));
+/// Whether the day was merged by day: only that writes a file of `DD/00` reaching past the hour.
+pub(super) fn merged_by_day(files: &[FileKey]) -> bool {
+    files.iter().any(day_output)
+}
+
+/// Batches of one partition of the day, all written to `DD/00`; none when the day stays as it is.
+pub(super) fn plan_day(
+    files: Vec<FileKey>,
+    mode: &MergeMode,
+    limits: &BatchLimits<'_>,
+) -> Vec<PlannedBatch> {
+    let outputs = files.iter().filter(|f| day_output(f)).count();
+    let act = if outputs > 0 {
+        // a merged day stays in one place: what arrived since joins it, whatever its count
+        outputs < files.len()
+    } else {
+        should_merge_day(&files, limits.max_file_size)
+    };
+    if !act {
+        return Vec::new();
     }
     let (mode_files, legacy_files) = split_legacy_metrics(files, mode);
     let mut batches: Vec<PlannedBatch> = time_ordered_groups(legacy_files, limits)
@@ -69,29 +81,17 @@ pub(super) fn plan_day(files: Vec<FileKey>, mode: &MergeMode, limits: &BatchLimi
                 .map(|group| (group, mode.clone())),
         );
     }
-    DayPlan::Merge(batches)
+    batches
+}
+
+/// A file of `DD/00` reaching past its hour; no file reaches past its day.
+fn day_output(file: &FileKey) -> bool {
+    file.key.split('/').nth(HOUR_SEGMENT) == Some("00")
+        && file.meta.max_ts % day_micros(1) >= hour_micros(1)
 }
 
 fn should_merge_day(files: &[FileKey], max_file_size: usize) -> bool {
     files.len() > DAY_MERGE_FACTOR * ideal_file_count(files, max_file_size) + DAY_MERGE_SLACK
-}
-
-/// The files an hourly merge of hour 00 would have queried.
-fn hour00_files(
-    mut files: Vec<FileKey>,
-    mode: &MergeMode,
-    limits: &BatchLimits<'_>,
-) -> Vec<FileKey> {
-    let max_original_size = if mode.merges_whole_batch() {
-        i64::MAX
-    } else {
-        limits.merge_max_original_size
-    };
-    files.retain(|f| {
-        f.key.split('/').nth(HOUR_SEGMENT) == Some("00")
-            && f.meta.original_size <= max_original_size
-    });
-    files
 }
 
 /// Size-bounded groups in time order, so each output covers a contiguous range of the day.
@@ -108,7 +108,7 @@ fn time_ordered_groups(mut files: Vec<FileKey>, limits: &BatchLimits<'_>) -> Vec
 
 #[cfg(test)]
 mod tests {
-    use config::{meta::stream::FileMeta, utils::time::hour_micros};
+    use config::meta::stream::FileMeta;
 
     use super::*;
 
@@ -146,18 +146,19 @@ mod tests {
             .collect()
     }
 
-    fn merged(plan: DayPlan) -> Vec<PlannedBatch> {
-        match plan {
-            DayPlan::Merge(batches) => batches,
-            DayPlan::Hour00(_) => panic!("the day was not merged"),
-        }
-    }
-
-    fn hour00(plan: DayPlan) -> Vec<FileKey> {
-        match plan {
-            DayPlan::Hour00(files) => files,
-            DayPlan::Merge(_) => panic!("the day was merged"),
-        }
+    /// What a merged day looks like: each batch became one file in `DD/00` spanning its hours.
+    fn outputs(batches: &[PlannedBatch]) -> Vec<FileKey> {
+        batches
+            .iter()
+            .enumerate()
+            .map(|(i, (files, _))| {
+                let mut out = file("logs", 0, &format!("merged{i}"), 0);
+                out.meta.min_ts = files.iter().map(|f| f.meta.min_ts).min().unwrap();
+                out.meta.max_ts = files.iter().map(|f| f.meta.max_ts).max().unwrap();
+                out.meta.original_size = files.iter().map(|f| f.meta.original_size).sum();
+                out
+            })
+            .collect()
     }
 
     #[test]
@@ -170,6 +171,18 @@ mod tests {
             day_prefix("files/o/logs/s/2026/09/30/17/k8s_namespace=prod/host=a"),
             "files/o/logs/s/2026/09/30/00/k8s_namespace=prod/host=a"
         );
+    }
+
+    /// Only a file of hour 00 reaching past the hour marks a merged day.
+    #[test]
+    fn test_merged_by_day_needs_a_file_of_hour_00_past_the_hour() {
+        assert!(!merged_by_day(&day("logs", "f", MB)));
+        let mut spanning = file("logs", 5, "late", MB);
+        spanning.meta.max_ts = hour_micros(23);
+        assert!(!merged_by_day(&[spanning]));
+        let mut merged = file("logs", 0, "merged", MB);
+        merged.meta.max_ts = hour_micros(23);
+        assert!(merged_by_day(&[merged]));
     }
 
     /// The design's table: one file per hour against the default 2 GB target.
@@ -205,7 +218,7 @@ mod tests {
         let mut files = day("logs", "f", 300 * MB);
         files.reverse();
         files.swap(3, 17);
-        let batches = merged(plan_day(files, &MergeMode::Classic, &limits));
+        let batches = plan_day(files, &MergeMode::Classic, &limits);
         assert_eq!(batches.len(), 4);
         let ranges: Vec<(i64, i64)> = batches
             .iter()
@@ -220,47 +233,62 @@ mod tests {
         assert!(batches.iter().all(|(files, _)| files.len() == 6));
     }
 
+    /// A day with the files its size needs stays as it is, late data or not.
+    #[test]
+    fn test_plan_day_leaves_a_large_day_alone() {
+        let strategy = MergeStrategy::FileTime;
+        let limits = limits(&strategy);
+        let mut files = day("logs", "f", GB);
+        files.push(file("logs", 0, "late", MB));
+        files.push(file("logs", 5, "late", MB));
+        assert!(plan_day(files, &MergeMode::Classic, &limits).is_empty());
+    }
+
     /// Running the job again on the merged day does nothing: the policy is idempotent.
     #[test]
     fn test_plan_day_second_run_leaves_a_merged_day_alone() {
         let strategy = MergeStrategy::FileTime;
         let limits = limits(&strategy);
-        let batches = merged(plan_day(
+        let batches = plan_day(day("logs", "f", 300 * MB), &MergeMode::Classic, &limits);
+        let merged = outputs(&batches);
+        assert_eq!(merged.len(), 4);
+        assert!(plan_day(merged, &MergeMode::Classic, &limits).is_empty());
+    }
+
+    /// A merged day takes its late files without the threshold; they join an unfilled output.
+    #[test]
+    fn test_plan_day_merged_day_takes_late_files_into_hour_00() {
+        let strategy = MergeStrategy::FileTime;
+        let limits = limits(&strategy);
+        let mut merged = outputs(&plan_day(
             day("logs", "f", 300 * MB),
             &MergeMode::Classic,
             &limits,
         ));
-        // each batch becomes one file in DD/00 that spans the batch's hours
-        let outputs: Vec<FileKey> = batches
-            .iter()
-            .enumerate()
-            .map(|(i, (files, _))| {
-                let mut out = file("logs", 0, &format!("merged{i}"), 0);
-                out.meta.min_ts = files.iter().map(|f| f.meta.min_ts).min().unwrap();
-                out.meta.max_ts = files.iter().map(|f| f.meta.max_ts).max().unwrap();
-                out.meta.original_size = files.iter().map(|f| f.meta.original_size).sum();
-                out
-            })
-            .collect();
-        let left = hour00(plan_day(outputs, &MergeMode::Classic, &limits));
-        assert_eq!(left.len(), 4);
-    }
-
-    #[test]
-    fn test_plan_day_skip_keeps_only_the_hour_00_merge_candidates() {
-        let strategy = MergeStrategy::FileTime;
-        let limits = limits(&strategy);
-        // a large stream, plus late data and a full-size file in hour 00
-        let mut files = day("logs", "f", GB);
-        files.push(file("logs", 0, "late", MB));
-        files.push(file("logs", 0, "full", 2 * GB));
-        files.push(file("logs", 5, "late", MB));
-        let files = hour00(plan_day(files, &MergeMode::Classic, &limits));
-        let names: Vec<&str> = files
+        // the first three outputs are full, the last has room
+        for out in merged.iter_mut().take(3) {
+            out.meta.original_size = 2 * GB;
+        }
+        let mut files = merged.clone();
+        files.push(file("logs", 5, "late5", MB));
+        files.push(file("logs", 9, "late9", MB));
+        let batches = plan_day(files, &MergeMode::Classic, &limits);
+        assert_eq!(batches.len(), 1);
+        let names: Vec<&str> = batches[0]
+            .0
             .iter()
             .map(|f| f.key.rsplit('/').next().unwrap())
             .collect();
-        assert_eq!(names, vec!["f0.parquet", "late.parquet"]);
+        assert_eq!(
+            names,
+            vec!["late5.parquet", "late9.parquet", "merged3.parquet"]
+        );
+        // a single late file with no output to join stays where it is
+        for out in merged.iter_mut() {
+            out.meta.original_size = 2 * GB;
+        }
+        merged.push(file("logs", 5, "late5", MB));
+        assert!(plan_day(merged, &MergeMode::Classic, &limits).is_empty());
     }
 
     /// Indexed metrics keep every series in one batch; legacy files never join it.
@@ -271,7 +299,7 @@ mod tests {
         let mut files = day("metrics", "indexed-v1-", 100 * MB);
         files.push(file("metrics", 3, "legacy-a", MB));
         files.push(file("metrics", 9, "legacy-b", MB));
-        let batches = merged(plan_day(files, &MergeMode::MetricsIndexed, &limits));
+        let batches = plan_day(files, &MergeMode::MetricsIndexed, &limits);
         assert_eq!(batches.len(), 2);
         let (legacy, indexed): (Vec<_>, Vec<_>) = batches
             .iter()
