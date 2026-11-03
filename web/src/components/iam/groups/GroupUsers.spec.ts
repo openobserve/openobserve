@@ -44,10 +44,11 @@ const o2Stubs = {
           <slot name="cell-email" :row="row" />
           <slot name="cell-organization" :row="row" />
         </template>
-        <slot v-if="!data || data.length === 0" name="empty" />
+        <slot v-if="!loading && (!data || data.length === 0)" name="empty" />
       </div>
     `,
     props: [
+      "loading",
       "data",
       "columns",
       "rowKey",
@@ -612,6 +613,35 @@ describe("GroupUsers Component", () => {
       expectUnclippable(orgEmpty);
 
       orgEmpty.unmount();
+    });
+
+    it("makes no claim about the org while its user list is still loading", async () => {
+      mockUsersState.getOrgUsers.mockReturnValue(new Promise(() => {}));
+      const pending = await mountReal([]);
+
+      expect(pending.findComponent(o2Stubs.OTable).props("loading")).toBe(true);
+      expect(pending.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(false);
+      expect(pending.text()).not.toContain("No users yet");
+
+      pending.unmount();
+    });
+
+    it("shows a load error, not the org-empty copy, when the user list fails, and recovers on retry", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      mockUsersState.getOrgUsers.mockRejectedValueOnce(new Error("boom"));
+      const failed = await mountReal([]);
+
+      expect(failed.find('[data-test="iam-users-selection-load-error"]').exists()).toBe(true);
+      expect(failed.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(false);
+      expect(failed.text()).not.toContain("No users yet");
+
+      await failed.find('[data-test="iam-users-selection-load-error"] button').trigger("click");
+      await flushPromises();
+
+      expect(failed.find('[data-test="iam-users-selection-load-error"]').exists()).toBe(false);
+      expect(failed.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(true);
+
+      failed.unmount();
     });
 
     it("shows the search-filtered state when a search empties the Selected view", async () => {
