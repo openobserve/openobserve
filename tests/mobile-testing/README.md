@@ -76,7 +76,7 @@ npx playwright test --grep @masking
 npx playwright test --grep @known-bug         # the skipped #2289 markers
 ```
 
-### Coverage (all four mobile tracks) — 42 tests
+### Coverage (all four mobile tracks) — 46 tests
 Each platform has a **core RUM** bundle (`utils/coreRumSpec.js`: views + actions + handled error +
 native crash in `_rumdata`, then the crashed session rendering in the dashboard) **plus**
 per-capability specs built from shared factories in **`utils/rumChecks.js`** — so the platforms stay
@@ -87,14 +87,15 @@ at parity without copy-paste:
 - `networkSuite` — a successful fetch is a resource (**positive**) + a 4xx status is captured (**negative**)
 - `maskingSuite` — no PII leaks into the session replay (MASK_ALL)
 - `bgFgSuite` — a pre-background view and a post-foreground view share one session
+- `logsSuite` — one tap's info/warn/error log burst lands in `_rumlog` as exactly three rows
 - `noPhoneHomeAndroidSuite` — the installed APK contains zero Datadog hosts (**security/negative**)
 
 | Project | App | Service | Specs |
 |---|---|---|---|
-| `rn-android` | `apps/o2-rum-tester` (Android) | `o2-rum-tester` | crash, network(+404), handled-error, views, masking, attributes, user-identity, background-foreground, no-phone-home |
-| `android-native` | `apps/o2-native-android` | `o2-native-android` | core bundle, attributes, user-identity, no-phone-home |
-| `rn-ios` | `apps/o2-rum-tester` (iOS) | `o2-rum-tester` | core bundle, network(+404), attributes, user-identity, masking |
-| `ios-native` | `apps/o2-native-ios` | `o2-native-ios` | core bundle, attributes |
+| `rn-android` | `apps/o2-rum-tester` (Android) | `o2-rum-tester` | crash, network(+404), handled-error, views, masking, attributes, user-identity, background-foreground, logs, no-phone-home |
+| `android-native` | `apps/o2-native-android` | `o2-native-android` | core bundle, attributes, user-identity, logs, no-phone-home |
+| `rn-ios` | `apps/o2-rum-tester` (iOS) | `o2-rum-tester` | core bundle, network(+404), attributes, user-identity, masking, logs |
+| `ios-native` | `apps/o2-native-ios` | `o2-native-ios` | core bundle, attributes, logs |
 
 See **`docs/COVERAGE-MATRIX.md`** for the full capability×platform matrix, on-device validation
 status, and the deferred follow-ups (native/iOS background-foreground, native network/masking,
@@ -103,7 +104,7 @@ iOS-native user identity — each needs a fixture-app change or a background har
 Prereqs: Android emulator booted for the Android projects; an iOS simulator booted (udid in
 `.env` `IOS_SIM_UDID`) for the iOS projects; the fixture apps built + installed (see `apps/`).
 
-Tags: `@mobile @rn-android @rn-ios @android-native @ios-native @P0 @P1 @crash @network @negative @errors @views @replay @masking @lifecycle @attributes @user-identity @security @known-bug`.
+Tags: `@mobile @rn-android @rn-ios @android-native @ios-native @P0 @P1 @crash @network @negative @errors @views @replay @masking @lifecycle @logs @attributes @user-identity @security @known-bug`.
 
 ## Notes
 
