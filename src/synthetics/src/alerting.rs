@@ -103,7 +103,7 @@ pub fn classify(
 ) -> RunClass {
     // Our own fault, checked before anything else: a queue-dropped job never ran,
     // so it is evidence about our scheduling and nothing at all about the target.
-    if error_source == ERROR_SOURCE_QUEUE {
+    if error_source == ERROR_SOURCE_QUEUE || error_source == ERROR_SOURCE_CONTROL_PLANE {
         return RunClass::NotMeasured;
     }
     // A child still replicating to this region is lag of ours, like a queue drop.
@@ -144,6 +144,9 @@ pub const REASON_FLAKY: &str = "flaky";
 /// ever created), because those first two are real signals about the check and
 /// this one is a signal about us.
 pub const ERROR_SOURCE_QUEUE: &str = "queue";
+
+/// `error_source` for a probe that could not reach the job API, so it never checked the target.
+pub const ERROR_SOURCE_CONTROL_PLANE: &str = "control_plane";
 
 /// `error_source` for a check nothing scheduled at all.
 ///
@@ -445,6 +448,21 @@ mod tests {
         assert_eq!(classify(Some("warning"), 1, "", None), RunClass::Degraded);
         // A probe that never reported attempts must not be read as flaky.
         assert_eq!(classify(Some("warning"), 0, "", None), RunClass::Degraded);
+    }
+
+    #[test]
+    fn a_probe_that_cannot_reach_the_job_api_is_not_measured() {
+        assert_eq!(
+            classify(Some("error"), 1, ERROR_SOURCE_CONTROL_PLANE, None),
+            RunClass::NotMeasured
+        );
+        let before = state(2, 0, false);
+        let (outcome, after) = decide(before, RunClass::NotMeasured, 3, 0, 1010 * MIN);
+        assert_eq!(outcome, AlertOutcome::Silent);
+        assert_eq!(
+            after.consecutive_failures, 2,
+            "the failure streak must not move"
+        );
     }
 
     #[test]

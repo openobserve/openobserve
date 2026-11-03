@@ -762,6 +762,7 @@
     "dragToReorder": "拖曳以重新排序",
     "timeAmount": "時間量",
     "timeUnit": "時間單位",
+    "unitFor": "{label} 單位",
     "queryEditorAriaLabel": "查詢編輯器。按 Escape 移至下一個控制項。",
     "queryEditorEscapeAction": "將焦點移至下一個控制項",
     "inlineEdit": {
@@ -11951,6 +11952,7 @@
       "budgetLabel": "警示額度",
       "budgetPerDay": "每日",
       "budgetPerWeek": "每週",
+      "budgetPeriod": "警示預算期間",
       "budgetRange": "請輸入大於 0 的數字",
       "chartsTab": "圖表",
       "checkEvery": "檢查頻率",
@@ -11960,6 +11962,7 @@
       "sendsToStatus": "每次偵測到異常時傳送至 {targets}。",
       "detectionAlreadyRunning": "偵測已在執行中，請稍後再試。",
       "detectionCharts": "偵測結果",
+      "detectionFunctionField": "偵測函式欄位",
       "detectionFunctionTooltip": "每個時間桶中要測量的內容。count 觀察有多少記錄到達；avg、min、max 和 sum 觀察某個數值欄位。p50、p95 和 p99 觀察該欄位的分布 — 例如 response_time_ms 的 p95 能捕捉到即使流量持平，最慢請求的延遲正在變差。",
       "detectionResolution": "偵測解析度",
       "detectionResolutionTooltip": "每個資料點的精細程度。例如「5m」表示以 5 分鐘的解析度偵測異常。",

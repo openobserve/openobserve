@@ -184,4 +184,15 @@ describe("AnomalyAlerting - direction and window share", () => {
       t("alerts.anomaly.windowBucketsRange"),
     );
   });
+
+  it("names the notifications switch after its row label and state", async () => {
+    const w = await mountComp({ config: makeConfig({ alert_enabled: true }) });
+    const btn = w.find('[role="switch"]');
+    const name = btn
+      .attributes("aria-labelledby")!
+      .split(" ")
+      .map((id) => w.find(`#${id}`).text())
+      .join(" ");
+    expect(name).toBe("Notifications Enabled");
+  });
 });
