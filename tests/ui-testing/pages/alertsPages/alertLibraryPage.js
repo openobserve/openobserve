@@ -75,6 +75,20 @@ export class AlertLibraryPage {
       retry: '[data-test="alert-library-install-retry"]',
       done: '[data-test="alert-library-install-done"]',
       cancel: '[data-test="alert-library-install-cancel"]',
+      // alert-type facet (present only when the manifest ships anomaly alerts)
+      alertType: '[data-test="alert-library-alert-type"]',
+      alertTypeAll: '[data-test="alert-library-alert-type-all"]',
+      alertTypeScheduled: '[data-test="alert-library-alert-type-scheduled"]',
+      alertTypeAnomaly: '[data-test="alert-library-alert-type-anomaly"]',
+      // anomaly (locked) card tags + the global upgrade dialog
+      cardAnomalyTag: '[data-test="alert-library-card-anomaly"]',
+      cardEnterpriseTag: '[data-test="alert-library-card-enterprise"]',
+      upgradeDialog: '[data-test="enterprise-upgrade-dialog"]',
+      selectAllCheckbox: '[data-test="alert-library-select-all-in-view"] [role="checkbox"]',
+      // enterprise-gated anomaly content (fixme only, see the anomaly spec)
+      drawerAnomalyNote: '[data-test="alert-library-drawer-anomaly-note"]',
+      drawerDetection: '[data-test="alert-library-drawer-detection"]',
+      installAnomalyNote: '[data-test="alert-library-install-anomaly-note"]',
     };
   }
 
@@ -145,6 +159,13 @@ export class AlertLibraryPage {
   cardTitle(id) { return this.page.locator(`[data-test="alert-library-card-title-${id}"]`); }
   needsDataChip(id) {
     return this.card(id).locator('[data-test="alert-library-card-needs-data"]');
+  }
+  cardAnomaly(id) { return this.card(id).locator(this.l.cardAnomalyTag); }
+  cardEnterprise(id) { return this.card(id).locator(this.l.cardEnterpriseTag); }
+
+  // ── alert-type facet (anomaly) ────────────────────────────────────────────
+  async pickAlertType(id) {
+    await this.page.locator(`[data-test="alert-library-alert-type-${id}"]`).click();
   }
 
   async firstCardId() {
@@ -294,6 +315,14 @@ export class AlertLibraryPage {
   async expectCardAbsent(id) { await expect(this.card(id)).toHaveCount(0); }
   async expectCardNeedsData(id) { await expect(this.needsDataChip(id)).toBeVisible(); }
   async expectCardReady(id) { await expect(this.needsDataChip(id)).toHaveCount(0); }
+  async expectCardAnomalyTag(id) { await expect(this.cardAnomaly(id)).toBeVisible(); }
+  async expectCardEnterpriseTag(id) { await expect(this.cardEnterprise(id)).toBeVisible(); }
+  async expectNoEnterpriseTag(id) { await expect(this.cardEnterprise(id)).toHaveCount(0); }
+  async expectCardNotSelected(id) { await expect(this.card(id)).toHaveAttribute('data-selected', 'false'); }
+  async expectNoAnomalyCard() { await expect(this.page.locator(this.l.cardAnomalyTag)).toHaveCount(0); }
+  async expectAlertTypeToggleVisible() { await expect(this.page.locator(this.l.alertType)).toBeVisible(); }
+  async expectAlertTypeToggleAbsent() { await expect(this.page.locator(this.l.alertType)).toHaveCount(0); }
+  async expectSelectAllDisabled() { await expect(this.page.locator(this.l.selectAllCheckbox)).toBeDisabled(); }
   async expectDrawerPreviewVisible() { await expect(this.page.locator(this.l.drawerPreview)).toBeVisible(); }
   async expectDrawerNeedsData() { await expect(this.page.locator(this.l.drawerNeedsData)).toBeVisible(); }
   async expectDrawerAvailability() { await expect(this.page.locator(this.l.drawerAvailability)).toBeVisible(); }
@@ -302,6 +331,30 @@ export class AlertLibraryPage {
     await this.page.keyboard.press('Escape');
     await expect(this.page.locator(this.l.drawer)).toBeHidden();
   }
+
+  // ── locked-card upgrade dialog ────────────────────────────────────────────
+  async clickCardTitle(id) {
+    await this.cardTitle(id).click();
+  }
+
+  async expectUpgradeDialogVisible() {
+    await expect(this.page.locator(this.l.upgradeDialog)).toBeVisible({ timeout: 15000 });
+  }
+
+  async closeUpgradeDialog() {
+    await this.page.keyboard.press('Escape');
+    await expect(this.page.locator(this.l.upgradeDialog)).toBeHidden({ timeout: 10000 });
+  }
+
+  async expectDrawerClosed() {
+    await expect(this.page.locator(this.l.drawer)).toBeHidden();
+  }
+
+  // Enterprise-gated anomaly content — called only from the anomaly spec's
+  // test.fixme placeholders (unreachable on OSS; enabled with an entitled build).
+  async expectDrawerAnomalyNote() { await expect(this.page.locator(this.l.drawerAnomalyNote)).toBeVisible(); }
+  async expectDrawerDetection() { await expect(this.page.locator(this.l.drawerDetection)).toBeVisible(); }
+  async expectAnomalyInstallNote() { await expect(this.page.locator(this.l.installAnomalyNote)).toBeVisible(); }
 
   async expectSummaryDestination(text) {
     await expect(this.page.locator(this.l.summary).locator('dd').first()).toHaveText(text);
