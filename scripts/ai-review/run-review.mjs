@@ -12,6 +12,7 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import {
   addUsage,
   cleanAttributes,
+  genAiProviderName,
   genAiRequestAttributes,
   genAiResponseAttributes,
   genAiUsageAttributes,
@@ -95,7 +96,7 @@ const PAIRED = {
 // ─── Model provider selection ──────────────────────────────────────────────
 // The review runs against a single provider per invocation, chosen via env so the same script
 // can be launched once per provider (see .github/workflows/ai-code-review.yml, whose matrix
-// currently has a single deepseek leg). Everything defaults to that DeepSeek-V4.1-Flash (max effort) setup, so an
+// currently has a single anthropic leg). Everything defaults to that Claude Sonnet 5.5 (high effort) setup, so an
 // invocation with no REVIEW_* env set still works. The model is named freely here and in CI logs;
 // what must never name it is the posted PR comment — see redactProviderIdentity.
 //
@@ -105,21 +106,20 @@ const PAIRED = {
 // - REVIEW_API_KEY_ENV: name of the env var holding the provider API key (checked for presence).
 // - REVIEW_MARKER: HTML comment marker that identifies this provider's comment on the PR, so
 //   providers post/update independent comments and never clobber each other.
-const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "deepseek-review";
-const MODEL_ID = process.env.REVIEW_MODEL_ID || "deepseek-flash";
+const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "anthropic-review";
+const MODEL_ID = process.env.REVIEW_MODEL_ID || "claude-sonnet-5-5";
 const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "";
-const GEN_AI_PROVIDER_NAME = process.env.REVIEW_GEN_AI_PROVIDER_NAME
-  || (PROVIDER_ID.toLowerCase().includes("deepseek") ? "deepseek" : PROVIDER_ID);
-// REVIEW_API_KEY_ENV holds the NAME of the env var carrying the key (e.g. "DEEPSEEK_API_KEY"),
+const GEN_AI_PROVIDER_NAME = process.env.REVIEW_GEN_AI_PROVIDER_NAME || genAiProviderName(PROVIDER_ID);
+// REVIEW_API_KEY_ENV holds the NAME of the env var carrying the key (e.g. "ANTHROPIC_REVIEW_API_KEY"),
 // never the key itself — the value is read only via apiKey() below and is never logged or
 // posted. Constrain it to an env-var-shaped token anyway: the name is echoed into CI logs, so a
 // malformed value must not become the vehicle for leaking anything. This also keeps CodeQL's
 // js/clear-text-logging taint analysis from treating the *name* as the secret (it flags any
 // `...API_KEY...` env read reaching a log).
-const RAW_API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "DEEPSEEK_API_KEY";
+const RAW_API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "ANTHROPIC_REVIEW_API_KEY";
 const API_KEY_VAR_NAME = /^[A-Z][A-Z0-9_]{0,63}$/.test(RAW_API_KEY_VAR_NAME)
   ? RAW_API_KEY_VAR_NAME
-  : "DEEPSEEK_API_KEY";
+  : "ANTHROPIC_REVIEW_API_KEY";
 const MODEL_SLUG = `${PROVIDER_ID}/${MODEL_ID}`;
 
 function apiKey() {
@@ -761,8 +761,8 @@ function selectAgents(tierConfig, filteredDiff) {
 // Each reviewer/coordinator is a named agent in opencode.jsonc (ai-review-*), running
 // read-only against the checked-out repo via OpencodeServer + callOpencode below. Unlike
 // a bare chat-completion call, opencode agents can Read/Grep the actual codebase around
-// the diff, not just the diff text — that repo context is the main quality lever over the
-// old DeepSeek-only approach.
+// the diff, not just the diff text — that repo context is the main quality lever over a
+// diff-only prompt.
 
 const OPENCODE = new OpencodeServer({
   cwd: PR_DIR || ENGINE_DIR,
