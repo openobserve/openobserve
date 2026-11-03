@@ -265,13 +265,13 @@ const rgbaToOklch = (color: Rgba): number[] => {
   return [lightness, Math.hypot(aAxis, bAxis), hue < 0 ? hue + 360 : hue];
 };
 
-/** A relative-colour channel: a number, a channel keyword, or min()/max()/calc() over one binary operation. */
-const evalChannel = (expr: string, env: Record<string, number>): number => {
+/** A relative-colour channel: a number, a percentage of `full`, a channel keyword, or min()/max()/calc() over one binary operation. */
+const evalChannel = (expr: string, env: Record<string, number>, full: number): number => {
   const text = collapseSpace(expr);
   if (text in env) return env[text];
   const call = asFunctionCall(text);
   if (call) {
-    const args = splitTopLevel(call.args, ",").map((arg) => evalChannel(arg, env));
+    const args = splitTopLevel(call.args, ",").map((arg) => evalChannel(arg, env, full));
     if (call.name === "min") return Math.min(...args);
     if (call.name === "max") return Math.max(...args);
     if (call.name === "calc" && args.length === 1) return args[0];
@@ -279,13 +279,13 @@ const evalChannel = (expr: string, env: Record<string, number>): number => {
   }
   const binary = /^(.+) ([*/+-]) (.+)$/.exec(text);
   if (binary) {
-    const left = evalChannel(binary[1], env);
-    const right = evalChannel(binary[3], env);
+    const left = evalChannel(binary[1], env, full);
+    const right = evalChannel(binary[3], env, full);
     if (binary[2] === "*") return left * right;
     if (binary[2] === "/") return left / right;
     return binary[2] === "+" ? left + right : left - right;
   }
-  return parseNumber(text);
+  return text.endsWith("%") ? (parseNumber(text) / 100) * full : parseNumber(text);
 };
 
 /** `oklch(from <colour> L C H [/ A])`, the relative form the rail lens tokens use. */
@@ -304,8 +304,11 @@ const relativeOklchChannels = (
   const slash = channels.indexOf("/");
   const lch = slash === -1 ? channels : channels.slice(0, slash);
   if (lch.length !== 3 || (slash !== -1 && channels.length !== slash + 2)) return null;
-  const [lightness, chroma, hue] = lch.map((token) => evalChannel(token, env));
-  const alpha = slash === -1 ? originAlpha : evalChannel(channels[slash + 1], env);
+  // A hue has no percentage form, so NaN rejects one.
+  const [lightness, chroma, hue] = lch.map((token, i) =>
+    evalChannel(token, env, [1, OKLCH_CHROMA_FULL, Number.NaN][i]),
+  );
+  const alpha = slash === -1 ? originAlpha : evalChannel(channels[slash + 1], env, 1);
   if ([lightness, chroma, hue, alpha].some(Number.isNaN)) return null;
   return [lightness, chroma, hue, alpha];
 };

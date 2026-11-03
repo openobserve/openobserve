@@ -244,6 +244,13 @@ describe("resolveColor", () => {
     expect([soft.r, soft.g, soft.b].map(Math.round)).toEqual([255, 0, 0]);
   });
 
+  it("reads relative oklch() percentages as fractions of each channel's range", () => {
+    const percent = parseColor("oklch(from #ff0000 50% 50% h / 50%)");
+    const fraction = parseColor("oklch(from #ff0000 0.5 0.2 h / 0.5)");
+    expect(percent).not.toBeNull();
+    expect(percent).toEqual(fraction);
+  });
+
   it("keeps a wide-gamut oklch() origin's channels until the relative transform", () => {
     const scope = scopeOf({
       "--ink": "oklch(64.6% 0.222 41.116)",
