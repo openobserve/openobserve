@@ -6026,6 +6026,7 @@
     "resetRUMTokenLabel": "重設 RUM 權杖",
     "generateRUMTokenLabel": "產生 RUM 權杖",
     "generateRUMTokenMessage": "產生 RUM 權杖以啟用組織的 RUM 功能。",
+    "rumTokenForbiddenMessage": "您的角色無法檢視 RUM 權杖。請向管理員索取 RUM 設定片段，或取得在此查看所需的角色。",
     "rumPlatform": "平台",
     "rumPlatformBrowser": "瀏覽器",
     "rumPlatformReactNative": "React Native",
@@ -6185,7 +6186,7 @@
       },
       "installOneClick": "新增至 {client}",
       "skillsLabel": "新增 {brand} 技能（選填）",
-      "skillsHint": "教導您的 AI 助手如何在 {brand} 中查詢、設定警示及建立儀表板，讓它能更充分利用 MCP 工具。在您的專案中執行它，它會安裝到您電腦上找到的每個 AI 工具中。",
+      "skillsHint": "教導您的 AI 助手如何在 {brand} 中查詢、設定警示及建立儀表板，讓它能更充分利用 MCP 工具。請在您的專案中執行它；它會將這些技能安裝到您電腦上找到的每個 AI 工具中。",
       "skillsRepo": "在 {host} 上檢視技能"
     },
     "manageTokensBtnLabel": "管理權杖",

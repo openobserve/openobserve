@@ -37,6 +37,29 @@ pub struct AgentSignalsQuery {
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/agent_signals",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetAgentSignals",
+    summary = "Get agent trace signals",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("start_time" = Option<i64>, Query, description = "Start time in microseconds"),
+        ("end_time" = Option<i64>, Query, description = "End time in microseconds"),
+        ("signal_type" = Option<String>, Query, description = "Signal type: failure, loop or cost"),
+        ("source_stream" = Option<String>, Query, description = "Source trace stream"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn get_agent_signals(
     axum::extract::Path(org_id): axum::extract::Path<String>,
     axum::extract::Query(query): axum::extract::Query<AgentSignalsQuery>,
@@ -120,6 +143,29 @@ pub async fn get_agent_signals(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/agent_signals",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetAgentSignals",
+    summary = "Get agent trace signals",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("start_time" = Option<i64>, Query, description = "Start time in microseconds"),
+        ("end_time" = Option<i64>, Query, description = "End time in microseconds"),
+        ("signal_type" = Option<String>, Query, description = "Signal type: failure, loop or cost"),
+        ("source_stream" = Option<String>, Query, description = "Source trace stream"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn get_agent_signals(
     axum::extract::Path(_org_id): axum::extract::Path<String>,
     axum::extract::Query(_query): axum::extract::Query<AgentSignalsQuery>,
@@ -146,7 +192,7 @@ pub async fn get_agent_signals(
 const COMPARE_ROLLUP_LOOKBACK_MICROS: i64 = 30 * 24 * 60 * 60 * 1_000_000;
 
 /// One arm (A or B) of a version-compare request.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct CompareArm {
     pub agent_name: String,
     pub env: Option<String>,
@@ -158,7 +204,7 @@ pub struct CompareArm {
 }
 
 /// Request body for the version-compare sketch-merge endpoint.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct CompareRequest {
     pub a: CompareArm,
     pub b: CompareArm,
@@ -427,6 +473,26 @@ async fn fetch_arm_failures(
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/traces/agent_signals/compare",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "CompareAgentVersions",
+    summary = "Compare agent versions",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(CompareRequest), content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn compare_agent_versions(
     axum::extract::Path(org_id): axum::extract::Path<String>,
     axum::Json(req): axum::Json<CompareRequest>,
@@ -484,6 +550,26 @@ pub async fn compare_agent_versions(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/traces/agent_signals/compare",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "CompareAgentVersions",
+    summary = "Compare agent versions",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(CompareRequest), content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn compare_agent_versions(
     axum::extract::Path(_org_id): axum::extract::Path<String>,
     axum::Json(_req): axum::Json<CompareRequest>,

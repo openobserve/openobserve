@@ -6026,6 +6026,7 @@
     "resetRUMTokenLabel": "RUM Token'ını Sıfırla",
     "generateRUMTokenLabel": "RUM Token Oluştur",
     "generateRUMTokenMessage": "Kuruluşunuz için RUM'u etkinleştirmek için RUM Token oluşturun.",
+    "rumTokenForbiddenMessage": "Rolünüz RUM token'ını görüntüleyemiyor. RUM kurulum snippet'i için veya burada görebilmek için gereken rol için bir yöneticiye başvurun.",
     "rumPlatform": "Platform",
     "rumPlatformBrowser": "Tarayıcı",
     "rumPlatformReactNative": "React Native",
@@ -6185,7 +6186,7 @@
       },
       "installOneClick": "{client} öğesine ekle",
       "skillsLabel": "{brand} becerisini ekleyin (isteğe bağlı)",
-      "skillsHint": "Yapay Zeka Asistanınıza {brand} içinde nasıl sorgu yapacağını, uyarı oluşturacağını ve gösterge panoları oluşturacağını öğretir, böylece MCP araçlarından daha fazla yararlanır. Projenizde çalıştırın; makinenizde bulduğu her yapay zeka aracına yükler.",
+      "skillsHint": "Yapay zeka asistanınıza {brand} içinde nasıl sorgulama yapacağını, uyarı oluşturacağını ve gösterge panoları kuracağını öğretir; böylece MCP araçlarından daha fazla yararlanır. Projenizde çalıştırın; makinenizde bulduğu her yapay zeka aracına bunları yükler.",
       "skillsRepo": "{host} üzerindeki becerileri görüntüleyin"
     },
     "manageTokensBtnLabel": "Token'ları Yönet",

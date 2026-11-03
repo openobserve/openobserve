@@ -152,6 +152,26 @@ pub async fn query_get(
     query(&org_id, req, &user_email.user_id, &headers).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/query",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusQueryPost",
+    summary = "Execute Prometheus instant query with form parameters",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(config::meta::promql::RequestQuery), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn query_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestQuery>,
@@ -327,6 +347,26 @@ pub async fn query_range_get(
     query_range(&org_id, req, &user_email.user_id, &headers, false).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/query_range",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusRangeQueryPost",
+    summary = "Execute Prometheus range query with form parameters",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(config::meta::promql::RequestRangeQuery), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
+    responses(
+        (status = 200, description = "JSON result, or a server-sent event stream when use_streaming is true", content((Object = "application/json"), ("text/event-stream"))),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn query_range_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestRangeQuery>,
@@ -423,6 +463,26 @@ pub async fn query_exemplars_get(
     query_range(&org_id, req, &user_email.user_id, &headers, true).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/query_exemplars",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusQueryExemplarsPost",
+    summary = "Query Prometheus exemplars with form parameters",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(config::meta::promql::RequestRangeQuery), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn query_exemplars_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestRangeQuery>,
@@ -779,6 +839,26 @@ pub async fn series_get(
     series(&org_id, req, &user_email.user_id).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/series",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusSeriesPost",
+    summary = "Find Prometheus series with form parameters",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(config::meta::promql::RequestSeries), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn series_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestSeries>,
@@ -914,6 +994,26 @@ pub async fn labels_get(
     labels(&org_id, req, &user_email.user_id).await
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/labels",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusLabelsPost",
+    summary = "List Prometheus labels with form parameters",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(config::meta::promql::RequestLabels), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn labels_post(
     Path(org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestLabels>,
@@ -1278,6 +1378,27 @@ pub async fn format_query_get(
     format_query(&req.query)
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/format_query",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusFormatQueryPost",
+    summary = "Format a PromQL expression with form parameters",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("query" = String, Query, description = "PromQL expression; the extractor rejects a request without it, and a non-empty form value wins"),
+    ),
+    request_body(content = inline(config::meta::promql::RequestFormatQuery), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn format_query_post(
     Path(_org_id): Path<String>,
     Query(req): Query<config::meta::promql::RequestFormatQuery>,

@@ -22,7 +22,7 @@ use db::authz::{remove_ownership, set_ownership};
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::{
-    ReadCheck, UserEmail, UserReads, first_unreadable, is_ofga_object_visible,
+    ReadCheck, UserEmail, UserReads, check_permissions, first_unreadable, is_ofga_object_visible,
 };
 
 use crate::{
@@ -41,6 +41,9 @@ use crate::{
 
 /// Most scorers one request may name; each costs a permission check before anything runs.
 pub(crate) const MAX_SCORERS_PER_REQUEST: usize = 50;
+
+/// Per-scorer PUT checks in flight at once when the org-wide one fails.
+const PERMISSION_CONCURRENCY: usize = 16;
 
 fn scorer_error_response(value: ScorerError) -> Response {
     match value {
@@ -63,6 +66,45 @@ fn scorer_error_response(value: ScorerError) -> Response {
     }
 }
 
+/// Remote scorer credentials stay with those who may change the scorer.
+async fn redact_unwritable(org_id: &str, user_id: &str, scorers: &mut [ScorerResponseBody]) {
+    use futures::StreamExt;
+
+    let mut ids: Vec<String> = scorers
+        .iter()
+        .filter(|s| s.has_credentials())
+        .map(|s| s.entity_id.clone())
+        .collect();
+    if ids.is_empty()
+        || check_permissions(
+            org_id, org_id, user_id, "scorers", "PUT", None, true, false, false,
+        )
+        .await
+    {
+        return;
+    }
+    ids.sort_unstable();
+    ids.dedup();
+    let writable: std::collections::HashSet<String> = futures::stream::iter(ids)
+        .map(|id| async move {
+            check_permissions(
+                &id, org_id, user_id, "scorers", "PUT", None, false, false, true,
+            )
+            .await
+            .then_some(id)
+        })
+        .buffer_unordered(PERMISSION_CONCURRENCY)
+        .filter_map(|id| async move { id })
+        .collect()
+        .await;
+    for scorer in scorers
+        .iter_mut()
+        .filter(|s| s.has_credentials() && !writable.contains(&s.entity_id))
+    {
+        scorer.redact_credentials();
+    }
+}
+
 /// ListScorers
 #[utoipa::path(
     get,
@@ -80,7 +122,7 @@ fn scorer_error_response(value: ScorerError) -> Response {
     responses(
         (status = 200, body = inline(ListScorersResponseBody)),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "list"})),
     ),
 )]
@@ -116,7 +158,8 @@ pub async fn list_scorers(
                     )
                 })
                 .collect();
-            let body: ListScorersResponseBody = list.into();
+            let mut body: ListScorersResponseBody = list.into();
+            redact_unwritable(&org_id, &user_email.user_id, &mut body.list).await;
             MetaHttpResponse::json(body)
         }
         Err(err) => scorer_error_response(err),
@@ -142,7 +185,7 @@ pub async fn list_scorers(
         (status = 404, description = "Provider not found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "create"})),
     ),
 )]
@@ -184,14 +227,23 @@ pub async fn create_scorer(
         (status = 200, body = inline(ScorerResponseBody)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "get"})),
     ),
 )]
-pub async fn get_scorer(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
+pub async fn get_scorer(
+    Path((org_id, entity_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     match scorers::get_scorer(&org_id, &entity_id).await {
         Ok(s) => {
-            let resp: ScorerResponseBody = s.into();
+            let mut resp: ScorerResponseBody = s.into();
+            redact_unwritable(
+                &org_id,
+                &user_email.user_id,
+                std::slice::from_mut(&mut resp),
+            )
+            .await;
             MetaHttpResponse::json(resp)
         }
         Err(err) => scorer_error_response(err),
@@ -215,14 +267,18 @@ pub async fn get_scorer(Path((org_id, entity_id)): Path<(String, String)>) -> Re
     responses(
         (status = 200, body = inline(ListScorerVersionsResponseBody)),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "list_versions"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "list"})),
     ),
 )]
-pub async fn list_scorer_versions(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
+pub async fn list_scorer_versions(
+    Path((org_id, entity_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     match scorers::get_scorer_versions(&org_id, &entity_id).await {
         Ok(versions) => {
-            let body: ListScorerVersionsResponseBody = versions.into();
+            let mut body: ListScorerVersionsResponseBody = versions.into();
+            redact_unwritable(&org_id, &user_email.user_id, &mut body.versions).await;
             MetaHttpResponse::json(body)
         }
         Err(err) => scorer_error_response(err),
@@ -249,7 +305,7 @@ pub async fn list_scorer_versions(Path((org_id, entity_id)): Path<(String, Strin
         (status = 403, description = "Provider not accessible", body = ()),
         (status = 404, description = "Scorer or provider not found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "update"})),
     ),
 )]
@@ -289,11 +345,11 @@ pub async fn update_scorer(
         ("entity_id" = String, Path, description = "Scorer stable entity id"),
     ),
     responses(
-        (status = 200, description = "Deactivated", body = String),
+        (status = 200, description = "Deactivated", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 404, description = "Not Found", body = ()),
         (status = 409, description = "Conflict", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "delete"})),
     ),
 )]
@@ -325,8 +381,8 @@ pub async fn delete_scorer(Path((org_id, entity_id)): Path<(String, String)>) ->
         (status = 403, description = "Provider not accessible", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "test"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "create"})),
     ),
 )]
 pub async fn test_scorer(
@@ -356,8 +412,8 @@ pub async fn test_scorer(
         (status = 200, body = inline(LlmJudgeOutputSchemaResponseBody)),
         (status = 400, description = "Bad Request", body = ()),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "preview_llm_judge_output_schema"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "create"})),
     ),
 )]
 pub async fn preview_llm_judge_output_schema(

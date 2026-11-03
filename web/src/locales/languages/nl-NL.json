@@ -6026,6 +6026,7 @@
     "resetRUMTokenLabel": "RUM-token opnieuw instellen",
     "generateRUMTokenLabel": "Genereer een RUM-token",
     "generateRUMTokenMessage": "Genereer een RUM-token om RUM voor uw organisatie mogelijk te maken.",
+    "rumTokenForbiddenMessage": "Uw rol kan het RUM-token niet bekijken. Vraag een beheerder om het RUM-setupsnippet, of om de rol die nodig is om het hier te zien.",
     "rumPlatform": "Platform",
     "rumPlatformBrowser": "Browser",
     "rumPlatformReactNative": "React Native",
@@ -6185,7 +6186,7 @@
       },
       "installOneClick": "Toevoegen aan {client}",
       "skillsLabel": "Voeg de {brand}-vaardigheid toe (optioneel)",
-      "skillsHint": "Leert je AI-assistent hoe hij query's uitvoert, alarmen instelt en dashboards bouwt in {brand}, zodat je meer uit de MCP-tools haalt. Voer het uit in je project; het installeert ze in elke AI-tool die het op je computer vindt.",
+      "skillsHint": "Leert je AI-assistent query's uitvoeren, alarmen instellen en dashboards bouwen in {brand}, zodat deze meer uit de MCP-tools haalt. Voer het uit in je project; het installeert ze in elke AI-tool die het op je machine vindt.",
       "skillsRepo": "Bekijk de vaardigheden op {host}"
     },
     "manageTokensBtnLabel": "Tokens beheren",

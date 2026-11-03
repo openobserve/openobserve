@@ -169,6 +169,10 @@ pub struct EdgeHistoryQuery {
         (status = 403, description = "Forbidden - Enterprise feature"),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 #[cfg(feature = "enterprise")]
 pub async fn get_edge_history(
