@@ -534,6 +534,45 @@ describe("HomeView org home dashboard tab", () => {
     expect(tab.props("folderId")).toBe("A");
   });
 
+  describe("a saved pinned tab restored on mount", () => {
+    const pinIn = (folderId: string) => ({
+      data: { setting_value: { dashboardId: "abc", folderId, label: "X" } },
+    });
+    const loadPin = async (folderId: string) => {
+      queryClient.clear();
+      (settingsService.getSetting as any).mockResolvedValueOnce(pinIn(folderId));
+      await useHomeDashboard(gt).load("test-org");
+    };
+
+    it("opens the pin's current folder after the dashboard moved", async () => {
+      await loadPin("A");
+      (settingsService.getSetting as any).mockResolvedValue(pinIn("A"));
+      localStorage.setItem("o2_home_active_tab", "dash:B:abc");
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.activeHomeTab).toBe("dash:A:abc");
+      expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).props("folderId")).toBe("A");
+    });
+
+    it("re-reads the pin before mounting the tab, so an out-of-band move never mounts the stale folder", async () => {
+      await loadPin("B");
+      let answer: (v: unknown) => void = () => {};
+      (settingsService.getSetting as any).mockReturnValue(new Promise((r) => (answer = r)));
+      localStorage.setItem("o2_home_active_tab", "dash:B:abc");
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(settingsService.getSetting).toHaveBeenCalledTimes(2);
+      expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).exists()).toBe(false);
+
+      answer(pinIn("A"));
+      await flushPromises();
+      expect(wrapper.vm.activeHomeTab).toBe("dash:A:abc");
+      expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).props("folderId")).toBe("A");
+    });
+  });
+
   it("does NOT toast when the pin is closed deliberately via the ×", async () => {
     const hd = useHomeDashboard(gt);
     hd.homeDashboard.value = {
@@ -604,6 +643,21 @@ describe("HomeView org home dashboard tab", () => {
       await flushPromises();
       expect(wrapper.vm.activeHomeTab).toBe("dash:default:abc");
       expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).exists()).toBe(true);
+    });
+
+    it("opens the pin's new folder when the pending pin arrives moved", async () => {
+      localStorage.setItem("o2_home_active_tab", "dash:old:abc");
+      await startPendingLoad();
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.activeHomeTab).toBe("dash:old:abc");
+
+      answer({ data: { setting_value: PINNED } });
+      await flushPromises();
+      expect(wrapper.vm.activeHomeTab).toBe("dash:default:abc");
+      expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).props("folderId")).toBe(
+        "default",
+      );
     });
 
     it("falls back to the first tab once the org turns out to have no pin", async () => {
