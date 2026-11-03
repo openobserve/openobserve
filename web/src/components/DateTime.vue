@@ -557,6 +557,11 @@ export default defineComponent({
       type: String,
       default: null,
     },
+    /** The last pickable calendar day (yyyy/MM/dd); absent means today, for a caller that schedules ahead. */
+    maxDate: {
+      type: String,
+      default: null,
+    },
     menuAlign: {
       type: String as PropType<"center" | "start" | "end">,
       default: "end",
@@ -837,6 +842,7 @@ export default defineComponent({
     });
 
     const calendarMaxDate = computed(() => {
+      if (props.maxDate) return props.maxDate;
       return timestampToTimezoneDate(new Date().getTime(), store.state.timezone, "yyyy/MM/dd");
     });
 
@@ -1566,11 +1572,7 @@ export default defineComponent({
     };
 
     const optionsFn = (date: string) => {
-      const formattedDate = timestampToTimezoneDate(
-        new Date().getTime(),
-        store.state.timezone,
-        "yyyy/MM/dd",
-      );
+      const formattedDate = calendarMaxDate.value;
       if (props.disableRelative) {
         return date >= props.minDate && date <= formattedDate;
       }
@@ -1643,8 +1645,8 @@ export default defineComponent({
 
       let delta = (direction === "prev" ? -1 : 1) * duration;
       if (direction === "next") {
-        // The calendar rejects future dates, so a forward shift stops at now.
-        delta = Math.min(delta, Date.now() * 1000 - endTime);
+        // A forward shift stops where the calendar does: now, or the end of `maxDate`.
+        delta = Math.min(delta, forwardCeilingMicros() - endTime);
         if (delta < MICROS_PER_SECOND) return;
       }
       const startDateTime = convertUnixTime(startTime + delta);
@@ -1660,12 +1662,17 @@ export default defineComponent({
       if (!props.autoApply) saveDate("absolute");
     };
 
+    const forwardCeilingMicros = () =>
+      props.maxDate
+        ? convertToUtcTimestamp(`${props.maxDate} 23:59:59`, store.state.timezone)
+        : Date.now() * 1000;
+
     const isNextShiftDisabled = () => {
       if (selectedType.value === "relative") {
         return (parseCalendarToken(calendarToken.value)?.offset ?? 0) === 0;
       }
       const { endUTC } = getUTCTimeStamp();
-      return !(endUTC + MICROS_PER_SECOND <= Date.now() * 1000);
+      return !(endUTC + MICROS_PER_SECOND <= forwardCeilingMicros());
     };
 
     // Only the calendar section is a 2-column grid of this/last pairs; every other row is 1-item.

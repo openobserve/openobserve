@@ -51,7 +51,10 @@ vi.mock("@/services/llm-datasets.service", async () => ({
   default: { list: vi.fn(), listItems: vi.fn() },
 }));
 vi.mock("@/services/online-evals.service", () => ({
-  default: { scorers: { list: vi.fn() }, providers: { list: vi.fn() } },
+  default: {
+    scorers: { list: vi.fn() },
+    providers: { list: vi.fn(), testConfig: vi.fn().mockResolvedValue("ok") },
+  },
 }));
 vi.mock("@/services/llm-prompts.service", () => ({
   default: { list: vi.fn(), resolve: vi.fn() },
@@ -68,7 +71,10 @@ const dataset = {
   id: "ds-1",
   name: "RAG regression set",
   description: null,
+  // 128 single-item writes and one batch: the row counter and the shown
+  // version differ, and only the row counter is a valid pin.
   globalVersion: 12,
+  writeVersion: 4,
   itemCount: 128,
   tags: [],
   sources: { trace: 0, annotation: 0, manual: 0 },
@@ -223,6 +229,20 @@ describe("ExperimentForm", () => {
     expect(payload).not.toHaveProperty("temperature");
     expect(payload).not.toHaveProperty("sources");
     expect(payload).not.toHaveProperty("userPrompt");
+  });
+
+  it("pins the dataset's row version but shows its write version", async () => {
+    wrapper = await createWrapper();
+    fillValid(wrapper);
+    await flushPromises();
+
+    const meta = wrapper.find('[data-test="ai-experiment-form-dataset-meta"]').text();
+    expect(meta).toContain("v4");
+    expect(meta).not.toContain("v12");
+
+    await submit(wrapper);
+    const [, payload] = vi.mocked(llmExperimentsService.create).mock.calls[0];
+    expect(payload.datasetVersion).toBe(12);
   });
 
   it("omits the system message when it is blank", async () => {

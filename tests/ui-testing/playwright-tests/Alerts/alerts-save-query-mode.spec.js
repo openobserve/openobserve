@@ -317,14 +317,13 @@ test.describe('Alerts — Choose Query Mode on save', {
     expect(saved.query_condition.multi_time_range).toEqual([]);
   });
 
-  test('the detail page shows no condition for a Builder alert that still stores SQL', async ({ page }) => {
+  test('the detail page shows the Builder count, not the SQL a Builder alert still stores', async ({ page }) => {
     const builderId = await seed(page, builderEmptyWithSql(uniq('auto_qm_detbuilder')));
     const sqlId = await seed(page, sqlWithBuilderCondition(uniq('auto_qm_detsql')));
 
-    // The stored SQL never runs on a Builder alert, so showing it here would
-    // claim the alert watches something it does not.
+    // The stored SQL never runs on a Builder alert; with no filters it counts every row.
     await pm.alertSaveQueryModePage.openDetailConfiguration(builderId);
-    await pm.alertSaveQueryModePage.expectDetailConditionEmpty();
+    await pm.alertSaveQueryModePage.expectDetailConditionCountOnly();
 
     // A SQL alert still shows the query it actually evaluates.
     await pm.alertSaveQueryModePage.openDetailConfiguration(sqlId);

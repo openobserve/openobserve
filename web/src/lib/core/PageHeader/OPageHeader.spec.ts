@@ -155,6 +155,16 @@ describe("OPageHeader with a status", () => {
     expect(statusInTitleRow()).toBe(false);
   });
 
+  /// L2: a header whose trail competes for the row can keep the title readable at every width.
+  it("floors the title at every width when asked", async () => {
+    const header = mount(OPageHeader, {
+      props: { title: raw("A long page title"), titleMinWidth: true },
+      global: { plugins: [i18n, createRouter({ history: createMemoryHistory(), routes: [] })] },
+    });
+    expect(header.find("h1").element.closest(".flex-col")!.className).toContain("min-w-40");
+    header.unmount();
+  });
+
   it("keeps the title's own floor when no status is shown", async () => {
     await mountHeader(false, false);
     expect(wrapper!.html()).toContain("md:max-lg:min-w-32");
