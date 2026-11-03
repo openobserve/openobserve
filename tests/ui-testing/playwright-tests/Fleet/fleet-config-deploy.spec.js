@@ -182,8 +182,6 @@ test.describe('Fleet management configurations and deploy', { tag: ['@fleet', '@
     await pm.fleetConfigPage.expectModeChip(`Viewing published v${v1} · not rolled out`);
     await pm.fleetConfigPage.switchToYaml();
     await pm.fleetConfigPage.expectYaml(FLEET_YAML.publishable);
-    // Declared after the setup so a broken precondition fails loudly instead of counting as the expected failure.
-    test.fail(true, 'o2-enterprise#3311 item 8: Publish is enabled with no change, so the failed config can be republished');
     await pm.fleetConfigPage.expectPublishEnabled(false);
 
     await pm.fleetConfigPage.setYaml(FLEET_YAML.publishable.replace('https://example.com', 'https://example.org'));
@@ -206,7 +204,6 @@ test.describe('Fleet management configurations and deploy', { tag: ['@fleet', '@
     await pm.fleetFleetsPage.openDeploy();
     await pm.fleetRolloutPage.expectReady();
 
-    test.fail(true, 'o2-enterprise#3311 item 12: the phase timeout note rounds 90 s to "2 min"');
     expect(await pm.fleetRolloutPage.timeoutNoteText()).not.toContain('2 min');
     await pm.fleetRolloutPage.expectTimeoutNoteContains('1 min 30 s');
   });
