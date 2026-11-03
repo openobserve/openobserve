@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nKey } from "@/types/i18n";
+import type { IconName } from "@/lib/core/Icon/OIcon.types";
 
 export type AlertSectionId = "watch" | "condition" | "notify" | "schedule" | "details";
 
@@ -45,6 +46,7 @@ export interface AlertSectionDef {
   navKey: I18nKey;
   /** One sentence under the heading that tells the user how little this step asks. */
   helpKey: I18nKey;
+  icon: IconName;
 }
 
 export const ALERT_SECTIONS: readonly AlertSectionDef[] = [
@@ -53,30 +55,35 @@ export const ALERT_SECTIONS: readonly AlertSectionDef[] = [
     titleKey: "alerts.sections.watch.title",
     navKey: "alerts.sections.watch.nav",
     helpKey: "alerts.sections.watch.help",
+    icon: "visibility",
   },
   {
     id: "condition",
     titleKey: "alerts.sections.condition.title",
     navKey: "alerts.sections.condition.nav",
     helpKey: "alerts.sections.condition.help",
+    icon: "notifications-active",
   },
   {
     id: "notify",
     titleKey: "alerts.sections.notify.title",
     navKey: "alerts.sections.notify.nav",
     helpKey: "alerts.sections.notify.help",
+    icon: "send",
   },
   {
     id: "schedule",
     titleKey: "alerts.sections.schedule.title",
     navKey: "alerts.sections.schedule.nav",
     helpKey: "alerts.sections.schedule.help",
+    icon: "schedule",
   },
   {
     id: "details",
     titleKey: "alerts.sections.details.title",
     navKey: "alerts.sections.details.nav",
     helpKey: "alerts.sections.details.help",
+    icon: "label",
   },
 ];
 

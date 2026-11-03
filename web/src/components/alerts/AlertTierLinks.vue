@@ -30,6 +30,8 @@ import {
 const props = defineProps<{
   section: AlertSectionId;
   view: AlertSectionTierView;
+  /** The section opened by itself because everything fits, so there is nothing to offer hiding. */
+  autoOpened?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -54,6 +56,10 @@ const rows = computed(() =>
     .filter((r) => r.items.length > 0),
 );
 
+const showToggle = computed(
+  () => props.view.tucked.length > 0 && !(props.autoOpened && props.view.expanded),
+);
+
 const moreLabel = computed(() =>
   moreLinkLabel(
     props.view.tucked.map((d) => t(d.nameKey)),
@@ -64,7 +70,7 @@ const moreLabel = computed(() =>
 
 <template>
   <div
-    v-if="rows.length || view.tucked.length"
+    v-if="rows.length || showToggle"
     class="flex flex-col"
     :data-test="`add-alert-section-${section}-tiers`"
   >
@@ -89,7 +95,7 @@ const moreLabel = computed(() =>
         </OButton>
       </div>
     </OSettingRow>
-    <div v-if="view.tucked.length" class="py-1">
+    <div v-if="showToggle" class="py-1">
       <OButton
         variant="ghost-primary"
         size="sm"
