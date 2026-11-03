@@ -82,7 +82,7 @@ const baseClasses = computed<string>(() =>
         : slots.trailing
           ? "ps-2 pe-1"
           : "px-2",
-    isVertical.value && isActive.value ? "font-semibold" : "font-normal",
+    isVertical.value && isActive.value ? "font-medium" : "font-normal",
     "text-sm whitespace-nowrap",
     isVertical.value ? "rounded-default" : "rounded-t-default",
     "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke] duration-(--duration-hover-out) hover:duration-(--duration-hover-in)",
@@ -105,7 +105,7 @@ const stateClasses = computed<string>(() => {
     return [
       "text-tabs-active-text cursor-pointer",
       isVertical.value
-        ? "bg-tabs-active-bg before:bg-tabs-indicator before:absolute before:inset-y-1.5 before:start-0 before:w-1 before:rounded-full"
+        ? "bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
         : "border-b-2 border-transparent",
     ].join(" ");
   }

@@ -357,9 +357,8 @@ onBeforeUnmount(() => {
 // tinted selected pill + lighter accent in dark, where a white pill would vanish
 // on the near-black rail.
 const indicatorClass = computed(() => [
-  "pointer-events-none absolute left-0 top-0 z-0 rounded-surface",
+  "pointer-events-none absolute left-0 top-0 z-0 rounded-surface border border-accent",
   "bg-surface-base shadow-xs dark:bg-tabs-active-bg dark:shadow-none",
-  "before:absolute before:top-2 before:h-5 before:start-0 before:w-1 before:rounded-full before:bg-accent",
   transitionOn.value &&
     "transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none",
   indicatorVisible.value ? "opacity-100" : "opacity-0",
