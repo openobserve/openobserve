@@ -1297,9 +1297,10 @@ fn validate_net_retry_budget(
         } else {
             String::new()
         };
+        let or = if retries_fix.is_empty() { "" } else { "or " };
         return Err(format!(
             "config: this check needs up to {} per run, which is over the {} check budget. To fix \
-             it, {retries_fix}or lower config.timeout_ms (currently {}). Detail: {} attempt(s) x \
+             it, {retries_fix}{or}lower config.timeout_ms (currently {}). Detail: {} attempt(s) x \
              {} each, plus {}s between retries. A check that outlives the budget is killed mid-run \
              by the probe's function timeout and reports a failure the target never had.",
             human_ms(worst_case_ms),
@@ -2291,9 +2292,14 @@ fn validate_browser_config(
         } else {
             String::new()
         };
+        let or = if combos_fix.is_empty() && retries_fix.is_empty() {
+            ""
+        } else {
+            "or "
+        };
         return Err(format!(
             "config: this check needs up to {} per run, which is over the {} check budget. To fix \
-             it, {combos_fix}{retries_fix}or shorten the run with config.journey_budget_ms \
+             it, {combos_fix}{retries_fix}{or}shorten the run with config.journey_budget_ms \
              (currently {}). Detail: {devices} browser/device combo(s) x {attempts} attempt(s) x \
              {} each, plus {}s between retries. A run that outlives the budget is killed \
              mid-journey by the probe's function timeout.",
@@ -4302,6 +4308,30 @@ mod tests {
             .find("journey_budget_ms")
             .expect("still names the budget");
         assert!(retries_at < budget_at, "reachable lever first: {err}");
+    }
+
+    #[test]
+    fn over_budget_message_with_only_the_budget_lever_has_no_dangling_or() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.retries = 0;
+        s.config["journey_budget_ms"] = serde_json::json!(MAX_JOURNEY_BUDGET_MS);
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(
+            err.contains(
+                "To fix it, shorten the run with config.journey_budget_ms (currently 15m)"
+            ),
+            "{err}"
+        );
+        assert!(!err.contains("To fix it, or"), "{err}");
+
+        s.retries = 1;
+        s.config["journey_budget_ms"] = serde_json::json!(450_000);
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(
+            err.contains("To fix it, lower retries below 1, or shorten the run"),
+            "{err}"
+        );
     }
 
     /// Two browser/device combos with the web form's own default `retries: 1`
