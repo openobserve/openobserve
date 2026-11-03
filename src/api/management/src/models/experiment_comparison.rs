@@ -32,7 +32,8 @@ pub struct ExperimentComparisonQuery {
     pub baseline_id: String,
     pub candidate_id: String,
     pub threshold: Option<f64>,
-    /// Comma-separated dimension IDs; omitted selects all eligible columns, empty selects none.
+    /// Comma-separated dimension IDs; omitted selects every eligible Score column (cost and
+    /// latency gate only when listed), empty selects none.
     pub outcome_dimensions: Option<String>,
 }
 

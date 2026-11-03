@@ -233,9 +233,6 @@
                             @update:model-value="(v: any) => addRotation(String(v))"
                           />
                         </span>
-                        <!-- On by default. A rotation is a position on the team, and
-                       one that exists at P1 but not P2 is a decision almost
-                       nobody means to make. -->
                         <OCheckbox
                           v-model="applyToAllPriorities"
                           size="sm"
@@ -716,11 +713,8 @@ const pendingUserStep = ref<LadderStep | null>(null);
 /// person on call in it or everyone on it, and which was asked for decides
 /// what the picked rotation MEANS.
 const pendingRotation = ref<{ step: LadderStep; mode: RotationMode } | null>(null);
-/// Whether the next rotation lands on every priority at once. Sticky for the
-/// life of the dialog: somebody adding a position to the ladder is doing it for
-/// the ladder, not for one priority, and re-ticking per priority would be the
-/// same chore in a different shape.
-const applyToAllPriorities = ref(true);
+/// Off until ticked, so an edit on one priority tab changes only that priority.
+const applyToAllPriorities = ref(false);
 const memberOptions = ref<{ label: I18nText; value: string }[]>([]);
 const teamMembers = computed(() => memberOptions.value.map((m) => m.value));
 /// The rotation in force, so the preview names people rather than target

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import * as objects from "./kubernetesObjects";
 import searchService from "@/services/search";
@@ -21,6 +21,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import * as queries from "@/services/kubernetes.queries";
 import { useKubernetesInventory, type K8sTime } from "./useKubernetesInventory";
 import { CLUSTER_QUERIES, QUERY_STREAM, queryText, type QueryId } from "./kubernetesQueries";
+import { col, setStreamColumns } from "./kubernetesFlatten";
 import { parseUrlState, type K8sUrlState } from "./kubernetesUrlState";
 
 const getStreams = vi.fn();
@@ -117,6 +118,8 @@ const setup = async (
 };
 
 describe("useKubernetesInventory", () => {
+  afterEach(() => setStreamColumns(null));
+
   beforeEach(() => {
     vi.clearAllMocks();
     queryClient.clear();
@@ -378,6 +381,19 @@ describe("useKubernetesInventory", () => {
       await inv.load();
       expect(search).not.toHaveBeenCalled();
     });
+
+    it("clears the previous column set when a later stream load fails", async () => {
+      await setup({ view: "events" }, { eventFields: ["k8s_cluster", "body"] });
+      expect(col(["kind"])).toBe("json_get_str(body,'object','kind')");
+      getStreams.mockRejectedValue(new Error("down"));
+      const inv = useKubernetesInventory(
+        () => parseUrlState({ view: "events" }),
+        () => ({ start: START, end: END, relative: true }),
+        () => "org2",
+      );
+      await inv.loadStreams();
+      expect(col(["kind"])).toBe("body_object_kind");
+    });
   });
 
   describe("map object queries (AC 81)", () => {
@@ -523,6 +539,20 @@ describe("useKubernetesInventory", () => {
       search.mockClear();
       await events.inv.load();
       expect(sentSql()[0]).toMatchObject({ start_time: START, end_time: END });
+    });
+
+    it("builds the events SQL from the stream's actual columns at flatten level 2", async () => {
+      const { inv } = await setup(
+        { view: "events" },
+        { eventFields: ["k8s_cluster", "body_object", "body_type"] },
+      );
+      await inv.load();
+      const events = sentSql().filter((q: any) => q.sql.includes("k8s_events"));
+      expect(events.length).toBeGreaterThan(0);
+      for (const q of events) {
+        expect(q.sql).toContain("json_get_str(body_object,'kind')");
+        expect(q.sql).not.toContain("body_object_kind");
+      }
     });
 
     it("marks all of 1,200 affected objects, and banners a truncated W", async () => {
