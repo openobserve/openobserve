@@ -23,8 +23,8 @@ use config::{
     utils::{json, time::now_micros},
 };
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Select, Set,
-    UpdateMany,
+    ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Select, Set, UpdateMany,
     sea_query::{Expr, Func, OnConflict},
 };
 
@@ -609,6 +609,30 @@ pub async fn list_waiting_with<C: ConnectionTrait>(
         .all(conn)
         .await?;
     Ok(decode_rows(models))
+}
+
+/// The org's rows on the installation that ended failed since `since`: count and newest.
+pub async fn refused_since_with<C: ConnectionTrait>(
+    conn: &C,
+    installation_id: &str,
+    org_id: &str,
+    since: i64,
+) -> Result<(u32, Option<SlackAlertMessage>), Error> {
+    let query = live()
+        .filter(Column::InstallationId.eq(installation_id))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::State.eq(enum_text(&MessageState::Failed)?))
+        .filter(Column::UpdatedAt.gte(since));
+    let count = query.clone().count(conn).await?;
+    let newest = query
+        .order_by_desc(Column::UpdatedAt)
+        .limit(1)
+        .all(conn)
+        .await?;
+    Ok((
+        u32::try_from(count).unwrap_or(u32::MAX),
+        decode_rows(newest).into_iter().next(),
+    ))
 }
 
 fn live() -> Select<Entity> {
@@ -1256,5 +1280,53 @@ mod tests {
             [3],
             "a clear the leader records after recovery still counts"
         );
+    }
+
+    #[tokio::test]
+    async fn refused_since_counts_this_orgs_failed_rows_and_returns_the_newest() {
+        let db = db().await;
+        let failed = |dest: &str, firing: i64, updated_at: i64, reason: &str| SlackAlertMessage {
+            state: MessageState::Failed,
+            updated_at,
+            content: Some(SlackMessageContent {
+                failed: Some(reason.into()),
+                ..Default::default()
+            }),
+            ..row(dest, "k", firing)
+        };
+        let rows = [
+            failed("d1", 1, 100, "channel_not_found"),
+            failed("d2", 2, 300, "is_archived"),
+            failed("d1", 3, 200, "not_in_channel"),
+            failed("d1", 4, 50, "too_old"),
+            SlackAlertMessage {
+                org_id: "other".into(),
+                ..failed("d1", 5, 400, "other_org")
+            },
+            SlackAlertMessage {
+                installation_id: "i2".into(),
+                ..failed("d1", 6, 400, "other_installation")
+            },
+            SlackAlertMessage {
+                state: MessageState::Cleared,
+                ..failed("d1", 7, 400, "not_failed")
+            },
+        ];
+        for r in &rows {
+            assert!(insert_firing_with(&db, r).await.unwrap());
+        }
+        let (count, newest) = refused_since_with(&db, "i1", "acme", 100).await.unwrap();
+        assert_eq!(count, 3);
+        let newest = newest.unwrap();
+        assert_eq!(
+            (
+                newest.destination_id.as_str(),
+                newest.updated_at,
+                newest.content.and_then(|c| c.failed).as_deref()
+            ),
+            ("d2", 300, Some("is_archived"))
+        );
+        let (count, newest) = refused_since_with(&db, "i1", "acme", 301).await.unwrap();
+        assert_eq!((count, newest), (0, None));
     }
 }

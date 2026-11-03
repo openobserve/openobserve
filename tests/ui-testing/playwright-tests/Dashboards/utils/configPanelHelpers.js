@@ -310,6 +310,13 @@ export async function setupGaugePanelWithConfig(page, pm, dashboardName, panelNa
   testLogger.info("Gauge panel with config ready", { dashboardName, panelName });
 }
 
+/** Bar gauge chart panel — config sidebar opened and ready. */
+export async function setupBarGaugePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPanel(page, pm, dashboardName, { chartType: "bar-gauge", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Bar gauge panel with config ready", { dashboardName, panelName });
+}
+
 /**
  * GeoMap chart panel — ingests geo data, builds panel with lat/lon fields, opens config sidebar.
  */
