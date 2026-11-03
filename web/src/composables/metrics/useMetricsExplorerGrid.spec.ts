@@ -1203,18 +1203,98 @@ describe("useMetricsExplorerGrid", () => {
         expect(grid.pageSlice.value).toHaveLength(walked);
       });
 
-      it("a new time window earns the look-ahead again", async () => {
+      it("a new time window earns the look-ahead again, from page one rather than on top of the old walk", async () => {
         const grid = await walkedGrid();
 
         grid.setTimeRange({ start_time: NOW_US - 24 * HOUR_US, end_time: NOW_US });
-        expect(grid.pagedCards.value).toHaveLength(walked);
+        expect(grid.pagedCards.value).toHaveLength(INITIAL_PAGE_SIZE);
 
         const asked: number[] = [];
         await emptyVisibleAndDrain(grid, asked);
-        expect(Math.max(...asked)).toBe(walked + SHOW_MORE_MAX_BATCHES * PAGE_SIZE_INCREMENT - 1);
-        expect(grid.pageSlice.value).toHaveLength(
-          walked + SHOW_MORE_MAX_BATCHES * PAGE_SIZE_INCREMENT,
+        expect(Math.max(...asked)).toBe(walked - 1);
+        expect(grid.pageSlice.value).toHaveLength(walked);
+      });
+
+      it("a time change returns to page one; a refresh of the same window keeps the page", async () => {
+        getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
+        const grid = createGrid(t);
+        grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
+        await grid.loadStreams();
+        grid.hideEmptyPanels.value = false;
+        grid.showMore();
+        grid.showMore();
+        const paged = INITIAL_PAGE_SIZE + 2 * PAGE_SIZE_INCREMENT;
+        expect(grid.pageSlice.value).toHaveLength(paged);
+
+        grid.setTimeRange(
+          { start_time: NOW_US - HOUR_US, end_time: NOW_US },
+          { keepPreviews: true },
         );
+        expect(grid.pageSlice.value).toHaveLength(paged);
+
+        grid.setTimeRange({ start_time: NOW_US - 24 * HOUR_US, end_time: NOW_US });
+        expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
+      });
+
+      it("a page reset that leaves the same metric names still earns the look-ahead", async () => {
+        const grid = await walkedGrid();
+
+        // Every metric matches, so the list is unchanged; only the page goes back to one.
+        grid.searchTerm.value = "metric_";
+        await flush();
+        expect(grid.pageSlice.value.length + grid.remainingCount.value).toBe(500);
+
+        await drainWalk(grid, () => NO_SERIES, []);
+        expect(grid.pagedCards.value).toHaveLength(0);
+        expect(grid.pageSlice.value).toHaveLength(walked);
+      });
+
+      it("a walk in flight across an org switch with the same metric names does not commit its budget", async () => {
+        getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
+        const grid = createGrid(t);
+        grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
+        await grid.loadStreams();
+
+        const done = grid.showMore();
+        for (let round = 0; round < 20 && !inFlight.length; round++) await flush();
+        expect(inFlight.length).toBeGreaterThan(0);
+
+        grid.onOrgChange();
+        expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
+        await drainWalk(grid, () => NO_SERIES, []);
+        await done;
+
+        expect(grid.pageSlice.value).toHaveLength(INITIAL_PAGE_SIZE);
+      });
+
+      it("a list change that aborts a walk still auto-advances the new list once the walk ends", async () => {
+        getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
+        const grid = createGrid(t);
+        grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
+        await grid.loadStreams();
+        for (const card of [...grid.pagedCards.value]) {
+          let settled = false;
+          const preview = grid.requestPreview(card).finally(() => (settled = true));
+          for (let round = 0; round < 100 && !settled; round++) {
+            await flush();
+            answerAll(() => NO_SERIES, []);
+          }
+          await preview;
+        }
+
+        // Page one is empty, so the auto-advance's first batch is in flight.
+        for (let round = 0; round < 20 && !inFlight.length; round++) await flush();
+        expect(grid.showingMore.value).toBe(true);
+
+        // metric_0000..0099: its page one is the same known-empty cards, with more behind it.
+        grid.searchTerm.value = "metric_00";
+        await flush();
+        expect(grid.pageSlice.value.length + grid.remainingCount.value).toBe(100);
+        expect(grid.showingMore.value).toBe(true);
+
+        await drainWalk(grid, () => NO_SERIES, []);
+        expect(grid.pagedCards.value).toHaveLength(0);
+        expect(grid.pageSlice.value).toHaveLength(walked);
       });
 
       it("a list change mid-walk stops the remaining batches for the old list", async () => {
