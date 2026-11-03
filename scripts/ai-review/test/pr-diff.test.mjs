@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { parseRawDiff, sizeReasons } from "../src/auto-approve.mjs";
-import { fetchDiff, fetchPinnedDiff, localDiff, pinDiff, prefixDiffPaths } from "../src/pr-diff.mjs";
+import { diffFingerprint, fetchDiff, fetchPinnedDiff, localDiff, pinDiff, prefixDiffPaths } from "../src/pr-diff.mjs";
 
 const DIFF = [
   "diff --git a/src/lib.rs b/src/lib.rs",
@@ -198,4 +198,41 @@ test("a renamed symlink or submodule whose header carries no mode cannot pass as
   });
   assert.match(edited, /^index \S+ 100644$/m);
   assert.deepEqual(parseRawDiff(edited).problems, []);
+});
+
+test("a rebase that moves the PR's lines keeps its diff fingerprint, a changed line does not", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ai-review-fingerprint-"));
+  const git = (...args) => execFileSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], { encoding: "utf-8" });
+  try {
+    git("init", "-q", "-b", "main");
+    const lines = Array.from({ length: 40 }, (_, i) => `line ${i}`);
+    writeFileSync(join(dir, "a.rs"), `${lines.join("\n")}\n`);
+    git("add", ".");
+    git("commit", "-qm", "base");
+    git("checkout", "-qb", "pr");
+    writeFileSync(join(dir, "a.rs"), `${lines.map((l, i) => (i === 30 ? "line 30 changed" : l)).join("\n")}\n`);
+    git("commit", "-qam", "pr change");
+    const before = localDiff(dir, "main", "pr");
+    git("checkout", "-q", "main");
+    writeFileSync(join(dir, "a.rs"), `head 1\nhead 2\nhead 3\n${lines.join("\n")}\n`);
+    git("commit", "-qam", "main moves on");
+    git("checkout", "-q", "pr");
+    git("rebase", "-q", "main");
+    const after = localDiff(dir, "main", "pr");
+    assert.notEqual(before, after, "the rebase must change hunk numbers and blob ids, or this test proves nothing");
+    assert.equal(diffFingerprint(after), diffFingerprint(before));
+    writeFileSync(join(dir, "a.rs"), `head 1\nhead 2\nhead 3\n${lines.map((l, i) => (i === 30 ? "line 30 changed again" : l)).join("\n")}\n`);
+    git("commit", "-qam", "another change");
+    assert.notEqual(diffFingerprint(localDiff(dir, "main", "pr")), diffFingerprint(before));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the fingerprint ignores only blob ids and hunk numbers", () => {
+  const base = "diff --git a/a b/a\nindex 1111111..2222222 100644\n--- a/a\n+++ b/a\n@@ -1,2 +1,2 @@ fn x\n ctx\n-old\n+new\n";
+  assert.equal(diffFingerprint(base.replace("1111111..2222222", "3333333..4444444").replace("-1,2 +1,2 @@ fn x", "-9,2 +12,2 @@ fn y")), diffFingerprint(base));
+  assert.notEqual(diffFingerprint(base.replace("+new", "+newer")), diffFingerprint(base));
+  assert.notEqual(diffFingerprint(base.replace("diff --git a/a b/a", "diff --git a/b b/b")), diffFingerprint(base));
+  assert.match(diffFingerprint(base), /^[0-9a-f]{64}$/);
 });

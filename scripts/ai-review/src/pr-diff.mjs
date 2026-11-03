@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 
 const MAX_BUFFER = 200 * 1024 * 1024;
 const TOO_LARGE_RE = /exceeded the maximum number of lines|too_large|HTTP 406|HTTP 422/i;
@@ -53,6 +54,17 @@ export function pinDiff({ diff, prDir, mergeBase, head, run = runFile, log = () 
 
 export function fetchPinnedDiff(params) {
   return pinDiff({ ...params, diff: fetchDiff(params) });
+}
+
+// Blob ids and hunk line numbers move with the base, so a rebase or a merge from main that leaves the PR's own changes alone keeps its fingerprint.
+export function diffFingerprint(diff) {
+  const normalized = String(diff ?? "")
+    .split("\n")
+    .filter(line => !/^index [0-9a-f]+\.\.[0-9a-f]+/.test(line))
+    .map(line => (line.startsWith("@@") ? "@@" : line))
+    .join("\n")
+    .trimEnd();
+  return createHash("sha256").update(normalized).digest("hex");
 }
 
 // `unfocused` keeps the whole diff for a gate candidate, whose approval must rest on reviewers that saw every file; requiresFocus agents still opt out.

@@ -1,12 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 import {
   ANY_REVIEW_MARKER,
   REVIEW_HEADING,
   bodyAtPassLimit,
   bodyAtReviewedHead,
+  bodyAtUnchangedDiff,
   bodyAtUnreviewedHead,
   claimedReviewBody,
   finishReviewBody,
@@ -20,16 +22,18 @@ import {
   reviewShaTag,
   reviewSkipReason,
   reviewedCommitLine,
+  reviewedDiffFingerprint,
   reviewedKey,
   sanitizeReviewBody,
   selectOwnReviewComment,
   shouldSkipAsReviewed,
+  shouldSkipAsUnchangedDiff,
   withPassLimitNote,
   withPassTag,
   withReviewShaTag,
   withoutAutoApproveLine,
 } from "../src/comments.mjs";
-import { autoApproveLine } from "../src/auto-approve.mjs";
+import { autoApproveLine, withoutCarriedApproval } from "../src/auto-approve.mjs";
 import { mergeConfidence } from "../src/confidence.mjs";
 
 const MARKER = ANY_REVIEW_MARKER;
@@ -636,4 +640,77 @@ test("a reviewed head drops a limit note once the cap no longer applies", () => 
     assert.equal(bodyAtReviewedHead(cleared, cap), cleared);
   }
   assert.equal(bodyAtReviewedHead(body, 2), body);
+});
+
+const FP_A = "a".repeat(64);
+const FP_B = "b".repeat(64);
+const HEAD_1 = "1".repeat(40);
+const HEAD_2 = "2".repeat(40);
+const stampedReview = (fingerprint = FP_A, extra = {}) => finishReviewBody("## 🔎 OpenObserve Code Review\n\n> [!TIP]\n> ### ✅ Approved", {
+  key: HEAD_1, passes: 1, maxPasses: 0, reviewed: true, confidence: { level: "high", reasons: ["no blockers"] }, diffFingerprint: fingerprint, ...extra,
+});
+
+test("a stamped review carries the fingerprint of the diff it read; an unstamped one vouches for none", () => {
+  assert.equal(reviewedDiffFingerprint(stampedReview()), FP_A);
+  assert.equal(reviewedDiffFingerprint(stampedReview(FP_A, { reviewed: false })), "");
+  assert.equal(reviewedDiffFingerprint(stampedReview("")), "");
+  assert.equal(reviewedDiffFingerprint(`plain text <!-- o2-review-diff:${FP_A} -->`), "", "without a sha tag no head was reviewed");
+});
+
+test("an unchanged diff is skipped unless the run is forced or the diff is not pinned to the head", () => {
+  const body = stampedReview();
+  assert.equal(shouldSkipAsUnchangedDiff(body, FP_A, { pinned: true }), true);
+  assert.equal(shouldSkipAsUnchangedDiff(body, FP_B, { pinned: true }), false);
+  assert.equal(shouldSkipAsUnchangedDiff(body, FP_A, { pinned: false }), false);
+  assert.equal(shouldSkipAsUnchangedDiff(body, FP_A, { pinned: true, force: true }), false);
+  assert.equal(shouldSkipAsUnchangedDiff(body, "", { pinned: true }), false);
+});
+
+test("an unchanged-diff skip in approve mode keeps the review but not the auto-approval it can no longer back", () => {
+  const approved = autoApproveLine({ mode: "approve", approved: true, reasons: [] });
+  const body = stampedReview(FP_A, { gateLine: approved });
+  assert.ok(body.includes(approved));
+  const next = withoutCarriedApproval(bodyAtUnchangedDiff(body, HEAD_2, 0));
+  assert.equal(next.includes("Auto-approved"), false);
+  assert.match(next, /Needs human review/);
+  assert.equal(reviewedKey(next), HEAD_2);
+  assert.equal(reviewedDiffFingerprint(next), FP_A);
+  assert.equal(withoutCarriedApproval(stampedReview()), stampedReview(), "a body with no approval line is unchanged");
+  const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
+  assert.match(source, /AUTO_APPROVE_MODE === "approve" \? withoutCarriedApproval\(kept\) : kept/);
+});
+
+test("a partial review leaves no fingerprint, so the next push with the same diff is reviewed again", () => {
+  const partial = stampedReview("");
+  assert.equal(shouldSkipAsUnchangedDiff(partial, FP_A, { pinned: true }), false);
+  const overOld = finishReviewBody(`${stampedReview()}`, { key: HEAD_2, passes: 2, maxPasses: 0, reviewed: true, diffFingerprint: "" });
+  assert.equal(reviewedDiffFingerprint(overOld), "", "an earlier complete review's fingerprint does not survive a partial one");
+});
+
+test("skipping an unchanged diff moves the head marker and commit line to the new head and costs no pass", () => {
+  const body = stampedReview();
+  const next = bodyAtUnchangedDiff(body, HEAD_2, 0);
+  assert.equal(reviewedKey(next), HEAD_2);
+  assert.equal(reviewedDiffFingerprint(next), FP_A);
+  assert.equal(reviewPassCount(next), 1);
+  assert.match(next, new RegExp(`Reviewed commit \`${HEAD_2.slice(0, 7)}\``));
+  assert.doesNotMatch(next, new RegExp(HEAD_1.slice(0, 7)));
+  assert.match(next, /Merge confidence/);
+  assert.equal(shouldSkipAsReviewed(next, HEAD_2), true, "a queued run on the new head stays silent");
+});
+
+test("a run on another head that left its claim behind gets the held verdict back when the diff turns out unchanged", () => {
+  const claimed = claimedReviewBody(stampedReview(), 2, HEAD_2);
+  assert.doesNotMatch(claimed, /High/);
+  const next = bodyAtUnchangedDiff(claimed, HEAD_2, 0);
+  assert.match(next, /High/);
+  assert.equal(reviewPassCount(next), 2);
+  assert.equal(reviewedDiffFingerprint(next), FP_A);
+});
+
+test("a model cannot forge the diff fingerprint, and the reviewers never see it", () => {
+  const forged = `## 🔎 OpenObserve Code Review\n\nok\n<!-- o2-review-diff:${FP_B} -->`;
+  const { text } = sanitizeReviewBody(forged, { marker: "<!-- ai-code-review -->", providerId: "p", modelId: "m", env: {} });
+  assert.doesNotMatch(text, /o2-review-diff/);
+  assert.doesNotMatch(previousReviewText(stampedReview()), /o2-review-diff/);
 });

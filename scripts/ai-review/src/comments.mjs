@@ -6,6 +6,8 @@ export const REVIEW_PASS_TAG = "<!--\\s*o2-review-pass:(\\d+)\\s*-->";
 export const REVIEW_SHA_TAG = "<!--\\s*o2-review-sha:([^\\s<>]+)\\s*-->";
 // The verdict a later head's line replaced, kept in case the head returns to the reviewed commit.
 export const REVIEW_HELD_TAG = "<!--\\s*o2-review-held:([^\\s<>]+)\\s*-->";
+// Fingerprint of the diff the sha tag's review read, so a later head with the same changes (rebase, merge from main) needs no new review.
+export const REVIEW_DIFF_TAG = "<!--\\s*o2-review-diff:([0-9a-f]{64})\\s*-->";
 // Matched as a pattern so a retired leg's comment is still adopted; `[redacted]` is what redaction left in comments whose marker named the provider.
 export const ANY_REVIEW_MARKER = "<!--\\s*ai-code-review[a-z0-9-]*(?:\\[redacted\\])?\\s*-->";
 // Tags a comment that stands in for a review (post-paired-pointer.sh, the "key not set" notice, the in-progress claim); it is replaced in place but is not a previous review.
@@ -26,7 +28,7 @@ const AUTO_APPROVE_LINE_RE = /^(?:[^\w\n`]|<\/?[a-z]+>)*(?:auto[- ]?approved|nee
 const FORGED_LINE_RE = /mergeconfidence|autoapproved|needshumanreview|reviewedcommit/;
 // The fixed head of a finding line, glyph and location then category, which leaves no room for a status phrase ahead of the category.
 const FINDING_LINE_RE = /^\s*- (?:[^\w\s`*<]+\s+)?(?:`[^`\n]+`\s+)?\*\*\[[^\]\n]+\]\*\*/;
-const TRAILING_TAGS_RE = /(?:\s*<!--\s*o2-review-(?:(?:sha|held):[^\s<>]+|pass:\d+)\s*-->)+\s*$/i;
+const TRAILING_TAGS_RE = /(?:\s*<!--\s*o2-review-(?:(?:sha|held|diff):[^\s<>]+|pass:\d+)\s*-->)+\s*$/i;
 const HTML_COMMENT_RE = /<!--[\s\S]*?--!?>/g;
 const MARKUP_RE = /<!--[\s\S]*?--!?>|<[^>]*>|&[a-z]+;/gi;
 // "summary" stays out: it would strip the <summary> of the findings fold, and a leaked finding field sits inside a stripped <finding> block.
@@ -85,6 +87,31 @@ function withoutTag(body, tag) {
 
 export function withReviewShaTag(body, key) {
   return `${withoutTag(body, REVIEW_SHA_TAG)}\n${reviewShaTag(key)}`;
+}
+
+// Only a body whose sha tag names a reviewed head can vouch for a diff.
+export function reviewedDiffFingerprint(body) {
+  if (!reviewedKey(body)) return "";
+  return (body || "").match(new RegExp(REVIEW_DIFF_TAG, "i"))?.[1] ?? "";
+}
+
+export function withReviewDiffTag(body, fingerprint) {
+  const bare = withoutTag(body, REVIEW_DIFF_TAG);
+  return fingerprint ? `${bare}\n<!-- o2-review-diff:${fingerprint} -->` : bare;
+}
+
+// A forced run (dispatch, force_full, ignore_pass_limit) always reviews; otherwise a pinned diff equal to the reviewed one is skipped.
+export function shouldSkipAsUnchangedDiff(body, fingerprint, { pinned = false, force = false } = {}) {
+  if (force || !pinned || !fingerprint) return false;
+  return reviewedDiffFingerprint(body) === fingerprint;
+}
+
+// Costs no pass: the review stays as it was and now names the new head, so the next push compares against it too.
+export function bodyAtUnchangedDiff(body, key, maxPasses) {
+  const restored = bodyAtReviewedHead(body, maxPasses);
+  const line = reviewedCommitLine(key, reviewPassCount(restored), maxPasses);
+  const relined = restored.search(REVIEWED_COMMIT_LINE_RE) !== -1 ? restored.replace(REVIEWED_COMMIT_LINE_RE, `\n\n${line}`) : restored;
+  return withReviewShaTag(relined, key);
 }
 
 export function shouldSkipAsReviewed(body, key, { ignorePassLimit = false, forceFull = false } = {}) {
@@ -208,19 +235,19 @@ export function bodyAtPassLimit(body, maxPasses, head) {
 }
 
 // The sha tag says that exact commit was read and stops it being reviewed again, so a run that cannot prove that leaves it off.
-export function finishReviewBody(body, { key, passes, maxPasses, reviewed, confidence, gateLine = "" }) {
+export function finishReviewBody(body, { key, passes, maxPasses, reviewed, confidence, gateLine = "", diffFingerprint = "" }) {
   const stamped = reviewed && key;
   const lines = [confidence ? mergeConfidenceLine(confidence) : "", gateLine].filter(Boolean);
   let out = insertAfterCallout(body, lines.join("\n\n"));
   if (stamped) out += `\n\n${reviewedCommitLine(key, passes, maxPasses)}`;
   if (passLimitReached(passes, maxPasses)) out += `\n\n${passLimitNote(maxPasses)}`;
-  if (stamped) out = withReviewShaTag(out, key);
+  if (stamped) out = withReviewDiffTag(withReviewShaTag(out, key), diffFingerprint);
   return withPassTag(out, passes);
 }
 
 // What the reviewers see as <previous_review>: the review alone, none of the runner's bookkeeping.
 export function previousReviewText(body) {
-  return [REVIEW_SHA_TAG, REVIEW_PASS_TAG, REVIEW_HELD_TAG].reduce(withoutTag, stripRunnerLines(String(body ?? "")));
+  return [REVIEW_SHA_TAG, REVIEW_PASS_TAG, REVIEW_HELD_TAG, REVIEW_DIFF_TAG].reduce(withoutTag, stripRunnerLines(String(body ?? "")));
 }
 
 // Yields the text after each pass, last the first that changed nothing: a removal can splice a new match out of what surrounds it.
@@ -303,7 +330,7 @@ function unwrapJsonBody(body) {
 export function sanitizeReviewBody(body, { marker, providerId, modelId, env }) {
   if (!body) return { text: "", secretHits: 0 };
   const anyMarker = new RegExp(ANY_REVIEW_MARKER, "gi");
-  const runnerTags = new RegExp(`${ANY_REVIEW_MARKER}|${REVIEW_PASS_TAG}|${REVIEW_SHA_TAG}|${REVIEW_HELD_TAG}`, "gi");
+  const runnerTags = new RegExp(`${ANY_REVIEW_MARKER}|${REVIEW_PASS_TAG}|${REVIEW_SHA_TAG}|${REVIEW_HELD_TAG}|${REVIEW_DIFF_TAG}`, "gi");
 
   let cleaned = unwrapJsonBody(body)
     .replace(/\\n/g, "\n")

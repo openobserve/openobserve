@@ -1,7 +1,7 @@
 # AI Code Review (`scripts/ai-review`)
 
 Automated PR review that posts a single consolidated comment on every pull request. Driven by
-`.github/workflows/ai-code-review.yml` → `run-review.mjs`, using Claude Sonnet 5.5 (`anthropic-review/claude-sonnet-5-5`) at high effort with adaptive thinking via `opencode`.
+`.github/workflows/ai-code-review.yml` → `run-review.mjs`, using Claude Sonnet 5.5 (`anthropic-review/claude-sonnet-5-5`) with adaptive thinking via `opencode`, at `high` effort unless the `AI_REVIEW_EFFORT` variable says otherwise (see Effort below).
 
 The posted comment is branded **OpenObserve Code Reviewer**. Branding is *cosmetic + identity
 only* — it does not change what the reviewer finds or decides.
@@ -18,7 +18,7 @@ whose marker still names the provider, such as o2-enterprise's older one, keeps 
 ## How it works (one paragraph)
 
 On each PR the workflow fetches the diff, filters noise, picks a risk tier (`trivial` / `lite` /
-`full`), runs the tier's specialist agents (security, correctness, code-quality, performance,
+`full` / `test-only` / `ci-only`), runs the tier's specialist agents (security, correctness, code-quality, performance,
 documentation) in parallel — plus any *conditional* agent whose domain the diff touches (frontend,
 qa, and release for migrations, `Cargo.toml`/`package.json`, `src/config/src/config.rs`, `.github/`,
 `deploy/` and Docker files) — and a coordinator consolidates their findings into one comment with
@@ -39,6 +39,45 @@ and keeps a finding raised by any pass, merging duplicates; the fallback comment
 and folds findings at the same file and nearby line when one title's words contain the other's (two P0/P1 blockers fold only on the same title). An area counts as
 reviewed when any of its passes finished, and the comment notes a lost pass. Each pass is billed,
 so the review costs about M times one pass; reviewer spans carry `review.pass`.
+
+### Risk tiers
+
+`assessRiskTier` in `run-review.mjs` picks the tier. More than 50 files, or any path that looks
+security-sensitive (`auth`, `token`, `secret`, `crypto`, `password`, `oauth`, `unsafe`, `acme`,
+`cert`), is `full`. Otherwise a PR whose every file is test code (`tests/`, `test/`, `e2e/`,
+`fixtures/`, `*.spec.*`, `*.test.*`, `*_test.rs`; `isTestOnlyPath` in `src/selection.mjs`) is
+`test-only` and runs qa and correctness, whatever its size. A PR whose every file is CI
+definition (`.github/workflows/**`, `.github/actions/**` or a top-level `.github/*.yml`;
+`isCiOnlyPath`) is `ci-only` and runs security and release. Scripts, including this engine and the
+two opencode configs, are code and take the size tiers below. Everything else is `trivial` (at most 10
+lines), `lite` (at most 100 lines) or `full`. Conditional agents are added on top as before, and
+`force_full` still forces `full`.
+
+### Effort
+
+`AI_REVIEW_EFFORT` (`low`, `medium`, `high`, `xhigh` or `max`, default `high`) sets the reviewers' effort, and
+`AI_REVIEW_COORDINATOR_EFFORT` the coordinator's (default: the reviewers' value). The workflow
+passes them as `REVIEW_MODEL_VARIANT` and `REVIEW_COORDINATOR_VARIANT`, and the matrix carries no
+variant of its own, so the variables are the only source. Each value is a variant of
+`claude-sonnet-5-5` in both opencode configs, which opencode sends as adaptive thinking plus
+`"output_config": { "effort": "<value>" }`. A value that is not a declared variant stops the run
+before it claims a pass or calls the model. Spans carry the effort in
+`gen_ai.request.reasoning_effort`.
+
+### PRs that are never reviewed
+
+The workflow's `Skip PRs with nothing to review` step runs right after the engine checkout and
+before anything is installed. It lists the PR's files (a rename lists its old path too) and the
+author login, committer login and signature state of each commit, and runs `skip-check.mjs` (`nothingToReviewReason` in
+`src/selection.mjs`). A PR is skipped, with nothing posted and no model called, when its author is
+`dependabot[bot]` or `renovate[bot]` and every commit is authored by that same bot, committed by
+it or by `web-flow` (how GitHub commits a bot's API-made commits) and carries a signature GitHub
+verified, when every file is docs (`*.md` or `docs/**`, but not markdown under `scripts/ai-review/`, `.claude/`, `.agents/`,
+`.github/` or an `AGENTS.md`/`CLAUDE.md`, which steers the AI or CI), or when every file is one the
+translation workflow commits (`web/src/locales/languages/*.json` other than `en-US.json`, which a
+person writes, and `scripts/translations/.translation_state.json`). Every other bot or App author
+is reviewed, and so is a dependency-bot PR someone else pushed to. A manual dispatch always
+reviews, and so does a run where the file or commit listing, or `skip-check.mjs` itself, fails.
 
 The coordinator also lists the findings it kept in a hidden JSON block, which the runner strips
 from the comment. Kept P0, P1 and P2 findings whose `file:line` is an added or context line of the
@@ -64,6 +103,21 @@ from `MERGE_BASE_SHA` and `HEAD_SHA` (both sides of a paired review), because th
 branch as it is now. If that cannot be done, or no reviewer finished (each one failed or returned
 nothing parseable), the run writes no tag and names no commit, so that commit can be reviewed again.
 A run where no reviewer finished also reports `Not reviewed` and fails the check.
+
+A stamped review that was complete (every reviewer pass finished without a failure, timeout or
+wrap-up, and the coordinator merged them without falling back; `reviewComplete` in
+`src/passes.mjs`) also records a fingerprint of the filtered diff it read, in a hidden
+`o2-review-diff` tag (`diffFingerprint` in `src/pr-diff.mjs`: a SHA-256 of the diff with blob ids
+and hunk line numbers removed, so a rebase or a merge from main that leaves the PR's own changed
+and context lines alone keeps it). When a new head's pinned diff has the same fingerprint, the run
+skips with `unchanged_diff` before any model call: it uses no pass, keeps the review and its merge
+confidence, and moves the `o2-review-sha` tag and the `Reviewed commit` line to the new head. The
+check runs ahead of the review cap, so such a push is skipped, not refused, after the cap. A manual
+dispatch (`REVIEW_MANUAL_RUN`), `force_full` or `ignore_pass_limit` always reviews, and so does a
+diff that is not pinned to the head. In `approve` mode the skip still dismisses the earlier
+approval, and the kept review's `Auto-approved` line becomes `Needs human review`, because the
+fingerprint ignores lockfiles and other noise the approval gate checks. A partial review records no fingerprint, so the next push
+reviews again even when its diff is the same.
 
 There is no cap on reviews per PR unless the variable `AI_REVIEW_MAX_PASSES` is a positive integer;
 unset, empty, `0` or an invalid value means no cap. Reviews are counted either way, in a hidden
@@ -204,8 +258,8 @@ A PR must never be able to run code next to the review secrets or weaken its own
 | `src/opencode.mjs` env allowlist | `opencode serve` runs in `./pr` with only `PATH`, a fresh temp `HOME`/XDG dirs, `OPENCODE_CONFIG` (this repo's `opencode.jsonc` or `opencode.ci.jsonc` from `./engine`), the `OPENCODE_*` disable flags, a random server password and the one provider key. No `GH_*`, `GITHUB_*`, `ACTIONS_*`, `RUNNER_*` or `O2_*` variables. |
 | Config selection | `REVIEW_OPENCODE_CONFIG` = `default` (`opencode.jsonc`) or `ci-full` (`opencode.ci.jsonc`); any other value stops the run. The workflow sets `ci-full`, which keeps `approve` ineligible (see Auto-approve). |
 | `opencode.jsonc` permissions | Each `ai-review-*` agent: deny `*`, then allow `read`, `glob`, `grep`; `external_directory` denied. A `provider.use` policy allows only `anthropic-review`. LSP, formatters, snapshots and sharing are off. |
-| `opencode.ci.jsonc` permissions | Same provider, model and agents, but each agent allows `*`: shell, edit, write and webfetch run with no prompt. The PR checkout is untrusted input to an agent that can run commands, and the provider key is in the opencode process environment, so a shell command can read it. |
-| Startup self-check | Refuses to review if any agent is missing, any non-built-in plugin or MCP server loaded, or a granted tool's plugin is not active. Under `default` it also refuses any agent that resolves to allow a tool other than `read`/`glob`/`grep` or any outside directory; under `ci-full` it refuses an agent that does not allow every tool without asking. Permission prompts are rejected under `default` and approved once under `ci-full`. |
+| `opencode.ci.jsonc` permissions | Same provider, model, variants and agents. Each agent allows `*` (read, glob, grep, edit, write run with no prompt), then denies `webfetch`, `websearch`, `subagent`, `question` (which would wait on an answer nobody in CI gives), `execute` (opencode 2.2.0's Code Mode: it runs JavaScript with `fetch`, so it would reach the network past the `webfetch` deny) and `skill` (reviewers read the skill copies with `read`). `shell` is kept to an allowlist: `git diff`, `git log`, `git show`, `git blame`, `git ls-files`, `git status` (each also after `git --no-pager`), `git rev-parse`, `git merge-base`, `git cat-file -p`/`-t`/`-s`, `rg`, `grep`, `cat`, `ls`, `head`, `tail`, `find`, `sed -n` and `wc`. Later deny rules refuse `find` with `-exec`, `-execdir`, `-ok`, `-okdir`, `-delete`, `-fprint`, `-fprint0`, `-fprintf` or `-fls` as a separate word; `tail -f`, `-F` and `--follow`; any absolute path, `../` path, `=/` argument or `environ` in `cat`, `head`, `tail`, `grep`, `rg`, `sed` and `wc` (so `/proc/*/environ` and `/dev/*` are not read through them); and any command containing `>` (an output redirect). `git grep` is not allowed (its `-O` runs a pager command). opencode checks every command in a pipeline, `&&` or `;` chain and inside `$(...)` or backticks, so the command runs only when every part is allowed, and a denied command fails outright, without a prompt. The allowlist stops builds, installs and long exploration. It is not a sandbox: `rg --pre` or a GNU `sed` `e` command can still run a program, a glob or a relative path inside the checkout is not inspected, and edit/write stay allowed in the disposable checkout. The PR checkout is untrusted input, and the provider key is in the opencode process environment, so a command that gets past these rules can read it. |
+| Startup self-check | Refuses to review if any agent is missing, any non-built-in plugin or MCP server loaded, or a granted tool's plugin is not active. Under `default` it also refuses any agent that resolves to allow a tool other than `read`/`glob`/`grep` or any outside directory; under `ci-full` it refuses an agent that does not allow read, glob, grep, edit and write without asking, that leaves webfetch, websearch, subagent, question, execute or skill enabled, or whose shell is denied or not restricted to an allowlist. Permission prompts are rejected under `default` and approved once under `ci-full`. |
 | `src/comments.mjs` | The previous review is only ever a marker comment by the reviewer app (`REVIEW_BOT_LOGIN` = `<app-slug>[bot]`), read across every page; anyone else's comment carrying the marker is never fed to the reviewers or edited. When the app token cannot be minted the review posts as `github-actions[bot]`, which any same-repo PR workflow can also post as, so that run uses no previous review and posts a fresh comment. |
 | `src/scrub.mjs` | Before posting: redacts values of secret-named env vars and token-shaped strings (inside code too), breaks forged `<!-- o2-review` markers, and neutralises `@mentions` outside code. |
 
@@ -229,6 +283,19 @@ poll for the session's idle record as a safety net), then reads the last assista
 blocking request that waits for the run dies at undici's 300 s `headersTimeout` ("fetch failed").
 A timed-out agent is interrupted server-side; transient provider errors are retried at most twice,
 each in a fresh session.
+
+A wrap-up keeps a long session's findings instead of discarding them at the 20-minute timeout. A
+reviewer still running 3 minutes before its timeout is interrupted, and once opencode confirms the
+interrupt the same session gets one more prompt asking for its verified findings in the required
+format with no further tools. The interrupt keeps the steps already run, so the answer comes from
+what the agent read, mostly from cache. If the interrupt is not confirmed, or the answer does not
+arrive in time, the session ends as a timeout, as before; a run that finished on its own just
+before the interrupt keeps its own answer. No agent sets opencode's `steps` cap: on 2.2.0 the capped
+turn ends the request on an assistant message (its "maximum steps reached" text), a prefill the
+model rejects with a 400 when thinking is on; `test/integration/opencode-sandbox.test.mjs` pins
+that. Reviewer
+spans carry `review.wrapped_up`. Sessions shorter than 6 minutes, and the coordinator, get no
+wrap-up.
 
 The binary is pinned in `opencode-pin.env` and installed by `install-opencode.sh`, which verifies
 the release asset's SHA-256. Bump both lines together, to a release at least 14 days old (waived

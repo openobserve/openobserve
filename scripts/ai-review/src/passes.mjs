@@ -78,6 +78,12 @@ export function lostPasses(results) {
   return results.filter(r => !r.skipped && r.passesFinished > 0 && r.passesFinished < r.passes);
 }
 
+// Only a review with every pass finished in time and a real coordinator merge may let the next push with the same diff skip.
+export function reviewComplete(passResults, coordinatorResult) {
+  if (!coordinatorResult || coordinatorResult.fallback) return false;
+  return passResults.every(r => r.skipped || (reviewerFinished(r) && !r.wrappedUp));
+}
+
 // Written by code like the failed-reviewers line, so a reader learns an area got less scrutiny than the rest.
 export function lostPassesNote(results) {
   const lost = lostPasses(results);
