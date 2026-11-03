@@ -386,8 +386,7 @@ pub(crate) async fn location_for_write(
     }
 }
 
-/// Response for a location create: private rows carry the org's `o2syn_`
-/// token and a ready-to-paste agent install command for the setup drawer.
+/// Private rows carry the org's `o2syn_` token, withheld without PUT on the default folder.
 #[derive(Debug, Serialize)]
 pub struct CreateLocationResponse {
     pub location: synthetics_locations::SyntheticsLocationRecord,
@@ -535,7 +534,7 @@ pub struct LocationDetail {
     pub location: LocationEntry,
     pub agents: Vec<LocationAgentInfo>,
     pub checks: Vec<LocationCheckSummary>,
-    /// Install command for private rows (setup drawer's "copy" action).
+    /// Install command for private rows; withheld without PUT on the default folder.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub install: Option<String>,
 }

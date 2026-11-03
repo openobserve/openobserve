@@ -54,6 +54,8 @@ const organizationObj = {
   rumToken: {
     rum_token: "",
   },
+  // the RUM token read returned 403: the setup card withholds its snippet and the header its actions
+  rumTokenForbidden: false,
   // Which traces stream contains a given (canonical 32-char) trace id, and the
   // range it ran in when the time index knew — see useCorrelatedTracesStream.
   // knownStreams is the org-level fact ("streams that have ever contained a
@@ -220,6 +222,9 @@ const store = createStore({
     },
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
+    },
+    setRUMTokenForbidden(state, payload) {
+      state.organizationData.rumTokenForbidden = payload;
     },
     setCorrelatedTracesStream(
       state,
@@ -493,6 +498,9 @@ const store = createStore({
     },
     setOrganizationPasscodeForbidden(context, payload) {
       context.commit("setOrganizationPasscodeForbidden", payload);
+    },
+    setRUMTokenForbidden(context, payload) {
+      context.commit("setRUMTokenForbidden", payload);
     },
     resetOrganizationData(context, payload) {
       context.commit("resetOrganizationData", payload);

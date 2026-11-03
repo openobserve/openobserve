@@ -6026,6 +6026,7 @@
     "resetRUMTokenLabel": "Đặt lại Token RUM",
     "generateRUMTokenLabel": "Tạo Token RUM",
     "generateRUMTokenMessage": "Tạo Token RUM để kích hoạt RUM cho tổ chức của bạn.",
+    "rumTokenForbiddenMessage": "Vai trò của bạn không thể xem token RUM. Hãy yêu cầu quản trị viên cung cấp đoạn mã thiết lập RUM, hoặc vai trò cần thiết để xem nó tại đây.",
     "rumPlatform": "Nền tảng",
     "rumPlatformBrowser": "Trình duyệt",
     "rumPlatformReactNative": "React Native",
@@ -6185,7 +6186,7 @@
       },
       "installOneClick": "Thêm vào {client}",
       "skillsLabel": "Thêm kỹ năng {brand} (không bắt buộc)",
-      "skillsHint": "Dạy Trợ lý AI của bạn cách truy vấn, cảnh báo và tạo bảng điều khiển trong {brand}, để tận dụng tốt hơn các công cụ MCP. Chạy nó trong dự án của bạn; nó sẽ cài đặt vào mọi công cụ AI tìm thấy trên máy của bạn.",
+      "skillsHint": "Hướng dẫn trợ lý AI của bạn cách truy vấn, đặt cảnh báo và tạo bảng điều khiển trong {brand}, để nó tận dụng tốt hơn các công cụ MCP. Hãy chạy nó trong dự án của bạn; nó sẽ cài đặt chúng vào mọi công cụ AI mà nó tìm thấy trên máy của bạn.",
       "skillsRepo": "Xem các kỹ năng trên {host}"
     },
     "manageTokensBtnLabel": "Quản lý mã thông báo",

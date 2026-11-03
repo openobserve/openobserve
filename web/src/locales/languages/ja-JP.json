@@ -6026,6 +6026,7 @@
     "resetRUMTokenLabel": "RUM トークンをリセット",
     "generateRUMTokenLabel": "RUM トークンを生成",
     "generateRUMTokenMessage": "組織でRUMを有効にするにはRUMトークンを生成してください。",
+    "rumTokenForbiddenMessage": "あなたのロールでは RUM トークンを表示できません。管理者に RUM のセットアップスニペット、またはここで表示するために必要なロールを確認してください。",
     "rumPlatform": "プラットフォーム",
     "rumPlatformBrowser": "ブラウザ",
     "rumPlatformReactNative": "React Native",
@@ -6185,7 +6186,7 @@
       },
       "installOneClick": "{client} に追加",
       "skillsLabel": "{brand} スキルを追加（任意）",
-      "skillsHint": "{brand} でのクエリ、アラート、ダッシュボードの作成方法を AI アシスタントに教えることで、MCP ツールをより活用できるようになります。プロジェクトで実行すると、マシン上で見つかったすべての AI ツールにインストールされます。",
+      "skillsHint": "AI アシスタントが {brand} でクエリ、アラート、ダッシュボードの構築を行う方法を教えるため、MCP ツールをより活用できるようになります。プロジェクトで実行すると、マシン上で検出されたすべての AI ツールにインストールされます。",
       "skillsRepo": "{host} でスキルを表示"
     },
     "manageTokensBtnLabel": "トークンの管理",

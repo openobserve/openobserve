@@ -6026,6 +6026,7 @@
     "resetRUMTokenLabel": "Reimposta il token RUM",
     "generateRUMTokenLabel": "Genera token RUM",
     "generateRUMTokenMessage": "Genera token RUM per abilitare RUM per la tua organizzazione.",
+    "rumTokenForbiddenMessage": "Il tuo ruolo non può visualizzare il token RUM. Chiedi a un amministratore lo snippet di configurazione RUM, oppure il ruolo necessario per vederlo qui.",
     "rumPlatform": "Piattaforma",
     "rumPlatformBrowser": "Browser",
     "rumPlatformReactNative": "React Native",
@@ -6185,7 +6186,7 @@
       },
       "installOneClick": "Aggiungi a {client}",
       "skillsLabel": "Aggiungi la skill {brand} (opzionale)",
-      "skillsHint": "Insegna al tuo Assistente AI come eseguire query, creare avvisi e dashboard in {brand}, così può sfruttare al meglio gli strumenti MCP. Eseguilo nel tuo progetto: le installa in ogni strumento AI che trova sul tuo computer.",
+      "skillsHint": "Insegna al tuo Assistente AI come eseguire query, creare avvisi e dashboard in {brand}, così ottiene di più dagli strumenti MCP. Eseguilo nel tuo progetto; li installa in ogni strumento AI che trova sulla tua macchina.",
       "skillsRepo": "Visualizza le skill su {host}"
     },
     "manageTokensBtnLabel": "Gestisci i token",
