@@ -270,7 +270,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     runs-on:
       labels: ubicloud-standard-8
     permissions:
@@ -313,7 +313,7 @@ jobs:
         working-directory: web
         env:
           UI_SHARD_BALANCE: '1'
-          SHARD: ${{ matrix.shard }}/4
+          SHARD: ${{ matrix.shard }}/8
           # The PR run already gated coverage; the queue only needs pass/fail.
           NO_COVERAGE: ${{ github.event_name == 'merge_group' }}
         run: |
