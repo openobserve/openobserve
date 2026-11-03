@@ -592,6 +592,19 @@ describe("AddToDashboard — onSubmit validation", () => {
       query: { dashboard: "dash-1", folder: "folder-1", tab: "tab-1" },
     });
   });
+
+  it("closes itself after a successful add, so a kept-alive page does not reopen with it", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+
+    await wrapper.vm.onSubmit({ panelTitle: "New Panel" });
+    await flushPromises();
+
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+  });
 });
 
 describe("AddToDashboard — error handling in addPanelToDashboard", () => {
@@ -647,6 +660,20 @@ describe("AddToDashboard — error handling in addPanelToDashboard", () => {
 
     // The finally block always emits save
     expect(wrapper.emitted("save")).toBeTruthy();
+  });
+
+  it("stays open when addPanel throws, so the user can retry", async () => {
+    mockAddPanel.mockRejectedValue(new Error("failure"));
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+
+    await wrapper.vm.onSubmit({ panelTitle: "Panel" });
+    await flushPromises();
+
+    expect(wrapper.emitted("update:open")).toBeFalsy();
   });
 
   it("calls dismiss function in finally block", async () => {

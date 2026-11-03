@@ -118,6 +118,19 @@ export default defineComponent({
       selectedDashboard.value = dashboardId ?? null;
     };
 
+    // Registered before the list watcher, whose immediate run on a cached list selects during setup.
+    watch(
+      () => selectedDashboard.value,
+      (dashboardId) => {
+        const dashboard = dashboardList.value.find((d: any) => d.value === dashboardId);
+        // emit {label, value} for backward compatibility with parents
+        emit(
+          "dashboard-selected",
+          dashboard ?? (dashboardId ? { label: dashboardId, value: dashboardId } : null),
+        );
+      },
+    );
+
     // Each (re)load: keep a still-valid selection, else fall back to the first
     // row — covers mount, folder switch and background revalidation alike.
     watch(
@@ -132,18 +145,6 @@ export default defineComponent({
         emit("dashboard-list-updated");
       },
       { immediate: true },
-    );
-
-    watch(
-      () => selectedDashboard.value,
-      (dashboardId) => {
-        const dashboard = dashboardList.value.find((d: any) => d.value === dashboardId);
-        // emit {label, value} for backward compatibility with parents
-        emit(
-          "dashboard-selected",
-          dashboard ?? (dashboardId ? { label: dashboardId, value: dashboardId } : null),
-        );
-      },
     );
 
     return {

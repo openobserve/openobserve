@@ -292,6 +292,8 @@ export default defineComponent({
             : t("metrics.addToDashboardPage.panelAdded"),
           variant: "success",
         });
+        // A kept-alive caller page would show the dialog still open on return.
+        emit("update:open", false);
         router.push({
           name: "viewDashboard",
           query: { dashboard: dashboardId, folder: folderId, tab: tabId },
