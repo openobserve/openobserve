@@ -69,6 +69,8 @@ use search::{
 };
 use svix_ksuid::Ksuid;
 
+#[cfg(test)]
+use crate::alerts::notifications::{apply_custom_template, render, resolve_content};
 #[cfg(feature = "enterprise")]
 use crate::auth::{check_folder_write_permissions, check_permissions};
 use crate::{
@@ -76,16 +78,14 @@ use crate::{
         QueryConditionExt, build_sql,
         destinations::{self, note_skipped},
         notifications::{
-            NotificationContext, RenderedMessage, apply_custom_template, build_row_columns, chart,
+            NotificationContext, RenderedMessage, build_row_columns, chart,
             custom::{VarValue, process_variable_replace},
             derive_channel_format,
             format::ChannelFormat,
             jira,
             modifiers::{PreparedTemplate, prepare_modifiers},
             platform::{self, platform_of},
-            render,
             render::slack as slack_render,
-            resolve_content,
             send::{self, org_member_email},
         },
     },
@@ -3280,47 +3280,6 @@ async fn send_to_destination(
         send::Subject::Alert(&alert.name),
         dest_type,
         template,
-        ctx,
-    )
-    .await
-}
-
-/// Render `ctx` with the alert's template, else the destination's, else the org default, and send
-/// it.
-#[cfg(feature = "enterprise")]
-pub(crate) async fn send_templated_to_destination(
-    org_id: &str,
-    sns_subject: &str,
-    dest_name: &str,
-    alert_template: Option<&Template>,
-    ctx: &mut NotificationContext,
-) -> Result<String, anyhow::Error> {
-    let (dest, dest_template) = destinations::get_with_template(org_id, dest_name).await?;
-    let Module::Alert {
-        destination_type, ..
-    } = dest.module
-    else {
-        anyhow::bail!("not an alert destination");
-    };
-    let explicit = choose_template(alert_template, dest_template.as_ref()).cloned();
-    let effective =
-        crate::alerts::notifications::org_default::resolve_effective_template(org_id, explicit)
-            .await;
-    if let DestinationType::SlackApp(target) = &destination_type {
-        return crate::alerts::slack_publish::send_templated_post(
-            &crate::alerts::slack_publish::QueueSink,
-            org_id,
-            target,
-            effective.template(),
-            ctx,
-        )
-        .await;
-    }
-    send::send_to_destination(
-        org_id,
-        send::Subject::Alert(sns_subject),
-        &destination_type,
-        effective.template(),
         ctx,
     )
     .await

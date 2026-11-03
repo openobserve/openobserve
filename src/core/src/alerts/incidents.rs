@@ -461,7 +461,7 @@ async fn send_incident_notifications_inner(
         "{}/web/alerts/incidents/{incident_id}?org_identifier={org_id}",
         cfg.common.web_url
     );
-    let subject = format!("[{event}] {title}");
+    let incident_template = incident_override(org_id).await;
 
     let mut success_parts: Vec<String> = Vec::new();
     let mut err_parts: Vec<String> = Vec::new();
@@ -476,17 +476,23 @@ async fn send_incident_notifications_inner(
             &service_name,
             &incident_url,
         );
+        // Ordered level 1: an override that does not fit a transport falls to the alert's template.
+        let explicit: Vec<_> = incident_template
+            .iter()
+            .chain(send.alert_template)
+            .cloned()
+            .collect();
         for dest_name in &send.dest_names {
-            match crate::alerts::alert::send_templated_to_destination(
+            match crate::alerts::notifications::notify::notify(
                 org_id,
-                &subject,
                 dest_name,
-                send.alert_template,
+                &explicit,
+                None,
                 &mut send.ctx,
             )
             .await
             {
-                Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
+                Ok(sent) => success_parts.push(format!("{dest_name}: {}", sent.response)),
                 Err(e) => {
                     log::error!(
                         "[incidents] Failed to notify {dest_name} for incident {org_id}/{incident_id}: {e}"
@@ -512,6 +518,53 @@ async fn send_incident_notifications_inner(
     }
 }
 
+/// The org's `default_templates.incident`, loaded once per batch; a missing row falls through.
+#[cfg(feature = "enterprise")]
+async fn incident_override(org_id: &str) -> Option<config::meta::destinations::Template> {
+    use config::meta::alerts::notification_kind::NotificationKind;
+    let defaults = crate::alerts::notifications::org_default::get_default_templates(org_id).await;
+    let name = defaults.get(NotificationKind::Incident)?;
+    match crate::db::alerts::templates::get(org_id, name).await {
+        Ok(t) => Some(t),
+        Err(e) => {
+            log::warn!(
+                "[incidents] default_templates.incident '{name}' not found for {org_id}: {e}"
+            );
+            None
+        }
+    }
+}
+
+/// Close the incident's platform records (D8); no other destination hears of a resolve (D4).
+#[cfg(feature = "enterprise")]
+async fn resolve_platform_destinations(org_id: &str, incident_id: &str) {
+    use config::meta::alerts::notification_kind::{NotificationEvent, NotificationKind};
+
+    use crate::alerts::notifications::{NotificationContext, notify, platform::platform_of};
+
+    let mut ctx = NotificationContext {
+        kind: NotificationKind::Incident,
+        event: NotificationEvent::Resolved,
+        episode_id: Some(incident_id.to_string()),
+        incident_id: incident_id.to_string(),
+        ..Default::default()
+    };
+    for dest_name in collect_incident_destinations(org_id, incident_id, &[]).await {
+        let resolved = match notify::resolve(org_id, &dest_name, &[], NotificationKind::Incident)
+            .await
+        {
+            Ok(r) if platform_of(&r.destination_type).is_some() => r,
+            Ok(_) => continue,
+            Err(e) => {
+                log::warn!("[incidents] resolve of {org_id}/{incident_id} skips {dest_name}: {e}");
+                continue;
+            }
+        };
+        // Best effort: `send` logs the outcome and nothing retries it.
+        let _ = notify::send(org_id, &resolved, None, &mut ctx).await;
+    }
+}
+
 /// Point `ctx` at the incident: its link, and the `incident_*` template variables.
 #[cfg(feature = "enterprise")]
 fn apply_incident_to_context(
@@ -526,6 +579,9 @@ fn apply_incident_to_context(
     // The alert's own link points at its search; an incident notification must open the incident.
     ctx.alert_url = incident_url.to_string();
     ctx.incident_id = incident_id.to_string();
+    ctx.kind = config::meta::alerts::notification_kind::NotificationKind::Incident;
+    ctx.event = config::meta::alerts::notification_kind::NotificationEvent::Firing;
+    ctx.episode_id = Some(incident_id.to_string());
     ctx.context_attributes.extend(
         [
             ("incident_id", incident_id),
@@ -3191,6 +3247,12 @@ pub async fn update_status_as(
     ) && infra::table::alert_incidents::get(org_id, incident_id)
         .await?
         .is_some_and(|m| m.muted_by_downtime_id.is_some());
+    // The status write has no guard, so a second resolve must not close the records again.
+    #[cfg(feature = "enterprise")]
+    let was_resolved = status == "resolved"
+        && infra::table::alert_incidents::get(org_id, incident_id)
+            .await?
+            .is_some_and(|m| m.status == "resolved");
     let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
 
     let muted = status_change_is_muted(
@@ -3242,6 +3304,11 @@ pub async fn update_status_as(
             config::meta::alerts::rca_runs::RunTrigger::AutoReopen,
         )
         .await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    if status == "resolved" && !muted && !was_resolved {
+        resolve_platform_destinations(org_id, incident_id).await;
     }
 
     publish_status(org_id, incident_id, status).await;
@@ -3432,6 +3499,64 @@ pub async fn update_severity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_incident_send_is_keyed_by_the_incident_id() {
+        use config::meta::alerts::notification_kind::{NotificationEvent, NotificationKind};
+        let mut ctx = crate::alerts::notifications::NotificationContext {
+            episode_id: Some("alert-episode".into()),
+            ..Default::default()
+        };
+        apply_incident_to_context(
+            &mut ctx,
+            "inc_1",
+            "severity_escalated",
+            "High error rate",
+            "P1",
+            "checkout",
+            "https://o2/web/alerts/incidents/inc_1",
+        );
+        assert_eq!(ctx.kind, NotificationKind::Incident);
+        assert_eq!(ctx.event, NotificationEvent::Firing);
+        assert_eq!(ctx.episode_id.as_deref(), Some("inc_1"));
+        assert_eq!(ctx.alert_url, "https://o2/web/alerts/incidents/inc_1");
+        let route =
+            crate::alerts::notifications::notify::route(&pagerduty_resolved(), &ctx).unwrap();
+        assert_eq!(route, crate::alerts::notifications::notify::Route::Render);
+        ctx.event = NotificationEvent::Resolved;
+        assert!(matches!(
+            crate::alerts::notifications::notify::route(&pagerduty_resolved(), &ctx).unwrap(),
+            crate::alerts::notifications::notify::Route::PlatformResolve(_)
+        ));
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn pagerduty_resolved() -> crate::alerts::notifications::notify::Resolved {
+        use crate::alerts::notifications::org_default::{
+            EffectiveTemplate, TemplateSource, compiled_fallback_for,
+        };
+        let dest_type = config::meta::destinations::DestinationType::Http(
+            config::meta::destinations::Endpoint {
+                destination_type: Some("pagerduty".into()),
+                url: "https://events.pagerduty.com/v2/enqueue".into(),
+                ..Default::default()
+            },
+        );
+        crate::alerts::notifications::notify::Resolved {
+            destination: Default::default(),
+            channel: crate::alerts::notifications::derive_channel_format(&dest_type),
+            destination_type: dest_type,
+            effective: EffectiveTemplate {
+                template: compiled_fallback_for(
+                    "org",
+                    config::meta::alerts::notification_kind::NotificationKind::Incident,
+                ),
+                source: TemplateSource::Compiled,
+                skipped: vec![],
+            },
+        }
+    }
 
     /// The incident path and the alert path page the same person about the same
     /// alert, so an unset priority has to mean the same thing on both. They used
