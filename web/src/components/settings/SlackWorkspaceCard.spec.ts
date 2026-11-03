@@ -186,7 +186,7 @@ describe("SlackWorkspaceCard (A3)", () => {
       '[data-test="slack-workspace-refused"]',
     );
     expect(line.text()).toContain(
-      "3 alert posts refused in the last 24 h. Last: is_archived on sre-app,",
+      "3 alert posts failed in the last 24 h. Last: is_archived on sre-app,",
     );
     expect(line.text()).toMatch(/2 min/);
     expect(mountCard().find('[data-test="slack-workspace-refused"]').exists()).toBe(false);

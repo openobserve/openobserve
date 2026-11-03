@@ -206,7 +206,7 @@ const unavailable = ref(false);
 /// Set only when the first load fails; a failed refresh keeps the teams on screen instead.
 const loadError = ref<string | null>(null);
 
-// Opened from the avatar menu or a channel chip, so Back returns there when the history has it.
+// Opened from the On-Call menu or a channel chip, so Back returns there when the history has it.
 const back = computed<{
   label?: I18nText;
   to?: RouteLocationRaw;

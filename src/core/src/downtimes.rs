@@ -266,6 +266,9 @@ pub async fn update(
     let now = now_micros();
     let mut after = edited(&before, req, user_id, now);
     after.notifications = notifications;
+    if takes_room_on_edit(&before, &after, now) {
+        check_room(org, now)?;
+    }
     let plan = remeasure_plan(Some(&before), &after).await?;
     set_if_unchanged(&after, before.updated_at, &plan).await?;
     if !before.same_coverage(&after) {
@@ -878,18 +881,26 @@ fn check_room(org: &str, now: i64) -> Result<(), DowntimeError> {
 fn cap_message(rows: &[Downtime], limit: usize, now: i64) -> Option<String> {
     let counted = rows
         .iter()
-        .filter(|row| {
-            matches!(
-                schedule::status(&row.schedule, row.cancelled_at, now),
-                DowntimeStatus::Scheduled | DowntimeStatus::Active
-            )
-        })
+        .filter(|row| counts_toward_cap(row, now))
         .count();
     (counted >= limit).then(|| {
         format!(
             "This organization already has {limit} active or upcoming downtimes, the most allowed."
         )
     })
+}
+
+/// Whether `row` takes a place under the per-org cap at `now`. [pure]
+fn counts_toward_cap(row: &Downtime, now: i64) -> bool {
+    matches!(
+        schedule::status(&row.schedule, row.cancelled_at, now),
+        DowntimeStatus::Scheduled | DowntimeStatus::Active
+    )
+}
+
+/// Whether an edit moves a row that left the cap back under it, so it needs room. [pure]
+fn takes_room_on_edit(before: &Downtime, after: &Downtime, now: i64) -> bool {
+    !counts_toward_cap(before, now) && counts_toward_cap(after, now)
 }
 
 /// A new row; `source` is set only for a quick mute from an alert route.
@@ -1773,6 +1784,24 @@ mod tests {
             cap_message(&[], 0, now).as_deref(),
             Some("This organization already has 0 active or upcoming downtimes, the most allowed.")
         );
+    }
+
+    #[test]
+    fn an_edit_needs_room_only_when_it_brings_an_ended_row_back() {
+        let now = 11 * HOUR;
+        let ended = row(vec![TargetModule::Alerts], HOUR, 2 * HOUR);
+        let upcoming = row(vec![TargetModule::Alerts], 20 * HOUR, 22 * HOUR);
+        let active = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        let cases = [
+            (&ended, &upcoming, true),
+            (&ended, &active, true),
+            (&ended, &ended, false),
+            (&upcoming, &active, false),
+            (&active, &ended, false),
+        ];
+        for (i, (before, after, needs)) in cases.into_iter().enumerate() {
+            assert_eq!(takes_room_on_edit(before, after, now), needs, "case {i}");
+        }
     }
 
     #[test]

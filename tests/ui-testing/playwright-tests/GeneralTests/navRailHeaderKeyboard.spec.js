@@ -25,13 +25,13 @@ async function setLanguageCookie(page, code) {
 
 const isFocused = (locator) => locator.evaluate((el) => el === document.activeElement);
 
-async function openProfileMenuByKeyboard(page) {
+async function openProfileMenuByKeyboard(page, { whileLoading = false } = {}) {
   const navRail = new NavRailPage(page);
-  await navRail.waitForHomeLoaded();
+  if (!whileLoading) await navRail.waitForHomeLoaded();
   await page.locator(PROFILE).focus();
   await page.keyboard.press("Enter");
   await expect(page.locator(ROW)).toBeVisible();
-  await navRail.expectFocusInMenu();
+  if (!whileLoading) await navRail.expectFocusInMenu();
 }
 
 async function arrowToRow(page) {
@@ -150,4 +150,34 @@ test.describe("Nav rail: header Language row keyboard (AC-10)", () => {
       });
     }
   }
+
+  test("Arrows keep focus in the profile menu opened while the full config loads", async ({
+    page,
+  }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    const navRail = new NavRailPage(page);
+    const { release, served } = await navRail.holdOrgConfig();
+    await page.setViewportSize(SIZES[0]);
+    await setLanguageCookie(page, "en-us");
+
+    testLogger.step("Open the profile menu by keyboard while the full config is held");
+    await navigateToBase(page);
+    // The home view cannot finish loading while the config is held.
+    await openProfileMenuByKeyboard(page, { whileLoading: true });
+
+    testLogger.step("Release the full config");
+    release();
+    await served;
+    await navRail.waitForHomeLoaded();
+    await expect(page.locator(ROW)).toBeVisible();
+
+    testLogger.step("Arrow keys still move between menu rows");
+    await page.keyboard.press("ArrowDown");
+    const first = await navRail.focusedMenuRow();
+    expect(first, "focus is inside the menu").not.toBeNull();
+    await page.keyboard.press("ArrowDown");
+    const second = await navRail.focusedMenuRow();
+    expect(second, "focus is inside the menu").not.toBeNull();
+    expect(second).not.toBe(first);
+  });
 });

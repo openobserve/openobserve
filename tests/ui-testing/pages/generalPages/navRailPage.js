@@ -170,6 +170,31 @@ export class NavRailPage {
     return locator.evaluate((el) => getComputedStyle(el).backgroundColor);
   }
 
+  async focusedMenuRow() {
+    return this.page.evaluate(() => {
+      const el = document.activeElement;
+      return el && el.closest('[role="menu"]') ? el.getAttribute('data-test') || el.textContent.trim() : null;
+    });
+  }
+
+  // Holds the org's full /api/{org}/config (not the bootstrap /config) until release().
+  async holdOrgConfig() {
+    const path = `/api/${process.env.ORGNAME || 'default'}/config`;
+    let release;
+    const released = new Promise((resolve) => (release = resolve));
+    let served;
+    const done = new Promise((resolve) => (served = resolve));
+    await this.page.route(
+      (url) => url.pathname.endsWith(path),
+      async (route) => {
+        await released;
+        await route.continue();
+        served();
+      },
+    );
+    return { release, served: done };
+  }
+
   async openDrawer() {
     await this.drawerToggle.click();
     await this.drawerNav.waitFor({ state: 'visible' });

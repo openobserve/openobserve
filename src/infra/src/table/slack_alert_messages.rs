@@ -611,7 +611,7 @@ pub async fn list_waiting_with<C: ConnectionTrait>(
     Ok(decode_rows(models))
 }
 
-/// The org's rows on the installation Slack refused for good since `since`: count and newest.
+/// The org's rows on the installation that ended failed since `since`: count and newest.
 pub async fn refused_since_with<C: ConnectionTrait>(
     conn: &C,
     installation_id: &str,
