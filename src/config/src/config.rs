@@ -134,7 +134,7 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 134: add write_version to llm_dataset_items, so one write request is one Dataset version.
 // 135: add last_run_class and last_run_class_at to synthetics.
 // 136: add false_alarm_by, false_alarm_at and false_alarm_reason to status_page_notices.
-// 137: add gap_since, gap_runs and gap_notified_at to synthetics (136 is the status page false alarm migration).
+// 137: add gap_since, gap_runs and gap_notified_at to synthetics.
 pub const DB_SCHEMA_VERSION: u64 = 137;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 

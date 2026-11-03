@@ -251,8 +251,8 @@ mod m20261030_000002_create_org_domain_ownership_req_table;
 mod m20261101_000001_create_oncall_slack;
 mod m20261103_000001_add_status_streaks_to_synthetics;
 mod m20261103_000002_add_run_class_to_synthetics;
-mod m20261103_000003_status_page_notice_false_alarm;
 mod m20261103_000003_add_gap_state_to_synthetics;
+mod m20261103_000003_status_page_notice_false_alarm;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
