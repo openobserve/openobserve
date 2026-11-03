@@ -156,9 +156,8 @@ test("a file or commit listing that may be cut short never skips a review", () =
   }
 });
 
-test("the workflow never waits, skips nothing-to-review PRs before installing anything, and lets a hand-started run force a review", () => {
+test("the workflow skips nothing-to-review PRs before installing anything, and lets a hand-started run force a review", () => {
   const workflow = readFileSync(new URL("../../../.github/workflows/ai-code-review.yml", import.meta.url), "utf-8");
-  assert.doesNotMatch(workflow, /\bsleep\b/);
   const skipAt = workflow.indexOf("- name: Skip PRs with nothing to review");
   assert.ok(skipAt > workflow.indexOf("- name: Check out review engine"), "the check runs from the engine checkout");
   for (const later of ["- name: Defer to a paired o2-enterprise PR", "- name: Install engine dependencies", "- name: Install opencode", "- name: Run AI Code Review"]) {

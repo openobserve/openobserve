@@ -71,6 +71,10 @@ jobs:
             api_key_env: ANTHROPIC_REVIEW_API_KEY
             marker: "<!-- ai-code-review -->"
     steps:
+      # Debounce: lets a burst of pushes land so Resolve PR picks up the newest head.
+      - if: github.event_name == 'pull_request_target'
+        run: sleep 60
+
       - name: Resolve PR
         id: pr
         env:
