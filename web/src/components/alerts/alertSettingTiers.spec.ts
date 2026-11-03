@@ -96,7 +96,7 @@ describe("isTierVisible", () => {
   });
 
   it("shows a one-click setting once added, and never via expand", () => {
-    expect(isTierVisible("template", state({ expanded: () => true }))).toBe(false);
+    expect(isTierVisible("template", state({ expanded: () => true }))).toBe(true);
     expect(isTierVisible("template", state({ revealed: new Set(["template"]) }))).toBe(true);
   });
 });

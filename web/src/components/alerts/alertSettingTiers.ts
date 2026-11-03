@@ -16,7 +16,7 @@
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import type { AlertSectionId } from "./alertFormSections";
 
-/** Shown = always visible; one = its own "+ add" link; tucked = behind the section's "N more" link. */
+/** Shown = always visible; one = its own "+ add" link while closed; tucked = behind the section's "More options" link while closed. */
 export type AlertSettingTier = "shown" | "one" | "tucked";
 
 export type AlertSettingId =
@@ -126,7 +126,7 @@ const defOf = (id: AlertSettingId) => ALERT_SETTING_TIERS.find((d) => d.id === i
 export function isTierVisible(id: AlertSettingId, state: AlertTierState): boolean {
   const def = defOf(id);
   if (!def || def.tier === "shown" || state.isSet(id) || state.revealed.has(id)) return true;
-  return def.tier === "tucked" && state.available(id) && state.expanded(def.section);
+  return state.available(id) && state.expanded(def.section);
 }
 
 export function sectionTierView(
@@ -137,7 +137,9 @@ export function sectionTierView(
     (d) => d.section === section && state.available(d.id) && !state.isSet(d.id),
   );
   return {
-    addLinks: own.filter((d) => d.tier === "one" && !state.revealed.has(d.id)),
+    addLinks: state.expanded(section)
+      ? []
+      : own.filter((d) => d.tier === "one" && !state.revealed.has(d.id)),
     tucked: own.filter((d) => d.tier === "tucked" && !state.revealed.has(d.id)),
     expanded: state.expanded(section),
   };

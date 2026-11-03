@@ -99,7 +99,7 @@
       </div>
       <!-- Action buttons -->
 
-      <div class="flex items-center justify-start" :class="!isQuietEmpty && 'ms-4'">
+      <div class="flex items-center justify-start" :class="isQuietEmpty ? '-ms-2' : 'ms-4'">
         <OButton
           data-test="alert-conditions-add-condition-btn"
           :class="!isQuietEmpty && 'ms-3'"
