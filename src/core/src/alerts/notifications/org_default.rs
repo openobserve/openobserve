@@ -555,7 +555,8 @@ mod tests {
     #[tokio::test]
     async fn a_missing_default_templates_row_is_cached_until_a_real_row_replaces_it() {
         meta_store().await;
-        let org = "org_default_templates_miss";
+        // The meta store outlives the run, and this test leaves a row for its org.
+        let org = &format!("org_default_templates_miss_{}", config::ider::generate());
         assert_eq!(
             get_default_templates(org)
                 .await
