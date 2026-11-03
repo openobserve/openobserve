@@ -300,7 +300,7 @@ pub(crate) async fn act_on(
     }
 }
 
-/// The verb's answer as JSON: an `AckResponse`, or an `UnackResponse` for an unack.
+/// The verb's answer as JSON: an `AckResponse`, or an `UnackResponse` for a verb that clears.
 pub(crate) async fn act(
     problem: &Problem,
     actor: &str,
@@ -314,6 +314,7 @@ pub(crate) async fn act(
         Verb::HandOff => {
             serde_json::to_value(ack::release_for_hand_off(problem, actor, source).await?)
         }
+        Verb::Resolve => serde_json::to_value(ack::resolve(problem, actor, source, None).await?),
     };
     body.map_err(|e| AckError::Internal(e.to_string()))
 }

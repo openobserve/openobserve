@@ -285,6 +285,9 @@ pub async fn update_incident(
             )
             .await
             {
+                Ok(incident) if status == IncidentStatus::Resolved => {
+                    end_ack_after_resolve(org_id, incident_id, &user_id, incident).await
+                }
                 Ok(incident) => MetaHttpResponse::json(incident),
                 Err(e) => {
                     if e.to_string().contains("not found") {
@@ -753,6 +756,33 @@ fn json_status_response(status: axum::http::StatusCode, body: serde_json::Value)
         .header(axum::http::header::CONTENT_TYPE, "application/json")
         .body(axum::body::Body::from(body.to_string()))
         .unwrap()
+}
+
+/// A person resolved the incident: end the ack its alerts carry, then answer with the incident.
+#[cfg(feature = "enterprise")]
+async fn end_ack_after_resolve(
+    org_id: String,
+    incident_id: String,
+    actor: &str,
+    incident: impl Serialize,
+) -> Response {
+    use openobserve_core::alerts::ack::{self, Problem};
+
+    let problem = Problem::Incident {
+        org_id,
+        incident_id,
+    };
+    match ack::resolve(
+        &problem,
+        actor,
+        config::meta::alerts::ack::AckSource::Incident,
+        None,
+    )
+    .await
+    {
+        Ok(_) => MetaHttpResponse::json(incident),
+        Err(e) => crate::request::alerts::ack::error_response(e),
+    }
 }
 
 #[cfg(feature = "enterprise")]
