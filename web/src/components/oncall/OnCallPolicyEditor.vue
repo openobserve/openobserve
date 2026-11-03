@@ -507,14 +507,14 @@
                 <OText variant="label" class="w-32 shrink-0 pt-2">
                   {{ t("alerts.templateOverride.label") }}
                 </OText>
-                <span class="w-72">
+                <div class="w-72">
                   <TemplateOverridePicker
                     kind="on_call"
                     :model-value="templateOverride"
                     :destinations="selectedDestinationTypes"
                     @update:model-value="templateOverride = $event"
                   />
-                </span>
+                </div>
               </div>
 
               <!-- C15/C16: WHERE the team is talked to, beside the policy list it

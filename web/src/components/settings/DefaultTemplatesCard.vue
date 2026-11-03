@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :kind="kind"
             :model-value="values[kind] ?? null"
             :server-error="rowErrors[kind] ?? null"
+            :disabled="readOnly"
             @update:model-value="(v) => setRow(kind, v)"
           />
           <div
@@ -77,10 +78,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+      <div
+        v-if="readOnly"
+        class="text-text-secondary pb-2 text-sm"
+        role="status"
+        data-test="settings-default-templates-read-only"
+      >
+        {{ t("settings.defaultTemplates.readOnly") }}
+      </div>
       <OButton
         variant="primary"
         size="sm-action"
-        :disabled="!dirty"
+        :disabled="!dirty || readOnly"
         :loading="saving"
         data-test="settings-default-templates-save"
         @click="save"
@@ -124,6 +133,8 @@ const values = ref<Record<string, string | null>>({});
 const rowErrors = ref<Record<string, string>>({});
 const shippedKinds = ref<string[]>([]);
 const saving = ref(false);
+// Set by a write 403: the card stays visible but the user cannot change it.
+const readOnly = ref(false);
 
 const shownKinds = computed(() => ROW_ORDER.filter((k) => shippedKinds.value.includes(k)));
 
@@ -148,13 +159,17 @@ const setRow = (kind: NotificationKind, name: string | null) => {
   rowErrors.value = rest;
 };
 
-// The preview response's variable groups name the kinds whose stage shipped.
+// The preview response's variable groups name the kinds whose stage shipped; a failure shows all.
 const loadShippedKinds = async () => {
-  const res = await templateService.preview({
-    org_identifier: orgId(),
-    data: { definition: starterContentSpec(), channel: "slack" },
-  });
-  shippedKinds.value = (res.data?.variable_groups ?? []).map((g: { name: string }) => g.name);
+  try {
+    const res = await templateService.preview({
+      org_identifier: orgId(),
+      data: { definition: starterContentSpec(), channel: "slack" },
+    });
+    shippedKinds.value = (res.data?.variable_groups ?? []).map((g: { name: string }) => g.name);
+  } catch {
+    shippedKinds.value = [...ROW_ORDER];
+  }
 };
 
 const load = async () => {
@@ -193,7 +208,9 @@ const save = async () => {
     const message: string = e?.response?.data?.message ?? String(e?.message ?? e);
     // "default_templates.anomaly: ..." names the row the error belongs to.
     const kind = /^default_templates\.(\w+):/.exec(message)?.[1];
-    if (kind) {
+    if (e?.response?.status === 403) {
+      readOnly.value = true;
+    } else if (kind) {
       rowErrors.value = { [kind]: message };
     } else {
       toast({ variant: "error", message: raw(message) });
@@ -205,5 +222,5 @@ const save = async () => {
 
 onMounted(load);
 
-defineExpose({ load, save, values, nextMap, dirty, state });
+defineExpose({ load, save, values, nextMap, dirty, state, readOnly });
 </script>

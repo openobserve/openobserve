@@ -17,25 +17,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- One template override select for a notification kind; lists only user templates that apply to it. -->
 <template>
   <div class="flex min-w-0 flex-col gap-1" :data-test="`template-override-${kind}`">
+    <OButton
+      variant="ghost-primary"
+      size="xs"
+      class="gap-1 self-start font-medium"
+      data-test="template-override-help-btn"
+      @click="helpOpen = true"
+    >
+      <OIcon name="help" size="xs" />
+      <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
+    </OButton>
     <template v-if="state === 'empty'">
       <span class="text-text-secondary text-sm" data-test="template-override-empty">
         {{ t("alerts.templateOverride.empty", { kind: kindLabel }) }}
-        <a
-          class="text-text-link ms-1 cursor-pointer underline"
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          class="ms-1"
           data-test="template-override-create"
           @click="openCreate"
-          >{{ t("alerts.templateOverride.create") }}</a
+          >{{ t("alerts.templateOverride.create") }}</OButton
         >
       </span>
     </template>
     <template v-else-if="state === 'error'">
       <span class="text-input-error-text text-sm" data-test="template-override-error">
         {{ t("alerts.templateOverride.loadFailed") }}
-        <a
-          class="text-text-link ms-1 cursor-pointer underline"
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          class="ms-1"
           data-test="template-override-retry"
           @click="load"
-          >{{ t("common.retry") }}</a
+          >{{ t("common.retry") }}</OButton
         >
       </span>
       <span
@@ -67,6 +81,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onSelect"
     />
     <span
+      v-if="isStale"
+      class="text-status-warning-text text-xs"
+      role="status"
+      data-test="template-override-stale"
+    >
+      {{ t("alerts.templateOverride.stale", { name: modelValue ?? "" }) }}
+    </span>
+    <span
       v-if="mismatched.length"
       class="text-status-warning-text text-xs"
       role="status"
@@ -79,6 +101,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         })
       }}
     </span>
+    <AlertSettingsHelpDrawer
+      v-model:open="helpOpen"
+      topic="template"
+      :templates="templates"
+      :current-template="modelValue ?? ''"
+      @apply:template="onSelect"
+    />
   </div>
 </template>
 
@@ -86,6 +115,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import AlertSettingsHelpDrawer from "@/components/alerts/AlertSettingsHelpDrawer.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -100,6 +132,7 @@ interface PickerTemplate {
   name: string;
   kind?: string;
   type?: string;
+  isPrebuilt?: boolean;
 }
 
 const props = withDefaults(
@@ -123,6 +156,7 @@ const router = useRouter();
 
 const state = ref<"loading" | "ready" | "empty" | "error" | "forbidden">("loading");
 const templates = ref<PickerTemplate[]>([]);
+const helpOpen = ref(false);
 
 const kindLabel = computed(() => t(kindLabelKey(props.kind)));
 
@@ -150,6 +184,8 @@ const options = computed<SelectOption[]>(() => {
 });
 
 const selected = computed(() => templates.value.find((tpl) => tpl.name === props.modelValue));
+// A deleted or renamed template would be re-sent under its old name until the server refused it.
+const isStale = computed(() => state.value === "ready" && !!props.modelValue && !selected.value);
 
 // A Custom template renders only on its own transport; other destinations use their own template.
 const mismatched = computed(() => {
@@ -167,9 +203,8 @@ const load = async () => {
       org_identifier: store.state.selectedOrganization.identifier,
       applies_to: props.kind,
     });
-    templates.value = (Array.isArray(res.data) ? res.data : []).filter(
-      (tpl: any) => !tpl.isPrebuilt,
-    );
+    const list: PickerTemplate[] = Array.isArray(res.data) ? res.data : [];
+    templates.value = list.filter((tpl) => !tpl.isPrebuilt);
     state.value = templates.value.length ? "ready" : "empty";
   } catch (e: any) {
     state.value = e?.response?.status === 403 ? "forbidden" : "error";

@@ -114,6 +114,14 @@ describe("TemplateOverridePicker", () => {
     expect(select(w).exists()).toBe(true);
   });
 
+  it("warns when the stored template no longer exists", async () => {
+    list.mockResolvedValue({ data: [{ name: "card", kind: "content" }] } as any);
+    const w = await mountPicker({ modelValue: "deleted-card" });
+    expect(w.find('[data-test="template-override-stale"]').text()).toContain("deleted-card");
+    await w.setProps({ modelValue: "card" });
+    expect(w.find('[data-test="template-override-stale"]').exists()).toBe(false);
+  });
+
   it("warns when a Custom pick does not fit some destinations", async () => {
     list.mockResolvedValue({ data: [{ name: "hook", kind: "custom", type: "http" }] } as any);
     const w = await mountPicker({

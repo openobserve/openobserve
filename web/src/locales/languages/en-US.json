@@ -13107,7 +13107,8 @@
       "groupCustom": "Custom",
       "webhookOnly": "(webhook only)",
       "emailOnly": "(email only)",
-      "snsOnly": "(SNS only)"
+      "snsOnly": "(SNS only)",
+      "stale": "Template {name} no longer exists. Pick another one or clear the field."
     }
   },
   "alert_dependencies": {
@@ -14951,7 +14952,8 @@
       "incidentHelp": "Also overrides the alert's template for incident messages",
       "save": "Save",
       "saved": "Default templates saved",
-      "loadFailed": "Could not load the default templates"
+      "loadFailed": "Could not load the default templates",
+      "readOnly": "You can view the default templates but not change them."
     }
   },
   "reports": {

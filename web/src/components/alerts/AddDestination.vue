@@ -416,11 +416,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="payloadFormatOptions"
                   labelKey="label"
                   valueKey="value"
+                  :help-text="t('alert_destinations.payloadFormatHelp')"
                   tabindex="0"
                 />
-                <div class="text-text-secondary mt-1 text-xs">
-                  {{ t("alert_destinations.payloadFormatHelp") }}
-                </div>
               </div>
 
               <!-- Test Result Display -->
@@ -1480,7 +1478,9 @@ function headersFromRows(rows: { key: string; value: string }[]): Headers {
 // is the validated payload source of truth; the payload is built with explicit
 // keys so no schema-only field (e.g. `credentials`) leaks into the request.
 /** The stored metadata.payload_format as the select's value; anything else is automatic. */
-function storedPayloadFormat(metadata: any): "auto" | "legacy" | "rendered" {
+function storedPayloadFormat(
+  metadata: Record<string, unknown> | null,
+): "auto" | "legacy" | "rendered" {
   const stored = metadata?.payload_format;
   return stored === "legacy" || stored === "rendered" ? stored : "auto";
 }

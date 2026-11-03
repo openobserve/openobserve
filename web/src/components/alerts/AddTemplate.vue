@@ -100,12 +100,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? t("alert_templates.appliesToInferred")
                     : t("alert_templates.appliesToManual")
                 }}</span>
-                <a
+                <OButton
                   v-if="appliesToMode === 'manual' && !isPrebuiltTemplate"
-                  class="text-text-link cursor-pointer underline"
+                  variant="ghost-primary"
+                  size="xs"
                   data-test="add-template-applies-to-reset"
                   @click="resetAppliesTo"
-                  >{{ t("alert_templates.appliesToReset") }}</a
+                  >{{ t("alert_templates.appliesToReset") }}</OButton
                 >
               </div>
             </div>
@@ -114,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ContentTemplateForm
                 v-model="contentSpec"
                 :is-seeded="isSeededTemplate"
+                :variables="guideVariables"
                 data-test="add-template-content-form"
               />
             </template>
@@ -270,32 +272,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="break-words">{{ raw(group.variables.join(", ")) }}</div>
             </div>
             <div class="px-1 py-3">
-              <div>{{ raw("org_name, stream_type, stream_name") }}</div>
-              <div>{{ raw("alert_name, alert_type, alert_status") }}</div>
-              <div>
-                <b>{{ raw("episode_id") }}</b>
-                {{ t("alert_templates.variableEpisodeIdDescription") }}
-              </div>
-              <div>{{ raw("alert_period, alert_operator, alert_threshold") }}</div>
-              <div>{{ raw("alert_count, alert_agg_value") }}</div>
-              <div>{{ raw("alert_description") }}</div>
-              <div>
-                {{
-                  raw(
-                    "alert_start_time, alert_end_time, alert_start_time_millis, alert_end_time_millis, alert_url",
-                  )
-                }}
-              </div>
-              <div>
-                {{
-                  raw(
-                    "alert_trigger_time, alert_trigger_time_millis, alert_trigger_time_seconds, alert_trigger_time_str",
-                  )
-                }}
-              </div>
-              <div>
-                <b>{{ raw("rows") }}</b> {{ t("alert_templates.variableRowsDescription") }}
-              </div>
+              <template v-if="!shownVariableGroups.length">
+                <div>{{ raw("org_name, stream_type, stream_name") }}</div>
+                <div>{{ raw("alert_name, alert_type, alert_status") }}</div>
+                <div>
+                  <b>{{ raw("episode_id") }}</b>
+                  {{ t("alert_templates.variableEpisodeIdDescription") }}
+                </div>
+                <div>{{ raw("alert_period, alert_operator, alert_threshold") }}</div>
+                <div>{{ raw("alert_count, alert_agg_value") }}</div>
+                <div>{{ raw("alert_description") }}</div>
+                <div>
+                  {{
+                    raw(
+                      "alert_start_time, alert_end_time, alert_start_time_millis, alert_end_time_millis, alert_url",
+                    )
+                  }}
+                </div>
+                <div>
+                  {{
+                    raw(
+                      "alert_trigger_time, alert_trigger_time_millis, alert_trigger_time_seconds, alert_trigger_time_str",
+                    )
+                  }}
+                </div>
+                <div>
+                  <b>{{ raw("rows") }}</b> {{ t("alert_templates.variableRowsDescription") }}
+                </div>
+              </template>
               <div>
                 <b>{{ t("alert_templates.variableStreamFields") }}</b>
               </div>
@@ -506,6 +510,10 @@ const shownVariableGroups = computed(() => {
     (g) => g.name === "common" || (kinds.includes(g.name) && g.variables.length > 0),
   );
 });
+// The chips use the same groups as the guide, each variable once.
+const guideVariables = computed(() => [
+  ...new Set(shownVariableGroups.value.flatMap((g) => g.variables)),
+]);
 const variableGroupLabel = (name: string) =>
   isKind(name) ? t(kindLabelKey(name)) : t("alert_templates.variableGroupCommon");
 
@@ -576,6 +584,7 @@ watch(
 const variableGuideOpen = ref(editorMode.value !== "content");
 watch(editorMode, (mode) => {
   variableGuideOpen.value = mode !== "content";
+  if (mode === "custom") loadVariableGroups();
 });
 
 // Starter body for raw-payload mode on a PRISTINE new template. Without
@@ -865,7 +874,8 @@ const templateDraft = useEditorDraft<TemplateDraftData>({
 });
 
 onMounted(async () => {
-  loadVariableGroups();
+  // The content preview panel emits the groups itself; only custom mode needs the call.
+  if (editorMode.value === "custom") loadVariableGroups();
   if (draftsActive) await templateDraft.start();
 });
 

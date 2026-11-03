@@ -281,6 +281,18 @@ describe("AddDestination - custom path schema gating + payload parity", () => {
     });
   });
 
+  it("hides the payload format select on email and Slack destinations", async () => {
+    wrapper = mountComp({ isAlerts: true });
+    const form = await toCustomHttp(wrapper);
+    form.setFieldValue("type", "email");
+    await nextTick();
+    expect(wrapper.find('[data-test="add-destination-payload-format"]').exists()).toBe(false);
+    form.setFieldValue("type", "http");
+    form.setFieldValue("destination_type", "slack");
+    await nextTick();
+    expect(wrapper.find('[data-test="add-destination-payload-format"]').exists()).toBe(false);
+  });
+
   it("an edit reads the stored payload format and automatic removes only that key", async () => {
     wrapper = mountComp({
       isAlerts: true,

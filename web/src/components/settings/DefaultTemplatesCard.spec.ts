@@ -33,7 +33,7 @@ import templateService from "@/services/alert_templates";
 const pickerStub = {
   name: "TemplateOverridePicker",
   template: "<div />",
-  props: ["kind", "modelValue", "serverError"],
+  props: ["kind", "modelValue", "serverError", "disabled"],
   emits: ["update:modelValue"],
 };
 
@@ -122,5 +122,29 @@ describe("DefaultTemplatesCard", () => {
     vi.mocked(settingsService.getSetting).mockRejectedValueOnce({ response: { status: 403 } });
     const w = await mountCard();
     expect(w.find('[data-test="settings-default-templates"]').exists()).toBe(false);
+  });
+
+  it("shows every row when the preview cannot be read", async () => {
+    vi.mocked(templateService.preview).mockRejectedValueOnce({ response: { status: 403 } });
+    const w = await mountCard();
+    const kinds = w
+      .findAllComponents({ name: "TemplateOverridePicker" })
+      .map((p: any) => p.props("kind"));
+    expect(kinds).toEqual(["incident", "anomaly", "synthetics", "downtime", "on_call", "alert"]);
+  });
+
+  it("turns read only after a write 403", async () => {
+    vi.mocked(settingsService.setOrgSetting).mockRejectedValueOnce({
+      response: { status: 403, data: { message: "Forbidden" } },
+    });
+    const w = await mountCard();
+    await picker(w, "incident").vm.$emit("update:modelValue", "other-card");
+    await (w.vm as any).save();
+    await flushPromises();
+    expect(w.find('[data-test="settings-default-templates-read-only"]').exists()).toBe(true);
+    expect(picker(w, "incident").props("disabled")).toBe(true);
+    expect(
+      w.find('[data-test="settings-default-templates-save"]').attributes("disabled"),
+    ).toBeDefined();
   });
 });
