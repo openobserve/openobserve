@@ -44,6 +44,9 @@ pub async fn create_synthetic(
             body.folder_id = pk;
         }
     }
+    // A new check alerts on down only unless it asks for any location (spec S7, Q3).
+    body.alert_on
+        .get_or_insert(config::meta::synthetics::AlertOn::Down);
     // Normalise locations — ensure aws- prefix (UI may send "us-east-1" instead of "aws-us-east-1")
     body.locations = body.locations.into_iter().map(normalize_location).collect();
 
@@ -651,14 +654,19 @@ async fn keep_stored_type(
     id: &str,
     body: &mut Synthetic,
 ) -> anyhow::Result<Option<SyntheticType>> {
-    let stored = synthetics_checks::get(conn, org_id, id)
+    let Some(stored) = synthetics_checks::get(conn, org_id, id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .map(|c| c.check_type);
-    if let Some(check_type) = &stored {
-        body.check_type = check_type.clone();
+    else {
+        return Ok(None);
+    };
+    body.check_type = stored.check_type.clone();
+    // A client that does not send the alert rule keeps the stored one, so an edit from an older
+    // UI never turns "any location" into "down only".
+    if body.alert_on.is_none() {
+        body.alert_on = stored.alert_on;
     }
-    Ok(stored)
+    Ok(Some(stored.check_type))
 }
 
 async fn holds_browser_check(

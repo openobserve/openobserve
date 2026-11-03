@@ -118,6 +118,10 @@ pub struct RunFinalized {
     pub gap_retry: bool,
     /// `Some` only when the badge, a streak or the run class changed.
     pub check_update: Option<StatusStreaks>,
+    /// Locations that vote, one per original job: `job_count` without confirm jobs.
+    pub voters: i32,
+    /// Locations whose vote is a failure after confirm pairs merge, sorted, each once.
+    pub failed_locations: Vec<String>,
 }
 
 /// One job of a run, as finalization reads it.
@@ -130,6 +134,7 @@ pub struct JobOutcome {
     pub status_reason: Option<String>,
     /// The job this one confirms, for a confirm job.
     pub confirm_of: Option<String>,
+    pub location: String,
 }
 
 /// What a run's jobs add up to.
@@ -144,6 +149,10 @@ pub struct Tally {
     pub has_confirm: bool,
     /// Some job measured nothing because of [`GAP_RETRY_SOURCES`].
     pub gap_cause: bool,
+    /// See [`RunFinalized::voters`].
+    pub voters: i32,
+    /// See [`RunFinalized::failed_locations`].
+    pub failed_locations: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -196,6 +205,7 @@ pub fn tally(job_count: i32, jobs: &[JobOutcome]) -> Tally {
     let mut config = 0;
     let mut confirmed_flaky = false;
     let mut worst = 0;
+    let mut failed_locations: Vec<String> = Vec::new();
     for job in jobs.iter().filter(|j| j.confirm_of.is_none()) {
         let mut vote = job.vote();
         let mut result = job_to_status(job.status);
@@ -212,7 +222,12 @@ pub fn tally(job_count: i32, jobs: &[JobOutcome]) -> Tally {
         worst = worst.max(result);
         match vote {
             Vote::Healthy => healthy += 1,
-            Vote::Failed => failed += 1,
+            Vote::Failed => {
+                failed += 1;
+                if !failed_locations.contains(&job.location) {
+                    failed_locations.push(job.location.clone());
+                }
+            }
             Vote::Config => config += 1,
             Vote::NotMeasured => {}
         }
@@ -235,6 +250,11 @@ pub fn tally(job_count: i32, jobs: &[JobOutcome]) -> Tally {
         confirmed_flaky,
         has_confirm: !confirms.is_empty(),
         gap_cause: jobs.iter().any(JobOutcome::is_gap_cause),
+        voters,
+        failed_locations: {
+            failed_locations.sort();
+            failed_locations
+        },
     }
 }
 
@@ -557,6 +577,8 @@ async fn finalize<C: ConnectionTrait + TransactionTrait>(
             && t.gap_cause
             && run.trigger_type == TRIGGER_SCHEDULE,
         check_update,
+        voters: t.voters,
+        failed_locations: t.failed_locations,
     }))
 }
 
@@ -642,7 +664,7 @@ pub async fn job_outcomes<C: ConnectionTrait>(
     let rows = conn
         .query_all(Statement::from_sql_and_values(
             conn.get_database_backend(),
-            "SELECT id, status, result, metadata FROM synthetics_jobs WHERE run_id = $1",
+            "SELECT id, status, result, metadata, location FROM synthetics_jobs WHERE run_id = $1",
             [Value::from(run_id.to_owned())],
         ))
         .await?;
@@ -660,6 +682,7 @@ pub async fn job_outcomes<C: ConnectionTrait>(
                 error_source: ack.error_source,
                 status_reason: ack.status_reason,
                 confirm_of: meta.confirm_of,
+                location: row.try_get("", "location")?,
             })
         })
         .collect::<Result<_, sea_orm::DbErr>>()
@@ -1053,6 +1076,9 @@ mod tests {
             status_run_ts: 0,
             last_run_class: 0,
             last_run_class_at: 0,
+            gap_since: 0,
+            gap_runs: 0,
+            gap_notified_at: 0,
             owner: None,
             created_at: 0,
             updated_at: 0,
@@ -1409,6 +1435,48 @@ mod tests {
             confirm_of: Some(of.to_string()),
             ..job(id, status)
         }
+    }
+
+    #[test]
+    fn tally_names_the_failed_locations_of_the_voters() {
+        let at = |j: JobOutcome, loc: &str| JobOutcome {
+            location: loc.to_string(),
+            ..j
+        };
+        // One of two fails, its confirm job from the other location fails too: one vote.
+        let t = tally(
+            3,
+            &[
+                at(job("a", JOB_FAILED), "aws-us-east-1"),
+                at(job("b", JOB_PASSED), "aws-us-west-1"),
+                at(confirm("c", "a", JOB_FAILED), "aws-us-west-1"),
+            ],
+        );
+        assert_eq!(t.class, RunClass::Partial);
+        assert_eq!(t.voters, 2);
+        assert_eq!(t.failed_locations, vec!["aws-us-east-1".to_string()]);
+        // Both fail: down, both named once, sorted.
+        let t = tally(
+            2,
+            &[
+                at(job("b", JOB_FAILED), "aws-us-west-1"),
+                at(job("a", JOB_FAILED), "aws-us-east-1"),
+            ],
+        );
+        assert_eq!(t.class, RunClass::Down);
+        assert_eq!(
+            t.failed_locations,
+            vec!["aws-us-east-1".to_string(), "aws-us-west-1".to_string()]
+        );
+        // A failure its confirm job clears names nothing.
+        let t = tally(
+            2,
+            &[
+                at(job("a", JOB_FAILED), "aws-us-east-1"),
+                at(confirm("c", "a", JOB_PASSED), "aws-us-west-1"),
+            ],
+        );
+        assert!(t.failed_locations.is_empty());
     }
 
     #[test]

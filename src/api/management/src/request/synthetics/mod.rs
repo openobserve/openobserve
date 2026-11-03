@@ -1726,6 +1726,13 @@ async fn process_ack(
             openobserve_core::synthetics::notify_check_result(notification).await;
         });
     }
+    // The gap notices are about our side, so they go out whatever the run's own alert decided.
+    #[cfg(feature = "enterprise")]
+    if let Some(gap) = openobserve_core::synthetics::GapNotification::from_ack(&resp) {
+        tokio::spawn(async move {
+            openobserve_core::synthetics::notify_gap(gap).await;
+        });
+    }
     Ok(resp)
 }
 
@@ -2425,6 +2432,8 @@ mod tests {
             failing_environments: Vec::new(),
             usage_events,
             suppressed_by: None,
+            coverage: None,
+            gap_notice: None,
         }
     }
 

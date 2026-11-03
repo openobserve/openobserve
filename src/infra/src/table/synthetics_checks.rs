@@ -161,6 +161,7 @@ impl TryFrom<synthetics_checks::Model> for Synthetic {
             last_run_class: m.last_run_class,
             last_run_class_at: m.last_run_class_at,
             confirm_failures: settings.confirm_failures,
+            alert_on: settings.alert_on,
             owner: m.owner,
             created_at: m.created_at,
             updated_at: m.updated_at,
@@ -1095,6 +1096,12 @@ pub struct AlertState {
     /// degraded. Degradation persists for as long as the certificate takes to
     /// expire, so it is suppressed by transition rather than by a time window.
     pub degraded_notified_at: i64,
+    /// When the current Not measured gap started, in microseconds. 0 = no gap.
+    pub gap_since: i64,
+    /// Not measured runs in a row in the current gap.
+    pub gap_runs: i32,
+    /// When the gap notice of the current gap was sent. 0 = not sent, so no resumed notice is due.
+    pub gap_notified_at: i64,
 }
 
 /// Reads the alert state without pulling the whole check (config, secrets and
@@ -1109,15 +1116,29 @@ pub async fn get_alert_state<C: ConnectionTrait>(
         .column(Column::LastAlertAt)
         .column(Column::Alerting)
         .column(Column::DegradedNotifiedAt)
-        .into_tuple::<(i32, i64, bool, i64)>()
+        .column(Column::GapSince)
+        .column(Column::GapRuns)
+        .column(Column::GapNotifiedAt)
+        .into_tuple::<(i32, i64, bool, i64, i64, i32, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
-        |(consecutive_failures, last_alert_at, alerting, degraded_notified_at)| AlertState {
+        |(
             consecutive_failures,
             last_alert_at,
             alerting,
             degraded_notified_at,
+            gap_since,
+            gap_runs,
+            gap_notified_at,
+        )| AlertState {
+            consecutive_failures,
+            last_alert_at,
+            alerting,
+            degraded_notified_at,
+            gap_since,
+            gap_runs,
+            gap_notified_at,
         },
     ))
 }
@@ -1159,6 +1180,9 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
             Column::DegradedNotifiedAt,
             Expr::value(state.degraded_notified_at),
         )
+        .col_expr(Column::GapSince, Expr::value(state.gap_since))
+        .col_expr(Column::GapRuns, Expr::value(state.gap_runs))
+        .col_expr(Column::GapNotifiedAt, Expr::value(state.gap_notified_at))
         // Watermark for the status-page rebuilder's delta read. Safe here
         // because the caller only writes when `next != prior` (job_api), so a
         // healthy check acking every minute never bumps it.
@@ -1171,6 +1195,9 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
         .filter(Column::LastAlertAt.eq(expected.last_alert_at))
         .filter(Column::Alerting.eq(expected.alerting))
         .filter(Column::DegradedNotifiedAt.eq(expected.degraded_notified_at))
+        .filter(Column::GapSince.eq(expected.gap_since))
+        .filter(Column::GapRuns.eq(expected.gap_runs))
+        .filter(Column::GapNotifiedAt.eq(expected.gap_notified_at))
         .exec(conn)
         .await?;
     Ok(res.rows_affected > 0)
@@ -1267,6 +1294,7 @@ fn pack_settings(check: &Synthetic) -> Result<serde_json::Value, errors::Error> 
         start: check.start,
         environments: check.environments.clone(),
         confirm_failures: check.confirm_failures,
+        alert_on: check.alert_on,
     })?)
 }
 
@@ -1432,6 +1460,9 @@ pub(crate) mod tests {
             status_run_ts: 0,
             last_run_class: 0,
             last_run_class_at: 0,
+            gap_since: 0,
+            gap_runs: 0,
+            gap_notified_at: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,
@@ -2091,6 +2122,42 @@ pub(crate) mod tests {
         let am: ActiveModel = model.into();
         am.reset_all().insert(&db).await.unwrap();
         db
+    }
+
+    /// The gap state is what makes each gap send one notice pair across restarts and nodes, so
+    /// it must round-trip through the row and be guarded by the compare-and-swap.
+    #[tokio::test]
+    async fn gap_state_round_trips_and_is_guarded() {
+        let db = db_with_one_check(0).await;
+        let prior = get_alert_state(&db, "mon-1").await.unwrap().unwrap();
+        assert_eq!(prior, AlertState::default());
+        let gap = AlertState {
+            gap_since: 1_000,
+            gap_runs: 3,
+            gap_notified_at: 2_000,
+            ..prior
+        };
+        assert!(
+            update_alert_state_if(&db, "mon-1", prior, gap)
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_alert_state(&db, "mon-1").await.unwrap(), Some(gap));
+        // A node that read the state before the gap notice must lose, or it sends a second one.
+        let stale = AlertState {
+            gap_notified_at: 0,
+            ..gap
+        };
+        let other = AlertState {
+            gap_notified_at: 3_000,
+            ..gap
+        };
+        assert!(
+            !update_alert_state_if(&db, "mon-1", stale, other)
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_alert_state(&db, "mon-1").await.unwrap(), Some(gap));
     }
 
     async fn stored_status(db: &sea_orm::DatabaseConnection, id: &str) -> i32 {
