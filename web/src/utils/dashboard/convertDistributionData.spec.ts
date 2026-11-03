@@ -18,6 +18,7 @@ import { convertPanelData } from "./convertPanelData";
 import {
   bucketCounts,
   DISTRIBUTION_DEFAULT_BUCKETS,
+  DISTRIBUTION_MAX_BUCKETS,
   distributionBuckets,
   niceBucketSize,
 } from "./convertDistributionData";
@@ -122,6 +123,31 @@ describe("distribution buckets", () => {
     expect(distributionBuckets([5, 5], {})).toMatchObject({ count: 1 });
   });
 
+  it("widens a bucket size too small for the range, so the buckets still cover every value", () => {
+    const buckets = distributionBuckets([200, 300, 401], { distribution_bucket_size: 0.1 })!;
+    expect(buckets.size).toBe(0.25);
+    expect(buckets.widenedFrom).toBe(0.1);
+    expect(buckets.count).toBeLessThanOrEqual(DISTRIBUTION_MAX_BUCKETS);
+    expect(buckets.start).toBeLessThanOrEqual(200);
+    expect(buckets.start + buckets.count * buckets.size).toBeGreaterThan(401);
+    const counts = bucketCounts([200, 401], buckets);
+    expect(counts[0]).toBe(1);
+    expect(counts[counts.length - 1]).toBe(1);
+    expect(distributionBuckets([0, 10], { distribution_bucket_size: 0.1 })).not.toHaveProperty(
+      "widenedFrom",
+    );
+  });
+
+  it("keeps a full bucket count of the cap within the cap without a warning", () => {
+    const buckets = distributionBuckets([0.3, 997.7], {
+      distribution_bucket_count: DISTRIBUTION_MAX_BUCKETS,
+      distribution_bucket_offset: 0.5,
+    })!;
+    expect(buckets.count).toBeLessThanOrEqual(DISTRIBUTION_MAX_BUCKETS);
+    expect(buckets.start + buckets.count * buckets.size).toBeGreaterThan(997.7);
+    expect(buckets).not.toHaveProperty("widenedFrom");
+  });
+
   it("counts each value into its bucket and clamps past the last one", () => {
     expect(bucketCounts([0, 9.9, 10, 25, 99], { start: 0, size: 10, count: 3 })).toEqual([2, 1, 2]);
   });
@@ -219,6 +245,134 @@ describe("distribution through convertPanelData", () => {
     expect(bytes.options.xAxis.axisLabel.formatter(0)).toBe("0.00B");
   });
 
+  it("names an empty breakdown value so its series has a legend entry", async () => {
+    const size = field("y_axis_2", "Size");
+    const blanks = [
+      { y_axis_1: 5, breakdown_1: "api" },
+      { y_axis_1: 6, breakdown_1: null },
+      { y_axis_1: 7, breakdown_1: "" },
+    ];
+    const one = await viaPanel(panel("distribution", { y: [latency], breakdown: [service] }), [
+      blanks,
+    ]);
+    expect(one.options.series.map((s: any) => s.name)).toEqual(["api", "(empty)"]);
+    expect(one.options.series[1].data.reduce((sum: number, [, n]: number[]) => sum + n, 0)).toBe(2);
+    const two = await viaPanel(
+      panel("distribution", { y: [latency, size], breakdown: [service] }),
+      [blanks.map((row) => ({ ...row, y_axis_2: 1 }))],
+    );
+    expect(two.options.series.map((s: any) => s.name)).toContain("(empty) · Size");
+  });
+
+  it("gives stacked series distinct palette colors when no color mode is set", async () => {
+    // These two names hash to the same default palette color.
+    const clash = [
+      [
+        { y_axis_1: 1, breakdown_1: "svc7" },
+        { y_axis_1: 2, breakdown_1: "svc10" },
+      ],
+    ];
+    for (const color of [undefined, { mode: "palette-classic-by-series", colorBySeries: [] }]) {
+      const { options } = await viaPanel(
+        panel("distribution", { y: [latency], breakdown: [service] }, { color }),
+        clash,
+      );
+      const colors = options.series.map((s: any) => s.itemStyle.color);
+      expect(new Set(colors).size).toBe(colors.length);
+    }
+
+    const mapped = await viaPanel(
+      panel(
+        "distribution",
+        { y: [latency], breakdown: [service] },
+        { color: { colorBySeries: [{ value: "web", color: "#123456" }] } },
+      ),
+      [rows],
+    );
+    expect(mapped.options.series[1].itemStyle.color).toBe("#123456");
+    const fixed = await viaPanel(
+      panel(
+        "distribution",
+        { y: [latency], breakdown: [service] },
+        { color: { mode: "fixed", fixedColor: ["#abcdef"] } },
+      ),
+      [rows],
+    );
+    expect(fixed.options.series.map((s: any) => s.itemStyle.color)).toEqual(["#abcdef", "#abcdef"]);
+  });
+
+  it("shows the real bucket edges in the tooltip even when Decimals rounds them", async () => {
+    const { options } = await viaPanel(
+      panel(
+        "distribution",
+        { y: [latency] },
+        {
+          unit: "milliseconds",
+          decimals: 0,
+          distribution_bucket_size: 1,
+          distribution_bucket_offset: 0.5,
+        },
+      ),
+      [[{ y_axis_1: 199.7 }, { y_axis_1: 200.7 }]],
+    );
+    const tooltip = options.tooltip.formatter([
+      { dataIndex: 0, color: "#000", seriesName: "Latency", value: [200, 1] },
+    ]);
+    expect(tooltip).toContain("199.5ms – 200.5ms");
+    const plain = await viaPanel(
+      panel("distribution", { y: [latency] }, { decimals: 0, distribution_bucket_size: 10 }),
+      [rows],
+    );
+    expect(
+      plain.options.tooltip.formatter([
+        { dataIndex: 0, color: "#000", seriesName: "Latency", value: [5, 1] },
+      ]),
+    ).toContain("0 – 10");
+  });
+
+  it("keeps tooltip edges exact when the unit rescales, without trailing zeros on plain numbers", async () => {
+    const tooltipAt = async (config: Record<string, any>, values: number[], index: number) => {
+      const { options } = await viaPanel(panel("distribution", { y: [latency] }, config), [
+        values.map((y_axis_1) => ({ y_axis_1 })),
+      ]);
+      return options.tooltip.formatter([
+        { dataIndex: index, color: "#000", seriesName: "Latency", value: [0, 1] },
+      ]);
+    };
+    const ms = { unit: "milliseconds", decimals: 0, distribution_bucket_size: 1 };
+    expect(
+      await tooltipAt({ ...ms, distribution_bucket_offset: 0.5 }, [1499.7, 1500.2], 0),
+    ).toContain("1.4995s – 1.5005s");
+    expect(await tooltipAt({ ...ms, distribution_bucket_size: 200 }, [1000, 1500], 0)).toContain(
+      "1s – 1.2s",
+    );
+    expect(await tooltipAt({ distribution_bucket_size: 25 }, [30, 60], 0)).toContain("25 – 50");
+  });
+
+  it("counts a value on a bucket edge into the bucket that starts there, and shows no -0 edge", () => {
+    const buckets = distributionBuckets([0.1, 0.3], { distribution_bucket_size: 0.1 })!;
+    expect(bucketCounts([0.1, 0.3], buckets)).toEqual([1, 0, 1]);
+  });
+
+  it("warns when the bucket size is widened, and keeps room for the Count title", async () => {
+    const values = [[{ y_axis_1: 200 }, { y_axis_1: 401 }]];
+    const widened = await viaPanel(
+      panel("distribution", { y: [latency] }, { distribution_bucket_size: 0.1 }),
+      values,
+    );
+    expect(widened.extras.seriesLimit.displayCapMessage).toBe(
+      "Bucket size 0.1 is too small for this range, so 0.25 is used",
+    );
+    expect(widened.extras).not.toHaveProperty("limitNumberOfSeriesWarningMessage");
+    expect(widened.options.xAxis.max).toBeGreaterThan(401);
+    expect(widened.options.grid.top).toBe(28);
+    const normal = await viaPanel(panel("distribution", { y: [latency] }), values);
+    expect(normal.extras.seriesLimit).toBeUndefined();
+    expect(normal.options.graphic).toEqual([]);
+    expect(normal.options.grid.top).toBe(28);
+    expect(normal.options.yAxis.name).toBe("Count");
+  });
+
   it("returns an empty series list when no value is numeric", async () => {
     const { options } = await viaPanel(panel("distribution", { y: [latency] }), [
       [{ y_axis_1: "x" }],
@@ -257,7 +411,7 @@ describe("distribution builder SQL", () => {
       dashboardPanelData: { data: schema },
     });
     expect(sql).toBe(
-      'SELECT latency_ms as "y_axis_1", service as "breakdown_1" FROM "demo_app"  LIMIT 10000',
+      'SELECT latency_ms as "y_axis_1", service as "breakdown_1" FROM "demo_app"  WHERE latency_ms IS NOT NULL LIMIT 10000',
     );
     const limited = buildSQLChartQuery({
       queryData: { ...queryData, config: { limit: 500 } },
@@ -271,5 +425,66 @@ describe("distribution builder SQL", () => {
       dashboardPanelData: { data: schema },
     });
     expect(bar).not.toContain("LIMIT");
+    expect(bar).not.toContain("IS NOT NULL");
+  });
+
+  it("adds no null filter when a y field is an aggregate or raw SQL, which WHERE cannot hold", () => {
+    const schema = panel("distribution", { y: [latency] });
+    const build = (y: any[]) =>
+      buildSQLChartQuery({
+        queryData: {
+          ...schema.queries[0],
+          fields: { ...schema.queries[0].fields, y, filter: { conditions: [] } },
+          joins: [],
+        },
+        chartType: "distribution",
+        dashboardPanelData: { data: schema },
+      });
+    const column = { ...latency, args: [{ type: "field", value: { field: "latency_ms" } }] };
+    expect(build([{ ...column, functionName: "avg" }])).not.toContain("IS NOT NULL");
+    expect(build([{ ...latency, type: "raw", rawQuery: "avg(latency_ms)" }])).not.toContain(
+      "IS NOT NULL",
+    );
+    expect(build([column, { ...column, alias: "y_axis_2", functionName: "count" }])).not.toContain(
+      "IS NOT NULL",
+    );
+  });
+
+  it("keeps rows with any y value, ANDed with the user's filters", () => {
+    const schema = panel("distribution", { y: [latency] });
+    const yField = (alias: string, column: string) => ({
+      ...field(alias, column),
+      args: [{ type: "field", value: { field: column } }],
+    });
+    const fields = {
+      ...schema.queries[0].fields,
+      y: [yField("y_axis_1", "code"), yField("y_axis_2", "floatvalue")],
+      filter: {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          {
+            type: "condition",
+            values: [],
+            column: { field: "method" },
+            operator: "=",
+            value: "'GET'",
+            logicalOperator: "AND",
+            filterType: "condition",
+          },
+        ],
+      },
+    };
+    const sql = buildSQLChartQuery({
+      queryData: { ...schema.queries[0], fields, joins: [] },
+      chartType: "distribution",
+      dashboardPanelData: {
+        data: schema,
+        layout: { currentQueryIndex: 0 },
+        meta: { stream: { selectedStreamFields: [] } },
+      },
+    });
+    expect(sql).toContain("AND (code IS NOT NULL OR floatvalue IS NOT NULL) LIMIT 10000");
+    expect(sql).toMatch(/WHERE \(.*method.*\) AND \(code IS NOT NULL/);
   });
 });

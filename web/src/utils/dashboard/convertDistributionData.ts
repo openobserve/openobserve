@@ -35,6 +35,8 @@ export interface DistributionBuckets {
   start: number;
   size: number;
   count: number;
+  /** The set bucket size, when it needed more than the bucket cap and a wider size replaced it. */
+  widenedFrom?: number;
 }
 
 const toNumber = (value: unknown): number | null => {
@@ -58,6 +60,12 @@ export const niceBucketSize = (raw: number): number => {
   return factor * power;
 };
 
+const EDGE_MAX_DECIMALS = 8;
+
+// Float division can land a value on an edge a hair below it, which would count it one bucket early.
+const bucketIndex = (value: number, start: number, size: number) =>
+  Math.floor((value - start) / size + 1e-9);
+
 /** Bucket layout for the values: a set bucket size wins over the bucket count, and the offset shifts every edge. */
 export const distributionBuckets = (values: number[], config: any): DistributionBuckets | null => {
   if (!values.length) return null;
@@ -70,19 +78,29 @@ export const distributionBuckets = (values: number[], config: any): Distribution
   const offset = toNumber(config?.distribution_bucket_offset) ?? DISTRIBUTION_DEFAULT_OFFSET;
   const requested = Math.round(positive(config?.distribution_bucket_count) ?? 0);
   const wanted = Math.min(DISTRIBUTION_MAX_BUCKETS, requested || DISTRIBUTION_DEFAULT_BUCKETS);
-  const size =
-    positive(config?.distribution_bucket_size) ??
-    niceBucketSize(max > min ? (max - min) / wanted : Math.abs(max) || 1);
-  const start = Math.floor((min - offset) / size) * size + offset;
-  const count = Math.min(DISTRIBUTION_MAX_BUCKETS, Math.floor((max - start) / size) + 1);
-  return { start, size, count };
+  const setSize = positive(config?.distribution_bucket_size);
+  const layout = (size: number) => {
+    const start = bucketIndex(min, offset, size) * size + offset;
+    return { start, size, count: bucketIndex(max, start, size) + 1 };
+  };
+  const buckets = layout(
+    setSize ?? niceBucketSize(max > min ? (max - min) / wanted : Math.abs(max) || 1),
+  );
+  if (buckets.count <= DISTRIBUTION_MAX_BUCKETS) return buckets;
+  // Offset alignment can add a bucket at each end, so the range is spread over two fewer than the cap.
+  const widened = layout(niceBucketSize((max - min) / (DISTRIBUTION_MAX_BUCKETS - 2)));
+  return {
+    ...widened,
+    count: Math.min(DISTRIBUTION_MAX_BUCKETS, widened.count),
+    ...(setSize !== null ? { widenedFrom: setSize } : {}),
+  };
 };
 
-/** Counts per bucket; a value past the last bucket (only when the cap cut the range) lands in the last one. */
+/** Counts per bucket; a value outside the layout lands in the nearest end bucket. */
 export const bucketCounts = (values: number[], buckets: DistributionBuckets): number[] => {
   const counts = new Array(buckets.count).fill(0);
   for (const value of values) {
-    const index = Math.floor((value - buckets.start) / buckets.size);
+    const index = bucketIndex(value, buckets.start, buckets.size);
     counts[Math.max(0, Math.min(buckets.count - 1, index))] += 1;
   }
   return counts;
@@ -92,6 +110,12 @@ interface ValueGroup {
   name: string;
   values: number[];
 }
+
+// An empty breakdown value still needs a legend entry, so it gets a visible name.
+const breakdownName = (value: unknown): string => {
+  const text = String(value ?? "");
+  return text === "" ? gt("dashboard.utils.distributionEmptyBreakdown") : text;
+};
 
 /** Numeric y values per series: one per breakdown value, else per y field; several y fields with a breakdown name both. */
 const valueGroups = (panelSchema: any, data: any[]): ValueGroup[] => {
@@ -107,7 +131,7 @@ const valueGroups = (panelSchema: any, data: any[]): ValueGroup[] => {
       rows.forEach((row: any) => {
         const value = toNumber(getDataValue(row, field?.alias));
         if (value === null) return;
-        const group = breakdown ? String(getDataValue(row, breakdown.alias) ?? "") : null;
+        const group = breakdown ? breakdownName(getDataValue(row, breakdown.alias)) : null;
         const name = group === null ? label : yFields.length > 1 ? `${group} · ${label}` : group;
         if (!groups.has(name)) groups.set(name, { name, values: [] });
         groups.get(name)!.values.push(value);
@@ -133,17 +157,31 @@ export const convertDistributionData = (panelSchema: any, data: any, store: any)
   if (!buckets) return { options: { series: [] }, extras: { panelId: panelSchema?.id } };
 
   const theme = store?.state?.theme;
-  const format = (value: number) =>
-    formatUnitValue(getUnitValue(value, config.unit, config.unit_custom, config.decimals));
-  const range = (index: number) => {
-    const lower = buckets.start + index * buckets.size;
-    return `${format(lower)} – ${format(lower + buckets.size)}`;
+  const plainUnit = !config.unit || config.unit === "default";
+  // Units rescale (ms to s, B to KB), so decimals grow until the shown number is the exact edge.
+  const exact = (value: number, decimals: number = config.decimals ?? 2) => {
+    const show = (digits: number) => getUnitValue(value, config.unit, config.unit_custom, digits);
+    const target = Number(show(EDGE_MAX_DECIMALS + 4).value);
+    let digits = Math.max(0, decimals);
+    while (digits < EDGE_MAX_DECIMALS && Math.abs(Number(show(digits).value) - target) > 1e-9) {
+      digits += 1;
+    }
+    const text = formatUnitValue(show(digits));
+    return plainUnit ? trimZeroFraction(text) : text;
   };
+  const edge = (index: number) => {
+    const value = buckets.start + index * buckets.size;
+    return Math.abs(value) < buckets.size * 1e-9 ? 0 : value;
+  };
+  const range = (index: number) => `${exact(edge(index))} – ${exact(edge(index + 1))}`;
+  // Name hashing can give two stacked series one color, so the default palette goes by series order.
+  const byOrder = !config.color?.mode || config.color.mode === "palette-classic-by-series";
+  const colorConfig = byOrder ? { mode: "palette-classic" } : config.color;
   const series = groups.map((group, index) => {
     const counts = bucketCounts(group.values, buckets);
     const color =
       getSeriesColor(
-        config.color ?? null,
+        colorConfig,
         group.name,
         [],
         0,
@@ -171,7 +209,7 @@ export const convertDistributionData = (panelSchema: any, data: any, store: any)
       containLabel: true,
       left: 8,
       right: 16,
-      top: sampled ? 28 : 16,
+      top: 28,
       bottom: showLegend ? 32 : 8,
     },
     graphic: sampled ? [rawSampleNote()] : [],
@@ -231,5 +269,17 @@ export const convertDistributionData = (panelSchema: any, data: any, store: any)
     },
     series,
   };
-  return { options, extras: { panelId: panelSchema?.id } };
+  const extras: Record<string, any> = { panelId: panelSchema?.id };
+  if (buckets.widenedFrom !== undefined) {
+    extras.seriesLimit = {
+      shown: buckets.count,
+      total: Math.ceil(buckets.count * (buckets.size / buckets.widenedFrom)),
+      cap: DISTRIBUTION_MAX_BUCKETS,
+      displayCapMessage: gt("dashboard.utils.distributionBucketSizeWidened", {
+        requested: exact(buckets.widenedFrom, 0),
+        size: exact(buckets.size, 0),
+      }),
+    };
+  }
+  return { options, extras };
 };
