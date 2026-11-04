@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{sync::Arc, task::Poll};
 
 use arrow_schema::SchemaRef;
 use config::{
@@ -32,13 +32,14 @@ use datafusion::{
     },
 };
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
-use flight::common::{RemoteScanMetrics, RemoteScanState};
+use flight::common::{CallReport, RemoteCall, RemoteScanMetrics, RemoteScanState};
 use futures::{StreamExt, TryStreamExt};
 use futures_util::pin_mut;
 use opentelemetry::context::FutureExt as _;
+use parking_lot::Mutex;
 use rand::prelude::SliceRandom;
 
-use super::{node::RemoteScanNode, profile::NodeProfileRecorder};
+use super::node::RemoteScanNode;
 use crate::datafusion::{
     distributed_plan::{
         codec::get_physical_extension_codec,
@@ -161,6 +162,10 @@ impl RemoteScanExec {
         self.remote_scan_node.search_infos.is_analyze
     }
 
+    pub fn remote_scan_node(&self) -> &RemoteScanNode {
+        &self.remote_scan_node
+    }
+
     #[cfg(test)]
     pub fn index_optimize_mode(&self) -> Option<IndexOptimizeMode> {
         self.remote_scan_node
@@ -224,6 +229,7 @@ impl ExecutionPlan for RemoteScanExec {
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
         let baseline_metrics = RemoteScanMetrics::new(partition, &self.metrics);
+        let end_time = baseline_metrics.end_time.clone();
         let fut = get_remote_batch(
             self.remote_scan_node.clone(),
             partition,
@@ -232,7 +238,13 @@ impl ExecutionPlan for RemoteScanExec {
             self.state.clone(),
             baseline_metrics,
         );
-        let stream = futures::stream::once(fut).try_flatten();
+        let stream = futures::stream::once(fut).try_flatten().chain(
+            // Polled only once the call's stream is exhausted, so a stream cut short has no end.
+            futures::stream::poll_fn(move |_| {
+                end_time.record();
+                Poll::Ready(None)
+            }),
+        );
         Ok(Box::pin(RecordBatchStreamAdapter::new(
             self.schema().clone(),
             stream,
@@ -257,8 +269,9 @@ async fn get_remote_batch(
         scan_stats,
         peak_memory,
         partial_err,
-        node_profiles,
+        calls,
     } = state;
+    metrics.start_time.record();
     let start = std::time::Instant::now();
     let cfg = config::get_config();
     let trace_id = remote_scan_node.query_identifier.trace_id.clone();
@@ -291,12 +304,6 @@ async fn get_remote_batch(
         }
     }
 
-    let mut recorder = if remote_scan_node.search_infos.is_analyze {
-        NodeProfileRecorder::start(node_profiles, partition, node.as_ref())
-    } else {
-        NodeProfileRecorder::default()
-    };
-
     let empty_stream = EmptyStream::new(
         &trace_id,
         schema.clone(),
@@ -307,13 +314,21 @@ async fn get_remote_batch(
     );
 
     // fast return for empty file list querier node
-    if !is_super
+    let skipped = !is_super
         && is_querier
         && !is_ingester
         && !enrich_mode
-        && remote_scan_node.is_file_list_empty(partition)
-    {
-        recorder.mark_skipped();
+        && remote_scan_node.is_file_list_empty(partition);
+    let report = Arc::new(Mutex::new(CallReport::default()));
+    if remote_scan_node.search_infos.is_analyze {
+        let call = RemoteCall {
+            metrics: metrics.clone(),
+            skipped,
+            report: report.clone(),
+        };
+        calls.lock().insert(partition, call);
+    }
+    if skipped {
         return Ok(get_empty_stream(empty_stream));
     }
 
@@ -377,7 +392,7 @@ async fn get_remote_batch(
         .with_partial_err(partial_err.clone())
         .with_peak_memory(peak_memory)
         .with_start_time(start)
-        .with_node_profile(recorder);
+        .with_call_report(report);
 
     let mut stream = FlightDecoderStream::new(stream, schema.clone(), metrics, query_context);
     let stream = async_stream::stream! {
@@ -501,6 +516,55 @@ mod tests {
         assert!(!exec.analyze());
         let exec = exec.set_analyze();
         assert!(exec.analyze());
+    }
+
+    #[derive(Debug)]
+    struct QuerierNode;
+
+    impl config::meta::cluster::NodeInfo for QuerierNode {
+        fn get_grpc_addr(&self) -> String {
+            "localhost:9090".to_string()
+        }
+        fn get_auth_token(&self) -> String {
+            "token".to_string()
+        }
+        fn get_name(&self) -> String {
+            "querier".to_string()
+        }
+        fn is_local(&self) -> bool {
+            true
+        }
+        fn is_querier(&self) -> bool {
+            true
+        }
+    }
+
+    #[tokio::test]
+    async fn test_analyze_records_a_skipped_call_with_its_times() {
+        let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
+        let node = RemoteScanNode {
+            nodes: vec![Arc::new(QuerierNode), Arc::new(QuerierNode)],
+            opentelemetry_context: opentelemetry::Context::current(),
+            query_identifier: Default::default(),
+            search_infos: Default::default(),
+            index_info: Default::default(),
+            super_cluster_info: Default::default(),
+        };
+        let exec = RemoteScanExec::new(Arc::new(EmptyExec::new(schema)), node)
+            .unwrap()
+            .set_analyze();
+        // The enrich-mode node is always called, so only the other one is skipped.
+        let partition = 1 - exec.enrich_mode_node_idx;
+        let stream = exec
+            .execute(partition, Arc::new(TaskContext::default()))
+            .unwrap();
+        let _: Vec<_> = stream.try_collect().await.unwrap();
+
+        let calls = exec.state.calls.lock();
+        let call = &calls[&partition];
+        assert!(call.skipped);
+        assert!(call.metrics.start_time.value().is_some());
+        assert!(call.metrics.end_time.value().is_some());
     }
 
     #[test]

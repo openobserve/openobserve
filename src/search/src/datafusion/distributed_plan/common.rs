@@ -22,9 +22,8 @@ use datafusion::{
     common::Result, execution::SendableRecordBatchStream,
     physical_plan::stream::RecordBatchStreamAdapter,
 };
+use flight::common::CallReport;
 use parking_lot::Mutex;
-
-use super::profile::NodeProfileRecorder;
 
 #[derive(Debug)]
 pub struct QueryContext {
@@ -40,7 +39,7 @@ pub struct QueryContext {
     pub req_id: u64,
     pub req_last_time: std::time::Instant,
     pub print_key_event: bool,
-    pub node_profile: NodeProfileRecorder,
+    pub call_report: Arc<Mutex<CallReport>>,
 }
 
 impl QueryContext {
@@ -58,7 +57,7 @@ impl QueryContext {
             req_id: 0,
             req_last_time: std::time::Instant::now(),
             print_key_event: config::get_config().common.print_key_event,
-            node_profile: NodeProfileRecorder::default(),
+            call_report: Arc::default(),
         }
     }
 
@@ -97,8 +96,8 @@ impl QueryContext {
         self
     }
 
-    pub fn with_node_profile(mut self, node_profile: NodeProfileRecorder) -> Self {
-        self.node_profile = node_profile;
+    pub fn with_call_report(mut self, call_report: Arc<Mutex<CallReport>>) -> Self {
+        self.call_report = call_report;
         self
     }
 }

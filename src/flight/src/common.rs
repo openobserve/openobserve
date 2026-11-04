@@ -38,7 +38,7 @@ use datafusion::{
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
-use crate::profile::{ProfileNode, RemoteNodeProfile};
+use crate::profile::ProfileNode;
 
 #[derive(Debug, Clone)]
 pub struct RemoteScanMetrics {
@@ -54,6 +54,10 @@ pub struct RemoteScanMetrics {
     /// `MetricValue::OutputBytes` so DataFusion formats it with `human_readable_size`
     /// (e.g. "1.5 GB") rather than `human_readable_count` ("1.57 B" = billion)
     pub bytes_received: metrics::Count,
+    /// When the call started; text plans drop timestamps, so it only shows in the profile.
+    pub start_time: metrics::Timestamp,
+    /// Unset while the call's stream runs, and for a stream dropped before it ended.
+    pub end_time: metrics::Timestamp,
 }
 
 impl RemoteScanMetrics {
@@ -77,6 +81,8 @@ impl RemoteScanMetrics {
             output_rows,
             batches_received,
             bytes_received,
+            start_time: MetricBuilder::new(metrics).start_timestamp(input_partition),
+            end_time: MetricBuilder::new(metrics).end_timestamp(input_partition),
         }
     }
 
@@ -192,8 +198,8 @@ pub enum NodeRole {
     ClusterLeader(RemoteScanState),
 }
 
-/// Per-partition profiles of one remote scan, keyed by partition.
-pub type NodeProfiles = Arc<Mutex<BTreeMap<usize, RemoteNodeProfile>>>;
+/// The calls of one remote scan, keyed by partition; filled only for EXPLAIN ANALYZE.
+pub type RemoteCalls = Arc<Mutex<BTreeMap<usize, RemoteCall>>>;
 
 /// What a remote scan collects from the nodes it calls, shared by every copy of the scan.
 #[derive(Debug, Clone, Default)]
@@ -201,8 +207,35 @@ pub struct RemoteScanState {
     pub scan_stats: Arc<Mutex<ScanStats>>,
     pub peak_memory: Arc<AtomicUsize>,
     pub partial_err: Arc<Mutex<String>>,
-    /// Filled only for EXPLAIN ANALYZE.
-    pub node_profiles: NodeProfiles,
+    pub calls: RemoteCalls,
+}
+
+/// One call a remote scan made: the counters it keeps live and what the called node sent back.
+#[derive(Debug, Clone)]
+pub struct RemoteCall {
+    pub metrics: RemoteScanMetrics,
+    /// The node had no files, so the call returned without contacting it.
+    pub skipped: bool,
+    pub report: Arc<Mutex<CallReport>>,
+}
+
+/// What a called node sent back about itself, filled in by the caller's decoder as it arrives.
+#[derive(Debug, Default)]
+pub struct CallReport {
+    pub scan_stats: Option<ScanStats>,
+    pub plan: Option<ProfileNode>,
+}
+
+impl CallReport {
+    pub fn add_scan_stats(&mut self, stats: &ScanStats) {
+        self.scan_stats.get_or_insert_default().add(stats);
+    }
+
+    pub fn record_plan(&mut self, metrics: Vec<Metrics>) {
+        if let Some(plan) = metrics.into_iter().find_map(|m| m.profile) {
+            self.plan = Some(plan);
+        }
+    }
 }
 
 pub struct MetricsInfo {

@@ -15,81 +15,17 @@
 
 use std::fmt;
 
-use config::{
-    meta::{cluster::NodeInfo, search::ScanStats},
-    utils::time::now_micros,
-};
+use config::{meta::cluster::NodeInfo, utils::time::now_micros};
 use datafusion::physical_plan::{
     DisplayFormatType, ExecutionPlan, ExecutionPlanProperties,
-    metrics::{MetricValue, MetricsSet},
+    metrics::{MetricValue, MetricsSet, Timestamp},
 };
 use flight::{
-    common::{Metrics, NodeProfiles, RemoteScanMetrics},
+    common::RemoteCall,
     profile::{MetricKind, ProfileInputs, ProfileMetric, ProfileNode, RemoteNodeProfile},
 };
 
 use super::remote_scan_exec::RemoteScanExec;
-
-/// One remote node as the leader sees it, published to its scan on drop; the default records
-/// nothing.
-#[derive(Debug, Default)]
-pub struct NodeProfileRecorder {
-    profiles: Option<NodeProfiles>,
-    profile: RemoteNodeProfile,
-}
-
-impl NodeProfileRecorder {
-    pub fn start(profiles: NodeProfiles, partition: usize, node: &dyn NodeInfo) -> Self {
-        let role = match (node.is_querier(), node.is_ingester()) {
-            (true, true) => "querier,ingester",
-            (true, false) => "querier",
-            (false, true) => "ingester",
-            (false, false) => "",
-        };
-        Self {
-            profiles: Some(profiles),
-            profile: RemoteNodeProfile {
-                partition,
-                node_name: node.get_name(),
-                node_address: node.get_grpc_addr(),
-                role: role.to_string(),
-                cluster: node.get_cluster(),
-                start_us: now_micros(),
-                ..Default::default()
-            },
-        }
-    }
-
-    /// Keeps the plan the node sent back about itself.
-    pub fn record_plan(&mut self, metrics: Vec<Metrics>) {
-        if let Some(plan) = metrics.into_iter().find_map(|m| m.profile) {
-            self.profile.plan = Some(plan);
-        }
-    }
-
-    pub fn mark_skipped(&mut self) {
-        self.profile.skipped = true;
-    }
-
-    pub fn finish(&mut self, metrics: &RemoteScanMetrics, scan_stats: ScanStats) {
-        let p = &mut self.profile;
-        p.output_rows = metrics.output_rows.value() as u64;
-        p.output_batches = metrics.batches_received.value() as u64;
-        p.output_bytes = metrics.bytes_received.value() as u64;
-        p.decode_ns = metrics.decode_time.value() as u64;
-        p.scan_stats = Some(scan_stats);
-    }
-}
-
-impl Drop for NodeProfileRecorder {
-    fn drop(&mut self) {
-        if let Some(profiles) = self.profiles.take() {
-            self.profile.end_us = now_micros();
-            let profile = std::mem::take(&mut self.profile);
-            profiles.lock().insert(profile.partition, profile);
-        }
-    }
-}
 
 /// A plan node's own line, exactly as EXPLAIN prints it.
 struct PlanDetail<'a>(&'a dyn ExecutionPlan);
@@ -103,15 +39,7 @@ impl fmt::Display for PlanDetail<'_> {
 /// Profile of an executed plan; a remote scan lists the nodes it called, as its children never ran.
 pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
     let inputs = match plan.downcast_ref::<RemoteScanExec>() {
-        Some(remote) => ProfileInputs::Remote(
-            remote
-                .state
-                .node_profiles
-                .lock()
-                .values()
-                .cloned()
-                .collect(),
-        ),
+        Some(remote) => ProfileInputs::Remote(remote_nodes(remote)),
         None => ProfileInputs::Children(
             plan.children()
                 .into_iter()
@@ -129,6 +57,62 @@ pub fn build_profile(plan: &dyn ExecutionPlan) -> ProfileNode {
             .unwrap_or_default(),
         inputs,
     }
+}
+
+/// The nodes a remote scan called, read from each call's live counters when the profile is built.
+fn remote_nodes(remote: &RemoteScanExec) -> Vec<RemoteNodeProfile> {
+    let now = now_micros();
+    let nodes = &remote.remote_scan_node().nodes;
+    remote
+        .state
+        .calls
+        .lock()
+        .iter()
+        .filter_map(|(&partition, call)| {
+            let node = nodes.get(partition)?;
+            Some(remote_node(partition, node.as_ref(), call, now))
+        })
+        .collect()
+}
+
+fn remote_node(
+    partition: usize,
+    node: &dyn NodeInfo,
+    call: &RemoteCall,
+    now: i64,
+) -> RemoteNodeProfile {
+    let metrics = &call.metrics;
+    let report = call.report.lock();
+    RemoteNodeProfile {
+        partition,
+        node_name: node.get_name(),
+        node_address: node.get_grpc_addr(),
+        role: role_name(node).to_string(),
+        cluster: node.get_cluster(),
+        start_us: timestamp_us(&metrics.start_time).unwrap_or(now),
+        // A call still running, or cut short by a LIMIT, ends when the profile is built.
+        end_us: timestamp_us(&metrics.end_time).unwrap_or(now),
+        output_rows: metrics.output_rows.value() as u64,
+        output_batches: metrics.batches_received.value() as u64,
+        output_bytes: metrics.bytes_received.value() as u64,
+        decode_ns: metrics.decode_time.value() as u64,
+        skipped: call.skipped,
+        scan_stats: report.scan_stats,
+        plan: report.plan.clone(),
+    }
+}
+
+fn role_name(node: &dyn NodeInfo) -> &'static str {
+    match (node.is_querier(), node.is_ingester()) {
+        (true, true) => "querier,ingester",
+        (true, false) => "querier",
+        (false, true) => "ingester",
+        (false, false) => "",
+    }
+}
+
+fn timestamp_us(timestamp: &Timestamp) -> Option<i64> {
+    timestamp.value().map(|t| t.timestamp_micros())
 }
 
 /// Aggregates and orders the metrics the same way the text plan does, so `display` matches it.
@@ -195,6 +179,7 @@ mod tests {
 
     use arrow::array::{Int32Array, RecordBatch};
     use arrow_schema::{DataType, Field, Schema};
+    use config::meta::search::ScanStats;
     use datafusion::{
         physical_plan::{
             collect,
@@ -205,6 +190,7 @@ mod tests {
         },
         prelude::SessionContext,
     };
+    use flight::common::{Metrics, RemoteScanMetrics};
 
     use super::*;
     use crate::datafusion::distributed_plan::node::RemoteScanNode;
@@ -242,52 +228,6 @@ mod tests {
             vec![Arc::new(Int32Array::from_iter_values(0..rows))],
         )
         .unwrap()
-    }
-
-    #[test]
-    fn test_recorder_publishes_one_node_on_drop() {
-        let profiles = NodeProfiles::default();
-        let mut recorder = NodeProfileRecorder::start(profiles.clone(), 2, &TestNode);
-        let metrics = RemoteScanMetrics::new(2, &ExecutionPlanMetricsSet::new());
-        metrics.record_output(&batch(3));
-        metrics.record_output(&batch(4));
-        recorder.record_plan(vec![Metrics {
-            profile: Some(ProfileNode {
-                name: "FilterExec".to_string(),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }]);
-        recorder.finish(
-            &metrics,
-            ScanStats {
-                files: 5,
-                ..Default::default()
-            },
-        );
-        assert!(profiles.lock().is_empty());
-        drop(recorder);
-
-        let p = profiles.lock().get(&2).cloned().unwrap();
-        assert_eq!(p.node_name, "q-0");
-        assert_eq!(p.role, "querier");
-        assert_eq!(p.output_rows, 7);
-        assert_eq!(p.output_batches, 2);
-        assert!(p.end_us >= p.start_us);
-        assert_eq!(p.scan_stats.unwrap().files, 5);
-        assert_eq!(p.plan.unwrap().name, "FilterExec");
-    }
-
-    #[test]
-    fn test_recorder_publishes_skipped_and_unfinished_nodes() {
-        let profiles = NodeProfiles::default();
-        NodeProfileRecorder::start(profiles.clone(), 0, &TestNode).mark_skipped();
-        drop(NodeProfileRecorder::start(profiles.clone(), 1, &TestNode));
-        NodeProfileRecorder::default().mark_skipped();
-        let profiles = profiles.lock();
-        assert_eq!(profiles.len(), 2);
-        assert!(profiles[&0].skipped);
-        assert!(!profiles[&1].skipped && profiles[&1].scan_stats.is_none());
     }
 
     #[test]
@@ -354,27 +294,68 @@ mod tests {
         assert_eq!(children[0].name, "EmptyExec");
     }
 
-    #[test]
-    fn test_build_profile_stops_at_remote() {
+    fn remote_scan() -> RemoteScanExec {
         let node = RemoteScanNode {
-            nodes: vec![Arc::new(TestNode)],
+            nodes: vec![Arc::new(TestNode), Arc::new(TestNode)],
             opentelemetry_context: opentelemetry::Context::current(),
             query_identifier: Default::default(),
             search_infos: Default::default(),
             index_info: Default::default(),
             super_cluster_info: Default::default(),
         };
-        let remote = RemoteScanExec::new(empty(), node).unwrap();
-        drop(NodeProfileRecorder::start(
-            remote.state.node_profiles.clone(),
-            0,
-            &TestNode,
-        ));
+        RemoteScanExec::new(empty(), node).unwrap()
+    }
+
+    fn started_call(remote: &RemoteScanExec, partition: usize) -> RemoteCall {
+        let call = RemoteCall {
+            metrics: RemoteScanMetrics::new(partition, &remote.metrics),
+            skipped: false,
+            report: Default::default(),
+        };
+        call.metrics.start_time.record();
+        remote.state.calls.lock().insert(partition, call.clone());
+        call
+    }
+
+    #[test]
+    fn test_build_profile_reads_each_remote_call() {
+        let remote = remote_scan();
+        let finished = started_call(&remote, 0);
+        finished.metrics.record_output(&batch(3));
+        finished.metrics.record_output(&batch(4));
+        {
+            let mut report = finished.report.lock();
+            report.add_scan_stats(&ScanStats {
+                files: 5,
+                ..Default::default()
+            });
+            report.record_plan(vec![Metrics {
+                profile: Some(ProfileNode {
+                    name: "FilterExec".to_string(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }]);
+        }
+        finished.metrics.end_time.record();
+        started_call(&remote, 1);
+
         let profile = build_profile(&remote);
         assert_eq!(profile.name, "RemoteScanExec");
-        let ProfileInputs::Remote(remote) = profile.inputs else {
+        let ProfileInputs::Remote(nodes) = profile.inputs else {
             panic!("expected remote inputs");
         };
-        assert_eq!(remote[0].node_name, "q-0");
+        assert_eq!(nodes.len(), 2);
+        let p = &nodes[0];
+        assert_eq!((p.partition, p.node_name.as_str()), (0, "q-0"));
+        assert_eq!(p.role, "querier");
+        assert_eq!((p.output_rows, p.output_batches), (7, 2));
+        assert!(p.start_us > 0 && p.end_us >= p.start_us);
+        assert_eq!(p.scan_stats.unwrap().files, 5);
+        assert_eq!(p.plan.as_ref().unwrap().name, "FilterExec");
+
+        let running = &nodes[1];
+        assert!(running.end_us >= running.start_us);
+        assert!(running.scan_stats.is_none() && running.plan.is_none());
     }
 }
