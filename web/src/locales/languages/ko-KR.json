@@ -9898,27 +9898,184 @@
     "scrollLeft": "서비스 왼쪽으로 스크롤",
     "scrollRight": "서비스 오른쪽으로 스크롤",
     "untitledIncident": "제목 없는 인시던트",
-    "allClear": "모든 시스템 정상",
-    "allClearDesc": "선택한 기간에 활성 이상 징후, 인시던트 또는 성능이 저하된 서비스가 없습니다. 인프라가 정상입니다.",
-    "allClearDescScoped": "선택한 시간 범위에 미해결 인시던트, 이상 징후 또는 성능이 저하된 서비스가 없습니다.",
     "notMonitoredTitle": "아직 모니터링하는 항목이 없습니다",
     "notMonitoredDesc": "데이터는 도착하고 있지만 이에 대해 실행되는 알림이나 이상 감지 검사가 없습니다. 하나를 추가하면 개요에서 주의가 필요한 항목을 모두 나열합니다.",
     "notMonitoredAlert": "알림 생성",
     "notMonitoredAlertDesc": "쿼리가 임계값을 초과하면 알림 받기",
     "notMonitoredAnomaly": "이상 감지 설정",
     "notMonitoredAnomalyDesc": "임계값을 지정하지 않고 비정상적인 볼륨 표시",
-    "emptyActionAlerts": "알림 규칙 보기",
-    "emptyActionAlertsDesc": "구성된 알림 및 임계값 검토",
     "emptyActionLogs": "로그 살펴보기",
     "emptyActionLogsDesc": "로그 스트림 검색 및 필터링",
-    "emptyActionTraces": "트레이스 탐색",
-    "emptyActionTracesDesc": "분산 트레이스 및 서비스 지연 시간을 검사하세요.",
     "anomalyDetectedTitle": "이상 감지 — {name}",
     "anomalyDetectedDescription": "스트림: {stream} · 이상 지점 {count}개",
     "secondsAgo": "{count}초 전",
     "minutesAgo": "{count}분 전",
     "hoursAgo": "{count}시간 전",
-    "daysAgo": "{count}일 전"
+    "daysAgo": "{count}일 전",
+    "cards": {
+      "firingAlerts": "발생 중인 알림",
+      "failingRules": "실패 중인 규칙",
+      "openIncidents": "미해결 인시던트",
+      "pipelineErrors": "파이프라인 오류",
+      "pipelinesOf": "{enabled}개 활성화됨",
+      "quietStreams": "조용한 스트림",
+      "firingNone": "발생 중인 알림 없음",
+      "noAlertRules": "알림 규칙 없음",
+      "noEnabledRules": "활성화된 규칙 없음",
+      "failingNone": "실패 중인 규칙 없음",
+      "failingNote": "마지막 평가 오류",
+      "incidentsNone": "미해결 인시던트 없음",
+      "noPipelines": "파이프라인 없음",
+      "noStreams": "스트림 없음",
+      "quietNote": "지난 7일 동안 쓰기 중단",
+      "criticalUnit": "심각 수준 {count}개",
+      "deliveryFailures": "알림 전송 실패",
+      "deliveryNote": "발생했지만 알림을 보내지 못한 알림",
+      "oldestFiring": "{age} 동안 발생 중인 가장 오래된 알림"
+    },
+    "state": {
+      "tileForbidden": "접근 권한 없음",
+      "tileLocked": "잠김",
+      "tileError": "불러올 수 없음",
+      "tileUnavailable": "사용할 수 없음",
+      "sectionLocked": "엔터프라이즈 라이선스에서 사용 가능",
+      "sectionForbidden": "현재 역할로는 이 데이터를 볼 수 없습니다. 조직 관리자에게 접근 권한을 요청하세요."
+    },
+    "time": {
+      "minutes": "{minutes}분",
+      "hoursMinutes": "{hours}시간 {minutes}분",
+      "daysHours": "{days}일 {hours}시간"
+    },
+    "level": {
+      "critical": "심각",
+      "warning": "경고",
+      "okFiring": "발생"
+    },
+    "sections": {
+      "alerts": "알림",
+      "dataHealth": "데이터 상태",
+      "alertsAndIncidents": "알림 및 인시던트",
+      "limitAndStorage": "수집 한도 및 스토리지",
+      "storage": "데이터 크기",
+      "topStreams": "데이터 크기 기준 상위 스트림"
+    },
+    "alerts": {
+      "firingFor": "발생 기간",
+      "showMore": "발생 중인 알림 {count}개 더 보기 | 발생 중인 알림 {count}개 더 보기",
+      "emptyTitle": "아직 알림 규칙이 없습니다",
+      "emptyDesc": "생성한 규칙이 여기에 표시되며, 수준별 발생 현황과 실행 실패 항목을 보여줍니다.",
+      "emptyAction": "알림 생성",
+      "criticalLevel": "심각 수준",
+      "warningLevel": "경고 수준",
+      "rulesFailing": "실패 중인 규칙",
+      "firingNow": "현재 발생 중, 오래된 순",
+      "noneFiring": "현재 발생 중인 알림이 없습니다",
+      "rulesActive": "{count}개 규칙 활성 | {count}개 규칙 활성",
+      "rulesFailingToEvaluate": "{count}개 평가 실패 | {count}개 평가 실패",
+      "subtitle": "{active} · {failing}",
+      "viewAll": "모든 알림 보기",
+      "rulesEvaluated": "{count}개 규칙 평가 중 | {count}개 규칙 평가 중"
+    },
+    "dataHealth": {
+      "viewPipelines": "파이프라인 보기",
+      "noPipelines": "아직 파이프라인이 없습니다.",
+      "pipelinesErrored": "오류가 있는 파이프라인",
+      "pipelinesNote": "오류가 있는 활성화된 파이프라인",
+      "quiet": "수집이 끊긴 스트림",
+      "quietNote": "1시간~7일 전에 쓰기가 중단됨",
+      "failing": "평가에 실패한 알림 규칙",
+      "failingNote": "사각지대이며 발생하지 않음",
+      "delivery": "알림 전달 실패",
+      "deliveryNote": "발생했지만 알림을 보낼 수 없었던 알림",
+      "schema": "24시간 내 스키마 변경",
+      "schemaNote": "스트림 전체의 새 스키마 버전",
+      "status": {
+        "needsAction": "조치 필요",
+        "warning": "경고",
+        "healthy": "정상",
+        "notSetUp": "설정되지 않음",
+        "info": "정보"
+      },
+      "compaction": "대기 중인 컴팩션 작업",
+      "compactionNote": "볼 수 있는 스트림 유형 전체",
+      "pipelinesActive": "{count}개 활성 파이프라인 중 | {count}개 활성 파이프라인 중",
+      "subtitle": "데이터가 온전하게 도착하고 전달되고 있나요?"
+    },
+    "streams": {
+      "emptyTitle": "아직 스트림이 없습니다",
+      "emptyDesc": "데이터가 도착하기 시작하면 여기에 스트림이 표시됩니다.",
+      "startIngesting": "수집 시작",
+      "allStreams": "모든 스트림",
+      "shareOfTotal": "전체의 {percent}%",
+      "shareUnderOne": "전체의 1% 미만",
+      "subtitle": "접근할 수 있는 가장 큰 스트림",
+      "typeShare": "{type} · {share}"
+    },
+    "signals": {
+      "open": "열기",
+      "openAria": {
+        "logs": "로그 열기",
+        "metrics": "메트릭 열기",
+        "traces": "트레이스 열기"
+      },
+      "logs": "로그",
+      "metrics": "메트릭",
+      "traces": "트레이스",
+      "streams": "스트림",
+      "events": "이벤트",
+      "samples": "샘플",
+      "spans": "스팬",
+      "stored": "데이터 크기"
+    },
+    "storage": {
+      "emptyTitle": "아직 데이터가 없습니다",
+      "bySignal": "시그널별 데이터 크기",
+      "splitNote": "로그, 메트릭, 트레이스의 비압축 크기",
+      "used": "데이터 크기"
+    },
+    "limit": {
+      "used": "오늘 수집량(UTC)",
+      "ofLimit": "{limit} 중",
+      "daysOver": "이번 달 한도 초과 일수",
+      "approachingLimit": "한도 근접",
+      "overLimit": "한도 초과",
+      "ofUnlimited": "무제한",
+      "unavailable": "수집 한도를 사용할 수 없음",
+      "blockNote": "한도 초과 일수가 {allowed}일을 초과하면 검색이 차단됩니다 | 한도 초과 일수가 {allowed}일을 초과하면 검색이 차단됩니다",
+      "daysOverOf": "{allowed}일 중 {days}일",
+      "expiredLine": "라이선스 만료됨",
+      "resets": "00:00 UTC에 초기화됩니다. {countdown} 후",
+      "subtitle": "일일 한도는 롤링 24시간이 아니라 UTC 기준 하루를 집계합니다"
+    },
+    "empty": {
+      "incidents": "미해결 인시던트 없음",
+      "anomalies": "선택한 시간 범위에서 이상 징후가 감지되지 않았습니다",
+      "anomalyNoChecks": "이상 감지 검사가 설정되어 있지 않습니다",
+      "services": "선택한 시간 범위에 서비스 데이터가 없습니다",
+      "recentEvents": "선택한 시간 범위에 알림 이벤트가 없습니다"
+    },
+    "stale": {
+      "message": "{time} 기준 데이터를 표시하고 있습니다. 새로고침에 실패했습니다.",
+      "retry": "다시 시도"
+    },
+    "dataAsOf": "{time} 기준 데이터",
+    "status": {
+      "attention": "주의 필요",
+      "checking": "확인 중…",
+      "partial": "일부 검사를 불러오지 못했습니다",
+      "clear": "주의가 필요한 항목이 없습니다",
+      "items": {
+        "firing": "{count}개 알림 발생 | {count}개 알림 발생",
+        "failing": "{count}개 규칙 실패 | {count}개 규칙 실패",
+        "incidents": "{count}개 미해결 인시던트 | {count}개 미해결 인시던트",
+        "pipelines": "{count}개 파이프라인에서 오류 발생 | {count}개 파이프라인에서 오류 발생",
+        "quiet": "{count}개 활동 없는 스트림 | {count}개 활동 없는 스트림"
+      },
+      "unmonitored": "아직 모니터링 중인 항목이 없습니다"
+    },
+    "timeRange": {
+      "heading": "선택한 시간 범위 내"
+    }
   },
   "chatHistory": {
     "title": "채팅",

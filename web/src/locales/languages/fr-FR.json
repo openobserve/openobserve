@@ -9888,7 +9888,7 @@
     "activeAnomalies": "Anomalies actives",
     "activeIncidents": "Incidents actifs",
     "services": "Des services",
-    "recentEvents": "Évènements récents",
+    "recentEvents": "Événements récents",
     "investigate": "Enquêter →",
     "viewAll": "Afficher tout",
     "showingOf": "Affichage de {shown} de {total}",
@@ -9898,27 +9898,184 @@
     "scrollLeft": "Faire défiler les services vers la gauche",
     "scrollRight": "Faire défiler les services vers la droite",
     "untitledIncident": "Incident sans titre",
-    "allClear": "Tout est clair",
-    "allClearDesc": "Aucune anomalie active, aucun incident ou service dégradé dans la fenêtre de temps sélectionnée.",
-    "allClearDescScoped": "Aucun incident ouvert, aucune anomalie ni service dégradé dans la plage de temps sélectionnée.",
     "notMonitoredTitle": "Rien n'est encore surveillé",
     "notMonitoredDesc": "Vos données arrivent, mais aucune alerte ni vérification d'anomalie ne s'exécute dessus. Ajoutez-en une et la Vue d'ensemble listera tout ce qui nécessite votre attention.",
     "notMonitoredAlert": "Créer une alerte",
     "notMonitoredAlertDesc": "Soyez notifié lorsqu'une requête franchit un seuil",
     "notMonitoredAnomaly": "Configurer la détection d'anomalies",
     "notMonitoredAnomalyDesc": "Signalez un volume inhabituel sans définir de seuil",
-    "emptyActionAlerts": "Afficher les règles d'alerte",
-    "emptyActionAlertsDesc": "Passez en revue les alertes et les seuils configurés",
     "emptyActionLogs": "Explorez les journaux",
     "emptyActionLogsDesc": "Recherchez et filtrez vos flux de logs",
-    "emptyActionTraces": "Explorer les traces",
-    "emptyActionTracesDesc": "Inspectez les traces distribuées et la latence des services",
     "anomalyDetectedTitle": "Anomalie détectée — {name}",
     "anomalyDetectedDescription": "Flux : {stream} · {count} point(s) anormal(s)",
     "secondsAgo": "il y a {count}s",
     "minutesAgo": "il y a {count}m",
     "hoursAgo": "il y a {count}h",
-    "daysAgo": "il y a {count}d"
+    "daysAgo": "il y a {count}d",
+    "cards": {
+      "firingAlerts": "Alertes déclenchées",
+      "failingRules": "Règles en échec",
+      "openIncidents": "Incidents ouverts",
+      "pipelineErrors": "Erreurs de pipeline",
+      "pipelinesOf": "sur {enabled} activés",
+      "quietStreams": "Flux silencieux",
+      "firingNone": "Aucune déclenchée",
+      "noAlertRules": "Aucune règle d'alerte",
+      "noEnabledRules": "Aucune règle activée",
+      "failingNone": "Aucune en échec",
+      "failingNote": "Dernière évaluation en erreur",
+      "incidentsNone": "Aucun ouvert",
+      "noPipelines": "Aucun pipeline",
+      "noStreams": "Aucun flux",
+      "quietNote": "A cessé d'écrire ces 7 derniers jours",
+      "criticalUnit": "{count} au niveau critique",
+      "deliveryFailures": "Échecs de livraison des alertes",
+      "deliveryNote": "Alertes déclenchées mais non notifiées",
+      "oldestFiring": "Plus ancienne déclenchée depuis {age}"
+    },
+    "state": {
+      "tileForbidden": "Aucun accès",
+      "tileLocked": "Verrouillé",
+      "tileError": "Chargement impossible",
+      "tileUnavailable": "Non disponible",
+      "sectionLocked": "Disponible avec une licence entreprise",
+      "sectionForbidden": "Votre rôle ne permet pas de voir ces données. Demandez l'accès à un administrateur de l'organisation."
+    },
+    "time": {
+      "minutes": "{minutes} min",
+      "hoursMinutes": "{hours} h {minutes} min",
+      "daysHours": "{days} j {hours} h"
+    },
+    "level": {
+      "critical": "Critique",
+      "warning": "Avertissement",
+      "okFiring": "Déclenchée"
+    },
+    "sections": {
+      "alerts": "Alertes",
+      "dataHealth": "Santé des données",
+      "alertsAndIncidents": "Alertes et incidents",
+      "limitAndStorage": "Limite d'ingestion et stockage",
+      "storage": "Taille des données",
+      "topStreams": "Principaux flux par taille de données"
+    },
+    "alerts": {
+      "firingFor": "Déclenchée depuis",
+      "showMore": "Afficher {count} autre alerte déclenchée | Afficher {count} autres alertes déclenchées",
+      "emptyTitle": "Aucune règle d'alerte pour l'instant",
+      "emptyDesc": "Les règles que vous créez s'affichent ici, avec les déclenchements par niveau et les échecs d'exécution.",
+      "emptyAction": "Créer une alerte",
+      "criticalLevel": "Niveau critique",
+      "warningLevel": "Niveau avertissement",
+      "rulesFailing": "Règles en échec",
+      "firingNow": "Déclenchées maintenant, de la plus ancienne à la plus récente",
+      "noneFiring": "Aucune alerte déclenchée pour le moment",
+      "rulesActive": "{count} règle active | {count} règles actives",
+      "rulesFailingToEvaluate": "{count} en échec d'évaluation | {count} en échec d'évaluation",
+      "subtitle": "{active} · {failing}",
+      "viewAll": "Voir toutes les alertes",
+      "rulesEvaluated": "{count} règle est en cours d'évaluation | {count} règles sont en cours d'évaluation"
+    },
+    "dataHealth": {
+      "viewPipelines": "Voir les pipelines",
+      "noPipelines": "Aucun pipeline pour le moment.",
+      "pipelinesErrored": "Pipelines en erreur",
+      "pipelinesNote": "Pipelines activés en erreur",
+      "quiet": "Flux sans activité",
+      "quietNote": "Écriture arrêtée il y a entre une heure et 7 jours",
+      "failing": "Règles d'alerte en échec d'évaluation",
+      "failingNote": "Angles morts, sans déclenchement",
+      "delivery": "Échecs de livraison des alertes",
+      "deliveryNote": "Alertes déclenchées mais non notifiées",
+      "schema": "Changements de schéma sur 24 h",
+      "schemaNote": "Nouvelles versions de schéma dans vos flux",
+      "status": {
+        "needsAction": "Action requise",
+        "warning": "Avertissement",
+        "healthy": "Bon état",
+        "notSetUp": "Non configuré",
+        "info": "Info"
+      },
+      "compaction": "Tâches de compaction en attente",
+      "compactionNote": "Tous les types de flux que vous pouvez voir",
+      "pipelinesActive": "Sur {count} pipeline actif | Sur {count} pipelines actifs",
+      "subtitle": "Les données arrivent-elles, intactes et livrées ?"
+    },
+    "streams": {
+      "emptyTitle": "Aucun flux pour le moment",
+      "emptyDesc": "Les flux apparaissent ici dès que des données commencent à arriver.",
+      "startIngesting": "Commencer l'ingestion",
+      "allStreams": "Tous les flux",
+      "shareOfTotal": "{percent} % du total",
+      "shareUnderOne": "Moins de 1 % du total",
+      "subtitle": "Les plus grands flux auxquels vous avez accès",
+      "typeShare": "{type} · {share}"
+    },
+    "signals": {
+      "open": "Ouvrir",
+      "openAria": {
+        "logs": "Ouvrir les logs",
+        "metrics": "Ouvrir les métriques",
+        "traces": "Ouvrir les traces"
+      },
+      "logs": "Logs",
+      "metrics": "Métriques",
+      "traces": "Traces",
+      "streams": "Flux",
+      "events": "Événements",
+      "samples": "Échantillons",
+      "spans": "Spans",
+      "stored": "Taille des données"
+    },
+    "storage": {
+      "emptyTitle": "Aucune donnée pour le moment",
+      "bySignal": "Taille des données par signal",
+      "splitNote": "Taille non compressée pour les logs, les métriques et les traces",
+      "used": "Taille des données"
+    },
+    "limit": {
+      "used": "Ingestion aujourd'hui (UTC)",
+      "ofLimit": "sur {limit}",
+      "daysOver": "Jours au-dessus de la limite ce mois-ci",
+      "approachingLimit": "Limite bientôt atteinte",
+      "overLimit": "Limite dépassée",
+      "ofUnlimited": "sur un quota illimité",
+      "unavailable": "Limite d'ingestion indisponible",
+      "blockNote": "La recherche est bloquée après plus de {allowed} jour de dépassement | La recherche est bloquée après plus de {allowed} jours de dépassement",
+      "daysOverOf": "{days} sur {allowed} autorisé(s)",
+      "expiredLine": "Licence expirée",
+      "resets": "Réinitialisation à 00:00 UTC, dans {countdown}",
+      "subtitle": "La limite quotidienne compte le jour UTC, pas une fenêtre glissante de 24 h"
+    },
+    "empty": {
+      "incidents": "Aucun incident ouvert",
+      "anomalies": "Aucune anomalie détectée dans la plage de temps sélectionnée",
+      "anomalyNoChecks": "Aucune vérification d'anomalie n'est configurée",
+      "services": "Aucune donnée de service dans la plage de temps sélectionnée",
+      "recentEvents": "Aucun événement d'alerte dans la plage de temps sélectionnée"
+    },
+    "stale": {
+      "message": "Affichage des données de {time}. Échec de l'actualisation.",
+      "retry": "Réessayer"
+    },
+    "dataAsOf": "Données en date du {time}",
+    "status": {
+      "attention": "Nécessite une attention",
+      "checking": "Vérification…",
+      "partial": "Certaines vérifications n'ont pas pu être chargées",
+      "clear": "Rien ne nécessite d'attention",
+      "items": {
+        "firing": "{count} alerte déclenchée | {count} alertes déclenchées",
+        "failing": "{count} règle en échec | {count} règles en échec",
+        "incidents": "{count} incident ouvert | {count} incidents ouverts",
+        "pipelines": "{count} pipeline en erreur | {count} pipelines en erreur",
+        "quiet": "{count} flux silencieux | {count} flux silencieux"
+      },
+      "unmonitored": "Rien n'est encore surveillé"
+    },
+    "timeRange": {
+      "heading": "Dans la plage de temps sélectionnée"
+    }
   },
   "chatHistory": {
     "title": "Discussions",

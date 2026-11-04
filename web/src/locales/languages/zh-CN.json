@@ -9888,7 +9888,7 @@
     "activeAnomalies": "活跃异常",
     "activeIncidents": "活跃事件",
     "services": "服务",
-    "recentEvents": "最近的事件",
+    "recentEvents": "最近事件",
     "investigate": "调查 →",
     "viewAll": "查看全部",
     "showingOf": "显示 {shown}/{total}",
@@ -9897,28 +9897,185 @@
     "colReqs": "要求",
     "scrollLeft": "向左滚动服务",
     "scrollRight": "向右滚动服务",
-    "untitledIncident": "无题事件",
-    "allClear": "全部清除",
-    "allClearDesc": "在所选时间窗口内没有活跃的异常、事件或降级的服务。",
-    "allClearDescScoped": "所选时间范围内没有未解决的事件、异常或性能下降的服务。",
+    "untitledIncident": "未命名事件",
     "notMonitoredTitle": "尚无任何被监控项",
     "notMonitoredDesc": "您的数据正在到达，但没有对其运行任何告警或异常检查。添加一个后，概览会列出所有需要关注的内容。",
     "notMonitoredAlert": "创建告警",
     "notMonitoredAlertDesc": "当查询超过阈值时收到通知",
     "notMonitoredAnomaly": "设置异常检测",
     "notMonitoredAnomalyDesc": "无需设置阈值即可标记异常量",
-    "emptyActionAlerts": "查看告警规则",
-    "emptyActionAlertsDesc": "查看已配置的告警和阈值",
     "emptyActionLogs": "浏览日志",
     "emptyActionLogsDesc": "搜索和筛选您的日志流",
-    "emptyActionTraces": "探索追踪",
-    "emptyActionTracesDesc": "检查分布式追踪和服务延迟",
     "anomalyDetectedTitle": "检测到异常 — {name}",
     "anomalyDetectedDescription": "流：{stream} · {count} 个异常点",
     "secondsAgo": "{count} 秒前",
     "minutesAgo": "{count} 分钟前",
     "hoursAgo": "{count} 小时前",
-    "daysAgo": "{count} 天前"
+    "daysAgo": "{count} 天前",
+    "cards": {
+      "firingAlerts": "触发中的告警",
+      "failingRules": "失败的规则",
+      "openIncidents": "未解决事件",
+      "pipelineErrors": "流水线错误",
+      "pipelinesOf": "共 {enabled} 个已启用",
+      "quietStreams": "静默数据流",
+      "firingNone": "无触发",
+      "noAlertRules": "无告警规则",
+      "noEnabledRules": "无已启用规则",
+      "failingNone": "无失败",
+      "failingNote": "上次评估出错",
+      "incidentsNone": "无未解决",
+      "noPipelines": "无流水线",
+      "noStreams": "无数据流",
+      "quietNote": "过去 7 天内停止写入",
+      "criticalUnit": "{count} 个处于严重级别",
+      "deliveryFailures": "告警投递失败",
+      "deliveryNote": "已触发但无法通知的告警",
+      "oldestFiring": "最早触发已持续 {age}"
+    },
+    "state": {
+      "tileForbidden": "无访问权限",
+      "tileLocked": "已锁定",
+      "tileError": "无法加载",
+      "tileUnavailable": "不可用",
+      "sectionLocked": "需企业许可证方可使用",
+      "sectionForbidden": "您的角色无法查看此数据。请联系组织管理员获取访问权限。"
+    },
+    "time": {
+      "minutes": "{minutes} 分钟",
+      "hoursMinutes": "{hours} 小时 {minutes} 分钟",
+      "daysHours": "{days} 天 {hours} 小时"
+    },
+    "level": {
+      "critical": "严重",
+      "warning": "警告",
+      "okFiring": "触发中"
+    },
+    "sections": {
+      "alerts": "告警",
+      "dataHealth": "数据健康",
+      "alertsAndIncidents": "告警与事件",
+      "limitAndStorage": "摄取限制与存储",
+      "storage": "数据大小",
+      "topStreams": "按数据大小排名的数据流"
+    },
+    "alerts": {
+      "firingFor": "已触发时长",
+      "showMore": "再显示 {count} 个触发中的告警 | 再显示 {count} 个触发中的告警",
+      "emptyTitle": "尚无告警规则",
+      "emptyDesc": "您创建的规则会显示在此处，包括按级别划分的触发情况和运行失败的规则。",
+      "emptyAction": "创建告警",
+      "criticalLevel": "严重级别",
+      "warningLevel": "警告级别",
+      "rulesFailing": "失败的规则",
+      "firingNow": "当前触发中，最早的在前",
+      "noneFiring": "当前没有告警触发中",
+      "rulesActive": "{count} 条规则已启用 | {count} 条规则已启用",
+      "rulesFailingToEvaluate": "{count} 条评估失败 | {count} 条评估失败",
+      "subtitle": "{active} · {failing}",
+      "viewAll": "查看所有告警",
+      "rulesEvaluated": "{count} 条规则正在评估 | {count} 条规则正在评估"
+    },
+    "dataHealth": {
+      "viewPipelines": "查看流水线",
+      "noPipelines": "暂无流水线。",
+      "pipelinesErrored": "出错的流水线",
+      "pipelinesNote": "已启用但出错的流水线",
+      "quiet": "已静默的数据流",
+      "quietNote": "在 1 小时至 7 天前停止写入",
+      "failing": "评估失败的告警规则",
+      "failingNote": "监控盲区，未触发",
+      "delivery": "告警投递失败",
+      "deliveryNote": "已触发但无法通知的告警",
+      "schema": "24 小时内的 Schema 变更",
+      "schemaNote": "各数据流中新增的 Schema 版本",
+      "status": {
+        "needsAction": "需要处理",
+        "warning": "警告",
+        "healthy": "健康",
+        "notSetUp": "未设置",
+        "info": "信息"
+      },
+      "compaction": "待处理的压缩任务",
+      "compactionNote": "涵盖您可见的各数据流类型",
+      "pipelinesActive": "在 {count} 条启用的流水线中 | 在 {count} 条启用的流水线中",
+      "subtitle": "数据是否在到达、完整且已投递？"
+    },
+    "streams": {
+      "emptyTitle": "暂无数据流",
+      "emptyDesc": "数据开始到达后，数据流将显示在这里。",
+      "startIngesting": "开始摄取",
+      "allStreams": "所有数据流",
+      "shareOfTotal": "占总量的 {percent}%",
+      "shareUnderOne": "低于总量的 1%",
+      "subtitle": "您可访问的最大数据流",
+      "typeShare": "{type} · {share}"
+    },
+    "signals": {
+      "open": "打开",
+      "openAria": {
+        "logs": "打开日志",
+        "metrics": "打开指标",
+        "traces": "打开追踪"
+      },
+      "logs": "日志",
+      "metrics": "指标",
+      "traces": "追踪",
+      "streams": "数据流",
+      "events": "事件",
+      "samples": "样本",
+      "spans": "Span",
+      "stored": "数据大小"
+    },
+    "storage": {
+      "emptyTitle": "暂无数据",
+      "bySignal": "按信号划分的数据大小",
+      "splitNote": "日志、指标和追踪的未压缩大小",
+      "used": "数据大小"
+    },
+    "limit": {
+      "used": "今日已摄取（UTC）",
+      "ofLimit": "共 {limit}",
+      "daysOver": "本月超限天数",
+      "approachingLimit": "接近上限",
+      "overLimit": "超出上限",
+      "ofUnlimited": "无上限",
+      "unavailable": "摄取上限不可用",
+      "blockNote": "超过上限 {allowed} 天后搜索会被阻止 | 超过上限 {allowed} 天后搜索会被阻止",
+      "daysOverOf": "{days} / {allowed}（允许）",
+      "expiredLine": "许可证已过期",
+      "resets": "将于 00:00 UTC 重置，剩余 {countdown}",
+      "subtitle": "每日上限按 UTC 自然日计算，而非滚动 24 小时"
+    },
+    "empty": {
+      "incidents": "没有未解决的事件",
+      "anomalies": "所选时间范围内未检测到异常",
+      "anomalyNoChecks": "未设置异常检查",
+      "services": "所选时间范围内无服务数据",
+      "recentEvents": "所选时间范围内无告警事件"
+    },
+    "stale": {
+      "message": "正在显示 {time} 的数据。刷新失败。",
+      "retry": "重试"
+    },
+    "dataAsOf": "数据截至 {time}",
+    "status": {
+      "attention": "需要关注",
+      "checking": "检查中…",
+      "partial": "部分检查无法加载",
+      "clear": "无需关注",
+      "items": {
+        "firing": "{count} 条告警触发中 | {count} 条告警触发中",
+        "failing": "{count} 条规则失败 | {count} 条规则失败",
+        "incidents": "{count} 个未解决事件 | {count} 个未解决事件",
+        "pipelines": "{count} 条流水线有错误 | {count} 条流水线有错误",
+        "quiet": "{count} 个静默数据流 | {count} 个静默数据流"
+      },
+      "unmonitored": "尚未监控任何内容"
+    },
+    "timeRange": {
+      "heading": "在所选时间范围内"
+    }
   },
   "chatHistory": {
     "title": "聊天",

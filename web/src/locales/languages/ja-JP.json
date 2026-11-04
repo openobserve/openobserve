@@ -9885,8 +9885,8 @@
     "alertsSuffix": "アラート",
     "viewingLabel": "— 表示中",
     "timesSymbol": "×",
-    "activeAnomalies": "アクティブ・アノマリー",
-    "activeIncidents": "アクティブインシデント",
+    "activeAnomalies": "アクティブな異常",
+    "activeIncidents": "アクティブなインシデント",
     "services": "サービス",
     "recentEvents": "最近のイベント",
     "investigate": "調査する →",
@@ -9898,27 +9898,184 @@
     "scrollLeft": "サービスを左にスクロール",
     "scrollRight": "サービスを右にスクロール",
     "untitledIncident": "無題のインシデント",
-    "allClear": "すべてクリア",
-    "allClearDesc": "選択した時間枠には、アクティブな異常、インシデント、または低下したサービスはありません。",
-    "allClearDescScoped": "選択した期間に未解決のインシデント、異常、サービス劣化はありません。",
     "notMonitoredTitle": "まだ何も監視されていません",
     "notMonitoredDesc": "データは到着していますが、アラートや異常検知が実行されていません。追加すると、概要に注意が必要な項目が表示されます。",
     "notMonitoredAlert": "アラートを作成",
     "notMonitoredAlertDesc": "クエリがしきい値を超えたときに通知を受け取ります",
     "notMonitoredAnomaly": "異常検知を設定",
     "notMonitoredAnomalyDesc": "しきい値を指定せずに異常なボリュームを検出します",
-    "emptyActionAlerts": "アラートルールを表示する",
-    "emptyActionAlertsDesc": "設定したアラートと閾値を確認",
     "emptyActionLogs": "ログを見る",
     "emptyActionLogsDesc": "ログストリームの検索とフィルタリング",
-    "emptyActionTraces": "トレースを探索",
-    "emptyActionTracesDesc": "分散トレースとサービスレイテンシーを確認",
     "anomalyDetectedTitle": "異常を検出 — {name}",
     "anomalyDetectedDescription": "ストリーム: {stream} · {count} 異常ポイント",
     "secondsAgo": "{count}秒前",
     "minutesAgo": "{count}分前",
     "hoursAgo": "{count}時間前",
-    "daysAgo": "{count}日前"
+    "daysAgo": "{count}日前",
+    "cards": {
+      "firingAlerts": "発火中のアラート",
+      "failingRules": "失敗しているルール",
+      "openIncidents": "未解決のインシデント",
+      "pipelineErrors": "パイプラインエラー",
+      "pipelinesOf": "うち {enabled} 件有効",
+      "quietStreams": "停止中のストリーム",
+      "firingNone": "発火なし",
+      "noAlertRules": "アラートルールなし",
+      "noEnabledRules": "有効なルールなし",
+      "failingNone": "失敗なし",
+      "failingNote": "前回の評価でエラー",
+      "incidentsNone": "未解決なし",
+      "noPipelines": "パイプラインなし",
+      "noStreams": "ストリームなし",
+      "quietNote": "過去 7 日間に書き込みが停止",
+      "criticalUnit": "クリティカルレベルが {count} 件",
+      "deliveryFailures": "アラート配信の失敗",
+      "deliveryNote": "発火したが通知できなかったアラート",
+      "oldestFiring": "最も古い発火から {age}"
+    },
+    "state": {
+      "tileForbidden": "アクセス権限なし",
+      "tileLocked": "ロック済み",
+      "tileError": "読み込めませんでした",
+      "tileUnavailable": "利用できません",
+      "sectionLocked": "エンタープライズライセンスで利用可能",
+      "sectionForbidden": "お使いのロールではこのデータを表示できません。組織の管理者にアクセス権を依頼してください。"
+    },
+    "time": {
+      "minutes": "{minutes}分",
+      "hoursMinutes": "{hours}時間 {minutes}分",
+      "daysHours": "{days}日 {hours}時間"
+    },
+    "level": {
+      "critical": "クリティカル",
+      "warning": "警告",
+      "okFiring": "発火中"
+    },
+    "sections": {
+      "alerts": "アラート",
+      "dataHealth": "データヘルス",
+      "alertsAndIncidents": "アラートとインシデント",
+      "limitAndStorage": "取り込み上限とストレージ",
+      "storage": "データサイズ",
+      "topStreams": "データサイズ別トップストリーム"
+    },
+    "alerts": {
+      "firingFor": "発火継続時間",
+      "showMore": "発火中のアラートをさらに {count} 件表示 | 発火中のアラートをさらに {count} 件表示",
+      "emptyTitle": "アラートルールはまだありません",
+      "emptyDesc": "作成したルールはここに表示され、レベル別の発火状況と実行に失敗しているルールを確認できます。",
+      "emptyAction": "アラートを作成",
+      "criticalLevel": "クリティカルレベル",
+      "warningLevel": "警告レベル",
+      "rulesFailing": "失敗しているルール",
+      "firingNow": "現在発火中（古い順）",
+      "noneFiring": "現在発火中のアラートはありません",
+      "rulesActive": "{count} 件のルールがアクティブ | {count} 件のルールがアクティブ",
+      "rulesFailingToEvaluate": "{count} 件が評価に失敗 | {count} 件が評価に失敗",
+      "subtitle": "{active} · {failing}",
+      "viewAll": "すべてのアラートを表示",
+      "rulesEvaluated": "{count} 件のルールを評価中 | {count} 件のルールを評価中"
+    },
+    "dataHealth": {
+      "viewPipelines": "パイプラインを表示",
+      "noPipelines": "パイプラインはまだありません。",
+      "pipelinesErrored": "エラーのあるパイプライン",
+      "pipelinesNote": "エラーが発生している有効なパイプライン",
+      "quiet": "書き込みが止まったストリーム",
+      "quietNote": "1 時間～7 日前に書き込みが停止",
+      "failing": "評価に失敗しているアラートルール",
+      "failingNote": "発火していない盲点",
+      "delivery": "アラート配信の失敗",
+      "deliveryNote": "発火したが通知できなかったアラート",
+      "schema": "24 時間のスキーマ変更",
+      "schemaNote": "各ストリームの新しいスキーマバージョン",
+      "status": {
+        "needsAction": "対応が必要",
+        "warning": "警告",
+        "healthy": "正常",
+        "notSetUp": "未設定",
+        "info": "情報"
+      },
+      "compaction": "保留中のコンパクションジョブ",
+      "compactionNote": "表示可能なストリームタイプ全体",
+      "pipelinesActive": "アクティブなパイプライン {count} 件中 | アクティブなパイプライン {count} 件中",
+      "subtitle": "データは欠損なく届き、配信されていますか？"
+    },
+    "streams": {
+      "emptyTitle": "ストリームはまだありません",
+      "emptyDesc": "データの到着が始まると、ストリームがここに表示されます。",
+      "startIngesting": "取り込みを開始",
+      "allStreams": "すべてのストリーム",
+      "shareOfTotal": "全体の {percent}%",
+      "shareUnderOne": "全体の 1% 未満",
+      "subtitle": "アクセス可能な最大のストリーム",
+      "typeShare": "{type} · {share}"
+    },
+    "signals": {
+      "open": "開く",
+      "openAria": {
+        "logs": "ログを開く",
+        "metrics": "メトリクスを開く",
+        "traces": "トレースを開く"
+      },
+      "logs": "ログ",
+      "metrics": "メトリクス",
+      "traces": "トレース",
+      "streams": "ストリーム",
+      "events": "イベント",
+      "samples": "サンプル",
+      "spans": "スパン",
+      "stored": "データサイズ"
+    },
+    "storage": {
+      "emptyTitle": "データはまだありません",
+      "bySignal": "シグナル別のデータサイズ",
+      "splitNote": "ログ、メトリクス、トレース全体の非圧縮サイズ",
+      "used": "データサイズ"
+    },
+    "limit": {
+      "used": "本日の取り込み量 (UTC)",
+      "ofLimit": "{limit} のうち",
+      "daysOver": "今月の上限超過日数",
+      "approachingLimit": "上限に接近",
+      "overLimit": "上限超過",
+      "ofUnlimited": "無制限",
+      "unavailable": "取り込み上限を取得できません",
+      "blockNote": "{allowed} 日を超えて上限を超過すると検索がブロックされます | {allowed} 日を超えて上限を超過すると検索がブロックされます",
+      "daysOverOf": "{allowed} 日中 {days} 日",
+      "expiredLine": "ライセンスの有効期限が切れています",
+      "resets": "00:00 UTC にリセット（{countdown} 後）",
+      "subtitle": "日次上限は UTC の 1 日単位でカウントされ、ローリング 24 時間ではありません"
+    },
+    "empty": {
+      "incidents": "オープンなインシデントはありません",
+      "anomalies": "選択した時間範囲に異常は検出されませんでした",
+      "anomalyNoChecks": "異常チェックが設定されていません",
+      "services": "選択した時間範囲にサービスデータはありません",
+      "recentEvents": "選択した時間範囲にアラートイベントはありません"
+    },
+    "stale": {
+      "message": "{time} 時点のデータを表示しています。更新に失敗しました。",
+      "retry": "再試行"
+    },
+    "dataAsOf": "{time} 時点のデータ",
+    "status": {
+      "attention": "対応が必要",
+      "checking": "確認中…",
+      "partial": "一部のチェックを読み込めませんでした",
+      "clear": "対応が必要な項目はありません",
+      "items": {
+        "firing": "{count} 件のアラートが発火中 | {count} 件のアラートが発火中",
+        "failing": "{count} 件のルールが失敗しています | {count} 件のルールが失敗しています",
+        "incidents": "{count} 件のオープンなインシデント | {count} 件のオープンなインシデント",
+        "pipelines": "{count} 件のエラーのあるパイプライン | {count} 件のエラーのあるパイプライン",
+        "quiet": "{count} 件のデータのないストリーム | {count} 件のデータのないストリーム"
+      },
+      "unmonitored": "まだ何も監視されていません"
+    },
+    "timeRange": {
+      "heading": "選択した時間範囲内"
+    }
   },
   "chatHistory": {
     "title": "チャット",

@@ -9880,10 +9880,10 @@
     "alertsSuffix": "警示",
     "viewingLabel": "— 檢視中",
     "timesSymbol": "×",
-    "activeAnomalies": "作用中的異常",
-    "activeIncidents": "作用中的事件",
+    "activeAnomalies": "作用中異常",
+    "activeIncidents": "作用中事件",
     "services": "服務",
-    "recentEvents": "近期事件",
+    "recentEvents": "最近事件",
     "investigate": "調查 →",
     "viewAll": "檢視全部",
     "showingOf": "顯示 {shown} / {total}",
@@ -9893,27 +9893,184 @@
     "scrollLeft": "向左捲動服務",
     "scrollRight": "向右捲動服務",
     "untitledIncident": "未命名事件",
-    "allClear": "一切正常",
-    "allClearDesc": "在選取的時間區段中沒有作用中的異常、事件或降級服務。",
-    "allClearDescScoped": "在所選時間範圍內沒有未解決的事件、異常或降級的服務。",
     "notMonitoredTitle": "尚未監控任何項目",
     "notMonitoredDesc": "你的資料正在送達，但沒有任何警示或異常檢查在執行。新增一個，總覽就會列出需要關注的項目。",
     "notMonitoredAlert": "建立警示",
     "notMonitoredAlertDesc": "當查詢超過閾值時收到通知",
     "notMonitoredAnomaly": "設定異常偵測",
     "notMonitoredAnomalyDesc": "不必設定閾值也能標示異常的量",
-    "emptyActionAlerts": "查看警示規則",
-    "emptyActionAlertsDesc": "檢視已設定的警示與閾值",
     "emptyActionLogs": "探索日誌",
     "emptyActionLogsDesc": "搜尋並篩選您的日誌串流",
-    "emptyActionTraces": "探索追蹤",
-    "emptyActionTracesDesc": "檢查分散式追蹤與服務延遲",
     "anomalyDetectedTitle": "偵測到異常 — {name}",
     "anomalyDetectedDescription": "串流：{stream} · {count} 個異常點",
     "secondsAgo": "{count} 秒前",
     "minutesAgo": "{count} 分鐘前",
     "hoursAgo": "{count} 小時前",
-    "daysAgo": "{count} 天前"
+    "daysAgo": "{count} 天前",
+    "cards": {
+      "firingAlerts": "觸發中警示",
+      "failingRules": "失敗規則",
+      "openIncidents": "未解決事件",
+      "pipelineErrors": "管線錯誤",
+      "pipelinesOf": "已啟用 {enabled} 個",
+      "quietStreams": "沉寂串流",
+      "firingNone": "目前無觸發",
+      "noAlertRules": "無警示規則",
+      "noEnabledRules": "無已啟用規則",
+      "failingNone": "目前無失敗",
+      "failingNote": "上次評估發生錯誤",
+      "incidentsNone": "目前無未解決事件",
+      "noPipelines": "無管線",
+      "noStreams": "無串流",
+      "quietNote": "過去 7 天已停止寫入",
+      "criticalUnit": "{count} 個為嚴重等級",
+      "deliveryFailures": "警示傳送失敗",
+      "deliveryNote": "已觸發但無法通知的警示",
+      "oldestFiring": "最久觸發已持續 {age}"
+    },
+    "state": {
+      "tileForbidden": "無存取權",
+      "tileLocked": "已鎖定",
+      "tileError": "無法載入",
+      "tileUnavailable": "無法使用",
+      "sectionLocked": "需企業授權才能使用",
+      "sectionForbidden": "您的角色無法查看此數據。請聯絡組織管理員取得存取權。"
+    },
+    "time": {
+      "minutes": "{minutes} 分鐘",
+      "hoursMinutes": "{hours} 小時 {minutes} 分鐘",
+      "daysHours": "{days} 天 {hours} 小時"
+    },
+    "level": {
+      "critical": "嚴重",
+      "warning": "警告",
+      "okFiring": "觸發中"
+    },
+    "sections": {
+      "alerts": "警示",
+      "dataHealth": "數據健康度",
+      "alertsAndIncidents": "警示與事件",
+      "limitAndStorage": "擷取上限與儲存",
+      "storage": "數據大小",
+      "topStreams": "數據大小最大的串流"
+    },
+    "alerts": {
+      "firingFor": "觸發持續時間",
+      "showMore": "再顯示 {count} 個觸發中警示 | 再顯示 {count} 個觸發中警示",
+      "emptyTitle": "尚無警示規則",
+      "emptyDesc": "您建立的規則會顯示在這裡，包含各層級目前觸發中的項目，以及執行失敗的項目。",
+      "emptyAction": "建立警示",
+      "criticalLevel": "嚴重等級",
+      "warningLevel": "警告等級",
+      "rulesFailing": "執行失敗的規則",
+      "firingNow": "目前觸發中，最久優先",
+      "noneFiring": "目前沒有警示觸發中",
+      "rulesActive": "{count} 條規則啟用中 | {count} 條規則啟用中",
+      "rulesFailingToEvaluate": "{count} 項評估失敗 | {count} 項評估失敗",
+      "subtitle": "{active} · {failing}",
+      "viewAll": "檢視所有警示",
+      "rulesEvaluated": "{count} 條規則正在評估 | {count} 條規則正在評估"
+    },
+    "dataHealth": {
+      "viewPipelines": "檢視管線",
+      "noPipelines": "尚無管線。",
+      "pipelinesErrored": "發生錯誤的管線",
+      "pipelinesNote": "已啟用但發生錯誤的管線",
+      "quiet": "停止寫入的串流",
+      "quietNote": "在 1 小時至 7 天前停止寫入",
+      "failing": "評估失敗的警示規則",
+      "failingNote": "盲區，未觸發",
+      "delivery": "警示傳送失敗",
+      "deliveryNote": "已觸發但無法通知的警示",
+      "schema": "24 小時內的結構描述變更",
+      "schemaNote": "各串流中的新結構描述版本",
+      "status": {
+        "needsAction": "需要處理",
+        "warning": "警告",
+        "healthy": "健康",
+        "notSetUp": "尚未設定",
+        "info": "資訊"
+      },
+      "compaction": "待處理的壓縮作業",
+      "compactionNote": "涵蓋您可見的串流類型",
+      "pipelinesActive": "共 {count} 條啟用中的管線 | 共 {count} 條啟用中的管線",
+      "subtitle": "數據是否正常抵達、保持完整並成功送達？"
+    },
+    "streams": {
+      "emptyTitle": "尚無串流",
+      "emptyDesc": "數據開始抵達後，串流就會顯示在這裡。",
+      "startIngesting": "開始擷取",
+      "allStreams": "所有串流",
+      "shareOfTotal": "佔總計 {percent}%",
+      "shareUnderOne": "佔總計不到 1%",
+      "subtitle": "您可存取的最大串流",
+      "typeShare": "{type} · {share}"
+    },
+    "signals": {
+      "open": "開啟",
+      "openAria": {
+        "logs": "開啟日誌",
+        "metrics": "開啟指標",
+        "traces": "開啟追蹤"
+      },
+      "logs": "日誌",
+      "metrics": "指標",
+      "traces": "追蹤",
+      "streams": "串流",
+      "events": "事件",
+      "samples": "樣本",
+      "spans": "Span",
+      "stored": "數據大小"
+    },
+    "storage": {
+      "emptyTitle": "尚無數據",
+      "bySignal": "依訊號劃分的數據大小",
+      "splitNote": "日誌、指標與追蹤的未壓縮大小",
+      "used": "資料大小"
+    },
+    "limit": {
+      "used": "今日擷取量 (UTC)",
+      "ofLimit": "共 {limit}",
+      "daysOver": "本月超限天數",
+      "approachingLimit": "接近上限",
+      "overLimit": "超出上限",
+      "ofUnlimited": "無上限",
+      "unavailable": "無法取得擷取上限",
+      "blockNote": "超出上限超過 {allowed} 天後，搜尋將被封鎖 | 超出上限超過 {allowed} 天後，搜尋將被封鎖",
+      "daysOverOf": "{days}／{allowed}（允許）",
+      "expiredLine": "授權已過期",
+      "resets": "將於 00:00 UTC 重設，倒數 {countdown}",
+      "subtitle": "每日上限以 UTC 日計算，而非滾動 24 小時"
+    },
+    "empty": {
+      "incidents": "沒有未解決事件",
+      "anomalies": "所選時間範圍內未偵測到異常",
+      "anomalyNoChecks": "尚未設定異常檢查",
+      "services": "所選時間範圍內沒有服務資料",
+      "recentEvents": "所選時間範圍內沒有警示事件"
+    },
+    "stale": {
+      "message": "顯示 {time} 的資料。重新整理失敗。",
+      "retry": "重試"
+    },
+    "dataAsOf": "資料截至 {time}",
+    "status": {
+      "attention": "需要留意",
+      "checking": "檢查中…",
+      "partial": "部分檢查無法載入",
+      "clear": "沒有需要留意的事項",
+      "items": {
+        "firing": "{count} 個警示觸發中 | {count} 個警示觸發中",
+        "failing": "{count} 條規則失敗 | {count} 條規則失敗",
+        "incidents": "{count} 個未解決事件 | {count} 個未解決事件",
+        "pipelines": "{count} 條管線有錯誤 | {count} 條管線有錯誤",
+        "quiet": "{count} 個閒置串流 | {count} 個閒置串流"
+      },
+      "unmonitored": "尚未監控任何項目"
+    },
+    "timeRange": {
+      "heading": "所選時間範圍內"
+    }
   },
   "chatHistory": {
     "title": "對話",
