@@ -294,7 +294,7 @@ jobs:
 
       - name: Restore node_modules
         id: nm
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: web/node_modules
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
@@ -308,7 +308,7 @@ jobs:
       # Only main saves it: a PR-saved cache is visible to that PR alone and fills the 10 GB repo cache.
       - name: Save node_modules
         if: github.ref == 'refs/heads/main' && steps.nm.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: web/node_modules
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
@@ -359,7 +359,7 @@ jobs:
 
       - name: Restore node_modules
         id: nm
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: web/node_modules
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
