@@ -167,11 +167,12 @@ describe("FilterBuilder", () => {
     }
 
     it.each(["alert", "pipeline", "workflow", "eval", "annotation"] as FilterProfileName[])(
-      "%s hides them while the server keeps them off, and keeps contains ignore case",
+      "%s hides them and contains ignore case while the server keeps them off",
       async (profile) => {
         const rows = await operatorRows(profile, false);
         expect(rows.filter((id) => EXTENDED.includes(id))).toEqual([]);
-        expect(rows).toContain("contains_ci");
+        expect(rows).not.toContain("contains_ci");
+        expect(rows).toContain("contains");
         expect(rows).toContain("eq");
       },
     );
@@ -185,9 +186,11 @@ describe("FilterBuilder", () => {
     );
 
     it.each(["logs", "dashboard-panel"] as FilterProfileName[])(
-      "%s is not affected by the switch",
+      "%s keeps the extended engine operators off the switch",
       async (profile) => {
-        expect(await operatorRows(profile, false)).toEqual(expect.arrayContaining(EXTENDED));
+        expect(await operatorRows(profile, false)).toEqual(
+          expect.arrayContaining([...EXTENDED, "contains_ci"]),
+        );
       },
     );
 
@@ -198,6 +201,20 @@ describe("FilterBuilder", () => {
       expect(find("row-0").text()).toContain("IN");
       expect(find("row-0").text()).toContain("error");
       expect(state.valid.at(-1)).toBe(true);
+    });
+  });
+
+  describe("a saved contains ignore case while the server keeps it off", () => {
+    const ci = { ...leaf("level", "err", "AND", "contains"), case_insensitive: true };
+    const saved = v2(ci, leaf("service", "api", "OR"));
+
+    it("still shows the chip and writes it back unchanged when another line changes", async () => {
+      const state = mountBuilder("alert", saved, {}, { extended_condition_operators: false });
+      await flushPromises();
+      expect(find("row-0").text()).toContain("err");
+      await click("connector-1");
+      expect(state.value.conditions[1].logicalOperator).toBe("AND");
+      expect(state.value.conditions[0]).toEqual(ci);
     });
   });
 

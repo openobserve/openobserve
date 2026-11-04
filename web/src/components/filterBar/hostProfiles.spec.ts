@@ -302,7 +302,9 @@ describe("serverProfile", () => {
 
   it.each(ENGINE)("drops the extended operators from %s unless the server allows them", (name) => {
     expect(offered(name, false).filter((id) => EXTENDED_ENGINE_OPERATORS.includes(id))).toEqual([]);
-    expect(offered(name, false)).toContain("contains_ci");
+    expect(offered(name, false)).not.toContain("contains_ci");
+    expect(offered(name, false)).toEqual(expect.arrayContaining(["contains", "not_contains"]));
+    expect(offered(name, true)).toContain("contains_ci");
     expect(serverProfile(name, true)).toBe(FILTER_PROFILES[name]);
     expect(serverProfile(name, false).codec).toBe(FILTER_PROFILES[name].codec);
   });

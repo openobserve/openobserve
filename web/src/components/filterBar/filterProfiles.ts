@@ -536,7 +536,7 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
   },
 };
 
-/** Engine operators that servers older than the skip-unreadable-rows fix fail on; offered only when the server allows them. */
+/** Engine operators older servers cannot read faithfully; offered only when the server allows them. */
 export const EXTENDED_ENGINE_OPERATORS: readonly FilterOperatorId[] = [
   "in",
   "not_in",
@@ -544,6 +544,7 @@ export const EXTENDED_ENGINE_OPERATORS: readonly FilterOperatorId[] = [
   "ends_with",
   "regex",
   "not_regex",
+  "contains_ci",
 ];
 
 const ENGINE_PROFILES: ReadonlySet<FilterProfileName> = new Set([
