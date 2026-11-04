@@ -564,9 +564,9 @@ fn internal_error(context: &str, e: &impl std::fmt::Display) -> Response {
 fn to_response(e: anyhow::Error) -> Response {
     use o2_enterprise::enterprise::oncall::service::OncallError;
     let status = match e.downcast_ref::<OncallError>() {
-        Some(OncallError::TeamNotFound(_)) | Some(OncallError::ResponseNotFound(_)) => {
-            StatusCode::NOT_FOUND
-        }
+        Some(OncallError::TeamNotFound(_))
+        | Some(OncallError::MemberNotFound { .. })
+        | Some(OncallError::ResponseNotFound(_)) => StatusCode::NOT_FOUND,
         // Not 404: the record exists, and the honest answer is that working it is not theirs.
         Some(OncallError::NotOnThisTeam { .. }) => StatusCode::FORBIDDEN,
         // A conflict, not a 400: the caller fixes it by changing the org's state, not the request.
@@ -1108,19 +1108,14 @@ pub async fn remove_member(
         )
         .await
         {
-            Ok(removal) => {
+            Ok(released_pages) => {
                 openobserve_core::alerts::ack::release_leaver_pages(
                     &org_id,
-                    &removal.released_pages,
+                    &released_pages,
                     &q.user_email,
                 )
                 .await;
-                if removal.removed {
-                    MetaHttpResponse::ok("Member removed")
-                } else {
-                    MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Member not found")
-                        .into_response()
-                }
+                MetaHttpResponse::ok("Member removed")
             }
             Err(e) => to_response(e),
         }
