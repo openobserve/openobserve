@@ -401,6 +401,10 @@ pub async fn extend_downtime(
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn test_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
