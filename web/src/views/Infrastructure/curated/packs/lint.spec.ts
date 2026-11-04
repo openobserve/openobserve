@@ -508,10 +508,10 @@ describe.each(packs)("author JS (custom_chart) — %s pack", (_packId, manifest)
   });
 
   it("every customChartContent assigns a BARE `option`", () => {
-    // The sandbox runs the code as `(function(data, echarts) { <userCode> })` and
+    // The sandbox runs the code in a block inside `__o2UserChart(data, echarts, context, o2)` and
     // then reads a FREE `option` identifier from the enclosing scope
-    // (convertCustomChartData.ts:151). `const option = ...` binds inside the IIFE,
-    // so the postMessage throws ReferenceError and the panel paints nothing.
+    // (customChartSandbox.ts userChartScript). `const option = ...` binds inside the block,
+    // so `return option` throws ReferenceError and the panel paints nothing.
     for (const panel of chartPanels) {
       const ast = parse(String(panel.customChartContent));
       let declared = false;

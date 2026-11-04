@@ -117,9 +117,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="panelData.chartType == 'logs' ? panelData : null"
           :config="panelSchema.config"
         />
-        <CustomChartRenderer
+        <CustomChartSandboxRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
-          :data="panelData"
+          :run="panelData.chartType == 'custom_chart' ? (panelData.run ?? null) : null"
           class="flex h-full w-full flex-col"
           @error="errorDetail = $event"
         />
@@ -488,7 +488,7 @@ const AddAnnotation = defineAsyncComponent(() => {
 // Statically imported by several route-level components, so it cannot be
 // code-split into its own chunk — import it statically to avoid the mixed
 // dynamic/static import build warning.
-import CustomChartRenderer from "./panels/CustomChartRenderer.vue";
+import CustomChartSandboxRenderer from "./panels/CustomChartSandboxRenderer.vue";
 
 const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
@@ -525,7 +525,7 @@ export default defineComponent({
     FlameGraphPanelRenderer,
     LogsPanelRenderer,
     AddAnnotation,
-    CustomChartRenderer,
+    CustomChartSandboxRenderer,
     LoadingProgress,
     OButton,
     OIcon,

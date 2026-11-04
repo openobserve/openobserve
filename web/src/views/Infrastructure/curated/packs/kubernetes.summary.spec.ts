@@ -25,11 +25,14 @@
 // only. What is not pinned here ships unchecked.
 
 import * as acorn from "acorn";
-import DOMPurify from "dompurify";
 import * as walk from "acorn-walk";
 import { describe, it, expect, vi } from "vitest";
 import { kubernetesPage, FLEET_DRILLDOWN_EVENT, FLEET_DRILLDOWN_TAB } from "./kubernetes.page";
 import { validateUserCode } from "@/utils/dashboard/convertCustomChartData";
+import {
+  CUSTOM_CHART_DRILLDOWN_EVENTS,
+  parseSandboxMessage,
+} from "@/utils/dashboard/customChartSandbox";
 import { processPromQLData } from "@/utils/dashboard/promql/shared/dataProcessor";
 import { PROMQL_MODULAR_CHART_TYPES } from "@/utils/dashboard/promql/shared/types";
 import { b64DecodeUnicodeSafe } from "@/utils/zincutils";
@@ -83,6 +86,9 @@ const chartCode = (id: string): string => {
 };
 
 const parse = (code: string): acorn.Node => acorn.parse(code, { ecmaVersion: 2020 }) as acorn.Node;
+
+// The author comments name the APIs the code must avoid, so negative checks read the code alone.
+const withoutComments = (code: string): string => code.replace(/\/\/[^\n]*/g, "");
 
 const isDataIndex = (node: any): boolean =>
   node.computed &&
@@ -166,15 +172,11 @@ const isValuePosition = (node: any, ancestors: any[]): boolean => {
   return true;
 };
 
-/** True when the node sits under the `o2_events` property, whose handlers run in the parent. */
-const inO2Events = (ancestors: any[]): boolean =>
-  ancestors.some(
-    (node: any) => node.type === "Property" && (node.key?.name ?? node.key?.value) === "o2_events",
-  );
-
 /** Standard globals a sandboxed iframe genuinely has, plus the free `option` it must assign. */
 const SANDBOX_GLOBALS = new Set([
   "option",
+  // The frame is a real window, so its handlers can defer work like any page script.
+  "setTimeout",
   "Math",
   "Number",
   "String",
@@ -198,15 +200,6 @@ const SANDBOX_GLOBALS = new Set([
   "NaN",
   "Infinity",
 ]);
-
-/**
- * DOM globals, legal ONLY inside `o2_events`. The sandbox iframe never CALLS
- * those handlers — it only `obj.toString()`s them across the postMessage
- * boundary (convertCustomChartData.ts:110-118) — and CustomChartRenderer
- * rebuilds them with `new Function` in the parent window, where the DOM exists.
- * Anywhere else in the body this list would be a render-time throw.
- */
-const PARENT_ONLY_GLOBALS = new Set(["CustomEvent", "setTimeout"]);
 
 const UNIT_VALUES = new Set(
   getUnitOptions(((k: string) => raw(k)) as any)
@@ -619,10 +612,10 @@ describe("summary — the author JS is real, safe, and shaped for the sandbox", 
   });
 
   it("assigns a BARE `option`, never a declared one", () => {
-    // The sandbox runs the code as `(function(data, echarts) { <userCode> })` and
+    // The sandbox runs the code in a block inside `__o2UserChart(data, echarts, context, o2)` and
     // then reads a FREE `option` identifier from the enclosing scope
-    // (convertCustomChartData.ts:151). `const option = ...` binds inside the IIFE,
-    // so the postMessage line throws ReferenceError and the panel shows nothing.
+    // (customChartSandbox.ts userChartScript). `const option = ...` binds inside the block,
+    // so `return option` throws ReferenceError and the panel shows nothing.
     const code = chartCode(PANEL_ID);
     const ast = parse(code);
     let declared = false;
@@ -704,14 +697,14 @@ describe("summary — the author JS is real, safe, and shaped for the sandbox", 
   });
 
   it("references a bare identifier the sandbox does not provide", () => {
-    // The IIFE's only parameters are `data` and `echarts`
-    // (convertCustomChartData.ts:155), so any OTHER free identifier — `store`,
+    // The chart function's only parameters are `data`, `echarts`, `context` and `o2`
+    // (customChartSandbox.ts userChartScript), so any OTHER free identifier — `store`,
     // `theme`, `Vue` — throws at render while passing validateUserCode. Checks value
     // position only: property KEYS share the Identifier node type, so walking every
     // Identifier would fail on a harmless `{ document: … }` key or a `p.document`
     // member access.
     const ast = parse(chartCode(PANEL_ID));
-    const bound = new Set<string>(["data", "echarts"]);
+    const bound = new Set<string>(["data", "echarts", "context", "o2"]);
     walk.simple(ast, {
       VariableDeclarator(node: any) {
         for (const name of boundNames(node.id)) bound.add(name);
@@ -738,34 +731,22 @@ describe("summary — the author JS is real, safe, and shaped for the sandbox", 
       Identifier(node: any, _state: any, ancestors: any[]) {
         if (!isValuePosition(node, ancestors)) return;
         if (bound.has(node.name) || SANDBOX_GLOBALS.has(node.name)) return;
-        // A DOM global is only reachable from a handler the PARENT rebuilds, so
-        // where it appears is the whole question — see PARENT_ONLY_GLOBALS.
-        if (PARENT_ONLY_GLOBALS.has(node.name) && inO2Events(ancestors)) return;
         free.push(node.name);
       },
     });
     expect([...new Set(free)], `${PANEL_ID} reads globals the sandbox never passes in`).toEqual([]);
   });
 
-  it("reaches for a DOM global ONLY from inside o2_events", () => {
-    // The exemption above is scoped by POSITION, so it has to be proved rather
-    // than trusted: a `new CustomEvent` hoisted into the option body would throw
-    // at render inside the iframe, which has no such global in scope.
-    const ast = parse(chartCode(PANEL_ID));
-    const misplaced: string[] = [];
-    walk.ancestor(ast, {
-      Identifier(node: any, _state: any, ancestors: any[]) {
-        if (!isValuePosition(node, ancestors)) return;
-        if (!PARENT_ONLY_GLOBALS.has(node.name)) return;
-        if (!inO2Events(ancestors)) misplaced.push(node.name);
-      },
-    });
-    expect(misplaced, `${PANEL_ID} reads a DOM global outside o2_events`).toEqual([]);
+  it("never reaches for the page it is drawn in", () => {
+    // The chart runs in an opaque-origin frame: the app document is out of reach, and o2.drilldown is the only way out.
+    expect(withoutComments(chartCode(PANEL_ID))).not.toMatch(
+      /ownerDocument|dispatchEvent|CustomEvent|location/,
+    );
   });
 });
 
 describe("summary — colours come from real theme data, never a hardcoded palette", () => {
-  // The sandbox CSP is `default-src 'none'; style-src 'none'`, so NO stylesheet
+  // The sandbox frame loads none of the app's stylesheets, so NO stylesheet
   // reaches the iframe and getComputedStyle cannot resolve a --color-* token from
   // inside it. That leaves exactly two options: bake a palette into the JS, or
   // have the resolver substitute the parent-resolved colours into the string
@@ -1162,95 +1143,49 @@ describe("summary — i18n", () => {
 });
 
 describe("summary — a bubble click ANNOUNCES the cluster, and never navigates itself", () => {
-  // The click handler is the page's only answer to "which cluster should I look
-  // at" actually leading anywhere. It travels as `o2_events`, which the sandbox
-  // serializes to a string (convertCustomChartData.ts:110-118) and
-  // CustomChartRenderer.vue:118-124 rebuilds with `new Function` in the PARENT.
-  // It gets the DOM but never the router, so it dispatches and CuratedPageView
-  // routes: `location.assign` here tore down and reloaded the entire SPA.
-  // Extracted and EXECUTED here, because the string surviving is not evidence
-  // that the dispatch is right.
-  const handlerSource = (): string => {
-    const code = chartCode(PANEL_ID);
-    const ast = parse(code);
-    let source: string | null = null;
-    walk.simple(ast, {
-      Property(node: any) {
-        const key = node.key?.name ?? node.key?.value;
-        if (key !== "o2_events") return;
-        for (const prop of node.value?.properties ?? []) {
-          const event = prop.key?.name ?? prop.key?.value;
-          if (event === "click") source = code.slice(prop.value.start, prop.value.end);
-        }
-      },
-    });
-    if (!source) throw new Error("no o2_events.click handler on the fleet quadrant");
-    return source;
-  };
-
-  /** Rebuilds the handler the way CustomChartRenderer does, over a fake chart DOM. */
-  const runClick = (params: unknown, source = handlerSource()) => {
-    const events: CustomEvent[] = [];
-    const assigned: string[] = [];
-    const ownerDocument = {
-      dispatchEvent: (event: CustomEvent) => events.push(event),
-      defaultView: {
-        location: {
-          search: "?org_identifier=default",
-          pathname: "/web/infra/kubernetes",
-          assign: (url: string) => assigned.push(url),
-          replace: (url: string) => assigned.push(url),
-        },
-      },
-    };
-    const handler = new Function(`return ${source}`)();
-    handler(params, { getDom: () => ({ ownerDocument }) });
-    return { events, assigned };
+  // The frame has no router or app document, so the click asks o2 for a drilldown and CuratedPageView routes it.
+  const runClick = (params: unknown) => {
+    const drilldowns: { name: string; detail: unknown }[] = [];
+    const o2 = { drilldown: (name: string, detail: unknown) => drilldowns.push({ name, detail }) };
+    const option = new Function(
+      "data",
+      "echarts",
+      "context",
+      "o2",
+      `${chartCode(PANEL_ID)}; return option;`,
+    )([], {}, {}, o2);
+    option.o2_events.click(params, {});
+    return drilldowns;
   };
 
   const bubble = (name: string) => ({ data: { name, meta: { name } } });
 
-  it("survives DOMPurify byte-for-byte — a `<` would TRUNCATE the handler", () => {
-    // The sandbox serializes this function with DOMPurify.sanitize over its TEXT
-    // (convertCustomChartData.ts:110-118). Measured: `&` becomes `&amp;` and `<`
-    // silently cuts the function off mid-body, so `for (i = 0; i < n; i++)`
-    // rebuilt as a syntax error and the whole panel rendered a blank canvas with
-    // NO console error. Executing the sanitized text is the only honest check.
-    const source = handlerSource();
-    expect(DOMPurify.sanitize(source), "sanitize rewrote the handler").toBe(source);
-  });
-
-  it("still dispatches after a real sanitize round trip", () => {
-    const { events } = runClick(bubble("prod-eu"), DOMPurify.sanitize(handlerSource()));
-    expect(events).toHaveLength(1);
-    expect(events[0].detail).toEqual({ cluster: "prod-eu" });
+  it("asks for a cluster drilldown with the clicked cluster", () => {
+    expect(runClick(bubble("prod-eu"))).toEqual([
+      { name: "cluster", detail: { cluster: "prod-eu" } },
+    ]);
   });
 
   it("NEVER touches location — that is the whole reload bug", () => {
     // location.assign/replace is a document navigation: it discards the SPA, so
-    // every panel refetches and the user watches a white flash. A regression here
-    // is invisible in a screenshot and only shows up as the reload itself.
-    const { assigned } = runClick(bubble("prod-eu"));
-    expect(assigned).toEqual([]);
-    expect(handlerSource()).not.toMatch(/location/);
+    // every panel refetches and the user watches a white flash.
+    expect(withoutComments(chartCode(PANEL_ID))).not.toMatch(/location/);
   });
 
-  it("dispatches the event name CuratedPageView actually listens for", () => {
+  it("requests a drilldown the parent accepts and maps to the event CuratedPageView listens for", () => {
     // A typo on either side is a click that silently does nothing at all.
-    const { events } = runClick(bubble("prod-eu"));
-    expect(events[0].type).toBe(FLEET_DRILLDOWN_EVENT);
-  });
-
-  it("bubbles, because the listener sits on the document and not on this chart", () => {
-    const { events } = runClick(bubble("prod-eu"));
-    expect(events[0].bubbles).toBe(true);
+    const [drilldown] = runClick(bubble("prod-eu"));
+    expect(parseSandboxMessage({ type: "drilldown", ...drilldown })).toEqual({
+      type: "drilldown",
+      drilldown: { name: "cluster", detail: { cluster: "prod-eu" } },
+    });
+    expect(CUSTOM_CHART_DRILLDOWN_EVENTS.cluster).toBe(FLEET_DRILLDOWN_EVENT);
   });
 
   it("carries the clicked cluster verbatim, escaping nothing", () => {
     // The name rides a structured `detail`, so a name that would have broken a
     // query string needs no encoding here — the router encodes it downstream.
-    const { events } = runClick(bubble("eu&west=1"));
-    expect(events[0].detail).toEqual({ cluster: "eu&west=1" });
+    expect(runClick(bubble("eu&west=1"))[0].detail).toEqual({ cluster: "eu&west=1" });
   });
 
   it("targets a tab id the manifest actually declares", () => {
@@ -1267,8 +1202,8 @@ describe("summary — a bubble click ANNOUNCES the cluster, and never navigates 
   it("ignores a click that carries no cluster", () => {
     // markArea/markLine zones and axis clicks all reach this handler with no
     // `meta`, and drilling into `var-cluster=undefined` would blank every panel.
-    expect(runClick({}).events).toEqual([]);
-    expect(runClick({ data: {} }).events).toEqual([]);
+    expect(runClick({})).toEqual([]);
+    expect(runClick({ data: {} })).toEqual([]);
   });
 
   it("the bubbles show a pointer cursor, so the affordance is visible", () => {
@@ -1309,13 +1244,9 @@ describe("summary — the plot stays square at EVERY resolution", () => {
     return new Function("data", "echarts", `${code}; return option;`)(data, {});
   };
 
-  /**
-   * Drives o2_events.finished the way CustomChartRenderer does — through the SAME
-   * sanitize-and-rebuild round trip, so a truncated function fails here too.
-   */
+  /** Drives o2_events.finished the way the sandbox frame does, over a fake live chart. */
   const solve = (w: number, h: number, option = runFleet()) => {
-    const source = DOMPurify.sanitize(String(option.o2_events.finished));
-    const handler = new Function(`return ${source}`)();
+    const handler = option.o2_events.finished;
     let applied: any = null;
     // A real chart reports the grid it is CURRENTLY showing, and the handler's guard reads it.
     let grid: any = option.grid;
@@ -1392,8 +1323,7 @@ describe("summary — the plot stays square at EVERY resolution", () => {
   });
 
   it("re-solves on resize instead of keeping the size it first painted", () => {
-    // CustomChartRenderer.vue:201,215-216 calls chart.resize() but never re-runs the
-    // author JS, so a static option would keep the seeded margins forever.
+    // Resizing never re-runs the author JS, so a static option would keep the seeded margins forever.
     const option = runFleet();
     const wide = solve(1760, 624, option).applied;
     const narrow = solve(900, 500, option).applied;
@@ -1410,8 +1340,7 @@ describe("summary — the plot stays square at EVERY resolution", () => {
     // setOption paints, painting fires `finished` again. Without the guard this is an
     // infinite loop that pins a core and never settles.
     const option = runFleet();
-    const source = DOMPurify.sanitize(String(option.o2_events.finished));
-    const handler = new Function(`return ${source}`)();
+    const handler = option.o2_events.finished;
     let calls = 0;
     let grid: any = option.grid;
     const chart: any = {
@@ -1446,8 +1375,7 @@ describe("summary — the plot stays square at EVERY resolution", () => {
     // "`setOption` should not be called during main process." and then throws
     // 'Please set $action: "replace" to change `type`' — the sidebar never paints.
     const option = runFleet();
-    const source = DOMPurify.sanitize(String(option.o2_events.finished));
-    const handler = new Function(`return ${source}`)();
+    const handler = option.o2_events.finished;
     let calls = 0;
     const chart: any = {
       getWidth: () => 1760,
@@ -1487,31 +1415,12 @@ describe("summary — the plot stays square at EVERY resolution", () => {
     expect(code).not.toMatch(/grid:\s*\{[^}]*(left|right):\s*["'][\d.]+%["']/);
   });
 
-  it("carries the layout inputs as DATA, since the handler crosses the sandbox with no scope", () => {
-    // o2_events handlers are serialized to a string and rebuilt by `new Function` in the
-    // parent (CustomChartRenderer.vue:118-124), so every closure they had is gone.
+  it("carries the layout inputs on the option, where the handler reads them back", () => {
     const cfg = runFleet().o2_layout;
     for (const key of ["axisLeft", "axisTop", "axisBottom", "axisRight"]) {
       expect(cfg[key], `o2_layout.${key} is missing`).toBeDefined();
     }
     expect(JSON.parse(JSON.stringify(cfg)), "o2_layout does not survive JSON").toEqual(cfg);
-  });
-
-  it("survives DOMPurify without truncation — no '<' and no '&' in the handler", () => {
-    // DOMPurify TRUNCATES the function at '<' and escapes '&', both silently: the chart
-    // goes blank with nothing in the console.
-    const source = String(runFleet().o2_events.finished);
-    expect(source).not.toContain("<");
-    expect(source).not.toContain("&");
-    expect(DOMPurify.sanitize(source)).toBe(source);
-  });
-
-  it("keeps the ES5 idiom both ECharts versions parse", () => {
-    // The sandbox runs 5.6.1 and the app paints with 6.1.0.
-    const source = String(runFleet().o2_events.finished);
-    expect(source).not.toMatch(/=>/);
-    expect(source).not.toMatch(/\b(let|const)\b/);
-    expect(source).not.toMatch(/\.\.\./);
   });
 });
 

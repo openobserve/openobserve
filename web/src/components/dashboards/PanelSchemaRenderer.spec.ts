@@ -129,9 +129,9 @@ vi.mock("@/components/dashboards/panels/MarkdownRenderer.vue", () => ({
   },
 }));
 
-vi.mock("@/components/dashboards/panels/CustomChartRenderer.vue", () => ({
+vi.mock("@/components/dashboards/panels/CustomChartSandboxRenderer.vue", () => ({
   default: {
-    name: "CustomChartRenderer",
+    name: "CustomChartSandboxRenderer",
     template: '<div data-test="custom-chart-renderer"></div>',
   },
 }));
@@ -271,7 +271,7 @@ describe("PanelSchemaRenderer", () => {
             props: ["variablesData"],
             template: '<div data-test="markdown-renderer"></div>',
           },
-          CustomChartRenderer: { template: '<div data-test="custom-chart-renderer"></div>' },
+          CustomChartSandboxRenderer: { template: '<div data-test="custom-chart-renderer"></div>' },
           AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
           LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
           ...extra.stubs,
@@ -413,7 +413,7 @@ describe("PanelSchemaRenderer", () => {
       },
     );
 
-    it("should render CustomChartRenderer for custom_chart type", () => {
+    it("should render the sandbox renderer for custom_chart type", () => {
       wrapper = createWrapper({
         panelSchema: { ...defaultProps.panelSchema, type: "custom_chart" },
       });
@@ -1086,6 +1086,50 @@ describe("PanelSchemaRenderer", () => {
         expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]?.variables).toEqual({
           threshold: "9",
         });
+      });
+
+      it("hands the converted run to the sandbox renderer and shows the error it reports", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        const run = { code: "option = {}", data: [[{ count: 1 }]], panelId: "panel-1" };
+        vi.mocked(convertPanelData).mockResolvedValueOnce({
+          chartType: "custom_chart",
+          run,
+        } as any);
+        wrapper = createWrapper(
+          {
+            panelSchema: {
+              ...defaultProps.panelSchema,
+              type: "custom_chart",
+              customChartContent: "option = {}",
+              queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+            },
+          },
+          {
+            stubs: {
+              CustomChartSandboxRenderer: {
+                name: "CustomChartSandboxRenderer",
+                props: ["run"],
+                emits: ["error"],
+                template: '<div data-test="custom-chart-renderer"></div>',
+              },
+            },
+          },
+        );
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        const renderer = wrapper.findComponent({ name: "CustomChartSandboxRenderer" });
+        expect(renderer.props("run")).toEqual(run);
+
+        renderer.vm.$emit("error", { message: "Execution Error: boom", code: "" });
+        await nextTick();
+        expect(wrapper.vm.errorDetail).toEqual({ message: "Execution Error: boom", code: "" });
       });
 
       it("keeps the rendered chart and shows no error when the chart run is skipped", async () => {

@@ -46,7 +46,11 @@ vi.mock("./convertSankeyData", () => ({
 }));
 
 vi.mock("./convertCustomChartData", () => ({
-  runJavaScriptCode: vi.fn().mockResolvedValue({ customData: [] }),
+  prepareCustomChartRun: vi.fn((panelSchema: any, data: any, context: any) => ({
+    code: panelSchema.customChartContent ?? "",
+    data,
+    context,
+  })),
   validateUserCode: vi.fn().mockReturnValue(null),
 }));
 
@@ -267,7 +271,7 @@ describe("convertPanelData", () => {
         queries: [{ query: "SELECT * FROM test" }],
       };
 
-      const { runJavaScriptCode } = await import("./convertCustomChartData");
+      const { prepareCustomChartRun } = await import("./convertCustomChartData");
       const result = await convertPanelData(
         panelSchema,
         mockData,
@@ -280,9 +284,12 @@ describe("convertPanelData", () => {
         mockAnnotations,
       );
 
-      expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, mockData, undefined);
-      expect(result.chartType).toBe("custom_chart");
-      expect(result).toHaveProperty("customData");
+      expect(prepareCustomChartRun).toHaveBeenCalledWith(panelSchema, mockData, undefined);
+      // The code runs in the panel's sandbox frame, so conversion only hands over the run.
+      expect(result).toEqual({
+        chartType: "custom_chart",
+        run: { code: "", data: mockData, context: undefined },
+      });
     });
 
     it("passes the chart context through to the sandbox", async () => {
@@ -294,7 +301,7 @@ describe("convertPanelData", () => {
         theme: "light" as const,
       };
 
-      const { runJavaScriptCode } = await import("./convertCustomChartData");
+      const { prepareCustomChartRun } = await import("./convertCustomChartData");
       await convertPanelData(
         panelSchema,
         mockData,
@@ -310,7 +317,7 @@ describe("convertPanelData", () => {
         context,
       );
 
-      expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, mockData, context);
+      expect(prepareCustomChartRun).toHaveBeenCalledWith(panelSchema, mockData, context);
     });
 
     it("should handle custom chart type with no data", async () => {
@@ -334,31 +341,6 @@ describe("convertPanelData", () => {
 
       // No rows is an empty state, not an error; the renderer shows "No Data"
       expect(result).toEqual({});
-    });
-
-    it("should handle custom chart type with invalid JavaScript result", async () => {
-      const panelSchema = {
-        type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }],
-      };
-
-      const { runJavaScriptCode } = await import("./convertCustomChartData");
-      vi.mocked(runJavaScriptCode).mockResolvedValueOnce(null);
-
-      const result = await convertPanelData(
-        panelSchema,
-        mockData,
-        mockStore,
-        mockChartPanelRef,
-        mockHoveredSeriesState,
-        mockResultMetaData,
-        mockMetadata,
-        mockChartPanelStyle,
-        mockAnnotations,
-      );
-
-      expect(result.chartType).toBe("custom_chart");
-      expect(result).toEqual({ chartType: "custom_chart" });
     });
 
     it("should handle custom chart with empty data array but has query", async () => {
@@ -475,79 +457,31 @@ describe("convertPanelData", () => {
       expect(result).toEqual({});
     });
 
-    it("should handle custom chart with string result from JavaScript", async () => {
+    it("rejects a run skipped by another panel's refresh so the panel keeps its chart", async () => {
       const panelSchema = {
         type: "custom_chart",
         queries: [{ query: "SELECT * FROM test" }],
       };
+      const skipped = new Error("skipped");
 
-      const { runJavaScriptCode } = await import("./convertCustomChartData");
-      vi.mocked(runJavaScriptCode).mockResolvedValueOnce("string result");
+      const { prepareCustomChartRun } = await import("./convertCustomChartData");
+      vi.mocked(prepareCustomChartRun).mockImplementationOnce(() => {
+        throw skipped;
+      });
 
-      const result = await convertPanelData(
-        panelSchema,
-        mockData,
-        mockStore,
-        mockChartPanelRef,
-        mockHoveredSeriesState,
-        mockResultMetaData,
-        mockMetadata,
-        mockChartPanelStyle,
-        mockAnnotations,
-      );
-
-      expect(result.chartType).toBe("custom_chart");
-      expect(result).toEqual({ chartType: "custom_chart" });
-    });
-
-    it("should handle custom chart with number result from JavaScript", async () => {
-      const panelSchema = {
-        type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }],
-      };
-
-      const { runJavaScriptCode } = await import("./convertCustomChartData");
-      vi.mocked(runJavaScriptCode).mockResolvedValueOnce(123);
-
-      const result = await convertPanelData(
-        panelSchema,
-        mockData,
-        mockStore,
-        mockChartPanelRef,
-        mockHoveredSeriesState,
-        mockResultMetaData,
-        mockMetadata,
-        mockChartPanelStyle,
-        mockAnnotations,
-      );
-
-      expect(result.chartType).toBe("custom_chart");
-      expect(result).toEqual({ chartType: "custom_chart" });
-    });
-
-    it("should handle custom chart with boolean result from JavaScript", async () => {
-      const panelSchema = {
-        type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }],
-      };
-
-      const { runJavaScriptCode } = await import("./convertCustomChartData");
-      vi.mocked(runJavaScriptCode).mockResolvedValueOnce(false);
-
-      const result = await convertPanelData(
-        panelSchema,
-        mockData,
-        mockStore,
-        mockChartPanelRef,
-        mockHoveredSeriesState,
-        mockResultMetaData,
-        mockMetadata,
-        mockChartPanelStyle,
-        mockAnnotations,
-      );
-
-      expect(result.chartType).toBe("custom_chart");
-      expect(result).toEqual({ chartType: "custom_chart" });
+      await expect(
+        convertPanelData(
+          panelSchema,
+          mockData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockResultMetaData,
+          mockMetadata,
+          mockChartPanelStyle,
+          mockAnnotations,
+        ),
+      ).rejects.toBe(skipped);
     });
   });
 
@@ -931,57 +865,6 @@ describe("convertPanelData", () => {
       expect(result.chartType).toBe("gauge");
     });
 
-    it("should handle custom chart with undefined result from JavaScript", async () => {
-      const panelSchema = {
-        type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }],
-      };
-
-      const { runJavaScriptCode } = await import("./convertCustomChartData");
-      vi.mocked(runJavaScriptCode).mockResolvedValueOnce(undefined);
-
-      const result = await convertPanelData(
-        panelSchema,
-        mockData,
-        mockStore,
-        mockChartPanelRef,
-        mockHoveredSeriesState,
-        mockResultMetaData,
-        mockMetadata,
-        mockChartPanelStyle,
-        mockAnnotations,
-      );
-
-      expect(result.chartType).toBe("custom_chart");
-      expect(result).toEqual({ chartType: "custom_chart" });
-    });
-
-    it("should handle custom chart with array result from JavaScript", async () => {
-      const panelSchema = {
-        type: "custom_chart",
-        queries: [{ query: "SELECT * FROM test" }],
-      };
-
-      const arrayResult = [1, 2, 3];
-      const { runJavaScriptCode } = await import("./convertCustomChartData");
-      vi.mocked(runJavaScriptCode).mockResolvedValueOnce(arrayResult);
-
-      const result = await convertPanelData(
-        panelSchema,
-        mockData,
-        mockStore,
-        mockChartPanelRef,
-        mockHoveredSeriesState,
-        mockResultMetaData,
-        mockMetadata,
-        mockChartPanelStyle,
-        mockAnnotations,
-      );
-
-      expect(result.chartType).toBe("custom_chart");
-      expect(result).toEqual({ chartType: "custom_chart", 0: 1, 1: 2, 2: 3 });
-    });
-
     it("should handle mixed case chart types", async () => {
       const panelSchema = {
         type: "Area",
@@ -1313,7 +1196,7 @@ describe("convertPanelData", () => {
       };
       const promqlData = [{ result: [{ metric: {}, values: [[1, "1"]] }] }];
 
-      const { runJavaScriptCode } = await import("./convertCustomChartData");
+      const { prepareCustomChartRun } = await import("./convertCustomChartData");
       const result = await convertPanelData(
         panelSchema,
         promqlData,
@@ -1326,7 +1209,7 @@ describe("convertPanelData", () => {
         mockAnnotations,
       );
 
-      expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, promqlData, undefined);
+      expect(prepareCustomChartRun).toHaveBeenCalledWith(panelSchema, promqlData, undefined);
       expect(result.chartType).toBe("custom_chart");
     });
   });

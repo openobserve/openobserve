@@ -9393,7 +9393,6 @@
       "duplicatePanelId": "Se encontró un ID de panel duplicado: {id}",
       "panelMissingLayoutI": "Al panel {id} le falta el valor layout.i",
       "duplicateLayoutI": "Se encontró un valor layout.i duplicado en la pestaña {tabId}: {value}",
-      "customChartCallbacksDropped": "Gráfico personalizado: se ignoró {count} callback de función en el código de este panel. El código de gráfico almacenado no puede ejecutar callbacks en la aplicación; usa valores simples en su lugar. | Gráfico personalizado: se ignoraron {count} callbacks de función en el código de este panel. El código de gráfico almacenado no puede ejecutar callbacks en la aplicación; usa valores simples en su lugar.",
       "unsafeCodeDetected": "Se detectó código no seguro: {error}",
       "forbiddenFunctionCall": "No se permite el uso de '{name}()'.",
       "forbiddenInsideSetTimeout": "No se permite el uso de {name} dentro de 'setTimeout()'.",
