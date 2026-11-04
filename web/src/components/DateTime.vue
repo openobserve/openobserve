@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="timezoneSelectOptions"
                 searchable
                 :aria-label="t('logStream.timezone')"
-                :dropdown-style="{ minWidth: '24rem' }"
+                :dropdown-style="{ minWidth: 'min(24rem, calc(100vw - 2rem))' }"
                 @update:model-value="onTimezoneChange"
                 @open="isTimezoneSelectOpen = true"
                 @close="isTimezoneSelectOpen = false"
@@ -680,27 +680,45 @@ export default defineComponent({
     const filteredTimezone: any = ref(timezoneOptions);
     const isTimezoneSelectOpen = ref(false);
 
+    const zoneOffsets = new Map<string, string>();
+
+    // longOffset throws on engines that lack it, so the label falls back to no offset.
     const zoneOffset = (zone: string): string => {
-      const name = new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "longOffset" })
-        .formatToParts(new Date())
-        .find((part) => part.type === "timeZoneName")?.value;
-      const offset = name?.replace("GMT", "") ?? "";
-      return offset === "" ? "+00:00" : offset;
+      const cached = zoneOffsets.get(zone);
+      if (cached !== undefined) return cached;
+      let offset = "";
+      try {
+        const name = new Intl.DateTimeFormat("en-US", {
+          timeZone: zone,
+          timeZoneName: "longOffset",
+        })
+          .formatToParts(new Date())
+          .find((part) => part.type === "timeZoneName")?.value;
+        offset = name?.replace("GMT", "") || "+00:00";
+      } catch {
+        offset = "";
+      }
+      zoneOffsets.set(zone, offset);
+      return offset;
     };
 
     const timezoneSelectOptions = computed(() =>
-      timezoneOptions.map((tz: string) =>
-        tz === browserTime
-          ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
-          : tz === "UTC"
-            ? { label: raw(tz), value: tz }
-            : {
-                label: raw(`${tz} (UTC${zoneOffset(tz)})`),
-                listLabel: raw(tz),
-                suffix: raw(`UTC${zoneOffset(tz)}`),
-                value: tz,
-              },
-      ),
+      timezoneOptions.map((tz: string) => {
+        const isBrowser = tz === browserTime;
+        const zone = isBrowser ? browserTz : tz;
+        const offset = zoneOffset(zone);
+        const suffix = offset ? raw(`UTC${offset}`) : undefined;
+        if (isBrowser) {
+          return { label: t("common.browserTimeWithZone", { zone: browserTz }), suffix, value: tz };
+        }
+        if (tz === "UTC") return { label: raw(tz), suffix, value: tz };
+        return {
+          label: raw(offset ? `${tz} (UTC${offset})` : tz),
+          listLabel: raw(tz),
+          suffix,
+          value: tz,
+        };
+      }),
     );
 
     let relativePeriods = [

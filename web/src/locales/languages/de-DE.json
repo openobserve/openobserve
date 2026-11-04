@@ -872,7 +872,6 @@
     "calendarQuarterOf": "Q{quarter} {year}",
     "timeRangeRecent": "Zuletzt",
     "timeRangeCalendar": "Kalender",
-    "timeRangeRecentEmpty": "Angewendete Zeiträume werden hier angezeigt.",
     "timeRangeRemoveRecent": "{range} aus den letzten Zeiträumen entfernen",
     "timeRangeRecentKeysHint": "Drücken Sie Entf, um ihn zu entfernen, oder die rechte Pfeiltaste, um zu seiner Entfernen-Schaltfläche zu gelangen.",
     "timeRangeShowMore": "Mehr anzeigen",

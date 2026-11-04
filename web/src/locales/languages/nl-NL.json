@@ -872,7 +872,6 @@
     "calendarQuarterOf": "Q{quarter} {year}",
     "timeRangeRecent": "Recent",
     "timeRangeCalendar": "Kalender",
-    "timeRangeRecentEmpty": "Toegepaste bereiken verschijnen hier.",
     "timeRangeRemoveRecent": "{range} uit recente bereiken verwijderen",
     "timeRangeRecentKeysHint": "Druk op Delete om het te verwijderen, of op de pijl rechts om de verwijderknop te bereiken.",
     "timeRangeShowMore": "Meer tonen",

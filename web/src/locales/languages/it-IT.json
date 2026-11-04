@@ -872,7 +872,6 @@
     "calendarQuarterOf": "Q{quarter} {year}",
     "timeRangeRecent": "Recenti",
     "timeRangeCalendar": "Calendario",
-    "timeRangeRecentEmpty": "Gli intervalli applicati verranno visualizzati qui.",
     "timeRangeRemoveRecent": "Rimuovi {range} dagli intervalli recenti",
     "timeRangeRecentKeysHint": "Premi Elimina per rimuoverlo, oppure la freccia destra per raggiungere il suo pulsante di rimozione.",
     "timeRangeShowMore": "Mostra di più",

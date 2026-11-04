@@ -86,8 +86,12 @@ describe("timeRangeRail", () => {
     const compact = (start: string, end: string, zone = "UTC") =>
       formatRecentRangeLabel(us(start), us(end), zone, NOW);
 
-    it("shows a single day as month and day", () => {
-      expect(compact("2026-10-02T08:00:00Z", "2026-10-02T09:00:00Z")).toBe("Oct 2");
+    it("names the hours of a range inside one day", () => {
+      expect(compact("2026-10-02T08:00:00Z", "2026-10-02T09:00:00Z")).toBe("Oct 2 · 08:00–09:00");
+    });
+
+    it("shows a whole day as month and day only", () => {
+      expect(compact("2026-10-02T00:00:00Z", "2026-10-02T23:59:59Z")).toBe("Oct 2");
     });
 
     it("collapses a same-month range to one month name", () => {
@@ -111,7 +115,7 @@ describe("timeRangeRail", () => {
 
     it("reads days in the picker timezone", () => {
       expect(compact("2026-10-26T20:00:00Z", "2026-10-26T21:00:00Z", "Asia/Calcutta")).toBe(
-        "Oct 27",
+        "Oct 27 · 01:30–02:30",
       );
     });
   });

@@ -106,7 +106,13 @@ const civilParts = (date: string): { year: number; month: number; day: number } 
 const currentYearIn = (nowMs: number, zone: string): number =>
   toZonedTime(nowMs, zone).getFullYear();
 
-/** "Oct 2", "Oct 2 – 3" or "Oct 30 – Nov 2" for a recent range, with the year only outside the current one. */
+// A within-day range names its hours so two windows on one day do not read alike; a whole day stays bare.
+const sameDayTimes = (startTime: string, endTime: string): string =>
+  startTime === "00:00:00" && endTime === "23:59:59"
+    ? ""
+    : ` · ${startTime.slice(0, 5)}–${endTime.slice(0, 5)}`;
+
+/** "Oct 2 · 08:00–09:00", "Oct 2 – 3" or "Oct 30 – Nov 2" for a recent range, with the year only outside the current one. */
 export const formatRecentRangeLabel = (
   startUs: number,
   endUs: number,
@@ -121,7 +127,7 @@ export const formatRecentRangeLabel = (
     from.year !== currentYearIn(nowMs, zone) || to.year !== currentYearIn(nowMs, zone);
   const day = (p: typeof from) => `${MONTHS[p.month]} ${p.day}${withYear ? `, ${p.year}` : ""}`;
   if (from.year === to.year && from.month === to.month) {
-    if (from.day === to.day) return day(from);
+    if (from.day === to.day) return `${day(from)}${sameDayTimes(start.time, end.time)}`;
     return `${MONTHS[from.month]} ${from.day} – ${to.day}${withYear ? `, ${from.year}` : ""}`;
   }
   return `${day(from)} – ${day(to)}`;

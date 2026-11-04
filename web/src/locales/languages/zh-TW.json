@@ -872,7 +872,6 @@
     "calendarQuarterOf": "第 {quarter} 季 {year}",
     "timeRangeRecent": "最近",
     "timeRangeCalendar": "日曆",
-    "timeRangeRecentEmpty": "您套用的時間範圍會顯示在這裡。",
     "timeRangeRemoveRecent": "從最近範圍移除 {range}",
     "timeRangeRecentKeysHint": "按下 Delete 鍵即可移除，或按向右鍵前往其移除按鈕。",
     "timeRangeShowMore": "顯示更多",

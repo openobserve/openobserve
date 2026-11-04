@@ -872,7 +872,6 @@
     "calendarQuarterOf": "{quarter} кв. {year}",
     "timeRangeRecent": "Недавние",
     "timeRangeCalendar": "Календарь",
-    "timeRangeRecentEmpty": "Применённые диапазоны появятся здесь.",
     "timeRangeRemoveRecent": "Удалить {range} из недавних диапазонов",
     "timeRangeRecentKeysHint": "Нажмите Delete, чтобы удалить, или стрелку вправо, чтобы перейти к кнопке удаления.",
     "timeRangeShowMore": "Показать больше",

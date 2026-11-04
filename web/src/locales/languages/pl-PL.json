@@ -872,7 +872,6 @@
     "calendarQuarterOf": "Q{quarter} {year}",
     "timeRangeRecent": "Ostatnie",
     "timeRangeCalendar": "Kalendarz",
-    "timeRangeRecentEmpty": "Zastosowane zakresy pojawią się tutaj.",
     "timeRangeRemoveRecent": "Usuń {range} z ostatnich zakresów",
     "timeRangeRecentKeysHint": "Naciśnij Delete, aby go usunąć, lub strzałkę w prawo, aby przejść do jego przycisku usuwania.",
     "timeRangeShowMore": "Pokaż więcej",

@@ -872,7 +872,6 @@
     "calendarQuarterOf": "{year}년 {quarter}분기",
     "timeRangeRecent": "최근",
     "timeRangeCalendar": "캘린더",
-    "timeRangeRecentEmpty": "적용한 범위가 여기에 표시됩니다.",
     "timeRangeRemoveRecent": "최근 범위에서 {range} 제거",
     "timeRangeRecentKeysHint": "삭제하려면 Delete 키를 누르고, 제거 버튼으로 이동하려면 오른쪽 화살표를 누르세요.",
     "timeRangeShowMore": "더 보기",

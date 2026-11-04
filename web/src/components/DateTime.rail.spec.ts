@@ -128,7 +128,7 @@ describe("DateTime rail", () => {
       const recent = el("date-time-rail-recent-header")!;
       const calendar = el("date-time-rail-calendar-header")!;
       for (const header of [recent, calendar]) {
-        expect(header.className).toContain("text-text-label");
+        expect(header.className).toContain("text-input-label-text");
         expect(header.className).toContain("tracking-wide");
       }
     });
@@ -166,6 +166,24 @@ describe("DateTime rail", () => {
       el("date-time-relative-tab")!.click();
       await flushPromises();
       expect(wrapper!.vm.selectedType).toBe("relative");
+    });
+
+    it("gives every timezone option a UTC offset suffix and the zone name as its list label", async () => {
+      createWrapper({ autoApply: false });
+      await openMenu();
+
+      const options = wrapper!.vm.timezoneSelectOptions as {
+        label: string;
+        listLabel?: string;
+        suffix?: string;
+        value: string;
+      }[];
+      const kolkata = options.find((o) => o.value === "Asia/Calcutta")!;
+      expect(kolkata.suffix).toBe("UTC+05:30");
+      expect(kolkata.listLabel).toBe("Asia/Calcutta");
+      expect(kolkata.label).toBe("Asia/Calcutta (UTC+05:30)");
+      expect(options.find((o) => o.value === "UTC")?.suffix).toBe("UTC+00:00");
+      expect(options.every((o) => o.suffix?.startsWith("UTC"))).toBe(true);
     });
 
     it("has no Cancel button and shows the timezone offset", async () => {
@@ -808,12 +826,12 @@ describe("DateTime rail", () => {
       await openMenu();
 
       expect(el("date-time-rail-recent-0")?.getAttribute("aria-label")).toBe(
-        "Oct 8 (2026/10/08 04:30:00 - 2026/10/08 05:00:00)",
+        "Oct 8 · 04:30–05:00 (2026/10/08 04:30:00 - 2026/10/08 05:00:00)",
       );
       expect(el("date-time-rail-recent-0")?.textContent).toContain("Oct 8");
       expect(el("date-time-rail-recent-0-duration")?.textContent).toBe("30m");
       expect(el("date-time-rail-recent-1")?.getAttribute("aria-label")).toBe(
-        "Oct 6 (2026/10/06 23:30:00 - 2026/10/06 23:59:59)",
+        "Oct 6 · 23:30–23:59 (2026/10/06 23:30:00 - 2026/10/06 23:59:59)",
       );
       expect(el("date-time-rail-recent-1")?.textContent).toContain("Oct 6");
 

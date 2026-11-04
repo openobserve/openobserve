@@ -872,7 +872,6 @@
     "calendarQuarterOf": "Ç{quarter} {year}",
     "timeRangeRecent": "Son kullanılanlar",
     "timeRangeCalendar": "Takvim",
-    "timeRangeRecentEmpty": "Uyguladığınız aralıklar burada görünecek.",
     "timeRangeRemoveRecent": "{range} aralığını son kullanılan aralıklardan kaldır",
     "timeRangeRecentKeysHint": "Kaldırmak için Delete tuşuna, kaldırma düğmesine ulaşmak için sağ ok tuşuna basın.",
     "timeRangeShowMore": "Daha fazla göster",
