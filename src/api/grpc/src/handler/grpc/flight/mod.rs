@@ -191,14 +191,17 @@ impl FlightService for FlightServiceImpl {
             Status::internal(e.to_string())
         })?;
 
-        let mut stream =
-            FlightEncoderStreamBuilder::new(write_options, MAX_FLIGHT_DATA_SIZE, session_guard)
-                .with_trace_id(trace_id.to_string())
-                .with_is_super(is_super_cluster)
-                .with_defer_lock(lock)
-                .with_start(start)
-                .with_node_messages(node_messages)
-                .build(streams, span);
+        let mut stream = FlightEncoderStreamBuilder::new(
+            write_options,
+            MAX_FLIGHT_DATA_SIZE,
+            session_guard,
+            node_messages,
+        )
+        .with_trace_id(trace_id.to_string())
+        .with_is_super(is_super_cluster)
+        .with_defer_lock(lock)
+        .with_start(start)
+        .build(streams, span);
 
         let stream = async_stream::stream! {
             let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));

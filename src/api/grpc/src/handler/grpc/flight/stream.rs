@@ -35,7 +35,7 @@ pub(crate) const MAX_FLIGHT_DATA_SIZE: usize = 32 * 1024 * 1024;
 pub struct FlightEncoderStreamBuilder {
     options: IpcWriteOptions,
     max_flight_data_size: usize,
-    node_messages: Option<NodeMessages>,
+    node_messages: NodeMessages,
     // query context
     trace_id: String,
     is_super: bool,
@@ -49,22 +49,18 @@ impl FlightEncoderStreamBuilder {
         options: IpcWriteOptions,
         max_flight_data_size: usize,
         session_guard: SessionGuard,
+        node_messages: NodeMessages,
     ) -> Self {
         Self {
             options,
             max_flight_data_size,
-            node_messages: None,
+            node_messages,
             trace_id: String::new(),
             is_super: false,
             defer_lock: None,
             session_guard: Some(session_guard),
             start: std::time::Instant::now(),
         }
-    }
-
-    pub fn with_node_messages(mut self, messages: NodeMessages) -> Self {
-        self.node_messages = Some(messages);
-        self
     }
 
     pub fn with_trace_id(mut self, trace_id: String) -> Self {
@@ -167,7 +163,7 @@ pub struct FlightEncoderStream {
     /// Only used to encode custom messages (scan stats, peak memory, ...).
     encoder: FlightDataEncoder,
     queue: VecDeque<FlightData>,
-    node_messages: Option<NodeMessages>,
+    node_messages: NodeMessages,
     first_data: bool,
     done: bool,
     /// query context + resources consumed by the stream's `Drop` teardown.
@@ -234,15 +230,12 @@ impl EventLog {
 impl FlightEncoderStream {
     /// Queues the node's messages due now; a stream with no batch sends its first ones at the end.
     fn encode_node_messages(&mut self, at_end: bool) -> Result<(), FlightError> {
-        let Some(node) = &self.node_messages else {
-            return Ok(());
-        };
         let mut messages = Vec::new();
         if self.first_data {
-            messages.extend(node.first());
+            messages.extend(self.node_messages.first());
         }
         if at_end {
-            messages.extend(node.last());
+            messages.extend(self.node_messages.last());
         }
         self.first_data = false;
         for message in messages {
@@ -402,6 +395,7 @@ mod tests {
             IpcWriteOptions::default(),
             4096,
             SessionGuard::new("test-trace".to_string()),
+            follower_messages(),
         )
     }
 
@@ -412,7 +406,6 @@ mod tests {
         assert!(!b.is_super);
         assert!(b.defer_lock.is_none());
         assert!(b.session_guard.is_some());
-        assert!(b.node_messages.is_none());
     }
 
     #[test]
@@ -446,12 +439,6 @@ mod tests {
         let _ = b.start;
     }
 
-    #[test]
-    fn test_builder_with_node_messages() {
-        let b = make_builder().with_node_messages(follower_messages());
-        assert!(b.node_messages.is_some());
-    }
-
     fn follower_messages() -> NodeMessages {
         NodeMessages {
             scan_stats: ScanStats::new(),
@@ -463,7 +450,6 @@ mod tests {
 
     async fn message_kinds(partition: SendableRecordBatchStream) -> Vec<&'static str> {
         let fds: Vec<FlightData> = make_builder()
-            .with_node_messages(follower_messages())
             .build(vec![partition], tracing::Span::none())
             .try_collect()
             .await
@@ -547,6 +533,7 @@ mod tests {
             options,
             MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
+            follower_messages(),
         )
         .build(partitions, tracing::Span::none());
 
@@ -555,6 +542,7 @@ mod tests {
         let dicts = std::collections::HashMap::new();
         let mut decoded: Vec<i32> = fds
             .iter()
+            .filter(|fd| fd.app_metadata.is_empty())
             .flat_map(|fd| {
                 let b = arrow_flight::utils::flight_data_to_arrow_batch(fd, schema.clone(), &dicts)
                     .unwrap();
@@ -602,6 +590,7 @@ mod tests {
             IpcWriteOptions::default(),
             MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
+            follower_messages(),
         )
         .build(vec![ok_partition, panic_partition], tracing::Span::none());
 
@@ -720,6 +709,7 @@ mod tests {
             options,
             MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
+            follower_messages(),
         )
         .build(partitions, tracing::Span::none());
         let fds: Vec<FlightData> = stream.try_collect().await.unwrap();
@@ -793,6 +783,7 @@ mod tests {
             options,
             MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
+            follower_messages(),
         )
         .build(vec![inner], tracing::Span::none());
 
@@ -804,6 +795,7 @@ mod tests {
         let dicts = std::collections::HashMap::new();
         let decoded: Vec<i32> = fds
             .iter()
+            .filter(|fd| fd.app_metadata.is_empty())
             .flat_map(|fd| {
                 let b = arrow_flight::utils::flight_data_to_arrow_batch(fd, schema.clone(), &dicts)
                     .unwrap();
