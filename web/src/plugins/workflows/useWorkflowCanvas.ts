@@ -1086,6 +1086,31 @@ const withBranchProbes = (workflow: any, nodeId: string) => {
   };
 };
 
+// A saved workflow's probe run is persisted with the probe ids, so a reopened run must fold them the way the live response is folded.
+const foldStoredBranchProbes = (maps: {
+  inputs: Record<string, any>;
+  outputs: Record<string, any>;
+  errors: Record<string, any>;
+}) => {
+  const handlesOf = new Map<string, Set<string>>();
+  for (const key of [
+    ...Object.keys(maps.inputs),
+    ...Object.keys(maps.outputs),
+    ...Object.keys(maps.errors),
+  ]) {
+    const at = key.lastIndexOf(BRANCH_PROBE_SEP);
+    if (at <= 0) continue;
+    const branchId = key.slice(0, at);
+    if (!handlesOf.has(branchId)) handlesOf.set(branchId, new Set());
+    handlesOf.get(branchId)!.add(key.slice(at + BRANCH_PROBE_SEP.length));
+  }
+  let folded = maps;
+  for (const [branchId, handles] of handlesOf) {
+    folded = foldBranchProbes(branchId, [...handles], folded);
+  }
+  return folded;
+};
+
 /** Folds the probes' inputs into the Branch's per-handle output map and drops the probes from the result. */
 export const foldBranchProbes = (
   nodeId: string,
@@ -1732,12 +1757,12 @@ export const loadWorkflowRun = async (opts: {
     // errors.data (array) -> map keyed by node_id, in the same
     // { error_count, errors: [[message], …] } shape the badges + drawer read.
     const errList = Array.isArray(payload.errors?.data) ? payload.errors.data : [];
-    const errors: Record<string, any> = {};
+    const rawErrors: Record<string, any> = {};
     for (const e of errList) {
       // Drop null/empty messages so a message-less error entry doesn't render
       // the literal string "undefined"/"null" as an error line.
       const msgs = (Array.isArray(e.error) ? e.error : [e.error]).filter(Boolean);
-      errors[e.node_id] = {
+      rawErrors[e.node_id] = {
         error_count: msgs.length,
         errors: msgs.map((m: string) => [m]),
       };
@@ -1746,11 +1771,16 @@ export const loadWorkflowRun = async (opts: {
     // Per-node INPUT for the whole run (all nodes) — the same shape/semantics as a
     // Test run's `inputs`. Older runs only carried error_node_map (errored node's
     // input) — fall back to that.
-    const inputs = payload.data?.input_map || payload.data?.error_node_map || {};
+    const rawInputs = payload.data?.input_map || payload.data?.error_node_map || {};
     // Per-node OUTPUT for the whole run — the stored counterpart of a Test run's
     // `outputs`, so the drawer reads a node's Output directly. Older runs predate
     // the output map → empty, and Output shows "run to view".
-    const outputs = payload.data?.output_map || {};
+    const rawOutputs = payload.data?.output_map || {};
+    const { inputs, outputs, errors } = foldStoredBranchProbes({
+      inputs: rawInputs,
+      outputs: rawOutputs,
+      errors: rawErrors,
+    });
 
     // GHOST NODES — the run references a node the workflow no longer has (it was
     // edited/deleted after the run). Its badge has nowhere to render, so an error

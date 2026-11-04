@@ -313,6 +313,63 @@ describe("loadWorkflowRun — history run response mapping", () => {
     });
   });
 
+  it("folds a stored Branch Run Step's probes instead of reporting them as ghosts", async () => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [
+        {
+          id: "b1",
+          data: { node_type: "branch", cases: [{ handle: "case_0" }], else_handle: "else" },
+        },
+        { id: "d0", data: { node_type: "destination" } },
+        { id: "d1", data: { node_type: "destination" } },
+      ],
+      edges: [
+        { source: "b1", sourceHandle: "case_0", target: "d0" },
+        { source: "b1", sourceHandle: "else", target: "d1" },
+      ],
+    } as any;
+    mockRun.mockResolvedValue({
+      data: {
+        errors: { data: [] },
+        data: {
+          input_map: {
+            b1: [{ a: 1 }, { a: 2 }, { a: 3 }],
+            "b1::path::case_0": [{ a: 1 }, { a: 2 }],
+            "b1::path::else": [{ a: 3 }],
+          },
+          output_map: {
+            b1: [{ a: 1 }, { a: 2 }, { a: 3 }],
+            "b1::path::case_0": [{ a: 1 }, { a: 2 }],
+            "b1::path::else": [{ a: 3 }],
+          },
+        },
+      },
+    });
+    await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "probe" });
+    const res: any = workflowObj.testRun.result;
+    expect(res.ghostNodeIds).toEqual([]);
+    expect(res.inputs).toEqual({ b1: [{ a: 1 }, { a: 2 }, { a: 3 }] });
+    expect(res.outputs).toEqual({
+      b1: { case_0: [{ a: 1 }, { a: 2 }], else: [{ a: 3 }] },
+    });
+  });
+
+  it("leaves a run without probes exactly as stored", async () => {
+    const outputMap = { n1: [{ a: 1 }], n2: { "case-0": [{ a: 1 }] } };
+    mockRun.mockResolvedValue({
+      data: {
+        errors: { data: [] },
+        data: { input_map: { n1: [{ a: 1 }] }, output_map: outputMap },
+      },
+    });
+    await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "plain" });
+    const res: any = workflowObj.testRun.result;
+    expect(res.outputs).toEqual(outputMap);
+    expect(res.ghostNodeIds).toEqual([]);
+  });
+
   it("returns ok:false with the backend message on failure", async () => {
     mockRun.mockRejectedValue({ response: { data: { message: "nope" } } });
     const r = await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r4" });
