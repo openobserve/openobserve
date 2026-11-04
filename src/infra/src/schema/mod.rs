@@ -21,9 +21,9 @@ use std::{
 use arc_swap::ArcSwap;
 use chrono::Utc;
 use config::{
-    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, COMPACT_DYNAMIC_MERGE_STREAM_TYPES,
-    ORIGINAL_DATA_COL_NAME, RwAHashMap, RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS,
-    SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config,
+    ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, ORIGINAL_DATA_COL_NAME, RwAHashMap,
+    RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS,
+    TIMESTAMP_COL_NAME, get_config,
     ider::SnowflakeIdGenerator,
     meta::{
         self_reporting::usage::INTERNAL_STREAM_NAMES,
@@ -377,12 +377,6 @@ pub async fn get_is_llm_stream(org_id: &str, stream_name: &str, stream_type: Str
     false
 }
 
-/// Whether the compactor merges this stream's closed days across hours.
-pub async fn get_dynamic_merge(org_id: &str, stream_name: &str, stream_type: StreamType) -> bool {
-    let settings = get_settings(org_id, stream_name, stream_type).await;
-    get_stream_setting_dynamic_merge(stream_type, &settings)
-}
-
 pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {
     if schema.metadata().is_empty() {
         return None;
@@ -426,15 +420,16 @@ pub fn get_partition_time_level(stream_type: StreamType) -> PartitionTimeLevel {
     }
 }
 
-/// The stream setting `dynamic_merge` when set, else the type's presence in the env list.
-pub fn get_stream_setting_dynamic_merge<T: std::borrow::Borrow<StreamSettings>>(
+/// The level of the stream's day holding `ts`; types without a history stay at the type's level.
+pub fn get_partition_time_level_at(
     stream_type: StreamType,
-    settings: &Option<T>,
-) -> bool {
+    settings: Option<&StreamSettings>,
+    ts: i64,
+) -> PartitionTimeLevel {
     settings
-        .as_ref()
-        .and_then(|settings| settings.borrow().dynamic_merge)
-        .unwrap_or_else(|| COMPACT_DYNAMIC_MERGE_STREAM_TYPES.contains(&stream_type))
+        .filter(|_| stream_type.support_dynamic_partition())
+        .and_then(|settings| settings.partition_time_level.level_at(ts))
+        .unwrap_or_else(|| get_partition_time_level(stream_type))
 }
 
 pub fn get_stream_setting_defined_schema_fields<T: std::borrow::Borrow<StreamSettings>>(
@@ -1861,23 +1856,34 @@ mod tests {
     }
 
     #[test]
-    fn test_get_stream_setting_dynamic_merge() {
-        // the env list is empty in tests, so only the stream setting can enable it
-        let unset = Some(StreamSettings::default());
-        assert!(!get_stream_setting_dynamic_merge(
-            StreamType::Metrics,
-            &unset
-        ));
-        let on = Some(StreamSettings {
-            dynamic_merge: Some(true),
+    fn test_get_partition_time_level_at_reads_the_history_of_merged_types() {
+        use config::meta::stream::{PartitionTimeLevelChange, StreamPartitionTimeLevel};
+        let daily_from_100 = StreamSettings {
+            partition_time_level: StreamPartitionTimeLevel {
+                pin: None,
+                changes: vec![PartitionTimeLevelChange {
+                    since: 100,
+                    level: PartitionTimeLevel::Daily,
+                }],
+            },
             ..Default::default()
-        });
-        assert!(get_stream_setting_dynamic_merge(StreamType::Traces, &on));
-        let off = Some(Arc::new(StreamSettings {
-            dynamic_merge: Some(false),
-            ..Default::default()
-        }));
-        assert!(!get_stream_setting_dynamic_merge(StreamType::Logs, &off));
+        };
+        let at = |stream_type, settings, ts| get_partition_time_level_at(stream_type, settings, ts);
+        let history = Some(&daily_from_100);
+        for stream_type in [StreamType::Logs, StreamType::Metrics, StreamType::Traces] {
+            assert_eq!(at(stream_type, history, 100), PartitionTimeLevel::Daily);
+            assert_eq!(at(stream_type, history, 99), PartitionTimeLevel::Hourly);
+            assert_eq!(at(stream_type, None, 100), PartitionTimeLevel::Hourly);
+        }
+        // a history on other types does not count; the file-list stream stays daily
+        assert_eq!(
+            at(StreamType::Profiles, history, 100),
+            PartitionTimeLevel::Hourly
+        );
+        assert_eq!(
+            at(StreamType::Filelist, None, 100),
+            PartitionTimeLevel::Daily
+        );
     }
 
     fn empty_cache() -> SchemaCache {

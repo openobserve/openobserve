@@ -504,13 +504,13 @@ pub async fn update_stream_settings(
     if let Some(v) = new_settings.approx_partition {
         settings.approx_partition = v;
     }
-    if let Some(v) = new_settings.dynamic_merge {
-        if !stream_type.support_dynamic_merge() {
+    if let Some(level) = new_settings.partition_time_level {
+        if !stream_type.support_dynamic_partition() {
             return Ok(MetaHttpResponse::bad_request(
-                "dynamic_merge is only supported for logs, metrics and traces streams",
+                "partition_time_level is only supported for logs, metrics and traces streams",
             ));
         }
-        settings.dynamic_merge = Some(v);
+        settings.partition_time_level.write_pin(level, now_micros());
     }
     if let Some(v) = new_settings.index_original_data {
         settings.index_original_data = v;
@@ -980,10 +980,11 @@ pub async fn delete_stream_data_by_time_range(
 
     // Convert the time range to RFC3339 format
     // we need check the date is hour or day, user can't delete data with minute and second
-    let partition_time_level = get_partition_time_level(stream_type);
+    let settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let needs_whole_days = delete_needs_whole_days(stream_type, settings.as_deref(), &time_range);
     let start_time = Utc.timestamp_nanos(time_range.start * 1000);
     let end_time = Utc.timestamp_nanos(time_range.end * 1000);
-    let (start_time, end_time) = if partition_time_level == PartitionTimeLevel::Daily {
+    let (start_time, end_time) = if needs_whole_days {
         if start_time.hour() != 0 || start_time.minute() != 0 || start_time.second() != 0 {
             return Err(infra::errors::Error::Message(
                 "Start time must be with zero hour, minute and second".to_string(),
@@ -1039,6 +1040,21 @@ pub async fn delete_stream_data_by_time_range(
         ended_at: 0,
     };
     db::compact::compactor_manual_jobs::add_job(job).await
+}
+
+/// A delete must cover whole days when a day of the range is stored by day.
+fn delete_needs_whole_days(
+    stream_type: StreamType,
+    settings: Option<&StreamSettings>,
+    range: &TimeRange,
+) -> bool {
+    get_partition_time_level(stream_type) == PartitionTimeLevel::Daily
+        || (stream_type.support_dynamic_partition()
+            && settings.is_some_and(|settings| {
+                settings
+                    .partition_time_level
+                    .touches_daily(range.start, range.end)
+            }))
 }
 
 async fn transform_stats(
@@ -1946,6 +1962,48 @@ mod tests {
         infra::schema::remove_stream_settings(&key).await;
     }
 
+    #[test]
+    fn test_delete_needs_whole_days() {
+        use config::{
+            meta::stream::{PartitionTimeLevelChange, StreamPartitionTimeLevel},
+            utils::time::{day_micros, hour_micros},
+        };
+        const DAY: i64 = 1_790_640_000_000_000; // 2026-09-29T00:00:00Z
+        let settings = StreamSettings {
+            partition_time_level: StreamPartitionTimeLevel {
+                pin: None,
+                changes: vec![PartitionTimeLevelChange {
+                    since: DAY,
+                    level: PartitionTimeLevel::Daily,
+                }],
+            },
+            ..Default::default()
+        };
+        let range = |start, end| TimeRange::new(start, end);
+        let needs =
+            |stream_type, settings, range| delete_needs_whole_days(stream_type, settings, &range);
+        let before = DAY - hour_micros(5);
+        let hour_of_the_day = range(DAY + hour_micros(1), DAY + hour_micros(2));
+        let logs = StreamType::Logs;
+        assert!(needs(logs, Some(&settings), hour_of_the_day.clone()));
+        assert!(needs(logs, Some(&settings), range(before, DAY + 1)));
+        assert!(
+            !needs(logs, Some(&settings), range(before, DAY)),
+            "ends where the daily day starts"
+        );
+        assert!(!needs(logs, None, hour_of_the_day.clone()));
+        assert!(!needs(
+            StreamType::Profiles,
+            Some(&settings),
+            hour_of_the_day
+        ));
+        assert!(needs(
+            StreamType::Filelist,
+            None,
+            range(DAY, DAY + day_micros(1))
+        ));
+    }
+
     async fn update_settings_test_stream(name: &str, update: UpdateStreamSettings) {
         let resp = update_stream_settings(SETTINGS_TEST_ORG, name, StreamType::Logs, update)
             .await
@@ -1979,6 +2037,52 @@ mod tests {
         let settings = settings_test_stream(name).await;
         assert!(settings.enable_distinct_fields);
         assert_eq!(settings.data_retention, 17);
+    }
+
+    #[tokio::test]
+    async fn test_partition_time_level_write_pins_and_unset_keeps_the_level() {
+        let name = &format!("level_pin_{}", now_micros());
+        create_settings_test_stream(name, &[]).await;
+        let write = |level| UpdateStreamSettings {
+            partition_time_level: Some(level),
+            ..Default::default()
+        };
+        update_settings_test_stream(name, write(PartitionTimeLevel::Daily)).await;
+        let history = settings_test_stream(name).await.partition_time_level;
+        assert_eq!(history.pin, Some(PartitionTimeLevel::Daily));
+        assert_eq!(history.changes.len(), 1);
+        assert_eq!(history.changes[0].level, PartitionTimeLevel::Daily);
+        assert!(
+            history.changes[0].since > now_micros(),
+            "takes effect later"
+        );
+
+        update_settings_test_stream(name, write(PartitionTimeLevel::Unset)).await;
+        let unset = settings_test_stream(name).await.partition_time_level;
+        assert_eq!(unset.pin, None);
+        assert_eq!(unset.changes, history.changes);
+    }
+
+    #[tokio::test]
+    async fn test_partition_time_level_write_refuses_other_stream_types() {
+        let _ = infra::db::create_table().await;
+        let name = &format!("level_refused_{}", now_micros());
+        let stream = StreamCreate {
+            fields: Vec::new(),
+            settings: StreamSettings::default(),
+        };
+        let resp = create_stream(SETTINGS_TEST_ORG, name, StreamType::Profiles, stream)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        let update = UpdateStreamSettings {
+            partition_time_level: Some(PartitionTimeLevel::Daily),
+            ..Default::default()
+        };
+        let resp = update_stream_settings(SETTINGS_TEST_ORG, name, StreamType::Profiles, update)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
