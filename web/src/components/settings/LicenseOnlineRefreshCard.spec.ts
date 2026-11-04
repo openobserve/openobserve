@@ -222,6 +222,18 @@ describe("LicenseOnlineRefreshCard", () => {
   });
 });
 
+it("a saved master_key_changed error shows the recovery steps in red", () => {
+  const w = card({
+    last_error: "master_key_changed",
+    last_outcome: { error: "master_key_changed" },
+  });
+  const row = w.get('[data-test="license-online-last-error"]');
+  expect(row.text()).toContain("Set the previous master key again");
+  expect(row.classes()).toContain("text-status-negative");
+  expect(w.get('[data-test="license-online-outcome"]').text()).toContain(
+    "O2_MASTER_ENCRYPTION_KEY changed or is not set",
+  );
+});
 it("rotation confirms the registration key changed", async () => {
   const w = card();
   await w.get('[data-test="license-online-rotate"]').trigger("click");
@@ -491,22 +503,28 @@ describe("clicked outcome versus newer server attempts", () => {
     expect(outcomeText(w)).toBe("Registration key rotated.");
   });
 
-  it("an older server's failed click is not replaced by a pre-click attempt seen during the request", async () => {
-    vi.setSystemTime(1792748530000);
-    let finish!: (value: unknown) => void;
-    rotate.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
-    const w = card();
-    await w.get('[data-test="license-online-rotate"]').trigger("click");
-    await w.setProps({
-      refresh: status({
-        last_attempt_at: 1792748520000000,
-        last_outcome: { outcome: "unchanged" },
-      }),
-    });
-    finish({ ok: true, status: 200, body: { error: "instance_key_unreadable" } });
-    await flushPromises();
-    expect(outcomeText(w)).toContain("cannot be read");
-  });
+  it.each([
+    ["instance_key_unreadable", "cannot be read"],
+    ["master_key_changed", "O2_MASTER_ENCRYPTION_KEY changed or is not set"],
+  ])(
+    "an older server's failed %s click is not replaced by a pre-click attempt seen during the request",
+    async (error, text) => {
+      vi.setSystemTime(1792748530000);
+      let finish!: (value: unknown) => void;
+      rotate.mockImplementation(() => new Promise((resolve) => (finish = resolve)));
+      const w = card();
+      await w.get('[data-test="license-online-rotate"]').trigger("click");
+      await w.setProps({
+        refresh: status({
+          last_attempt_at: 1792748520000000,
+          last_outcome: { outcome: "unchanged" },
+        }),
+      });
+      finish({ ok: true, status: 200, body: { error } });
+      await flushPromises();
+      expect(outcomeText(w)).toContain(text);
+    },
+  );
 
   it("an answer with neither attempt field keeps its outcome until the next click", async () => {
     vi.setSystemTime(1792748530000);

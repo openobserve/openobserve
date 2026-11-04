@@ -24,6 +24,7 @@ const errors = {
   rejected: "rejected",
   validator_rejected: "validator",
   instance_key_unreadable: "cannot be read",
+  master_key_changed: "O2_MASTER_ENCRYPTION_KEY changed or is not set",
   lock_unavailable: "lock",
   internal: "could not be completed",
   rotation_unsettled: "key rotation has not finished",
@@ -37,6 +38,9 @@ describe("license refresh messages", () => {
   });
   it.each(["pending_reload", "rotation_unsettled"])("shows %s as a retryable warning", (error) => {
     expect(refreshMessage({ error }, gt).variant).toBe("warning");
+  });
+  it.each(["instance_key_unreadable", "master_key_changed"])("shows %s as an error", (error) => {
+    expect(refreshMessage({ error }, gt).variant).toBe("error");
   });
   it("includes waiver counts", () => {
     expect(

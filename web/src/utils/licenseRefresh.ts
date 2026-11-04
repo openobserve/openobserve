@@ -31,6 +31,7 @@ const ERROR_KEYS: Record<string, I18nKey> = {
   rejected: "about.online_error_rejected",
   validator_rejected: "about.online_error_validator_rejected",
   instance_key_unreadable: "about.online_error_instance_key_unreadable",
+  master_key_changed: "about.online_error_master_key_changed",
   lock_unavailable: "about.online_error_lock_unavailable",
   pending_reload: "about.online_error_pending_reload",
   rotation_unsettled: "about.online_error_rotation_unsettled",
