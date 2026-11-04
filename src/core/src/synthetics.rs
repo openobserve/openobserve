@@ -240,6 +240,11 @@ fn synthetics_attributes(n: &CheckNotification) -> Vec<(String, String)> {
         ("check_run_id", n.run_id.clone()),
         ("check_url", run_url(n)),
         ("check_error", n.error.clone().unwrap_or_default()),
+        (
+            "check_environments",
+            environments_line(n).unwrap_or_default(),
+        ),
+        ("check_checked_at", checked_at_utc(n.checked_at)),
         ("check_title", check_title(n)),
     ]
     .into_iter()
@@ -1289,6 +1294,8 @@ fn location_down_context(
                 format!("{} ({affected} affected checks)", loc.region),
             ),
             ("check_error".to_string(), String::new()),
+            ("check_environments".to_string(), String::new()),
+            ("check_checked_at".to_string(), checked_at_utc(now)),
             ("check_url".to_string(), locations_url(org_id)),
             ("check_title".to_string(), subject.clone()),
         ],

@@ -139,8 +139,9 @@ fn parse_channel(channel: &str) -> Result<ChannelFormat, PreviewError> {
 /// `"single_level"` all mean "no severity axis" (`None`) — design §4.2.1.
 fn parse_severity(severity: &Option<String>) -> Result<Option<AlertLevel>, PreviewError> {
     match severity.as_deref() {
-        None | Some("single_level") | Some("") => Ok(None),
-        Some("critical") => Ok(Some(AlertLevel::Critical)),
+        // The editor starts on Critical so the sample Level is never blank.
+        None | Some("") | Some("critical") => Ok(Some(AlertLevel::Critical)),
+        Some("single_level") => Ok(None),
         Some("warning") => Ok(Some(AlertLevel::Warning)),
         Some("ok") => Ok(Some(AlertLevel::Ok)),
         Some("no_data") => Ok(Some(AlertLevel::NoData)),
@@ -413,12 +414,11 @@ mod tests {
                 .iter()
                 .any(|f| f.label == "runbook")
         );
-        // "single_level" (default) → level None → show_when field vanishes
-        // (§4.2.1).
+        // "single_level" → level None → show_when field vanishes (§4.2.1).
         let single = preview(&PreviewRequest {
             definition: spec,
             channel: "slack".into(),
-            severity: None,
+            severity: Some("single_level".into()),
             sample: None,
             kind: Default::default(),
         })
@@ -547,7 +547,12 @@ mod tests {
         // note `preview_model.severity` echoes the request string verbatim, so
         // compare the rendered payload rather than that field.
         let mut payloads = vec![];
-        for ok in [None, Some("single_level".to_string()), Some(String::new())] {
+        for ok in [
+            None,
+            Some(String::new()),
+            Some("critical".to_string()),
+            Some("single_level".to_string()),
+        ] {
             let resp = preview(&PreviewRequest {
                 definition: sample_spec(),
                 channel: "slack".into(),
@@ -558,6 +563,7 @@ mod tests {
             .expect("documented severity values must be accepted");
             payloads.push(resp.payload);
         }
+        // A missing or empty severity previews as Critical, so the sample Level is never blank.
         assert_eq!(payloads[0], payloads[1]);
         assert_eq!(payloads[1], payloads[2]);
     }

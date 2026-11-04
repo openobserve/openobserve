@@ -95,7 +95,7 @@ describe("TemplatePreviewPanel", () => {
     expect(previewSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("maps single_level severity to a null severity in the request", async () => {
+  it("starts on Critical so the sample Level is never blank", async () => {
     const previewSpy = vi
       .spyOn(templateService, "preview")
       .mockResolvedValue(makePreviewResponse() as any);
@@ -106,10 +106,10 @@ describe("TemplatePreviewPanel", () => {
 
     expect(previewSpy).toHaveBeenCalled();
     const call = previewSpy.mock.calls[0][0] as any;
-    expect(call.data.severity).toBeNull();
+    expect(call.data.severity).toBe("critical");
   });
 
-  it("sends the selected non-single-level severity verbatim", async () => {
+  it("sends Single-level by name, because a missing severity means Critical", async () => {
     const previewSpy = vi
       .spyOn(templateService, "preview")
       .mockResolvedValue(makePreviewResponse() as any);
@@ -121,14 +121,14 @@ describe("TemplatePreviewPanel", () => {
 
     // Drive the internal severity ref directly via defineExpose (OSelect
     // interaction is exercised elsewhere; this isolates the mapping logic).
-    (w.vm as any).severity = "critical";
+    (w.vm as any).severity = "single_level";
     await flushPromises();
     await vi.advanceTimersByTimeAsync(300);
     await flushPromises();
 
     expect(previewSpy).toHaveBeenCalled();
     const call = previewSpy.mock.calls[0][0] as any;
-    expect(call.data.severity).toBe("critical");
+    expect(call.data.severity).toBe("single_level");
   });
 
   it("renders the raw payload tab as pretty-printed JSON", async () => {

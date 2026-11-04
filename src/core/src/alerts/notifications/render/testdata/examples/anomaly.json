@@ -165,6 +165,8 @@
       "kind": "anomaly",
       "notification_kind": "anomaly",
       "notification_event": "firing",
+      "notification_kind_label": "Anomaly",
+      "notification_event_label": "Firing",
       "cluster_name": "o2-acme",
       "alert_start_time_millis": "N/A",
       "alert_end_time_millis": "N/A",

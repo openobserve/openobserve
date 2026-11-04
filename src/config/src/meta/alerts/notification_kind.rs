@@ -51,6 +51,18 @@ impl NotificationKind {
         }
     }
 
+    /// The name a person reads in a message; `as_str` stays the machine value.
+    pub fn label(self) -> &'static str {
+        match self {
+            NotificationKind::Alert => "Alert",
+            NotificationKind::Incident => "Incident",
+            NotificationKind::Anomaly => "Anomaly",
+            NotificationKind::Synthetics => "Synthetics",
+            NotificationKind::Downtime => "Downtime",
+            NotificationKind::OnCall => "On-call",
+        }
+    }
+
     pub fn parse(s: &str) -> Option<NotificationKind> {
         Self::ALL.into_iter().find(|k| k.as_str() == s)
     }
@@ -105,6 +117,15 @@ impl NotificationEvent {
             NotificationEvent::Firing => "firing",
             NotificationEvent::Resolved => "resolved",
             NotificationEvent::Informational => "informational",
+        }
+    }
+
+    /// The name a person reads in a message; `as_str` stays the machine value.
+    pub fn label(self) -> &'static str {
+        match self {
+            NotificationEvent::Firing => "Firing",
+            NotificationEvent::Resolved => "Resolved",
+            NotificationEvent::Informational => "Informational",
         }
     }
 }

@@ -50,7 +50,7 @@ pub const INCIDENT_VARIABLES: [&str; 6] = [
     "incident_url",
 ];
 
-pub const SYNTHETICS_VARIABLES: [&str; 16] = [
+pub const SYNTHETICS_VARIABLES: [&str; 18] = [
     "check_id",
     "check_name",
     "check_type",
@@ -66,6 +66,8 @@ pub const SYNTHETICS_VARIABLES: [&str; 16] = [
     "check_run_id",
     "check_url",
     "check_error",
+    "check_environments",
+    "check_checked_at",
     "check_title",
 ];
 
@@ -338,6 +340,8 @@ fn synthetics_example(resolved: bool) -> NotificationContext {
         ("check_run_id", "run_42"),
         ("check_url", url),
         ("check_error", error),
+        ("check_environments", ""),
+        ("check_checked_at", "2026-11-02 10:05:00 UTC"),
         ("check_title", title),
     ]
     .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -353,12 +357,6 @@ fn on_call_example(resolved: bool) -> NotificationContext {
         AlertLevel::Critical
     };
     let mut ctx = base(NotificationKind::OnCall, resolved, level);
-    ctx.alert_name = "High error rate on web-logs".into();
-    ctx.alert_url = url.into();
-    ctx.episode_id = Some("resp_31".into());
-    ctx.event = event_of(resolved);
-    ctx.alert_trigger_time_str = "2026-11-02 10:05:00".into();
-    ctx.alert_description = "error rate 12.4% over the 5% threshold on checkout".into();
     let (stage, reason, ack) = if resolved {
         ("resolved", "the incident was resolved", "")
     } else {
@@ -368,6 +366,20 @@ fn on_call_example(resolved: bool) -> NotificationContext {
             "https://o2.acme.com/api/acme/oncall/ack/resp_31",
         )
     };
+    // The engine's subject and plain-text page, as `render_subject` and `render_body` build them.
+    ctx.alert_name = "[P2] High error rate on web-logs — checkout".into();
+    ctx.alert_url = url.into();
+    ctx.episode_id = Some("resp_31".into());
+    ctx.event = event_of(resolved);
+    ctx.alert_trigger_time_str = "2026-11-02 10:05:00".into();
+    let ack_line = if ack.is_empty() {
+        "\nAcknowledge from the incident page (no link available).\n".to_string()
+    } else {
+        format!("Acknowledge: {ack}\n")
+    };
+    ctx.alert_description = format!(
+        "P2 · High error rate on web-logs\n\n{reason} for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: {url}\n{ack_line}"
+    );
     ctx.context_attributes = [
         ("oncall_team", "checkout"),
         ("oncall_reason", reason),
@@ -577,11 +589,11 @@ mod tests {
         assert_eq!(example(NotificationKind::OnCall), want);
         let firing = want["slack_firing"].to_string();
         assert!(
-            firing.contains("P2 · High error rate on web-logs"),
+            firing.contains("[P2] High error rate on web-logs — checkout"),
             "{firing}"
         );
         assert!(firing.contains("Acknowledge"));
-        assert!(!want["slack_resolved"].to_string().contains("Acknowledge"));
+        assert!(!want["slack_resolved"].to_string().contains("oncall/ack/"));
     }
 
     #[test]

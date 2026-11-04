@@ -90,6 +90,8 @@ pub(crate) fn apply_custom_template_plain(
         .replace("{recovery_reason}", &ctx.recovery_reason)
         .replace("{notification_kind}", ctx.kind.as_str())
         .replace("{notification_event}", ctx.event.as_str())
+        .replace("{notification_kind_label}", ctx.kind.label())
+        .replace("{notification_event_label}", ctx.event.label())
         .replace("{cluster_name}", &ctx.cluster_name)
         // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
         // incident notifications build custom JSON and workflows carry

@@ -129,8 +129,11 @@ pub fn compiled_synthetics_content() -> ContentSpec {
         fields: vec![
             field("Check", "{check_name} ({check_type})"),
             field("Target", "{check_target}"),
+            field("Status", "{check_status_label}"),
             field("Locations", "{check_locations_line}"),
+            field("Environments", "{check_environments}"),
             field("Error", "{check_error}"),
+            field("Time", "{check_checked_at}"),
         ],
         rows: RowsSpec {
             enabled: false,
@@ -143,12 +146,12 @@ pub fn compiled_synthetics_content() -> ContentSpec {
     }
 }
 
-/// Today's page header as the title; the Acknowledge and Runbook links drop out when unset.
+/// Today's page subject and body; the Acknowledge and Runbook links drop out when unset.
 pub fn compiled_on_call_content() -> ContentSpec {
     ContentSpec {
-        title: "{oncall_priority} · {alert_name}".into(),
+        title: "{alert_name}".into(),
         title_overrides: Default::default(),
-        body: "**{oncall_team}** — {oncall_reason}\n\n{alert_description}".into(),
+        body: "{alert_description}".into(),
         fields: vec![
             field("Stage", "{oncall_stage}"),
             field("Recipient", "{oncall_recipient}"),
@@ -186,6 +189,10 @@ pub fn compiled_incident_content() -> ContentSpec {
             field("Severity", "{incident_severity}"),
             field("Service", "{incident_service}"),
             field("Alert", "{alert_name}"),
+            field("Stream", "{stream_name}"),
+            field("Threshold", "{alert_operator} {alert_threshold}"),
+            field("Value", "{alert_agg_value}"),
+            field("Triggered", "{alert_trigger_time_str}"),
         ],
         rows: RowsSpec {
             enabled: true,

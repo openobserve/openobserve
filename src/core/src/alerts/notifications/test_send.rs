@@ -36,7 +36,9 @@ use std::{
 use config::{
     get_config,
     meta::{
-        alerts::{content_spec::ContentSpec, notification_kind::NotificationKind},
+        alerts::{
+            content_spec::ContentSpec, level::AlertLevel, notification_kind::NotificationKind,
+        },
         destinations::DestinationType,
     },
 };
@@ -174,7 +176,7 @@ fn build_test_message_with_title(
 
     let format = derive_channel_format(dest_type);
     let ctx: NotificationContext = match kind {
-        NotificationKind::Alert => synthetic_context(None),
+        NotificationKind::Alert => synthetic_context(Some(AlertLevel::Critical)),
         kind => super::examples::example_context(kind, false),
     };
     let mut content = resolve_content(spec, &ctx, format.channel_family());

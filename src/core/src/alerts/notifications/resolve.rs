@@ -98,8 +98,8 @@ pub fn resolve_content(
         unknown_variables.append(&mut unk);
         let (value, mut unk) = substitute_raw(&field.value, ctx);
         unknown_variables.append(&mut unk);
-        // Alerts keep an empty field so their output stays byte identical; other kinds hide it.
-        if ctx.kind != NotificationKind::Alert && value.trim().is_empty() {
+        // Only legacy Custom templates keep a blank value; they never reach this function.
+        if value.trim().is_empty() {
             continue;
         }
         fields.push((label, value));
@@ -496,6 +496,8 @@ pub(crate) fn extra_scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str,
     vec![
         ("notification_kind", ctx.kind.as_str().to_string()),
         ("notification_event", ctx.event.as_str().to_string()),
+        ("notification_kind_label", ctx.kind.label().to_string()),
+        ("notification_event_label", ctx.event.label().to_string()),
         ("cluster_name", ctx.cluster_name.clone()),
         (
             "alert_start_time_millis",
@@ -519,9 +521,11 @@ pub(crate) fn extra_scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str,
     ]
 }
 
-pub(crate) const EXTRA_SCALAR_NAMES: [&str; 10] = [
+pub(crate) const EXTRA_SCALAR_NAMES: [&str; 12] = [
     "notification_kind",
     "notification_event",
+    "notification_kind_label",
+    "notification_event_label",
     "cluster_name",
     "alert_start_time_millis",
     "alert_end_time_millis",

@@ -146,6 +146,8 @@
       "kind": "downtime",
       "notification_kind": "downtime",
       "notification_event": "firing",
+      "notification_kind_label": "Downtime",
+      "notification_event_label": "Firing",
       "cluster_name": "o2-acme",
       "alert_start_time_millis": "N/A",
       "alert_end_time_millis": "N/A",

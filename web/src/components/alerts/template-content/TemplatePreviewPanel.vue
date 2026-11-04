@@ -396,7 +396,7 @@ const { isDark } = useTheme();
 const store = useStore();
 
 const channel = ref<PreviewChannel>("slack");
-const severity = ref<PreviewSeverityOption>("single_level");
+const severity = ref<PreviewSeverityOption>("critical");
 const view = ref<PreviewView>("visual");
 
 const channelOptions = computed(() => [
@@ -484,11 +484,11 @@ const severityOptions = computed(() => {
       ];
     default:
       return [
-        option(t("alert_templates.previewSeveritySingle"), "single_level"),
         option(t("alert_templates.severityCritical"), "critical"),
         option(t("alert_templates.severityWarning"), "warning"),
         option(t("alert_templates.severityOk"), "ok"),
         option(t("alert_templates.severityNoData"), "no_data"),
+        option(t("alert_templates.previewSeveritySingle"), "single_level"),
       ];
   }
 });
@@ -542,12 +542,8 @@ const openLink = (url: string) => {
   window.open(url, "_blank", "noopener,noreferrer");
 };
 
-// single_level maps to `severity: null` on the wire request — it is the
-// default/common case (no multi-level severity), and the backend documents
-// absence-or-"single_level" as equivalent. We always send null explicitly for
-// clarity/consistency (brief: "pick one, be consistent").
-const requestSeverity = (): string | null =>
-  severity.value === "single_level" ? null : severity.value;
+// The server reads a missing severity as Critical, so Single-level is sent by name.
+const requestSeverity = (): string => severity.value;
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 // Guards against a stale response landing after a newer request was already
