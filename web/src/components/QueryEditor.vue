@@ -85,7 +85,7 @@
       <CodeQueryEditor
         :ref="(el) => (editorRef = el)"
         :key="currentLanguage"
-        :editor-id="`${dataTestPrefix}-editor-${currentLanguage}`"
+        :editor-id="editorId ?? `${dataTestPrefix}-editor-${currentLanguage}`"
         :language="currentLanguage"
         :query="query"
         :nlp-mode="nlpMode"
@@ -101,6 +101,7 @@
         :filter-mode="filterMode"
         :values-time-range="valuesTimeRange ?? null"
         :recent-queries="recentQueries ?? []"
+        :transform-generated-query="transformGeneratedQuery ?? undefined"
         @update:query="handleQueryUpdate"
         @user-edit="(isBlank: boolean, wasBlank: boolean) => emit('user-edit', isBlank, wasBlank)"
         @run-query="emit('run-query')"
@@ -193,6 +194,7 @@ interface Props {
   filterMode?: boolean; // The query is a bare WHERE fragment (Logs without SQL mode)
   valuesTimeRange?: { startTime: number; endTime: number } | null; // Range field values are looked up in (microseconds)
   recentQueries?: string[]; // The user's recent queries, offered as clock rows while typing
+  transformGeneratedQuery?: ((sql: string) => string | null) | null; // Page-specific write of an AI result (null result = keep the editor)
 
   // NL Mode (optional external control)
   nlpMode?: boolean; // External NLP mode control (undefined = internal control)
@@ -208,6 +210,7 @@ interface Props {
 
   // Testing
   dataTestPrefix?: string;
+  editorId?: string; // Monaco host id; defaults to `<dataTestPrefix>-editor-<language>`
 }
 
 const props = withDefaults(defineProps<Props>(), {
