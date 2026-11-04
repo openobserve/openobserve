@@ -141,13 +141,19 @@ export default defineComponent({
     const locationFormRef = ref<any>(null);
     const locationFormSchema = makeSyntheticsLocationFormSchema(t);
 
-    // Provider options for the select dropdown.
-    const providerOptions = computed(() => [
-      { label: raw("AWS"), value: "aws" },
-      { label: raw("GCP"), value: "gcp" },
-      { label: raw("Azure"), value: "azure" },
-      { label: t("synthetics.locations.providerOther"), value: "custom" },
-    ]);
+    // Provider options for the select dropdown. Only AWS probes are supported,
+    // so create offers AWS alone. Edit keeps the full list so the (disabled)
+    // select still labels locations saved with another provider.
+    const providerOptions = computed(() =>
+      props.isEdit
+        ? [
+            { label: raw("AWS"), value: "aws" },
+            { label: raw("GCP"), value: "gcp" },
+            { label: raw("Azure"), value: "azure" },
+            { label: t("synthetics.locations.providerOther"), value: "custom" },
+          ]
+        : [{ label: raw("AWS"), value: "aws" }],
+    );
 
     // Edit-prefill defaults. OForm reads `:default-values` once at mount; ODrawer
     // (reka-ui `lazy`) unmounts/remounts its body on close/open so this re-seeds

@@ -156,7 +156,7 @@ jobs:
     name: "api_regression / ${{ matrix.config.label }}"
     needs: [check_main_changed, build_api_binary]
     if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
-    runs-on: ubicloud-standard-4
+    runs-on: eks-openobserve-standard-4
     permissions:
       actions: read
       contents: read

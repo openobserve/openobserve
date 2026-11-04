@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   match: vi.fn(),
   create: vi.fn(),
   get: vi.fn(),
-  getVersion: vi.fn(),
   createVersion: vi.fn(),
   confirm: vi.fn(),
 }));
@@ -48,7 +47,6 @@ beforeEach(() => {
   mocks.match.mockResolvedValue([]);
   mocks.create.mockResolvedValue({ prompt });
   mocks.get.mockResolvedValue(prompt);
-  mocks.getVersion.mockResolvedValue({ version: 3, contentHash: "head-3" });
   mocks.createVersion.mockResolvedValue({ prompt: { ...prompt, latestVersion: 4 } });
 });
 
@@ -79,7 +77,7 @@ describe("save as prompt", () => {
     expect(wrapper.emitted("saved")).toHaveLength(1);
   });
 
-  it("appends to the freshly read head rather than the cached selector version", async () => {
+  it("appends to the freshly read head with baseVersion and ifHead, never baseHash", async () => {
     const wrapper = mountSave();
     const form = wrapper.findComponent(OForm).props("form");
     form.setFieldValue("mode", "append");
@@ -87,16 +85,19 @@ describe("save as prompt", () => {
     form.setFieldValue("commitMessage", "Updated content");
     await flushPromises();
     await form.handleSubmit();
-    expect(mocks.createVersion).toHaveBeenCalledWith(
-      "org",
-      "prompt-1",
-      expect.objectContaining({
-        baseVersion: 3,
-        baseHash: "head-3",
-        commitMessage: "Updated content",
-      }),
-      expect.objectContaining({ ifHead: 3 }),
-    );
+    expect(mocks.createVersion).toHaveBeenCalledTimes(1);
+    const [orgId, entityId, input, options] = mocks.createVersion.mock.calls[0];
+    expect([orgId, entityId]).toEqual(["org", "prompt-1"]);
+    // The server rejects baseVersion and baseHash together.
+    expect(input).toEqual({
+      payload: "Summarize this",
+      config,
+      commitMessage: "Updated content",
+      source: "ui",
+      baseVersion: 3,
+    });
+    expect(input).not.toHaveProperty("baseHash");
+    expect(options).toEqual(expect.objectContaining({ ifHead: 3 }));
   });
 
   it("keeps the form open when the selected prompt was archived", async () => {

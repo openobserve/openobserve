@@ -38,6 +38,12 @@ _cov_test() {
         _seed_slot_postgres_dbs "$threads"
     fi
 
+    local report_args=(--json --summary-only --output-path report.json)
+    # Still instrumented so the build matches the shared cache; only the slow profdata merge and export are skipped.
+    if [ "${COVERAGE_NO_REPORT:-}" = "true" ]; then
+        report_args=(--no-report)
+    fi
+
     cargo llvm-cov nextest \
         --workspace \
         --verbose \
@@ -47,9 +53,7 @@ _cov_test() {
         --test-threads "$threads" \
         --no-fail-fast \
         --retries 1 \
-        --json \
-        --summary-only \
-        --output-path report.json
+        "${report_args[@]}"
 }
 
 # Gives each nextest slot its own copy of the initialised db; see .config/slot-isolation.sh.

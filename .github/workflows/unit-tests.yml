@@ -67,14 +67,12 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_backend_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -83,14 +81,20 @@ jobs:
           toolchain: nightly-2026-10-24
           targets: x86_64-unknown-linux-gnu
 
+      # Own cache: the unit-tests cache holds coverage-instrumented builds that clippy cannot reuse.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           cache-on-failure: true
-          shared-key: unit-tests
-          save-if: false
+          shared-key: clippy
+          # main only: merge-queue ref caches are invisible to PRs and would only crowd the repo cache cap
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: bash ./.github/protoc.sh
+
+      # The EKS runner image has no libclang, which bindgen needs to build custom-labels.
+      - name: Install libclang
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
 
       - name: Simulate building frontend code
         run: mkdir -p web/dist && touch web/dist/index.html
@@ -130,7 +134,9 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
+          # config::VERSION needs tags from git describe, which a shallow clone lacks; old blobs are not needed
           fetch-depth: 0
+          filter: blob:none
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -174,8 +180,11 @@ jobs:
         run: ./coverage.sh run-cov
         env:
           ZO_DATA_DIR: ${{ runner.temp }}/openobserve-postgres/
+          # The PR run already gated coverage; the queue only needs pass/fail.
+          COVERAGE_NO_REPORT: ${{ github.event_name == 'merge_group' }}
 
       - name: Check PostgreSQL coverage
+        if: github.event_name != 'merge_group'
         run: ./coverage.sh check
 
   backend_unit_tests_sqlite:
@@ -194,7 +203,9 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
+          # config::VERSION needs tags from git describe, which a shallow clone lacks; old blobs are not needed
           fetch-depth: 0
+          filter: blob:none
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -225,8 +236,11 @@ jobs:
         run: ./coverage.sh run-cov
         env:
           ZO_DATA_DIR: ${{ runner.temp }}/openobserve-sqlite/
+          # The PR run already gated coverage; the queue only needs pass/fail.
+          COVERAGE_NO_REPORT: ${{ github.event_name == 'merge_group' }}
 
       - name: Check SQLite coverage
+        if: github.event_name != 'merge_group'
         run: ./coverage.sh check
 
   backend_unit_tests:
@@ -262,7 +276,7 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4]
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
 
@@ -323,7 +337,8 @@ jobs:
     needs: [check_changes, ui_unit_test_shards]
     if: always() && needs.check_changes.outputs.has_ui_changes == 'true'
     timeout-minutes: 20
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
 
@@ -369,7 +384,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_ui_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
 
@@ -387,6 +402,27 @@ jobs:
       - name: Install dependencies
         working-directory: web
         run: npm ci
+
+      # Cheapest first, so a failure skips the slower steps.
+      - name: Check token-file purity (token files contain tokens only)
+        working-directory: web
+        run: npm run lint:token-purity
+
+      - name: Check for undefined CSS custom properties
+        working-directory: web
+        run: npm run lint:tokens
+
+      - name: Lint styles (stylelint — bans legacy --o2-* tokens)
+        working-directory: web
+        run: npm run lint:styles
+
+      - name: Check design-consistency ratchet (strict — hardcoded/arbitrary/raw-token, no slack)
+        working-directory: web
+        run: npm run lint:design:strict
+
+      - name: Lint frontend code
+        working-directory: web
+        run: npm run lint:ci
 
       - name: Prettier format check (any unformatted file fails)
         working-directory: web

@@ -42,6 +42,7 @@ import {
   computeSuffixGroups,
   MISC_GROUP_ID,
   matchesSearch,
+  matchesSearchName,
   type PrefixGroup,
   type SuffixGroup,
 } from "@/utils/metrics/prefixGrouping";
@@ -284,6 +285,14 @@ export const SWEEP_DEBOUNCE_MS = 250;
  * "a whole new page". The button's label is computed from this constant.
  */
 export const PAGE_SIZE_INCREMENT = 6;
+/**
+ * A single "Show more" may pull at most this many budget batches while
+ * stepping over no-data cards. A guard, not a target: it stops a long run of
+ * empty metrics from walking the whole list in one click. ~8 batches is the
+ * same order as a handful of manual clicks, never the query storm an unbounded
+ * fill would cost on a sparse org.
+ */
+export const SHOW_MORE_MAX_BATCHES = 8;
 
 /** Cards are ~40-60 points wide; a coarse step keeps preview responses tiny. */
 const PREVIEW_POINTS = 50;
@@ -864,6 +873,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       // Stable over the A–Z order above, so equally used metrics stay alphabetical.
       out.sort((a, b) => (usage[b.name]?.[kind] ?? 0) - (usage[a.name]?.[kind] ?? 0));
     }
+    const query = searchTerm.value;
+    if (!query) return out;
+    // Stable, so each group keeps the order chosen above; help-only hits otherwise fill page one.
+    const nameHits = new Set(
+      out.filter((c) => matchesSearchName(c.name, query)).map((c) => c.name),
+    );
+    out.sort((a, b) => Number(nameHits.has(b.name)) - Number(nameHits.has(a.name)));
     return out;
   };
 
@@ -880,13 +896,18 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * cost the page size exists to bound.
    *
    * So the budget is counted BEFORE the no-data filter and the hiding happens
-   * WITHIN the slice: at most `pageSize` cards are ever rendered or queried, and
-   * hiding empties shrinks the visible grid rather than refilling it. "Show more"
-   * is how the user asks to spend more.
+   * WITHIN the slice: at most `pageSize` cards are ever rendered, and hiding
+   * empties shrinks the visible grid rather than refilling it. "Show more" is how
+   * the user asks to spend more, and its look-ahead is the only thing that queries
+   * past the slice, in bounded batches; it also runs once per page generation
+   * when a page resolves to nothing visible.
    */
   const sortedCandidates = computed(() =>
     sortCards(cards.value.filter((card) => passesExcept(card, "empty"))),
   );
+
+  // A reload rebuilds every card, so array identity changes even when the list itself did not.
+  const candidatesKey = computed(() => sortedCandidates.value.map((card) => card.name).join("\n"));
 
   const isHiddenAsEmpty = (card: MetricCard) =>
     hideEmptyPanels.value && emptyMetrics.value.has(card.name);
@@ -942,8 +963,9 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const pageSize = ref(INITIAL_PAGE_SIZE);
 
   /**
-   * The page's query budget: at most `pageSize` cards, chosen BEFORE the no-data
-   * filter. Nothing outside this slice is ever rendered or queried.
+   * The page's committed query budget: at most `pageSize` cards, chosen BEFORE the
+   * no-data filter. Nothing outside it is rendered; only a "Show more" look-ahead
+   * queries past it, in bounded batches, before committing a larger slice.
    */
   const pageSlice = computed(() => sortedCandidates.value.slice(0, pageSize.value));
 
@@ -955,16 +977,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     Math.max(0, sortedCandidates.value.length - pageSize.value),
   );
 
-  /**
-   * A single "Show more" may pull at most this many budget batches while
-   * stepping over no-data cards. A guard, not a target: it stops a long run of
-   * empty metrics from walking the whole list in one click. ~8 batches is the
-   * same order as a handful of manual clicks, never the query storm an unbounded
-   * fill would cost on a sparse org.
-   */
-  const SHOW_MORE_MAX_BATCHES = 8;
   /** True while a "Show more" click is resolving; drives the button's spinner. */
   const showingMore = ref(false);
+
+  // Bumped whenever the look-ahead is owed again (page reset, new window, filter off), so an older walk never commits.
+  let pageGeneration = 0;
+  // Generation whose look-ahead walk committed: one walk per generation, then only Show more.
+  let autoAdvancedFor: number | null = null;
 
   /**
    * Reveal one more page.
@@ -976,7 +995,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * cards are found (or SHOW_MORE_MAX_BATCHES caps the walk), and only THEN
    * commit the budget. One commit per click — committing per batch made the
    * grid grow in visible steps, and rendering cards before their emptiness was
-   * known made the count tick back down as they resolved.
+   * known made the count tick back down as they resolved. The auto-advance below
+   * calls this too, at most once per page generation.
    */
   const showMore = async () => {
     if (!hideEmptyPanels.value) {
@@ -987,6 +1007,12 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     showingMore.value = true;
     try {
       const cands = sortedCandidates.value;
+      const generation = pageGeneration;
+      // A reload or usage re-sort changes the list without a page reset, and `cursor` indexes the old one.
+      const key = candidatesKey.value;
+      // Paused means nobody is looking; the auto-advance re-runs the walk on unpause if it is still owed.
+      const abandoned = () =>
+        pageGeneration !== generation || candidatesKey.value !== key || paused.value;
       let cursor = pageSize.value;
       let revealed = 0;
       let batches = 0;
@@ -995,6 +1021,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         cursor < cands.length &&
         revealed < PAGE_SIZE_INCREMENT
       ) {
+        if (abandoned()) return;
         const next = Math.min(cands.length, cursor + PAGE_SIZE_INCREMENT);
         await Promise.all(
           cands
@@ -1007,8 +1034,9 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       }
       // The list changed while we were querying (filter edit, org switch) — the
       // reset watcher already chose the right page size for the new list.
-      if (sortedCandidates.value !== cands) return;
+      if (abandoned()) return;
       pageSize.value = cursor;
+      autoAdvancedFor = generation;
     } finally {
       showingMore.value = false;
     }
@@ -1030,10 +1058,24 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       showFavoritesOnly,
     ],
     () => {
+      pageGeneration++;
       pageSize.value = INITIAL_PAGE_SIZE;
     },
     { deep: true },
   );
+
+  watch(hideEmptyPanels, (on) => {
+    // Turning it back on then finds this generation unwalked, so the same list earns a fresh auto-advance.
+    if (!on) pageGeneration++;
+  });
+
+  // After the page-one reset (watchers flush in creation order); `showingMore` re-runs it so an aborted walk is retried.
+  watch([pagedCards, pageSlice, hasMore, hideEmptyPanels, paused, showingMore], () => {
+    if (!hideEmptyPanels.value || paused.value || showingMore.value) return;
+    if (!hasMore.value || !pageSlice.value.length || pagedCards.value.length) return;
+    if (autoAdvancedFor === pageGeneration) return;
+    void showMore();
+  });
 
   const clearFilters = () => {
     searchTerm.value = "";
@@ -2099,6 +2141,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     previewOrder = [];
     emptyMetrics.value = new Set();
     emptyRecheckedCards.value = new Set();
+    pageGeneration++;
   };
 
   /**
@@ -2541,7 +2584,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
   const setTimeRange = (
     range: { start_time: number; end_time: number },
-    opts?: { keepPreviews?: boolean },
+    opts?: { keepPreviews?: boolean; keepPage?: boolean },
   ) => {
     timeRange.value = range;
     queue.cancelAll();
@@ -2565,6 +2608,9 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // A new window deserves its own bounded recheck, not one already spent by
     // the window just left.
     emptyRecheckedCards.value = new Set();
+    // Cards empty in the old window may have data in this one; a zoom keeps its page so the dragged card stays.
+    pageGeneration++;
+    if (!opts?.keepPage) pageSize.value = INITIAL_PAGE_SIZE;
 
     // Label VALUES are a property of the window too — `job` has the values it had
     // in the last 15 minutes, which is not what it had over 30 days. Their cache
@@ -2600,6 +2646,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     previewOrder = [];
     emptyMetrics.value = new Set();
     emptyRecheckedCards.value = new Set();
+    pageGeneration++;
     pageSize.value = INITIAL_PAGE_SIZE;
     schemaLoaded.value = false;
     // The in-flight guards, not just the loaded flags.

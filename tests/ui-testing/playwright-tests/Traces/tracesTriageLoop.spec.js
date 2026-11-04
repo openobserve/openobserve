@@ -3,39 +3,21 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { ingestTraces } = require('../utils/trace-ingestion.js');
+const {
+  TracesPage,
+  decodedSqlOf,
+  isComparison,
+  isCount,
+  isTableSearch,
+  bandSql,
+} = require('../../pages/tracesPages/tracesPage.js');
 
 const USER_FILTER = "duration >= '1ms'";
-const DURATION_UNIT_US = { us: 1, ms: 1000, s: 1000000 };
 const MINUTE_US = 60 * 1000000;
 const HOUR_US = 60 * MINUTE_US;
 
-function decodedSqlOf(request) {
-  if (request.method() !== 'POST' || !/_search/.test(request.url())) return null;
-  const body = request.postDataJSON?.() ?? null;
-  const query = body?.query ?? {};
-  if (typeof query.sql !== 'string') return null;
-  const base64 = body.encoding === 'base64' || query.encoding === 'base64';
-  return {
-    sql: base64 ? Buffer.from(query.sql, 'base64').toString('utf8') : query.sql,
-    start: query.start_time,
-    end: query.end_time,
-  };
-}
-
-// The comparison sends its own counts and LIMIT 4000 samples; nothing else does.
-const isComparison = (q) => /^SELECT count\(\*\) AS n\b/.test(q.sql) || /LIMIT 4000$/.test(q.sql);
-const isCount = (q) => /^SELECT count\(\*\) AS n\b/.test(q.sql);
-// The table search: spans mode posts a base64 `SELECT *` SQL.
-const isTableSearch = (q) => /^SELECT \* FROM/.test(q.sql);
-
-// The band's bounds in µs as the SQL writes them; a missing side is absent.
-function bandSql(editorBand) {
-  const toUs = (m) => (m ? Number(m[1]) * DURATION_UNIT_US[m[2]] : null);
-  const lo = toUs(editorBand.match(/duration >= '(\d+)(us|ms|s)'/));
-  const hi = toUs(editorBand.match(/duration < '(\d+)(us|ms|s)'/));
-  return [lo ? `duration >= ${lo}` : '', hi !== null ? `duration < ${hi}` : ''].filter(Boolean).join(' AND ');
-}
+// The default brush spans 35-75% of a 15m range (~10-4 min ago); spans stamped now sit right of it.
+const BRUSH_WINDOW_AGE_MS = 6 * 60 * 1000;
 
 test.describe('Traces triage loop', () => {
   let pm;
@@ -43,16 +25,7 @@ test.describe('Traces triage loop', () => {
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120000);
-    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
-    const page = await context.newPage();
-    try {
-      for (const scenario of [{ count: 6, forceScenario: 'error' }, { count: 10, forceScenario: 'success' }]) {
-        const seeded = await ingestTraces(page, scenario.count, { forceScenario: scenario.forceScenario });
-        expect(seeded.failed, `Seeding ${scenario.forceScenario} traces must succeed`).toBe(0);
-      }
-    } finally {
-      await context.close();
-    }
+    await TracesPage.seedTraces(browser);
   });
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -246,8 +219,9 @@ test.describe('Traces triage loop', () => {
 
   test('P1: an Errors brush compares error spans with the rest of its window', {
     tag: ['@tracesTriageLoop', '@traces', '@functional', '@P1', '@all'],
-  }, async ({ page }) => {
+  }, async ({ page, browser }) => {
     test.setTimeout(240000);
+    await TracesPage.seedTraces(browser, BRUSH_WINDOW_AGE_MS);
     await searchWith('');
     const preBox = queries.filter(isTableSearch).at(-1);
     expect(await pm.tracesPage.zoomOnMetricsPanel('Errors')).toBeTruthy();
@@ -267,8 +241,9 @@ test.describe('Traces triage loop', () => {
 
   test('P1: a Rate brush compares its window with the rest of the range', {
     tag: ['@tracesTriageLoop', '@traces', '@functional', '@P1', '@all'],
-  }, async ({ page }) => {
+  }, async ({ page, browser }) => {
     test.setTimeout(240000);
+    await TracesPage.seedTraces(browser, BRUSH_WINDOW_AGE_MS);
     await searchWith('');
     expect(await pm.tracesPage.zoomOnMetricsPanel('Rate')).toBeTruthy();
     await page.waitForTimeout(2000);
@@ -296,8 +271,9 @@ test.describe('Traces triage loop across time zones', () => {
 
   test('P2: an Errors brush under an Asia/Kolkata app zone keeps the brushed window', {
     tag: ['@tracesTriageLoop', '@traces', '@functional', '@P2', '@all'],
-  }, async ({ page }) => {
+  }, async ({ page, browser }) => {
     test.setTimeout(240000);
+    await TracesPage.seedTraces(browser, BRUSH_WINDOW_AGE_MS);
     const queries = [];
     page.on('request', (r) => {
       const q = decodedSqlOf(r);

@@ -160,6 +160,8 @@ const getEventIcon = (event: any): string => {
       return "check";
     case "Reopened":
       return "replay";
+    case "AckEndedByPageResolve":
+      return "check";
     case "DimensionsUpgraded":
       return "arrow-upward";
     case "TitleChanged":
@@ -201,6 +203,8 @@ const getEventBadgeColor = (event: any): string => {
       return "var(--color-success-600)";
     case "Reopened":
       return "var(--color-orange-500)";
+    case "AckEndedByPageResolve":
+      return "var(--color-blue-500)";
     case "DimensionsUpgraded":
       return "var(--color-ai-accent)";
     case "TitleChanged":
@@ -239,6 +243,8 @@ const getEventBadgeText = (event: any): string => {
       return t("alerts.incidents.timeline.badgeResolved");
     case "Reopened":
       return t("alerts.incidents.timeline.badgeReopened");
+    case "AckEndedByPageResolve":
+      return t("alerts.incidents.timeline.badgeAckEnded");
     case "DimensionsUpgraded":
       return t("alerts.incidents.timeline.badgeDimensionsUpgraded");
     case "TitleChanged":
@@ -339,6 +345,9 @@ const getInlineEventText = (event: any): string => {
       return isSystemEvent
         ? t("alerts.incidents.timeline.incidentWas")
         : t("alerts.incidents.timeline.theIncident");
+
+    case "AckEndedByPageResolve":
+      return t("alerts.incidents.timeline.ackEndedByPageResolve");
 
     case "Alert": {
       const alertName = bold(data.alert_name || t("alerts.incidents.timeline.unnamedAlert"));

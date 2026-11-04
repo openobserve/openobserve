@@ -8430,6 +8430,7 @@ dependencies = [
  "tikv-jemalloc-ctl",
  "time",
  "tokio",
+ "tokio-util",
  "tonic",
  "tracing",
  "tracing-opentelemetry",
@@ -8598,6 +8599,7 @@ dependencies = [
  "tracing",
  "urlencoding",
  "usage_reporting",
+ "utoipa",
 ]
 
 [[package]]

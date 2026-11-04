@@ -21,7 +21,8 @@ const apiKeys = {
     return http().get(`/api/usertoken`);
   },
   listRUMTokens: (org_id: string) => {
-    return http().get(`/api/${org_id}/rumtoken`);
+    // the ingestion pages render a 403 here themselves
+    return http().get(`/api/${org_id}/rumtoken`, { silentForbidden: true });
   },
   createUserAPIKey: (data: object) => {
     return http().post(`/api/usertoken`, data);

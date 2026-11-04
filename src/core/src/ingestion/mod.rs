@@ -819,15 +819,39 @@ pub async fn get_uds_and_original_data_streams(
         );
 
         if !stream_settings.defined_schema_fields.is_empty() {
-            let mut fields =
-                HashSet::<_>::from_iter(stream_settings.defined_schema_fields.iter().cloned());
-            if !fields.contains(TIMESTAMP_COL_NAME) {
-                fields.insert(TIMESTAMP_COL_NAME.to_string());
-            }
+            let fields = uds_pack_fields(&stream_settings.defined_schema_fields);
             user_defined_schema_map.insert(stream.stream_name.to_string(), Some(fields));
         } else {
             user_defined_schema_map.insert(stream.stream_name.to_string(), None);
         }
+    }
+}
+
+/// The fields to repack a batch with when its own schema check turned the UDS on, else None.
+pub fn newly_enabled_uds_fields(
+    had_uds: bool,
+    schema: Option<&SchemaCache>,
+) -> Option<HashSet<String>> {
+    if had_uds {
+        return None;
+    }
+    let settings = infra::schema::unwrap_stream_settings(schema?.schema())?;
+    if settings.defined_schema_fields.is_empty() {
+        return None;
+    }
+    let mut fields = uds_pack_fields(&settings.defined_schema_fields);
+    // ingest adds these after packing, so a repack must not move them into `_all`
+    fields.extend(settings.uds_internal_columns());
+    Some(fields)
+}
+
+/// Packs each record's columns outside `fields` into `_all`.
+pub fn repack_records<'a>(
+    records: impl IntoIterator<Item = &'a mut Map<String, Value>>,
+    fields: &HashSet<String>,
+) {
+    for record in records {
+        *record = refactor_map(std::mem::take(record), fields);
     }
 }
 
@@ -888,6 +912,12 @@ pub fn refactor_map(
     }
 
     new_map
+}
+
+fn uds_pack_fields(defined_schema_fields: &[String]) -> HashSet<String> {
+    let mut fields = HashSet::<_>::from_iter(defined_schema_fields.iter().cloned());
+    fields.insert(TIMESTAMP_COL_NAME.to_string());
+    fields
 }
 
 /// The downtime that silences a real-time firing, only when every ingested row is muted.
@@ -1076,6 +1106,53 @@ mod tests {
     use transform::compile_vrl_function;
 
     use super::*;
+
+    #[test]
+    fn test_newly_enabled_uds_fields_only_when_the_check_turned_the_uds_on() {
+        let with_settings = |settings: &config::meta::stream::StreamSettings| {
+            SchemaCache::new(arrow_schema::Schema::empty().with_metadata(
+                std::collections::HashMap::from([(
+                    "settings".to_string(),
+                    json::to_string(settings).unwrap(),
+                )]),
+            ))
+        };
+        let uds = config::meta::stream::StreamSettings {
+            defined_schema_fields: vec!["foo".to_string()],
+            store_original_data: true,
+            ..Default::default()
+        };
+        let uds_schema = with_settings(&uds);
+        let no_uds_schema = with_settings(&Default::default());
+
+        let fields = newly_enabled_uds_fields(false, Some(&uds_schema)).unwrap();
+        for name in [
+            "foo",
+            TIMESTAMP_COL_NAME,
+            config::ID_COL_NAME,
+            config::ORIGINAL_DATA_COL_NAME,
+        ] {
+            assert!(fields.contains(name), "missing {name}");
+        }
+        assert!(newly_enabled_uds_fields(true, Some(&uds_schema)).is_none());
+        assert!(newly_enabled_uds_fields(false, Some(&no_uds_schema)).is_none());
+        assert!(newly_enabled_uds_fields(false, None).is_none());
+    }
+
+    #[test]
+    fn test_repack_records_moves_columns_outside_the_uds_into_all() {
+        let mut records = [json::json!({"foo": 1, "bar": "x"})
+            .as_object()
+            .unwrap()
+            .clone()];
+        let fields = HashSet::from(["foo".to_string()]);
+        repack_records(records.iter_mut(), &fields);
+        assert!(records[0].contains_key("foo") && !records[0].contains_key("bar"));
+        let all = records[0][&get_config().common.column_all]
+            .as_str()
+            .unwrap();
+        assert!(all.contains("bar"));
+    }
 
     #[test]
     fn test_only_the_fail_closed_refusal_is_recognised() {

@@ -1172,6 +1172,49 @@ describe("targets that name a rotation", () => {
     expect(savedTargets().filter((t: any) => t.rotation_id === "rot_primary")).toHaveLength(2);
   });
 
+  /// R8: a rotation lands on the open priority alone until "All priorities" is ticked.
+  it("adds a rotation to the open priority only, unless All priorities is ticked", async () => {
+    const twoPriorities: OnCallPolicy = {
+      ...policy,
+      rungs: [1, 2].map((priority) => ({
+        priority,
+        steps: [{ after_micros: 0, targets: [{ kind: "user", email: "ana@o2.ai" }] }],
+        channels: ["email"],
+      })),
+    };
+    const wrapper = mount(OnCallPolicyEditor, {
+      props: { teamId: "team_1", policy: twoPriorities, open: true, rotations: TWO },
+      global: { plugins: [i18n, store], stubs },
+    });
+    await flushPromises();
+    const pick = async (rotationId: string, allPriorities?: boolean) => {
+      targetPicker(wrapper).vm.$emit("update:modelValue", "rotation");
+      await flushPromises();
+      const box = wrapper.findComponent('[data-test="oncall-policy-rotation-all-priorities"]');
+      if (allPriorities === undefined) expect(box.props("modelValue")).toBe(false);
+      else box.vm.$emit("update:modelValue", allPriorities);
+      await flushPromises();
+      wrapper
+        .findComponent('[data-test="oncall-policy-pick-rotation-1-0"]')
+        .vm.$emit("update:modelValue", rotationId);
+      await flushPromises();
+    };
+    await pick("rot_primary");
+    await pick("rot_secondary", true);
+
+    await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+    await flushPromises();
+
+    const { rungs } = (service.setPolicy.mock.calls.at(-1)![0] as any).data;
+    const rotationsOf = (priority: number) =>
+      rungs
+        .find((r: any) => r.priority === priority)
+        .steps[0].targets.filter((t: any) => t.kind === "rotation")
+        .map((t: any) => t.rotation_id);
+    expect(rotationsOf(1)).toEqual(["rot_primary", "rot_secondary"]);
+    expect(rotationsOf(2)).toEqual(["rot_secondary"]);
+  });
+
   /// Found by this suite leaking between tests: `reset` shallow-copied each
   /// step, so the draft shared `targets` with `props.policy` and every add or
   /// remove edited the policy in place. Cancel throws the draft away, which

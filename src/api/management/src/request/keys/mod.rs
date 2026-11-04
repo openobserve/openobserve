@@ -348,16 +348,12 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
         ("org_id" = String, Path, description = "name of the organization from which delete", example = "default")
     ),
     request_body(content = BulkDeleteRequest, description = "Key name list", content_type = "application/json"),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 200, description = "Success", content_type = "application/json", body = BulkDeleteResponse),
     ),
     tag = "Keys",
-    extensions(
+    extensions(("x-o2-ratelimit" = json!({"module": "Cipher Keys", "operation": "delete"})), 
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]

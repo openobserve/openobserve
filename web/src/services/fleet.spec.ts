@@ -267,9 +267,12 @@ describe("fleet service", () => {
     }
   });
 
-  it("listAudit() calls GET /api/{org}/fleet/audit", () => {
-    fleet.listAudit("acme");
-    expect(mockClient.get).toHaveBeenCalledWith("/api/acme/fleet/audit");
+  it("listAudit() calls GET /api/{org}/fleet/audit with the page and filters as params", () => {
+    const params = { offset: 50, limit: 50, fleet: "prod", module: "configs" };
+    fleet.listAudit("acme", { ...params, from: 1, to: 2 } as any);
+    expect(mockClient.get).toHaveBeenCalledWith("/api/acme/fleet/audit", {
+      params: { ...params, from: 1, to: 2 },
+    });
   });
 
   it("getPipelines() calls GET /api/{org}/fleet/pipelines with the window as a param", () => {
@@ -484,8 +487,9 @@ describe("fleet queries", () => {
     expect(interval(detail, { ...halted, auto_rollback: false })).toBe(false);
   });
 
-  it("refetches a scheduled rollout every minute and never a superseded one", () => {
+  it("refetches a scheduled or waiting rollout every minute and never a superseded one", () => {
     const scheduled = { status: "scheduled", total: 3, attempted: 0 };
+    expect(interval(fleetRolloutsQuery("acme"), [{ status: "waiting", total: 0 }])).toBe(60_000);
     const superseded = { status: "superseded", total: 3, attempted: 1, accepted: 1 };
     expect(interval(fleetRolloutsQuery("acme"), [scheduled])).toBe(60_000);
     expect(interval(fleetRolloutQuery("acme", "r1"), scheduled)).toBe(60_000);
@@ -511,6 +515,7 @@ describe("fleet queries", () => {
     expect(interval(opts, at("in_progress"))).toBe(5000);
     expect(interval(opts, at("halted"))).toBe(5000);
     expect(interval(opts, at("scheduled"))).toBe(60_000);
+    expect(interval(opts, at("waiting"))).toBe(60_000);
   });
 
   it("polls the collectors list while a row's delivery is in flight or a rollout moves", () => {
@@ -555,11 +560,32 @@ describe("fleet queries", () => {
   );
 
   it("returns the audit envelope and fails on a malformed one", async () => {
-    const list = { items: [{ id: "a1" }], audit_disabled: false };
+    const list = { total: 1, items: [{ id: "a1" }], audit_disabled: false };
     mockClient.get.mockResolvedValueOnce({ data: list });
     expect(await (fleetAuditQuery("acme").queryFn as any)()).toEqual(list);
     mockClient.get.mockResolvedValueOnce({ data: {} });
     await expect((fleetAuditQuery("acme").queryFn as any)()).rejects.toThrow();
+  });
+
+  it("keys each audit page and filter under the audit prefix the writes invalidate", () => {
+    const prefix = fleetKeys.audit("acme");
+    const first = fleetAuditQuery("acme", { offset: 0, limit: 50 }).queryKey;
+    const next = fleetAuditQuery("acme", { offset: 50, limit: 50 }).queryKey;
+    const tokens = fleetAuditQuery("acme", { offset: 0, limit: 50, module: "tokens" }).queryKey;
+    for (const key of [first, next, tokens]) expect(key.slice(0, prefix.length)).toEqual(prefix);
+    expect(new Set([first, next, tokens].map((k) => JSON.stringify(k))).size).toBe(3);
+  });
+
+  it("rounds the audit period start in the key but sends it exactly", async () => {
+    const at = 1_700_000_000_000;
+    const a = fleetAuditQuery("acme", { from: at + 1_000, fleet: undefined });
+    const b = fleetAuditQuery("acme", { from: at + 2_000 });
+    expect(a.queryKey).toEqual(b.queryKey);
+    mockClient.get.mockResolvedValueOnce({ data: { total: 0, items: [] } });
+    await (a.queryFn as any)();
+    expect(mockClient.get).toHaveBeenLastCalledWith("/api/acme/fleet/audit", {
+      params: { from: at + 1_000 },
+    });
   });
 
   it("keys the settings under the fleet scope and returns their body as is", async () => {

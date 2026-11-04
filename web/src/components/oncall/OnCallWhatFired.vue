@@ -29,13 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCardSection role="body" dense>
       <ODescriptionList dense>
         <ODescriptionItem :label="t('alerts.groups.criticalCondition')">
-          <span class="font-mono text-sm break-all" data-test="oncall-what-fired-condition">
+          <span class="font-mono text-sm wrap-anywhere" data-test="oncall-what-fired-condition">
             {{ raw(conditionText) }}
           </span>
         </ODescriptionItem>
 
         <ODescriptionItem v-if="hasWarning" :label="t('alerts.groups.warningCondition')">
-          <span class="font-mono text-sm break-all" data-test="oncall-what-fired-warning">
+          <span class="font-mono text-sm wrap-anywhere" data-test="oncall-what-fired-warning">
             {{ raw(warningText) }}
           </span>
         </ODescriptionItem>

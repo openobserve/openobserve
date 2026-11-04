@@ -115,15 +115,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The row is sized by its container, not the viewport, so the tab-less title stays shrinkable at every width. -->
         <div
           class="flex min-w-0 flex-col justify-center"
-          :class="
+          :class="[
             titleOverflow === 'visible'
               ? ''
               : hasTabs() && !tabsBelow
                 ? 'shrink-0 max-md:shrink'
                 : statusComponent
                   ? ''
-                  : 'md:max-lg:min-w-32'
-          "
+                  : 'md:max-lg:min-w-32',
+            titleMinWidth ? 'min-w-40' : '',
+          ]"
         >
           <h1
             v-if="titleOverflow === 'visible'"
@@ -274,12 +275,15 @@ const props = withDefaults(
     titleOverflow?: "truncate" | "visible";
     /** Render #actions-overflow BEFORE #actions on desktop, so a trailing primary CTA stays last. */
     overflowFirst?: boolean;
+    /** Keep the title at least 10rem wide at every width, for a #title-trail that competes for the row. */
+    titleMinWidth?: boolean;
   }>(),
   {
     title: raw(""),
     subtitle: raw(""),
     titleOverflow: "truncate",
     overflowFirst: false,
+    titleMinWidth: false,
   },
 );
 

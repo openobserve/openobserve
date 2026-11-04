@@ -123,7 +123,12 @@ the Free Software Foundation, either version 3 of the License, or
 </template>
 
 <script setup lang="ts">
-import { scoreConfigsQuery } from "@/services/online-evals.service.queries";
+import {
+  saveScoreConfigMutation,
+  saveScorerMutation,
+  scoreConfigsQuery,
+} from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
@@ -134,10 +139,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, {
-  type Provider,
-  type ScoreConfig,
-} from "@/services/online-evals.service";
+import { type Provider, type ScoreConfig } from "@/services/online-evals.service";
 import {
   fetchOnlineEvalsCatalog,
   type CatalogScoreConfig,
@@ -159,6 +161,9 @@ const emit = defineEmits<{
   (e: "update:selected-count", value: number): void;
   (e: "imported"): void;
 }>();
+
+const saveScorer = useMutation(() => saveScorerMutation(props.orgId));
+const saveScoreConfig = useMutation(() => saveScoreConfigMutation(props.orgId));
 
 const isLoadingCatalog = ref(false);
 const loadError = ref("");
@@ -297,10 +302,7 @@ async function importSelected() {
   for (const entry of selected) {
     try {
       const scoreConfig = await resolveRequiredScoreConfig(entry.requiredScoreConfigName);
-      await onlineEvalsService.scorers.create(
-        props.orgId,
-        scorerPayload(entry, entityId(scoreConfig)),
-      );
+      await saveScorer.mutateAsync({ payload: scorerPayload(entry, entityId(scoreConfig)) });
       successCount++;
     } catch (err: any) {
       if (err?.response?.status === 409) {
@@ -340,10 +342,7 @@ async function resolveRequiredScoreConfig(name: string): Promise<ScoreConfig> {
   if (!catalogEntry) throw new Error(t("onlineEvals.catalogScoreConfigNotFound", { name }));
 
   try {
-    return await onlineEvalsService.scoreConfigs.create(
-      props.orgId,
-      scoreConfigPayload(catalogEntry),
-    );
+    return await saveScoreConfig.mutateAsync({ payload: scoreConfigPayload(catalogEntry) });
   } catch (err: any) {
     if (err?.response?.status === 409) {
       const options = scoreConfigsQuery(props.orgId);

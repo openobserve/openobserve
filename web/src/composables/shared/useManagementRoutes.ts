@@ -130,6 +130,16 @@ const useManagementRoutes = () => {
     beforeEnter: withFeatureGate("modelPricing", routeGuard),
   });
   routes[0].children.push({
+    path: "model_pricing/gaps",
+    name: "modelPricingGaps",
+    meta: {
+      keepAlive: true,
+      titleKey: "modelPricing.unpriced.title",
+    },
+    component: () => import("@/components/settings/ModelPricingGaps.vue"),
+    beforeEnter: withFeatureGate("modelPricing", routeGuard),
+  });
+  routes[0].children.push({
     path: "model_pricing/edit",
     name: "modelPricingEditor",
     meta: {
@@ -143,8 +153,10 @@ const useManagementRoutes = () => {
     path: "llm_providers",
     name: "llmProviders",
     component: () => import("@/components/settings/LlmProvidersSettings.vue"),
+    // `/providers` is unregistered when the server reports `online_evals_enabled: false`.
     meta: {
       titleKey: "llmProviders.title",
+      requiresOnlineEvals: true,
     },
     beforeEnter: withFeatureGate("llmProviders", routeGuard),
   });

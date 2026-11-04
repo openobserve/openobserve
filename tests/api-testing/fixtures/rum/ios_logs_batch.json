@@ -1,0 +1,96 @@
+[
+  {
+    "date": "2026-05-12T09:14:00.512Z",
+    "status": "info",
+    "message": "Home view appeared __MARKER__",
+    "service": "e2e-ios-app",
+    "env": "staging",
+    "version": "1.0.0",
+    "build_version": "42",
+    "o2tags": "env:staging,version:1.0.0,application_id:app-123",
+    "logger.name": "com.example.app",
+    "logger.version": "1.0.0",
+    "logger.thread_name": "main",
+    "usr.id": "u-1001",
+    "usr.name": "Test User",
+    "usr.email": "test@example.com",
+    "usr.anonymous_id": "anon-7f3c",
+    "network.client.reachability": "yes",
+    "network.client.available_interfaces": [
+      "wifi"
+    ],
+    "network.client.supports_ipv4": true,
+    "network.client.supports_ipv6": true,
+    "network.client.is_expensive": false,
+    "network.client.is_constrained": false,
+    "network.client.sim_carrier.name": "ExampleCell",
+    "network.client.sim_carrier.iso_country": "US",
+    "network.client.sim_carrier.technology": "LTE",
+    "_o2": {
+      "device": {
+        "architecture": "arm64"
+      }
+    },
+    "device": {
+      "type": "mobile",
+      "name": "iPhone",
+      "model": "iPhone15,2",
+      "brand": "Apple",
+      "architecture": "arm64"
+    },
+    "os": {
+      "name": "iOS",
+      "version": "17.4",
+      "version_major": "17"
+    },
+    "session_id": "s-1",
+    "application_id": "app-123"
+  },
+  {
+    "date": "2026-05-12T09:14:01.512Z",
+    "status": "warn",
+    "message": "Cache miss for profile image __MARKER__",
+    "service": "e2e-ios-app",
+    "env": "staging",
+    "version": "1.0.0",
+    "build_version": "42",
+    "o2tags": "env:staging,version:1.0.0,application_id:app-123",
+    "logger.name": "com.example.app",
+    "logger.version": "1.0.0",
+    "logger.thread_name": "main",
+    "usr.id": "u-1001",
+    "usr.name": "Test User",
+    "usr.email": "test@example.com",
+    "usr.anonymous_id": "anon-7f3c",
+    "network.client.reachability": "yes",
+    "network.client.available_interfaces": [
+      "wifi"
+    ],
+    "network.client.supports_ipv4": true,
+    "network.client.supports_ipv6": true,
+    "network.client.is_expensive": false,
+    "network.client.is_constrained": false,
+    "network.client.sim_carrier.name": "ExampleCell",
+    "network.client.sim_carrier.iso_country": "US",
+    "network.client.sim_carrier.technology": "LTE",
+    "_o2": {
+      "device": {
+        "architecture": "arm64"
+      }
+    },
+    "device": {
+      "type": "mobile",
+      "name": "iPhone",
+      "model": "iPhone15,2",
+      "brand": "Apple",
+      "architecture": "arm64"
+    },
+    "os": {
+      "name": "iOS",
+      "version": "17.4",
+      "version_major": "17"
+    },
+    "session_id": "s-1",
+    "application_id": "app-123"
+  }
+]

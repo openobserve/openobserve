@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   clusterFallbackSql,
   detailEventsSql,
@@ -27,6 +27,8 @@ import {
 } from "./kubernetesEvents";
 import { buildInventory, type Series, type WarningEvent } from "./kubernetesModel";
 import type { QueryId } from "./kubernetesQueries";
+import { setStreamColumns } from "./kubernetesFlatten";
+import { SCHEMAS, missingColumns } from "./__fixtures__/flattenSchemas";
 
 // Catches a quadratic blow-up (seconds), not machine speed: CI runs this slower, under coverage.
 const GROUPING_BUDGET_MS = 250;
@@ -433,5 +435,61 @@ describe("event counts", () => {
     expect(parseEventCounts([{}])).toEqual({ total: 0, warnings: 0 });
     expect(parseEventCounts([])).toBeNull();
     expect(parseEventCounts(undefined)).toBeNull();
+  });
+});
+
+describe("flatten-level aware SQL", () => {
+  afterEach(() => setStreamColumns(null));
+  const build = () => ({
+    W: warningSql({ cluster: "prod", namespaces: ["data"] }, "Pod", true),
+    EC: eventCountsSql("prod"),
+    E: eventsSql({ cluster: "prod", namespaces: ["data"] }, 10),
+    DE: detailEventsSql("prod", { kind: "pod", namespace: "data", name: "x", uid: "u1" }),
+  });
+
+  for (const [level, schema] of Object.entries(SCHEMAS)) {
+    it(`reads only columns that exist at ${level}`, () => {
+      setStreamColumns(schema);
+      for (const [id, sql] of Object.entries(build())) {
+        expect(missingColumns(sql, schema), id).toEqual([]);
+      }
+    });
+  }
+
+  it("leaves the level 3 SQL identical to the schema-less SQL", () => {
+    const before = build();
+    setStreamColumns(SCHEMAS["level 3"]);
+    expect(build()).toEqual(before);
+  });
+
+  it("filters Events with COALESCE over existing columns on a mixed 3+2 schema", () => {
+    setStreamColumns(SCHEMAS["mixed 3+2"]);
+    const sql = eventsSql({ cluster: "prod", namespaces: [] }, 10);
+    expect(sql).toContain("COALESCE(body_object_kind,json_get_str(body_object,'kind'))");
+    expect(missingColumns(sql, SCHEMAS["mixed 3+2"])).toEqual([]);
+  });
+
+  it("selects the nested event fields from body_object at level 2", () => {
+    setStreamColumns(SCHEMAS["level 2"]);
+    const sql = eventsSql({ cluster: "prod", namespaces: [] }, 10);
+    expect(sql).toContain("json_get_str(body_object,'type') AS body_object_type");
+    expect(sql).toContain("json_get_json(body_object,'regarding') AS body_object_regarding");
+  });
+
+  it("parses flattened regarding and series columns at level 0", () => {
+    const [row] = parseEvents([
+      {
+        event_name: "x.1",
+        body_object_regarding_kind: "Pod",
+        body_object_regarding_name: "x",
+        body_object_regarding_namespace: "data",
+        body_object_regarding_uid: "u",
+        body_object_series_count: 4,
+        body_object_series_lastobservedtime: "2026-10-06T10:00:00Z",
+      },
+    ]);
+    expect(row.object).toEqual({ kind: "Pod", name: "x", namespace: "data", uid: "u" });
+    expect(row.count).toBe(4);
+    expect(row.lastSeen).toBe(Date.parse("2026-10-06T10:00:00Z") * 1000);
   });
 });

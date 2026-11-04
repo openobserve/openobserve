@@ -678,6 +678,8 @@ const activeIsSavable = computed(() => {
   if (!rotation?.name?.trim()) return false;
   if (!rotation.shift_rules.length) return false;
   if (rotation.shift_rules.some((rule) => !rule.members.length)) return false;
+  // The server refuses a From == To window outright.
+  if (rotation.shift_rules.some(hasZeroLengthWindow)) return false;
   return !rotation.shift_rules.some((rule) => priorityClashFor(rule));
 });
 
@@ -778,6 +780,10 @@ function priorityClashFor(rule: ShiftRule): I18nText | "" {
   const at = rules.indexOf(rule);
   const rival = rules.findIndex((other, k) => k !== at && rulesClash(rule, other));
   return rival < 0 ? "" : t("oncall.ruleClash", { name: raw(namedShiftRules.value[rival].name) });
+}
+
+function hasZeroLengthWindow(rule: ShiftRule): boolean {
+  return (rule.restrictions ?? []).some((window) => window.start_minute === window.end_minute);
 }
 
 function overlapNames(index: number): string {

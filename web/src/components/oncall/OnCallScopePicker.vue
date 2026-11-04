@@ -120,6 +120,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </div>
+      <OText variant="meta" data-test="oncall-scope-values-source">
+        {{ t("oncall.scopeValuesSeen") }}
+      </OText>
     </div>
 
     <!-- The claim as a sentence, and what it leaves to everybody else.

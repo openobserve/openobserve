@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import {
   addUsage,
   cleanAttributeValue,
+  genAiProviderName,
   genAiRequestAttributes,
   genAiResponseAttributes,
   sha256,
@@ -37,7 +38,7 @@ test("response content and provider-reported usage use standard attributes", () 
     {
       info: {
         id: "msg-123",
-        modelID: "deepseek-flash",
+        modelID: "claude-sonnet-5-5",
         finish: "stop",
         cost: 0.42,
         tokens: {
@@ -65,7 +66,8 @@ test("response content and provider-reported usage use standard attributes", () 
   assert.equal(attributes["gen_ai.usage.cache_read.input_tokens"], 78);
   assert.equal(attributes["gen_ai.usage.cache_creation.input_tokens"], 9);
   assert.equal(attributes["gen_ai.usage.cache_read_tokens"], undefined);
-  assert.equal(attributes["gen_ai.usage.cost"], 0.42);
+  assert.equal(attributes["gen_ai.usage.cost"], undefined, "the server prices the span from its token counts");
+  assert.equal(Object.keys(attributes).some(key => key.includes("cost")), false);
   assert.equal(attributes["ai.usage.reasoning_tokens"], 12);
   assert.equal(
     Object.keys(attributes).some(key => key.startsWith("gen_ai.completion.")),
@@ -77,7 +79,7 @@ test("usage without cache or reasoning breakdown passes through unchanged", () =
   const attributes = genAiResponseAttributes(
     { info: { tokens: { input: 100, output: 20 } } },
     "ok",
-    "deepseek-flash",
+    "claude-sonnet-5-5",
   );
 
   assert.equal(attributes["gen_ai.usage.input_tokens"], 100);
@@ -114,11 +116,23 @@ test("review instrumentation does not emit legacy TraceLoop content attributes",
 });
 
 test("usage of retried attempts is summed, and a missing side is skipped", () => {
-  const a = { cost: 0.1, tokens: { input: 10, output: 2, reasoning: 5, cache: { read: 100, write: 0 } } };
-  const b = { cost: 0.2, tokens: { input: 20, output: 3, reasoning: 7, cache: { read: 50, write: 1 } } };
+  const a = { tokens: { input: 10, output: 2, reasoning: 5, cache: { read: 100, write: 0 } } };
+  const b = { tokens: { input: 20, output: 3, reasoning: 7, cache: { read: 50, write: 1 } } };
   const sum = addUsage(a, b);
-  assert.equal(sum.cost.toFixed(2), "0.30");
   assert.deepEqual(sum.tokens, { input: 30, output: 5, reasoning: 12, cache: { read: 150, write: 1 } });
   assert.equal(addUsage(null, b), b);
   assert.equal(addUsage(a, undefined), a);
+});
+
+test("opencode provider ids map to the OTel gen_ai.provider.name vendor value", () => {
+  assert.equal(genAiProviderName("anthropic-review"), "anthropic");
+  assert.equal(genAiProviderName("deepseek-review"), "deepseek");
+  assert.equal(genAiProviderName("other-review"), "other-review");
+});
+
+test("neither config carries model prices, so the server's pricing table is the only price list", () => {
+  for (const file of ["opencode.jsonc", "opencode.ci.jsonc"]) {
+    const config = readFileSync(new URL(`../../../${file}`, import.meta.url), "utf8");
+    assert.doesNotMatch(config, /"cost"\s*:/, file);
+  }
 });

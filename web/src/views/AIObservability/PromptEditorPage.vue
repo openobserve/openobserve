@@ -137,7 +137,7 @@
                 </p>
               </div>
               <OFormSelect
-                v-if="enterpriseMode"
+                v-if="providersAvailable"
                 name="model"
                 :label="t('aiObservability.promptManagement.model')"
                 :options="modelOptions"
@@ -258,6 +258,7 @@
         class="bg-surface-base border-border-default sticky bottom-0 z-1 flex shrink-0 items-center justify-end gap-2 border-t px-5.5 py-3"
       >
         <OButton
+          v-if="playgroundAvailable"
           type="button"
           variant="outline"
           size="sm-action"
@@ -308,6 +309,7 @@ import { useMutation, useQuery } from "@tanstack/vue-query";
 import onlineEvalsService from "@/services/online-evals.service";
 import { onlineEvalKeys } from "@/services/online-evals.service.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
+import { hidesOnlineEvalEntries } from "@/composables/shared/useOnlineEvalsGate";
 import {
   createPromptMutation,
   createPromptVersionMutation,
@@ -376,6 +378,10 @@ const typeOptions = [
   { label: t("aiObservability.promptManagement.chat"), value: "chat" },
 ];
 const enterpriseMode = config.isEnterprise === "true" || config.isCloud === "true";
+/** Playground is hidden only when the server reports online evaluations off. */
+const playgroundAvailable = computed(() => !hidesOnlineEvalEntries(store.state.zoConfig));
+/** The providers API exists only on enterprise builds with online evaluations on. */
+const providersAvailable = computed(() => enterpriseMode && playgroundAvailable.value);
 const form = useOForm<PromptEditorForm>({
   defaultValues: promptEditorDefaults(),
   schema: makePromptEditorSchema(t),
@@ -399,7 +405,7 @@ const providerQuery = useQuery(() => ({
   queryKey: onlineEvalKeys.providers(orgId.value),
   queryFn: () => onlineEvalsService.providers.list(orgId.value),
   staleTime: MEDIUM_STALE_TIME,
-  enabled: enterpriseMode && Boolean(orgId.value),
+  enabled: providersAvailable.value && Boolean(orgId.value),
 }));
 const providers = computed(() => providerQuery.data.value ?? []);
 const variableValues = reactive<Record<string, string>>({});

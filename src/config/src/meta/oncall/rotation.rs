@@ -54,6 +54,7 @@ pub const MINUTES_PER_DAY: u32 = 1440;
 /// Local wall time, because that is how people state their hours: "I cover
 /// 09:00 to 17:00" means their 09:00, not UTC's.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[schema(as = RotationTimeWindow)]
 pub struct TimeWindow {
     /// 0 = Monday … 6 = Sunday. Empty means every day.
     #[serde(default)]

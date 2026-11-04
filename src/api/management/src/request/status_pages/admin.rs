@@ -52,6 +52,25 @@ fn map_err(ctx: &str, e: anyhow::Error) -> Response {
     MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
 }
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/status_pages",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "ListStatusPages",
+    summary = "List status pages",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn list_pages(Path(org_id): Path<String>) -> Response {
     match openobserve_core::status_pages::list_pages_view(&org_id).await {
         Ok(resp) => MetaHttpResponse::json(resp),
@@ -59,6 +78,26 @@ pub async fn list_pages(Path(org_id): Path<String>) -> Response {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/status_pages",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "CreateStatusPage",
+    summary = "Create a status page",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = CreatePageRequest, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn create_page(
     Path(org_id): Path<String>,
     Headers(user): Headers<UserEmail>,
@@ -73,6 +112,26 @@ pub async fn create_page(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/status_pages/{id}",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "GetStatusPage",
+    summary = "Get a status page",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Resource id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn get_page(Path((org_id, id)): Path<(String, String)>) -> Response {
     match openobserve_core::status_pages::get_page(&org_id, &id).await {
         Ok(Some(page)) => MetaHttpResponse::json(page),
@@ -81,6 +140,27 @@ pub async fn get_page(Path((org_id, id)): Path<(String, String)>) -> Response {
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/{org_id}/status_pages/{id}",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "UpdateStatusPage",
+    summary = "Update a status page",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Resource id"),
+    ),
+    request_body(content = UpdatePageRequest, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn update_page(
     Path((org_id, id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -95,6 +175,26 @@ pub async fn update_page(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/status_pages/{id}",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "DeleteStatusPage",
+    summary = "Delete a status page",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Resource id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_page(
     Path((org_id, id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -109,6 +209,26 @@ pub async fn delete_page(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/status_pages/{id}/rotate_slug",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "RotateStatusPageSlug",
+    summary = "Rotate the public slug of a status page",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Resource id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn rotate_slug(
     Path((org_id, id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -125,6 +245,27 @@ pub async fn rotate_slug(
 /// PUT components — the R-1 gate. Every mapped check is verified for folder-level
 /// synthetics READ by the caller BEFORE any write. Without this, a user maps
 /// checks they cannot see onto a public page and exfiltrates their status.
+#[utoipa::path(
+    put,
+    path = "/{org_id}/status_pages/{id}/components",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "SetStatusPageComponents",
+    summary = "Replace the components of a status page",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Resource id"),
+    ),
+    request_body(content = SetComponentsRequest, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn set_components(
     Path((org_id, id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -162,6 +303,26 @@ pub async fn set_components(
 
 /// Runs the exact serializer the public plane uses, so an admin previewing a
 /// draft page sees precisely what publishing would produce.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/status_pages/{id}/preview",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "PreviewStatusPage",
+    summary = "Preview a status page as published",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Resource id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn preview(Path((org_id, id)): Path<(String, String)>) -> Response {
     match openobserve_core::status_pages::preview(&org_id, &id).await {
         Ok(Some(resp)) => MetaHttpResponse::json(resp),
@@ -172,6 +333,26 @@ pub async fn preview(Path((org_id, id)): Path<(String, String)>) -> Response {
 
 /// Notices touching the given page's components — a filtered view over the
 /// org-scoped notice set (design: "a per-page convenience view").
+#[utoipa::path(
+    get,
+    path = "/{org_id}/status_pages/{id}/notices",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "ListStatusPageNotices",
+    summary = "List notices of a status page",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Resource id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn list_page_notices(Path((org_id, id)): Path<(String, String)>) -> Response {
     match openobserve_core::status_pages::list_notices_for_page(&org_id, &id).await {
         Ok(notices) => MetaHttpResponse::json(notices),
@@ -182,6 +363,27 @@ pub async fn list_page_notices(Path((org_id, id)): Path<(String, String)>) -> Re
 /// `component_ids` in the body may span any page the caller has permission
 /// on; omitting it defaults to every component on the page in the path, the
 /// common "post an update for this page" case.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/status_pages/{id}/notices",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "CreateStatusPageNotice",
+    summary = "Create a notice on a status page",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Resource id"),
+    ),
+    request_body(content = CreateNoticeRequest, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn create_notice(
     Path((org_id, id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -196,6 +398,27 @@ pub async fn create_notice(
     }
 }
 
+#[utoipa::path(
+    put,
+    path = "/{org_id}/status_pages/notices/{nid}",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "UpdateStatusPageNotice",
+    summary = "Update a status page notice",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("nid" = String, Path, description = "Notice id"),
+    ),
+    request_body(content = UpdateNoticeRequest, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn update_notice(
     Path((org_id, nid)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -210,6 +433,26 @@ pub async fn update_notice(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/status_pages/notices/{nid}",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "DeleteStatusPageNotice",
+    summary = "Delete a status page notice",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("nid" = String, Path, description = "Notice id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_notice(
     Path((org_id, nid)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -224,6 +467,26 @@ pub async fn delete_notice(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/status_pages/notices/{nid}/updates",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "ListStatusPageNoticeUpdates",
+    summary = "List the updates of a notice",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("nid" = String, Path, description = "Notice id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn list_notice_updates(Path((org_id, nid)): Path<(String, String)>) -> Response {
     match openobserve_core::status_pages::list_notice_updates(&org_id, &nid).await {
         Ok(updates) => MetaHttpResponse::json(updates),
@@ -231,6 +494,27 @@ pub async fn list_notice_updates(Path((org_id, nid)): Path<(String, String)>) ->
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/status_pages/notices/{nid}/updates",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "AddStatusPageNoticeUpdate",
+    summary = "Post an update to a notice",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("nid" = String, Path, description = "Notice id"),
+    ),
+    request_body(content = NoticeUpdateRequest, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn add_notice_update(
     Path((org_id, nid)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -249,6 +533,27 @@ pub async fn add_notice_update(
 
 /// The 3am escape hatch: resolves a false-positive auto-incident and snoozes
 /// the underlying check so it does not immediately reopen.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/status_pages/notices/{nid}/mark_false_positive",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "MarkStatusPageNoticeFalsePositive",
+    summary = "Resolve a notice as a false positive",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("nid" = String, Path, description = "Notice id"),
+    ),
+    request_body(content = MarkFalsePositiveRequest, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn mark_false_positive(
     Path((org_id, nid)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -270,6 +575,26 @@ pub async fn mark_false_positive(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/{org_id}/status_pages/{id}/domains",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "ListStatusPageDomains",
+    summary = "List custom domains of a status page",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Resource id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn list_domains(Path((org_id, id)): Path<(String, String)>) -> Response {
     match openobserve_core::status_pages::list_domains(&org_id, &id).await {
         Ok(domains) => MetaHttpResponse::json(domains),
@@ -277,6 +602,27 @@ pub async fn list_domains(Path((org_id, id)): Path<(String, String)>) -> Respons
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/status_pages/{id}/domains",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "CreateStatusPageDomain",
+    summary = "Add a custom domain to a status page",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Resource id"),
+    ),
+    request_body(content = CreateDomainRequest, description = "Request body", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn create_domain(
     Path((org_id, id)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -291,6 +637,26 @@ pub async fn create_domain(
     }
 }
 
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/status_pages/domains/{did}",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "DeleteStatusPageDomain",
+    summary = "Remove a custom domain",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("did" = String, Path, description = "Custom domain id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn delete_domain(
     Path((org_id, did)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -305,6 +671,26 @@ pub async fn delete_domain(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/status_pages/domains/{did}/verify",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "VerifyStatusPageDomain",
+    summary = "Verify a custom domain",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("did" = String, Path, description = "Custom domain id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Status Pages", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn verify_domain(
     Path((org_id, did)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
