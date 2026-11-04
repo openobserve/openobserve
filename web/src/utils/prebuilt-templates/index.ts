@@ -21,22 +21,36 @@
 export * from "./types";
 
 // Template configurations
-export { slackTemplate, slackConfig, slackDestinationType } from "./slack";
+export { slackTemplate, slackConfig, slackDestinationType, slackAppDestinationTile } from "./slack";
 export { discordTemplate, discordConfig, discordDestinationType } from "./discord";
 export { msteamsTemplate, msteamsConfig, msteamsDestinationType } from "./msteams";
 export { pagerdutyTemplate, pagerdutyConfig, pagerdutyDestinationType } from "./pagerduty";
 export { servicenowTemplate, servicenowConfig, servicenowDestinationType } from "./servicenow";
 export { emailTemplate, emailConfig, emailDestinationType } from "./email";
 export { opsgenieTemplate, opsgenieConfig, opsgenieDestinationType } from "./opsgenie";
+export { jiraTemplate, jiraConfig, jiraDestinationType } from "./jira";
 
-import { slackConfig, slackDestinationType } from "./slack";
+import { slackAppDestinationTile, slackConfig, slackDestinationType } from "./slack";
 import { discordConfig, discordDestinationType } from "./discord";
 import { msteamsConfig, msteamsDestinationType } from "./msteams";
-import { pagerdutyConfig, pagerdutyDestinationType } from "./pagerduty";
+import {
+  pagerdutyConfig,
+  pagerdutyDestinationType,
+  PAGERDUTY_EU_EVENTS_URL,
+  PAGERDUTY_US_EVENTS_URL,
+} from "./pagerduty";
 import { servicenowConfig, servicenowDestinationType } from "./servicenow";
 import { emailConfig, emailDestinationType } from "./email";
 import { opsgenieConfig, opsgenieDestinationType } from "./opsgenie";
-import { PrebuiltConfig, PrebuiltType } from "./types";
+import type { I18nKey } from "@/types/i18n";
+import {
+  jiraAuthorization,
+  jiraBaseUrl,
+  jiraConfig,
+  jiraDestinationType,
+  jiraMetadata,
+} from "./jira";
+import { DestinationTile, PrebuiltConfig, PrebuiltType, PrebuiltTypeId } from "./types";
 
 /**
  * All available prebuilt destination types
@@ -51,7 +65,33 @@ export const PREBUILT_DESTINATION_TYPES: PrebuiltType[] = [
   pagerdutyDestinationType,
   opsgenieDestinationType,
   servicenowDestinationType,
+  jiraDestinationType,
 ];
+
+const SHORT_KEYS: Record<PrebuiltTypeId, I18nKey> = {
+  slack: "slackApp.destination.postOnly",
+  discord: "alert_destinations.prebuilt.chatPostsShort",
+  msteams: "alert_destinations.prebuilt.chatPostsShort",
+  email: "alert_destinations.prebuilt.emailShort",
+  pagerduty: "alert_destinations.prebuilt.pageOnCallShort",
+  opsgenie: "alert_destinations.prebuilt.pageOnCallShort",
+  servicenow: "alert_destinations.prebuilt.servicenowShort",
+  jira: "alert_destinations.prebuilt.jiraShort",
+};
+
+/** Unavailable Slack apps remain discoverable beside the selectable webhook. */
+export function destinationTypeTiles(slackApp: boolean): DestinationTile[] {
+  const prebuilt: DestinationTile[] = PREBUILT_DESTINATION_TYPES.map((type) => ({
+    id: type.id,
+    name: type.name,
+    descriptionKey: type.descriptionKey,
+    shortKey: type.shortKey ?? SHORT_KEYS[type.id],
+    icon: type.icon,
+    image: type.image,
+  }));
+  const webhook = prebuilt.find((tile) => tile.id === "slack");
+  return webhook ? [{ ...slackAppDestinationTile, disabled: !slackApp }, ...prebuilt] : prebuilt;
+}
 
 /**
  * Configuration mapping for all prebuilt destination types
@@ -64,6 +104,7 @@ export const PREBUILT_CONFIGS: Record<string, PrebuiltConfig> = {
   servicenow: servicenowConfig,
   email: emailConfig,
   opsgenie: opsgenieConfig,
+  jira: jiraConfig,
 };
 
 /**
@@ -78,6 +119,17 @@ export function getPrebuiltConfig(type: string): PrebuiltConfig | null {
  */
 export function isPrebuiltType(type: string): boolean {
   return type in PREBUILT_CONFIGS;
+}
+
+/**
+ * Prebuilt type the server treats a destination as (`src/core/src/alerts/destinations.rs`), never guessed from its URL.
+ */
+export function detectPrebuiltType(destination: any): PrebuiltTypeId | null {
+  if (destination.type === "email") {
+    return destination.template?.startsWith("prebuilt_") ? "email" : null;
+  }
+  const type = destination.destination_type_name;
+  return type && isPrebuiltType(type) ? (type as PrebuiltTypeId) : null;
 }
 
 /**
@@ -101,18 +153,6 @@ export function getPopularPrebuiltTypes(): PrebuiltType[] {
 }
 
 /**
- * Detect if a URL matches a prebuilt destination pattern
- */
-export function detectPrebuiltTypeFromUrl(url: string): string | null {
-  for (const [type, config] of Object.entries(PREBUILT_CONFIGS)) {
-    if (config.urlValidator(url)) {
-      return type;
-    }
-  }
-  return null;
-}
-
-/**
  * Generate URL for prebuilt destination based on credentials
  */
 export function generateDestinationUrl(type: string, credentials: Record<string, any>): string {
@@ -128,8 +168,10 @@ export function generateDestinationUrl(type: string, credentials: Record<string,
       return credentials.webhookUrl || "";
     case "servicenow":
       return credentials.instanceUrl || "";
+    case "jira":
+      return jiraBaseUrl(credentials.url);
     case "pagerduty":
-      return "https://events.pagerduty.com/v2/enqueue";
+      return credentials.euRegion ? PAGERDUTY_EU_EVENTS_URL : PAGERDUTY_US_EVENTS_URL;
     case "opsgenie":
       return credentials.euRegion
         ? "https://api.eu.opsgenie.com/v2/alerts"
@@ -164,6 +206,11 @@ export function generateDestinationHeaders(
     case "opsgenie":
       if (credentials.apiKey) {
         headers["Authorization"] = `GenieKey ${credentials.apiKey}`;
+      }
+      break;
+    case "jira":
+      if (String(credentials.token ?? "").trim()) {
+        headers["Authorization"] = jiraAuthorization(credentials);
       }
       break;
     case "servicenow":
@@ -203,6 +250,8 @@ export function generatePrebuiltMetadata(
       // PagerDuty requires a non-empty `source` in the payload.
       metadata["source"] = "openobserve";
       break;
+    case "jira":
+      return jiraMetadata(credentials);
   }
 
   return metadata;

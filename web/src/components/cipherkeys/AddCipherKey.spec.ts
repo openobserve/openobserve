@@ -282,6 +282,19 @@ describe("AddCipherKey.vue", () => {
       expect(wrapper.vm.form.state.values.key.store.local).toBe("loaded-secret");
     });
 
+    it("never lets a __proto__ key in the loaded record reach Object.prototype", async () => {
+      (CipherKeysService.get_by_name as any).mockResolvedValue({
+        data: JSON.parse(
+          '{"name":"existing-key","__proto__":{"polluted":true},"key":{"__proto__":{"polluted":true}}}',
+        ),
+      });
+      wrapper = await createWrapper({ action: "edit", name: "existing-key" });
+      await flush();
+      const leaked = ({} as any).polluted;
+      delete (Object.prototype as any).polluted;
+      expect(leaked).toBeUndefined();
+    });
+
     it("makes the name input readonly AND disabled in update mode", async () => {
       wrapper = await createWrapper({ action: "edit", name: "existing-key" });
       await flush();
@@ -319,17 +332,20 @@ describe("AddCipherKey.vue", () => {
     it("emits cancel:hideform directly when there are no changes", async () => {
       wrapper = await createWrapper();
       await wrapper.find('[data-test="add-cipher-key-cancel-btn"]').trigger("click");
+      await flush();
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-      expect(wrapper.vm.dialog.show).toBe(false);
+      expect(document.body.querySelector('[data-test="editor-draft-leave-dialog"]')).toBeNull();
     });
 
-    it("opens the discard-changes dialog when there are unsaved changes", async () => {
+    it("asks through the draft leave dialog when there are unsaved changes", async () => {
       wrapper = await createWrapper();
+      window.dispatchEvent(new Event("pointerdown"));
       setField(wrapper, "name", "dirty-name");
       await nextTick();
       await wrapper.find('[data-test="add-cipher-key-cancel-btn"]').trigger("click");
-      expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Discard changes");
+      await flush();
+      expect(wrapper.emitted("cancel:hideform")).toBeFalsy();
+      expect(document.body.querySelector('[data-test="editor-draft-leave-dialog"]')).not.toBeNull();
     });
   });
 });

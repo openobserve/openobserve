@@ -194,11 +194,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="resolveReplaceConfirm(true)"
       @click:secondary="resolveReplaceConfirm(false)"
     >
-      <OText>{{
-        t("dashboard.addDashboardFromGitHub.replaceMessage", {
-          title: replaceConfirm?.title ?? "",
-        })
-      }}</OText>
+      <OText>
+        <i18n-t
+          keypath="dashboard.addDashboardFromGitHub.replaceMessage"
+          tag="span"
+          data-test="add-dashboard-github-replace-confirm-message"
+        >
+          <template #name
+            ><span
+              data-test="add-dashboard-github-replace-confirm-name"
+              class="text-text-heading font-semibold break-all"
+              >{{ replaceConfirm?.title }}</span
+            ></template
+          >
+        </i18n-t>
+      </OText>
     </ODialog>
 
     <!-- Add Folder Dialog -->

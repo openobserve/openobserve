@@ -409,6 +409,20 @@ describe("FleetTokens", () => {
     expect(fleet.listTokens).toHaveBeenCalledTimes(2);
   });
 
+  it("defaults to a token that never expires", async () => {
+    vi.mocked(fleet.createToken).mockResolvedValue({
+      data: { ...token({ id: "t7" }), token: "o2ft_y" },
+    } as any);
+    wrapper = await mountTokens();
+    await fillAndSubmit(wrapper, { name: "n" });
+    expect(fleet.createToken).toHaveBeenCalledWith(expect.any(String), {
+      name: "n",
+      expires_in_days: null,
+      max_uses: 100,
+      fleet: "f1",
+    });
+  });
+
   it("sends null for never-expiring and unlimited tokens", async () => {
     vi.mocked(fleet.createToken).mockResolvedValue({
       data: { ...token({ id: "t8" }), token: "o2ft_x" },
@@ -435,16 +449,18 @@ describe("FleetTokens", () => {
   });
 
   it.each([
-    [409, "token name exists"],
-    [400, "max_uses must be positive"],
-    [403, "Unauthorized Access"],
-  ])("shows the server's %s message and keeps the form filled", async (status, message) => {
+    [409, "token name exists", "token name exists"],
+    [400, "max_uses must be positive", "max_uses must be positive"],
+    [403, "Unauthorized Access", "You don't have permission to do this"],
+  ])("toasts the %s refusal and keeps the form filled", async (status, message, shown) => {
     vi.mocked(fleet.createToken).mockRejectedValue({
       response: { status, data: { code: status, message } },
     });
     wrapper = await mountTokens();
     await fillAndSubmit(wrapper, { name: "dup" });
-    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "error", message }));
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error", message: shown }),
+    );
     expect(wrapper.findComponent({ name: "OCodeBlock" }).exists()).toBe(false);
     expect(form(wrapper).state.values.name).toBe("dup");
   });

@@ -521,6 +521,7 @@ const settingLabel = (key: DashboardSettingKey) =>
     title: t("dashboard.saveConflict.settingTitle"),
     description: t("dashboard.saveConflict.settingDescription"),
     defaultDatetimeDuration: t("dashboard.saveConflict.settingTimeRange"),
+    defaultRefreshInterval: t("dashboard.saveConflict.settingAutoRefresh"),
     showDynamicFilters: t("dashboard.saveConflict.settingDynamicFilters"),
     other: t("dashboard.saveConflict.settingOther"),
   })[key];

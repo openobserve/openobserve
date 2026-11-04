@@ -7,12 +7,24 @@ const testLogger = require('../utils/test-logger.js');
 import logData from "../../fixtures/log.json";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
-import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+import {
+  waitForDashboardPage,
+  deleteDashboard,
+  setupTestDashboard,
+  cleanupTestDashboard,
+} from "./utils/dashCreation.js";
+import {
+  BLANK_TARGET_HTML_SNIPPET,
+  DROPPED_TARGET_HTML_SNIPPET,
+  HTML_LINK_SELECTORS,
+  POPUP_HTML_SNIPPET,
+  SHADOWED_FORM_HTML_SNIPPET,
+} from "./utils/htmlPanelFixtures.js";
 // Each test runs in parallel (mode: "parallel" below), so the name must be
 // generated fresh per test — a single shared name caused cross-test races
 // where one test's create/delete collided with another's mid-flight.
 const generateDashboardName = () =>
-  "Dashboard_" + Math.random().toString(36).substr(2, 9);
+  "Dashboard_" + Math.random().toString(36).slice(2, 11);
 
 // Basic HTML snippet for the first test
 const BASIC_HTML_SNIPPET = `<!DOCTYPE html>
@@ -106,7 +118,6 @@ test.describe("HTML chart dashboard", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  //skip because value is not set in the variable on other environments its is working
   test("Should correctly replace the dashboard variable value on the HTML chart.", async ({
     page,
   }) => {
@@ -176,8 +187,7 @@ test.describe("HTML chart dashboard", () => {
     const pm = new PageManager(page);
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
-    const dashboardName =
-      "Dashboard_" + Math.random().toString(36).substr(2, 9);
+    const dashboardName = generateDashboardName();
 
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
@@ -204,7 +214,6 @@ test.describe("HTML chart dashboard", () => {
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
     const dashboardName = generateDashboardName();
-    const sentinel = () => page.evaluate(() => window.__o2HtmlPanelSentinel);
 
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
@@ -217,7 +226,7 @@ test.describe("HTML chart dashboard", () => {
     await expect(
       pm.chartTypeSelector.getHtmlHeading("CSS Rewrite Test")
     ).toBeVisible();
-    await expect(page.locator("img[onerror]")).toHaveCount(0);
+    await expect(pm.chartTypeSelector.getInjectedOnErrorImages()).toHaveCount(0);
 
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
@@ -225,10 +234,10 @@ test.describe("HTML chart dashboard", () => {
     await expect(
       pm.chartTypeSelector.getHtmlHeading("CSS Rewrite Test")
     ).toBeVisible();
-    await expect(page.locator("img[onerror]")).toHaveCount(0);
+    await expect(pm.chartTypeSelector.getInjectedOnErrorImages()).toHaveCount(0);
     // an injected image fails to load asynchronously, so give onerror time to fire
     await page.waitForTimeout(1000);
-    expect(await sentinel()).toBeUndefined();
+    expect(await pm.chartTypeSelector.getHtmlPanelSentinel()).toBeUndefined();
 
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
@@ -240,8 +249,7 @@ test.describe("HTML chart dashboard", () => {
     const pm = new PageManager(page);
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
-    const dashboardName =
-      "Dashboard_" + Math.random().toString(36).substr(2, 9);
+    const dashboardName = generateDashboardName();
 
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
@@ -259,5 +267,175 @@ test.describe("HTML chart dashboard", () => {
     await pm.dashboardPanelActions.savePanel();
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
+  });
+});
+
+test.describe("HTML chart link targets", () => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    await navigateToBase(page);
+    await page.goto(
+      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+    );
+  });
+
+  test("Should keep target=_blank and force a safe rel on links, forms, area and SVG links", {
+    tag: ["@dashboards", "@htmlChart", "@P1"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupTestDashboard(page, pm, dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.addHtmlPanelContent(BLANK_TARGET_HTML_SNIPPET);
+    await expect(
+      pm.chartTypeSelector.getHtmlHeading("Blank Target Test")
+    ).toBeVisible();
+
+    for (const selector of [
+      HTML_LINK_SELECTORS.blankLink,
+      HTML_LINK_SELECTORS.blankMixedCaseLink,
+      HTML_LINK_SELECTORS.blankForm,
+      HTML_LINK_SELECTORS.blankArea,
+      HTML_LINK_SELECTORS.blankSvgLink,
+    ]) {
+      await pm.chartTypeSelector.expectHtmlLinkTarget(selector, "_blank");
+    }
+
+    await pm.dashboardPanelActions.addPanelName(
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test")
+    );
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("Should drop named, _top, _self and _parent targets without adding rel", {
+    tag: ["@dashboards", "@htmlChart", "@P1"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupTestDashboard(page, pm, dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.addHtmlPanelContent(DROPPED_TARGET_HTML_SNIPPET);
+    await expect(
+      pm.chartTypeSelector.getHtmlHeading("Dropped Target Test")
+    ).toBeVisible();
+
+    for (const selector of [
+      HTML_LINK_SELECTORS.namedLink,
+      HTML_LINK_SELECTORS.topLink,
+      HTML_LINK_SELECTORS.selfLink,
+      HTML_LINK_SELECTORS.parentLink,
+      HTML_LINK_SELECTORS.namedForm,
+    ]) {
+      await pm.chartTypeSelector.expectHtmlLinkTarget(selector, null);
+    }
+
+    // an element without a target keeps the author's rel
+    await expect(
+      pm.chartTypeSelector.getHtmlRendererElement(HTML_LINK_SELECTORS.plainLink)
+    ).toHaveAttribute("rel", "nofollow");
+
+    await pm.dashboardPanelActions.addPanelName(
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test")
+    );
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("Should render a form with a control named getAttribute and drop a nodeName-clobbered form", {
+    tag: ["@dashboards", "@htmlChart", "@P1"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupTestDashboard(page, pm, dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.addHtmlPanelContent(SHADOWED_FORM_HTML_SNIPPET);
+
+    await expect(
+      pm.chartTypeSelector.getHtmlHeading("Shadowed Form Test")
+    ).toBeVisible();
+    await expect(
+      pm.chartTypeSelector.getHtmlRendererElement(HTML_LINK_SELECTORS.shadowedFormButton)
+    ).toBeVisible();
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.shadowedForm, "_blank");
+    await expect(
+      pm.chartTypeSelector.getHtmlRendererElement(HTML_LINK_SELECTORS.clobberedForm)
+    ).toHaveCount(0);
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.afterFormsLink, "_blank");
+
+    await pm.dashboardPanelActions.addPanelName(
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test")
+    );
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("Should open a target=_blank link in a new tab without window.opener", {
+    tag: ["@dashboards", "@htmlChart", "@P1"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+    const popupUrl = new URL("/healthz", process.env["ZO_BASE_URL"]).href;
+
+    await setupTestDashboard(page, pm, dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.addHtmlPanelContent(POPUP_HTML_SNIPPET);
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.popupLink, "_blank");
+
+    const popup = await pm.chartTypeSelector.clickHtmlRendererElementForPopup(
+      HTML_LINK_SELECTORS.popupLink
+    );
+    expect(popup.url()).toBe(popupUrl);
+    expect(await pm.chartTypeSelector.isPopupOpenerNull(popup)).toBe(true);
+    await popup.close();
+
+    // the dashboard tab itself must not navigate away
+    await expect(
+      pm.chartTypeSelector.getHtmlHeading("Popup Link Test")
+    ).toBeVisible();
+
+    await pm.dashboardPanelActions.addPanelName(
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test")
+    );
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("Should keep target=_blank and safe rel on the saved panel after reload", {
+    tag: ["@dashboards", "@htmlChart", "@P2"],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupTestDashboard(page, pm, dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.addHtmlPanelContent(BLANK_TARGET_HTML_SNIPPET);
+    await expect(
+      pm.chartTypeSelector.getHtmlHeading("Blank Target Test")
+    ).toBeVisible();
+
+    await pm.dashboardPanelActions.addPanelName(
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test")
+    );
+    await pm.dashboardPanelActions.savePanel();
+
+    await expect(
+      pm.chartTypeSelector.getHtmlHeading("Blank Target Test")
+    ).toBeVisible();
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.blankLink, "_blank");
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.blankForm, "_blank");
+
+    await page.reload();
+    await expect(
+      pm.chartTypeSelector.getHtmlHeading("Blank Target Test")
+    ).toBeVisible();
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.blankLink, "_blank");
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.blankMixedCaseLink, "_blank");
+    await pm.chartTypeSelector.expectHtmlLinkTarget(HTML_LINK_SELECTORS.blankSvgLink, "_blank");
+
+    await cleanupTestDashboard(page, pm, dashboardName);
   });
 });

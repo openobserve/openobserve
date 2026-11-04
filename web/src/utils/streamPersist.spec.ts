@@ -60,8 +60,14 @@ describe("dashboard panel stream memory", () => {
     expect(pickDashboardPanelStream("org1", "logs", ["default"])).toBe("default");
   });
 
-  it("ignores unknown stream types and empty values", () => {
+  it("remembers the last enrichment table", () => {
     saveDashboardPanelStream("org1", "enrichment_tables", "geo");
+    expect(restoreDashboardPanelStreamType("org1")).toBe("enrichment_tables");
+    expect(pickDashboardPanelStream("org1", "enrichment_tables", ["asn", "geo"])).toBe("geo");
+  });
+
+  it("ignores unknown stream types and empty values", () => {
+    saveDashboardPanelStream("org1", "metadata", "geo");
     saveDashboardPanelStream("org1", "logs", "");
     expect(restoreDashboardPanelStreamType("org1")).toBe("");
   });

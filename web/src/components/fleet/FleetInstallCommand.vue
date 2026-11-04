@@ -47,16 +47,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ opt.label }}
       </OToggleGroupItem>
     </OToggleGroup>
+    <OInput
+      v-if="platform === 'kubernetes'"
+      v-model="clusterName"
+      size="sm"
+      width="md"
+      class="max-md:w-full"
+      :label="t('fleet.install.clusterName')"
+      :placeholder="raw('prod-us-east')"
+      :help-text="t('fleet.install.clusterNameHint', { attribute: raw('k8s.cluster.name') })"
+      data-test="fleet-install-command-cluster-name"
+    />
     <OText variant="meta" data-test="fleet-install-command-version">{{
       version
         ? t("fleet.install.versionLine", { version: raw(version) })
         : t("fleet.install.versionLatest")
     }}</OText>
     <OCheckbox
-      v-if="platform !== 'kubernetes'"
-      v-model="http"
-      :label="t('fleet.install.httpTransport')"
-      data-test="fleet-install-command-http"
+      v-model="websocket"
+      :label="t('fleet.install.websocketTransport')"
+      data-test="fleet-install-command-websocket"
     />
     <OCodeBlock
       :code="command"
@@ -80,6 +90,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { getIngestionURL } from "@/utils/queryUtils";
@@ -108,8 +119,9 @@ const settings = useFleetSettings().settings;
 const version = computed(() => settings.value?.target_collector_version || null);
 
 const platform = ref<InstallPlatform>("linux");
-const http = ref(false);
+const websocket = ref(false);
 const role = ref<KubernetesRole>("agent");
+const clusterName = ref("");
 
 const platformOptions = INSTALL_PLATFORMS.map((value) => ({
   value,
@@ -140,8 +152,9 @@ const build = (token: string) =>
     org: orgId.value,
     token,
     version: version.value,
-    http: http.value && platform.value !== "kubernetes",
+    http: !websocket.value,
     role: role.value,
+    clusterName: clusterName.value,
   });
 const command = computed(() => build(props.token));
 // A placeholder stays readable; a real token shows masked until revealed, while copy takes the full command.

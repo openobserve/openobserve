@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { AxiosRequestConfig } from "axios";
 import http from "./http";
 import analytics from "./product_analytics";
 
@@ -51,13 +52,18 @@ const stream = {
     return http().get(url);
   },
 
-  schema: (org_identifier: string, stream_name: string, type: string) => {
+  schema: (
+    org_identifier: string,
+    stream_name: string,
+    type: string,
+    requestConfig?: AxiosRequestConfig,
+  ) => {
     let url = `/api/${org_identifier}/streams/${stream_name}/schema`;
 
     if (type != "") {
       url += "?type=" + type;
     }
-    return http().get(url);
+    return requestConfig ? http().get(url, requestConfig) : http().get(url);
   },
 
   updateSettings: (org_identifier: string, stream_name: string, type: string, data: any) => {
@@ -181,4 +187,14 @@ export interface StreamPageParams {
   keyword?: string;
   sort?: string;
   asc?: boolean;
+}
+
+/** One stream row of the `GET /api/{org}/streams` list response. */
+export interface StreamListItem {
+  name: string;
+  stream_type?: string;
+  storage_type?: string;
+  /** System-written stream; the server omits the field when false. */
+  is_internal?: boolean;
+  [key: string]: unknown;
 }

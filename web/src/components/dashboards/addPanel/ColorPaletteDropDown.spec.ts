@@ -32,12 +32,13 @@ const createMockDashboardPanelData = () =>
   });
 
 let mockDashboardPanelData = createMockDashboardPanelData();
+const mockPromqlMode = { value: false };
 
 // Mock the useDashboardPanel composable
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
     dashboardPanelData: mockDashboardPanelData,
-    promqlMode: { value: false },
+    promqlMode: mockPromqlMode,
   }),
 }));
 
@@ -45,6 +46,8 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
 const mockColorPalette = ["#ff0000", "#00ff00", "#0000ff", "#ffff00"];
 vi.mock("@/utils/dashboard/colorPalette", () => ({
   getColorPalette: vi.fn(() => mockColorPalette),
+  CATEGORY10_PALETTE: ["#1f77b4", "#ff7f0e"],
+  TABLEAU10_PALETTE: ["#4e79a7", "#f28e2c"],
 }));
 
 // Mock Vuex store
@@ -107,6 +110,7 @@ describe("ColorPaletteDropDown", () => {
 
     // Reset mock data to default state
     mockDashboardPanelData = createMockDashboardPanelData();
+    mockPromqlMode.value = false;
     mockStore.state.theme = "light";
   });
 
@@ -114,6 +118,65 @@ describe("ColorPaletteDropDown", () => {
     if (wrapper) {
       wrapper.unmount();
     }
+  });
+
+  describe("sankey panels", () => {
+    const mountWithItems = () =>
+      mount(ColorPaletteDropDown, {
+        global: {
+          provide: { dashboardPanelDataPageKey: "dashboard" },
+          stubs: {
+            OSelect: { template: "<div><slot /></div>" },
+            OSelectGroup: {
+              template: '<div data-test="select-group"><slot /></div>',
+              props: ["label"],
+            },
+            OSelectItem: {
+              template: '<div data-test="select-item" :data-value="value"><slot /></div>',
+              props: ["value", "label"],
+            },
+          },
+        },
+      });
+    const itemValues = (w: VueWrapper) =>
+      w.findAll('[data-test="select-item"]').map((item) => item.attributes("data-value"));
+
+    it("offers only the categorical palettes for a sankey panel", () => {
+      (mockDashboardPanelData.data as any).type = "sankey";
+      wrapper = mountWithItems();
+      expect(itemValues(wrapper)).toEqual(["palette-classic-by-series", "palette-classic"]);
+      expect(wrapper.findAll('[data-test="select-group"]')).toHaveLength(1);
+    });
+
+    it("shows a carried-over non-categorical mode as the by-series palette it renders with", () => {
+      (mockDashboardPanelData.data as any).type = "sankey";
+      mockDashboardPanelData.data.config.color.mode = "continuous-temperature";
+      wrapper = createWrapper();
+      expect((wrapper.vm as any).selectedOptionLabel).toBe(
+        (wrapper.vm as any).colorOptions.find((o: any) => o.value === "palette-classic-by-series")
+          .label,
+      );
+      expect((wrapper.vm as any).selectedOptionPalette).toEqual(mockColorPalette);
+      expect(wrapper.find('[data-test="series-by-toggle"]').exists()).toBe(false);
+    });
+
+    it("hides the single-colour picker carried over from another chart type", () => {
+      (mockDashboardPanelData.data as any).type = "sankey";
+      mockDashboardPanelData.data.config.color.mode = "fixed";
+      (mockDashboardPanelData.data.config.color as any).fixedColor = ["#53ca53"];
+      wrapper = createWrapper();
+      expect(
+        wrapper.find('[data-test="dashboard-color-palette-color-input-wrapper"]').exists(),
+      ).toBe(false);
+    });
+
+    it("keeps every palette mode for other chart types", () => {
+      (mockDashboardPanelData.data as any).type = "bar";
+      wrapper = mountWithItems();
+      expect(itemValues(wrapper)).toContain("fixed");
+      expect(itemValues(wrapper)).toContain("continuous-temperature");
+      expect(wrapper.findAll('[data-test="select-group"]')).toHaveLength(2);
+    });
   });
 
   describe("Component Initialization", () => {
@@ -332,6 +395,27 @@ describe("ColorPaletteDropDown", () => {
       expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([]);
     });
 
+    it.each(["palette-category10", "palette-tableau10", "palette-from-thresholds"])(
+      "stores no fixed colours for %s",
+      async (mode) => {
+        mockDashboardPanelData.data.config.color.fixedColor = ["#53ca53"];
+        wrapper.vm.onColorModeChange(mode);
+        await nextTick();
+
+        expect(mockDashboardPanelData.data.config.color.mode).toBe(mode);
+        expect(mockDashboardPanelData.data.config.color.fixedColor).toEqual([]);
+      },
+    );
+
+    it("lists the categorical palettes by series and From thresholds by value", () => {
+      const groups = (wrapper.vm as any).colorOptionsByGroup;
+      const bySeries = groups.bySeries.map((o: any) => o.value);
+      const byValue = groups.byValue.map((o: any) => o.value);
+      expect(bySeries).toEqual(expect.arrayContaining(["palette-category10", "palette-tableau10"]));
+      expect(byValue).toContain("palette-from-thresholds");
+      expect(bySeries).not.toContain("palette-from-thresholds");
+    });
+
     it("should handle continuous color modes", async () => {
       const customPalette = ["red", "yellow", "green"];
       wrapper.vm.onColorModeChange("continuous-red-yellow-green");
@@ -434,6 +518,13 @@ describe("ColorPaletteDropDown", () => {
 
       const toggle = wrapper.find("[data-test='series-by-toggle']");
       expect(toggle.exists()).toBeTruthy();
+    });
+
+    it("shows the series by toggle for From thresholds", async () => {
+      mockDashboardPanelData.data.config.color.mode = "palette-from-thresholds";
+      await nextTick();
+
+      expect(wrapper.find("[data-test='series-by-toggle']").exists()).toBeTruthy();
     });
 
     it("should render series by toggle with correct options", async () => {
@@ -715,6 +806,33 @@ describe("ColorPaletteDropDown", () => {
         '[data-test="dashboard-color-palette-color-input-wrapper"]',
       );
       expect(colorWrapper.exists()).toBeTruthy();
+    });
+  });
+
+  describe("Color series by", () => {
+    const seriesBy = () => wrapper.find("[data-test='series-by-toggle']");
+
+    it("hides the toggle for a PromQL h-bar, which is coloured by its reduced value", async () => {
+      Object.assign(mockDashboardPanelData.data, { type: "h-bar" });
+      mockDashboardPanelData.data.config.color.mode = "continuous-positive";
+      mockPromqlMode.value = true;
+      wrapper = createWrapper();
+      await nextTick();
+      expect(seriesBy().exists()).toBe(false);
+    });
+
+    it("keeps the toggle for a SQL h-bar and for other PromQL charts", async () => {
+      Object.assign(mockDashboardPanelData.data, { type: "h-bar" });
+      mockDashboardPanelData.data.config.color.mode = "continuous-positive";
+      wrapper = createWrapper();
+      await nextTick();
+      expect(seriesBy().exists()).toBe(true);
+
+      Object.assign(mockDashboardPanelData.data, { type: "bar" });
+      mockPromqlMode.value = true;
+      wrapper = createWrapper();
+      await nextTick();
+      expect(seriesBy().exists()).toBe(true);
     });
   });
 });

@@ -35,8 +35,6 @@ mod agent_signals;
 mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
-#[cfg(feature = "enterprise")]
-pub mod alert_grouping;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
@@ -73,6 +71,7 @@ mod pipeline_error_cleanup;
 mod prompt_webhook_delivery;
 mod promql;
 mod promql_self_consume;
+mod public_dashboards_outbox;
 mod query_history_reaper;
 #[cfg(feature = "enterprise")]
 mod rca_run_sweeper;
@@ -587,6 +586,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::org_status::watch());
     // KV reads are served from a per-node cache, so every node, routers included, must hear writes.
     tokio::task::spawn(db::kv::watch());
+    #[cfg(feature = "enterprise")]
+    tokio::spawn(o2_enterprise::enterprise::common::settings::watch());
     retry_with_backoff(
         "load the org status cache",
         ORG_STATUS_LOAD_ATTEMPTS,
@@ -597,7 +598,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     .await?;
 
     #[cfg(feature = "cloud")]
-    tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
+    {
+        openobserve_core::org_domain_ownership::init().await;
+        tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
+        tokio::task::spawn(openobserve_core::org_domain_ownership::watch());
+    }
 
     // check version
     db::metas::version::set()
@@ -686,12 +691,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     slack_hooks::register();
 
+    // Routers serve the hook routes, so the hook node tasks start before the router return.
+    #[cfg(feature = "enterprise")]
+    openobserve_core::workflows::http_trigger::spawn_node_tasks();
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
     }
 
-    #[cfg(feature = "profiling")]
+    #[cfg(feature = "cpu-profiling")]
     tokio::task::spawn(openobserve_core::self_profiles::run());
 
     // telemetry run
@@ -708,6 +717,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     tokio::task::spawn(usage_reporting::run());
+
+    // Public dashboard reads are counted on the querier that owns the slug.
+    if LOCAL_NODE.is_querier() {
+        spawn_pausable_job!(
+            "public_dashboards_access_flush",
+            openobserve_core::public_dashboards::access::FLUSH_INTERVAL_SECS,
+            {
+                openobserve_core::public_dashboards::access::flush().await;
+            }
+        );
+    }
 
     // cache short_urls
     tokio::task::spawn(db::short_url::watch());
@@ -853,11 +873,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::common::remote_defaults::spawn_refresher();
 
     if config::get_config().common.model_pricing_enabled {
+        // Warm from committed seed rows even offline or when coordinator notification fails.
+        if let Err(e) = openobserve_builtins::model_pricing::load_seed().await {
+            log::error!("[model_pricing] loading seed prices failed: {e}");
+        }
         db::model_pricing::cache()
             .await
             .expect("model pricing cache failed");
 
-        // Sync built-in model pricing from GitHub (initial + periodic)
+        // Only queriers perform the initial and periodic GitHub sync.
         if LOCAL_NODE.is_querier() {
             tokio::task::spawn(async {
                 if let Err(e) =
@@ -1233,30 +1257,22 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
         o2_enterprise::enterprise::llm_evaluations::providers::register_provider_cost_calculator(
             |org_id, model, input_tokens, output_tokens, timestamp| {
-                use openobserve_core::traces::otel::pricing::{ResolvedPricing, resolve_pricing};
-
                 let entries = db::model_pricing::get_org_pricing_entries(org_id);
-                let resolved = resolve_pricing(&entries, model, Some(timestamp))?;
-                match resolved.pricing {
-                    ResolvedPricing::Definition(definition) => {
-                        let usage = std::collections::HashMap::from([
-                            ("input".to_string(), input_tokens),
-                            ("output".to_string(), output_tokens),
-                        ]);
-                        db::model_pricing::calculate_cost_from_definition(
-                            &definition,
-                            &usage,
-                            Some(timestamp),
-                            &config::meta::model_pricing::PricingContext::default(),
-                        )
-                        .cost
-                        .get("total")
-                        .copied()
-                    }
-                    ResolvedPricing::Compiled(pricing) => {
-                        Some(pricing.cost(input_tokens, output_tokens, Some(timestamp)).2)
-                    }
-                }
+                let resolved =
+                    db::model_pricing::find_pricing_sync_at(&entries, model, Some(timestamp))?;
+                let usage = std::collections::HashMap::from([
+                    ("input".to_string(), input_tokens),
+                    ("output".to_string(), output_tokens),
+                ]);
+                db::model_pricing::calculate_cost_from_definition(
+                    &resolved.definition,
+                    &usage,
+                    Some(timestamp),
+                    &config::meta::model_pricing::PricingContext::default(),
+                )
+                .cost
+                .get("total")
+                .copied()
             },
         );
 
@@ -1401,8 +1417,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(metrics::run());
     let _ = promql::run();
     tokio::task::spawn(scheduler::run());
-    #[cfg(feature = "enterprise")]
-    tokio::task::spawn(alert_grouping::process_expired_batches());
     tokio::task::spawn(infra::cache::file_downloader::run());
     // Note: Service discovery extraction runs automatically during parquet file processing
     // See src/jobs/src/job/files/parquet.rs:queue_services_from_data_file for
@@ -1514,6 +1528,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // copy or it grows without bound.
     alert_eval_ledger_reaper::run();
     query_history_reaper::run();
+    public_dashboards_outbox::run();
     // Reconciliation is what makes the rolling window actually roll: the
     // ingest pass only ever ADDS, so without this a 7-day SLO's covered_slices
     // climbs past what its window can hold. Also releases expired budget

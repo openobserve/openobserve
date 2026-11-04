@@ -55,19 +55,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              unaffected — the spacer just absorbs 1.25rem less. -->
         <!-- Curated tiles sit six to a row: they wrap at every width and keep two lines so a row's values stay level. -->
         <!-- One line; next to notice chips it holds ~40% of the bar so the chip squeezes nothing but the spacer. -->
+        <!-- shrink-[1000]: at factor 1 a long title still hands a fraction of a pixel of its cut to the freshness label, which ellipsises it to "no…". -->
         <OTruncatedText
           as="div"
-          class="text-compact text-text-heading me-5 font-medium tracking-[0.02em] @max-[22rem]/panelbar:me-1"
+          class="text-compact text-text-heading me-5 shrink-[1000] font-medium tracking-[0.02em] @max-[22rem]/panelbar:me-1"
           :class="[
             curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined,
+            titleMeta ? 'me-2!' : undefined,
             hasNoticeChips
               ? 'min-w-[min(10rem,40%)]! @max-[12rem]/panelbar:min-w-[35%]!'
               : undefined,
           ]"
           data-test="dashboard-panel-header"
         >
-          {{ props.data.title }}
+          {{ panelTitle }}
         </OTruncatedText>
+        <span
+          v-if="titleMeta"
+          class="text-2xs text-text-secondary me-5 shrink-0 font-normal whitespace-nowrap"
+          data-test="dashboard-panel-header-meta"
+          >{{ titleMeta }}</span
+        >
         <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
@@ -83,6 +91,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="schedule" size="xs" class="@min-[32rem]/panelbar:hidden" />
           </span>
           <OTooltip :content="curatedBadgeTooltip" side="bottom" />
+        </OTag>
+        <!-- A note the injected result carries about itself, such as the public view's retained or truncated data. -->
+        <OTag
+          v-if="injectedNotice"
+          variant="default-soft"
+          size="sm"
+          class="shrink-0 @max-[8rem]/panelbar:hidden"
+          data-test="dashboard-panel-injected-notice"
+        >
+          {{ injectedNotice }}
         </OTag>
         <OTag
           v-if="
@@ -119,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="hoverRevealClass"
           v-if="
             props.showLegendsButton &&
+            !isDataView &&
             !PanleSchemaRendererRef?.noData &&
             ![
               'table',
@@ -130,6 +149,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'heatmap',
               'metric',
               'gauge',
+              'bar-gauge',
+              'treemap',
+              'sunburst',
+              'funnel',
+              'node-graph',
+              'alert-list',
+              'flame-graph',
+              'boxplot',
+              'logs',
             ].includes(props.data.type)
           "
           variant="ghost"
@@ -149,17 +177,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           :class="hoverRevealClass"
           v-if="
+            !isDataView &&
             !viewOnly &&
             !simplifiedPanelView &&
             [
               'area',
               'area-stacked',
               'bar',
-              'h-bar',
               'line',
               'scatter',
               'stacked',
-              'h-stacked',
               'state-timeline',
             ].includes(props.data.type) &&
             PanleSchemaRendererRef?.checkIfPanelIsTimeSeries === true
@@ -185,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <ExemplarToggle
-          v-if="exemplarsEligible && !viewOnly"
+          v-if="exemplarsEligible && !viewOnly && !isDataView"
           :class="exemplarToggleAtRest && !isLayoutEditing ? '' : hoverRevealClass"
           :on="exemplarsOn"
           :loading="PanleSchemaRendererRef?.exemplarsStatus === 'loading'"
@@ -281,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :error="errorData"
           :maxQueryRangeWarning="maxQueryRangeWarning"
           :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-          v-bind="noticeProps"
+          v-bind="panelNoticeProps"
           :sparklineWarning="sparklineWarning"
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
@@ -363,6 +390,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </ODropdownItem>
           <ODropdownItem
+            v-if="showDataViewToggle && !isLayoutEditing"
+            data-test="dashboard-panel-data-view-toggle"
+            @select="previewView = isDataView ? 'chart' : 'data'"
+          >
+            <template #icon-left
+              ><OIcon :name="isDataView ? 'show-chart' : 'table-chart'" size="sm"
+            /></template>
+            {{ isDataView ? t("panel.showChart") : t("panel.showRawData") }}
+          </ODropdownItem>
+          <ODropdownItem
             v-if="!simplifiedPanelView && layoutMode !== 'view'"
             data-test="dashboard-edit-layout"
             @select="onPanelModifyClick('EditLayout')"
@@ -403,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               data-test="dashboard-panel-download-as-csv-btn"
-              @select="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
+              @select="PanleSchemaRendererRef?.downloadDataAsCSV(panelFileName)"
             >
               <template #icon-left><OIcon name="file-download" size="sm" /></template>
               {{ t("panel.downloadAsCSV") }}
@@ -411,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               data-test="dashboard-panel-download-as-json-btn"
-              @select="PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)"
+              @select="PanleSchemaRendererRef?.downloadDataAsJSON(panelFileName)"
             >
               <template #icon-left><OIcon name="data-object" size="sm" /></template>
               {{ t("panel.downloadAsJSON") }}
@@ -445,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  panel's state through a pure adapter and the action owns the rest
                  (label, confirm dialog, transport). See CreateAlertAction.vue. -->
             <CreateAlertAction
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              v-if="!simplifiedPanelView && canCreateAlert"
               variant="menu-item"
               source="panel"
               :build="buildPanelAlertPrefill"
@@ -464,7 +501,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       class="drag-cancel relative min-h-0 flex-1"
-      :class="curatedBadge || kioskStale ? 'opacity-60' : undefined"
+      :class="
+        curatedBadge || kioskStale || props.injectedPanelData?.dimmed ? 'opacity-60' : undefined
+      "
       data-test="dashboard-panel-body"
       :data-curated-stale="curatedBadge ? 'true' : 'false'"
     >
@@ -488,6 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :viewOnly="viewOnly"
         :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
         :exemplars-override="exemplarOverride"
+        :injectedPromqlData="props.injectedPanelData"
         @loading-state-change="handleLoadingStateChange"
         @metadata-update="metaDataValue"
         @limit-number-of-series-warning-message-update="
@@ -495,6 +535,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @sparkline-warning-update="handleSparklineWarningUpdate"
         @series-limit-update="handleSeriesLimitUpdate"
+        @region-join-update="handleRegionJoinUpdate"
+        @sankey-notice-update="handleSankeyNoticeUpdate"
         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -509,13 +551,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @is-partial-data-update="handleIsPartialDataUpdate"
         @contextmenu="$emit('contextmenu', $event)"
         ref="PanleSchemaRendererRef"
-        :allowAnnotationsAdd="true"
+        :allowAnnotationsAdd="!props.injectedPanelData"
+        :allowDrilldown="!props.injectedPanelData"
         :allowAlertCreation="allowAlertCreation"
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"
         @series-data-update="onCuratedSeriesData"
         @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
       ></PanelSchemaRenderer>
+      <PanelDataView
+        v-if="showDataOverlay"
+        class="absolute inset-0 z-10"
+        :data="previewRawData"
+        :query-type="props.data.queryType"
+        :loading="isPanelLoading"
+        data-test-prefix="dashboard-panel"
+      />
 
       <!-- Until the first result or error lands, an empty body would read as "No Data" on a TV. -->
       <div
@@ -584,7 +635,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('panel.deletePanelTitle')"
-      :message="t('panel.deletePanelMessage')"
+      message-keypath="panel.deletePanelMessage"
+      :message-name="data.title"
+      ok-variant="destructive"
       @update:ok="deletePanelDialog"
       @update:cancel="confirmDeletePanelDialog = false"
       v-model="confirmDeletePanelDialog"
@@ -618,6 +671,8 @@ import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh"
 import { summarizePanelError } from "@/utils/dashboard/kiosk";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
+import PanelDataView from "./addPanel/PanelDataView.vue";
+import { usePanelDataView } from "@/composables/dashboard/usePanelDataView";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
@@ -638,7 +693,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
 import shortURL from "@/services/short_url";
+import { isEnrichmentTablePanel } from "@/utils/dashboard/streamLifetime";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
+import { toPanelFileName } from "@/utils/dashboard/panelTitle";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
@@ -714,6 +772,7 @@ export default defineComponent({
     "shouldRefreshWithoutCache",
     "showLegendsButton",
     "isTimeRangeWaiting",
+    "injectedPanelData",
     "layoutMode",
     "kiosk",
   ],
@@ -722,6 +781,7 @@ export default defineComponent({
     OBadge,
     OSkeleton,
     PanelSchemaRenderer,
+    PanelDataView,
     PanelBar,
     QueryInspector,
     ConfirmDialog,
@@ -744,6 +804,14 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { t } = useI18nTyped();
+    const panelTitle = usePanelTitle({
+      title: () => props.data?.title,
+      variablesData: () => props.variablesData,
+      context: () => ({ tabId: props.tabId, panelId: props.data?.id }),
+    });
+    const panelFileName = computed(() => toPanelFileName(panelTitle.value));
+    // A runtime stamp from embedding pages (the traces Rate unit); stored dashboards never carry it.
+    const titleMeta = computed(() => props.data?.config?.title_meta as string | undefined);
     // Curated pages stamp this; stored dashboards never carry it, so the badge
     // and the body dimming are both invisible outside them (§6.3).
     const curatedBadge = computed(
@@ -776,11 +844,23 @@ export default defineComponent({
       curatedBadge.value ? t(curatedBadge.value.key as never, curatedBadgeParams.value) : raw(""),
     );
     // Both halves are already translated; joining them widens to string without untranslating either.
+    const injectedNotice = computed(() => props.injectedPanelData?.notice);
     const curatedBadgeTooltip = computed(() =>
       raw(`${curatedBadgeText.value} · ${t("infra.curated.staleBadgeTooltip")}`),
     );
     // need PanleSchemaRendererRef for table download as a csv
     const PanleSchemaRendererRef: any = ref(null);
+    const {
+      previewView,
+      showDataViewToggle,
+      isDataView,
+      showDataOverlay,
+      rawData: previewRawData,
+    } = usePanelDataView({
+      panelType: () => props.data?.type,
+      renderer: PanleSchemaRendererRef,
+      enabled: () => !props.kiosk && !props.viewOnly && !props.simplifiedPanelView,
+    });
 
     const exemplarsEligible = computed(() => isExemplarEligible(props.data));
     const exemplarKey = computed(() =>
@@ -880,11 +960,14 @@ export default defineComponent({
     const {
       panelDiagnostics,
       seriesLimit,
+      sankeyNotice,
       maxQueryRangeWarning,
       noticeProps,
       handleResultMetadataUpdate,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
 
     // to store and show when the panel was last loaded
@@ -937,12 +1020,25 @@ export default defineComponent({
     // for full screen button
     const isCurrentlyHoveredPanel: any = ref(false);
     const isLayoutEditing = computed(() => props.layoutMode === "edit");
+    // Layout editing hides the panel bar controls, which would leave the Data view with no way back.
+    watch(isLayoutEditing, (editing) => {
+      if (editing) previewView.value = "chart";
+    });
 
     // Editor actions follow the "Edit panel" menu item; Refresh is a viewer action, so layout edit and viewOnly keep it.
     const canEditFromNotice = computed(
       () => !props.viewOnly && !props.simplifiedPanelView && !isLayoutEditing.value,
     );
-    const canRefreshFromNotice = computed(() => !props.simplifiedPanelView);
+    // An injected result (the public viewer) has no query to re-run, so its notices offer no Refresh.
+    const canRefreshFromNotice = computed(
+      () => !props.simplifiedPanelView && !props.injectedPanelData,
+    );
+    // The public viewer's server marks a panel partial itself; it reads as the server's Partial notice.
+    const injectedPartial = computed(() => !!props.injectedPanelData?.serverPartial);
+    const panelNoticeProps = computed(() => ({
+      ...noticeProps.value,
+      serverPartial: noticeProps.value.serverPartial || injectedPartial.value,
+    }));
     const canInspectFromNotice = computed(
       () => !props.simplifiedPanelView && (metaData.value?.queries?.length ?? 0) > 0,
     );
@@ -959,7 +1055,11 @@ export default defineComponent({
       () =>
         !!limitNumberOfSeriesWarningMessage.value ||
         !!seriesLimit.value ||
+        !!noticeProps.value.regionJoin ||
+        !!sankeyNotice.value?.returnLinks ||
+        !!sankeyNotice.value?.skippedRows ||
         !!panelDiagnostics.value?.serverPartial ||
+        injectedPartial.value ||
         !!panelDiagnostics.value?.functionErrors?.length ||
         (isPartialData.value && !isPanelLoading.value),
     );
@@ -1324,11 +1424,11 @@ export default defineComponent({
       const panelId = props.data?.id;
       if (panelId) {
         panelDownloadRegistry.set(panelId, () =>
-          PanleSchemaRendererRef.value?.logDataAsJSON(props.data?.title),
+          PanleSchemaRendererRef.value?.logDataAsJSON(panelTitle.value),
         );
         panelCsvRegistry.set(
           panelId,
-          () => PanleSchemaRendererRef.value?.getPanelCsvData(props.data?.title) ?? null,
+          () => PanleSchemaRendererRef.value?.getPanelCsvData(panelTitle.value) ?? null,
         );
       }
     });
@@ -1396,12 +1496,19 @@ export default defineComponent({
     onMounted(() => window.addEventListener("keydown", handlePanelKeydown));
     onBeforeUnmount(() => window.removeEventListener("keydown", handlePanelKeydown));
 
+    // An alert list reads the alerts API, so it has no query to build an alert from.
+    const canCreateAlert = computed(
+      () => props.data?.type !== "alert-list" && (metaData.value?.queries?.length ?? 0) > 0,
+    );
+
     // Guards that used to fire as toasts AFTER the user clicked "Create alert".
     // Stated up front as a disabled reason instead — a dead-end click is worse
     // than a control that explains itself.
     const alertDisabledReason = computed(() => {
       const visible = (props.data?.queries ?? []).filter((query: any) => !query?.config?.hide);
       if (!visible.length) return t("panel.noQueriesToCreateAlert");
+      // The alert form offers no enrichment-table stream type, so the prefill would be rejected.
+      if (isEnrichmentTablePanel(props.data)) return t("panel.enrichmentTableAlertUnsupported");
       // A formula's stream comes from its inputs' text; any other query needs its own.
       if (!visible.some((query: any) => isFormulaQuery(query) || query?.fields?.stream)) {
         return t("panel.panelQueryMustHaveStream");
@@ -1423,12 +1530,17 @@ export default defineComponent({
       curatedBadgeParams,
       curatedBadgeText,
       curatedBadgeTooltip,
+      injectedNotice,
       curatedNoData,
       curatedAllClear,
       curatedTile,
       curatedTableOwnsEmpty,
       onCuratedSeriesData,
+      panelTitle,
+      titleMeta,
+      panelFileName,
       alertDisabledReason,
+      canCreateAlert,
       onEditPanel,
       onNoticeEditPanel,
       showDraftDot,
@@ -1438,6 +1550,11 @@ export default defineComponent({
       isCurrentlyHoveredPanel,
       isLayoutEditing,
       hoverRevealClass,
+      previewView,
+      showDataViewToggle,
+      isDataView,
+      showDataOverlay,
+      previewRawData,
       hasNoticeChips,
       showViewPanel,
       dependentAdHocVariable,
@@ -1485,8 +1602,11 @@ export default defineComponent({
       seriesLimit,
       noticeProps,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
+      panelNoticeProps,
       canInspectFromNotice,
     };
   },

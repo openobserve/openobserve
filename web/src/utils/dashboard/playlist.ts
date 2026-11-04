@@ -15,6 +15,7 @@
 
 import type { LocationQuery, LocationQueryValue } from "vue-router";
 import { generateDurationLabel, parseDuration } from "@/utils/date";
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import { isFitEnabled, parseKioskTheme, type KioskThemeChoice } from "@/utils/dashboard/kiosk";
 
 type QueryValue = LocationQueryValue | LocationQueryValue[] | undefined;
@@ -133,7 +134,7 @@ export const parsePlaylistSlide = (value: QueryValue, count: number): number => 
 
 export const parsePlaylistPeriod = (value: QueryValue): string | null => {
   const raw = first(value);
-  return raw && PERIOD_PATTERN.test(raw) ? raw : null;
+  return raw && (PERIOD_PATTERN.test(raw) || parseCalendarToken(raw) !== null) ? raw : null;
 };
 
 /** The playlist a URL describes, or null when it names no dashboard. */

@@ -56,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="rows"
           :loading="loading"
           :forbidden="forbidden"
+          forbidden-resource="roles"
           :action-loading="bulkDeleteLoading"
           v-model:global-filter="filterQuery"
           v-model:page-size="pageSize"
@@ -91,8 +92,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AddRole v-model:open="showAddGroup" @added:role="onRoleAdded" />
   <ConfirmDialog
     :title="t('iam.appRoles.deleteRole')"
-    :message="t('iam.appRoles.deleteConfirm', { roleName: deleteConformDialog?.data?.role_name })"
+    message-keypath="iam.appRoles.deleteConfirm"
+    :message-name="deleteConformDialog.data?.role_name"
     :warning-message="deleteImpactMessage"
+    ok-variant="destructive"
     @update:ok="_deleteRole"
     @update:cancel="deleteConformDialog.show = false"
     v-model="deleteConformDialog.show"
@@ -100,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="t('iam.appRoles.bulkDeleteRoles')"
     :message="t('iam.appRoles.bulkDeleteConfirm', { count: selectedRoleNames.length })"
+    ok-variant="destructive"
     :warning-message="bulkDeleteImpactMessage"
     @update:ok="bulkDeleteUserRoles"
     @update:cancel="confirmBulkDelete = false"
@@ -132,6 +136,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useListViewState } from "@/composables/useListViewState";
@@ -416,11 +421,17 @@ const orgId = useOrgId();
 const deleteRoleOne = useMutation(() => deleteRoleMutation(orgId.value));
 const bulkDeleteRolesAll = useMutation(() => bulkDeleteRolesMutation(orgId.value));
 
+const dropRoleDrafts = (roleNames: string[]) =>
+  roleNames.forEach((entityId) =>
+    deleteEditorDraftsFor({ kind: "iam_role", org: orgId.value, entityId }),
+  );
+
 const deleteUserRole = (role: any) => {
   // Was: invalidate, then delete — the refetch raced the write.
   deleteRoleOne
     .mutateAsync(role.role_name)
     .then(() => {
+      dropRoleDrafts([role.role_name]);
       toast({
         message: t("iam.appRoles.roleDeletedSuccess"),
         variant: "success",
@@ -508,6 +519,8 @@ const bulkDeleteUserRoles = async () => {
       throw new Error(err);
     }
 
+    dropRoleDrafts(successful);
+
     if (successful.length > 0 && unsuccessful.length === 0) {
       toast({
         message: t("iam.appRoles.bulkDeleteSuccess", { count: successful.length }),
@@ -532,7 +545,7 @@ const bulkDeleteUserRoles = async () => {
     selectedRoleNames.value = [];
     confirmBulkDelete.value = false;
   } catch (error: any) {
-    if (error.response?.status != 403 || error?.status != 403) {
+    if (error.response?.status !== 403 && error?.status !== 403) {
       toast({
         message:
           error.response?.data?.message || error?.message || t("iam.appRoles.bulkDeleteRolesError"),

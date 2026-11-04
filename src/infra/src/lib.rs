@@ -65,8 +65,7 @@ pub async fn get_db_schema_version() -> Result<u64, anyhow::Error> {
 fn is_db_schema_version_missing(e: &errors::Error) -> bool {
     match e {
         errors::Error::DbError(errors::DbError::KeyNotExists(_)) => true,
-        // meta table not created yet: fresh install. the sqlite/postgres
-        // Db::get() wrap the sqlx error text into DBOperError
+        // meta table not created yet: sqlite Db::get() keeps only the error text
         errors::Error::DbError(errors::DbError::DBOperError(msg, _)) => is_fresh_db_message(msg),
         errors::Error::SqlxError(sqlx::Error::Database(e)) => {
             e.code().as_deref() == Some("42P01") // postgres: undefined_table
@@ -172,6 +171,51 @@ pub async fn init() -> Result<(), anyhow::Error> {
 mod schema_version_tests {
     use super::*;
 
+    /// A postgres error whose message is localized while its SQLSTATE is not.
+    #[derive(Debug)]
+    struct PgError {
+        code: &'static str,
+        message: &'static str,
+    }
+
+    impl std::fmt::Display for PgError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(self.message)
+        }
+    }
+
+    impl std::error::Error for PgError {}
+
+    impl sqlx::error::DatabaseError for PgError {
+        fn message(&self) -> &str {
+            self.message
+        }
+
+        fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
+            Some(self.code.into())
+        }
+
+        fn as_error(&self) -> &(dyn std::error::Error + Send + Sync + 'static) {
+            self
+        }
+
+        fn as_error_mut(&mut self) -> &mut (dyn std::error::Error + Send + Sync + 'static) {
+            self
+        }
+
+        fn into_error(self: Box<Self>) -> Box<dyn std::error::Error + Send + Sync + 'static> {
+            self
+        }
+
+        fn kind(&self) -> sqlx::error::ErrorKind {
+            sqlx::error::ErrorKind::Other
+        }
+    }
+
+    fn pg_error(code: &'static str, message: &'static str) -> errors::Error {
+        errors::Error::SqlxError(sqlx::Error::Database(Box::new(PgError { code, message })))
+    }
+
     #[test]
     fn test_missing_version_key_is_fresh_install() {
         let e = errors::Error::DbError(errors::DbError::KeyNotExists("/meta/kv/version".into()));
@@ -180,8 +224,7 @@ mod schema_version_tests {
 
     #[test]
     fn test_missing_meta_table_is_fresh_install() {
-        // sqlite and postgres Db::get() wrap the table-missing error into
-        // DBOperError with the sqlx message text
+        // table-missing errors that reach the classifier as text only
         let e = errors::Error::DbError(errors::DbError::DBOperError(
             "error returned from database: (code: 1) no such table: meta".to_string(),
             "/meta/kv/version".to_string(),
@@ -191,6 +234,9 @@ mod schema_version_tests {
             "error returned from database: relation \"meta\" does not exist".to_string(),
             "/meta/kv/version".to_string(),
         ));
+        assert!(is_db_schema_version_missing(&e));
+        // postgres server with non-English lc_messages
+        let e = pg_error("42P01", "Relation »meta« existiert nicht");
         assert!(is_db_schema_version_missing(&e));
     }
 
@@ -219,6 +265,8 @@ mod schema_version_tests {
             "connection reset by peer".to_string(),
             "/meta/kv/version".to_string(),
         ));
+        assert!(!is_db_schema_version_missing(&e));
+        let e = pg_error("42501", "keine Berechtigung für Tabelle meta");
         assert!(!is_db_schema_version_missing(&e));
     }
 }

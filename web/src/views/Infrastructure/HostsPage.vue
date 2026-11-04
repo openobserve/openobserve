@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   MainLayout's bare router-view, so the page must survive remounts.
 -->
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -34,11 +34,14 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 import DateTime from "@/components/DateTime.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import HostDetailDrawer from "./HostDetailDrawer.vue";
+import HostsDependenciesView from "./HostsDependenciesView.vue";
 import { useHostsList, utilizationTint, type HostRow } from "./useHostsList";
 import { HOSTS_DEFAULT_RELATIVE_PERIOD, HOSTS_DEFAULT_WINDOW_US } from "./hostsQueries";
 import { useWorkloadDetection } from "@/composables/useWorkloadDetection";
@@ -70,19 +73,34 @@ const hostsState = computed(() => detection.states.value.hosts);
 const loading = ref(false);
 
 const nowUs = () => Date.now() * 1000;
-const range = ref({ start: nowUs() - HOSTS_DEFAULT_WINDOW_US, end: nowUs() });
+const range = ref({ start: nowUs() - HOSTS_DEFAULT_WINDOW_US, end: nowUs(), relative: true });
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
 const dateTimePickerRef = ref<{ refresh?: () => void } | null>(null);
 
+// Set when a reload on the Dependencies tab skipped the list, so the table catches up when shown.
+let listStale = false;
+
 const refreshList = async () => {
+  listStale = false;
   loading.value = true;
   try {
     await list.refresh({ orgId: orgId.value, start: range.value.start, end: range.value.end });
   } finally {
     loading.value = false;
   }
+};
+
+// The Dependencies view loads on its own when shown and on an org switch. On its tab a reload refreshes
+// only the map, which keeps the host names the list already loaded.
+const refreshNonce = ref(0);
+// The Dependencies view reports its own reloads, which the header's Refresh shows on that tab.
+const mapLoading = ref(false);
+const reload = () => {
+  refreshNonce.value++;
+  if (view.value === "dependencies") listStale = true;
+  else refreshList();
 };
 
 // Set while picker.refresh() runs so its programmatic re-emit may fetch; the
@@ -97,7 +115,7 @@ let reAnchorFetched = false;
 const onRefreshClick = () => {
   const picker = dateTimePickerRef.value;
   if (!picker?.refresh) {
-    refreshList();
+    reload();
     return;
   }
   reAnchoring = true;
@@ -109,17 +127,26 @@ const onRefreshClick = () => {
   }
   // DateTime.refresh() emits synchronously today; if that ever changes, the
   // window is merely stale rather than the button going dead.
-  if (!reAnchorFetched) refreshList();
+  if (!reAnchorFetched) reload();
 };
 
-const onDateChange = (date: { startTime: number; endTime: number; userChangedValue?: boolean }) => {
-  range.value = { start: date.startTime, end: date.endTime };
+const onDateChange = (date: {
+  startTime: number;
+  endTime: number;
+  valueType?: string;
+  userChangedValue?: boolean;
+}) => {
+  range.value = {
+    start: date.startTime,
+    end: date.endTime,
+    relative: date.valueType !== "absolute",
+  };
   // DateTime replays on mount with userChangedValue:false — "do not fetch" (DateTime.vue contract).
   if (date.userChangedValue === false && !reAnchoring) return;
   // The picker re-emitted, so the window is current whether or not we fetch.
   if (reAnchoring) reAnchorFetched = true;
   if (hostsState.value !== "detected") return;
-  refreshList();
+  reload();
 };
 
 // ── URL-carried state (design 4.7: flat routes remount, params persist) ─────
@@ -174,6 +201,34 @@ watch(
   },
 );
 
+// Back and Forward between the tabs move the URL without remounting, so the table's state follows it. Every field
+// is set, absent ones to their defaults, and only where it differs, so the page's own URL writes change nothing.
+const ownRoute = route.name;
+const sameList = (a: string[], b: string[]) => a.join("\n") === b.join("\n");
+watch(
+  () => route.query,
+  async (q) => {
+    if (route.name !== ownRoute) return;
+    const status = q.status ? [q.status].flat().map(String) : [];
+    const os = q.os ? [q.os].flat().map(String) : [];
+    const pageParam = Number(first(q.page));
+    const sort = first(q.sort);
+    suppressQuerySync = true;
+    if (nameFilter.value !== (first(q.name) ?? "")) nameFilter.value = first(q.name) ?? "";
+    if (!sameList(statusFilter.value, status)) statusFilter.value = status;
+    if (!sameList(osFilter.value, os)) osFilter.value = os;
+    const nextPage = Number.isFinite(pageParam) && pageParam > 1 ? pageParam : 1;
+    if (page.value !== nextPage) page.value = nextPage;
+    const nextSort = sort ? (LEGACY_SORT_FIELD[sort] ?? sort) : "cpu";
+    if (sortBy.value !== nextSort) sortBy.value = nextSort;
+    const nextDesc = first(q.desc) ? first(q.desc) !== "false" : true;
+    if (sortDesc.value !== nextDesc) sortDesc.value = nextDesc;
+    // The state watchers run before this resumes, so they see the restore as their own and write nothing back.
+    await nextTick();
+    suppressQuerySync = false;
+  },
+);
+
 // ── Org switching — flat routes get no remount for free (design 4.8) ────────
 watch(
   () => store.state.selectedOrganization?.identifier,
@@ -206,6 +261,27 @@ onMounted(() => {
   detection.refresh();
   if (hostsState.value === "detected") refreshList();
 });
+
+// ── View — ?view=dependencies swaps the table for the dependency map ─────────
+const view = computed(() =>
+  first(route.query.view) === "dependencies" ? "dependencies" : "table",
+);
+const knownHosts = computed(() => list.rows.value.map((r) => r.host_name));
+watch(view, (next) => {
+  if (next === "table" && listStale && hostsState.value === "detected") refreshList();
+});
+const onViewChange = (name: string | number) => {
+  // The map's low-traffic switch goes with the map, as on Kubernetes.
+  const { view: _view, lowTraffic: _lowTraffic, ...rest } = route.query;
+  // A history entry per tab, so Back returns to the other one.
+  router.push({ query: name === "dependencies" ? { ...rest, view: "dependencies" } : rest });
+};
+
+// The map's low-traffic switch, kept in the URL like the view.
+const onLowTraffic = (show: boolean) => {
+  const { lowTraffic: _lowTraffic, ...rest } = route.query;
+  router.replace({ query: show ? { ...rest, lowTraffic: "true" } : rest });
+};
 
 // ── Drawer — deep-linked via ?host= so it survives reload ───────────────────
 const drawerHost = computed(() => first(route.query.host) ?? "");
@@ -383,6 +459,22 @@ const osToggleLabel = (slug: string) =>
 
 <template>
   <OPageLayout :title="t('menu.hosts')" icon="dns" bleed>
+    <template v-if="hostsState === 'detected'" #header-tabs>
+      <OTabs :model-value="view" align="left" data-test="hosts-view-tabs" @change="onViewChange">
+        <OTab
+          name="table"
+          :label="t('infra.hosts.viewTable')"
+          icon="table-chart"
+          data-test="hosts-view-table"
+        />
+        <OTab
+          name="dependencies"
+          :label="t('infra.hosts.viewDependencies')"
+          icon="account-tree"
+          data-test="hosts-view-dependencies"
+        />
+      </OTabs>
+    </template>
     <template #actions>
       <div class="flex items-center gap-2">
         <OText
@@ -415,7 +507,7 @@ const osToggleLabel = (slug: string) =>
           icon-left="refresh"
           class="max-md:min-w-0 max-md:ps-2 max-md:pe-2"
           data-test="hosts-refresh"
-          :loading="loading"
+          :loading="view === 'dependencies' ? mapLoading : loading"
           @click="onRefreshClick"
         >
           <span class="max-md:sr-only">{{ t("infra.hosts.refresh") }}</span>
@@ -453,9 +545,28 @@ const osToggleLabel = (slug: string) =>
       </div>
     </div>
 
+    <!-- Labelled by name: the tab buttons carry generated ids and no aria-controls without a tab-content
+         primitive, which would re-nest every branch below. -->
+    <HostsDependenciesView
+      v-else-if="view === 'dependencies'"
+      role="tabpanel"
+      :aria-label="t('infra.hosts.viewDependencies')"
+      :org-id="orgId"
+      :range="range"
+      :refresh-nonce="refreshNonce"
+      :known-hosts="knownHosts"
+      :low-traffic="first(route.query.lowTraffic) === 'true'"
+      @open="openDrawer"
+      @update:low-traffic="onLowTraffic"
+      @refresh="onRefreshClick"
+      @loading="(now: boolean) => (mapLoading = now)"
+    />
+
     <!-- Total failure: ONE page-level surface, never stacked column warnings. -->
     <div
       v-else-if="pageError"
+      role="tabpanel"
+      :aria-label="t('infra.hosts.viewTable')"
       class="flex min-h-60 flex-col items-center justify-center gap-2"
       data-test="hosts-page-error"
     >
@@ -466,7 +577,12 @@ const osToggleLabel = (slug: string) =>
       </OButton>
     </div>
 
-    <div v-else class="flex h-full min-h-0 flex-col gap-2">
+    <div
+      v-else
+      role="tabpanel"
+      :aria-label="t('infra.hosts.viewTable')"
+      class="flex h-full min-h-0 flex-col gap-2"
+    >
       <div
         v-if="banners.liveness"
         class="border-border-default bg-surface-base rounded-default flex items-center justify-between gap-2 border px-3 py-2"

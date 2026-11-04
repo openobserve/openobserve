@@ -151,7 +151,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="tab === 'alertTriggers'" #default>
               <div class="flex items-center gap-1.5">
                 <span>{{ tabLabels.alertTriggers }}</span>
-                <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
+                <OTag
+                  v-if="!loading"
+                  type="countChip"
+                  value="neutral"
+                  data-test="incident-alert-triggers-count"
+                  >{{ triggers.length }}</OTag
+                >
               </div>
             </template>
           </OTab>
@@ -1105,14 +1111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ t("alerts.incidents.frequency") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
-                                {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.frequency ||
-                                  raw("N/A")
-                                }}
-                                {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.frequency_type ||
-                                  "min"
-                                }}
+                                {{ formatFrequency(alerts[selectedAlertIndex]?.trigger_condition) }}
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
@@ -1506,6 +1505,8 @@ import type { OnCallResponse } from "@/ts/interfaces/oncall";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { updateIncidentMutation, updateIncidentStatusMutation } from "@/services/incidents.queries";
+import type { AckAlertResponse, UnackAlertResponse } from "@/ts/interfaces/alert";
+import { incidentRefusalToast, incidentStatusToast } from "@/utils/alerts/ackState";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import serviceStreamsApi, {
@@ -1714,7 +1715,9 @@ export default defineComponent({
       }
     }
 
-    const oncallTeamNameFor = (teamId: string) => oncallTeamNames.value[teamId] ?? teamId;
+    // A page nothing routed has no team, so it reads as unrouted rather than as a blank name.
+    const oncallTeamNameFor = (teamId: string | null): string =>
+      teamId ? (oncallTeamNames.value[teamId] ?? teamId) : String(t("oncall.statUnrouted"));
 
     const oncallTeamName = computed(() =>
       oncallResponse.value ? oncallTeamNameFor(oncallResponse.value.team_id) : "",
@@ -1787,11 +1790,18 @@ export default defineComponent({
     const editableSeverity = ref<"P1" | "P2" | "P3" | "P4">("P3");
 
     // Status and Severity options
-    const statusOptions = [
-      { label: t("alerts.incidents.statusOpen"), value: "open" },
+    // Leaving Acknowledged for Open is an Unacknowledge: it clears the ack everywhere and pages again.
+    const statusOptions = computed(() => [
+      {
+        label:
+          editableStatus.value === "acknowledged"
+            ? t("alerts.ack.unacknowledge")
+            : t("alerts.incidents.statusOpen"),
+        value: "open",
+      },
       { label: t("alerts.incidents.statusAcknowledged"), value: "acknowledged" },
       { label: t("alerts.incidents.statusResolved"), value: "resolved" },
-    ];
+    ]);
 
     const severityOptions = [
       { label: t("alerts.incidents.severityP1"), value: "P1" },
@@ -2680,6 +2690,20 @@ export default defineComponent({
       emit("sendToAiChat", value, append);
     };
 
+    /** The one ack's toast for an acknowledge or unacknowledge; `null` for any other change. */
+    const statusToastOf = (
+      status: "open" | "acknowledged" | "resolved",
+      response:
+        { data?: Incident } | { data?: Incident; ack: AckAlertResponse | UnackAlertResponse },
+    ) =>
+      incidentStatusToast(
+        status,
+        "ack" in response ? response.ack : undefined,
+        incidentDetails.value?.title || incidentDetails.value?.id || "",
+        store.state.userInfo?.email,
+        t,
+      );
+
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
       if (!incidentDetails.value) return;
       updating.value = true;
@@ -2687,20 +2711,35 @@ export default defineComponent({
         const response = await updateIncidentStatus.mutateAsync({
           id: incidentDetails.value.id,
           status: newStatus,
+          from: incidentDetails.value.status,
         });
         // Update local state with the actual status from the API response
-        incidentDetails.value.status = response.data.status;
-        incidentDetails.value.acknowledged_by = response.data.acknowledged_by;
-        incidentDetails.value.acknowledged_at = response.data.acknowledged_at;
-        incidentDetails.value.updated_at = response.data.updated_at || Date.now() * 1000;
-        editableStatus.value = response.data.status;
-        toast({
-          variant: "success",
-          message: t("alerts.incidents.statusUpdated"),
-        });
+        const updated = response.data;
+        if (updated) {
+          incidentDetails.value.status = updated.status;
+          incidentDetails.value.acknowledged_by = updated.acknowledged_by;
+          incidentDetails.value.acknowledged_at = updated.acknowledged_at;
+          incidentDetails.value.resolved_at = updated.resolved_at ?? undefined;
+          incidentDetails.value.updated_at = updated.updated_at || Date.now() * 1000;
+          editableStatus.value = updated.status;
+        } else {
+          // The write stood but its read-back failed: read the incident again.
+          void loadDetails(incidentDetails.value.id);
+        }
+        toast(
+          statusToastOf(newStatus, response) ?? {
+            variant: "success",
+            message: t("alerts.incidents.statusUpdated"),
+          },
+        );
         // Mark data as stale so incident list will refresh when navigating back
         store.dispatch("incidents/setShouldRefresh", true);
         emit("status-updated");
+        // The one ack stopped or restarted the incident's pages; the write expired their read.
+        void loadOnCallResponse(
+          store.state.selectedOrganization.identifier,
+          incidentDetails.value.id,
+        );
 
         // Refresh events in timeline if Activity tab is active
         if (activeTab.value === "activity") {
@@ -2713,10 +2752,12 @@ export default defineComponent({
         }
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
-        toast({
-          variant: "error",
-          message: t("alerts.incidents.statusUpdateFailed"),
-        });
+        toast(
+          incidentRefusalToast(error, newStatus, t) ?? {
+            variant: "error",
+            message: t("alerts.incidents.statusUpdateFailed"),
+          },
+        );
       } finally {
         updating.value = false;
       }
@@ -2734,8 +2775,29 @@ export default defineComponent({
       // The caller's promise must cover the update, not just the confirm dialog.
       return updateStatus("acknowledged");
     };
-    const resolveIncident = () => updateStatus("resolved");
-    const reopenIncident = () => updateStatus("open");
+    // Resolving closes the incident, so it confirms like Acknowledge; Reopen too.
+    const resolveIncident = async () => {
+      const ok = await confirm({
+        title: t("alerts.incidents.resolveConfirmTitle"),
+        message: t("alerts.incidents.resolveConfirmMessage"),
+        confirmLabel: t("alerts.incidents.resolve"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
+      return updateStatus("resolved");
+    };
+    const reopenIncident = async () => {
+      const ok = await confirm({
+        title: t("alerts.incidents.reopenConfirmTitle"),
+        message: t("alerts.incidents.reopenConfirmMessage"),
+        confirmLabel: t("alerts.incidents.reopen"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
+      return updateStatus("open");
+    };
 
     // Title editing. OInlineEdit owns the open/close and the Escape-restores
     // behaviour; this only has to persist a committed value. `isEditingTitle`
@@ -2800,20 +2862,34 @@ export default defineComponent({
       }
     };
 
-    const formatPeriod = (periodInSeconds: number | undefined) => {
-      if (!periodInSeconds) return raw("N/A");
+    const formatSeconds = (totalSeconds: number | undefined) => {
+      if (!totalSeconds) return raw("N/A");
 
-      // Convert seconds to minutes
-      if (periodInSeconds >= 60) {
-        const minutes = Math.floor(periodInSeconds / 60);
-        const seconds = periodInSeconds % 60;
+      if (totalSeconds >= 60) {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
         if (seconds === 0) {
           return t("alerts.incidents.periodMinutes", { minutes });
         }
         return t("alerts.incidents.periodMinutesSeconds", { minutes, seconds });
       }
 
-      return t("alerts.incidents.periodSeconds", { seconds: periodInSeconds });
+      return t("alerts.incidents.periodSeconds", { seconds: totalSeconds });
+    };
+
+    // The stored alert keeps `period` in minutes but `frequency` in seconds.
+    const formatPeriod = (periodInMinutes: number | undefined) =>
+      formatSeconds(periodInMinutes ? periodInMinutes * 60 : undefined);
+
+    const formatFrequency = (triggerCondition?: {
+      frequency?: number;
+      frequency_type?: string;
+      cron?: string;
+    }) => {
+      if (triggerCondition?.frequency_type === "cron") {
+        return triggerCondition?.cron || raw("N/A");
+      }
+      return formatSeconds(triggerCondition?.frequency);
     };
 
     // Transform V1 format conditions (or/and structure) to readable expression
@@ -2883,45 +2959,15 @@ export default defineComponent({
       return typeof conditionData === "string" ? conditionData : "--";
     };
 
-    // Handle status change from dropdown
-    const handleStatusChange = async (newStatus: "open" | "acknowledged" | "resolved") => {
-      if (!incidentDetails.value || updating.value) return;
-
-      updating.value = true;
-      try {
-        const response = await updateIncidentStatus.mutateAsync({
-          id: incidentDetails.value.id,
-          status: newStatus,
-        });
-
-        // Update local state with the actual status from the API response
-        incidentDetails.value.status = response.data.status;
-        editableStatus.value = response.data.status;
-
-        toast({
-          variant: "success",
-          message: t("toastMessages.alerts.incidentStatusUpdatedTo", {
-            status: response.data.status,
-          }),
-        });
-        // Mark data as stale so incident list will refresh
-        store.dispatch("incidents/setShouldRefresh", true);
-
-        // Refresh events in timeline if Activity tab is active
-        if (activeTab.value === "activity") {
-          timelineRefreshTrigger.value++;
-        }
-      } catch (error: any) {
-        console.error("Failed to update status:", error);
-        toast({
-          variant: "error",
-          message: error?.response?.data?.message || t("alerts.incidents.statusUpdateFailed"),
-        });
-        // Revert on error
-        editableStatus.value = incidentDetails.value.status;
-      } finally {
-        updating.value = false;
-      }
+    // The Manage panel chips take the same confirmed path as the header buttons.
+    const handleStatusChange = (newStatus: "open" | "acknowledged" | "resolved") => {
+      if (updating.value) return;
+      const actions = {
+        open: reopenIncident,
+        acknowledged: acknowledgeIncident,
+        resolved: resolveIncident,
+      };
+      return actions[newStatus]();
     };
 
     // Handle trigger row click - find the alert index by name
@@ -3153,6 +3199,7 @@ export default defineComponent({
       handleTriggerRowClick,
       getStatusLabel,
       formatPeriod,
+      formatFrequency,
       formatCustomConditions,
       formatTimestamp,
       formatTimestampUTC,

@@ -19,7 +19,7 @@
 // inspect separate (Edit Workflow -> editor route; back -> list). The canvas /
 // panel / result drawer are stubbed.
 
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
 const {
   mockRouter,
@@ -72,12 +72,17 @@ vi.mock("@/plugins/workflows/useWorkflowCanvas", () => ({
   retryWorkflowRun: (...a: any[]) => mockRetry(...a),
   isRetryableRun: (run: any) =>
     !!run && !!run.error && run.event_type !== "Test" && run.event_type !== "Retry",
+  currentTriggerKind: () => "alert_fired",
+  currentTriggerNodeId: () => "t1",
 }));
 
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import WorkflowRuns from "./WorkflowRuns.vue";
+import workflowService from "@/services/workflows";
+import { queryClient } from "@/composables/query/queryClient";
+import { httpConfig } from "@/test/unit/helpers/workflowHttp";
 
 const OPageHeaderStub = {
   name: "OPageHeader",
@@ -96,8 +101,8 @@ const OButtonStub = {
 };
 const RunsPanelStub = {
   name: "WorkflowRunsPanel",
-  props: ["orgId", "workflowId", "workflowName", "selectedRunId"],
-  emits: ["select-run"],
+  props: ["orgId", "workflowId", "workflowName", "selectedRunId", "triggerFilter"],
+  emits: ["select-run", "update:triggerFilter"],
   template: `<div class="runs-panel" />`,
 };
 const stub = (name: string) => ({ name, template: `<div class="${name}" />` });
@@ -115,7 +120,27 @@ const globalCfg = {
       template: `<div class="WorkflowResultsDock"><slot /></div>`,
     },
     WorkflowCanvas: stub("WorkflowCanvas"),
-    WorkflowTestDialog: stub("WorkflowTestDialog"),
+    WorkflowTestDialog: {
+      name: "WorkflowTestDialog",
+      props: ["seed", "payloadFrom", "seedRunAt"],
+      template: `<div class="WorkflowTestDialog" />`,
+    },
+    WorkflowHttpEndpointPanel: {
+      name: "WorkflowHttpEndpointPanel",
+      props: [
+        "open",
+        "workflowId",
+        "workflowName",
+        "kind",
+        "isDraftOnly",
+        "workflowEnabled",
+        "context",
+        "beforeCreate",
+        "triggerNodeId",
+      ],
+      emits: ["update:open", "run-test"],
+      template: `<div class="WorkflowHttpEndpointPanel" />`,
+    },
   },
 };
 
@@ -304,6 +329,19 @@ describe("WorkflowRuns", () => {
     expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
+  it("gives the runs panel one static width whatever the filter", async () => {
+    const wrapper = await mountRuns();
+    const box = () => wrapper.find('[data-test="workflow-runs-panel"]').classes();
+    const before = box();
+    expect(before).toEqual(expect.arrayContaining(["w-[50rem]", "max-w-[60%]", "max-lg:w-full"]));
+    panel(wrapper).vm.$emit("update:triggerFilter", "http_request");
+    await flushPromises();
+    expect(box()).toEqual(before);
+    panel(wrapper).vm.$emit("update:triggerFilter", "alert_fired");
+    await flushPromises();
+    expect(box()).toEqual(before);
+  });
+
   it("back returns to the workflows list", async () => {
     const wrapper = await mountRuns();
     await wrapper.find(".back-btn").trigger("click");
@@ -371,5 +409,117 @@ describe("WorkflowRuns — retry the loaded run", () => {
     await w.find(RETRY).trigger("click");
     await flushPromises();
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+  });
+});
+
+describe("WorkflowRuns — HTTP endpoint", () => {
+  const getHttpTrigger = vi.mocked(workflowService.getHttpTrigger);
+  const button = (w: any) => w.find('[data-test="workflow-runs-http-endpoint"]');
+  const chip = (w: any) => w.find('[data-test="workflow-runs-http-endpoint-chip"]');
+  const chipVariant = (w: any) =>
+    w
+      .findAllComponents({ name: "OTag" })
+      .find((c: any) => c.find('[data-test="workflow-runs-http-endpoint-chip"]').exists())
+      ?.props("variant");
+  const httpPanel = (w: any) => w.findComponent({ name: "WorkflowHttpEndpointPanel" });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryClient.clear();
+    listWorkflows.mockResolvedValue({ data: [] });
+    mockLoadRun.mockResolvedValue({ ok: true });
+    getHttpTrigger.mockResolvedValue(httpConfig());
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: true };
+    workflowObj.readOnly = false;
+    workflowObj.testRun = { resultDrawer: { show: false, nodeId: "" }, result: null, show: false };
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf-1",
+      name: "my flow",
+      nodes: [],
+      edges: [],
+      enabled: true,
+    };
+  });
+  afterEach(() => {
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+  });
+
+  it("shows the button on the read-only page, just before Test, with the live chip", async () => {
+    const wrapper = await mountRuns();
+    expect(workflowObj.readOnly).toBe(true);
+    expect(button(wrapper).text()).toContain(i18n.global.t("workflow.http.editorButton"));
+    expect(chipVariant(wrapper)).toBe("success-soft");
+    const html = wrapper.html();
+    const at = (id: string) => html.indexOf(`data-test="${id}"`);
+    expect(at("workflow-runs-http-endpoint")).toBeLessThan(at("workflow-runs-test"));
+    expect(at("workflow-runs-test")).toBeLessThan(at("workflow-runs-edit"));
+    wrapper.unmount();
+  });
+
+  it("shows the neutral Off chip for an endpoint that is switched off", async () => {
+    getHttpTrigger.mockResolvedValue(httpConfig({ enabled: false }));
+    const wrapper = await mountRuns();
+    expect(chipVariant(wrapper)).toBe("default-soft");
+    expect(chip(wrapper).text()).toBe(i18n.global.t("workflow.http.editorButtonOff"));
+    wrapper.unmount();
+  });
+
+  it("shows a paused workflow's live endpoint as a warning", async () => {
+    workflowObj.currentSelectedWorkflow.enabled = false;
+    const wrapper = await mountRuns();
+    expect(chipVariant(wrapper)).toBe("warning-soft");
+    wrapper.unmount();
+  });
+
+  it("has no button or panel while HTTP endpoints are disabled for the org", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+    // Pages the earlier suites never unmounted fetch when beforeEach turns the flag on.
+    await flushPromises();
+    getHttpTrigger.mockClear();
+    const wrapper = await mountRuns();
+    expect(button(wrapper).exists()).toBe(false);
+    expect(httpPanel(wrapper).exists()).toBe(false);
+    expect(getHttpTrigger).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("opens the panel with this page's workflow in the editor context", async () => {
+    const wrapper = await mountRuns();
+    expect(httpPanel(wrapper).props("open")).toBe(false);
+    await button(wrapper).trigger("click");
+    expect(httpPanel(wrapper).props()).toMatchObject({
+      open: true,
+      workflowId: "wf-1",
+      workflowName: "my flow",
+      kind: "alert_fired",
+      isDraftOnly: false,
+      workflowEnabled: true,
+      context: "editor",
+      triggerNodeId: "t1",
+    });
+    await httpPanel(wrapper).vm.$emit("update:open", false);
+    expect(httpPanel(wrapper).props("open")).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("Run test closes the panel, clears the selected run and opens a seeded Test dialog", async () => {
+    const wrapper = await mountRuns();
+    panel(wrapper).vm.$emit("select-run", "run-5");
+    await flushPromises();
+    expect(panel(wrapper).props("selectedRunId")).toBe("run-5");
+    await button(wrapper).trigger("click");
+
+    const seed = [{ meta: { trigger_source: "http", trigger_id: "test" }, data: [] }];
+    await httpPanel(wrapper).vm.$emit("run-test", seed, 42);
+    await flushPromises();
+
+    expect(httpPanel(wrapper).props("open")).toBe(false);
+    expect(panel(wrapper).props("selectedRunId")).toBe("");
+    expect(workflowObj.testRun.show).toBe(true);
+    const dialog = wrapper.findComponent({ name: "WorkflowTestDialog" });
+    expect(dialog.props("seed")).toEqual(seed);
+    expect(dialog.props("payloadFrom")).toBe("http");
+    expect(dialog.props("seedRunAt")).toBe(42);
+    wrapper.unmount();
   });
 });

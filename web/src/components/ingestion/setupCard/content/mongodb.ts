@@ -21,6 +21,7 @@ import { raw, type TranslateFn } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
+import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
 
 // The receiver authenticates as a user with clusterMonitor. Name/password are
 // literal here and in the config so the two stay in lockstep.
@@ -70,6 +71,7 @@ export default function mongodbCard(subs: CardSubstitutions, t: TranslateFn): Ri
       tone: "#00ED64",
       metaBadges: [t("common.metrics")],
     },
+    setupModes: DB_SETUP_MODES,
     steps: [
       {
         id: "prepare",
@@ -104,9 +106,16 @@ export default function mongodbCard(subs: CardSubstitutions, t: TranslateFn): Ri
           },
         ],
       },
-      collectorInstallStep(t),
+      dbQuickInstallStep(t, subs, {
+        db: "mongodb",
+        hostLabelKey: "ingestion.setupCard.mongodbHostLabel",
+        defaultPort: "27017",
+        defaultUser: "otel",
+      }),
+      manualOnly(collectorInstallStep(t)),
       {
         id: "configure",
+        mode: "manual",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
         descriptionKey: "ingestion.setupCard.configureCollectorDesc",
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
@@ -133,6 +142,7 @@ export default function mongodbCard(subs: CardSubstitutions, t: TranslateFn): Ri
       },
       {
         id: "run",
+        mode: "manual",
         titleKey: "ingestion.setupCard.runCollectorTitle",
         descriptionKey: "ingestion.setupCard.runCollectorDesc",
         chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
@@ -159,6 +169,7 @@ export default function mongodbCard(subs: CardSubstitutions, t: TranslateFn): Ri
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mongodb", filter: "" },
+    extras: { uninstall: dbUninstallExtra() },
     docUrl: "https://openobserve.ai/blog/monitor-mongodb-metrics-otel",
   };
 }

@@ -152,7 +152,7 @@ export const makeSlackStore = (
 ) =>
   createStore({
     state: {
-      selectedOrganization: { identifier: "acme", name: "acme" },
+      selectedOrganization: { identifier: "acme", label: "acme" },
       userInfo: { email },
       currentuser: { email },
       theme: "light",

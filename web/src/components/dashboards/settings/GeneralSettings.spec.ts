@@ -15,6 +15,14 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+const notify = vi.hoisted(() => ({ positive: vi.fn(), error: vi.fn() }));
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({
+    showPositiveNotification: notify.positive,
+    showErrorNotification: notify.error,
+  }),
+}));
+
 // Mock utilities
 vi.mock("@/utils/commons", () => ({
   getDashboard: vi.fn(),
@@ -34,6 +42,12 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { getDashboard, updateDashboard } from "@/utils/commons";
 import { createRouter, createWebHistory } from "vue-router";
+import { defineComponent, h } from "vue";
+import {
+  createDashboardSettingsDraftContext,
+  provideDashboardSettingsDraft,
+  type DashboardSettingsDraftContext,
+} from "@/components/dashboards/settings/dashboardSettingsDraft";
 
 const mockDashboardData = {
   dashboardId: "dashboard-1",
@@ -129,7 +143,12 @@ describe("GeneralSettings", () => {
           },
           DateTimePickerDashboard: {
             template: '<div data-test="datetime-picker"></div>',
-            props: ["modelValue", "initialTimezone", "autoApplyDashboard"],
+            props: {
+              modelValue: Object,
+              initialTimezone: String,
+              autoApplyDashboard: Boolean,
+              calendarPresets: Boolean,
+            },
             emits: ["update:modelValue"],
           },
         },
@@ -412,6 +431,53 @@ describe("GeneralSettings", () => {
     });
   });
 
+  describe("Calendar default duration", () => {
+    it("offers the calendar presets in the default-duration picker", async () => {
+      wrapper = await createWrapper();
+      const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
+      expect(dateTimePicker.props("calendarPresets")).toBe(true);
+    });
+
+    it("loads a saved calendar token and saves it back unchanged", async () => {
+      vi.mocked(getDashboard).mockResolvedValue({
+        ...mockDashboardData,
+        defaultDatetimeDuration: { relativeTimePeriod: "calendar:month:-1", type: "relative" },
+      });
+      wrapper = await createWrapper();
+      expect(wrapper.vm.dateTimeValue).toMatchObject({
+        relativeTimePeriod: "calendar:month:-1",
+        valueType: "relative",
+      });
+
+      const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
+      await dateTimePicker.vm.$emit("update:modelValue", {
+        startTime: 1,
+        endTime: 2,
+        relativeTimePeriod: "calendar:month:0",
+        valueType: "relative",
+      });
+
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(updateDashboard).toHaveBeenCalledWith(
+        store,
+        store.state.selectedOrganization.identifier,
+        "dashboard-1",
+        expect.objectContaining({
+          defaultDatetimeDuration: {
+            startTime: 1,
+            endTime: 2,
+            relativeTimePeriod: "calendar:month:0",
+            type: "relative",
+          },
+        }),
+        "default",
+      );
+    });
+  });
+
   describe("Datetime Picker Integration", () => {
     it("should pass correct props to datetime picker", async () => {
       wrapper = await createWrapper();
@@ -617,6 +683,109 @@ describe("GeneralSettings", () => {
     });
   });
 
+  describe("Default auto refresh", () => {
+    const refreshSelect = () => wrapper.findComponent({ name: "AutoRefreshInterval" });
+    const helpText = () =>
+      wrapper.find('[data-test="dashboard-general-setting-default-refresh-help"]').text();
+    const formValues = () => wrapper.findComponent({ name: "OForm" }).vm.form.state.values;
+    const savedPayload = () => vi.mocked(updateDashboard).mock.calls[0][3] as any;
+
+    afterEach(() => {
+      store.state.zoConfig.min_auto_refresh_interval = undefined;
+    });
+
+    it("uses the toolbar refresh control, with intervals below the minimum disabled", async () => {
+      store.state.zoConfig.min_auto_refresh_interval = 30;
+      wrapper = await createWrapper();
+
+      expect(refreshSelect().props("minRefreshInterval")).toBe(30);
+      expect(refreshSelect().props("modelValue")).toBe(0);
+    });
+
+    it("writes the interval picked in the control into the form", async () => {
+      wrapper = await createWrapper();
+      refreshSelect().vm.$emit("update:modelValue", 900);
+      await flushPromises();
+
+      expect(formValues().defaultRefreshInterval).toBe(900);
+      expect(refreshSelect().props("modelValue")).toBe(900);
+    });
+
+    it("loads the saved default into the form", async () => {
+      vi.mocked(getDashboard).mockResolvedValue({
+        ...mockDashboardData,
+        defaultRefreshInterval: 300,
+      });
+      wrapper = await createWrapper();
+
+      expect(formValues().defaultRefreshInterval).toBe(300);
+      expect(refreshSelect().text()).toContain("5 min");
+    });
+
+    it("shows the effective value when the saved one is below the server minimum", async () => {
+      store.state.zoConfig.min_auto_refresh_interval = 30;
+      vi.mocked(getDashboard).mockResolvedValue({
+        ...mockDashboardData,
+        defaultRefreshInterval: 10,
+      });
+      wrapper = await createWrapper();
+
+      expect(formValues().defaultRefreshInterval).toBe(30);
+      expect(helpText()).toContain("10 sec");
+      expect(helpText()).toContain("30 sec");
+    });
+
+    it("saves the picked interval in seconds", async () => {
+      wrapper = await createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" }).vm.form;
+      form.setFieldValue("defaultRefreshInterval", 60);
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(savedPayload().defaultRefreshInterval).toBe(60);
+    });
+
+    it("Save changes shows the success toast and emits save, leaving the drawer to the parent", async () => {
+      wrapper = await createWrapper();
+      await wrapper.find("form").trigger("submit");
+      await flushPromises();
+      await vi.waitFor(() => expect(wrapper.emitted("save")).toHaveLength(1));
+
+      expect(updateDashboard).toHaveBeenCalledTimes(1);
+      expect(notify.positive).toHaveBeenCalledWith("Dashboard updated successfully.");
+      expect(wrapper.emitted("close")).toBeUndefined();
+    });
+
+    it("drops the key when Off is saved, so the dashboard stays unchanged", async () => {
+      vi.mocked(getDashboard).mockResolvedValue({
+        ...mockDashboardData,
+        defaultRefreshInterval: 60,
+      });
+      wrapper = await createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" }).vm.form;
+      form.setFieldValue("defaultRefreshInterval", 0);
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(savedPayload()).not.toHaveProperty("defaultRefreshInterval");
+    });
+
+    it("hints that live updates need a relative range only for an absolute default range", async () => {
+      vi.mocked(getDashboard).mockResolvedValue({
+        ...mockDashboardData,
+        defaultRefreshInterval: 60,
+        defaultDatetimeDuration: { type: "absolute", startTime: 1, endTime: 2 },
+      });
+      wrapper = await createWrapper();
+      const hint = '[data-test="dashboard-general-setting-default-refresh-absolute-hint"]';
+      expect(wrapper.find(hint).exists()).toBe(true);
+
+      wrapper.findComponent({ name: "OForm" }).vm.form.setFieldValue("defaultRefreshInterval", 0);
+      await flushPromises();
+      expect(wrapper.find(hint).exists()).toBe(false);
+    });
+  });
+
   describe("Performance", () => {
     it("should not cause unnecessary re-renders", async () => {
       wrapper = await createWrapper();
@@ -648,6 +817,93 @@ describe("GeneralSettings", () => {
       // Should reflect the final value (the form owns `name`)
       const form = wrapper.findComponent({ name: "OForm" });
       expect(form.vm.form.state.values.name).toBe("ABC");
+    });
+  });
+
+  describe("Draft section", () => {
+    const absoluteRange = { startTime: 1672531200000, endTime: 1672617599000, type: "absolute" };
+    // The real picker re-emits an absolute range in microseconds.
+    const echoedRange = {
+      startTime: 1672531200000000,
+      endTime: 1672617599000000,
+      relativeTimePeriod: "15m",
+      valueType: "absolute",
+    };
+    let context: DashboardSettingsDraftContext;
+
+    const mountWithDraftContext = async () => {
+      context = createDashboardSettingsDraftContext(() => undefined);
+      const Host = defineComponent({
+        setup() {
+          provideDashboardSettingsDraft(context);
+          return () => h(GeneralSettings);
+        },
+      });
+      const host = mount(Host, {
+        attachTo: document.body,
+        global: {
+          plugins: [i18n, store, router],
+          stubs: {
+            DashboardHeader: { template: "<div><slot></slot></div>", props: ["title"] },
+            DateTimePickerDashboard: {
+              template: '<div data-test="datetime-picker"></div>',
+              props: { modelValue: Object },
+              emits: ["update:modelValue"],
+            },
+          },
+        },
+      });
+      await flushPromises();
+      return host;
+    };
+    const picker = () => wrapper.findComponent('[data-test="datetime-picker"]');
+
+    beforeEach(() => {
+      vi.mocked(getDashboard).mockResolvedValue({
+        ...mockDashboardData,
+        defaultDatetimeDuration: absoluteRange,
+      });
+    });
+
+    it("an untouched form never counts as edited, however late the picker re-emits its range", async () => {
+      wrapper = await mountWithDraftContext();
+      await picker().vm.$emit("update:modelValue", { ...echoedRange });
+      await flushPromises();
+      await picker().vm.$emit("update:modelValue", { ...echoedRange });
+      await flushPromises();
+
+      expect(context.pending.general).toBeNull();
+    });
+
+    it("a range the user picks after the picker settled is an edit", async () => {
+      wrapper = await mountWithDraftContext();
+      await picker().vm.$emit("update:modelValue", { ...echoedRange });
+      await flushPromises();
+
+      window.dispatchEvent(new Event("pointerdown"));
+      await picker().vm.$emit("update:modelValue", {
+        startTime: 0,
+        endTime: 0,
+        relativeTimePeriod: "1h",
+        valueType: "relative",
+      });
+      await flushPromises();
+
+      expect(context.pending.general?.dateTime).toMatchObject({
+        relativeTimePeriod: "1h",
+        valueType: "relative",
+      });
+    });
+
+    it("a title filled with no key or pointer event stays an edit while the picker re-emits", async () => {
+      wrapper = await mountWithDraftContext();
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("name", "Filled title");
+      await flushPromises();
+      await picker().vm.$emit("update:modelValue", { ...echoedRange });
+      await flushPromises();
+
+      expect(context.pending.general?.values.name).toBe("Filled title");
     });
   });
 });

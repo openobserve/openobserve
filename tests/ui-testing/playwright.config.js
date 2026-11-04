@@ -31,8 +31,7 @@ module.exports = defineConfig({
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry failed tests: 3 times on CI, 0 times locally */
-  retries: process.env.CI ? 3 : 0,
+  retries: process.env.CI ? 1 : 0,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 5 : 5,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
@@ -59,9 +58,9 @@ module.exports = defineConfig({
     navigationTimeout: process.env.CI ? 90000 : 30000,
     actionTimeout: process.env.CI ? 45000 : 15000,
 
-    /* Capture screenshots and videos on failure for CI debugging */
+    /* No video: the first-retry trace already replays every step with DOM snapshots */
     screenshot: process.env.CI ? 'only-on-failure' : 'off',
-    video: process.env.CI ? 'retain-on-failure' : 'off',
+    video: 'off',
 
     /* Slow down execution for Pipeline tests on deployed environments to avoid sync issues */
     slowMo: (process.env.SLOW_MO_TESTS === 'true' && process.env.TEST_SHARD === 'Pipelines') ? 1000 : 0,

@@ -86,6 +86,9 @@ export class ServicesCatalogPage {
     // data-test="service-graph-side-panel" from ServiceGraphNodeSidePanel.vue)
     // =====================================================================
     this.sidePanel = page.locator('[data-test="service-graph-side-panel"]');
+    this.sidePanelViewRelatedBtn = page.locator('[data-test="service-graph-node-panel-view-related-btn"]');
+    this.sidePanelViewRelatedTracesItem = page.locator('[data-test="service-graph-node-panel-view-related-traces-btn"]');
+    this.tracesSearchBar = page.locator('[data-test="logs-search-bar"]');
 
     // =====================================================================
     // Navigation — Services Catalog is reached from the Traces rail tile's hover
@@ -446,6 +449,14 @@ export class ServicesCatalogPage {
 
   async expectSidePanelVisible() {
     await expect(this.sidePanel).toBeVisible({ timeout: 30000 });
+  }
+
+  /** Leaves the catalog for the service's traces; the catalog component unmounts. */
+  async viewServiceTracesFromSidePanel() {
+    await this.sidePanelViewRelatedBtn.click();
+    await this.sidePanelViewRelatedTracesItem.click();
+    await expect(this.tracesSearchBar).toBeVisible({ timeout: 15000 });
+    await expect(this.filterInputField).toHaveCount(0, { timeout: 15000 });
   }
 
   // =========================================================================

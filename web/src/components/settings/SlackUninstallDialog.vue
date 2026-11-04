@@ -183,7 +183,16 @@ const removeSelected = async (): Promise<void> => {
   >
     <div v-if="!result" class="flex flex-col gap-3 text-sm" data-test="slack-dialog-confirm">
       <template v-if="mode === 'disconnect'">
-        <p class="m-0">{{ t("slackApp.uninstall.disconnectMessage", { org }) }}</p>
+        <i18n-t
+          keypath="slackApp.uninstall.disconnectMessage"
+          tag="p"
+          class="m-0"
+          data-test="slack-dialog-disconnect-message"
+        >
+          <template #org
+            ><span class="text-text-heading font-semibold break-all">{{ org }}</span></template
+          >
+        </i18n-t>
         <p class="m-0 font-medium">
           {{
             t(
@@ -195,7 +204,16 @@ const removeSelected = async (): Promise<void> => {
         </p>
       </template>
       <template v-else>
-        <p class="m-0">{{ t("slackApp.uninstall.uninstallMessage") }}</p>
+        <i18n-t
+          keypath="slackApp.uninstall.uninstallMessage"
+          tag="p"
+          class="m-0"
+          data-test="slack-dialog-uninstall-message"
+        >
+          <template #team
+            ><span class="text-text-heading font-semibold break-all">{{ team }}</span></template
+          >
+        </i18n-t>
         <p class="m-0 font-medium">
           {{ t("slackApp.uninstall.otherOrgsBefore", { count: otherOrgs }, otherOrgs) }}
         </p>

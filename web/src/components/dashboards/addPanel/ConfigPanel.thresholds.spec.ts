@@ -136,24 +136,29 @@ describe("ConfigPanel Thresholds section", { timeout: 30_000 }, () => {
   const section = () => wrapper!.find('[data-test="dashboard-addpanel-config-thresholds-section"]');
   const count = () => wrapper!.find('[data-test="dashboard-addpanel-config-thresholds-count"]');
 
-  it.each(["line", "area", "area-stacked", "bar", "h-bar", "scatter", "gauge", "metric"])(
-    "shows on %s",
-    async (type) => {
-      mountPanel(type);
-      await flushPromises();
-      expect(section().exists()).toBe(true);
-      expect(wrapper!.find('[data-test="dashboard-config-thresholds"]').exists()).toBe(true);
-    },
-  );
+  it.each([
+    "line",
+    "area",
+    "area-stacked",
+    "bar",
+    "h-bar",
+    "stacked",
+    "h-stacked",
+    "scatter",
+    "gauge",
+    "metric",
+  ])("shows on %s", async (type) => {
+    mountPanel(type);
+    await flushPromises();
+    expect(section().exists()).toBe(true);
+    expect(wrapper!.find('[data-test="dashboard-config-thresholds"]').exists()).toBe(true);
+  });
 
-  it.each(["stacked", "h-stacked", "pie", "donut", "heatmap", "table"])(
-    "is absent on %s",
-    async (type) => {
-      mountPanel(type);
-      await flushPromises();
-      expect(section().exists()).toBe(false);
-    },
-  );
+  it.each(["pie", "donut", "heatmap", "table"])("is absent on %s", async (type) => {
+    mountPanel(type);
+    await flushPromises();
+    expect(section().exists()).toBe(false);
+  });
 
   it("sits between Mark Lines and Background", async () => {
     mountPanel("metric");

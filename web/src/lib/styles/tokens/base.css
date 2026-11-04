@@ -60,11 +60,14 @@
   --tracking-tight: -0.025em;
   --tracking-normal: 0;
   --tracking-wide: 0.025em;
+  /* Headings tighten as they grow; 13px h6 stays at 0 because small text needs its spacing. */
+  --tracking-heading-display: -0.04em;
+  --tracking-heading: -0.02em;
 
   /* --- Font weight scale --- */
   --font-normal: normal;
   --font-medium: 500;
-  --font-semibold: 600;
+  --font-semibold: 550; /* Geist is variable, so 550 renders between medium and bold */
   --font-bold: 700;
   /* --- Primary palette — blue-teal #3F7994 ---
      The runtime theme engine is the AUTHORITY for brand colour. `constants/themes.ts`
@@ -265,10 +268,8 @@
   --color-chart-table-23: #ffe6e6;
   --color-chart-table-24: #e8f4fd;
 
-  /* --- Chart grid line (dashed split-line) — light value; dark in dark.css.
-     1.4.11 exempt (object required to understand content), raised for
-     perceptibility rather than to hit 3:1. --- */
-  --color-chart-gridline: rgba(0, 0, 0, 0.2);
+  /* Solid horizontal split-line, faint on purpose: 1.4.11 exempt, the series carries the data. */
+  --color-chart-gridline: rgba(0, 10, 23, 0.09);
 
   /* Expected-range band fill; alpha lives in the token so the legend swatch matches. */
   --color-chart-band: rgba(115, 115, 115, 0.22);
@@ -324,6 +325,8 @@
      swap lives in dark.css, so chart JS branches on neither token nor theme. --- */
   --chart-area-fill-top-opacity: 0.9;
   --chart-area-fill-bottom-opacity: 0.4;
+  --chart-area-stacked-fill-top-opacity: 0.9;
+  --chart-area-stacked-fill-bottom-opacity: 0.4;
   --chart-metric-contrast-threshold: 0.5;
   --chart-threshold-band-opacity: 0.28;
 
@@ -605,13 +608,18 @@
   --color-log-severity-emergency-indicator: #e53935;
   --color-log-severity-alert-indicator: #ea580c;
   --color-log-severity-critical-indicator: #f4511e;
-  --color-log-severity-error-indicator: #ef5350;
-  --color-log-severity-warning-indicator: #dd7b00;
+  --color-log-severity-error-indicator: #e53935;
+  --color-log-severity-warning-indicator: #c46a00;
   --color-log-severity-notice-indicator: #16a34a;
-  --color-log-severity-info-indicator: #1e88e5;
-  --color-log-severity-debug-indicator: #00a3b7;
+  --color-log-severity-info-indicator: #1b80d9;
+  --color-log-severity-debug-indicator: #008a9b;
   --color-log-severity-trace-indicator: #8497a0;
   --color-log-severity-ok-indicator: #43a047;
+  /* Logs level-column text: own knobs, so retuning them never moves the shared status text. */
+  --color-log-severity-error-text: #b8323f;
+  --color-log-severity-warning-text: #a14b0f;
+  --color-log-severity-debug-text: #5c606c;
+  --color-log-severity-info-text: var(--color-text-body);
   --color-log-table-header-bg: #f1f3f7;
   --color-log-table-row-bg: #ffffff;
   --color-log-table-row-border: #e4e6ec;

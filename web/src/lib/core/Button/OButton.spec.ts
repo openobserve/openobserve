@@ -28,6 +28,20 @@ describe("OButton", () => {
 
   // --- Props ---
 
+  it("cell variant keeps a visible focus ring and the control radius", () => {
+    const classes = mount(OButton, { props: { variant: "cell" } }).classes();
+    expect(classes).toContain("focus-visible:ring-3");
+    expect(classes).toContain("rounded-default");
+    expect(classes).toContain("h-auto!");
+  });
+
+  it("cell variant dims when unavailable but focusable, like the other variants", () => {
+    const classes = mount(OButton, {
+      props: { variant: "cell", disabled: true, focusableUnavailable: true },
+    }).classes();
+    expect(classes).toContain("opacity-60");
+  });
+
   it('defaults to type="button"', () => {
     const wrapper = mount(OButton);
     expect(wrapper.attributes("type")).toBe("button");
@@ -176,9 +190,16 @@ describe("OButton", () => {
 
   // --- Size classes ---
 
-  it("applies md size classes by default", () => {
-    const wrapper = mount(OButton);
-    expect(wrapper.classes().join(" ")).toContain("h-10");
+  it("applies the h-8.5 md size classes by default", () => {
+    const classes = mount(OButton).classes();
+    expect(classes).toContain("h-8.5");
+    expect(classes).not.toContain("h-10");
+  });
+
+  it("applies the h-10 cta size classes", () => {
+    const classes = mount(OButton, { props: { size: "cta" } }).classes();
+    expect(classes).toContain("h-10");
+    expect(classes).not.toContain("h-8.5");
   });
 
   it("applies sm size classes", () => {
@@ -211,11 +232,11 @@ describe("OButton", () => {
     expect(classes).toContain("w-8");
   });
 
-  it("applies icon-md size classes (h-10 w-10)", () => {
-    const wrapper = mount(OButton, { props: { size: "icon-md" } });
-    const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("h-10");
-    expect(classes).toContain("w-10");
+  it("applies icon-md size classes (h-8.5 w-8.5), matching md", () => {
+    const classes = mount(OButton, { props: { size: "icon-md" } }).classes();
+    expect(classes).toContain("h-8.5");
+    expect(classes).toContain("w-8.5");
+    expect(classes).not.toContain("h-10");
   });
 
   it("applies icon-lg size classes (h-12 w-12)", () => {
@@ -312,6 +333,9 @@ describe("OButton", () => {
     expect(classes).toContain(
       "transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow]",
     );
+    // Animating outline would fade the focus indicator in from the default grey.
+    expect(classes).not.toMatch(/transition-\[[^\]]*outline/);
+    expect(wrapper.classes()).not.toContain("transition-all");
     expect(classes).toContain("duration-150");
   });
 
@@ -322,14 +346,21 @@ describe("OButton", () => {
     expect(wrapper.classes()).not.toContain("transition-colors");
   });
 
-  it("applies the unified focus ring at full opacity, never a translucent accent", () => {
+  it("uses an offset outline in the opaque focus-ring token, not a ring, for focus", () => {
     const wrapper = mount(OButton);
-    const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("focus-visible:ring-[0.125rem]!");
-    expect(classes).toContain("focus-visible:ring-focus-ring-accent!");
+    const classes = wrapper.classes();
+    // A hugging accent ring merges into the accent-filled primary button; the offset gap keeps focus visible.
+    expect(classes).toContain("focus-visible:outline-2!");
+    expect(classes).toContain("focus-visible:outline-solid!");
+    expect(classes).toContain("focus-visible:outline-offset-2!");
+    expect(classes).toContain("focus-visible:outline-focus-ring-accent!");
+    // ring-0! keeps the per-variant rings from painting a second indicator inside the outline.
+    expect(classes).toContain("focus-visible:ring-0!");
+    expect(classes).not.toContain("focus-visible:ring-[0.125rem]!");
+    expect(classes).not.toContain("focus-visible:ring-focus-ring-accent!");
     // accent/25 measured 1.38:1 light and 1.50:1 dark against the 3:1 SC 1.4.11 floor;
     // an alpha here is a contrast regression, not a styling preference.
-    expect(classes).not.toContain("focus-visible:ring-accent/25!");
+    expect(classes).not.toContain("focus-visible:outline-accent/25!");
   });
 
   it("retains outline-none as part of base classes", () => {

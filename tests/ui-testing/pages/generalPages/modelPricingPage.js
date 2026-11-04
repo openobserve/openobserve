@@ -5,6 +5,7 @@
 //   Editor: /web/settings/model_pricing/edit?org_identifier={org}&id={id}
 
 import { expect } from '@playwright/test';
+import { discardEditorDraftIfAsked, clearEditorDrafts } from '../alertsPages/editorDraftHelpers.js';
 const modelPricingStrings = require('../../../../web/src/locales/languages/en-US.json').modelPricing;
 
 // en-US trigger labels for each rule operator. The rule-op select renders a
@@ -194,11 +195,13 @@ export class ModelPricingPage {
     // ----------------------------------------------------------------
 
     async clickAdd() {
+        await clearEditorDrafts(this.page);
         await this.addBtn.click();
         await this.editorTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async clickEmptyAdd() {
+        await clearEditorDrafts(this.page);
         await this.emptyAddBtn.click();
         await this.editorTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
@@ -260,6 +263,8 @@ export class ModelPricingPage {
             .locator(`tr:has-text("${name}")`);
         // OCheckbox renders as button[role="checkbox"] — data-test="o2-table-select-{id}"
         const checkbox = row.locator('button[role="checkbox"]').first();
+        // Clicking a ticked box unticks it, so a re-select must leave checked rows alone.
+        if ((await checkbox.getAttribute('aria-checked')) === 'true') return;
         await checkbox.click();
     }
 
@@ -401,11 +406,13 @@ export class ModelPricingPage {
 
     async clickCancel() {
         await this.cancelBtn.click();
+        await discardEditorDraftIfAsked(this.page);
         await this.listTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     async clickEditorBack() {
         await this.editorBackBtn.click();
+        await discardEditorDraftIfAsked(this.page);
         await this.listTitle.waitFor({ state: 'visible', timeout: 10000 });
     }
 

@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Pagination and Reset Controls -->
     <div class="flex items-center justify-end gap-1">
       <!-- Pagination -->
-      <div v-if="pagesNumber > 1" class="flex items-center gap-0.5">
+      <div v-if="pagesNumber > 1" class="flex h-7 items-start gap-0.5 pt-px">
         <OTooltip
           :content="t('common.totalFields', { count: totalFieldsCount })"
           max-width="18.75rem"
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           :data-test="`${dataTestPrefix}-fields-list-pagination-firstpage-button`"
           variant="ghost"
-          size="icon-xs-sq"
+          size="icon-chip"
           :disabled="isFirstPage"
           @click="$emit('first-page')"
           :aria-label="t('search.firstPage')"
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-for="page in visiblePages" :key="page">
           <OButton
             :variant="currentPage === page ? 'primary' : 'ghost'"
-            size="icon-xs-sq"
+            size="icon-chip"
             :data-test="`${dataTestPrefix}-fields-list-pagination-page-${page}-button`"
             @click="$emit('set-page', page)"
           >
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           :data-test="`${dataTestPrefix}-fields-list-pagination-lastpage-button`"
           variant="ghost"
-          size="icon-xs-sq"
+          size="icon-chip"
           :disabled="isLastPage"
           @click="$emit('last-page')"
           :aria-label="t('search.lastPage')"

@@ -438,11 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :open="removeTarget !== null"
       size="sm"
       :persistent="actioningToken !== ''"
-      :title="
-        t('billing.billingGroup.removeTitle', {
-          name: removeTarget?.org_name || removeTarget?.org_id,
-        })
-      "
+      :title="t('billing.billingGroup.removeTitle')"
       :secondary-button-label="t('billing.billingGroup.cancel')"
       secondary-button-variant="outline"
       :primary-button-label="t('billing.billingGroup.remove')"
@@ -453,7 +449,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="removeTarget = null"
       @click:primary="removeMember"
     >
-      <p class="text-text-body text-sm">{{ t("billing.billingGroup.removeBody") }}</p>
+      <i18n-t keypath="billing.billingGroup.removeBody" tag="p" class="text-text-body text-sm">
+        <template #name>
+          <span
+            data-test="org-group-remove-dialog-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ removeName }}</span
+          >
+        </template>
+      </i18n-t>
     </ODialog>
 
     <ODialog
@@ -655,6 +659,11 @@ export default defineComponent({
     }
 
     const removeTarget = ref<SuperRow | null>(null);
+    // Set on open only, so the name stays visible while the dialog fades out.
+    const removeName = ref("");
+    watch(removeTarget, (row) => {
+      if (row) removeName.value = row.org_name || row.org_id;
+    });
 
     const superRows = computed<SuperRow[]>(() => {
       const rows: SuperRow[] = [];
@@ -956,6 +965,7 @@ export default defineComponent({
       showInviteDialog,
       showLeaveDialog,
       removeTarget,
+      removeName,
       superFilter,
       superFilterTabs,
       filteredSuperRows,

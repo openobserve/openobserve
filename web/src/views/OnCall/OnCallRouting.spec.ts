@@ -81,7 +81,7 @@ const stubs = {
   },
   OnCallRoutingSimulator: {
     name: "OnCallRoutingSimulator",
-    props: ["preview", "teams", "aliases", "loading", "sending", "canConfigure"],
+    props: ["preview", "teams", "aliases", "loading", "sending", "canConfigure", "testResult"],
     template: "<div />",
   },
   // Both tables render the host's toolbar, which carries the tabs, search and refresh.
@@ -140,7 +140,7 @@ const stubs = {
     props: ["open", "primaryButtonDisabled", "title"],
     template: "<div><slot /></div>",
   },
-  ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue"], template: "<div />" },
+  ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue", "okVariant"], template: "<div />" },
   OButton: {
     name: "OButton",
     props: ["disabled", "active"],
@@ -244,6 +244,16 @@ describe("OnCallRouting", () => {
     expect(rulesPanel(wrapper).props("showTeam")).toBe(true);
   });
 
+  it("asks to remove a rule with a destructive confirm button", async () => {
+    const wrapper = render();
+    await flushPromises();
+    rulesPanel(wrapper).vm.$emit("remove", { rule_id: "r9" });
+    await wrapper.vm.$nextTick();
+    const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
+    expect(dialog.props("modelValue")).toBe(true);
+    expect(dialog.props("okVariant")).toBe("destructive");
+  });
+
   /// G4: claiming an unrouted signal opens the rule dialog with the failing
   /// path already filled — the user picks the team and confirms. The evidence
   /// dimensions (a pod name survives neither restart nor redeploy) must not
@@ -322,24 +332,23 @@ describe("OnCallRouting", () => {
     expect(simulator(wrapper).props("canConfigure")).toBe(false);
   });
 
-  /// A test page that tried and failed everywhere was sent, so it must not say "Nothing was sent", and it must say why.
-  it("names the provider's error when every test delivery fails", async () => {
-    service.testPage.mockResolvedValue({
-      data: {
-        reached_anyone: false,
-        not_sent_because: null,
-        channels: ["sms"],
-        attempts: [
-          {
-            channel: "sms",
-            recipient: "ana@o2.ai",
-            reason: "on call now",
-            delivered: false,
-            detail: "Twilio 401: authenticate",
-          },
-        ],
-      },
-    } as any);
+  /// The result stays in the simulator card, one row per attempt, rather than a toast that is gone in five seconds.
+  it("hands the test page result to the simulator instead of a toast", async () => {
+    const result = {
+      reached_anyone: false,
+      not_sent_because: null,
+      channels: ["sms"],
+      attempts: [
+        {
+          channel: "sms",
+          recipient: "ana@o2.ai",
+          reason: "on call now",
+          delivered: false,
+          detail: "Twilio 401: authenticate",
+        },
+      ],
+    };
+    service.testPage.mockResolvedValue({ data: result } as any);
     const wrapper = render();
     await flushPromises();
     await wrapper.find('[data-test="oncall-routing-test-signal"]').trigger("click");
@@ -347,10 +356,27 @@ describe("OnCallRouting", () => {
     simulator(wrapper).vm.$emit("send-test", { team_id: "team_1", priority: "P1" });
     await flushPromises();
 
-    expect(vi.mocked(toast)).toHaveBeenCalledWith({
-      variant: "warning",
-      message: "Test page sent, but no delivery succeeded: Twilio 401: authenticate",
-    });
+    expect(simulator(wrapper).props("testResult")).toEqual(result);
+    expect(vi.mocked(toast)).not.toHaveBeenCalled();
+  });
+
+  /// A failed send must not leave the previous send's result looking like this one's.
+  it("clears the previous test page result when a new send starts", async () => {
+    service.testPage.mockResolvedValueOnce({
+      data: { reached_anyone: true, channels: ["email"], attempts: [] },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-routing-test-signal"]').trigger("click");
+    simulator(wrapper).vm.$emit("send-test", { team_id: "team_1", priority: "P1" });
+    await flushPromises();
+    expect(simulator(wrapper).props("testResult")).not.toBeNull();
+
+    service.testPage.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+    simulator(wrapper).vm.$emit("send-test", { team_id: "team_1", priority: "P2" });
+    await flushPromises();
+
+    expect(simulator(wrapper).props("testResult")).toBeNull();
   });
 
   /// Nominating a catch-all is a one-time act, but whether one exists is a

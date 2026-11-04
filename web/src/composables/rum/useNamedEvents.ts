@@ -15,6 +15,7 @@
 
 import { computed, ref } from "vue";
 import type { HistoryState } from "vue-router";
+import { useStore } from "vuex";
 import api from "@/services/rumProductAnalytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { gt, type I18nText } from "@/types/i18n";
@@ -31,6 +32,7 @@ import {
   type ScopedListStatus,
 } from "@/composables/rum/scopedList";
 import { ANALYTICS_SUBTABS, type AnalyticsSubTab } from "@/utils/rum/productAnalyticsRoutes";
+import { hashDraftValue, listEditorDrafts } from "@/utils/drafts/editorDraftStore";
 
 export type NamedEventsPermission = ScopedListPermission;
 export type NamedEventsStatus = ScopedListStatus;
@@ -46,6 +48,8 @@ export type NamedEventHandoff = {
   draft: Pick<NamedEvent, "name" | "rules"> | null;
   pageHints: string[];
   from: AnalyticsSubTab | null;
+  /** The event a duplicate was copied from; keys the duplicate's own editor draft. */
+  source?: string;
 };
 
 const HANDOFF_KEY = "rumNamedEventHandoff";
@@ -84,6 +88,7 @@ export function namedEventHandoffState(handoff: Partial<NamedEventHandoff>): His
     draft: handoff.draft ? { name: handoff.draft.name, rules: handoff.draft.rules } : null,
     pageHints: handoff.pageHints ?? [],
     from: handoff.from ?? null,
+    ...(handoff.source ? { source: handoff.source } : {}),
   };
   // History state is structured-cloned, which throws on the reactive proxies a caller may hold.
   return { [HANDOFF_KEY]: JSON.parse(JSON.stringify(plain)) };
@@ -103,7 +108,36 @@ export function readNamedEventHandoff(state: unknown): NamedEventHandoff {
       ? stored.pageHints.filter((p): p is string => typeof p === "string")
       : [],
     from: from && ANALYTICS_SUBTABS.includes(from) ? from : null,
+    ...(typeof stored?.source === "string" && stored.source ? { source: stored.source } : {}),
   };
+}
+
+/** The editor-draft slot of a new event: one per app, and one per duplicate source or pre-fill. */
+export function namedEventDraftVariant(
+  app: string,
+  handoff: Pick<NamedEventHandoff, "draft" | "source"> = { draft: null },
+): string {
+  if (handoff.source) return `${app}~clone:${handoff.source}`;
+  if (handoff.draft) return `${app}~prefill:${hashDraftValue(handoff.draft)}`;
+  return app;
+}
+
+/** When this user's new-event draft in each slot was written, keyed by `namedEventDraftVariant`; reactive. */
+export function useNewEventDraftTimes(): { savedAt: (variant: string) => number | null } {
+  const store = useStore();
+  const times = computed(
+    () =>
+      new Map(
+        listEditorDrafts(
+          "rum_named_event",
+          String(store.state.selectedOrganization?.identifier ?? ""),
+          String(store.state.userInfo?.email ?? ""),
+        ).flatMap((entry) =>
+          entry.entityId === null && entry.variant ? [[entry.variant, entry.savedAt] as const] : [],
+        ),
+      ),
+  );
+  return { savedAt: (variant) => times.value.get(variant) ?? null };
 }
 
 export default function useNamedEvents() {

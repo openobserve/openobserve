@@ -75,6 +75,13 @@ impl RemovalTarget {
     }
 }
 
+/// True when `requested` is not the same set of custom roles as `current`.
+#[cfg(feature = "enterprise")]
+fn custom_roles_differ(requested: &[String], current: &[String]) -> bool {
+    let requested: std::collections::HashSet<&String> = requested.iter().collect();
+    requested != current.iter().collect()
+}
+
 fn redact_token(token: &str) -> String {
     if token.is_empty() {
         return String::new();
@@ -501,9 +508,24 @@ pub async fn update_user(
             is_org_updated |= local_user.role.ne(&new_user.role);
             #[cfg(feature = "enterprise")]
             if let Some(cr) = new_org_role.custom_role {
-                custom_roles_need_change = true;
-                custom_roles.extend(cr);
-                is_org_updated = true;
+                // Only an admin grants custom roles; a self-update may resend its own unchanged.
+                if update_mode.is_self_update()
+                    && !matches!(local_user.role, UserRole::Admin | UserRole::Root)
+                    // An unreadable assignment counts as a change, so the self-update is refused.
+                    && o2_openfga::authorizer::roles::get_roles_for_org_user(org_id, email)
+                        .await
+                        .inspect_err(|e| {
+                            log::error!("Error reading custom roles for {email} in {org_id}: {e}")
+                        })
+                        .ok()
+                        .is_none_or(|existing| custom_roles_differ(&cr, &existing))
+                {
+                    message = "Self custom roles cannot be changed";
+                } else {
+                    custom_roles_need_change = true;
+                    custom_roles.extend(cr);
+                    is_org_updated = true;
+                }
             }
         }
     }
@@ -524,6 +546,22 @@ pub async fn update_user(
     if !is_updated && !is_org_updated && !remove_lockout {
         return Ok(MetaHttpResponse::bad_request("No changes to update"));
     }
+
+    // Read before any write below, so a failed read leaves the user and membership untouched.
+    #[cfg(feature = "enterprise")]
+    let existing_roles = if custom_roles_need_change && get_openfga_config().enabled {
+        match o2_openfga::authorizer::roles::get_roles_for_org_user(org_id, email).await {
+            Ok(roles) => roles,
+            Err(e) => {
+                log::error!("Error reading custom roles for user {email} in {org_id} org : {e}");
+                return Ok(MetaHttpResponse::internal_error(
+                    "Failed to update custom roles for user",
+                ));
+            }
+        }
+    } else {
+        vec![]
+    };
 
     // Ahead of the record writes below: an unlock that the caller asked for must not be skipped
     // because a later write failed, and it is safe to repeat if they retry the whole update.
@@ -592,7 +630,7 @@ pub async fn update_user(
         {
             use o2_openfga::authorizer::{
                 authz::{get_user_crole_tuple, update_tuples, update_user_role},
-                roles::{get_role_key, get_roles_for_org_user, get_user_crole_removal_tuples},
+                roles::{get_role_key, get_user_crole_removal_tuples},
             };
 
             if get_openfga_config().enabled
@@ -616,7 +654,6 @@ pub async fn update_user(
                     }
                 }
                 if custom_roles_need_change {
-                    let existing_roles = get_roles_for_org_user(org_id, email).await;
                     let mut write_tuples = vec![];
                     let mut delete_tuples = vec![];
                     custom_roles.iter().for_each(|crole| {
@@ -1157,6 +1194,8 @@ pub async fn remove_user_from_org(
             ),
         }
     }
+    // After the membership is gone: their links ran with their stream access.
+    crate::public_dashboards::pause_departed_publisher_links(org_id, email_id).await;
     if let Err(e) = infra::table::query_history::delete_by_user(org_id, email_id).await {
         log::error!("error deleting query history of {email_id} in {org_id}: {e}");
     }
@@ -1322,7 +1361,13 @@ pub async fn get_user_roles(user_email: &str, org_id: Option<&str>) -> Vec<Strin
         return get_user_roles_by_org_id(roles, org_id);
     }
 
-    let roles = o2_openfga::authorizer::roles::get_roles_for_user(user_email).await;
+    let roles = match o2_openfga::authorizer::roles::get_roles_for_user(user_email).await {
+        Ok(roles) => roles,
+        Err(e) => {
+            log::error!("Error reading roles for user {user_email}: {e}");
+            return vec![];
+        }
+    };
     update_cache(user_email, roles.clone()).await;
 
     get_user_roles_by_org_id(roles, org_id)
@@ -1574,6 +1619,20 @@ mod tests {
 
     // Mutex to ensure test setup is serialized to prevent race conditions
     static TEST_SETUP_LOCK: tokio::sync::OnceCell<Mutex<()>> = tokio::sync::OnceCell::const_new();
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_self_update_may_resend_its_custom_roles_but_not_change_them() {
+        let current = ["a".to_string(), "b".to_string()];
+        assert!(!custom_roles_differ(&["b".into(), "a".into()], &current));
+        assert!(custom_roles_differ(
+            &["a".into(), "b".into(), "c".into()],
+            &current
+        ));
+        assert!(custom_roles_differ(&["a".into()], &current));
+        assert!(custom_roles_differ(&["c".into()], &[]));
+        assert!(!custom_roles_differ(&[], &[]));
+    }
 
     #[test]
     fn test_redact_token_exactly_four_chars() {
@@ -1842,12 +1901,7 @@ mod tests {
     }
 
     async fn create_query_history_table() {
-        use sea_orm::{ConnectionTrait, Schema};
-        let conn = get_orm_client_rw().await;
-        let backend = conn.get_database_backend();
-        let mut stmt = Schema::new(backend)
-            .create_table_from_entity(infra_table::entity::query_history::Entity);
-        conn.execute(backend.build(stmt.if_not_exists()))
+        infra_table::query_history::create_table_for_tests(get_orm_client_rw().await)
             .await
             .unwrap();
     }
@@ -1872,14 +1926,24 @@ mod tests {
         };
         create_new_user(user).await.unwrap();
         for org in ["dummy", "other"] {
-            infra_table::query_history::record(org, email, "up", serde_json::json!({}), 1)
-                .await
-                .unwrap();
+            infra_table::query_history::record(infra_table::query_history::NewRun {
+                org_id: org,
+                user_email: email,
+                source: "logs",
+                query: "up",
+                query_key: None,
+                streams: &[],
+                status: "ok",
+                context: serde_json::json!({}),
+                now_us: 1,
+            })
+            .await
+            .unwrap();
         }
     }
 
     async fn history_count(org: &str, email: &str) -> usize {
-        infra_table::query_history::list(org, email, None, None, 10, 0)
+        infra_table::query_history::list(org, email, &Default::default(), 10, 0)
             .await
             .unwrap()
             .len()
@@ -1897,6 +1961,62 @@ mod tests {
         assert_eq!(resp.status(), http::StatusCode::OK);
         assert_eq!(history_count("dummy", email).await, 0);
         assert_eq!(history_count("other", email).await, 1);
+    }
+
+    #[tokio::test]
+    async fn gate14_removing_a_publisher_pauses_their_public_links_after_the_membership_delete() {
+        use infra::table::{entity::public_dashboards::Model as Link, public_dashboards as links};
+
+        let _guard = set_up().await;
+        links::create_tables_for_tests(get_orm_client_rw().await)
+            .await
+            .unwrap();
+        // The test database outlives the run, so nothing here may collide with an earlier run.
+        let id = config::ider::uuid();
+        let email = format!("publisher-{id}@example.com");
+        let email = email.as_str();
+        create_user_with_history(email).await;
+        let link = Link {
+            id: id.clone(),
+            org_id: "dummy".to_string(),
+            folder_id: "default".to_string(),
+            dashboard_id: id.clone(),
+            slug: config::utils::rand::generate_random_string(22),
+            name: "Exec view".to_string(),
+            visibility: 1,
+            time_ranges: None,
+            default_range_key: None,
+            frozen_variables: None,
+            refresh_secs: 300,
+            dashboard_version: 8,
+            published_by: email.to_string(),
+            enabled: true,
+            expires_at: None,
+            created_by: email.to_string(),
+            updated_by: None,
+            created_at: 1,
+            updated_at: 1,
+            rev: 1,
+            deleted_at: None,
+            last_accessed_at: None,
+            access_count: 0,
+        };
+        let created = links::insert_capped(get_orm_client_rw().await, &link, u32::MAX, 1, false)
+            .await
+            .unwrap();
+        assert_eq!(created, links::CreateOutcome::Created);
+
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev", RemovalTarget::User)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert!(infra_table::org_users::get("dummy", email).await.is_err());
+        let row = links::get(get_orm_client_rw().await, &id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!row.enabled, "the departed publisher's link is paused");
+        assert!(row.rev > link.rev, "the pause bumped the revision");
     }
 
     #[tokio::test]
@@ -2451,24 +2571,8 @@ mod tests {
         let _guard = set_up().await;
 
         let email = "locked@zo.dev";
-        let resp = post_user(
-            "dummy",
-            UserRequest {
-                email: email.to_string(),
-                password: "Pass#1234567890".to_string(),
-                role: common::meta::user::UserOrgRole {
-                    base_role: UserRole::Viewer,
-                    custom_role: None,
-                },
-                first_name: "locked".to_owned(),
-                last_name: "".to_owned(),
-                is_external: false,
-                token: None,
-            },
-            "admin@zo.dev",
-        )
-        .await;
-        assert!(resp.is_ok());
+        // post_user refuses non-admin roles while OpenFGA is off, which it always is in unit tests.
+        create_member(email, &[("dummy", UserRole::Viewer)]).await;
 
         infra_table::user_auth_state::insert_first_failure(email, 1)
             .await

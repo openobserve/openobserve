@@ -66,6 +66,9 @@ if (import.meta.env.DEV && !form) {
         <template v-if="$slots['icon-left']" #icon-left>
           <slot name="icon-left" />
         </template>
+        <template v-if="$slots.trigger" #trigger="scope">
+          <slot name="trigger" v-bind="scope" />
+        </template>
       </OSelect>
     </template>
   </component>

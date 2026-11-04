@@ -355,6 +355,13 @@ export class SloFormPage {
     // Cancel sits beside Save in the page header actions; it is the only
     // control there that is not the save button.
     await this.page.getByRole('button', { name: /cancel/i }).first().click();
+    // Unsaved changes open the shared leave dialog; discard so no draft is left behind.
+    const leaveDialog = this.page.locator('[data-test="editor-draft-leave-dialog"]');
+    const asked = await leaveDialog
+      .waitFor({ state: 'visible', timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+    if (asked) await leaveDialog.locator('[data-test="o-dialog-neutral-btn"]').click();
     await this.page.waitForURL((url) => !/\/slos\/(add|edit)/.test(url.pathname), {
       timeout: 20000,
     });

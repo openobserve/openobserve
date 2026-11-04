@@ -87,6 +87,17 @@ export class RumPage {
         // date-time-relative-{value}-{unit}-btn) — label text is not stable.
         await this.page.locator('[data-test="date-time-relative-1-h-btn"]').click();
         await this.page.waitForTimeout(1000);
+        await this.closeDateTimePickerIfOpen();
+    }
+
+    /** The auto-apply picker stays open after a pick, and its popover covers the run-query button beside it. */
+    async closeDateTimePickerIfOpen() {
+        const panel = this.page.locator('#date-time-menu');
+        if (!(await panel.isVisible().catch(() => false))) return;
+        await this.page.keyboard.press('Escape');
+        const closed = await panel.waitFor({ state: 'hidden', timeout: 2000 }).then(() => true).catch(() => false);
+        if (!closed) await this.page.locator(this.dateTimeDropdown).click();
+        await expect(panel).toBeHidden({ timeout: 5000 });
     }
 
     async clickRunQuery() {

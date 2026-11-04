@@ -59,6 +59,9 @@ export class AlertTemplatesPage {
         this.headerCheckbox = '[data-test="o2-table-select-all"]';
         this.addTemplateTitle = '[data-test="add-template-title"]';
         this.templateCancelBtn = '[data-test="add-template-cancel-btn"]';
+        // Editor drafts: Cancel with unsaved changes opens the shared leave dialog
+        this.draftLeaveDialog = '[data-test="editor-draft-leave-dialog"]';
+        this.draftLeaveDiscardBtn = '[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-neutral-btn"]';
         this.templateCloneBtnPattern = '[data-test="alert-template-list-{templateName}-clone-template"]';
 
         // Inline locators moved from methods
@@ -1218,6 +1221,15 @@ export class AlertTemplatesPage {
 
     async clickTemplateCancelBtn() {
         await this.page.locator(this.templateCancelBtn).click();
+        // Unsaved changes are discarded through the leave dialog so no draft is left behind.
+        const asked = await this.page.locator(this.draftLeaveDialog)
+            .waitFor({ state: 'visible', timeout: 2000 })
+            .then(() => true)
+            .catch(() => false);
+        if (asked) {
+            await this.page.locator(this.draftLeaveDiscardBtn).click();
+            await this.page.locator(this.draftLeaveDialog).waitFor({ state: 'hidden', timeout: 10000 });
+        }
         await this.page.waitForTimeout(1000);
     }
 

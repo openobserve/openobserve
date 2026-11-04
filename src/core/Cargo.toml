@@ -48,9 +48,10 @@ vectorscan = [
 ]
 # Lets dependants' tests install a fake stream access checker; never enabled outside dev-dependencies.
 test-utils = []
+cpu-profiling = ["dep:pprof"]
 profiling = [
+    "cpu-profiling",
     "dep:jemalloc_pprof",
-    "dep:pprof",
     "dep:tikv-jemalloc-ctl",
 ]
 
@@ -129,6 +130,7 @@ thiserror.workspace = true
 time.workspace = true
 tiktoken-rs.workspace = true
 tokio.workspace = true
+tokio-util.workspace = true
 tonic.workspace = true
 tracing.workspace = true
 tracing-opentelemetry.workspace = true
@@ -144,9 +146,11 @@ lettre.workspace = true
 jemalloc_pprof = { workspace = true, optional = true }
 pprof = { workspace = true, optional = true }
 tikv-jemalloc-ctl = { workspace = true, optional = true }
+zstd.workspace = true
 
 [dev-dependencies]
 infra = { workspace = true, features = ["test-utils"] }
+tokio = { workspace = true, features = ["test-util"] }
 criterion = { version = "0.5", default-features = false, features = ["rayon"] }
 multer.workspace = true
 

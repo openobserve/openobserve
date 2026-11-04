@@ -24,11 +24,8 @@ use std::{
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{
-    MEM_TABLE_INDIVIDUAL_STREAMS, get_config,
-    meta::stream::StreamType,
-    metrics,
-    stats::MemorySize,
-    utils::hash::{Sum64, gxhash},
+    MEM_TABLE_INDIVIDUAL_STREAMS, get_config, meta::stream::StreamType, metrics, stats::MemorySize,
+    utils::hash::key_sum64,
 };
 use hashbrown::HashSet;
 use infra::runtime::WAL_RUNTIME;
@@ -135,12 +132,12 @@ fn get_table_idx(thread_id: usize, org_id: &str, stream_name: &str) -> usize {
     } else if get_config().common.feature_shared_memtable_enabled {
         // When shared memtable is enabled, hash by org_id and stream_name
         let hash_key = format!("{org_id}_{stream_name}");
-        let hash_id = gxhash::new().sum64(&hash_key);
+        let hash_id = key_sum64(&hash_key);
         hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
     } else {
         // Original behavior: hash by thread_id and stream_name
         let hash_key = format!("{thread_id}_{stream_name}");
-        let hash_id = gxhash::new().sum64(&hash_key);
+        let hash_id = key_sum64(&hash_key);
         hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
     }
 }

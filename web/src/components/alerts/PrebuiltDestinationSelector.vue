@@ -13,159 +13,197 @@ See the License for the specific language governing permissions and
 limitations under the License. -->
 
 <template>
-  <div data-test="prebuilt-destination-selector">
-    <!-- Destination Type Grid -->
-    <div
-      class="selector-grid mb-4 grid [grid-template-columns:repeat(auto-fill,minmax(8.75rem,1fr))] gap-3"
-    >
+  <div data-test="prebuilt-destination-selector" class="@container/dest-picker">
+    <div class="mb-4">
       <div
-        v-for="type in filteredDestinationTypes"
-        :key="type.id"
-        data-test="destination-type-card"
-        :data-type="type.id"
-        class="destination-card group/dest-card border-card-glass-border rounded-default hover:border-accent hover:shadow-status-info-text/15 relative flex [min-height:7.5rem] cursor-pointer flex-col border-2 px-3 py-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
-        :class="
-          selectedType === type.id
-            ? 'selected border-accent shadow-status-info-text/20 bg-card-glass-tint shadow-lg'
-            : 'bg-card-glass-bg'
-        "
-        @click="selectType(type.id)"
+        class="selector-grid grid auto-cols-fr grid-flow-col gap-2 @max-[54rem]/dest-picker:auto-cols-auto @max-[54rem]/dest-picker:grid-flow-row @max-[54rem]/dest-picker:grid-cols-5 @max-[27rem]/dest-picker:grid-cols-2"
       >
-        <!-- Card Content -->
-        <div class="card-content relative flex h-full flex-col items-center text-center">
-          <!-- Icon/Image -->
+        <OTooltip v-for="tile in tiles" :key="tile.id" :delay="300">
+          <template #content>
+            <div v-for="(part, index) in tile.tips" :key="index" :class="index > 0 && 'mt-1'">
+              {{ part }}
+            </div>
+          </template>
           <div
-            data-test="destination-type-icon"
-            class="text-icon-color group-[.selected]/dest-card:text-accent mb-2"
+            data-test="destination-type-card"
+            :data-type="tile.id"
+            class="destination-card group/dest-card border-card-glass-border rounded-default hover:border-accent relative flex min-h-24 min-w-0 flex-col items-center border-2 px-2 py-3 text-center"
+            :class="[
+              tile.id === 'custom' && 'custom-card border-dashed',
+              tile.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+              !tile.disabled && selectedType === tile.id
+                ? 'selected border-accent shadow-status-info-text/20 bg-card-glass-tint shadow-lg'
+                : 'bg-card-glass-bg',
+            ]"
+            role="button"
+            tabindex="0"
+            :aria-disabled="tile.disabled ? 'true' : undefined"
+            :aria-describedby="`${uid}-${tile.id}`"
+            @click="selectType(tile.id)"
+            @keydown.enter.prevent="selectType(tile.id)"
+            @keydown.space.prevent="selectType(tile.id)"
           >
-            <img
-              v-if="type.image"
-              :src="type.image"
-              :alt="type.name"
-              class="destination-logo h-6 w-6 [object-fit:contain]"
+            <span :id="`${uid}-${tile.id}`" data-test="destination-type-description" class="sr-only"
+              ><span v-for="(part, index) in tile.tips" :key="index" class="block">{{
+                part
+              }}</span></span
+            >
+            <div
+              class="card-content flex min-w-0 flex-1 flex-col items-center"
+              :class="{ 'opacity-40': tile.disabled }"
+            >
+              <div
+                data-test="destination-type-icon"
+                class="text-icon-color group-[.selected]/dest-card:text-accent mb-1"
+              >
+                <img
+                  v-if="tile.image"
+                  :src="tile.image"
+                  :alt="tile.name"
+                  class="destination-logo h-6 w-6 [object-fit:contain]"
+                  :class="{ 'dark:invert': tile.id === 'opsgenie' }"
+                />
+                <OIcon v-else :name="getIconName(tile.icon)" size="md" />
+              </div>
+              <div
+                data-test="destination-type-name"
+                class="card-title text-compact text-text-heading mb-0 text-center [line-height:1.3] font-medium"
+              >
+                {{ tile.name }}
+              </div>
+              <div
+                data-test="destination-type-short"
+                class="text-2xs text-text-secondary mt-auto pt-1 text-center [line-height:1.2]"
+              >
+                {{ tile.short }}
+              </div>
+            </div>
+
+            <OTag
+              v-if="tile.disabled"
+              data-test="destination-type-off"
+              variant="default-soft"
+              size="sm"
+              class="absolute top-1 right-1"
+              :label="t('slackApp.destination.off')"
             />
-            <OIcon v-else :name="getIconName(type.icon)" size="md" />
+            <div
+              v-if="!tile.disabled && selectedType === tile.id"
+              class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
+            >
+              <OIcon name="check" size="xs" />
+            </div>
           </div>
-
-          <!-- Name -->
-          <div
-            data-test="destination-type-name"
-            class="card-title text-compact text-text-heading mt-1 mb-0 text-center [line-height:1.3] font-medium"
-          >
-            {{ type.name }}
-          </div>
-
-          <!-- Description -->
-          <div
-            data-test="destination-type-description"
-            class="text-2xs text-text-secondary mt-1 mb-0 hidden grow text-center [line-height:1.2] min-[75rem]:block"
-          >
-            {{ t(type.descriptionKey) }}
-          </div>
-        </div>
-
-        <!-- Selection Indicator -->
-        <div
-          v-if="selectedType === type.id"
-          class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
-        >
-          <OIcon name="check" size="xs" />
-        </div>
-      </div>
-
-      <!-- Custom Option Card -->
-      <div
-        data-test="destination-type-card"
-        data-type="custom"
-        class="destination-card custom-card group/dest-card border-card-glass-border rounded-default hover:border-accent hover:shadow-status-info-text/15 relative flex [min-height:7.5rem] cursor-pointer flex-col border-2 border-dashed px-3 py-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
-        :class="
-          selectedType === 'custom'
-            ? 'selected border-accent shadow-status-info-text/20 bg-card-glass-tint shadow-lg'
-            : 'bg-card-glass-bg'
-        "
-        @click="selectType('custom')"
-      >
-        <div class="card-content relative flex h-full flex-col items-center text-center">
-          <div
-            data-test="destination-type-icon"
-            class="text-icon-color group-[.selected]/dest-card:text-accent mb-2"
-          >
-            <OIcon name="settings" size="md" />
-          </div>
-          <div
-            data-test="destination-type-name"
-            class="card-title text-compact text-text-heading mt-1 mb-0 text-center [line-height:1.3] font-medium"
-          >
-            {{ t("alerts.customDestination") }}
-          </div>
-          <div
-            data-test="destination-type-description"
-            class="text-2xs text-text-secondary mt-1 mb-0 hidden grow text-center [line-height:1.2] min-[75rem]:block"
-          >
-            {{ t("alerts.customDestinationDescription") }}
-          </div>
-        </div>
-
-        <!-- Selection Indicator -->
-        <div
-          v-if="selectedType === 'custom'"
-          class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
-        >
-          <OIcon name="check" size="xs" />
-        </div>
+        </OTooltip>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
-import { PREBUILT_DESTINATION_TYPES } from "@/utils/prebuilt-templates";
-import type { PrebuiltTypeId } from "@/utils/prebuilt-templates/types";
+import { computed, useId } from "vue";
+import config from "@/aws-exports";
+import { raw, useI18nTyped } from "@/types/i18n";
+import type { SlackDisabledReason } from "@/types/slack";
+import { destinationTypeTiles } from "@/utils/prebuilt-templates";
+import type { DestinationTileId } from "@/utils/prebuilt-templates/types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
-// Define component props
-// `modelValue` is the owner form's `destination_type` field, which is a plain
-// string in the schema; accept `string` so the bound form value fits while the
-// emit side stays narrowed to real selections.
 interface Props {
-  modelValue?: PrebuiltTypeId | "custom" | "" | null | string;
+  modelValue?: DestinationTileId | "custom" | "" | null | string;
+  /** Whether the deployment and org allow Slack app destinations. */
+  slackApp?: boolean;
+  /** Why they are off; the edition and a super cluster share one reason. */
+  unavailableReason?: SlackDisabledReason;
+  /** Org admin or root: only they can get an operator to turn Slack on. */
+  canManageSlack?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   modelValue: null,
+  slackApp: false,
+  canManageSlack: false,
 });
 
-// Define component emits
 interface Emits {
-  (e: "update:modelValue", value: PrebuiltTypeId | "custom"): void;
-  (e: "select", value: PrebuiltTypeId | "custom"): void;
+  (e: "update:modelValue", value: DestinationTileId | "custom"): void;
+  (e: "select", value: DestinationTileId | "custom"): void;
 }
 
 const emit = defineEmits<Emits>();
 
-// Composables
 const { t } = useI18nTyped();
+const uid = useId();
+const isCloud = computed(() => config.isCloud === "true");
+const serverReason = computed(() =>
+  props.unavailableReason === "flag" || props.unavailableReason === "master_key"
+    ? props.unavailableReason
+    : null,
+);
+const operatorSetting = computed(() => {
+  // Cloud users have no operator to ask, so no reason names a server variable.
+  if (isCloud.value || !props.canManageSlack || !serverReason.value) return null;
+  return serverReason.value === "flag" ? "O2_SLACK_ENABLED" : "O2_MASTER_ENCRYPTION_KEY";
+});
+const unavailableKey = computed(() => {
+  if (isCloud.value) return "slackApp.destination.unavailableCloud" as const;
+  if (!serverReason.value) return "slackApp.destination.unavailableReason" as const;
+  if (!props.canManageSlack) return "slackApp.destination.unavailableNoAccess" as const;
+  return serverReason.value === "flag"
+    ? ("slackApp.destination.unavailableFlag" as const)
+    : ("slackApp.destination.unavailableMasterKey" as const);
+});
 
-// Reactive state
 const selectedType = computed({
   get: () => props.modelValue,
   // Only user selections flow through the setter, so null/'' never get emitted.
-  set: (value: PrebuiltTypeId | "custom") => emit("update:modelValue", value),
+  set: (value: DestinationTileId | "custom") => emit("update:modelValue", value),
 });
 
-// Computed properties
-const filteredDestinationTypes = computed(() => PREBUILT_DESTINATION_TYPES);
+const filteredDestinationTypes = computed(() => destinationTypeTiles(props.slackApp));
+const unavailableText = computed(() =>
+  operatorSetting.value
+    ? t(unavailableKey.value, { variable: raw(operatorSetting.value) })
+    : t(unavailableKey.value),
+);
 
-// Methods
-function selectType(typeId: PrebuiltTypeId | "custom") {
+// Separate lines, not one joined sentence, so every locale keeps its own punctuation.
+function tileTips(tile: (typeof filteredDestinationTypes.value)[number]): string[] {
+  const hasSlackWebhook = filteredDestinationTypes.value.some((type) => type.id === "slack");
+  const isSlack = tile.id === "slack" || tile.id === "slack_app";
+  return [
+    ...(tile.disabled ? [unavailableText.value] : []),
+    ...(tile.disabled && !isSlack ? [] : [t(tile.descriptionKey)]),
+    ...(isSlack && hasSlackWebhook ? [t("slackApp.destination.choiceHint")] : []),
+  ];
+}
+
+const tiles = computed(() => [
+  ...filteredDestinationTypes.value.map((tile) => ({
+    ...tile,
+    short: t(tile.shortKey),
+    tips: tileTips(tile),
+  })),
+  {
+    id: "custom" as const,
+    name: t("alerts.customDestination"),
+    short: t("alert_destinations.prebuilt.customShort"),
+    tips: [t("alerts.customDestinationDescription")],
+    icon: "settings",
+    image: undefined,
+    disabled: false,
+  },
+]);
+
+function selectType(typeId: DestinationTileId | "custom") {
+  if (filteredDestinationTypes.value.find((type) => type.id === typeId)?.disabled) return;
   selectedType.value = typeId;
   emit("select", typeId);
 }
 
 function getIconName(icon: string): string {
-  // Map destination type icons to icon names
   const iconMap: Record<string, string> = {
     slack: "chat",
     discord: "forum",
@@ -174,6 +212,7 @@ function getIconName(icon: string): string {
     pagerduty: "warning",
     opsgenie: "notifications_active",
     servicenow: "support_agent",
+    jira: "assignment",
     custom: "settings",
   };
 

@@ -220,6 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aliases="aliases"
         :loading="testing"
         :sending="sendingTest"
+        :test-result="testResult"
         :can-configure="canConfigure"
         :embedded="true"
         @run="runPreview"
@@ -255,6 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :model-value="!!ruleToDelete"
       :title="t('oncall.removeRuleTitle')"
       :message="t('oncall.removeRuleMessage')"
+      ok-variant="destructive"
       @update:ok="deleteRule"
       @update:cancel="ruleToDelete = null"
     />
@@ -324,6 +326,7 @@ import type {
   RoutingPreview,
   TeamOverview,
   TeamRungSummary,
+  TestPageResult,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -362,6 +365,7 @@ const loadingRules = ref(true);
 const loadingSignals = ref(true);
 const testing = ref(false);
 const sendingTest = ref(false);
+const testResult = ref<TestPageResult | null>(null);
 const saving = ref(false);
 
 /// Which list is on screen. `signals` is the queue of paths nothing claims.
@@ -808,6 +812,7 @@ async function dismissSignal(signal: UnroutedSignal) {
 
 async function runPreview(query: SimulatorQuery) {
   testing.value = true;
+  testResult.value = null;
   try {
     // Uncached for the same reason as the editor's dry run: the answer belongs to this query alone.
     const res = await oncallService.previewRouting({
@@ -826,22 +831,13 @@ async function runPreview(query: SimulatorQuery) {
 /// two are separate buttons rather than one control with a mode.
 async function sendTestPage(value: { team_id: string; priority: string }) {
   sendingTest.value = true;
+  testResult.value = null;
   try {
     const res = await testPageWrite.mutateAsync({
       teamId: value.team_id,
       priority: Number(value.priority.replace(/^P/i, "")) || undefined,
     });
-    // `attempts`, not `recipients` — the latter never existed on the wire.
-    const reached = (res.data?.attempts ?? []).filter((attempt) => attempt.delivered).length;
-    const failure = res.data?.attempts.find((attempt) => attempt.detail)?.detail;
-    toast({
-      variant: res.data?.reached_anyone ? "success" : "warning",
-      message: res.data?.reached_anyone
-        ? t("oncall.testPageSent", { count: reached }, reached)
-        : res.data?.not_sent_because
-          ? t("oncall.testPageNobody", { reason: raw(res.data.not_sent_because) })
-          : t("oncall.testPageUndelivered", { reason: raw(failure ?? "") }),
-    });
+    testResult.value = res.data ?? null;
   } catch (err) {
     noteConfigurationDenied(err);
     failed(err, t("oncall.testPageFailed"));

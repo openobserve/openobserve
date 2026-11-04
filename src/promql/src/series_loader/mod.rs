@@ -335,6 +335,7 @@ fn batch_hash_values<'a>(batch: &'a RecordBatch, hash_field_type: &DataType) -> 
         Cow::Borrowed(hash_values.values().as_ref())
     } else {
         let hash_values = batch[HASH_LABEL].as_string::<i32>();
+        // stable gxhash: emitted as `__hash__` and merged across clusters
         let mut hasher = gxhash::new();
         Cow::Owned(
             (0..hash_values.len())

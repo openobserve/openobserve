@@ -22,21 +22,28 @@ import { raw, type TranslateFn } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
+import { DB_SETUP_MODES, dbQuickInstallStep, dbUninstallExtra, manualOnly } from "./dbInstaller";
 import {
   DBM_CONTRIB_VERSION,
   MSSQL_DBM_CONFIG_YAML,
+  MSSQL_2022_PLUS,
   MSSQL_DBM_GRANT_SQL,
   dbmVerifyStep,
 } from "./dbmShared";
 
-// Step 1 — the monitoring login and the grants the receiver needs. On SQL
-// Server 2019 and older, VIEW SERVER STATE replaces VIEW SERVER PERFORMANCE
-// STATE. The login name/password are literals here and in the collector config
-// so the two stay in lockstep.
+// The login name/password are literals here and in the collector config so the two stay in lockstep.
 const GRANT_SQL = `USE master;
 CREATE LOGIN otel WITH PASSWORD = 'YourStrong@Passw0rd';
-GRANT VIEW SERVER PERFORMANCE STATE TO otel;
+-- SQL Server 2022+ has VIEW SERVER PERFORMANCE STATE; 2016-2019 use VIEW SERVER STATE.
+${MSSQL_2022_PLUS}
+  EXEC('GRANT VIEW SERVER PERFORMANCE STATE TO otel');
+ELSE
+  EXEC('GRANT VIEW SERVER STATE TO otel');
 GRANT VIEW ANY DATABASE TO otel;`;
+
+const VERSION_NOTE = raw(
+  "The script checks the server version, so the same commands work on SQL Server 2016, 2017, 2019, 2022 and 2025.",
+);
 
 const applyGrants = (connect: string) => `${connect} -Q "
 ${GRANT_SQL}
@@ -82,6 +89,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
       // samples into the _o2_dbm_server logs stream.
       metaBadges: [t("common.metrics"), t("common.logs")],
     },
+    setupModes: DB_SETUP_MODES,
     steps: [
       {
         id: "prepare",
@@ -118,11 +126,26 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
             code: { lang: "sql", raw: GRANT_SQL },
           },
         ],
+        note: VERSION_NOTE,
+        pills: [
+          raw("SQL Server 2022+ · VIEW SERVER PERFORMANCE STATE"),
+          raw("SQL Server 2016–2019 · VIEW SERVER STATE"),
+        ],
       },
+      dbQuickInstallStep(t, subs, {
+        db: "sqlserver",
+        hostInputId: "server",
+        hostLabelKey: "ingestion.setupCard.sqlServerHostLabel",
+        defaultPort: "1433",
+        defaultUser: "otel",
+        defaultDatabase: "master",
+        dbm: true,
+      }),
       // Pinned so all four Tier-1 cards install the same collector.
-      collectorInstallStep(t, DBM_CONTRIB_VERSION),
+      manualOnly(collectorInstallStep(t, DBM_CONTRIB_VERSION)),
       {
         id: "configure",
+        mode: "manual",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
         descriptionKey: "ingestion.setupCard.configureCollectorDesc",
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
@@ -151,6 +174,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
       },
       {
         id: "run",
+        mode: "manual",
         titleKey: "ingestion.setupCard.runCollectorTitle",
         descriptionKey: "ingestion.setupCard.runCollectorDesc",
         chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
@@ -195,7 +219,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
               raw: `sqlcmd -S localhost,1433 -U sa -P "YOUR_SA_PASSWORD" -C -Q "${MSSQL_DBM_GRANT_SQL}"`,
             },
             note: raw(
-              "VIEW SERVER STATE is what lets the collector read OTHER sessions in sys.dm_exec_requests. The metrics login's VIEW SERVER PERFORMANCE STATE is not enough — it exposes counters, not the session DMVs.",
+              "VIEW SERVER STATE is what lets the collector read OTHER sessions in sys.dm_exec_requests. On SQL Server 2022+, the metrics login's VIEW SERVER PERFORMANCE STATE is not enough — it exposes counters, not the session DMVs.",
             ),
           },
           {
@@ -214,9 +238,15 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
             code: { lang: "sql", raw: MSSQL_DBM_GRANT_SQL },
           },
         ],
+        note: VERSION_NOTE,
+        pills: [
+          raw("SQL Server 2022+ · VIEW SERVER STATE + VIEW SERVER PERFORMANCE STATE"),
+          raw("SQL Server 2016–2019 · VIEW SERVER STATE"),
+        ],
       },
       {
         id: "dbm-configure",
+        mode: "manual",
         titleKey: "ingestion.setupCard.dbmConfigureTitle",
         descriptionKey: "ingestion.setupCard.dbmConfigureMssqlDesc",
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
@@ -245,6 +275,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
       },
       {
         id: "dbm-run",
+        mode: "manual",
         titleKey: "ingestion.setupCard.dbmRunTitle",
         descriptionKey: "ingestion.setupCard.dbmRunMssqlDesc",
         chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
@@ -265,6 +296,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
     // Metrics fan out into one stream per metric — match by keyword: any
     // metrics stream containing "sqlserver" means data is flowing.
     detect: { streamType: "metrics", match: "keyword", streamName: "sqlserver", filter: "" },
+    extras: { uninstall: dbUninstallExtra() },
     docUrl: "https://openobserve.ai/blog/monitor-sql-server-with-otel/",
   };
 }

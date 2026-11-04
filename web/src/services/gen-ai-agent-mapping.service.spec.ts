@@ -86,6 +86,40 @@ describe("listVersionsForCompare", () => {
     });
   });
 
+  it("widens the window to the page start when the page window is longer than retention", async () => {
+    const pageStart = nowMicros - 90 * 24 * 3600 * 1000 * 1000;
+    getMock.mockResolvedValueOnce({ data: { agents: [] } });
+
+    await genAiAgentMappingService.listVersionsForCompare(
+      "org",
+      "checkout-agent",
+      null,
+      nowMicros,
+      pageStart,
+    );
+
+    expect(getMock).toHaveBeenLastCalledWith("/api/org/gen_ai/agents", {
+      params: { start_time: pageStart, end_time: nowMicros },
+    });
+  });
+
+  it("keeps the retention window when the page window is shorter", async () => {
+    const pageStart = nowMicros - 7 * 24 * 3600 * 1000 * 1000;
+    getMock.mockResolvedValueOnce({ data: { agents: [] } });
+
+    await genAiAgentMappingService.listVersionsForCompare(
+      "org",
+      "checkout-agent",
+      null,
+      nowMicros,
+      pageStart,
+    );
+
+    expect(getMock).toHaveBeenLastCalledWith("/api/org/gen_ai/agents", {
+      params: { start_time: nowMicros - 2_592_000_000_000, end_time: nowMicros },
+    });
+  });
+
   it("returns versions outside the page window and excludes the version:null (UNSET) row", async () => {
     getMock.mockResolvedValueOnce({
       data: {

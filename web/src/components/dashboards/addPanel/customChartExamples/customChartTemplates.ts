@@ -1,3 +1,5 @@
+import { trustCustomChartCode } from "@/utils/dashboard/convertCustomChartData";
+
 // Interface for custom chart template modules
 export interface CustomChartTemplateModule {
   code: string;
@@ -56,6 +58,10 @@ const templateMap: Record<string, () => Promise<any>> = {
   "scatter3d-scatter-matrix": () => import("./customChartTemplates/scatter3dScatterMatrix"),
   "scatter3d-dataset": () => import("./customChartTemplates/scatter3dDataset"),
 };
+
+/** Editor content for a template, trusted so its bundled callbacks keep working until the code is edited. */
+export const customChartTemplateContent = (header: string, template: CustomChartTemplateModule) =>
+  trustCustomChartCode(header + template.code);
 
 /**
  * Lazily loads a custom chart template by its value key

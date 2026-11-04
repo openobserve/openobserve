@@ -289,6 +289,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-variable-textbox-default-value"
             />
           </div>
+          <div class="mt-3" v-if="variableData.type === 'date'">
+            <OFormDate
+              name="value"
+              :label="t('dashboard.DefaultValue')"
+              clearable
+              data-test="dashboard-variable-date-default-value"
+            />
+          </div>
+          <div class="mt-3 flex flex-col" v-if="variableData.type === 'date'">
+            <OFormSelect
+              name="dateFormat"
+              :label="t('dashboard.dateFormat')"
+              :options="dateFormatOptions"
+              :help-text="t('dashboard.dateFormatHelp')"
+              data-test="dashboard-variable-date-format-select"
+            />
+          </div>
           <div v-if="variableData.type == 'custom'">
             <div class="flex">
               <div class="w-6"></div>
@@ -508,17 +525,24 @@ import {
   reactive,
   onMounted,
   onActivated,
+  onBeforeUnmount,
   watch,
   toRef,
   computed,
   nextTick,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import {
+  DATE_VARIABLE_FORMATS,
+  DEFAULT_DATE_VARIABLE_FORMAT,
+} from "@/utils/dashboard/variables/variablesUtils";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
 import { addVariable, getDashboard, updateVariable } from "../../../utils/commons";
 import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
+import { useDashboardSettingsDraft } from "./dashboardSettingsDraft";
+import { stableStringify } from "@/utils/drafts/editorDraftStore";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -528,6 +552,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -559,6 +584,7 @@ export default defineComponent({
     OForm,
     OFormSelect,
     OFormInput,
+    OFormDate,
     OFormSwitch,
     OFormCheckbox,
     OCheckbox,
@@ -593,6 +619,7 @@ export default defineComponent({
         filter: [],
       },
       value: "",
+      dateFormat: DEFAULT_DATE_VARIABLE_FORMAT,
       options: [{ label: raw(""), value: "", selected: true }],
       multiSelect: false,
       hideOnDashboard: false,
@@ -670,6 +697,7 @@ export default defineComponent({
         name: fieldView("name"),
         label: fieldView("label"),
         value: fieldView("value"),
+        dateFormat: fieldView("dateFormat"),
         query_data: {
           get: () => formValues.value?.query_data ?? {},
           set: (v: unknown) => {
@@ -700,6 +728,73 @@ export default defineComponent({
     // Form-driven Save spinner for the footer (outside <OForm>, linked by
     // form-id). isSubmitting resets even if the save throws.
     const isSavingVariable = form.useStore((s: any) => s.isSubmitting);
+
+    // The panel editor's variable form has no settings drawer around it, so it keeps no draft.
+    const draftContext = props.isFromAddPanel ? null : useDashboardSettingsDraft();
+    // The form as loaded, once its own watchers settled; null until then.
+    let loadedKey: string | null = null;
+    // Set once the form saved or was cancelled, so its last values never come back as unsaved.
+    let released = false;
+    let lastSaveSucceeded = false;
+    let unregisterDraftSection: (() => void) | null = null;
+
+    const syncDraftSection = () => {
+      if (!draftContext || loadedKey === null || released) return;
+      const values = JSON.parse(JSON.stringify(formValues.value ?? {})) as AddSettingVariableForm;
+      draftContext.pending.variable =
+        stableStringify(values) === loadedKey
+          ? null
+          : { variableName: props.variableName ?? null, values };
+    };
+
+    const pendingForThisVariable = () => {
+      const pending = draftContext?.pending.variable;
+      return pending && pending.variableName === (props.variableName ?? null) ? pending : null;
+    };
+
+    const applyPendingDraft = async () => {
+      const pending = pendingForThisVariable();
+      if (!pending) return;
+      form.reset(pending.values);
+      customSelectAllModel.value =
+        pending.values.type === "custom" &&
+        (pending.values.options ?? []).length > 0 &&
+        (pending.values.options ?? []).every((option: { selected?: boolean }) => option.selected);
+      await nextTick();
+    };
+
+    const releaseDraftSection = () => {
+      released = true;
+      if (draftContext) draftContext.pending.variable = null;
+    };
+
+    const saveForDraft = async (): Promise<boolean> => {
+      lastSaveSucceeded = false;
+      await form.handleSubmit();
+      return lastSaveSucceeded;
+    };
+
+    const startDraftSection = async () => {
+      if (!draftContext) return;
+      // Two ticks: the scope and panel watchers prune the loaded selection after a reset.
+      await nextTick();
+      await nextTick();
+      loadedKey = stableStringify(formValues.value ?? {});
+      await applyPendingDraft();
+      syncDraftSection();
+      unregisterDraftSection = draftContext.register("variable", saveForDraft);
+    };
+
+    watch(formValues, syncDraftSection, { deep: true });
+    watch(
+      () => draftContext?.restoreRevision,
+      async () => {
+        if (loadedKey === null) return;
+        await applyPendingDraft();
+        syncDraftSection();
+      },
+    );
+    onBeforeUnmount(() => unregisterDraftSection?.());
 
     // Format tabs for selection from dashboard data
     const tabsOptions = computed(() =>
@@ -786,10 +881,30 @@ export default defineComponent({
         value: "textbox",
       },
       {
+        label: t("dashboard.date"),
+        value: "date",
+      },
+      {
         label: t("dashboard.custom"),
         value: "custom",
       },
     ]);
+
+    // Each option shows its format name as written in `${name:<format>}`.
+    const dateFormatLabels = {
+      iso: "dashboard.dateFormatIso",
+      dmy: "dashboard.dateFormatDmy",
+      mdy: "dashboard.dateFormatMdy",
+      epoch: "dashboard.dateFormatEpoch",
+      epochms: "dashboard.dateFormatEpochms",
+      epochus: "dashboard.dateFormatEpochus",
+    } as const satisfies Record<(typeof DATE_VARIABLE_FORMATS)[number], string>;
+    const dateFormatOptions = computed(() =>
+      DATE_VARIABLE_FORMATS.map((format) => ({
+        label: t(dateFormatLabels[format]),
+        value: format,
+      })),
+    );
 
     const filterCycleError: any = ref("");
 
@@ -886,6 +1001,7 @@ export default defineComponent({
           filter: variable.query_data?.filter ?? [],
         },
         value: variable.value ?? "",
+        dateFormat: variable.dateFormat ?? DEFAULT_DATE_VARIABLE_FORMAT,
         options,
         multiSelect: variable.multiSelect ?? false,
         hideOnDashboard: variable.hideOnDashboard ?? false,
@@ -945,6 +1061,7 @@ export default defineComponent({
       } catch (error) {
         showErrorNotification(t("dashboard.addSettingVariable.failedToLoadDashboard"));
       }
+      await startDraftSection();
     });
 
     // Watch on scope — reset tab/panel selections via the form.
@@ -997,6 +1114,15 @@ export default defineComponent({
     watch(
       () => [variableData.type],
       async () => {
+        // a date variable keeps its value only when it is a valid YYYY-MM-DD
+        // (only write when non-empty: the write re-triggers this watcher)
+        if (
+          variableData.type == "date" &&
+          variableData.value &&
+          !/^\d{4}-\d{2}-\d{2}$/.test(String(variableData.value))
+        ) {
+          form.setFieldValue("value", "" as never);
+        }
         if (variableData.type == "query_values") {
           // query_data always exists via the schema defaults (no manual init).
 
@@ -1112,6 +1238,7 @@ export default defineComponent({
       delete v.selectedPanels;
 
       if (v.type !== "query_values") delete v.query_data;
+      if (v.type !== "date") delete v.dateFormat;
       if (v.type !== "query_values" && v.type !== "custom") {
         v.multiSelect = false;
         v.selectAllValueForMultiSelect = "";
@@ -1160,6 +1287,8 @@ export default defineComponent({
             route.query.folder ?? "default",
           );
           analytics.track("dashboard_variable_saved", { type: payload.type, is_new: false });
+          lastSaveSucceeded = true;
+          releaseDraftSection();
           emit("save");
         } catch (error: any) {
           if (saveConflict.isConflict(error)) {
@@ -1170,6 +1299,7 @@ export default defineComponent({
               onResolved: () => emit("save"),
             });
             // The variable is already in the working copy; leaving the form open would let Save add it again.
+            releaseDraftSection();
             emit("save");
           } else {
             showErrorNotification(
@@ -1184,6 +1314,8 @@ export default defineComponent({
         try {
           await addVariable(t, store, dashId, payload, route.query.folder ?? "default");
           analytics.track("dashboard_variable_saved", { type: payload.type, is_new: true });
+          lastSaveSucceeded = true;
+          releaseDraftSection();
           emit("save");
         } catch (error: any) {
           if (saveConflict.isConflict(error)) {
@@ -1194,6 +1326,7 @@ export default defineComponent({
               onResolved: () => emit("save"),
             });
             // The variable is already in the working copy; leaving the form open would let Save add it again.
+            releaseDraftSection();
             emit("save");
           } else {
             showErrorNotification(
@@ -1402,6 +1535,7 @@ export default defineComponent({
     };
 
     const close = () => {
+      releaseDraftSection();
       emit("close");
     };
 
@@ -1569,6 +1703,7 @@ export default defineComponent({
       streamsFilteredOptions,
       fieldsFilteredOptions,
       variableTypes,
+      dateFormatOptions,
       streamTypeUpdated,
       streamUpdated,
       onActivated,

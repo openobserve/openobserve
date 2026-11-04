@@ -93,9 +93,10 @@ async function globalSetup() {
     // Verify login success by checking for the main nav rail — the current
     // rail no longer renders per-route `menu-link-*` items (see #13659, which
     // made the same fix in enhanced-baseFixtures.js).
+    // Deployed hosts take ~13s after sign-in to mount the shell, so 10s failed every run there.
     await page.locator('[data-test="navbar-main-nav"]').waitFor({
       state: 'visible',
-      timeout: 10000,
+      timeout: 30000,
     });
     
     testLogger.info('Global login authentication successful');

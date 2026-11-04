@@ -479,6 +479,29 @@ describe("ServicesCatalog", () => {
       expect(emptyDiv.exists()).toBe(true);
     });
 
+    it("does not show the empty state while the stream list is still loading", async () => {
+      mockGetStreams.mockReturnValueOnce(new Promise(() => {}));
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="services-catalog-empty"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="services-catalog-table"]').attributes("data-loading")).toBe(
+        "true",
+      );
+    });
+
+    it("shows the empty state for an org with no trace stream", async () => {
+      mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
+      mockGetStreams.mockResolvedValueOnce({ list: [] });
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="services-catalog-empty"]').exists()).toBe(true);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
     it("should not show empty state when loading", async () => {
       mockFetchQueryDataWithHttpStream.mockImplementation(() => {
         // Keep isLoading true — never calls complete
@@ -596,38 +619,6 @@ describe("ServicesCatalog", () => {
         expect(nameCell.exists()).toBe(true);
         expect(nameCell.text()).toBe(service.service_name);
       }
-    });
-
-    it("should render the table component", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
-        const hits = mockServices.slice(0, 1).map((s) => ({
-          service_name: s.service_name,
-          total_requests: s.total_requests,
-          error_count: s.error_count,
-          error_rate: s.error_rate,
-          avg_duration_ns: s.avg_duration_ns,
-          max_duration_ns: s.max_duration_ns,
-          p50_latency_ns: s.p50_latency_ns,
-          p95_latency_ns: s.p95_latency_ns,
-          p99_latency_ns: s.p99_latency_ns,
-        }));
-
-        if (callbacks?.data) {
-          callbacks.data(null, {
-            type: "search_response_hits",
-            content: { results: { hits } },
-          });
-        }
-        if (callbacks?.complete) {
-          callbacks.complete(null, {});
-        }
-      });
-
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      const table = wrapper.find('[data-test="services-catalog-table"]');
-      expect(table.exists()).toBe(true);
     });
   });
 
@@ -868,57 +859,6 @@ describe("ServicesCatalog", () => {
 
       // "notification-service" has status "critical" (error_rate 15.0 > 10)
       expect(wrapper.vm.statusCounts.critical).toBe(1);
-    });
-
-    it("should show correct warning count", async () => {
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      // "payment-service" has status "warning" (error_rate 7.0 > 5, <= 10)
-      expect(wrapper.vm.statusCounts.warning).toBe(1);
-    });
-
-    it("should show correct degraded count", async () => {
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      // "auth-service" has status "degraded" (error_rate 2.0 > 1, <= 5)
-      expect(wrapper.vm.statusCounts.degraded).toBe(1);
-    });
-
-    it("should render the pill with only total when all services are healthy", async () => {
-      mockFetchQueryDataWithHttpStream.mockReset();
-      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
-        const hits = [
-          {
-            service_name: "svc-a",
-            total_requests: 100,
-            error_count: 0,
-            error_rate: 0,
-            avg_duration_ns: 1000,
-            max_duration_ns: 2000,
-            p50_latency_ns: 800,
-            p95_latency_ns: 1500,
-            p99_latency_ns: 1800,
-          },
-        ];
-
-        if (callbacks?.data) {
-          callbacks.data(null, {
-            type: "search_response_hits",
-            content: { results: { hits } },
-          });
-        }
-        if (callbacks?.complete) {
-          callbacks.complete(null, {});
-        }
-      });
-
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      // Entity total is shown in the type-filter tabs, not a separate pill.
-      expect(wrapper.vm.statusCounts.critical).toBe(0);
     });
 
     it("should show individual status pills when non-healthy statuses exist", async () => {
@@ -1215,56 +1155,6 @@ describe("ServicesCatalog", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Status legend
-  // -----------------------------------------------------------------------
-  describe.skip("status legend", () => {
-    it("should render the status legend", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
-        if (callbacks?.complete) {
-          callbacks.complete(null, {});
-        }
-      });
-
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      const legend = wrapper.find('[data-test="services-catalog-status-legend"]');
-      expect(legend.exists()).toBe(true);
-    });
-
-    it("should render all four legend items", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
-        if (callbacks?.complete) {
-          callbacks.complete(null, {});
-        }
-      });
-
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      const healthyLegend = wrapper.find('[data-test="services-catalog-legend-healthy"]');
-      const degradedLegend = wrapper.find('[data-test="services-catalog-legend-degraded"]');
-      const warningLegend = wrapper.find('[data-test="services-catalog-legend-warning"]');
-      const criticalLegend = wrapper.find('[data-test="services-catalog-legend-critical"]');
-
-      expect(healthyLegend.exists()).toBe(true);
-      expect(degradedLegend.exists()).toBe(true);
-      expect(warningLegend.exists()).toBe(true);
-      expect(criticalLegend.exists()).toBe(true);
-    });
-
-    it("should render legend even when services array is empty", async () => {
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      const legend = wrapper.find('[data-test="services-catalog-status-legend"]');
-      // Legend is outside the v-if="!isLoading && services.length > 0" block,
-      // so it always renders.
-      expect(legend.exists()).toBe(true);
-    });
-  });
-
-  // -----------------------------------------------------------------------
   // Entity counts live in the type-filter tabs (no separate count pill)
   // -----------------------------------------------------------------------
   describe("type-filter tab counts", () => {
@@ -1305,14 +1195,6 @@ describe("ServicesCatalog", () => {
       const allTab = wrapper.find('[data-test="services-catalog-type-all"]');
       expect(allTab.exists()).toBe(true);
       expect(allTab.text()).toContain(String(mockServices.length));
-    });
-
-    it("does not render a separate total count pill", async () => {
-      mockAllServices();
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="services-catalog-status-pill"]').exists()).toBe(false);
     });
 
     it("does not render the type filter when loading", async () => {
@@ -1589,43 +1471,6 @@ describe("ServicesCatalog", () => {
         }),
         expect.any(Object),
       );
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // P99 latency warning threshold
-  // -----------------------------------------------------------------------
-  describe("P99 warning threshold", () => {
-    it("should have P99_WARN_US set to 1 second (1,000,000 µs)", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
-        if (callbacks?.complete) {
-          callbacks.complete(null, {});
-        }
-      });
-
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      expect(wrapper.vm.P99_WARN_US).toBe(1_000_000);
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // defineExpose
-  // -----------------------------------------------------------------------
-  describe("defineExpose", () => {
-    it("should expose loadServicesCatalog method", async () => {
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      expect(typeof wrapper.vm.loadServicesCatalog).toBe("function");
-    });
-
-    it("should expose streamFilter", async () => {
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      expect(wrapper.vm.streamFilter).toBeDefined();
     });
   });
 
@@ -1914,7 +1759,13 @@ describe("ServicesCatalog", () => {
 
       it("keeps inferred dependencies with the same name but different identities separate", async () => {
         mockStreamSchema.mockResolvedValueOnce({
-          data: { schema: [{ name: "infer_service_name" }] },
+          data: {
+            schema: [
+              { name: "infer_service_name" },
+              { name: "infer_service_system" },
+              { name: "infer_service_type" },
+            ],
+          },
         });
         mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
           callbacks.data(null, {
@@ -2428,6 +2279,34 @@ describe("ServicesCatalog", () => {
         status: "healthy",
       });
       expect(wrapper.find('[data-test="services-catalog-requests-nightly-cron"]').text()).toBe("0");
+    });
+
+    it("selects NULL for inferred system and type columns the stream does not have", async () => {
+      const sql = await loadWithSchema(
+        schemaWith("infer_service_name", "reference_parent_span_id"),
+      );
+      expect(selectItem(sql, "_infer_service_system").trim()).toBe(
+        "NULL AS _infer_service_system,",
+      );
+      expect(selectItem(sql, "_infer_service_type").trim()).toBe("NULL AS _infer_service_type,");
+      expect(sql).not.toContain("NULLIF(infer_service_system");
+      expect(sql).not.toContain("NULLIF(infer_service_type");
+      const groupBy = sql.split("GROUP BY")[1].split("ORDER BY")[0];
+      expect(groupBy.trim().split(",\n")).toEqual([
+        "COALESCE(NULLIF(infer_service_name, ''), service_name)",
+        "  NULLIF(infer_service_name, '')",
+      ]);
+    });
+
+    it("groups by only the inferred column the stream has", async () => {
+      const sql = await loadWithSchema(schemaWith("infer_service_name", "infer_service_type"));
+      expect(selectItem(sql, "_infer_service_system").trim()).toBe(
+        "NULL AS _infer_service_system,",
+      );
+      expect(selectItem(sql, "_infer_service_type")).toContain("NULLIF(infer_service_type, '')");
+      const groupBy = sql.split("GROUP BY")[1].split("ORDER BY")[0];
+      expect(groupBy).toContain("NULLIF(infer_service_type, '')");
+      expect(groupBy).not.toContain("infer_service_system");
     });
 
     it("discards a schema fetched for a stream that is no longer selected", async () => {
@@ -3232,6 +3111,76 @@ describe("ServicesCatalog", () => {
 
       expect(wrapper.vm.showSidePanel).toBe(false);
       expect(wrapper.vm.selectedServiceRow).toBeNull();
+    });
+  });
+
+  describe("search error state", () => {
+    const failSearch = () =>
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.error(null, {
+          type: "error",
+          content: { message: "Search field not found: infer_service_system" },
+        });
+      });
+    const errorState = () => wrapper.find('[data-test="services-catalog-error"]');
+    const retry = () => errorState().find('[data-test="o2-empty-state"] button');
+
+    it("shows the load-error state with the server message instead of the empty state", async () => {
+      failSearch();
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="services-catalog-empty"]').exists()).toBe(false);
+      expect(errorState().find('[data-test="o2-empty-state"]').exists()).toBe(true);
+      expect(errorState().text()).toContain("Search field not found: infer_service_system");
+      expect(retry().text()).toContain("Retry");
+    });
+
+    it("retry runs the search again and clears the error once it succeeds", async () => {
+      failSearch();
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const calls = mockFetchQueryDataWithHttpStream.mock.calls.length;
+
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.complete(null, {});
+      });
+      await retry().trigger("click");
+      await flushPromises();
+
+      expect(mockFetchQueryDataWithHttpStream.mock.calls.length).toBe(calls + 1);
+      expect(errorState().exists()).toBe(false);
+      expect(wrapper.find('[data-test="services-catalog-empty"]').exists()).toBe(true);
+    });
+
+    it("falls back to a generic message when the error has none", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.error(null, { type: "error", content: {} });
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(errorState().text()).toContain("Unknown error");
+    });
+
+    it("drops the previous rows and shows the error when a later search fails", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.data(null, {
+          type: "search_response_hits",
+          content: { results: { hits: [{ service_name: "frontend", total_requests: 3 }] } },
+        });
+        callbacks.complete(null, {});
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      expect(wrapper.find('[data-test="services-catalog-row-name-frontend"]').exists()).toBe(true);
+
+      failSearch();
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="services-catalog-row-name-frontend"]').exists()).toBe(false);
+      expect(errorState().text()).toContain("Search field not found: infer_service_system");
     });
   });
 

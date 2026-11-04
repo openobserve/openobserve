@@ -1068,7 +1068,7 @@ pub(crate) mod tests {
         );
     }
 
-    fn pre_run_topology() -> serde_json::Value {
+    pub(crate) fn pre_run_topology() -> serde_json::Value {
         serde_json::json!({
             "nodes": [],
             "edges": [],
@@ -1078,7 +1078,7 @@ pub(crate) mod tests {
         })
     }
 
-    async fn completed_at(org_id: &str, incident_id: &str, timestamp: i64) {
+    pub(crate) async fn completed_at(org_id: &str, incident_id: &str, timestamp: i64) {
         let mut event = IncidentEvent::ai_analysis_complete();
         event.timestamp = timestamp;
         infra::table::incident_events::append(org_id, incident_id, event)
@@ -1212,6 +1212,56 @@ pub(crate) mod tests {
             .map(|report| report.report)
             .collect();
         assert_eq!(v1, ["current report", "older report"]);
+    }
+
+    /// The upgrade's `v1-0` pointer reads as the topology did; a new run keeps it as previous.
+    #[tokio::test]
+    async fn a_backfilled_v1_pointer_reads_like_the_pre_run_reports() {
+        let _db = db().await;
+        let (org, inc) = new_incident(Some(pre_run_topology())).await;
+        completed_at(&org, &inc, 150).await;
+        let before = rca_detail(&org, &incident_row(&org, &inc).await)
+            .await
+            .unwrap()
+            .unwrap();
+
+        runs_table::backfill_v1_pointers_for_tests().await.unwrap();
+
+        let row = incident_row(&org, &inc).await;
+        assert_eq!(
+            (row.rca_run_id.as_deref(), row.rca_state.as_deref()),
+            (Some("v1-0"), Some("completed"))
+        );
+        let after = rca_detail(&org, &row).await.unwrap().unwrap();
+        assert_eq!(
+            after, before,
+            "the stored pointer reads as the topology did"
+        );
+        assert_eq!(
+            crate::alerts::rca_turn::cancel_rca_run(&org, &inc, "a.rao@acme.io")
+                .await
+                .unwrap(),
+            None,
+            "a v1 report is no run to cancel"
+        );
+
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+
+        let summary =
+            runs_table::summary_from_incident(&incident_row(&org, &inc).await, 0, 600).unwrap();
+        assert_eq!(
+            (summary.run_id.as_str(), summary.report_format),
+            (run_id.as_str(), ReportFormat::V2)
+        );
+        assert_eq!(
+            summary.summary.previous,
+            Some(config::meta::alerts::rca_runs::PreviousResult {
+                run_id: "v1-0".to_string(),
+                outcome: None,
+                confidence: None,
+                ended_at: 200,
+            })
+        );
     }
 
     /// The detail names the runs and carries no report text; never analyzed is `None`.

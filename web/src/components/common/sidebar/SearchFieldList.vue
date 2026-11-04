@@ -34,7 +34,7 @@
               v-if="(groupFieldCount[row.group] ?? 0) > 0"
               variant="ghost"
               size="icon"
-              class="flex-shrink-0"
+              class="size-5! flex-shrink-0"
             >
               <OIcon
                 :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
@@ -204,6 +204,7 @@
 </template>
 
 <script setup lang="ts">
+import { unescapeSqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { computed, ref, watch, onMounted, type Ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -344,14 +345,14 @@ function walkFilters(
         if (node.left?.type === "column_ref") {
           const col = extractColName(node.left.column);
           if (col && node.right?.value != null) {
-            push(include, col, String(node.right.value));
+            push(include, col, unescapeSqlLiteral(node.right.value));
           }
         }
       } else if (op === "!=" || op === "<>") {
         if (node.left?.type === "column_ref") {
           const col = extractColName(node.left.column);
           if (col && node.right?.value != null) {
-            push(exclude, col, String(node.right.value));
+            push(exclude, col, unescapeSqlLiteral(node.right.value));
           }
         }
       } else if (op === "IS") {

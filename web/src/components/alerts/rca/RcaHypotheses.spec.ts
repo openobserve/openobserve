@@ -91,6 +91,25 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
     ).toEqual(["DNS", "Node CPU saturation"]);
   });
 
+  it("agent inline code in a statement or reason shows as code, never as backticks", () => {
+    const wrapper = mountList(
+      rcaRunSummary({
+        hypotheses: [
+          rcaHypothesis({
+            statement: "The `adFailure` flag was toggled on",
+            reason: "`GET /api/data` errors began at the toggle",
+          }),
+        ],
+      }),
+    );
+
+    const statement = wrapper.find('[data-test="rca-hypothesis-statement"]');
+    expect(statement.text()).toBe("The adFailure flag was toggled on");
+    expect(statement.find("code").text()).toBe("adFailure");
+    expect(wrapper.text()).not.toContain("`");
+    expect(wrapper.findAll("code").map((code) => code.text())).toContain("GET /api/data");
+  });
+
   it("frame C: Not confirmed first, and a root_cause hypothesis reads 'Root cause · not confirmed' (VE18)", () => {
     const wrapper = mountList(rcaRunSummaryInconclusive());
 

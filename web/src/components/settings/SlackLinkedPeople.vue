@@ -170,7 +170,8 @@ const confirmUnlink = (): void => {
     <ConfirmDialog
       v-model="confirmOpen"
       :title="t('slackApp.people.unlinkTitle', { user: pending?.user_email ?? '' })"
-      :message="t('slackApp.people.unlinkMessage', { user: pending?.user_email ?? '' })"
+      message-keypath="slackApp.people.unlinkMessage"
+      :message-name="pending?.user_email"
       :ok-label="t('slackApp.people.unlink')"
       ok-variant="destructive"
       focus-cancel

@@ -333,15 +333,25 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(true);
     });
 
-    it("TH32: an expired thread shows the expired transcript", async () => {
+    it("TH32: an expired thread of a finished run shows the expired transcript", async () => {
       answers.thread = null;
       answers.threadStatus = "expired";
-      wrapper = mountPanel(liveProps());
+      wrapper = mountPanel(completedProps());
       await flushPromises();
 
       expect(byTest(wrapper, "rca-thread-empty").text()).toBe(
         "The transcript of this run is no longer stored.",
       );
+    });
+
+    it("a live run whose transcript is not stored yet shows the working line", async () => {
+      answers.thread = null;
+      answers.threadStatus = "expired";
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-working").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-thread-empty").exists()).toBe(false);
     });
   });
 
@@ -374,6 +384,32 @@ describe("IncidentRCAAnalysis", () => {
       );
       await byTest(wrapper, "rca-banner-cancel-btn").trigger("click");
       expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
+    });
+
+    it("M: a resumed run names the step it resumed from", async () => {
+      wrapper = mountPanel(
+        liveProps({
+          rca: rcaSummary({
+            current_run: rcaRun({
+              trigger: "resume",
+              context_used: {
+                resumed_from: {
+                  run_id: "run-1",
+                  steps: 2,
+                  from_step: { index: 3, stage: "changes", title: "Await flag change actor" },
+                },
+              },
+            }),
+          }),
+          reportRun: rcaRunItem(),
+          reportText: REPORT,
+        }),
+      );
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-reanalyzing-message").text()).toBe(
+        "Resuming from “Await flag change actor”…",
+      );
     });
 
     it("M: Follow in thread scrolls the thread column", async () => {
@@ -497,6 +533,17 @@ describe("IncidentRCAAnalysis", () => {
       await flushPromises();
 
       expect(byTest(wrapper, "rca-cancelled-message").text()).toBe(cancelledSentence(4, 5));
+    });
+
+    it("E (m1): with no thread, the run's stored Resume count wins over m - 1", async () => {
+      answers.thread = null;
+      answers.threadStatus = "expired";
+      const props = cancelledProps(5);
+      props.rca.summary.reusable_steps = 2;
+      wrapper = mountPanel(props);
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-cancelled-message").text()).toBe(cancelledSentence(2, 5));
     });
 
     it("E (m1): with no thread and no steps, 0 of 0", async () => {
@@ -695,19 +742,23 @@ describe("IncidentRCAAnalysis", () => {
       expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
-    it("Download as Markdown writes a .md file with the same text", async () => {
+    it("Download as Markdown writes a .md file with the same text, named for its run", async () => {
       const createObjectURL = vi.mocked(URL.createObjectURL);
       createObjectURL.mockClear().mockReturnValueOnce("blob:rca");
       vi.mocked(URL.revokeObjectURL).mockClear();
       const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-      wrapper = mountPanel(completedProps());
+      // The shown run-1 is Run 2: run-0 came before it.
+      wrapper = mountPanel({
+        ...completedProps(),
+        history: [rcaRunItem(), rcaRunItem({ run_id: "run-0" })],
+      });
       await flushPromises();
 
       await byTest(wrapper, "rca-download-btn").trigger("click");
 
       expect(click).toHaveBeenCalledTimes(1);
       const anchor = click.mock.contexts[0] as HTMLAnchorElement;
-      expect(anchor.download).toBe("incident-inc-1-rca.md");
+      expect(anchor.download).toBe("incident-inc-1-rca-run-2.md");
       const blob = createObjectURL.mock.calls[0][0] as Blob;
       expect(blob.type).toBe("text/markdown;charset=utf-8");
       // jsdom's Blob has no text(); FileReader reads it.
@@ -1017,7 +1068,7 @@ describe("IncidentRCAAnalysis", () => {
       });
       await flushPromises();
 
-      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Failed");
+      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Cancelled");
       expect(byTest(wrapper, "rca-verdict-headline").text()).toBe(
         "Run cancelled before a verdict. Partial results below",
       );
@@ -1304,7 +1355,7 @@ describe("IncidentRCAAnalysis", () => {
       );
       // RCA_T0 + 30 min in the store's UTC zone.
       expect(byTest(wrapper, "rca-paused-deadline").text()).toBe(
-        "The agent waits until 09:23 for an answer, then closes the run as Blocked.",
+        "The agent waits until 09:23 UTC for an answer, then closes the run as Blocked.",
       );
       expect(byTest(wrapper, "rca-thread-question-status").text()).toBe("Waiting for an answer");
       expect(byTest(wrapper, "rca-steer-question").text()).toContain("Agent asks:");
@@ -1323,9 +1374,33 @@ describe("IncidentRCAAnalysis", () => {
       await flushPromises();
 
       expect(byTest(wrapper, "rca-verdict-unblocked").text()).toBe(
-        "Unblocked by a.rao at 08:58 · change history from a human lead",
+        "Unblocked by a.rao at 08:58 UTC · change history from a human lead",
       );
       expect(byTest(wrapper, "rca-thread-question-status").text()).toBe("Answered by a.rao");
+    });
+
+    it("R-I9: the deadline and the 'Unblocked by' time are local and name the viewer's zone", async () => {
+      const zone = store.state.timezone;
+      store.state.timezone = "Asia/Kolkata";
+      try {
+        answers.thread = rcaThread({
+          run_id: "run-1",
+          active: false,
+          steps: [rcaStep()],
+          questions: [rcaThreadQuestion()],
+        });
+        answers.steering = rcaSteeringUnblocked();
+        answers.runSummary = rcaRunSummary();
+        wrapper = mountSteerable(completedProps());
+        await flushPromises();
+
+        // read_at = RCA_T0 + 310 s = 08:58:30 UTC = 14:28 in Asia/Kolkata.
+        expect(byTest(wrapper, "rca-verdict-unblocked").text()).toBe(
+          "Unblocked by a.rao at 14:28 GMT+5:30 · change history from a human lead",
+        );
+      } finally {
+        store.state.timezone = zone;
+      }
     });
 
     it("H16: a hypothesis action POSTs its body; the row shows 'Pending · <author>' until read", async () => {
@@ -1496,6 +1571,18 @@ describe("IncidentRCAAnalysis", () => {
         await flushPromises();
 
         expect(byTest(wrapper, "rca-resume-btn").exists()).toBe(false);
+      });
+
+      it("the thread of a run Resume can continue is not called final; a picked earlier run's is", async () => {
+        wrapper = mountPanel(failedProps({ resumeRunId: "run-2" }));
+        await flushPromises();
+        expect(byTest(wrapper, "rca-thread-final-note").text()).toBe(
+          "This run stopped before it finished. Resume run continues from the last finished step.",
+        );
+
+        await wrapper.setProps({ viewedRun: rcaRunItem(), threadRunId: "run-1" });
+        await flushPromises();
+        expect(byTest(wrapper, "rca-thread-final-note").text()).toContain("This report is final");
       });
 
       it("the resume_run blind spot of the latest run emits resume-rca", async () => {

@@ -338,7 +338,7 @@ const cases: [string, Row, boolean, Expected][] = [
       kind: "state",
       label: "Blocked",
       tone: "warn-strong",
-      detail: "Needs change history · until 12:30",
+      detail: "Needs change history · until 12:30 UTC",
       rerunNote: "",
     },
   ],
@@ -378,7 +378,7 @@ const cases: [string, Row, boolean, Expected][] = [
     },
   ],
   [
-    "SG41: a run stopped on resolve shows its detail",
+    "SG41: a run stopped on resolve is Cancelled, as in the drawer, and shows its detail",
     {
       rca: rca({ state: "cancelled", summary: { detail: "Stopped: incident resolved" } }),
       severity: "P2",
@@ -386,7 +386,7 @@ const cases: [string, Row, boolean, Expected][] = [
     true,
     {
       kind: "state",
-      label: "Failed",
+      label: "Cancelled",
       tone: "err",
       detail: "Stopped: incident resolved",
       rerunNote: "",
@@ -431,7 +431,17 @@ describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
     },
   );
 
-  it("SG26: the until time is in the viewer's zone", () => {
+  it("a stored Resume count wins over the steps before the open one", () => {
+    const row = {
+      rca: rca({ state: "cancelled", summary: { steps: 4, reusable_steps: 1 } }),
+      severity: "P2",
+    } as Row;
+    expect(rcaCellModel(row, { rcaEnabled: true, now: NOW }).detail).toBe(
+      gt("alerts.incidents.aiAnalysis.cancelledAfterChecks", { count: 1 }, 1),
+    );
+  });
+
+  it("SG26: the until time is in the viewer's zone and names it", () => {
     const row = {
       rca: rca({
         state: "waiting_input",
@@ -441,7 +451,7 @@ describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
       severity: "P2",
     } as Row;
     const model = rcaCellModel(row, { rcaEnabled: true, now: NOW, timezone: "Asia/Kolkata" });
-    expect(model.detail).toBe("Needs change history · until 18:00");
+    expect(model.detail).toBe("Needs change history · until 18:00 GMT+5:30");
   });
 });
 

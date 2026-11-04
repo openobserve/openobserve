@@ -379,6 +379,11 @@ async fn compile_realtime_pipeline(
 ) -> anyhow::Result<ExecutablePipeline> {
     let compiled = ExecutablePipeline::new(pipeline).await;
     let mut broken = BROKEN_REALTIME_PIPELINES.write().await;
+    // A broken entry is reported on the source stream, so never on another org's.
+    if !stream_params.org_id.is_empty() && stream_params.org_id.as_str() != pipeline.org {
+        broken.remove(&pipeline.id);
+        return compiled;
+    }
     match &compiled {
         Ok(_) => {
             broken.remove(&pipeline.id);
@@ -1086,5 +1091,39 @@ mod tests {
             &stream_a,
             start + BROKEN_PIPELINE_LOG_INTERVAL
         ));
+    }
+
+    #[tokio::test]
+    async fn a_pipeline_with_a_node_in_another_org_does_not_compile() {
+        let foreign = StreamParams::new("exec_org_b", "exec_stream", StreamType::Logs);
+        let mut pipeline = realtime_pipeline("exec_cross_org", &foreign);
+        pipeline.org = "exec_org_a".to_string();
+        assert!(ExecutablePipeline::new(&pipeline).await.is_err());
+        assert!(
+            compile_realtime_pipeline(&pipeline, &foreign)
+                .await
+                .is_err()
+        );
+        assert!(
+            broken_on_node("exec_org_b").await.is_empty(),
+            "a cross-org pipeline must not be reported on the other org's stream"
+        );
+
+        let own = StreamParams::new("exec_org_c", "exec_stream", StreamType::Logs);
+        let mut pipeline = realtime_pipeline("exec_foreign_dest", &own);
+        pipeline.nodes[1].data =
+            NodeData::Stream(StreamParams::new("exec_org_d", "dest", StreamType::Logs));
+        assert!(compile_realtime_pipeline(&pipeline, &own).await.is_err());
+        assert!(
+            broken_on_node("exec_org_c")
+                .await
+                .contains_key("exec_foreign_dest"),
+            "a foreign destination is still reported on the pipeline's own source stream"
+        );
+
+        let legacy = StreamParams::new("", "exec_stream", StreamType::Logs);
+        let mut pipeline = realtime_pipeline("exec_legacy", &legacy);
+        pipeline.org = "exec_org_a".to_string();
+        assert!(ExecutablePipeline::new(&pipeline).await.is_ok());
     }
 }

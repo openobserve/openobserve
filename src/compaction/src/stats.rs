@@ -82,6 +82,7 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
 
     let grouped = db::schema::list_all_streams_grouped().await;
     let mut total_streams = 0;
+    let mut failed_streams = 0;
     for (org_id, stream_types) in grouped {
         for (stream_type, streams) in stream_types {
             if stream_type == StreamType::Index || stream_type == StreamType::Filelist {
@@ -95,18 +96,19 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
                 }
 
                 let start = std::time::Instant::now();
-                for (date_range, is_recent) in iter.iter() {
-                    if !is_recent && no_need_update_old_stats {
-                        continue;
-                    }
-                    update_stream_stats_with_retry(
-                        &org_id,
-                        stream_type,
-                        &stream_name,
-                        date_range.clone(),
-                        *is_recent,
-                    )
-                    .await?;
+                // a stream that fails must not stop the stats of every stream after it
+                if update_stream_stats_ranges(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    &iter,
+                    no_need_update_old_stats,
+                )
+                .await
+                .is_err()
+                {
+                    failed_streams += 1;
+                    continue;
                 }
 
                 log::info!(
@@ -115,6 +117,9 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
                 );
             }
         }
+    }
+    if failed_streams > 0 {
+        log::warn!("[STATS] {failed_streams} streams failed to update stats in this scan");
     }
 
     // Update global metrics
@@ -184,6 +189,29 @@ async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
     }
 }
 
+async fn update_stream_stats_ranges(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    ranges: &[((String, String), bool)],
+    recent_only: bool,
+) -> Result<(), anyhow::Error> {
+    for (date_range, is_recent) in ranges {
+        if !is_recent && recent_only {
+            continue;
+        }
+        update_stream_stats_with_retry(
+            org_id,
+            stream_type,
+            stream_name,
+            date_range.clone(),
+            *is_recent,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
 // Transient metastore errors must not abort the whole run, which would restart it from scratch
 async fn update_stream_stats_with_retry(
     org_id: &str,
@@ -218,7 +246,10 @@ async fn update_stream_stats_with_retry(
         metrics::STREAM_STATS_SCAN_ERRORS_TOTAL
             .with_label_values(&labels)
             .inc();
-        if attempt >= STATS_SCAN_MAX_ATTEMPTS {
+        let permanent = e
+            .downcast_ref::<infra::errors::Error>()
+            .is_some_and(infra::errors::Error::is_data_exception);
+        if attempt >= STATS_SCAN_MAX_ATTEMPTS || permanent {
             log::error!(
                 "[STATS] update stats for {org_id}/{stream_type}/{stream_name} failed after {attempt} attempts: {e}"
             );
@@ -340,6 +371,34 @@ mod tests {
         assert_eq!(recent_range, (boundary.clone(), String::new()));
         assert!(!old);
         assert_eq!(old_range, (String::new(), boundary));
+    }
+
+    /// CI runs this under both meta stores; only PostgreSQL bounds the stream_stats key column.
+    #[tokio::test]
+    async fn test_too_long_stream_fails_without_retry() {
+        infra_file_list::create_table().await.unwrap();
+        infra_file_list::create_table_index().await.unwrap();
+        let stream_name = "s".repeat(300);
+        let start = std::time::Instant::now();
+        let result = update_stream_stats_ranges(
+            "org",
+            StreamType::Logs,
+            &stream_name,
+            &stats_date_ranges(),
+            true,
+        )
+        .await;
+        let meta_store =
+            config::meta::meta_store::MetaStore::from(get_config().common.meta_store.as_str());
+        if meta_store == config::meta::meta_store::MetaStore::PostgreSQL {
+            assert!(result.is_err());
+            assert!(
+                start.elapsed() < STATS_SCAN_RETRY_DELAY,
+                "a data error was retried"
+            );
+        } else {
+            assert!(result.is_ok(), "{result:?}");
+        }
     }
 
     #[test]

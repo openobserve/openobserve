@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="o-field-row group rounded-default hover:bg-field-list-row-hover-bg relative flex h-6 w-full items-center gap-1 ps-1"
+    class="o-field-row group rounded-default hover:bg-field-list-row-hover-bg relative flex h-6 w-full items-center gap-1 ps-1 max-md:h-7"
     :class="[highlight && 'bg-field-list-row-hover-bg!']"
   >
     <slot />

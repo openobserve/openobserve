@@ -170,7 +170,7 @@ describe("useFirstDataNotice", () => {
     });
   });
 
-  it("bounds the flag-off source to three limit-1 probes and 20-row pages", async () => {
+  it("bounds the flag-off source to one limit-1 probe per type and 20-row pages", async () => {
     writeFirstDataRecord(ORG, { lastVisit: 1, hadData: false });
     rows.metrics = [
       ...Array.from({ length: 30 }, (_, i) => ({ name: `_o2_internal_${i}`, stats: {} })),
@@ -179,7 +179,7 @@ describe("useFirstDataNotice", () => {
     noticeOf();
     await flushPromises();
     const calls = nameList.mock.calls;
-    expect(calls.filter((c) => c[4] === 1)).toHaveLength(3);
+    expect(calls.filter((c) => c[4] === 1)).toHaveLength(4);
     expect(calls.every((c) => c[4] === 1 || c[4] === 20)).toBe(true);
     expect(calls.filter((c) => c[1] === "metrics" && c[4] === 20).map((c) => c[3])).toEqual([
       0, 20,

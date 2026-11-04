@@ -28,7 +28,7 @@ import { userLocalPart } from "./rcaCell";
 export interface RcaUnblockedLine {
   /** Local part of the answer's author. */
   author: string;
-  /** Local "HH:mm" of the answer's `read_at`. */
+  /** Local "HH:mm <zone>" of the answer's `read_at`. */
   time: string;
   /** The need of the question it answered, when known. */
   need: string | null;

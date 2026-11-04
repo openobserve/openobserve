@@ -13,20 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  routeGuard,
-  useLocalUserInfo,
-  useLocalCurrentUser,
-  invalidateLoginData,
-  getPath,
-} from "@/utils/zincutils";
+import { routeGuard, getPath } from "@/utils/zincutils";
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
-import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
-import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
-import { forgetLinkRequest } from "@/utils/slackLink";
+import {
+  hasMetricsEditorParams,
+  hasMetricsOverrideParams,
+} from "@/utils/metrics/metricsEditorParams";
+import { PA_ROUTES, redirectHeatmaps } from "@/utils/rum/productAnalyticsRoutes";
+import { endSignedInSession } from "@/utils/drafts/signOutFlow";
+import { silenceUnloadPrompts } from "@/utils/sessionServices";
 import {
   PLAYLIST_TV_PATH,
   buildPlaylistQuery,
@@ -38,11 +36,9 @@ const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
 const SearchHistory = () => import("@/plugins/logs/SearchHistory.vue");
 const SearchSchedulersList = () => import("@/plugins/logs/SearchSchedulersList.vue");
-const AppMetrics = () => import("@/plugins/metrics/Index.vue");
 const AppMetricsExplorer = () => import("@/plugins/metrics/explorer/MetricsExplorer.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
 const AppProfiles = () => import("@/plugins/profiles/Index.vue");
-const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
 const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
@@ -110,6 +106,13 @@ const dbMonitoringEnabled = (): boolean => {
   return Boolean(zoConfig.database_monitoring_enabled);
 };
 
+// Like dbMonitoringEnabled: a /config that hasn't loaded yet lets a deep link through.
+const publicDashboardsEnabled = (): boolean => {
+  const zoConfig = store?.state?.zoConfig;
+  const configLoaded = !!zoConfig && Object.keys(zoConfig).length > 0;
+  return !configLoaded || zoConfig.public_dashboards_enabled === true;
+};
+
 /**
  * Guard for the three enterprise-only DBM tabs — Deadlocks, Blocked queries and
  * Table health, whose reads an OSS backend answers 403 on. Disabling the tabs
@@ -175,6 +178,7 @@ const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
 const LogStream = () => import("@/views/LogStream.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
+const PublicDashboardLinks = () => import("@/views/Dashboards/PublicLinks.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
 const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
@@ -200,6 +204,7 @@ const NamedEventsListPage = () =>
   import("@/components/rum/productAnalytics/NamedEventsListPage.vue");
 const NamedEventEditor = () => import("@/views/RUM/NamedEventEditor.vue");
 const SourceMaps = () => import("@/views/RUM/SourceMaps.vue");
+const ClickHeatmap = () => import("@/views/RUM/ClickHeatmap.vue");
 const UploadSourceMaps = () => import("@/views/RUM/UploadSourceMaps.vue");
 
 const ReportList = () => import("@/components/reports/ReportList.vue");
@@ -251,11 +256,10 @@ const useRoutes = () => {
         // must run even if a clear throws, and must respect the app base —
         // a bare "/login" 404s when the app is served under /web/.
         try {
-          invalidateLoginData();
-          useLocalCurrentUser("", true);
-          useLocalUserInfo("", true);
-          forgetLinkRequest();
+          // Only the menu's sign-out confirms discarding drafts, so a direct link or a retried navigation keeps them, as an expired session does.
+          endSignedInSession(store, { keepDrafts: true });
         } finally {
+          silenceUnloadPrompts();
           window.location.href = `${getPath()}login`;
         }
       },
@@ -310,6 +314,15 @@ const useRoutes = () => {
       component: () => import("@/views/SlackConnectCallback.vue"),
       meta: {
         titleKey: "routeTitles.slackConnectCallback",
+      },
+    },
+    {
+      path: "/public/dashboards/:slug",
+      name: "publicDashboard",
+      component: () => import("@/views/Dashboards/PublicDashboard.vue"),
+      meta: {
+        public: true,
+        titleKey: "dashboard.header",
       },
     },
   ];
@@ -396,13 +409,7 @@ const useRoutes = () => {
       },
     },
     {
-      // The zero-query browse grid.
-      //
-      // Back-compat: a `/metrics` URL carrying editor-specific params (the
-      // `metrics_data` blob, or anything in METRICS_PARAMS) is a deep link
-      // created before the explorer existed — a shared chart, a link from logs
-      // or an alert. Those redirect to the editor with query and hash intact,
-      // so every existing link keeps working.
+      // A link carrying the editor's params (a shared chart, a link from logs or an alert) opens in Visualize.
       path: "metrics",
       name: "metrics",
       component: AppMetricsExplorer,
@@ -412,46 +419,35 @@ const useRoutes = () => {
         allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
-        if (hasMetricsEditorParams(to.query) && to.query.mode !== "visualize") {
-          routeGuard(to, from, () =>
-            next({
-              name: "metricsEditor",
-              query: to.query,
-              hash: to.hash,
-              replace: true,
-            }),
-          );
-          return;
+        const overrides = hasMetricsOverrideParams(to.query);
+        if (!overrides && !(hasMetricsEditorParams(to.query) && to.query.mode !== "visualize")) {
+          return routeGuard(to, from, next);
         }
-        routeGuard(to, from, next);
+        let translated: Promise<void> | undefined;
+        // routeGuard reads the store through inject(), which only works before the guard's first await.
+        routeGuard(to, from, (redirect?: any) => {
+          if (redirect !== undefined) return next(redirect);
+          // Loaded on demand: the translation needs the panel defaults, which pull in the store.
+          translated = (
+            overrides
+              ? import("@/composables/metrics/metricsUrlState").then((m) =>
+                  m.legacyLinkToVisualizeQuery(to.query),
+                )
+              : Promise.resolve({ ...to.query, mode: "visualize" })
+          ).then((query) => next({ name: "metrics", query, hash: to.hash, replace: true }));
+        });
+        return translated;
       },
     },
-    {
-      // Stays registered in BOTH flag states, so editor bookmarks created while
-      // the explorer was enabled survive a rollback.
-      path: "metrics/editor",
-      name: "metricsEditor",
-      component: AppMetrics,
-      meta: {
-        keepAlive: true,
-        titleKey: "menu.metrics",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
-    {
-      path: "promql-builder",
-      name: "promqlBuilder",
-      component: PromQLQueryBuilder,
-      meta: {
-        keepAlive: false,
-        titleKey: "metrics.queryBuilder.title",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
+    ...["metrics/editor", "promql-builder"].map((path) => ({
+      // Old editor and builder bookmarks; the `/metrics` guard turns any editor params into a Visualize chart.
+      path,
+      redirect: (to: any) => ({
+        name: "metrics",
+        query: { ...to.query, mode: "visualize" },
+        hash: to.hash,
+      }),
+    })),
     {
       path: "traces",
       name: "traces",
@@ -712,6 +708,7 @@ const useRoutes = () => {
       props: true,
       meta: {
         titleKey: "routeTitles.viewDashboard",
+        accessScopeQuery: ["dashboard"],
       },
       beforeEnter(to: any, from: any, next: any) {
         // A playlist link to the dashboard view is played by the TV player, except its own page fallback.
@@ -748,12 +745,28 @@ const useRoutes = () => {
       },
     },
     {
+      path: "/dashboards/public-links",
+      name: "publicDashboardLinks",
+      component: PublicDashboardLinks,
+      meta: {
+        titleKey: "dashboard.publicLinks.pageTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        if (!publicDashboardsEnabled()) {
+          next({ name: "dashboards", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "/dashboards/add_panel",
       name: "addPanel",
       component: AddPanel,
       props: true,
       meta: {
         titleKey: "panel.addPanel",
+        accessScopeQuery: ["dashboard"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -814,6 +827,9 @@ const useRoutes = () => {
           path: "pipelines",
           name: "pipelines",
           component: PipelinesList,
+          meta: {
+            accessResource: "pipelines",
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -822,6 +838,7 @@ const useRoutes = () => {
               path: "edit",
               name: "pipelineEditor",
               component: PipelineEditor,
+              meta: { accessScopeQuery: ["id"] },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -1263,6 +1280,10 @@ const useRoutes = () => {
           },
         },
         {
+          path: "heatmaps",
+          redirect: (to: any) => redirectHeatmaps(to),
+        },
+        {
           path: "source-maps",
           name: "SourceMaps",
           component: SourceMaps,
@@ -1371,6 +1392,14 @@ const useRoutes = () => {
           path: "paths",
           name: PA_ROUTES.paths,
           component: AnalyticsPaths,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "heatmaps",
+          name: PA_ROUTES.heatmaps,
+          component: ClickHeatmap,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

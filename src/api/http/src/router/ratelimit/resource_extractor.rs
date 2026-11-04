@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use axum::http::{HeaderMap, Method};
 use config::meta::ratelimit::{RatelimitRule, RatelimitRuleType, get_resource_from_params};
@@ -36,6 +36,10 @@ use crate::{
     handler::http::{request::ratelimit::QUOTA_PAGE_GLOBAL_RULES_ORG, router::openapi::ApiDoc},
     service::auth::extract_auth_str_from_headers,
 };
+
+// Built once: the spec is static, and rebuilding it per request costs one regex per path.
+static OPENAPI_PATHS: LazyLock<Vec<(String, Regex, Vec<Method>)>> =
+    LazyLock::new(openapi_path_table);
 
 fn extract_org_id(path: &str) -> String {
     let path_columns = path.split('/').collect::<Vec<&str>>();
@@ -309,73 +313,47 @@ fn path_to_regex(path: &str) -> Regex {
 }
 
 fn extract_openapi_path(path: &str, method: &Method) -> Option<String> {
-    let api = ApiDoc::openapi();
-    let path_patterns: HashMap<String, Regex> = {
-        api.paths
-            .paths
-            .keys()
-            .map(|path| {
-                let pattern = path_to_regex(path);
-                (path.clone(), pattern)
-            })
-            .collect()
-    };
+    for (openapi_path, pattern, methods) in OPENAPI_PATHS.iter() {
+        if !pattern.is_match(path) {
+            continue;
+        }
+        if methods.contains(method) {
+            log::debug!(
+                "Matched OpenAPI path: {openapi_path} for request path: {path} and method: {method}"
+            );
+            return Some(format!("{openapi_path}:{method}"));
+        }
+        log::debug!(
+            "Path matched but method {method} not supported for OpenAPI path: {openapi_path}"
+        );
+    }
+    None
+}
 
-    // Find matching path
-    for (openapi_path, path_item) in &api.paths.paths {
-        // Check if path pattern matches
-        if let Some(pattern) = path_patterns.get(openapi_path) {
-            if !pattern.is_match(path) {
-                continue;
-            }
-
-            // Check if method is supported for this path
-            let method_exists = [
-                (utoipa::openapi::HttpMethod::Get, path_item.get.as_ref()),
-                (utoipa::openapi::HttpMethod::Post, path_item.post.as_ref()),
-                (utoipa::openapi::HttpMethod::Put, path_item.put.as_ref()),
-                (
-                    utoipa::openapi::HttpMethod::Delete,
-                    path_item.delete.as_ref(),
-                ),
-                (utoipa::openapi::HttpMethod::Patch, path_item.patch.as_ref()),
-                (utoipa::openapi::HttpMethod::Head, path_item.head.as_ref()),
-                (
-                    utoipa::openapi::HttpMethod::Options,
-                    path_item.options.as_ref(),
-                ),
-                (utoipa::openapi::HttpMethod::Trace, path_item.trace.as_ref()),
+/// The spec's paths in its iteration order, each with its pattern and documented methods.
+fn openapi_path_table() -> Vec<(String, Regex, Vec<Method>)> {
+    ApiDoc::openapi()
+        .paths
+        .paths
+        .into_iter()
+        .map(|(openapi_path, item)| {
+            let methods = [
+                (Method::GET, item.get.is_some()),
+                (Method::POST, item.post.is_some()),
+                (Method::PUT, item.put.is_some()),
+                (Method::DELETE, item.delete.is_some()),
+                (Method::PATCH, item.patch.is_some()),
+                (Method::HEAD, item.head.is_some()),
+                (Method::OPTIONS, item.options.is_some()),
+                (Method::TRACE, item.trace.is_some()),
             ]
             .into_iter()
-            .filter_map(|(http_method, op)| op.map(|_| http_method))
-            .any(|op_method| {
-                matches!(
-                    (method, op_method),
-                    (&Method::GET, utoipa::openapi::HttpMethod::Get)
-                        | (&Method::POST, utoipa::openapi::HttpMethod::Post)
-                        | (&Method::PUT, utoipa::openapi::HttpMethod::Put)
-                        | (&Method::DELETE, utoipa::openapi::HttpMethod::Delete)
-                        | (&Method::PATCH, utoipa::openapi::HttpMethod::Patch)
-                        | (&Method::HEAD, utoipa::openapi::HttpMethod::Head)
-                        | (&Method::OPTIONS, utoipa::openapi::HttpMethod::Options)
-                        | (&Method::TRACE, utoipa::openapi::HttpMethod::Trace)
-                )
-            });
-
-            if method_exists {
-                log::debug!(
-                    "Matched OpenAPI path: {openapi_path} for request path: {path} and method: {method}"
-                );
-                return Some(format!("{openapi_path}:{method}"));
-            } else {
-                log::debug!(
-                    "Path matched but method {method} not supported for OpenAPI path: {openapi_path}"
-                );
-            }
-        }
-    }
-
-    None
+            .filter_map(|(method, documented)| documented.then_some(method))
+            .collect();
+            let pattern = path_to_regex(&openapi_path);
+            (openapi_path, pattern, methods)
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -664,5 +642,66 @@ mod tests {
         assert!(matches!(result.1, ExtractorRule::OrgLevel(None)));
         assert!(matches!(result.2, ExtractorRule::UserRole(Some(r)) if r.threshold == 75));
         assert!(matches!(result.3, ExtractorRule::UserId(None)));
+    }
+
+    /// The per-request lookup the cached table replaced, over a spec and patterns built once.
+    fn uncached_openapi_path(
+        reference: &[(&String, Regex, &utoipa::openapi::path::PathItem)],
+        path: &str,
+        method: &Method,
+    ) -> Option<String> {
+        for (openapi_path, pattern, item) in reference {
+            if !pattern.is_match(path) {
+                continue;
+            }
+            let documented = match *method {
+                Method::GET => item.get.is_some(),
+                Method::POST => item.post.is_some(),
+                Method::PUT => item.put.is_some(),
+                Method::DELETE => item.delete.is_some(),
+                Method::PATCH => item.patch.is_some(),
+                Method::HEAD => item.head.is_some(),
+                Method::OPTIONS => item.options.is_some(),
+                Method::TRACE => item.trace.is_some(),
+                _ => false,
+            };
+            if documented {
+                return Some(format!("{openapi_path}:{method}"));
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn cached_path_table_matches_the_per_request_lookup() {
+        let api = ApiDoc::openapi();
+        let reference: Vec<_> = api
+            .paths
+            .paths
+            .iter()
+            .map(|(template, item)| (template, path_to_regex(template), item))
+            .collect();
+        let param = Regex::new(r"\{[^}]+\}").unwrap();
+        let mut requests: Vec<String> = api
+            .paths
+            .paths
+            .keys()
+            .map(|template| param.replace_all(template, "x").to_string())
+            .collect();
+        requests.extend(["/api/x/no_such_route".to_string(), "/".to_string()]);
+        let mut matched = 0;
+        for path in &requests {
+            // GET and DELETE cover both a documented and an undocumented method on most paths.
+            for method in [Method::GET, Method::DELETE] {
+                let cached = extract_openapi_path(path, &method);
+                let expected = uncached_openapi_path(&reference, path, &method);
+                assert_eq!(cached, expected, "{method} {path}");
+                matched += usize::from(cached.is_some());
+            }
+        }
+        assert!(
+            matched >= api.paths.paths.len() / 2,
+            "only {matched} lookups matched"
+        );
     }
 }

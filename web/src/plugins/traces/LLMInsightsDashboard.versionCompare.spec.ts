@@ -234,6 +234,9 @@ afterEach(() => {
   localStorage.clear();
 });
 
+// Every test mounts the full page; on a loaded CI runner one mount can exceed the 5s default.
+vi.setConfig({ testTimeout: 20000 });
+
 describe("LLMInsightsDashboard — version compare entry", () => {
   it("enables the compare entry when the agent has >= 2 versions", async () => {
     const wrapper = mountDashboard();
@@ -257,6 +260,18 @@ describe("LLMInsightsDashboard — version compare entry", () => {
     // A disabled button reads as broken; the affordance is HIDDEN instead.
     const btn = wrapper.find('[data-test="llm-insights-compare-entry"]');
     expect(btn.exists()).toBe(false);
+  });
+
+  it("passes the page start to the compare version list so it is never narrower than the page", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    await wrapper.find('[data-test="llm-insights-compare-entry"]').trigger("click");
+    await flushPromises();
+    expect(mockListVersionsForCompare).toHaveBeenCalledTimes(1);
+    expect(mockListVersionsForCompare.mock.calls[0][4]).toBe(1_700_000_000_000_000);
   });
 });
 

@@ -52,15 +52,7 @@ describe("Slack template", () => {
   it("config has required properties", () => {
     expect(slackConfig.templateName).toBe("prebuilt_slack");
     expect(slackConfig.method).toBe("post");
-    expect(typeof slackConfig.urlValidator).toBe("function");
     expect(slackConfig.credentialFields.length).toBeGreaterThan(0);
-  });
-
-  it("validates Slack webhook URLs", () => {
-    expect(slackConfig.urlValidator("https://hooks.slack.com/services/T000/B000/secret")).toBe(
-      true,
-    );
-    expect(slackConfig.urlValidator("https://example.com")).toBe(false);
   });
 
   it("destination type has correct category", () => {
@@ -101,11 +93,6 @@ describe("Microsoft Teams template", () => {
     expect(() => JSON.parse(msteamsTemplate.body)).not.toThrow();
   });
 
-  it("config validates MS Teams webhook URLs", () => {
-    expect(msteamsConfig.urlValidator("https://outlook.office.com/webhook/")).toBe(true);
-    expect(msteamsConfig.urlValidator("https://example.com")).toBe(false);
-  });
-
   it("destination type has correct category", () => {
     expect(msteamsDestinationType.id).toBe("msteams");
     expect(msteamsDestinationType.category).toBe("messaging");
@@ -122,11 +109,6 @@ describe("PagerDuty template", () => {
   it("config has required properties", () => {
     expect(pagerdutyConfig.method).toBe("post");
     expect(pagerdutyConfig.headers["Content-Type"]).toBe("application/json");
-  });
-
-  it("validates PagerDuty URLs", () => {
-    expect(pagerdutyConfig.urlValidator("https://events.pagerduty.com/v2/enqueue")).toBe(true);
-    expect(pagerdutyConfig.urlValidator("https://example.com")).toBe(false);
   });
 
   it("has routing key credential field", () => {
@@ -158,13 +140,6 @@ describe("ServiceNow template", () => {
     expect(passwordField?.type).toBe("password");
   });
 
-  it("validates ServiceNow URLs", () => {
-    expect(
-      servicenowConfig.urlValidator("https://dev.service-now.com/api/now/table/incident"),
-    ).toBe(true);
-    expect(servicenowConfig.urlValidator("https://example.com")).toBe(false);
-  });
-
   it("destination type has correct category", () => {
     expect(servicenowDestinationType.id).toBe("servicenow");
     expect(servicenowDestinationType.category).toBe("incident");
@@ -183,11 +158,6 @@ describe("Opsgenie template", () => {
     expect(apiKeyField).toBeDefined();
     expect(apiKeyField?.required).toBe(true);
     expect(apiKeyField?.type).toBe("password");
-  });
-
-  it("validates Opsgenie URLs", () => {
-    expect(opsgenieConfig.urlValidator("https://api.opsgenie.com/v2/alerts")).toBe(true);
-    expect(opsgenieConfig.urlValidator("https://example.com")).toBe(false);
   });
 
   it("destination type has correct category", () => {
@@ -235,14 +205,6 @@ describe("Template consistency", () => {
   it("all templates follow naming convention", () => {
     templates.forEach(({ name, config }) => {
       expect(config.templateName).toBe(`prebuilt_${name}`);
-    });
-  });
-
-  it("all configs have urlValidator or headers", () => {
-    templates.forEach(({ config }) => {
-      const hasValidator = typeof config.urlValidator === "function";
-      const hasHeaders = config.headers !== undefined;
-      expect(hasValidator || hasHeaders).toBe(true);
     });
   });
 

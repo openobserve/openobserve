@@ -9,6 +9,8 @@ const push = vi.fn();
 vi.mock("vue-router", () => ({
   useRoute: () => route,
   useRouter: () => ({ push }),
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),
@@ -586,6 +588,7 @@ describe("RemoteTaskFormPage — test connection", () => {
 
     it.each([
       ["transport", undefined, "Could not reach the endpoint."],
+      ["timeout", undefined, "The endpoint did not answer in time."],
       ["http_status", 503, "The endpoint answered with HTTP 503."],
     ])("says the %s reason code as a sentence", async (code, httpStatus, message) => {
       testRun.mockResolvedValue([

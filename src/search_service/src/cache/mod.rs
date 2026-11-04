@@ -71,7 +71,7 @@ pub mod multi;
 pub mod result_utils;
 
 // Define cache version
-const CACHE_VERSION: &str = "v3";
+const CACHE_VERSION: &str = "v4";
 
 /// The hits a search was about to return when redaction could not run on them.
 #[cfg(any(feature = "vectorscan", test))]
@@ -203,7 +203,6 @@ pub async fn search(
 
     // Result caching check ends, start search
     let cache_took = start.elapsed().as_millis() as usize;
-    let mut results = Vec::new();
     let mut work_group_set = Vec::new();
     let mut search_results_have_hits = false;
     let mut res = if !should_exec_query {
@@ -315,9 +314,14 @@ pub async fn search(
             tasks.push(task);
         }
 
-        for task in tasks {
-            results.push(task.await.map_err(|e| Error::Message(e.to_string()))??);
-        }
+        // A public dashboard build owns its children: no delta may outlive a failed call.
+        let drain = in_req.search_type == Some(search::SearchEventType::PublicDashboard);
+        // Deltas run as `{trace_id}-{n}`; the failing parent goes with them.
+        let (org, family) = (org_id.to_string(), trace_id.to_string());
+        let mut results = join_deltas(tasks, drain, move || async move {
+            crate::abort_trace_family(&org, &family).await
+        })
+        .await?;
         for res in &results {
             work_group_set.push(res.work_group.clone());
         }
@@ -588,7 +592,7 @@ pub async fn prepare_cache_response(
 
     // Parse SQL first to get metadata needed for normalization
     let query: SearchQuery = req.query.clone().into();
-    let sql = match crate::Sql::new(&query, org_id, stream_type, req.search_type).await {
+    let mut sql = match crate::Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {e}");
@@ -661,6 +665,9 @@ pub async fn prepare_cache_response(
         }
     }
 
+    // #16175: sort, trim and cache checks compare ORDER BY with the column the hits carry
+    sql.order_by = result_utils::normalize_ts_order_by(&sql.order_by, &ts_column, &sql.aliases);
+
     // Refine is_descending for histogram queries with non-timestamp ORDER BY
     is_descending = cacher::refine_is_descending_for_histogram(&sql, &ts_column, is_descending);
 
@@ -703,6 +710,45 @@ pub async fn prepare_cache_response(
         }
     };
     Ok((resp, should_exec_query))
+}
+
+/// Awaits every delta; with `drain` the first error, in any order, aborts the rest and waits.
+async fn join_deltas<T, F, Fut>(
+    tasks: Vec<tokio::task::JoinHandle<Result<T, Error>>>,
+    drain: bool,
+    abort: F,
+) -> Result<Vec<T>, Error>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    if !drain {
+        let mut results = Vec::with_capacity(tasks.len());
+        for task in tasks {
+            results.push(task.await.map_err(|e| Error::Message(e.to_string()))??);
+        }
+        return Ok(results);
+    }
+    let mut slots: Vec<Option<T>> = tasks.iter().map(|_| None).collect();
+    let mut pending: futures::stream::FuturesUnordered<_> = tasks
+        .into_iter()
+        .enumerate()
+        .map(|(i, task)| async move { (i, task.await) })
+        .collect();
+    let mut abort = Some(abort);
+    let mut first_err = None;
+    while let Some((i, joined)) = futures::StreamExt::next(&mut pending).await {
+        match joined.map_err(|e| Error::Message(e.to_string())) {
+            Ok(Ok(res)) => slots[i] = Some(res),
+            Ok(Err(e)) | Err(e) => {
+                if let Some(abort) = abort.take() {
+                    abort().await;
+                }
+                first_err.get_or_insert(e);
+            }
+        }
+    }
+    first_err.map_or_else(|| Ok(slots.into_iter().flatten().collect()), Err)
 }
 
 // based on _timestamp of first record in config::meta::search::Response either add it in start
@@ -1668,6 +1714,50 @@ mod tests {
         assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
     }
 
+    #[tokio::test]
+    async fn gate09_a_failed_delta_aborts_and_drains_its_siblings_before_returning() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+        let long_done = Arc::new(AtomicBool::new(false));
+        let aborted = Arc::new(AtomicBool::new(false));
+        let done = long_done.clone();
+        let flag = aborted.clone();
+        let seen = aborted.clone();
+        // The long delta is first: the early failure must abort it while it still runs.
+        let tasks = vec![
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+                done.store(seen.load(Ordering::SeqCst), Ordering::SeqCst);
+                Ok(1)
+            }),
+            tokio::spawn(async { Err::<u8, Error>(Error::Message("early".into())) }),
+        ];
+        let err = join_deltas(tasks, true, || async move {
+            flag.store(true, Ordering::SeqCst);
+        })
+        .await
+        .unwrap_err();
+        assert_eq!(err.to_string(), Error::Message("early".into()).to_string());
+        assert!(aborted.load(Ordering::SeqCst), "siblings are aborted");
+        assert!(
+            long_done.load(Ordering::SeqCst),
+            "the abort fired while the long delta ran, and it was drained"
+        );
+
+        let tasks = vec![
+            tokio::spawn(async { Err::<u8, Error>(Error::Message("early".into())) }),
+            tokio::spawn(async { Ok(1) }),
+        ];
+        assert!(join_deltas(tasks, false, || async {}).await.is_err());
+        let tasks = vec![
+            tokio::spawn(async { Ok::<u8, Error>(1) }),
+            tokio::spawn(async { Ok(2) }),
+        ];
+        assert_eq!(join_deltas(tasks, true, || async {}).await.unwrap(), [1, 2]);
+    }
+
     fn response_with_ts(ts: &[i64]) -> search::Response {
         let hits = ts
             .iter()
@@ -1762,5 +1852,58 @@ mod tests {
         let order_by = vec![("name".to_string(), OrderBy::Desc)];
         sort_response(false, &mut resp, "_timestamp", &order_by);
         assert_eq!(ts_of(&resp), vec![30, 20, 10]);
+    }
+
+    fn response_with_alias_ts(ts: &[i64]) -> search::Response {
+        let hits = ts
+            .iter()
+            .map(|t| json::json!({"ts": t, "status": "passed"}))
+            .collect::<Vec<_>>();
+        search::Response {
+            total: hits.len(),
+            hits,
+            ..Default::default()
+        }
+    }
+
+    fn alias_ts_of(resp: &search::Response) -> Vec<i64> {
+        resp.hits.iter().map(|h| get_ts_value("ts", h)).collect()
+    }
+
+    // #16175: order_by keeps `_timestamp` while the hits carry only the alias `ts`
+    fn alias_order_by() -> Vec<(String, OrderBy)> {
+        result_utils::normalize_ts_order_by(
+            &[(TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc)],
+            "ts",
+            &[(TIMESTAMP_COL_NAME.to_string(), "ts".to_string())],
+        )
+    }
+
+    #[test]
+    fn test_sort_response_orders_by_aliased_timestamp() {
+        let mut resp = response_with_alias_ts(&[10, 30, 20]);
+        let order_by = alias_order_by();
+        assert_eq!(order_by, vec![("ts".to_string(), OrderBy::Desc)]);
+        sort_response(true, &mut resp, "ts", &order_by);
+        assert_eq!(alias_ts_of(&resp), vec![30, 20, 10]);
+    }
+
+    #[test]
+    fn test_merge_response_orders_aliased_timestamp_newest_first() {
+        let order_by = alias_order_by();
+        let merged = merge_response(
+            "t",
+            vec![response_with_alias_ts(&[20, 10])],
+            vec![response_with_alias_ts(&[40, 30])],
+            "ts",
+            10,
+            true,
+            0,
+            order_by,
+        );
+        assert_eq!(alias_ts_of(&merged), vec![40, 30, 20, 10]);
+        // write_results() takes the time range from the first and last hit
+        let (start, end) = result_utils::extract_timestamp_range(&merged.hits, "ts", true);
+        assert_eq!((start, end), (10, 40));
     }
 }

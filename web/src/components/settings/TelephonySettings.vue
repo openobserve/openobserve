@@ -52,81 +52,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <OCard
+      <TelephonyAccountCard
         v-else-if="state === 'deployment' && view"
-        class="rounded-surface bg-surface-base max-w-160"
+        :title="t('telephony.deploymentTitle', { provider: PROVIDER })"
+        :meta="t('telephony.deploymentMeta', { number: view.deployment_from_number ?? '' })"
+        :press4-available="view.press4_available"
+        :updatable="false"
+        :read-only="readOnly"
         data-test="telephony-settings-deployment"
       >
-        <OCardSection role="header">
-          <span class="flex flex-wrap items-center gap-2">
-            <OText variant="card-title">
-              {{ t("telephony.deploymentTitle", { provider: PROVIDER }) }}
-            </OText>
-            <OTag variant="success-soft" size="sm">{{ t("telephony.active") }}</OTag>
-          </span>
-        </OCardSection>
-        <OCardSection role="body" class="flex flex-col gap-3">
-          <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-            <dt class="text-text-secondary">{{ t("telephony.fromNumber") }}</dt>
-            <dd class="text-text-body">{{ raw(view.deployment_from_number) }}</dd>
-            <TelephonyPress4Row :available="view.press4_available" />
-          </dl>
-          <span class="flex flex-wrap items-center gap-1">
-            <OText variant="meta">{{ t("telephony.deploymentNote") }}</OText>
-            <OButton
-              variant="ghost-primary"
-              size="xs"
-              :disabled="readOnly"
-              data-test="telephony-settings-use-own"
-              @click="openDialog('connect')"
-            >
-              {{ t("telephony.useOwn", { provider: PROVIDER }) }}
-            </OButton>
-          </span>
-        </OCardSection>
-      </OCard>
+        <span class="flex flex-wrap items-center gap-1">
+          <OText variant="meta">{{ t("telephony.deploymentOwner") }}</OText>
+          <OButton
+            variant="ghost-primary"
+            size="xs"
+            :disabled="readOnly"
+            data-test="telephony-settings-use-own"
+            @click="openDialog('connect')"
+          >
+            {{ t("telephony.useOwn", { provider: PROVIDER }) }}
+          </OButton>
+        </span>
+      </TelephonyAccountCard>
 
-      <OCard
+      <TelephonyAccountCard
         v-else-if="state === 'connected' && view?.org"
-        class="rounded-surface bg-surface-base max-w-160"
+        :title="PROVIDER"
+        :meta="
+          t('telephony.cardMeta', {
+            number: view.org.from_number,
+            account: shortSid(view.org.account_sid),
+          })
+        "
+        :press4-available="view.press4_available"
+        updatable
+        :read-only="readOnly"
         data-test="telephony-settings-connected"
+        @update="openDialog('update')"
       >
-        <OCardSection role="header">
-          <span class="flex flex-1 flex-wrap items-center gap-2">
-            <OText variant="card-title">{{ PROVIDER }}</OText>
-            <OTag variant="success-soft" size="sm">{{ t("telephony.connected") }}</OTag>
-          </span>
-          <span class="flex items-center gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              :disabled="readOnly"
-              data-test="telephony-settings-update"
-              @click="openDialog('update')"
-            >
-              {{ t("telephony.update") }}
-            </OButton>
-            <OButton
-              variant="outline-destructive"
-              size="sm-action"
-              :disabled="readOnly"
-              data-test="telephony-settings-disconnect"
-              @click="confirmingDisconnect = true"
-            >
-              {{ t("telephony.disconnect") }}
-            </OButton>
-          </span>
-        </OCardSection>
-        <OCardSection role="body">
-          <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-            <dt class="text-text-secondary">{{ t("telephony.account") }}</dt>
-            <dd class="text-text-body">{{ raw(shortSid(view.org.account_sid)) }}</dd>
-            <dt class="text-text-secondary">{{ t("telephony.fromNumber") }}</dt>
-            <dd class="text-text-body">{{ raw(view.org.from_number) }}</dd>
-            <TelephonyPress4Row :available="view.press4_available" />
-          </dl>
-        </OCardSection>
-      </OCard>
+        <div class="flex flex-wrap justify-end gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            :disabled="readOnly"
+            data-test="telephony-settings-update"
+            @click="openDialog('update')"
+          >
+            {{ t("telephony.update") }}
+          </OButton>
+          <OButton
+            variant="outline-destructive"
+            size="sm-action"
+            :disabled="readOnly"
+            data-test="telephony-settings-disconnect"
+            @click="confirmingDisconnect = true"
+          >
+            {{ t("telephony.disconnect") }}
+          </OButton>
+        </div>
+      </TelephonyAccountCard>
     </div>
 
     <TelephonyAccountDialog
@@ -141,12 +125,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       v-model="confirmingDisconnect"
       :title="t('telephony.disconnectTitle', { provider: PROVIDER })"
-      :message="
+      :message-keypath="
         view?.deployment_account_present
-          ? t('telephony.disconnectToDeployment')
-          : t('telephony.disconnectToEmail')
+          ? 'telephony.disconnectToDeployment'
+          : 'telephony.disconnectToEmail'
       "
+      :message-name="view?.org ? shortSid(view.org.account_sid) : ''"
       :ok-label="t('telephony.disconnect')"
+      ok-variant="destructive"
       @update:ok="disconnect"
     />
   </OPageLayout>
@@ -158,10 +144,7 @@ import { useStore } from "vuex";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -171,9 +154,9 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { deleteTelephonyMutation, telephonyQuery } from "@/services/oncall.queries";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import TelephonyAccountCard from "./TelephonyAccountCard.vue";
 import TelephonyAccountDialog from "./TelephonyAccountDialog.vue";
 import type { TelephonyDialogMode } from "./TelephonyAccountDialog.schema";
-import TelephonyPress4Row from "./TelephonyPress4Row.vue";
 import {
   PROVIDER,
   isForbidden,

@@ -16,14 +16,17 @@ why this surface carries the sharpest invariants in the feature — from
     team scoping governs this route too
   * the token is SPENT BEFORE the acknowledgement — "expiry does not stop a
     replay, and a losing token must not act"
-  * a replay is deliberately not an error: acking is idempotent, so a second
-    click redirects where the first one landed
-  * the redirect carries `org_identifier`, or the app resolves whichever org was
-    last selected
+  * the POST answers with a plain HTML page (200), never a redirect: "Acknowledged"
+    for the click that took the page, the page's current state for a replay or a
+    failed ack, so a second click is not an error and never claims a success
+  * the page's "Open in OpenObserve" link carries `org_identifier`, or the app
+    resolves whichever org was last selected
+  * a token that cannot be trusted gets a 401 HTML page, "This link no longer
+    works", that names no record
   * a GET must only look — a link-prefetching mail gateway would otherwise
     acknowledge a page nobody read
 
-## The token could not be obtained, and nothing here pretends otherwise
+## The token exists only inside the page email, so it is read from a mailbox
 
 An acknowledgement token is minted inside the enterprise crate
 (`o2_enterprise::enterprise::oncall::token`) and embedded in the outgoing
@@ -41,21 +44,22 @@ notification. Everything reachable from this repo was checked:
     (the one OSS reference, src/jobs/src/job/oncall_maintenance.rs, passes None).
   * No notification- or template-preview route exists.
 
-So 12.3, 12.4 and 12.6 are BLOCKED on a mailbox (or an enterprise mint helper)
-and are marked skip with that reason. They are written out in full rather than
-stubbed, so they run the moment `minted_ack_token` can return a real one. No
-token is fabricated and no verifier is stubbed to turn them green — a test that
-passes without exercising `ack_claims` would prove nothing about this route.
+So 12.3, 12.4 and 12.6 read the token out of a real mailbox (Mailpit), which
+the enterprise `ent_oncall` API shard starts. Without one they skip locally and
+FAIL when `CI` is set: a skip there would hide a broken job behind a green run.
+No token is fabricated and no verifier is stubbed to turn them green — a test
+that passes without exercising `ack_claims` would prove nothing about this route.
 
 12.1, 12.2, 12.5 and 12.7 need only a malformed, expired or foreign token and
 run for real. Read the honest note on each: with no signing key on this side, a
 401 cannot be attributed to the *specific* check that produced it, so the
 expired and foreign-org cases pin "no such token acts", not "the expiry check
 fired". 12.7 is live for everything observable without a valid token (a GET
-never redirects, never carries a Location) and its full form is skipped.
+never says "Acknowledged", never carries a Location) and its full form needs the mailbox.
 
-Never asserted here: the confirmation page's HTML. It is plain markup a person
-reads; status codes, headers and the record's resulting state are the contract.
+Only the pages' fixed headings are asserted ("Acknowledged", "Already acknowledged
+by", "This link no longer works"); the rest is markup a person reads. Status codes,
+headers and the record's resulting state remain the contract.
 """
 
 import base64
@@ -72,20 +76,13 @@ from tests.oncall.oncall_helpers import (
     ack_link_for,
     mailpit_available,
     make_user,
+    oncall_enabled,
     rotation,
     shift_rule,
+    skip_or_fail_in_ci,
     uniq,
 )
 
-TOKEN_MINT_UNAVAILABLE = (
-    "no acknowledgement token is obtainable: it is minted inside "
-    "o2_enterprise::enterprise::oncall::token and only ever leaves the server "
-    "inside the notification body. The delivery ledger "
-    "(GET /oncall/responses/{id}/deliveries), the personal inbox "
-    "(GET /oncall/my/deliveries) and test-page all omit it, and no "
-    "notification-preview or mint endpoint exists. Needs a captured mailbox or "
-    "an enterprise-side mint helper exposed to tests."
-)
 
 # JWT-shaped so the route gets something structurally plausible to reject, but
 # signed with nothing — this must never be mistaken for a real token.
@@ -93,9 +90,7 @@ UNSIGNED_SIGNATURE = "not-a-real-signature"
 
 # Shapes a hostile or broken link can arrive in. Each must be refused, and
 # refused the same way: 401 from the claims check.
-# The whole feature needs an enterprise build with `O2_ONCALL_ENABLED`; the
-# marker lets CI hold this directory separately, and the session-scoped gate
-# in conftest skips it rather than failing when the flag is off.
+# Enterprise-only: the conftest gate skips on an OSS build and fails on an enterprise one without `O2_ONCALL_ENABLED`.
 pytestmark = pytest.mark.enterprise
 
 MALFORMED_TOKENS = [
@@ -114,26 +109,14 @@ MALFORMED_TOKENS = [
 # =============================================================================
 
 @pytest.fixture(scope="module", autouse=True)
-def require_oncall(create_session, base_url, org_id):
-    """Skip the module unless the build actually serves the on-call routes.
+def require_oncall(client, org_id):
+    """Skip the module only on an OSS build; `oncall_enabled` raises on anything else.
 
-    Probes `oncall/teams` rather than reading `config.oncall_enabled`: that key
-    is what the issue report quoted, but a current enterprise build does not
-    publish it, and gating on it skipped every test against a server that was
-    serving on-call correctly. A 404 means the routes are not registered, in
-    which case `/oncall/ack` falls through to the authenticated catch-all and
-    every assertion below would be measuring the auth middleware instead.
+    Without the routes `/oncall/ack` falls through to the authenticated
+    catch-all, and every assertion below would be measuring the auth middleware.
     """
-    resp = create_session.get(f"{base_url}api/{org_id}/oncall/teams")
-    if resp.status_code == 404:
-        pytest.skip("this build does not serve the on-call routes")
-    # 404 above is the only legitimate skip: the routes are genuinely absent. Any
-    # OTHER unexpected status is the server being broken, and skipping on it takes
-    # all 42 cases in this file with it — a 500 would have retired the whole ack
-    # surface silently.
-    assert resp.status_code in (200, 403), (
-        f"on-call is registered but `oncall/teams` answered {resp.status_code}, so the "
-        f"server is not healthy enough to measure the ack route against: {resp.text[:200]}")
+    if not oncall_enabled(client, org_id):
+        pytest.skip("on-call is enterprise-only and this is an OSS build")
 
 
 @pytest.fixture
@@ -148,7 +131,31 @@ def foreign_org():
 
 @pytest.fixture
 def minted_ack_token(oncall):
-    """A real token, the response it acks, and its subject.
+    """A real token, the response it acks, and its (admin) subject, alone on the team."""
+    return mint_ack_token(oncall, make_user(oncall._c, oncall.org, "admin")[0])
+
+
+@pytest.fixture
+def viewer_ack_token_with_a_teammate(oncall):
+    """A real token whose subject is a viewer, on a team that has a second member.
+
+    Neither exemption in `record_for_actor` applies: a viewer cannot work any
+    page on role alone, and a team that still has members is not open to the org.
+    """
+    try:
+        subject, _ = make_user(oncall._c, oncall.org, "viewer")
+    except AssertionError as e:
+        if "require open-fga" in str(e):
+            pytest.skip("non-admin roles need OpenFGA on")
+        raise
+    oncall.users.append(subject)
+    teammate, _ = make_user(oncall._c, oncall.org, "admin")
+    oncall.users.append(teammate)
+    return mint_ack_token(oncall, subject, teammates=[teammate])
+
+
+def mint_ack_token(oncall, email, teammates=()):
+    """Page `email` for real and return (token, response id, email).
 
     The token is minted server-side and leaves only inside the page email, so it
     is read back out of a mailbox. A TEST page will not do — those are sent with
@@ -157,29 +164,31 @@ def minted_ack_token(oncall):
     on call" instead of a page, which is the trap that looks like a missing token.
     """
     if not mailpit_available():
-        pytest.skip(
+        skip_or_fail_in_ci(
             f"no readable mailbox at {MAILPIT_BASE}; the ack token exists only "
             "inside a page email. Run Mailpit and point the server's SMTP at it."
         )
 
-    email, _ = make_user(oncall._c, oncall.org, "admin")
     marker = email.split("@")[0]
 
     team_id = oncall.team_id(uniq("oncall_ack_team"))
-    oncall.set_schedule(team_id, [rotation("R1", "Primary", [shift_rule("L1", [email])])])
-    oncall.add_member(team_id, email)
+    for member in (email, *teammates):
+        added = oncall.add_member(team_id, member)
+        assert added.status_code == 200, f"adding {member} refused: {added.status_code} {added.text}"
+    resp = oncall.set_schedule(team_id, [rotation("R1", "Primary", [shift_rule("L1", [email])])])
+    assert resp.status_code == 200, f"schedule refused: {resp.status_code} {resp.text}"
 
     page = oncall.open_pages_for([team_id], priority=2)[0]
     link = ack_link_for(marker)
     if not link:
-        pytest.skip(
+        skip_or_fail_in_ci(
             "a page opened but no acknowledge link reached the mailbox within the "
             "wait; check the server's SMTP settings and ZO_WEB_URL"
         )
 
     token = urllib.parse.parse_qs(urllib.parse.urlparse(link).query).get("token", [None])[0]
     assert token, f"ack link carried no token: {link}"
-    yield token, page["id"], email
+    return token, page["id"], email
 
 
 # =============================================================================
@@ -208,8 +217,8 @@ def forged_token(**claims):
 
 
 def get_ack(base_url, org, token, **kwargs):
-    """GET the confirmation page. Never follows the redirect — a followed 303
-    would hide both the status and the Location these tests exist to check."""
+    """GET the confirmation page. Redirects are not followed, so a stray one would
+    show up as its own status and Location rather than be hidden."""
     return requests.get(ack_url(base_url, org), params={"token": token},
                         allow_redirects=False, timeout=30, **kwargs)
 
@@ -225,13 +234,29 @@ def root_basic_auth():
     return {"Authorization": f"Basic {base64.b64encode(creds.encode()).decode()}"}
 
 
+ACKED_HEADING = "<h1>Acknowledged</h1>"
+BROKEN_LINK_HEADING = "This link no longer works"
+
+
 def assert_did_not_act(resp):
-    """Nothing was acknowledged: 303 + Location is the ONLY success signal this
-    route emits, so its absence is what "refused" looks like from outside."""
+    """Nothing was acknowledged: the "Acknowledged" heading is the ONLY success
+    signal this route emits, so its absence is what "refused" looks like from
+    outside. A redirect would be the old contract coming back, so none either."""
+    assert ACKED_HEADING not in resp.text, (
+        f"a refused token must not report an acknowledgement: {resp.text[:300]}"
+    )
     assert resp.status_code != 303, f"a refused token must not redirect: {resp.text[:300]}"
     assert "Location" not in resp.headers, (
         f"a refused token must carry no Location, got {resp.headers.get('Location')}"
     )
+
+
+def assert_acknowledged_page(resp):
+    """The click that took the page: 200 HTML, the heading, and a link into the app."""
+    assert resp.status_code == 200, f"expected the result page, got {resp.status_code}: {resp.text[:300]}"
+    assert resp.headers.get("Content-Type", "").startswith("text/html"), resp.headers
+    assert "Location" not in resp.headers, "the result is a page, not a redirect"
+    assert ACKED_HEADING in resp.text, f"the first click must say it acknowledged: {resp.text[:300]}"
 
 
 def assert_handler_refused(resp):
@@ -239,8 +264,8 @@ def assert_handler_refused(resp):
 
     The two are distinguishable and the difference is the whole point of the
     route: `AuthError::Unauthorized` attaches `WWW-Authenticate` and a bare-text
-    body, while `MetaHttpResponse::error(401, …)` returns JSON with no
-    challenge. If this route ever drifts behind `auth_middleware`, the
+    body, while the handler's refusal is an HTML page saying the link no longer
+    works, with no challenge. If this route ever drifts behind `auth_middleware`, the
     challenge header appears and this fails — which is the regression to catch.
     """
     assert resp.status_code == 401, f"expected 401, got {resp.status_code}: {resp.text[:300]}"
@@ -260,14 +285,12 @@ def assert_handler_refused(resp):
         "so the request never reached the ack handler — the route has drifted behind "
         "auth_middleware"
     )
-    try:
-        body = resp.json()
-    except ValueError:
-        pytest.fail(
-            "the handler answers with a JSON error body; a non-JSON 401 means "
-            f"something else refused this: {resp.text[:300]}"
-        )
-    assert body.get("code") == 401, f"expected the handler's JSON error body, got {body}"
+    assert resp.headers.get("Content-Type", "").startswith("text/html"), (
+        f"the handler refuses with an HTML page; got {resp.headers.get('Content-Type')}"
+    )
+    assert BROKEN_LINK_HEADING in resp.text, (
+        f"expected the handler's 'link no longer works' page, got: {resp.text[:300]}"
+    )
     assert_did_not_act(resp)
 
 
@@ -489,13 +512,11 @@ def test_the_ack_route_does_not_enumerate_orgs(base_url, org_id, foreign_org):
 
 @pytest.mark.parametrize("token", MALFORMED_TOKENS)
 def test_a_get_never_redirects(base_url, org_id, token):
-    """303 + Location is the only thing an acknowledgement emits, and a GET must
-    emit neither. A mail gateway prefetching the link would otherwise answer the
-    page on the responder's behalf.
+    """The "Acknowledged" page is the only thing an acknowledgement emits, and a
+    GET must never emit it, nor a redirect. A mail gateway prefetching the link
+    would otherwise answer the page on the responder's behalf.
 
-    Partial by necessity: without a valid token this covers every shape a
-    prefetcher could be handed from a *broken* link, not the real one. The full
-    case is the skipped test below.
+    Covers only broken-link shapes; the valid-token case below runs whenever the mailbox is reachable.
     """
     assert_did_not_act(get_ack(base_url, org_id, token))
 
@@ -547,15 +568,15 @@ def test_a_get_with_a_valid_token_does_not_acknowledge(create_session, base_url,
     )
 
     # The token must survive the look, or the responder's click finds it spent.
-    assert post_ack(base_url, org_id, token).status_code == 303
+    assert_acknowledged_page(post_ack(base_url, org_id, token))
 
 
 # =============================================================================
-# 12.3, 12.4, 12.6 — blocked on a token that cannot be obtained
+# 12.3, 12.4, 12.6 — a real token, read from the page email
 # =============================================================================
 
-def test_a_valid_token_acknowledges_and_redirects_with_the_org(create_session, base_url,
-                                                               org_id, minted_ack_token):
+def test_a_valid_token_acknowledges_and_links_with_the_org(create_session, base_url,
+                                                           org_id, minted_ack_token):
     """12.3, and the `org_identifier` invariant with it.
 
     The query parameter is not decoration: without it the app resolves whichever
@@ -565,11 +586,10 @@ def test_a_valid_token_acknowledges_and_redirects_with_the_org(create_session, b
     token, response_id, subject = minted_ack_token
 
     resp = post_ack(base_url, org_id, token)
-    assert resp.status_code == 303, resp.text[:300]
-    location = resp.headers["Location"]
-    assert location.endswith(
-        f"/web/oncall/responses/{response_id}?org_identifier={org_id}"
-    ), f"redirect must name the record AND the org, got {location}"
+    assert_acknowledged_page(resp)
+    assert f"/web/oncall/responses/{response_id}?org_identifier={org_id}" in resp.text, (
+        f"the page's link must name the record AND the org: {resp.text[:600]}"
+    )
 
     record = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}")
     assert record.status_code == 200, record.text
@@ -583,28 +603,29 @@ def test_a_valid_token_acknowledges_and_redirects_with_the_org(create_session, b
     )
 
 
-def test_a_replayed_token_redirects_again_and_records_nothing(create_session, base_url,
+def test_a_replayed_token_shows_the_state_and_records_nothing(create_session, base_url,
                                                               org_id, minted_ack_token):
     """12.4, and invariants 1 and 2 together.
 
     A second click is not an error — the responder double-taps, or the mail
-    client retries — so the replay must land where the first one did. But the
-    token was spent before the first acknowledgement, so the second must add
-    nothing: same destination, no second Acknowledged event in the timeline.
+    client retries — so the replay shows the page's current state. But the token
+    was spent before the first acknowledgement, so the second must add nothing:
+    it says who already has the page, and no second Acknowledged event appears.
     """
-    token, response_id, _subject = minted_ack_token
+    token, response_id, subject = minted_ack_token
 
     first = post_ack(base_url, org_id, token)
-    assert first.status_code == 303, first.text[:300]
+    assert_acknowledged_page(first)
 
     history = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}/history")
     assert history.status_code == 200, history.text
     before = json.dumps(history.json())
 
     second = post_ack(base_url, org_id, token)
-    assert second.status_code == 303, f"a replay must not be an error: {second.text[:300]}"
-    assert second.headers["Location"] == first.headers["Location"], (
-        "a replay must land where the first click did"
+    assert second.status_code == 200, f"a replay must not be an error: {second.text[:300]}"
+    assert ACKED_HEADING not in second.text, "a replay must not claim it acknowledged"
+    assert f"Already acknowledged by {subject}".lower() in second.text.lower(), (
+        f"a replay shows the page's current state: {second.text[:300]}"
     )
 
     after = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}/history")
@@ -615,26 +636,33 @@ def test_a_replayed_token_redirects_again_and_records_nothing(create_session, ba
     )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "PRODUCT DEFECT, not a test gap: the emailed link still acknowledges after "
-        "its subject is removed from the team. Measured on :5090 — remove the member "
-        "(200, membership empty), POST the link, 303 and the record reads acknowledged, "
-        "attributed to the removed person. The signed-in path refuses the same action "
-        "with NotOnThisTeam. o2-enterprise#2481."
-    ),
-    strict=True,
-)
-def test_a_token_whose_subject_left_the_team_is_refused(create_session, base_url, org_id,
-                                                        minted_ack_token):
-    """12.6, and invariant 3: claims resolve through `service::ack_claims`, so
-    the same membership check as the authenticated route applies here.
+def test_a_used_link_opened_again_shows_the_state_not_the_button(create_session, base_url,
+                                                                 org_id, minted_ack_token):
+    """Once the page is acknowledged, opening the link again must not offer the
+    Acknowledge button a second time; it says who has the page, as the POST does."""
+    token, _response_id, subject = minted_ack_token
 
-    The token is minted while the subject is on the team and presented after
-    they are removed — a leaver's old page email must stop working, or §1's
-    team scoping has a hole in it that needs no credentials at all.
+    assert_acknowledged_page(post_ack(base_url, org_id, token))
+
+    again = get_ack(base_url, org_id, token)
+    assert again.status_code == 200, again.text[:300]
+    assert again.headers.get("Content-Type", "").startswith("text/html"), again.headers
+    assert f"Already acknowledged by {subject}".lower() in again.text.lower(), (
+        f"a used link shows the page's current state: {again.text[:300]}"
+    )
+    assert "<form" not in again.text, "a used link must not offer the Acknowledge button again"
+    assert_did_not_act(again)
+
+
+def test_a_token_whose_subject_left_the_team_does_not_acknowledge(
+        create_session, base_url, org_id, viewer_ack_token_with_a_teammate):
+    """12.6: a viewer removed from a team that still has members cannot take its page from their old email.
+
+    `ack_claims` checks only org membership, so the link still opens; the ack
+    rule then needs edit access to the alert or being on call for it, hence the
+    viewer subject, and the teammate keeps the team from being emptied.
     """
-    token, response_id, subject = minted_ack_token
+    token, response_id, subject = viewer_ack_token_with_a_teammate
 
     record = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}")
     assert record.status_code == 200, record.text
@@ -645,10 +673,22 @@ def test_a_token_whose_subject_left_the_team_is_refused(create_session, base_url
         params={"user_email": subject},
     )
     assert removed.status_code == 200, removed.text
+    roster = create_session.get(f"{base_url}api/{org_id}/oncall/teams/{team_id}/members")
+    assert roster.status_code == 200, roster.text
+    remaining = [m.get("user_email") for m in roster.json()]
+    # An emptied team is open to the whole org, which would make this case measure the wrong rule.
+    assert remaining, "the teammate must still be on the team"
+    assert subject not in remaining, f"the subject must be gone: {remaining}"
 
-    assert_handler_refused(post_ack(base_url, org_id, token))
-    assert_handler_refused(get_ack(base_url, org_id, token))
+    assert_did_not_act(get_ack(base_url, org_id, token))
+
+    leaver_post = post_ack(base_url, org_id, token)
+    assert leaver_post.status_code == 403, f"{leaver_post.status_code}: {leaver_post.text[:300]}"
+    assert leaver_post.json().get("code") == "ack_refused", leaver_post.text[:300]
+    assert_did_not_act(leaver_post)
 
     after = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}")
     assert after.status_code == 200, after.text
-    assert after.json()["response"].get("state") != "acknowledged"
+    body = after.json()["response"]
+    assert body.get("state") != "acknowledged", body
+    assert (body.get("acked_by") or "").lower() != subject.lower(), body

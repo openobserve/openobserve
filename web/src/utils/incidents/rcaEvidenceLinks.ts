@@ -73,12 +73,12 @@ export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEviden
       : null;
   }
 
-  // PromQL: the metrics editor runs a `query` parameter on load; its share link writes ms.
+  // PromQL: the `/metrics` guard opens a `query` parameter in Visualize; from/to are ms.
   if (link.promql) {
     return {
       page: "metrics",
       route: {
-        name: "metricsEditor",
+        name: "metrics",
         query: {
           org_identifier: org,
           query: b64EncodeUnicode(link.promql) ?? "",

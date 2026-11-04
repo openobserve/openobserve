@@ -1,6 +1,6 @@
 // metricsPage.js
 import { expect } from '@playwright/test';
-import { gotoMetricsEditor } from '../commonActions.js';
+import { gotoMetricsVisualize } from '../commonActions.js';
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
@@ -11,12 +11,11 @@ export class MetricsPage {
 
         // Navigation
         this.metricsPageMenu = page.locator('[data-test="menu-link-\\/metrics-item"]');
-        this.metricsPageIndicator = page.locator('[data-test="metrics-page"]');
+        this.metricsPageIndicator = page.locator('[data-test="metrics-explorer-visualize"]');
 
         // VERIFIED selectors from Phase 1 analysis
         // Main metrics controls
-        this.applyButton = '[data-test="metrics-apply"]';
-        this.cancelButton = '[data-test="metrics-cancel"]';
+        this.applyButton = '[data-test="metrics-explorer-run"]';
         this.datePicker = '[data-test="metrics-date-picker"]';
         this.autoRefresh = '[data-test="metrics-auto-refresh"]';
 
@@ -36,7 +35,6 @@ export class MetricsPage {
         this.schemaTitleText = '[data-test="schema-title-text"]';
 
         // Other UI elements
-        this.syntaxGuideButton = '[data-cy="syntax-guide-button"]';
         this.themeToggleButton = '[data-test="navbar-theme-toggle-btn"]';
 
         // Inline error list locator (DashboardErrors component)
@@ -150,18 +148,17 @@ export class MetricsPage {
         this.configYAxisMaxField = page.locator('[data-test="dashboard-config-y_axis_max-field"]').first();
 
         // ===== Metrics Share & Deep-Link locators =====
-        this.shareButton = '[data-test="metrics-share-btn"]';
-        this.metricsPageContainer = '[data-test="metrics-page"]';
+        this.shareButton = '[data-test="metrics-explorer-share-btn"]';
+        this.metricsPageContainer = '[data-test="metrics-explorer-visualize"]';
         // Scoped success toast for the share-link "Link Copied" message as in dashboard-share-export
         this.shareSuccessToast = page.locator('[data-test-variant="success"][data-test-message*="Link Copied"]');
         this.shareErrorToast = page.locator('[data-test-variant="error"][data-test-message*="Error shortening link"]');
         this.toastMessage = page.locator('[data-test="o-toast-message"]');
 
-        // Query history drawer (QueryHistoryDrawer.vue)
         this.historyButton = page.locator('[data-test="metrics-history-btn"]');
-        this.historyTable = page.locator('[data-test="metrics-history-table"]');
-        this.historySearch = page.locator('[data-test="metrics-history-search"] input');
-        this.historyStarredOnly = page.locator('[data-test="metrics-history-starred-only"]');
+        this.historyDrawer = page.locator('[data-test="recent-searches-drawer"]');
+        this.historySearch = this.historyDrawer.locator('[data-test="recent-searches-search"] input');
+        this.historyStarredOnly = this.historyDrawer.locator('[data-test="recent-searches-starred-only"]');
     }
 
     /**
@@ -236,28 +233,17 @@ export class MetricsPage {
             // Caller branches on the current visibility (warn vs assert).
         }
     }
-    /**
-     * Opens the metrics PANEL EDITOR — the page every caller of this method
-     * actually drives (PromQL input, Apply, visualizations, Add to Dashboard).
-     *
-     * It used to click the sidebar, which was the same thing until `/metrics`
-     * became the Metrics Explorer browse grid; the editor moved to
-     * `/metrics/editor`. Navigating there directly also drops the cloud
-     * sidebar-click fallback this method used to need.
-     */
+    /** Opens the Metrics Explorer in Visualize mode. */
     async gotoMetricsPage() {
-        await gotoMetricsEditor(this.page);
+        await gotoMetricsVisualize(this.page);
 
         // Wait for a key editor control before proceeding.
         await this.page.locator(this.applyButton).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     }
 
+    /** Any explorer mode: switching org drops `mode=visualize` and lands on the grid. */
     async metricsPageValidation() {
-
-        await expect(this.page.locator('[data-cy="syntax-guide-button"]')).toContainText('Syntax Guide');
-        //await expect(this.page.locator('[data-test="zinc-metrics"]')).toContainText('PromQL:');
-
-
+        await expect(this.page.locator('[data-test="metrics-explorer"]')).toBeVisible();
     }
 
 
@@ -322,14 +308,6 @@ export class MetricsPage {
         await expect(this.page.locator(this.applyButton)).toBeEnabled();
     }
 
-    async clickCancelButton() {
-        await this.page.locator(this.cancelButton).click();
-    }
-
-    async expectCancelButtonVisible() {
-        await expect(this.page.locator(this.cancelButton)).toBeVisible();
-    }
-
     async openDatePicker() {
         // Close any open menus/modals first via Escape (data-test policy — no body locator)
         await this.page.keyboard.press('Escape');
@@ -340,6 +318,16 @@ export class MetricsPage {
 
     async expectDatePickerVisible() {
         await expect(this.page.locator(this.datePicker)).toBeVisible();
+    }
+
+    /** The auto-apply picker stays open after a pick, and its popover covers controls below it. */
+    async closeDateTimePickerIfOpen() {
+        const panel = this.page.locator('#date-time-menu');
+        if (!(await panel.isVisible().catch(() => false))) return;
+        await this.page.keyboard.press('Escape');
+        const closed = await panel.waitFor({ state: 'hidden', timeout: 2000 }).then(() => true).catch(() => false);
+        if (!closed) await this.page.locator(this.datePicker).click();
+        await expect(panel).toBeHidden({ timeout: 5000 });
     }
 
     async setAutoRefreshInterval() {
@@ -388,10 +376,6 @@ export class MetricsPage {
 
     async isDatePickerVisible() {
         return await this.page.locator(this.datePicker).isVisible().catch(() => false);
-    }
-
-    async isSyntaxGuideVisible() {
-        return await this.page.locator(this.syntaxGuideButton).isVisible().catch(() => false);
     }
 
     async searchInFieldList(searchTerm) {
@@ -573,10 +557,6 @@ export class MetricsPage {
         await this.page.locator(this.schemaCancel).click();
     }
 
-    async expectSyntaxGuideVisible() {
-        await expect(this.page.locator(this.syntaxGuideButton)).toBeVisible();
-    }
-
     async enterMetricsQuery(query) {
         // Ensure Custom mode is active so the editor is fully editable
         const customBtn = this.page.locator(`${this.customQueryTypeSelector || '[data-test="dashboard-custom-query-type"]'}:visible`).first();
@@ -644,11 +624,12 @@ export class MetricsPage {
         await this.page.keyboard.press('Escape');
     }
 
-    async waitForMetricsResults() {
+    /** `strict` lets a missing chart, table or no-data state fail the test instead of passing silently. */
+    async waitForMetricsResults({ strict = false } = {}) {
         // Wait for results to load after query execution.
         // networkidle never resolves on OpenObserve (persistent WebSocket/RUM)
         await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-        await this.page.waitForFunction(
+        const rendered = this.page.waitForFunction(
             () => {
                 const canvases = document.querySelectorAll('[data-test="chart-renderer"] canvas');
                 if (canvases.length > 0) return true;
@@ -665,7 +646,9 @@ export class MetricsPage {
             },
             null,
             { timeout: 15000, polling: 'raf' }
-        ).catch(() => {});
+        );
+        if (strict) await rendered;
+        else await rendered.catch(() => {});
     }
 
     // Query type switching methods
@@ -703,6 +686,37 @@ export class MetricsPage {
         const hasSqlMode = await this.isInSQLMode();
         // If not in SQL mode, assume PromQL mode (default)
         return !hasSqlMode || await promqlIndicator.isVisible().catch(() => false);
+    }
+
+    /** Runs `query` and reads its own range response, so a stale chart cannot answer: series seen, and the most at any one step. */
+    async executeQueryAndCountSeries(query) {
+        const response = this.page.waitForResponse(
+            (r) => r.url().includes('/prometheus/api/v1/query_range') && new URL(r.url()).searchParams.get('query') === query,
+            { timeout: 30000 }
+        );
+        await this.enterMetricsQuery(query);
+        await this.clickApplyButton();
+        // The UI can abort its own event stream after the last event, and Chrome keeps no body for an aborted request.
+        const body = await (await this.page.request.get((await response).url())).text();
+        const series = new Set();
+        const points = new Set();
+        for (const line of body.split('\n')) {
+            if (!line.startsWith('data: {')) continue;
+            const result = JSON.parse(line.slice(6))?.data?.result;
+            if (!Array.isArray(result)) continue;
+            for (const s of result) {
+                const key = JSON.stringify(s.metric);
+                series.add(key);
+                for (const [ts] of s.values ?? []) points.add(`${ts}|${key}`);
+            }
+        }
+        const perStep = new Map();
+        for (const point of points) {
+            const ts = point.split('|')[0];
+            perStep.set(ts, (perStep.get(ts) ?? 0) + 1);
+        }
+        await this.waitForMetricsResults({ strict: true });
+        return { series: series.size, maxPerStep: Math.max(0, ...perStep.values()) };
     }
 
     async executeQuery(query) {
@@ -988,8 +1002,7 @@ export class MetricsPage {
             // Portal element animation re-mount: fall back to dispatchEvent
             await last15Min.dispatchEvent('click').catch(() => {});
           }
-          // Wait for date picker popover to close (deterministic wait)
-          await last15Min.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+          await this.closeDateTimePickerIfOpen();
           return true;
         }
         // Dismiss the date picker via Escape if the option was not found
@@ -1390,7 +1403,7 @@ export class MetricsPage {
 
             if (await dateTimeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await dateTimeBtn.click();
-                await this.page.waitForTimeout(500);
+                await this.closeDateTimePickerIfOpen();
                 return true;
             }
         }
@@ -1399,6 +1412,7 @@ export class MetricsPage {
         const rangeOption = this.page.locator(`[role="option"]:has-text("${range}"), button:has-text("${range}")`).first();
         if (await rangeOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await rangeOption.click();
+            await this.closeDateTimePickerIfOpen();
             return true;
         }
 
@@ -1406,6 +1420,7 @@ export class MetricsPage {
         const relativeOption = this.page.locator('button').filter({ hasText: range }).first();
         if (await relativeOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await relativeOption.click();
+            await this.closeDateTimePickerIfOpen();
             return true;
         }
 
@@ -1833,6 +1848,14 @@ export class MetricsPage {
             }
         }
         return this.page.locator('.not-exists'); // Return non-existent locator
+    }
+
+    async expectChartRendered(timeout = 15000) {
+        await expect(this.chartRenderer.locator('canvas').first()).toBeVisible({ timeout });
+    }
+
+    async expectNoDataHidden() {
+        await expect(this.noDataMessage).toHaveCount(0);
     }
 
     async getNoDataMessage() {
@@ -2782,7 +2805,7 @@ export class MetricsPage {
 
     async openQueryHistory() {
         await this.historyButton.click();
-        await this.historyTable.waitFor({ state: 'visible', timeout: 15000 });
+        await this.historyDrawer.waitFor({ state: 'visible', timeout: 15000 });
     }
 
     /** Resolves once the filtered list answers: a click landing mid-re-render is lost. */
@@ -2794,24 +2817,33 @@ export class MetricsPage {
         await listed;
     }
 
-    /** The history row whose query cell is exactly `query`. */
+    /** The drawer row whose query text contains `query`. */
     historyRow(query) {
-        return this.historyTable.locator('[data-test^="o2-table-row-"]').filter({
-            has: this.page.locator('[data-test="o2-table-cell-query"]', { hasText: query }),
+        return this.historyDrawer.locator('[data-test^="recent-searches-drawer-row-"]').filter({
+            has: this.page.locator('[data-test="recent-searches-drawer-query"]', { hasText: query }),
         });
     }
 
     /** A row's star toggle; its data-test carries the entry id, so match the prefix. */
     historyStarButton(query) {
-        return this.historyRow(query).locator('[data-test^="metrics-history-star-"]');
+        return this.historyRow(query).locator('[data-test^="recent-searches-star-"]');
     }
 
+    /** Picks `action` (load, delete, copy-link, copy-query) from a row's "More" menu. */
+    async historyRowAction(query, action) {
+        const rowTest = await this.historyRow(query).getAttribute('data-test');
+        const id = rowTest.replace('recent-searches-drawer-row-', '');
+        await this.historyRow(query).locator(`[data-test="recent-searches-more-${id}"]`).click();
+        await this.page.locator(`[data-test="recent-searches-${action}-${id}"]`).click();
+    }
+
+    /** The DELETE is sent once the row's Undo toast closes, so callers wait for it. */
     async deleteHistoryEntry(query) {
-        await this.historyRow(query).locator('[data-test^="metrics-history-delete-"]').click();
+        await this.historyRowAction(query, 'delete');
     }
 
-    /** Clicking a row's query cell loads the entry into the open editor. */
+    /** Loads the entry into the editor without running it. */
     async loadHistoryEntry(query) {
-        await this.historyRow(query).locator('[data-test="o2-table-cell-query"]').click();
+        await this.historyRowAction(query, 'load');
     }
 }

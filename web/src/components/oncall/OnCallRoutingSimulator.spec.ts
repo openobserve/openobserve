@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 
 import OnCallRoutingSimulator from "@/components/oncall/OnCallRoutingSimulator.vue";
 import i18n from "@/locales";
-import type { RoutingPreview } from "@/ts/interfaces/oncall";
+import type { Channel, RoutingPreview } from "@/ts/interfaces/oncall";
 import store from "@/test/unit/helpers/store";
 
 const stubs = {
@@ -62,6 +62,7 @@ function preview(over: Partial<RoutingPreview> = {}): RoutingPreview {
         pages_anyone: true,
         nobody_after_micros: 1_200_000_000,
         ends_with_whole_team: true,
+        channels: ["email"],
       },
     ],
     current_responder: {
@@ -252,10 +253,71 @@ describe("OnCallRoutingSimulator", () => {
     );
   });
 
+  describe("the responder's channels", () => {
+    const withLadder = (ladder: RoutingPreview["ladder"]) =>
+      preview({
+        ladder,
+        current_responder: {
+          user_email: "aarav@o2.ai",
+          reason: "on call",
+          would_a_page_land: true,
+          deliverable_channels: ["email", "sms"],
+        },
+      });
+    const p1 = (channels: Channel[]) => [
+      { priority: "P1", rungs: 1, pages_anyone: true, ends_with_whole_team: true, channels },
+    ];
+    const note = (wrapper: Wrapper) =>
+      wrapper.find('[data-test="oncall-simulator-responder-note"]');
+    const tone = (wrapper: Wrapper) =>
+      note(wrapper)
+        .classes()
+        .find((c) => c.startsWith("text-status"));
+
+    it.each<[string, Channel[], string, string]>([
+      [
+        "names only what the priority sends",
+        ["sms", "voice"],
+        "SMS · now",
+        "text-status-success-text",
+      ],
+      [
+        "lists every channel both sides share",
+        ["email", "sms"],
+        "Email, SMS · now",
+        "text-status-success-text",
+      ],
+      [
+        "warns when the priority sends nothing they receive",
+        ["voice"],
+        "This priority sends nothing they can receive",
+        "text-status-warning-text",
+      ],
+    ])("%s", async (_, sends, expected, colour) => {
+      const wrapper = render({ preview: withLadder(p1(sends)) });
+      await pickPriority(wrapper);
+      expect(note(wrapper).text()).toBe(expected);
+      expect(tone(wrapper)).toBe(colour);
+    });
+
+    it("with no priority chosen, lists what they can receive", () => {
+      const wrapper = render({ preview: withLadder(p1(["voice"])) });
+      expect(note(wrapper).text()).toBe("Email, SMS · now");
+    });
+  });
+
   it("marks a priority that would wake nobody", async () => {
     const wrapper = render({
       preview: preview({
-        ladder: [{ priority: "P1", rungs: 0, pages_anyone: false, ends_with_whole_team: false }],
+        ladder: [
+          {
+            priority: "P1",
+            rungs: 0,
+            pages_anyone: false,
+            ends_with_whole_team: false,
+            channels: [],
+          },
+        ],
       }),
     });
     await pickPriority(wrapper);
@@ -276,4 +338,69 @@ describe("OnCallRoutingSimulator", () => {
       wrapper.find('[data-test="oncall-simulator-send-test"]').attributes("disabled"),
     ).toBeDefined();
   });
+
+  /// Attempts, not people: one person on email and text is two attempts, and the old toast called that "2 people".
+  it("lists each test page attempt in the result card", async () => {
+    const wrapper = await sentTest({
+      reached_anyone: true,
+      channels: ["email", "sms"],
+      attempts: [
+        { channel: "email", recipient: "aarav@o2.ai", reason: "on call", delivered: true },
+        {
+          channel: "sms",
+          recipient: "aarav@o2.ai",
+          reason: "on call",
+          delivered: false,
+          detail: "no phone number",
+        },
+      ],
+    });
+
+    const result = wrapper.find('[data-test="oncall-simulator-test-result"]');
+    expect(result.find('[data-test="oncall-simulator-test-count"]').text()).toBe("Sent 1 of 2");
+    const rows = result.findAll('[data-test^="oncall-simulator-test-attempt-"]');
+    expect(rows.map((row) => row.text())).toEqual([
+      "aarav@o2.ai · Email · Sent",
+      "aarav@o2.ai · SMS · Not sent: no phone number",
+    ]);
+  });
+
+  it("says why nothing was sent when no attempt was made", async () => {
+    const wrapper = await sentTest({
+      reached_anyone: false,
+      not_sent_because: "nobody is on call",
+      channels: ["email"],
+      attempts: [],
+    });
+
+    expect(wrapper.find('[data-test="oncall-simulator-test-result"]').text()).toBe(
+      "Nothing was sent — nobody is on call",
+    );
+  });
+
+  /// A result describes the team and priority it was sent for, never the ones on screen after a change.
+  it("hides the test result once the priority changes", async () => {
+    const wrapper = await sentTest({
+      reached_anyone: true,
+      channels: ["email"],
+      attempts: [
+        { channel: "email", recipient: "aarav@o2.ai", reason: "on call", delivered: true },
+      ],
+    });
+    expect(wrapper.find('[data-test="oncall-simulator-test-result"]').exists()).toBe(true);
+
+    await wrapper.find('[data-test="oncall-simulator-chip-priority"] button').trigger("click");
+    await pickPriority(wrapper, "P2");
+
+    expect(wrapper.find('[data-test="oncall-simulator-test-result"]').exists()).toBe(false);
+  });
 });
+
+/// The parent hands the result back after the click, the way the routing page does.
+async function sentTest(testResult: Record<string, unknown>) {
+  const wrapper = render({ preview: preview() });
+  await pickPriority(wrapper);
+  await wrapper.find('[data-test="oncall-simulator-send-test"]').trigger("click");
+  await wrapper.setProps({ testResult });
+  return wrapper;
+}

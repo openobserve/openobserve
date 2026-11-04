@@ -22,6 +22,9 @@ export default class DashboardVariables {
     this.variableLoadingSpinner = (name) => page.locator(`[data-test="variable-selector-${name}"] [role="status"]`);
     // HTML panel editor (Monaco) locators
     this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
+    // "Add Variable" button in the panel editor's variable bar, and the drawer's name input it opens
+    this.addVariableBtn = page.locator('[data-test="dashboard-add-variable-btn"]');
+    this.variableNameField = page.locator('[data-test="dashboard-variable-name-field"]');
     // Ad-hoc (dynamic) filter variable selector controls
     this.adhocAddSelector = page.locator('[data-test="dashboard-variable-adhoc-add-selector"]');
     this.adhocNameSelectorField = page.locator('[data-test="dashboard-variable-adhoc-name-selector-field"]');
@@ -41,6 +44,10 @@ export default class DashboardVariables {
     await this.adhocNameSelectorInput.fill(name);
     await this.adhocValueSelectorInput.click();
     await this.adhocValueSelectorInput.fill(value);
+  }
+
+  async clickAddVariableBtn() {
+    await this.addVariableBtn.click();
   }
 
   /**
@@ -550,6 +557,7 @@ export default class DashboardVariables {
         const options = document.querySelectorAll('[data-test="dashboard-variable-field-select-option"]');
         return options.length > 0;
       },
+      undefined,
       { timeout: 10000, polling: 100 }
     );
 
@@ -563,19 +571,14 @@ export default class DashboardVariables {
     const saveBtn = this.page.locator('[data-test="dashboard-variable-save-btn"]');
     await saveBtn.waitFor({ state: "visible", timeout: 10000 });
 
-    // Wait for save to complete by monitoring the close button becomes clickable
     await saveBtn.click();
 
-    // Wait for the variable to be saved (settings drawer close button should be ready)
-    const closeBtn = this.page.locator('[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]');
-    await closeBtn.waitFor({ state: "visible", timeout: 10000 });
+    // Closing before the save lands opens the "Leave with unsaved changes?" dialog, so wait for the row.
+    await this.editVariableBtn(variableName).waitFor({ state: "visible", timeout: 15000 });
 
-    // Close the settings drawer
-    await closeBtn.click();
-
-    // Wait for settings drawer to close
-    const settingsDrawer = this.page.locator('[data-test="dashboard-settings-drawer"]');
-    await settingsDrawer.waitFor({ state: "hidden", timeout: 15000 });
+    await this.settingsDrawerCloseBtn.waitFor({ state: "visible", timeout: 10000 });
+    await this.settingsDrawerCloseBtn.click();
+    await this.settingsDrawer.waitFor({ state: "hidden", timeout: 15000 });
 
     // Wait for dashboard to stabilize after variable addition (longer for parallel execution)
     await this.page.waitForLoadState('domcontentloaded');

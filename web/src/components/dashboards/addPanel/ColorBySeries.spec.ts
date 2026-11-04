@@ -332,6 +332,37 @@ describe("ColorBySeries", () => {
     delete (mockDashboardPanelData.data as any).type;
   });
 
+  it("lists bar gauge series from the bar categories, not the value-label series", async () => {
+    mockDashboardPanelData.data.type = "bar-gauge";
+    const barGaugeData = {
+      options: {
+        yAxis: { type: "category", data: ["api", "web"] },
+        xAxis: { type: "value" },
+        series: [
+          {
+            type: "bar",
+            data: [
+              { name: "api", value: 3 },
+              { name: "web", value: 5 },
+            ],
+          },
+          { type: "bar", data: [10, 10] },
+        ],
+      },
+    };
+
+    wrapper.unmount();
+    wrapper = mount(ColorBySeries, {
+      ...mountOptionsBase(),
+      props: { colorBySeriesData: barGaugeData },
+    });
+    await flushPromises();
+
+    expect(wrapper.vm.seriesOptions).toEqual({ series: [{ name: "api" }, { name: "web" }] });
+
+    delete (mockDashboardPanelData.data as any).type;
+  });
+
   it("should work with dark theme", async () => {
     store.state.theme = "dark";
 

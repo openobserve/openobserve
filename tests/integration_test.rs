@@ -105,6 +105,8 @@ mod tests {
         ("enrichment_tables", "org"),
         ("enrichment_table_urls", "org"),
     ];
+    /// The stack infra's runtimes give every thread that polls a server future.
+    const E2E_STACK_SIZE: usize = 16 * 1024 * 1024;
 
     static START: Once = Once::new();
     // A sub-test that calls `setup()` after `tear_down` fails fast instead of using deleted state.
@@ -505,56 +507,33 @@ mod tests {
         log::info!("Cleanup: finished cleaning up previous test state");
     }
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn e2e_test() {
+    // tokio::test polls the body on the 2 MiB harness thread, which the enterprise build overflows.
+    #[test]
+    fn e2e_test() {
+        let body = std::thread::Builder::new()
+            .name("e2e_test".to_string())
+            .stack_size(E2E_STACK_SIZE)
+            .spawn(|| {
+                tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(4)
+                    .thread_stack_size(E2E_STACK_SIZE)
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(e2e_test_body());
+            })
+            .unwrap();
+        if let Err(panic) = body.join() {
+            std::panic::resume_unwind(panic);
+        }
+    }
+
+    async fn e2e_test_body() {
         let sandbox = Sandbox::create().await;
         setup();
         sandbox.assert_config_uses_it();
 
-        // start gRPC server
-        tokio::task::spawn(async move {
-            init_grpc_server()
-                .await
-                .expect("router gRPC server init failed");
-        });
-
-        // register node
-        common::infra::cluster::register_and_keep_alive()
-            .await
-            .unwrap();
-        // init config
-        config::init().await.unwrap();
-        // init infra
-        migration::init_db().await.unwrap();
-        // ensure database tables are created
-        infra::db::create_table().await.unwrap();
-        // db migration steps, since it's separated out
-        infra::table::migrate().await.unwrap();
-        infra::init().await.unwrap();
-        #[cfg(feature = "enterprise")]
-        let master_key = Some(
-            o2_enterprise::enterprise::common::config::get_config()
-                .encryption
-                .master_key
-                .clone(),
-        );
-        #[cfg(not(feature = "enterprise"))]
-        let master_key: Option<String> = None;
-        infra::table::cipher::boot(master_key.as_deref())
-            .await
-            .unwrap();
-        openobserve_core::bootstrap::init().await.unwrap();
-        // ingester init
-        ingester::init().await.unwrap();
-        // init job
-        openobserve_jobs::job::init().await.unwrap();
-
-        // Wait for async initialization tasks (like default user creation) to complete
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        // Clean up any leftover state from previous test runs/retries
-        // This ensures tests are idempotent
-        cleanup_previous_test_state().await;
+        e2e_boot().await;
 
         for _i in 0..3 {
             e2e_1_post_bulk().await;
@@ -570,6 +549,7 @@ mod tests {
         e2e_post_trace().await;
         e2e_post_metrics().await;
         e2e_post_hec().await;
+        e2e_firehose_and_pubsub_status().await;
         // e2e_post_kinesis_data().await;
 
         // streams
@@ -625,6 +605,74 @@ mod tests {
         // the y column from the query on the next edit.
         e2e_dashboard_nested_cast_round_trip().await;
 
+        e2e_alerts().await;
+
+        e2e_create_test_pipeline().await;
+        e2e_handle_derived_stream_success().await;
+        e2e_handle_derived_stream_pipeline_not_found().await;
+        e2e_handle_derived_stream_max_retries().await;
+        test_derived_stream_invalid_timerange_delay_scenario().await;
+        test_derived_stream_invalid_timerange_with_cron_frequency().await;
+        e2e_handle_derived_stream_evaluation_failure().await;
+        e2e_cleanup_test_pipeline().await;
+
+        test_enrichment_table_integration().await;
+        test_enrichment_table_local_all_sequential().await;
+
+        test_backfill_job_list_and_delete().await;
+        test_backfill_job_get_nonexistent().await;
+        test_backfill_job_delete_by_pipeline().await;
+        test_backfill_job_enable_disable().await;
+
+        // Own fn: inline spawns widen e2e_test's frame and overflow the debug stack.
+        e2e_org_deletion().await;
+
+        e2e_health_check().await;
+        e2e_config().await;
+
+        e2e_delete_stream().await;
+        sandbox.tear_down().await;
+    }
+
+    async fn e2e_boot() {
+        tokio::task::spawn(async move {
+            init_grpc_server()
+                .await
+                .expect("router gRPC server init failed");
+        });
+
+        common::infra::cluster::register_and_keep_alive()
+            .await
+            .unwrap();
+        config::init().await.unwrap();
+        migration::init_db().await.unwrap();
+        infra::db::create_table().await.unwrap();
+        infra::table::migrate().await.unwrap();
+        infra::init().await.unwrap();
+        #[cfg(feature = "enterprise")]
+        let master_key = Some(
+            o2_enterprise::enterprise::common::config::get_config()
+                .encryption
+                .master_key
+                .clone(),
+        );
+        #[cfg(not(feature = "enterprise"))]
+        let master_key: Option<String> = None;
+        infra::table::cipher::boot(master_key.as_deref())
+            .await
+            .unwrap();
+        openobserve_core::bootstrap::init().await.unwrap();
+        ingester::init().await.unwrap();
+        openobserve_jobs::job::init().await.unwrap();
+
+        // Default user creation runs asynchronously after bootstrap.
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // A retried run starts from the state the failed attempt left behind.
+        cleanup_previous_test_state().await;
+    }
+
+    async fn e2e_alerts() {
         // alert
         e2e_post_alert_template().await;
         e2e_get_alert_template().await;
@@ -675,37 +723,6 @@ mod tests {
         // Cleanup
         e2e_delete_alert_with_sns_destination().await;
         e2e_delete_sns_alert_destination().await;
-
-        // derived streams
-        e2e_create_test_pipeline().await;
-        e2e_handle_derived_stream_success().await;
-        e2e_handle_derived_stream_pipeline_not_found().await;
-        e2e_handle_derived_stream_max_retries().await;
-        test_derived_stream_invalid_timerange_delay_scenario().await;
-        test_derived_stream_invalid_timerange_with_cron_frequency().await;
-        e2e_handle_derived_stream_evaluation_failure().await;
-        e2e_cleanup_test_pipeline().await;
-
-        // enrichment table
-        test_enrichment_table_integration().await;
-        test_enrichment_table_local_all_sequential().await;
-
-        // backfill jobs
-        test_backfill_job_list_and_delete().await;
-        test_backfill_job_get_nonexistent().await;
-        test_backfill_job_delete_by_pipeline().await;
-        test_backfill_job_enable_disable().await;
-
-        // Own fn: inline spawns widen e2e_test's frame and overflow the debug stack.
-        e2e_org_deletion().await;
-
-        // others
-        e2e_health_check().await;
-        e2e_config().await;
-
-        // clear
-        e2e_delete_stream().await;
-        sandbox.tear_down().await;
     }
 
     async fn e2e_org_deletion() {
@@ -5043,6 +5060,99 @@ mod tests {
         assert!(status.is_success());
     }
 
+    async fn post_firehose(app: &Router, stream: &str, record: &str) -> (StatusCode, json::Value) {
+        let mut headers = HeaderMap::new();
+        let basic = setup().1.trim_start_matches("Basic ");
+        headers.insert(
+            "X-Amz-Firehose-Access-Key",
+            HeaderValue::from_str(basic).unwrap(),
+        );
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        let body = json!({
+            "requestId": "r1",
+            "timestamp": Utc::now().timestamp_millis(),
+            "records": [{"data": config::utils::base64::encode(record)}],
+        });
+        let (status, body) = make_request(
+            app,
+            Method::POST,
+            &format!("/aws/e2e/{stream}/_kinesis_firehose"),
+            Some(headers),
+            Some(body.to_string()),
+        )
+        .await;
+        (status, json::from_slice(&body).unwrap())
+    }
+
+    async fn post_pubsub(app: &Router, stream: &str, data: &str) -> (StatusCode, json::Value) {
+        let basic = setup().1.trim_start_matches("Basic ");
+        let api_key: String = url::form_urlencoded::byte_serialize(basic.as_bytes()).collect();
+        let now = Utc::now().to_rfc3339();
+        let body = json!({
+            "message": {
+                "attributes": {"logging.googleapis.com/timestamp": now},
+                "data": config::utils::base64::encode(data),
+                "messageId": "m1",
+                "message_id": "m1",
+                "publishTime": now,
+                "publish_time": now,
+            },
+            "subscription": "projects/p/subscriptions/s",
+        });
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        let (status, body) = make_request(
+            app,
+            Method::POST,
+            &format!("/gcp/e2e/{stream}/_sub?API-Key={api_key}"),
+            Some(headers),
+            Some(body.to_string()),
+        )
+        .await;
+        (status, json::from_slice(&body).unwrap())
+    }
+
+    async fn e2e_firehose_and_pubsub_status() {
+        let app = init_test_router().merge(other_service_routes());
+
+        let (status, _) = post_firehose(&app, "firehose_status", r#"{"a":1}"#).await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, _) = post_pubsub(&app, "pubsub_status", r#"{"a":1}"#).await;
+        assert_eq!(status, StatusCode::OK);
+
+        // a message that is not an object stores no row, so Pub/Sub must redeliver it
+        let (status, body) = post_pubsub(&app, "pubsub_status", "123").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+
+        // only PostgreSQL rejects a stream key over 256 characters
+        if get_config().common.meta_store != "postgres" {
+            return;
+        }
+        let long_stream = "a".repeat(250);
+        let (status, body) = post_firehose(&app, &long_stream, r#"{"a":1}"#).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+        assert!(
+            body["errorMessage"]
+                .as_str()
+                .unwrap()
+                .contains("Stream name too long")
+        );
+        let (status, body) = post_pubsub(&app, &long_stream, r#"{"a":1}"#).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+        assert!(
+            body["message"]
+                .as_str()
+                .unwrap()
+                .contains("Stream name too long")
+        );
+    }
+
     async fn e2e_post_multi() {
         let auth = setup();
         let body_str = "{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}";
@@ -6652,7 +6762,7 @@ mod tests {
         alert.is_real_time = false;
         alert.enabled = true;
         alert.query_condition = QueryCondition {
-            query_type: "sql".into(),
+            query_type: config::meta::alerts::QueryType::SQL,
             conditions: None,
             sql: Some("SELEC country FROM \"olympics_schema\"".to_string()),
             ..Default::default()
@@ -6798,9 +6908,19 @@ mod tests {
     async fn e2e_config() {
         let auth = setup();
         let app = init_test_router();
-        let headers = auth_headers(auth);
-        let (status, _body) = make_request(&app, Method::GET, "/config", Some(headers), None).await;
+        let (status, body) = make_request(&app, Method::GET, "/config", None, None).await;
         assert!(status.is_success());
+        let bootstrap: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(bootstrap.get("rum").is_none(), "{bootstrap}");
+        assert!(bootstrap.get("commit_hash").is_some(), "{bootstrap}");
+
+        let headers = auth_headers(auth);
+        let (status, body) =
+            make_request(&app, Method::GET, "/api/e2e/config", Some(headers), None).await;
+        assert!(status.is_success());
+        let full: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(full["rum"]["version"], config::VERSION, "{full}");
+        assert!(full["rum"].get("client_token").is_some(), "{full}");
     }
 
     // Helper function to create pipeline via API

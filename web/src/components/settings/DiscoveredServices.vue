@@ -480,6 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('settings.correlation.resetServicesConfirmTitle')"
       :message="t('settings.correlation.resetServicesConfirmMessage')"
       :warningMessage="t('settings.correlation.resetServicesConfirmWarning')"
+      ok-variant="destructive"
       @update:ok="doResetServices"
       @update:cancel="confirmResetOpen = false"
       v-model="confirmResetOpen"

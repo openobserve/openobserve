@@ -18,7 +18,7 @@ import { defineComponent, nextTick, watch } from "vue";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
-import useStreamFields from "./useStreamFields";
+import useStreamFields, { FIELD_GROUPS_WAIT_MS } from "./useStreamFields";
 import { searchState } from "./searchState";
 import { queryClient } from "@/composables/query/queryClient";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
@@ -325,5 +325,90 @@ describe("extractFields and a slow semantic-groups load", () => {
     }
 
     expect(builds.count).toBe(0);
+  });
+});
+
+describe("field list on a cold semantic-groups load", () => {
+  it("keeps the field list loading until the groups arrive, then shows it grouped", async () => {
+    seedStream();
+    const land = pendingGroupsLoad();
+    const wrapper = mountConsumer();
+
+    await wrapper.vm.extractFields({ reuseLoadedSchema: true });
+    expect(searchObj.loadingStream).toBe(false);
+    expect(searchObj.loadingFieldGroups).toBe(true);
+
+    land([infraGroup()]);
+    await vi.waitFor(() => expect(searchObj.loadingFieldGroups).toBe(false));
+    expect(hostGroup()).toBe("infra");
+  });
+
+  it("shows the ungrouped list once the wait for the groups runs out", async () => {
+    seedStream();
+    const land = pendingGroupsLoad();
+    const wrapper = mountConsumer();
+    await wrapper.vm.extractFields({ reuseLoadedSchema: true });
+    expect(searchObj.loadingFieldGroups).toBe(true);
+
+    await new Promise((r) => setTimeout(r, FIELD_GROUPS_WAIT_MS + 50));
+    expect(searchObj.loadingFieldGroups).toBe(false);
+    land([]);
+  });
+
+  it("does not hold the list when the groups are already cached", async () => {
+    seedStream();
+    queryClient.setQueryData(groupsKey(), [infraGroup()]);
+    const land = pendingGroupsLoad();
+    const wrapper = mountConsumer();
+
+    await wrapper.vm.extractFields({ reuseLoadedSchema: true });
+    expect(searchObj.loadingFieldGroups).toBe(false);
+    expect(hostGroup()).toBe("infra");
+    land([infraGroup()]);
+  });
+
+  it("releases the list when the cold groups load comes back empty", async () => {
+    seedStream();
+    loadSemanticGroups.mockResolvedValue([]);
+    const wrapper = mountConsumer();
+
+    await wrapper.vm.extractFields({ reuseLoadedSchema: true });
+    await vi.waitFor(() => expect(searchObj.loadingFieldGroups).toBe(false));
+  });
+
+  it("keeps holding when another extract runs before the groups arrive", async () => {
+    seedStream();
+    const land = pendingGroupsLoad();
+    const wrapper = mountConsumer();
+
+    await wrapper.vm.extractFields({ reuseLoadedSchema: true });
+    await wrapper.vm.extractFields({ reuseLoadedSchema: true });
+    expect(searchObj.loadingStream).toBe(false);
+    expect(searchObj.loadingFieldGroups).toBe(true);
+
+    land([infraGroup()]);
+    await vi.waitFor(() => expect(searchObj.loadingFieldGroups).toBe(false));
+    expect(hostGroup()).toBe("infra");
+  });
+
+  it("does not hide a field list that is already showing", async () => {
+    seedStream();
+    searchObj.data.stream.selectedStreamFields = [{ name: "host" }] as any;
+    const land = pendingGroupsLoad();
+    const wrapper = mountConsumer();
+
+    await wrapper.vm.extractFields({ reuseLoadedSchema: true });
+    expect(searchObj.loadingFieldGroups).toBe(false);
+    land([]);
+  });
+
+  it("starts the groups request with the URL prefetch", () => {
+    searchObj.data.stream.selectedStream = [];
+    loadSemanticGroups.mockResolvedValue([]);
+    const wrapper = mountConsumer();
+
+    wrapper.vm.prefetchSelectedStreamFields();
+
+    expect(loadSemanticGroups).toHaveBeenCalledTimes(1);
   });
 });

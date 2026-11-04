@@ -99,9 +99,6 @@ impl CreateAlertRequestBody {
         if self.alert.is_real_time {
             return Some("is_real_time");
         }
-        if self.alert.deduplication.is_some() {
-            return Some("deduplication");
-        }
         if self.alert.tz_offset != 0 {
             return Some("tz_offset");
         }
@@ -294,9 +291,6 @@ impl UpdateAlertRequestBody {
         }
         if self.alert.is_real_time {
             return Some("is_real_time");
-        }
-        if self.alert.deduplication.is_some() {
-            return Some("deduplication");
         }
         if self.alert.tz_offset != 0 {
             return Some("tz_offset");

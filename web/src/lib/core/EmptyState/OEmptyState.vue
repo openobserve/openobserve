@@ -107,14 +107,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sizeClass.actions,
         ]"
       >
+        <!-- Every action carries `data-test="o2-empty-state-action-<id>"` (RUM
+             uses data-test as the click's action name, so a CTA click reads
+             apart from a dead click on the illustration) and
+             `data-empty-state-action="<id>"`. -->
         <slot name="actions">
           <template v-if="showCards">
             <EmptyStateActionCard
               v-for="(a, i) in resolvedActions"
               :key="a.id || i"
               :icon="a.icon"
-              :label="t(a.titleKey)"
-              :sublabel="a.descriptionKey ? t(a.descriptionKey) : undefined"
+              :label="t(a.titleKey, a.titleParams ?? {})"
+              :sublabel="
+                a.descriptionKey ? t(a.descriptionKey, a.descriptionParams ?? {}) : undefined
+              "
+              :data-test="`o2-empty-state-action-${a.id}`"
+              :data-empty-state-action="a.id"
               @click="emit('action', a.id)"
             />
           </template>
@@ -124,6 +132,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :variant="actionVariant"
               :size="size === 'inline' ? 'sm' : 'md'"
               :icon-left="resolvedActionIcon"
+              :data-test="`o2-empty-state-action-${actionId}`"
+              :data-empty-state-action="actionId"
               @click="emit('action')"
             >
               {{ resolvedActionLabel }}
@@ -132,6 +142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="secondaryActionLabel"
               variant="ghost"
               :size="size === 'inline' ? 'sm' : 'md'"
+              :data-test="`o2-empty-state-action-${secondaryActionId}`"
+              :data-empty-state-action="secondaryActionId"
               @click="emit('secondaryAction')"
             >
               {{ secondaryActionLabel }}
@@ -188,8 +200,12 @@ const props = withDefaults(
     /** Simple primary button (used instead of cards); emits `action` on click. */
     actionLabel?: I18nText;
     actionIcon?: IconName;
+    /** Stable id of the simple primary button, for its `data-test` (see the actions block). */
+    actionId?: string;
     /** Secondary action; emits `secondaryAction` on click. */
     secondaryActionLabel?: I18nText;
+    /** Stable id of the secondary button, for its `data-test`. */
+    secondaryActionId?: string;
     /** Suppress the preset's actions (e.g. table empties with no CTA). */
     hideAction?: boolean;
     /**
@@ -207,7 +223,7 @@ const props = withDefaults(
     /** Force the dot-grid backdrop on/off (default: on for hero/block). */
     backdrop?: boolean;
   }>(),
-  { size: "block" },
+  { size: "block", actionId: "primary", secondaryActionId: "secondary" },
 );
 
 const emit = defineEmits<{
@@ -349,7 +365,7 @@ const SIZE_MAP: Record<
   block: {
     root: "w-full min-h-65 px-6 py-10 max-md:min-h-0 max-md:px-4 max-md:py-5",
     stack: "gap-5 max-md:gap-3",
-    copy: "gap-2 max-md:gap-1",
+    copy: "gap-2 max-md:gap-1.5",
     actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
     extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",
     title: raw("text-lg! max-md:text-base!"),
@@ -361,7 +377,7 @@ const SIZE_MAP: Record<
   compact: {
     root: "w-full min-h-0 px-6 py-4 max-md:px-4",
     stack: "gap-3",
-    copy: "gap-2 max-md:gap-1",
+    copy: "gap-2 max-md:gap-1.5",
     actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
     extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",
     title: raw("text-lg! max-md:text-base!"),

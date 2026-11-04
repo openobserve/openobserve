@@ -7,6 +7,7 @@ import {
   buildCrossNavigationQuery,
   computeViewState,
   findRowById,
+  leavesEvalForm,
   parseTabFromRoute,
   rowIdOf,
   VALID_TABS,
@@ -240,5 +241,22 @@ describe("buildCrossNavigationQuery", () => {
     const current = { foo: "bar" };
     buildCrossNavigationQuery(current, "jobs", "j1");
     expect(current).toEqual({ foo: "bar" });
+  });
+});
+
+describe("leavesEvalForm", () => {
+  const at = (query: Record<string, string>, path = "/ai/evaluations") => ({ path, query });
+  const open = { tab: "jobs", action: "update", id: "j1" };
+
+  it("is a leave when the tab, action, item, scorer type or page changes", () => {
+    expect(leavesEvalForm(at({ ...open, tab: "scorers" }), at(open))).toBe(true);
+    expect(leavesEvalForm(at({ tab: "jobs" }), at(open))).toBe(true);
+    expect(leavesEvalForm(at({ ...open, id: "j2" }), at(open))).toBe(true);
+    expect(leavesEvalForm(at({ ...open, scorer_type: "remote" }), at(open))).toBe(true);
+    expect(leavesEvalForm(at(open, "/logs"), at(open))).toBe(true);
+  });
+
+  it("is not a leave when only another query key changes", () => {
+    expect(leavesEvalForm(at({ ...open, period: "1h" }), at(open))).toBe(false);
   });
 });

@@ -32,6 +32,7 @@ import {
   resolveLogSeverity,
   resolveSeverityFieldValue,
   setSeverityInferenceEnabled,
+  severityFieldTextClass,
   severityIndicatorColor,
   severityRowClass,
   severityStringValues,
@@ -1048,6 +1049,23 @@ describe("indicator colours and row classes (A7)", () => {
     expect(severityRowClass(sev({ status: 503 }))).toBe("o2-log-level-error o2-log-level-src-http");
   });
 
+  it("colours only a severity field's own cell by its level", () => {
+    expect(severityFieldTextClass("level", "ERROR")).toBe(
+      "font-mono font-medium text-log-severity-error-text",
+    );
+    expect(severityFieldTextClass("level", "warn")).toBe(
+      "font-mono font-medium text-log-severity-warning-text",
+    );
+    expect(severityFieldTextClass("severity", "debug")).toBe(
+      "font-mono font-medium text-log-severity-debug-text",
+    );
+    expect(severityFieldTextClass("level", "info")).toBe(
+      "font-mono font-medium text-log-severity-info-text",
+    );
+    expect(severityFieldTextClass("message", "ERROR")).toBe("");
+    expect(severityFieldTextClass("status", 503)).toBe("");
+  });
+
   it("defines every indicator token in light and dark", () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const tokens = join(here, "../../lib/styles/tokens");
@@ -1070,8 +1088,8 @@ describe("indicator colours and row classes (A7)", () => {
       expect(base).toContain(token);
       expect(dark).toContain(token);
     }
-    expect(base).toContain("--color-log-severity-warning-indicator: #dd7b00;");
-    expect(base).toContain("--color-log-severity-debug-indicator: #00a3b7;");
+    expect(base).toContain("--color-log-severity-warning-indicator: #c46a00;");
+    expect(base).toContain("--color-log-severity-debug-indicator: #008a9b;");
     expect(base).toContain("--color-log-severity-trace-indicator: #8497a0;");
   });
 });

@@ -22,8 +22,8 @@ import {
   TOOLTIP_SCROLL_STYLE,
 } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
-import { getCountryName } from "../countryMappings";
-import { escapeHtml } from "@/utils/html";
+import { resolveCountryName } from "../countryMappings";
+import { buildMapsTooltip, buildMapsVisualMap, regionJoinInfoOf } from "../convertMapsData";
 
 /**
  * Converter for maps charts (location-based visualization)
@@ -36,54 +36,34 @@ export class MapsConverter implements PromQLChartConverter {
   convert(processedData: ProcessedPromQLData[], panelSchema: any, store: any, extras: any) {
     const config: MapsConfig & Record<string, any> = panelSchema.config || {};
     const aggregation = config.aggregation || "last";
-
-    // Get label names for location name
     const nameLabel = config.name_label || "name";
 
-    const locationValueMap = new Map<string, number[]>();
-    const errors: string[] = [];
+    const regionTotals = new Map<string, number>();
+    const unmatched = new Set<string>();
+    let missingLabelCount = 0;
     processedData.forEach((queryData) => {
       queryData.series.forEach((seriesData) => {
-        const rawLocationName = seriesData.metric[nameLabel] || seriesData.name;
-
-        if (!rawLocationName) {
-          errors.push(
-            `Series "${seriesData.name}" missing location name. ` +
-              `Expected label: "${nameLabel}"`,
-          );
+        const labelValue = seriesData.metric[nameLabel];
+        // The legend name only stands in when it names a country itself, e.g. a legend template of the label.
+        const region = resolveCountryName(labelValue || seriesData.name);
+        if (!region) {
+          if (labelValue === undefined || labelValue === "") missingLabelCount++;
+          else unmatched.add(String(labelValue));
           return;
         }
-
-        // Map country codes to full names (e.g., "US" -> "United States")
-        const locationName = getCountryName(rawLocationName);
-
         const value = applyAggregation(seriesData.values, aggregation);
-
-        // Aggregate values by location
-        if (!locationValueMap.has(locationName)) {
-          locationValueMap.set(locationName, []);
-        }
-        locationValueMap.get(locationName)!.push(value);
+        if (!Number.isFinite(value)) return;
+        regionTotals.set(region, (regionTotals.get(region) ?? 0) + value);
       });
     });
 
-    // Convert aggregated data to map data array
-    const mapData: any[] = [];
-    locationValueMap.forEach((values, locationName) => {
-      // Sum all values for the same location (since we already applied aggregation per series)
-      const aggregatedValue = values.reduce((sum, val) => sum + val, 0);
-
-      mapData.push({
-        name: locationName,
-        value: aggregatedValue,
-      });
-
-      extras.legends.push(locationName);
+    extras.regionJoin = regionJoinInfoOf(unmatched, {
+      label: nameLabel,
+      count: missingLabelCount,
     });
 
-    if (errors.length > 0) {
-      console.warn("Maps conversion warnings:", errors);
-    }
+    const mapData = [...regionTotals].map(([name, value]) => ({ name, value }));
+    mapData.forEach((item) => extras.legends.push(item.name));
 
     if (mapData.length === 0) {
       return {
@@ -93,21 +73,11 @@ export class MapsConverter implements PromQLChartConverter {
       };
     }
 
-    // Calculate min/max values from data (matching SQL implementation)
-    const numericValues = mapData
-      .map((item: any) => item.value)
-      .filter((value: any): value is number => typeof value === "number" && !Number.isNaN(value));
-
-    const minValue = numericValues.length === 1 ? 0 : Math.min(...numericValues);
-    const maxValue = Math.max(...numericValues);
-
-    // Return map chart configuration
-    // Uses ECharts map type with location names
     return {
       series: [
         {
           type: "map",
-          map: config.map_type?.type || "world", // Map type: world, USA, China, etc.
+          map: config.map_type?.type || "world",
           roam: config.enable_roam !== false,
           data: mapData,
           emphasis: {
@@ -117,20 +87,7 @@ export class MapsConverter implements PromQLChartConverter {
           },
         },
       ],
-      tooltip: {
-        trigger: "item",
-        showDelay: 0,
-        transitionDuration: 0.2,
-        backgroundColor: "rgba(255,255,255,0.8)",
-        extraCssText: TOOLTIP_SCROLL_STYLE,
-        formatter: (params: any) => {
-          let formattedValue = params.value;
-          if (formattedValue === "-" || Number.isNaN(formattedValue)) {
-            formattedValue = "-";
-          }
-          return `${escapeHtml(params.name)}: ${escapeHtml(formattedValue)}`;
-        },
-      },
+      tooltip: { ...buildMapsTooltip(config), extraCssText: TOOLTIP_SCROLL_STYLE },
       toolbox: {
         show: true,
         left: "left",
@@ -138,28 +95,7 @@ export class MapsConverter implements PromQLChartConverter {
       },
       xAxis: [],
       yAxis: [],
-      visualMap: {
-        left: "right",
-        min: minValue,
-        max: maxValue,
-        inRange: {
-          color: [
-            "#313695",
-            "#4575b4",
-            "#74add1",
-            "#abd9e9",
-            "#e0f3f8",
-            "#ffffbf",
-            "#fee090",
-            "#fdae61",
-            "#f46d43",
-            "#d73027",
-            "#a50026",
-          ],
-        },
-        text: [gt("dashboard.utils.visualMapHigh"), gt("dashboard.utils.visualMapLow")],
-        calculable: true,
-      },
+      visualMap: buildMapsVisualMap([...regionTotals.values()], config),
     };
   }
 }

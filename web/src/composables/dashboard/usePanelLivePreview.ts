@@ -16,6 +16,7 @@
 import { computed, onScopeDispose, ref, toRaw, watch } from "vue";
 import type { Ref } from "vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { isPanelStarterQuery } from "@/composables/dashboard/usePanelAggregation";
 
 export const LIVE_PREVIEW_DEBOUNCE_MS = 600;
 export const LIVE_PREVIEW_SLOW_RUN_MS = 10_000;
@@ -83,7 +84,9 @@ export const hasTypedChanges = (panel: any, applied: any): boolean => {
   return (panel?.queries ?? []).some((query: any, index: number) => {
     const ran = applied.queries[index];
     const vrlChanged = (query?.vrlFunctionQuery ?? "") !== (ran?.vrlFunctionQuery ?? "");
-    const typedText = query?.customQuery && (query?.query ?? "").trim() !== "";
+    // A starter seeded by a type switch was not typed, so it runs like any builder edit.
+    const typedText =
+      query?.customQuery && (query?.query ?? "").trim() !== "" && !isPanelStarterQuery(query);
     return vrlChanged || (typedText && query.query !== ran?.query);
   });
 };

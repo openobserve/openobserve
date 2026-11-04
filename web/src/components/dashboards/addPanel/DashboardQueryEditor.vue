@@ -257,7 +257,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="bg-border-default h-full w-1 transition-colors hover:bg-[orange]"></div>
             </template>
             <template #before>
-              <div class="relative h-full w-full">
+              <div
+                ref="queryEditorBoxRef"
+                class="relative h-full w-full"
+                @keydown.capture="recentHost?.onKeydown($event)"
+              >
                 <UnifiedQueryEditor
                   ref="queryEditorRef"
                   :languages="['sql', 'promql']"
@@ -275,8 +279,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :suggestions="currentEditorSuggestions"
                   :field-value-resolver="resolveFieldValues"
                   :values-time-range="valuesTimeRange"
+                  :recent-queries="recentQueries"
                   @update:query="handleQueryUpdate"
-                  @focus="_sqlOnFocus"
+                  @user-edit="
+                    (isBlank: boolean, wasBlank: boolean) => recentHost?.onEdit(isBlank, wasBlank)
+                  "
+                  @focus="onQueryEditorFocus"
                   @blur="_sqlOnBlur"
                   @language-change="handleLanguageChange"
                   @ask-ai="handleAskAI"
@@ -411,6 +419,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { RECENT_SEARCHES_EDITOR_HOST } from "@/composables/queryHistory/useRecentSearchesEditorHost";
 import {
   formulaInputs,
   formulaRefs,
@@ -462,6 +471,9 @@ export default defineComponent({
     const { showErrorNotification, showPositiveNotification } = useNotifications();
     const store = useStore();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    // Only the Metrics page provides it; dashboards get no recents.
+    const recentHost = inject(RECENT_SEARCHES_EDITOR_HOST, null);
+    const queryEditorBoxRef = ref<HTMLElement | null>(null);
 
     const { getAllFunctions } = useFunctions();
     const functionList = ref<FunctionListItem[]>([]);
@@ -489,6 +501,7 @@ export default defineComponent({
         functionOptions.value = [...functionList.value];
         return;
       } catch (e) {
+        if ((e as { response?: { status?: number } })?.response?.status === 403) return;
         showErrorNotification(t("dashboard.errorFetchingFunctions"));
       }
     };
@@ -622,6 +635,12 @@ export default defineComponent({
         });
       }
 
+      if (dashboardPanelData.data.type === "boxplot") {
+        return t("dashboard.multiQueryWarning", {
+          chartType: t("dashboard.chartSelection.boxplot"),
+        });
+      }
+
       return null;
     });
 
@@ -661,10 +680,11 @@ export default defineComponent({
         .filter((query: any) => isFormulaQuery(query) === isFormulaQuery(tab)).length;
 
     const tabLabel = (tab: any, index: number) => {
-      if (isFormulaQuery(tab)) {
-        return tab.tabName || t("dashboard.formulaNumber", { index: numberAmongKind(tab, index) });
-      }
-      const name = tab.tabName || t("common.queryNumber", { index: numberAmongKind(tab, index) });
+      const name =
+        tab.tabName ||
+        (isFormulaQuery(tab)
+          ? t("dashboard.formulaNumber", { index: numberAmongKind(tab, index) })
+          : t("common.queryNumber", { index: numberAmongKind(tab, index) }));
       return promqlMode.value && tab.config?.ref
         ? t("dashboard.queryTabWithRef", { ref: raw(tab.config.ref), name })
         : name;
@@ -681,19 +701,21 @@ export default defineComponent({
       const queries = dashboardPanelData.data.queries;
       const out = substituteFormula(
         currentQuery.value.config.formula,
-        formulaInputs(
-          queries,
-          queries.map(() => ""),
-        ),
+        formulaInputs(queries, queries.map(queryTextOf)),
+        queryRefs(queries)[dashboardPanelData.layout.currentQueryIndex],
       );
       return "error" in out ? out.error : "";
     });
 
     const isFormulaInput = computed(() => {
       const letter = currentQuery.value?.config?.ref;
-      if (!letter || isFormulaQuery(currentQuery.value)) return false;
+      if (!letter) return false;
+      const names = queryRefs(dashboardPanelData.data.queries);
       return dashboardPanelData.data.queries.some(
-        (query: any) => isFormulaQuery(query) && formulaRefs(query.config.formula).includes(letter),
+        (query: any, i: number) =>
+          query !== currentQuery.value &&
+          isFormulaQuery(query) &&
+          formulaRefs(query.config.formula, names, names[i]).includes(letter),
       );
     });
 
@@ -1157,10 +1179,21 @@ export default defineComponent({
       editingQueryName.value = "";
     };
 
+    const recentQueries = computed(() => recentHost?.queries.value ?? []);
+
+    const onQueryEditorFocus = () => {
+      _sqlOnFocus();
+      recentHost?.onFocus(queryEditorBoxRef.value);
+    };
+
     return {
       raw,
       t,
       router,
+      recentHost,
+      queryEditorBoxRef,
+      recentQueries,
+      onQueryEditorFocus,
       onDropDownClick,
       promqlMode,
       dashboardPanelData,

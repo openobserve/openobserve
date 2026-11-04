@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span data-test="fleet-rollout-outcome-body">{{ outcome.body }}</span>
       <span v-if="outcome.at" class="text-xs">{{ outcome.at }}</span>
     </div>
-    <template v-if="rollout.status === 'halted' && rollout.halt" #actions>
-      <span v-for="exit in HALT_EXITS" :key="exit" class="inline-flex">
+    <template v-if="exits.length" #actions>
+      <span v-for="exit in exits" :key="exit" class="inline-flex">
         <OButton
           :variant="exit === 'rollback' ? 'outline-destructive' : 'outline'"
           size="sm"
@@ -70,10 +70,17 @@ const EXIT_ICON: Record<FleetHaltExit, IconName> = {
 const { t } = useI18nTyped();
 const { exitLabel, haltClassText, progressText, startsText } = useRolloutText();
 
+// A waiting rollout sent nothing, so going back to stable is its one way out.
+const exits = computed<FleetHaltExit[]>(() => {
+  if (props.rollout.status === "waiting") return ["rollback"];
+  return props.rollout.status === "halted" && props.rollout.halt ? HALT_EXITS : [];
+});
+
 // Skip needs collectors to exclude, even when the server lists it.
 const offered = (exit: FleetHaltExit) =>
-  !!props.rollout.halt?.exits.includes(exit) &&
-  (exit !== "skip" || failingMembers(props.rollout).length > 0);
+  props.rollout.status === "waiting" ||
+  (!!props.rollout.halt?.exits.includes(exit) &&
+    (exit !== "skip" || failingMembers(props.rollout).length > 0));
 
 function unavailableText(exit: FleetHaltExit): I18nText {
   if (exit === "skip" && props.rollout.halt?.exits.includes("skip"))
@@ -131,6 +138,13 @@ const outcome = computed<{
       title: t("fleet.badge.completed"),
       body: t("fleet.rollouts.outcomeCompleted", { count, to: r.toVersion }, count),
       at: at(r.endedAt),
+    };
+  }
+  if (r.status === "waiting") {
+    return {
+      variant: "warning",
+      title: t("fleet.badge.waiting"),
+      body: t("fleet.rollouts.outcomeWaiting", { to: r.toVersion }),
     };
   }
   if (r.status === "scheduled" && r.start.kind === "at") {

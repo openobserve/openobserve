@@ -419,7 +419,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="flex flex-col gap-3 py-1">
-        <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
+        <p class="text-text-body text-sm" data-test="log-stream-batch-delete-dialog-message">
+          {{ t("logStream.confirmBatchDeleteMsg", { count: batchDeleteCount }) }}
+        </p>
         <div class="text-text-secondary flex w-full items-center gap-2 text-sm">
           <OCheckbox v-model="deleteAssociatedAlertsPipelines" />
           <span class="text-text-secondary text-xs font-medium">
@@ -505,6 +507,8 @@ export default defineComponent({
     const isDeleting = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmBatchDelete = ref<boolean>(false);
+    // Snapshot at open: the selection is cleared while the dialog is still closing.
+    const batchDeleteCount = ref(0);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
     const selectedIds = ref<string[]>([]);
     const orgData: any = ref(store.state.selectedOrganization);
@@ -1035,6 +1039,7 @@ export default defineComponent({
     };
     const confirmBatchDeleteAction = () => {
       deleteAssociatedAlertsPipelines.value = false;
+      batchDeleteCount.value = selectedItems.value.length;
       confirmBatchDelete.value = true;
     };
     const cancelDelete = () => {
@@ -1416,6 +1421,7 @@ export default defineComponent({
       deleteStreamName,
       confirmDelete,
       confirmBatchDelete,
+      batchDeleteCount,
       schemaData,
       pageSize,
       pageSizeOptions,

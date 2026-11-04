@@ -10,6 +10,8 @@ export interface TruncatedTextProps {
   lines?: TruncatedTextLines;
   /** Tooltip text when cut (defaults to the element's own text); `false` when the full value is visible nearby. */
   tooltip?: I18nText | false;
+  /** Classes for the tooltip bubble, e.g. `whitespace-pre-wrap` to keep the text's line breaks. */
+  tooltipClass?: string;
 }
 
 export interface TruncatedTextSlots {

@@ -42,7 +42,25 @@
       class="border-card-glass-border rounded-default bg-code-bg overflow-x-auto overflow-y-auto border p-3"
       :class="fill ? 'min-h-0 flex-1' : 'max-h-[24rem]'"
     >
+      <div
+        v-if="loading"
+        class="flex flex-col gap-2"
+        :data-test="`ai-review-content-skeleton-${contentType}`"
+      >
+        <OSkeleton type="text" class="h-3 w-11/12" />
+        <OSkeleton type="text" class="h-3 w-full" />
+        <OSkeleton type="text" class="h-3 w-4/5" />
+        <OSkeleton type="text" class="h-3 w-2/3" />
+      </div>
+      <div
+        v-else-if="!content && emptyText"
+        class="text-text-secondary p-8 text-center text-sm italic"
+        :data-test="`ai-review-content-empty-${contentType}`"
+      >
+        {{ emptyText }}
+      </div>
       <LLMContentRenderer
+        v-else
         :content="content"
         :content-type="contentType"
         view-mode="formatted"
@@ -56,6 +74,7 @@
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 
@@ -69,8 +88,12 @@ const props = withDefaults(
     fill?: boolean;
     /** Whether the container this box belongs to is currently fullscreen. */
     fullscreen?: boolean;
+    /** Shown inside the box when there is no content; without it an empty box stays blank. */
+    emptyText?: I18nText;
+    /** Skeleton lines in place of the content while it loads; the frame, label and buttons stay. */
+    loading?: boolean;
   }>(),
-  { fill: false, fullscreen: false },
+  { fill: false, fullscreen: false, loading: false },
 );
 
 const emit = defineEmits<{ (_e: "toggle-fullscreen"): void }>();

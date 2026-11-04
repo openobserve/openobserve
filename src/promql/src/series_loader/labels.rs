@@ -275,6 +275,7 @@ async fn load_labels(
                 } else {
                     let hash_values = hash_column.downcast_ref::<StringArray>().unwrap();
                     for i in 0..batch.num_rows() {
+                        // stable gxhash: emitted as `__hash__` and merged across clusters
                         attach_row_labels(gxhash::new().sum64(hash_values.value(i)), i);
                     }
                 }

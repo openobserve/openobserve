@@ -44,6 +44,7 @@ vi.mock("@/components/DateTime.vue", () => ({
 }));
 
 import backfillService from "@/services/backfill";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import type { BackfillJob } from "@/services/backfill";
 import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";
 
@@ -574,6 +575,23 @@ describe("EditBackfillJobDialog", () => {
 
       resolveFn({ message: "updated" });
       await vi.waitFor(() => expect((wrapper.vm as any).form.state.isSubmitting).toBe(false));
+    });
+  });
+
+  describe("delete-before-backfill confirm", () => {
+    it("asks with a destructive confirm button and saves once confirmed", async () => {
+      const dialog = useConfirmDialog();
+      const wrapper = createWrapper({ modelValue: true, job: mockJob });
+      await flushPromises();
+      setField(wrapper, "deleteBeforeBackfill", true);
+
+      (wrapper.vm as any).form.handleSubmit();
+      await vi.waitFor(() => expect(dialog.currentDialog.value).not.toBeNull());
+      expect(dialog.currentDialog.value?.confirmVariant).toBe("destructive");
+      expect(backfillService.updateBackfillJob).not.toHaveBeenCalled();
+
+      dialog.handleConfirm();
+      await vi.waitFor(() => expect(backfillService.updateBackfillJob).toHaveBeenCalled());
     });
   });
 });

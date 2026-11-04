@@ -178,6 +178,7 @@ import {
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { generateDurationLabel } from "../utils/date";
+import { AUTO_REFRESH_INTERVALS, autoRefreshLabel } from "@/utils/dashboard/autoRefresh";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -222,29 +223,23 @@ export default defineComponent({
     const btnRefreshInterval = ref(false);
     let intervalInstance = 0;
 
-    // The count lives inside each message ("{count} sec") rather than being
-    // prefixed to a translated unit — number/unit order is per-language.
-    const refreshTimes = computed(() => [
-      [
-        { label: t("common.secShort", { count: 5 }), value: 5, disabled: false },
-        { label: t("common.minShort", { count: 1 }), value: 60, disabled: false },
-        { label: t("common.hrShort", { count: 1 }), value: 3600, disabled: false },
-      ],
-      [
-        { label: t("common.secShort", { count: 10 }), value: 10, disabled: false },
-        { label: t("common.minShort", { count: 5 }), value: 300, disabled: false },
-        { label: t("common.hrShort", { count: 2 }), value: 7200, disabled: false },
-      ],
-      [
-        { label: t("common.secShort", { count: 15 }), value: 15, disabled: false },
-        { label: t("common.minShort", { count: 15 }), value: 900, disabled: false },
-        { label: t("common.dayShort", { count: 1 }), value: 86400, disabled: false },
-      ],
-      [
-        { label: t("common.secShort", { count: 30 }), value: 30, disabled: false },
-        { label: t("common.minShort", { count: 30 }), value: 1800, disabled: false },
-      ],
-    ]);
+    const refreshTimes = computed(() => {
+      const columns = [
+        AUTO_REFRESH_INTERVALS.filter((v) => v < 60),
+        AUTO_REFRESH_INTERVALS.filter((v) => v >= 60 && v < 3600),
+        AUTO_REFRESH_INTERVALS.filter((v) => v >= 3600),
+      ];
+      const rowCount = Math.max(...columns.map((c) => c.length));
+      return Array.from({ length: rowCount }, (_, i) =>
+        columns
+          .filter((c) => i < c.length)
+          .map((c) => ({
+            label: autoRefreshLabel(c[i], t),
+            value: c[i] as number,
+            disabled: false,
+          })),
+      );
+    });
 
     // v-model computed value
     const selectedValue = computed({

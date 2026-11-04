@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach, onTestFinished } from "vitest";
 import { writePanelDraft } from "@/composables/dashboard/usePanelDraft";
+import { writeEditorDraft } from "@/utils/drafts/editorDraftStore";
+import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 import { shallowMount, flushPromises } from "@vue/test-utils";
-import { inject, type Ref } from "vue";
+import { inject, nextTick, reactive, type Ref } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
 // Comprehensive service mocks - these prevent real API calls
 vi.mock("@/services/dashboards", async (importOriginal) => {
@@ -115,12 +117,18 @@ const mockRouterPush = vi.fn().mockResolvedValue(undefined);
 const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
 const mockRouterBack = vi.fn();
 // Captures the leave guard ViewDashboard registers so tests can invoke it.
-const routeLeaveGuards: Array<() => unknown> = [];
 type RouteLike = { query: Record<string, string> };
+const routeLeaveGuards: Array<(to?: RouteLike) => unknown> = [];
+// Captures afterEach hooks so a test can say whether the navigation landed or a later guard stopped it.
+const afterEachHooks: Array<(to: unknown, from: unknown, failure?: unknown) => void> = [];
+const land = (to?: RouteLike, failure?: unknown) =>
+  afterEachHooks.forEach((hook) => hook(to, {}, failure));
 const routeUpdateGuards: Array<(to: RouteLike, from: RouteLike) => unknown> = [];
 // Mutable so a test can say what the previous history entry was; the back
 // button prefers real history over rebuilding the folder-scoped list route.
 const mockHistoryState: { back: string | null } = { back: null };
+// Mutable so a test can open the dashboard from a folder other than the default.
+const mockRouteFolder = { value: "default" };
 // Extra query params a test wants on the route it mounts with (cleared before every test).
 const mockExtraRouteQuery: Record<string, string> = {};
 
@@ -134,6 +142,13 @@ vi.mock("vue-router", () => ({
     forward: vi.fn(),
     options: { history: { state: mockHistoryState } },
     resolve: vi.fn().mockReturnValue({ href: "/test" }),
+    afterEach: (hook: (to: unknown, from: unknown, failure?: unknown) => void) => {
+      afterEachHooks.push(hook);
+      return () => {
+        const index = afterEachHooks.indexOf(hook);
+        if (index >= 0) afterEachHooks.splice(index, 1);
+      };
+    },
     currentRoute: {
       value: {
         params: { dashboardId: "test-dashboard-1", folderId: "default" },
@@ -145,7 +160,7 @@ vi.mock("vue-router", () => ({
       },
     },
   }),
-  onBeforeRouteLeave: (guard: () => unknown) => {
+  onBeforeRouteLeave: (guard: (to?: RouteLike) => unknown) => {
     routeLeaveGuards.push(guard);
   },
   onBeforeRouteUpdate: (guard: (to: RouteLike, from: RouteLike) => unknown) => {
@@ -155,7 +170,7 @@ vi.mock("vue-router", () => ({
     params: { dashboardId: "test-dashboard-1", folderId: "default" },
     query: {
       dashboard: "test-dashboard-1",
-      folder: "default",
+      folder: mockRouteFolder.value,
       tab: "tab-1",
       ...mockExtraRouteQuery,
     },
@@ -172,7 +187,8 @@ global.mockHistoryState = mockHistoryState;
 // Global store mock instances
 const mockStoreCommit = vi.fn();
 const mockStoreDispatch = vi.fn();
-const mockStoreState = {
+// Reactive like the real store, so watchers on store state (e.g. the timezone) run in specs.
+const mockStoreState = reactive({
   selectedOrganization: { identifier: "test-org" },
   theme: "light",
   printMode: false,
@@ -180,8 +196,8 @@ const mockStoreState = {
   organizationData: {
     folders: [{ folderId: "default", name: "Default" }],
   },
-  zoConfig: { min_auto_refresh_interval: 5 },
-};
+  zoConfig: { min_auto_refresh_interval: 5 } as Record<string, unknown>,
+}) as Record<string, any>;
 
 vi.mock("vuex", async () => {
   const actual = await vi.importActual("vuex");
@@ -272,6 +288,7 @@ import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import { getDashboard } from "@/utils/commons.ts";
+import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 import { getManager } from "@/lib/vue-shortcut-manager";
 import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
 
@@ -707,76 +724,7 @@ describe("ViewDashboard", () => {
     });
   });
 
-  describe("Basic Component Tests", () => {
-    it("should create component without crashing", async () => {
-      expect(() => {
-        wrapper = createWrapper();
-      }).not.toThrow();
-      if (wrapper) expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should mount successfully", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeDefined();
-    });
-
-    it("should have correct component name", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.$options.name).toBe("ViewDashboard");
-    });
-  });
-
-  describe("Template Structure", () => {
-    it("should render the component", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeDefined();
-    });
-
-    it("should have a stable component structure", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Check that the component has a stable structure
-      expect(wrapper.vm.currentDashboardData).toBeDefined();
-      expect(wrapper.vm.isFullscreen).toBeDefined();
-      expect(wrapper.vm.goBackToDashboardList).toBeDefined();
-    });
-  });
-
   describe("Store Integration", () => {
-    it("should access store state correctly", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Verify store is accessible
-      expect(store.state.selectedOrganization.identifier).toBe("test-org");
-      expect(store.state.theme).toBe("light");
-      expect(store.state.printMode).toBe(false);
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle theme changes", async () => {
-      const darkThemeState = {
-        ...store.state,
-        theme: "dark",
-      };
-      store.replaceState(darkThemeState);
-
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(store.state.theme).toBe("dark");
-      expect(wrapper.exists()).toBe(true);
-    });
-
     it("should handle print mode", async () => {
       const printModeState = {
         ...store.state,
@@ -789,85 +737,6 @@ describe("ViewDashboard", () => {
 
       expect(store.state.printMode).toBe(true);
       expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Component Methods", () => {
-    it("should have required methods defined", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(typeof wrapper.vm.goBackToDashboardList).toBe("function");
-      expect(typeof wrapper.vm.toggleFullscreen).toBe("function");
-      expect(typeof wrapper.vm.printDashboard).toBe("function");
-    });
-
-    it("should handle method calls without errors", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test that the methods exist and can be called
-      expect(typeof wrapper.vm.toggleFullscreen).toBe("function");
-
-      // Since toggleFullscreen deals with async operations, let's just verify it exists
-      // rather than trying to execute it which might have complex dependencies
-      expect(wrapper.vm.toggleFullscreen).toBeDefined();
-    });
-  });
-
-  describe("Service Integration", () => {
-    it("should have mocked services configured", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.exists()).toBe(true);
-      // Services are mocked at module level, preventing real API calls
-    });
-
-    it("should prevent real API calls through mocking", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Component should exist and work with mocked services
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Error Handling", () => {
-    it("should handle component initialization", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeDefined();
-    });
-
-    it("should be resilient to service errors", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Component should still exist even if services have errors
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Component State", () => {
-    it("should maintain component state", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Check that component has expected reactive data
-      expect(wrapper.vm.currentDashboardData).toBeDefined();
-      expect(typeof wrapper.vm.isFullscreen).toBe("boolean");
-    });
-
-    it("should handle state updates", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Component should be able to handle state changes
-      const initialFullscreen = wrapper.vm.isFullscreen;
-      expect(typeof initialFullscreen).toBe("boolean");
     });
   });
 
@@ -934,43 +803,6 @@ describe("ViewDashboard", () => {
         }),
       });
     });
-
-    it("should handle back button click", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method directly since DOM elements might not be available in shallow mount
-      expect(typeof wrapper.vm.goBackToDashboardList).toBe("function");
-
-      // Manually trigger the method to test router navigation
-      await wrapper.vm.goBackToDashboardList();
-      expect(global.mockRouterPush).toHaveBeenCalledWith({
-        path: "/dashboards",
-        query: {
-          folder: "default",
-          org_identifier: "test-org",
-        },
-      });
-    });
-
-    it("should handle add panel button click", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method directly since DOM elements might not be available in shallow mount
-      expect(typeof wrapper.vm.addPanelData).toBe("function");
-
-      // Manually trigger the method to test router navigation
-      await wrapper.vm.addPanelData();
-      expect(global.mockRouterPush).toHaveBeenCalledWith({
-        path: "/dashboards/add_panel",
-        query: expect.objectContaining({
-          org_identifier: "test-org",
-          dashboard: "test-dashboard-1",
-          folder: "default",
-        }),
-      });
-    });
   });
 
   describe("Print Mode Functionality", () => {
@@ -987,18 +819,6 @@ describe("ViewDashboard", () => {
       expect(global.mockRouterReplace).toHaveBeenCalled();
     });
 
-    it("should handle print button click", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method directly since DOM elements might not be available in shallow mount
-      expect(typeof wrapper.vm.printDashboard).toBe("function");
-
-      // Manually trigger the method to test print mode functionality
-      await wrapper.vm.printDashboard();
-      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", true);
-    });
-
     it("should clear print mode when leaving the page without the close button", async () => {
       routeLeaveGuards.length = 0;
       wrapper = createWrapper();
@@ -1007,6 +827,7 @@ describe("ViewDashboard", () => {
       global.mockStoreDispatch.mockClear();
 
       routeLeaveGuards.forEach((guard) => guard());
+      land();
 
       expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", false);
       Object.assign(global.mockStoreState, { printMode: false });
@@ -1020,6 +841,7 @@ describe("ViewDashboard", () => {
       global.mockStoreDispatch.mockClear();
 
       routeLeaveGuards.forEach((guard) => guard());
+      land();
 
       expect(global.mockStoreDispatch).not.toHaveBeenCalledWith("setPrintMode", expect.anything());
     });
@@ -1062,38 +884,9 @@ describe("ViewDashboard", () => {
       // Verify the method completed without errors
       expect(wrapper.vm.toggleFullscreen).toBeDefined();
     });
-
-    it("should handle fullscreen button click", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method directly since DOM elements might not be available in shallow mount
-      expect(typeof wrapper.vm.toggleFullscreen).toBe("function");
-
-      // Test that the method can be executed without errors
-      await wrapper.vm.toggleFullscreen();
-      expect(wrapper.vm.toggleFullscreen).toBeDefined();
-    });
-
-    it("should handle fullscreen change events", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test fullscreen state management
-      expect(wrapper.vm.isFullscreen).toBeDefined();
-      expect(typeof wrapper.vm.isFullscreen).toBe("boolean");
-    });
   });
 
   describe("Refresh Functionality", () => {
-    it("should handle refresh button click", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method directly since DOM elements might not be available in shallow mount
-      expect(typeof wrapper.vm.refreshData).toBe("function");
-    });
-
     it("should show warning color when variables changed", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1101,26 +894,9 @@ describe("ViewDashboard", () => {
       // Test variables changed computed property
       expect(typeof wrapper.vm.isVariablesChanged).toBe("boolean");
     });
-
-    it("should handle loading state", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test loading state property
-      expect(wrapper.vm.arePanelsLoading).toBeDefined();
-    });
   });
 
   describe("Share Functionality", () => {
-    it("should render share button component", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test that dashboardShareURL computed property exists
-      expect(wrapper.vm.dashboardShareURL).toBeDefined();
-      expect(typeof wrapper.vm.dashboardShareURL).toBe("string");
-    });
-
     it("should generate correct share URL", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1131,14 +907,6 @@ describe("ViewDashboard", () => {
   });
 
   describe("Settings Functionality", () => {
-    it("should handle settings functionality", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method exists
-      expect(typeof wrapper.vm.openSettingsDialog).toBe("function");
-    });
-
     it("should open settings dialog when openSettingsDialog is called", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1183,14 +951,6 @@ describe("ViewDashboard", () => {
       expect(wrapper.vm.selectedDate.valueType).toBe("absolute");
       expect(wrapper.vm.selectedDate.startTime).toBeInstanceOf(Date);
       expect(wrapper.vm.selectedDate.endTime).toBeInstanceOf(Date);
-    });
-
-    it("should have time string property", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test timeString property exists
-      expect(wrapper.vm.timeString).toBeDefined();
     });
 
     it("should handle refresh interval changes", async () => {
@@ -1271,22 +1031,6 @@ describe("ViewDashboard", () => {
       expect(wrapper.vm.variablesData).toBeDefined();
     });
 
-    it("should handle dynamic filters variables", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method can handle dynamic filters
-      expect(typeof wrapper.vm.variablesDataUpdated).toBe("function");
-    });
-
-    it("should detect variables changes", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test isVariablesChanged computed property
-      expect(typeof wrapper.vm.isVariablesChanged).toBe("boolean");
-    });
-
     it("should update refreshed variables data", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1300,29 +1044,6 @@ describe("ViewDashboard", () => {
   });
 
   describe("Dialog Management", () => {
-    it("should handle scheduled reports dialog", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test dialog state properties exist
-      expect(wrapper.vm.showScheduledReportsDialog).toBeDefined();
-      expect(wrapper.vm.isLoadingReports).toBeDefined();
-
-      // Test method exists
-      expect(typeof wrapper.vm.openScheduledReports).toBe("function");
-    });
-
-    it("should handle JSON editor dialog", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test dialog state property exists
-      expect(wrapper.vm.showJsonEditorDialog).toBeDefined();
-
-      // Test method exists
-      expect(typeof wrapper.vm.openJsonEditor).toBe("function");
-    });
-
     it("should save JSON dashboard changes", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1563,89 +1284,7 @@ describe("ViewDashboard", () => {
     });
   });
 
-  describe("Error Handling", () => {
-    it("should handle dashboard loading failure", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test loadDashboard method exists
-      expect(typeof wrapper.vm.loadDashboard).toBe("function");
-
-      // Test goBackToDashboardList method exists
-      expect(typeof wrapper.vm.goBackToDashboardList).toBe("function");
-    });
-
-    it("should handle empty dashboard data", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test loadDashboard can handle empty data
-      expect(typeof wrapper.vm.loadDashboard).toBe("function");
-    });
-
-    it("should handle panel deletion conflict error", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test onDeletePanel method exists and can handle errors
-      expect(typeof wrapper.vm.onDeletePanel).toBe("function");
-    });
-
-    it("should handle panel move conflict error", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test onMovePanel method exists and can handle errors
-      expect(typeof wrapper.vm.onMovePanel).toBe("function");
-    });
-
-    it("should generate share URL without errors", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test dashboardShareURL can be generated without errors
-      expect(wrapper.vm.dashboardShareURL).toBeDefined();
-      expect(typeof wrapper.vm.dashboardShareURL).toBe("string");
-    });
-
-    it("should handle fullscreen API errors", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test fullscreen functionality can handle errors
-      expect(typeof wrapper.vm.toggleFullscreen).toBe("function");
-      expect(typeof wrapper.vm.isFullscreen).toBe("boolean");
-    });
-
-    it("should handle JSON dashboard save errors", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test saveJsonDashboard can handle errors
-      expect(wrapper.vm.saveJsonDashboard).toBeDefined();
-    });
-
-    it("should handle reports loading error", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test openScheduledReports can handle errors
-      expect(typeof wrapper.vm.openScheduledReports).toBe("function");
-      expect(wrapper.vm.isLoadingReports).toBeDefined();
-    });
-  });
-
   describe("Component Lifecycle and Cleanup", () => {
-    it("should initialize component data on mount", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.currentDashboardData).toBeDefined();
-      expect(wrapper.vm.selectedDate).toBeDefined();
-      expect(wrapper.vm.refreshInterval).toBeDefined();
-      expect(wrapper.vm.variablesData).toBeDefined();
-    });
-
     it("should load dashboard on mount", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1670,43 +1309,6 @@ describe("ViewDashboard", () => {
       expect(() => wrapper.unmount()).not.toThrow();
     });
 
-    it("should cleanup component references on unmount", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test component references exist
-      expect(wrapper.vm.dateTimePicker).toBeDefined();
-      expect(wrapper.vm.renderDashboardChartsRef).toBeDefined();
-      expect(wrapper.vm.fullscreenDiv).toBeDefined();
-    });
-
-    it("should handle route parameter changes", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      const mockLoadDashboard = vi.fn().mockResolvedValue({});
-      wrapper.vm.loadDashboard = mockLoadDashboard;
-
-      // Simulate route change
-      wrapper.vm.$route.query = {
-        ...wrapper.vm.$route.query,
-        dashboard: "new-dashboard-id",
-      };
-
-      await wrapper.vm.$nextTick();
-
-      // Component should handle route changes
-      expect(wrapper.vm.$route.query.dashboard).toBe("new-dashboard-id");
-    });
-
-    it("should have runId property defined", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.runId).toBeDefined();
-      expect(typeof wrapper.vm.runId).toBe("string");
-    });
-
     it("should update run ID when updateRunId is called", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1718,15 +1320,6 @@ describe("ViewDashboard", () => {
       wrapper.vm.updateRunId(newRunId);
 
       expect(wrapper.vm.runId).toBe(newRunId);
-    });
-
-    it("should handle component activation", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Just verify component is activated/mounted properly
-      expect(wrapper.vm).toBeDefined();
-      expect(wrapper.exists()).toBe(true);
     });
   });
 
@@ -1808,6 +1401,256 @@ describe("ViewDashboard", () => {
     });
   });
 
+  describe("calendar time ranges", () => {
+    const NOW = new Date("2026-10-08T03:00:00Z");
+    const baseDashboard = {
+      dashboardId: "test-dashboard-1",
+      title: "Test Dashboard",
+      variables: { list: [] },
+      tabs: [{ tabId: "tab-1", name: "Tab 1", panels: [] }],
+    };
+
+    const mountWithPicker = async () => {
+      wrapper = createWrapper({
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            OPageLayout: { template: '<div><slot name="actions" /></div>' },
+          },
+        },
+      });
+      await flushPromises();
+      wrapper.vm.currentDashboardData.data = baseDashboard;
+      wrapper.vm.dateTimePicker = { getConsumableDateTime: () => ({}) };
+    };
+
+    beforeEach(() => {
+      store.state.timezone = "UTC";
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("turns the calendar presets on for the header picker", async () => {
+      await mountWithPicker();
+      const picker = wrapper.findComponent({ name: "DateTimePickerDashboard" });
+      expect(picker.props("calendarPresets")).toBe(true);
+    });
+
+    it("reads a calendar token from the URL period and writes it back", async () => {
+      Object.assign(mockExtraRouteQuery, { period: "calendar:month:-1" });
+      await mountWithPicker();
+
+      expect(wrapper.vm.selectedDate).toMatchObject({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:month:-1",
+      });
+      expect(wrapper.vm.getQueryParamsForDuration(wrapper.vm.selectedDate)).toEqual({
+        period: "calendar:month:-1",
+      });
+    });
+
+    it("opens on the dashboard's default calendar period when the URL has no time", async () => {
+      vi.mocked(getDashboard).mockResolvedValueOnce({
+        ...baseDashboard,
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "calendar:week:0" },
+      });
+      await mountWithPicker();
+
+      expect(wrapper.vm.selectedDate).toEqual({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:week:0",
+      });
+    });
+
+    it("keeps __global while an offset-0 period only grows with now", async () => {
+      await mountWithPicker();
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:0" };
+      wrapper.vm.computeAllPanelTimes(true);
+      const settled = wrapper.vm.currentTimeObjPerPanel.__global;
+      expect(settled.start_time.getTime()).toBe(Date.parse("2026-10-08T00:00:00Z") * 1000);
+
+      vi.setSystemTime(new Date("2026-10-08T04:00:00Z"));
+      wrapper.vm.computeAllPanelTimes();
+      expect(wrapper.vm.currentTimeObjPerPanel.__global).toBe(settled);
+
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:-1" };
+      wrapper.vm.computeAllPanelTimes();
+      const moved = wrapper.vm.currentTimeObjPerPanel.__global;
+      expect(moved).not.toBe(settled);
+      expect(moved.start_time.getTime()).toBe(Date.parse("2026-10-07T00:00:00Z") * 1000);
+      expect(moved.end_time.getTime()).toBe(Date.parse("2026-10-08T00:00:00.000Z") * 1000);
+    });
+
+    describe("timezone change from any picker", () => {
+      const panelWithOwnYesterday = {
+        ...baseDashboard,
+        tabs: [
+          {
+            tabId: "tab-1",
+            name: "Tab 1",
+            panels: [
+              {
+                id: "p1",
+                type: "line",
+                config: {
+                  panel_time_enabled: true,
+                  panel_time_range: { type: "relative", relativeTimePeriod: "calendar:day:-1" },
+                },
+              },
+            ],
+          },
+        ],
+      };
+      const UTC_START = Date.parse("2026-10-07T00:00:00Z") * 1000;
+      const IST_START = Date.parse("2026-10-06T18:30:00Z") * 1000;
+      const yesterdayAt = (startTime: number) => ({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:day:-1",
+        startTime,
+        endTime: startTime + 86_400_000_000,
+      });
+      // What any picker's DateTime.onTimezoneChange does: the store zone changes, then the app reacts.
+      const changeZone = async (zone: string) => {
+        global.mockStoreState.timezone = zone;
+        await flushPromises();
+      };
+      const setAutoRun = (on: boolean) => {
+        global.mockStoreState.zoConfig = {
+          ...global.mockStoreState.zoConfig,
+          auto_query_enabled: on,
+        };
+      };
+
+      const mountWith = async (autoRun: boolean, global0: Record<string, unknown>) => {
+        setAutoRun(autoRun);
+        await mountWithPicker();
+        setPickerTimezoneSource(() => global.mockStoreState.timezone);
+        wrapper.vm.currentDashboardData.data = panelWithOwnYesterday;
+        wrapper.vm.timeGate.onPick(global0);
+        wrapper.vm.selectedDate = global0;
+        await flushPromises();
+        wrapper.vm.computeAllPanelTimes(true);
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
+      };
+
+      afterEach(() => {
+        setPickerTimezoneSource(() => localStorage.getItem("timezone"));
+        global.mockStoreState.zoConfig = { min_auto_refresh_interval: 5 };
+        global.mockStoreState.timezone = "UTC";
+      });
+
+      it("moves a panel's own calendar range when the store zone changes, once", async () => {
+        await mountWith(true, { valueType: "relative", relativeTimePeriod: "15m" });
+
+        await changeZone("Asia/Kolkata");
+        const moved = wrapper.vm.currentTimeObjPerPanel.p1;
+        expect(moved.start_time.getTime()).toBe(IST_START);
+
+        await changeZone("Asia/Calcutta");
+        expect(wrapper.vm.currentTimeObjPerPanel.p1).toBe(moved);
+      });
+
+      it("re-applies a global calendar range through the time gate", async () => {
+        await mountWith(true, yesterdayAt(UTC_START));
+
+        await changeZone("Asia/Kolkata");
+
+        expect(wrapper.vm.selectedDate.startTime).toBe(IST_START);
+        expect(wrapper.vm.currentTimeObjPerPanel.__global.start_time.getTime()).toBe(IST_START);
+      });
+
+      it("queries a panel once when its own picker raised the zone change", async () => {
+        await mountWith(true, { valueType: "relative", relativeTimePeriod: "15m" });
+
+        global.mockStoreState.timezone = "Asia/Kolkata";
+        await nextTick();
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
+        // The panel's own gate re-applies it a tick later, as RenderDashboardCharts does.
+        wrapper.vm.refreshPanelRequest("p1");
+        const fromPanelGate = wrapper.vm.currentTimeObjPerPanel.p1;
+        expect(fromPanelGate.start_time.getTime()).toBe(IST_START);
+        await flushPromises();
+
+        expect(wrapper.vm.currentTimeObjPerPanel.p1).toBe(fromPanelGate);
+      });
+
+      it("waits for Refresh with Auto Run off and forgets the wait when the zone goes back", async () => {
+        await mountWith(false, { valueType: "relative", relativeTimePeriod: "15m" });
+
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(UTC_START);
+        expect(wrapper.vm.isRefreshPending).toBe(true);
+
+        await changeZone("UTC");
+        expect(wrapper.vm.zoneRefreshPending).toBe(false);
+        expect(wrapper.vm.isRefreshPending).toBe(false);
+
+        await changeZone("Asia/Kolkata");
+        await wrapper.vm.refreshData();
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(IST_START);
+        expect(wrapper.vm.zoneRefreshPending).toBe(false);
+      });
+
+      it("applies waiting panel windows when Auto Run is turned on", async () => {
+        await mountWith(false, { valueType: "relative", relativeTimePeriod: "15m" });
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.zoneRefreshPending).toBe(true);
+
+        setAutoRun(true);
+        await flushPromises();
+
+        expect(wrapper.vm.currentTimeObjPerPanel.p1.start_time.getTime()).toBe(IST_START);
+        expect(wrapper.vm.zoneRefreshPending).toBe(false);
+      });
+
+      it("keeps a waiting header pick when the zone changes from another picker", async () => {
+        await mountWith(false, yesterdayAt(UTC_START));
+        const lastWeek = {
+          valueType: "relative",
+          relativeTimePeriod: "7d",
+          startTime: 1,
+          endTime: 2,
+        };
+        wrapper.vm.timeGate.onPick(lastWeek);
+        expect(wrapper.vm.timeGate.isWaiting.value).toBe(true);
+
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.timeGate.picked.value.relativeTimePeriod).toBe("7d");
+
+        await wrapper.vm.refreshData();
+        expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("7d");
+      });
+
+      it("moves a waiting calendar header pick to the new zone", async () => {
+        await mountWith(false, { valueType: "relative", relativeTimePeriod: "15m" });
+        wrapper.vm.timeGate.onPick(yesterdayAt(UTC_START));
+
+        await changeZone("Asia/Kolkata");
+        expect(wrapper.vm.timeGate.picked.value.startTime).toBe(IST_START);
+
+        await wrapper.vm.refreshData();
+        expect(wrapper.vm.selectedDate).toMatchObject({
+          relativeTimePeriod: "calendar:day:-1",
+          startTime: IST_START,
+        });
+      });
+    });
+
+    it("still refreshes __global on a forced recompute", async () => {
+      await mountWithPicker();
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:0" };
+      wrapper.vm.computeAllPanelTimes(true);
+      const settled = wrapper.vm.currentTimeObjPerPanel.__global;
+
+      wrapper.vm.computeAllPanelTimes(true);
+      expect(wrapper.vm.currentTimeObjPerPanel.__global).not.toBe(settled);
+    });
+  });
+
   describe("product analytics", () => {
     const mountWithOverflowActions = () =>
       createWrapper({
@@ -1855,6 +1698,58 @@ describe("ViewDashboard", () => {
 
       expect(analytics.track).not.toHaveBeenCalled();
     });
+  });
+
+  it("names beta in the publish button's label instead of a chip while public links are on", async () => {
+    const zoConfig = global.mockStoreState.zoConfig;
+    global.mockStoreState.zoConfig = { ...zoConfig, public_dashboards_enabled: true };
+    onTestFinished(() => {
+      global.mockStoreState.zoConfig = zoConfig;
+    });
+    wrapper = createWrapper({
+      global: {
+        plugins: [i18n, store],
+        stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+      },
+    });
+    await flushPromises();
+    const publish = wrapper.find('[data-test="dashboard-publish-public"]');
+    const button = publish.find('[data-test="dashboard-publish-public-btn"]');
+    expect(button.exists()).toBe(true);
+    expect(publish.findComponent({ name: "BetaBadge" }).exists()).toBe(false);
+    // This spec's t() returns the key, so the rendered label is checked against the real message.
+    expect(button.attributes("aria-label")).toBe("dashboard.publicDashboard.shareTooltip");
+    expect(i18n.global.t("dashboard.publicDashboard.shareTooltip")).toBe("Publish publicly (beta)");
+  });
+
+  it("tells the public links drawer the dashboard's folder, so publishing can save it there", async () => {
+    const zoConfig = global.mockStoreState.zoConfig;
+    global.mockStoreState.zoConfig = { ...zoConfig, public_dashboards_enabled: true };
+    mockRouteFolder.value = "f9";
+    onTestFinished(() => {
+      global.mockStoreState.zoConfig = zoConfig;
+      mockRouteFolder.value = "default";
+    });
+    wrapper = createWrapper({
+      global: {
+        plugins: [i18n, store],
+        stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+      },
+    });
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "PublicLinksPanel" }).props("folderId")).toBe("f9");
+  });
+
+  it("hands the live variables manager to the template, so public links seed from it", async () => {
+    wrapper = createWrapper();
+    await flushPromises();
+    const manager = {
+      committedVariablesData: { global: [], tabs: {}, panels: {} },
+      getUrlParams: () => ({ "var-qns": "ingress-nginx" }),
+    };
+    await wrapper.vm.onVariablesManagerReady(manager);
+
+    expect(wrapper.vm.variablesManager.getUrlParams()).toEqual({ "var-qns": "ingress-nginx" });
   });
 
   describe("layout edit mode", () => {
@@ -1921,6 +1816,7 @@ describe("ViewDashboard", () => {
       mockSyncGrid.mockReset();
       routeLeaveGuards.length = 0;
       routeUpdateGuards.length = 0;
+      afterEachHooks.length = 0;
     });
 
     it("opens in view mode with the layout locked", async () => {
@@ -1964,6 +1860,29 @@ describe("ViewDashboard", () => {
       wrapper.vm.enterLayoutEdit();
       await flushPromises();
       expect(has("dashboard-panel-add")).toBe(false);
+      localStorage.clear();
+    });
+
+    it("marks Settings with a dot while this dashboard has a settings draft", async () => {
+      localStorage.clear();
+      await mountDashboard();
+      const settings = () => wrapper.find('[data-test="dashboard-setting-btn"]');
+      expect(settings().attributes("aria-label")).toBeUndefined();
+
+      const scope = {
+        kind: "dashboard_settings" as const,
+        org: "test-org",
+        userEmail: "",
+      };
+      writeEditorDraft({ ...scope, entityId: "another-dashboard" }, { data: {} });
+      await flushPromises();
+      expect(wrapper.vm.hasSettingsDraft).toBe(false);
+
+      writeEditorDraft({ ...scope, entityId: "test-dashboard-1" }, { data: {} });
+      await flushPromises();
+      expect(wrapper.vm.hasSettingsDraft).toBe(true);
+      // A button's children are presentational, so the draft state must be in the button's own name.
+      expect(settings().attributes("aria-label")).toBe("common.editorDraft.newDotDated");
       localStorage.clear();
     });
 
@@ -2130,6 +2049,64 @@ describe("ViewDashboard", () => {
       const leave = guard() as Promise<boolean>;
       wrapper.vm.settleDiscard(true);
       await expect(leave).resolves.toBe(true);
+      land();
+      expect(panelLayout().x).toBe(0);
+    });
+
+    it("offers no Stay on a forced sign-out, which goes on whatever is answered", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+      beginDraftSignOut({ forced: true });
+      onTestFinished(() => cancelDraftSignOut());
+
+      const leave = routeLeaveGuards.at(-1)!() as Promise<boolean>;
+      await flushPromises();
+      const dialog = wrapper.findComponent({ name: "ODialog" });
+      expect(dialog.props("open")).toBe(true);
+      expect(dialog.props("secondaryButtonLabel")).toBeUndefined();
+      expect(dialog.props("persistent")).toBe(true);
+      expect(dialog.props("showClose")).toBe(false);
+      expect(dialog.props("primaryButtonLabel")).toBe("dashboard.layoutEdit.discardAndSignOut");
+      expect(wrapper.vm.discardForced).toBe(true);
+
+      wrapper.vm.settleDiscard(true);
+      await expect(leave).resolves.toBe(true);
+    });
+
+    it("keeps the layout edits when a later leave guard keeps the user on the page", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+      const guard = routeLeaveGuards.at(-1)!;
+      const toLogs = { query: {} };
+
+      const leave = guard(toLogs) as Promise<boolean>;
+      wrapper.vm.settleDiscard(true);
+      await expect(leave).resolves.toBe(true);
+      // The settings drawer's guard answered Stay, so the navigation never landed.
+      land(toLogs, { type: 4 });
+      expect(wrapper.vm.isEditingLayout).toBe(true);
+      expect(panelLayout().x).toBe(30);
+
+      // A later, unrelated navigation must not roll back the edits the user stayed for.
+      land({ query: {} });
+      expect(panelLayout().x).toBe(30);
+    });
+
+    it("rolls the layout back only once a confirmed leave lands", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+      const toLogs = { query: {} };
+
+      const leave = routeLeaveGuards.at(-1)!(toLogs) as Promise<boolean>;
+      wrapper.vm.settleDiscard(true);
+      await expect(leave).resolves.toBe(true);
+      expect(panelLayout().x).toBe(30);
+
+      land(toLogs);
+      expect(wrapper.vm.isEditingLayout).toBe(false);
       expect(panelLayout().x).toBe(0);
     });
 
@@ -2152,6 +2129,7 @@ describe("ViewDashboard", () => {
       const leave = guard(toOther, from) as Promise<boolean>;
       wrapper.vm.settleDiscard(true);
       await expect(leave).resolves.toBe(true);
+      land(toOther);
       expect(wrapper.vm.isEditingLayout).toBe(false);
       expect(panelLayout().x).toBe(0);
     });
@@ -2644,6 +2622,7 @@ describe("ViewDashboard", () => {
       global.mockStoreDispatch.mockClear();
 
       routeLeaveGuards.at(-1)?.();
+      land();
 
       expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
     });

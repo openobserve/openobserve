@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 38] = [
+const QUERIER_ROUTES: [(&str, usize); 47] = [
     ("config", 0),               // /config (unauthenticated bootstrap)
     ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
@@ -30,6 +30,11 @@ const QUERIER_ROUTES: [(&str, usize); 38] = [
     ("details", 5),              // /api/{org_id}/{stream_name}/traces/{trace_id}/details
     ("traces/time_range", 3),    // /api/{org_id}/{stream_name}/traces/time_range
     ("traces/time_range", 2),    // /api/{org_id}/traces/time_range
+    ("profiles/meta", 3),        // /api/{org_id}/{stream_name}/profiles/meta
+    ("profiles/tag_values", 3),  // /api/{org_id}/{stream_name}/profiles/tag_values
+    ("profiles/series", 3),      // /api/{org_id}/{stream_name}/profiles/series
+    ("profiles/merge", 3),       // /api/{org_id}/{stream_name}/profiles/merge
+    ("profiles/diff", 3),        // /api/{org_id}/{stream_name}/profiles/diff
     ("rum/lookup", 2),           // /api/{org_id}/rum/lookup
     ("clusters", 1),             // /api/clusters
     ("query_manager", 2),        // /api/{org_id}/query_manager/...
@@ -51,11 +56,16 @@ const QUERIER_ROUTES: [(&str, usize); 38] = [
     ("chat_stream", 3),                       /* /api/{org_id}/ai/chat_stream
                                                * {label_name}/
                                                * values */
-    ("discovery", 2),         // /api/{org_id}/discovery
-    ("annotation_queues", 2), // /api/{org_id}/annotation_queues/...
-    ("playground", 2),        // /api/{org_id}/playground/...
-    ("service_streams", 2),   // /api/{org_id}/service_streams/...
-    ("node/list", 2),         // /api/_meta/node/list
+    ("discovery", 2),           // /api/{org_id}/discovery
+    ("annotation_queues", 2),   // /api/{org_id}/annotation_queues/...
+    ("playground", 2),          // /api/{org_id}/playground/...
+    ("service_streams", 2),     // /api/{org_id}/service_streams/...
+    ("node/list", 2),           // /api/_meta/node/list
+    ("gen_ai/data_health", 2),  // /api/{org_id}/gen_ai/data_health
+    ("llm/models/unpriced", 2), // /api/{org_id}/llm/models/unpriced
+    // Queriers own the built-in GitHub sync, so its node-local sync time lives there.
+    ("llm/models/built-in", 2), // /api/{org_id}/llm/models/built-in
+    ("llm/models/refresh-built-in", 2), // /api/{org_id}/llm/models/refresh-built-in
 ];
 const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/_search",
@@ -85,9 +95,17 @@ pub const INGESTER_ROUTES: [&str; 13] = [
     "/v1/traces",
 ];
 
+/// Prefix of the anonymous public dashboard routes `{slug}` and `{slug}/data`.
+const PUBLIC_DASHBOARDS_PREFIX: &str = "/api/public_dashboards/";
+/// Slugs are 22 alphanumeric characters (`generate_random_string(22)`).
+const PUBLIC_DASHBOARD_SLUG_LEN: usize = 22;
+
 #[inline]
 pub fn is_querier_route(path: &str) -> bool {
     let path = remove_base_uri(path);
+    if is_public_dashboard_querier_route(path) {
+        return true;
+    }
     QUERIER_ROUTES.iter().any(|(route, skip_segments)| {
         if path.contains(route) {
             let mut segments = path.split('/').filter(|s| !s.is_empty());
@@ -122,10 +140,41 @@ pub fn extract_path_without_query(path: &str) -> &str {
     &path[..query_start]
 }
 
+/// The slug of an anonymous public dashboard route, whatever its syntax; the router keys on it.
+pub fn public_dashboard_slug(path: &str) -> Option<&str> {
+    let rest =
+        extract_path_without_query(remove_base_uri(path)).strip_prefix(PUBLIC_DASHBOARDS_PREFIX)?;
+    match rest.split_once('/') {
+        None => Some(rest),
+        Some((slug, "data")) => Some(slug),
+        Some(_) => None,
+    }
+}
+
+/// A slug as `generate_random_string(22)` makes it; anything else is answered 404 unproxied.
+pub fn is_public_dashboard_slug(slug: &str) -> bool {
+    slug.len() == PUBLIC_DASHBOARD_SLUG_LEN && slug.bytes().all(|b| b.is_ascii_alphanumeric())
+}
+
 #[inline]
 pub fn is_fixed_querier_route(path: &str) -> bool {
     let path = remove_base_uri(path);
     FIXED_QUERIER_ROUTES.iter().any(|x| path.contains(x))
+}
+
+/// The public routes, and the status calls that answer from the querier owning a link's files.
+fn is_public_dashboard_querier_route(path: &str) -> bool {
+    let segments: Vec<&str> = extract_path_without_query(path)
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect();
+    matches!(
+        segments.as_slice(),
+        ["api", "public_dashboards", _]
+            | ["api", "public_dashboards", _, "data"]
+            | ["api", _, "public_dashboards", "status"]
+            | ["api", _, "dashboards", _, "public_links", _, "status"]
+    )
 }
 
 #[inline]
@@ -196,8 +245,20 @@ mod tests {
         assert!(is_querier_route(
             "/api/org1/traces/time_range?trace_id=a,b,c"
         ));
+        // Built-in catalogue status and refresh read the querier's sync state.
+        assert!(is_querier_route(
+            "/api/org1/llm/models/built-in?metadata_only=true"
+        ));
+        assert!(is_querier_route("/api/org1/llm/models/refresh-built-in"));
+        assert!(!is_querier_route("/api/org1/llm/models"));
         // the org-level entry must not swallow the OTLP ingest route
         assert!(!is_querier_route("/api/org1/traces"));
+        for leaf in ["meta", "tag_values", "series", "merge", "diff"] {
+            assert!(is_querier_route(&format!(
+                "/api/org1/default/profiles/{leaf}"
+            )));
+        }
+        assert!(!is_querier_route("/api/org1/v1/profiles"));
     }
 
     #[test]
@@ -252,6 +313,52 @@ mod tests {
         assert_eq!(extract_path_without_query(""), "");
         assert_eq!(extract_path_without_query("?only_query"), "");
         assert_eq!(extract_path_without_query("/path"), "/path");
+    }
+
+    #[test]
+    fn public_dashboard_routes_are_keyed_by_the_slug_alone() {
+        let slug = "k8Zt2mR7aB3cD4eF5gH6Qx";
+        let config = format!("/api/public_dashboards/{slug}");
+        let data = format!("/api/public_dashboards/{slug}/data?range=r3600");
+        let other_range = format!("/api/public_dashboards/{slug}/data?range=r86400");
+        assert_eq!(public_dashboard_slug(&config), Some(slug));
+        assert_eq!(public_dashboard_slug(&data), Some(slug));
+        assert_eq!(public_dashboard_slug(&other_range), Some(slug));
+        assert_eq!(public_dashboard_slug("/api/public_dashboards/x/y"), None);
+        assert_eq!(public_dashboard_slug("/api/org1/public_dashboards"), None);
+        assert_eq!(public_dashboard_slug("/api/org1/_search"), None);
+        assert_eq!(
+            public_dashboard_slug("/api/public_dashboards/../data"),
+            Some("..")
+        );
+    }
+
+    #[test]
+    fn a_public_dashboard_slug_is_twenty_two_alphanumerics() {
+        assert!(is_public_dashboard_slug("k8Zt2mR7aB3cD4eF5gH6Qx"));
+        assert!(!is_public_dashboard_slug("k8Zt2mR7aB3cD4eF5gH6Q"));
+        assert!(!is_public_dashboard_slug("k8Zt2mR7aB3cD4eF5gH6Qxy"));
+        assert!(!is_public_dashboard_slug("k8Zt2mR7aB3cD4eF5gH6Q-"));
+        assert!(!is_public_dashboard_slug("../../etc/passwd000000"));
+        assert!(!is_public_dashboard_slug(""));
+    }
+
+    #[test]
+    fn public_dashboard_reads_and_status_calls_go_to_queriers() {
+        assert!(is_querier_route(
+            "/api/public_dashboards/k8Zt2mR7aB3cD4eF5gH6Qx"
+        ));
+        assert!(is_querier_route(
+            "/api/public_dashboards/k8Zt2mR7aB3cD4eF5gH6Qx/data?range=r3600"
+        ));
+        assert!(is_querier_route(
+            "/api/org1/dashboards/d1/public_links/l1/status"
+        ));
+        assert!(is_querier_route(
+            "/api/org1/public_dashboards/status?ids=a,b"
+        ));
+        assert!(!is_querier_route("/api/org1/public_dashboards"));
+        assert!(!is_querier_route("/api/org1/dashboards/d1/public_links/l1"));
     }
 
     #[test]

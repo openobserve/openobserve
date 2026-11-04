@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :holder="holder"
         :name-of="nameOf"
         :team-members="teamMembers"
+        :timezone="timezone"
         :set-members="setMembers"
       />
       <p
@@ -165,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <p
             v-if="window.start_minute === window.end_minute"
             class="text-status-warning-text text-xs sm:col-span-4"
+            :data-test="`oncall-schedule-restriction-zero-length-${ruleIndex}-${index}`"
           >
             {{ t("oncall.rotationRestrictionZeroLength") }}
           </p>

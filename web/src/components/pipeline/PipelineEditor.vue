@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           :loading="isPipelineSaving"
           :disabled="isPipelineSaving"
-          @click="savePipeline"
+          @click="savePipeline()"
           >{{ t("common.save") }}</OButton
         >
       </Teleport>
@@ -187,19 +187,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
   </ODrawer>
   <ConfirmDialog
-    :title="confirmDialogMeta.title"
-    :message="confirmDialogMeta.message"
-    @update:ok="confirmDialogMeta.onConfirm()"
-    @update:cancel="resetConfirmDialog"
-    v-model="confirmDialogMeta.show"
-  />
-  <ConfirmDialog
     :title="t('pipeline.savePipeline')"
     :message="t('pipeline.savePipelineConfirm')"
     @update:ok="confirmSaveBasicPipeline"
     @update:cancel="resetBasicDialog"
     v-model="confirmDialogBasicPipeline"
   />
+  <EditorDraftDialogs :draft="pipelineDraft" />
 </template>
 
 <script setup lang="ts">
@@ -222,7 +216,7 @@ import functionsService from "@/services/jstransform";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import pipelineService from "@/services/pipelines";
-import { onBeforeRouteLeave, useRouter } from "vue-router";
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
@@ -251,6 +245,18 @@ import { contextRegistry, createPipelinesContextProvider } from "@/composables/c
 import JsonEditor from "../common/JsonEditor.vue";
 import { validatePipeline as validatePipelineUtil } from "../../utils/validatePipeline";
 import { useReo } from "@/services/reodotdev_analytics";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import {
+  projectPipeline,
+  projectPipelineNode,
+  restorePipelineEdge,
+  restorePipelineNode,
+  type PipelineDraftContent,
+  type PipelineDraftData,
+  type PipelineDraftDrawer,
+} from "./pipelineDraft";
 
 const functionImage = getImageURL("images/pipeline/transform_function.png");
 const streamImage = getImageURL("images/pipeline/input_stream.png");
@@ -298,6 +304,10 @@ interface Pipeline {
   derived_streams: any[];
 }
 
+interface PipelineSaveError {
+  response?: { status?: number; data?: { message?: string } };
+}
+
 const pipeline = ref<Pipeline>({
   pipeline_id: "",
   name: "",
@@ -313,14 +323,6 @@ const router = useRouter();
 const store = useStore();
 const orgId = useOrgId();
 const { isDark } = useTheme();
-
-const confirmDialogMeta: any = ref({
-  show: false,
-  title: "",
-  message: "",
-  data: null,
-  onConfirm: () => {},
-});
 
 // nodeTypes is built at module scope, so `t` has to be in scope above it.
 const { t } = useI18nTyped();
@@ -593,6 +595,101 @@ watch(
   { immediate: false },
 );
 
+const editPipelineId = (() => {
+  const route = router.currentRoute.value;
+  return route.name === "pipelineEditor" && route.query.id ? String(route.query.id) : null;
+})();
+let serverPipeline: PipelineDraftContent | null = null;
+let pipelineLoaded: Promise<boolean> = Promise.resolve(false);
+
+// The rule the route guard, Cancel and beforeunload share; a new pipeline counts once it has any node.
+const isPipelineDirty = () =>
+  pipelineObj.dirtyFlag ||
+  (!pipelineObj.isEditPipeline && pipelineObj.currentSelectedPipeline.nodes.length > 0);
+
+const drawerSnapshot = (): PipelineDraftDrawer | null => {
+  if (!pipelineObj.dialog.show || !pipelineObj.dialog.name) return null;
+  const node = pipelineObj.currentSelectedNodeData;
+  const nodeId = node?.id ? String(node.id) : null;
+  const isEditNode = !!pipelineObj.isEditNode;
+  return {
+    type: String(pipelineObj.dialog.name),
+    nodeId,
+    isEditNode,
+    stagedNode: !isEditNode && nodeId ? projectPipelineNode(node) : null,
+    pendingSource: pipelineObj.pendingEdge?.source ? String(pipelineObj.pendingEdge.source) : null,
+  };
+};
+
+const reopenDrawer = (drawer: PipelineDraftDrawer | null) => {
+  if (!drawer) return;
+  if (drawer.isEditNode) {
+    const node = pipelineObj.currentSelectedPipeline.nodes.find(
+      (n: { id: string }) => n.id === drawer.nodeId,
+    );
+    if (!node) return;
+    pipelineObj.currentSelectedNodeData = node;
+    pipelineObj.currentSelectedNodeID = node.id;
+  } else {
+    if (!drawer.stagedNode) return;
+    pipelineObj.currentSelectedNodeData = restorePipelineNode(drawer.stagedNode);
+    pipelineObj.pendingEdge = drawer.pendingSource ? { source: drawer.pendingSource } : null;
+  }
+  pipelineObj.isEditNode = drawer.isEditNode;
+  pipelineObj.dialog.name = drawer.type;
+  pipelineObj.dialog.show = true;
+};
+
+// Mutated in place: replacing currentSelectedPipeline would make PipelineFlow clear dirtyFlag.
+const applyPipelineDraft = (data: PipelineDraftData) => {
+  const current = pipelineObj.currentSelectedPipeline;
+  current.name = data.name;
+  current.description = data.description;
+  current.source = JSON.parse(JSON.stringify(data.source));
+  current.nodes = data.nodes.map(restorePipelineNode);
+  current.edges = data.edges.map(restorePipelineEdge);
+  pipelineObj.hasInputNode = current.nodes.some(
+    (node: { io_type?: string }) => node.io_type === "input",
+  );
+  if (pipelineObj.isEditPipeline) pipelineObj.dirtyFlag = true;
+  reopenDrawer(data.drawer);
+};
+
+// Registered before the draft's own leave guard, so a leave Save that stops at the basic-pipeline prompt knows where to go after it.
+let leaveTarget: string | null = null;
+let basicPromptLeaveTarget: string | null = null;
+let basicPromptFrom: string | null = null;
+onBeforeRouteLeave((to) => {
+  leaveTarget = to.fullPath;
+});
+onBeforeRouteUpdate((to) => {
+  leaveTarget = to.fullPath;
+});
+
+const pipelineDraft = useEditorDraft<PipelineDraftData>({
+  kind: "pipeline",
+  entityLabel: () => t("common.editorDraft.entities.pipeline"),
+  entityId: () => editPipelineId,
+  snapshot: () => ({
+    ...projectPipeline(pipelineObj.currentSelectedPipeline),
+    drawer: drawerSnapshot(),
+  }),
+  apply: applyPipelineDraft,
+  base: () => (editPipelineId ? serverPipeline : undefined),
+  hasChanges: isPipelineDirty,
+  save: () => savePipeline({ navigate: false }),
+  // The pipeline state is shared, so edits that leave without a save must not wait in it for the next open.
+  onLeaveWithoutSave: resetPipelineData,
+});
+
+const pipelinesRoute = () => ({
+  name: "pipelines",
+  query: {
+    org_identifier: store.state.selectedOrganization.identifier,
+  },
+});
+const goToPipelines = () => router.push(pipelinesRoute());
+
 onBeforeMount(() => {
   // Self-hosted-only (cloudOffers: false) — a pure-Cloud build reports
   // `visible: false` so the node stays entirely absent there, matching
@@ -611,12 +708,14 @@ onBeforeMount(() => {
     });
   }
   const route = router.currentRoute.value;
-  if (route.name == "pipelineEditor" && route.query.id) {
-    getPipeline();
+  if (editPipelineId) {
+    pipelineLoaded = getPipeline();
     pipelineObj.isEditPipeline = true;
   } else {
     pipelineObj.isEditPipeline = false;
     resetPipelineData();
+    // An edit URL without an id is redirected to the list on mount, so it never opens a draft.
+    pipelineLoaded = Promise.resolve(route.name !== "pipelineEditor");
   }
   getFunctions();
 });
@@ -626,6 +725,8 @@ const { getSelectedEdges, removeEdges } = useVueFlow();
 
 onMounted(async () => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
+  // Drafts apply after the reset/load above, so a continued draft is never overwritten by them.
+  void pipelineLoaded.then((found) => (found ? pipelineDraft.start() : undefined));
 
   // Add keyboard handler for edge deletion
   const handleKeydown = (event: KeyboardEvent) => {
@@ -673,6 +774,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
+  // pipelineObj outlives the editor; an open drawer is reopened only by continuing its draft.
+  resetDialog();
 
   // Cleanup keyboard handler
   if ((window as any).pipelineKeydownHandler) {
@@ -683,42 +786,11 @@ onUnmounted(() => {
   cleanupPipelinesContextProvider();
 });
 
-let forceSkipBeforeUnloadListener = false;
-
-onBeforeRouteLeave((to, from, next) => {
-  // check if it is a force navigation, then allow
-  if (forceSkipBeforeUnloadListener) {
-    next();
-    return;
-  }
-  // else continue to warn user
-  if (
-    (from.path === "/pipeline/pipelines/edit" && pipelineObj.dirtyFlag) ||
-    (from.path === "/pipeline/pipelines/add" && pipelineObj.currentSelectedPipeline.nodes.length)
-  ) {
-    // Cancel this navigation; show a Vue dialog instead of window.confirm
-    // (browsers often suppress window.confirm during navigation events).
-    next(false);
-    const destination = to.fullPath;
-    confirmDialogMeta.value.show = true;
-    confirmDialogMeta.value.title = t("common.cancelChanges");
-    confirmDialogMeta.value.message = t("pipeline.cancelChangesConfirm");
-    confirmDialogMeta.value.onConfirm = () => {
-      resetConfirmDialog();
-      resetPipelineData();
-      forceSkipBeforeUnloadListener = true;
-      router.push(destination);
-    };
-  } else {
-    // No unsaved changes or not leaving the edit route, allow navigation
-    next();
-  }
-});
-
-const getPipeline = () => {
+/** Loads the edited pipeline; resolves false when it is gone or could not be read. */
+const getPipeline = (): Promise<boolean> => {
   const route = router.currentRoute.value;
 
-  pipelineService
+  return pipelineService
     .getPipelines(store.state.selectedOrganization.identifier)
     .then(async (response) => {
       const _pipeline = response.data.list.find(
@@ -726,6 +798,13 @@ const getPipeline = () => {
       );
 
       if (!_pipeline) {
+        if (editPipelineId) {
+          deleteEditorDraftsFor({
+            kind: "pipeline",
+            org: store.state.selectedOrganization.identifier,
+            entityId: editPipelineId,
+          });
+        }
         toast({
           message: t("pipeline.pipelineNotFound"),
           variant: "warning",
@@ -736,7 +815,7 @@ const getPipeline = () => {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
-        return;
+        return false;
       }
 
       _pipeline.edges.forEach((edge: any) => {
@@ -763,6 +842,8 @@ const getPipeline = () => {
 
       pipelineObj.currentSelectedPipeline = _pipeline;
       pipelineObj.pipelineWithoutChange = JSON.parse(JSON.stringify(_pipeline));
+      serverPipeline = projectPipeline(_pipeline);
+      return true;
     })
     .catch((error) => {
       toast({
@@ -775,6 +856,7 @@ const getPipeline = () => {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+      return false;
     });
 };
 
@@ -810,8 +892,8 @@ const resetDialog = () => {
   editingStreamRouteName.value = "";
 };
 
-const savePipeline = async () => {
-  forceSkipBeforeUnloadListener = true;
+/** Resolves true once the pipeline is saved; `navigate: false` keeps the user on the page. */
+const savePipeline = async ({ navigate = true }: { navigate?: boolean } = {}): Promise<boolean> => {
   // Name validation is owned by the OForm schema. handleSubmit runs the schema
   // over the form values — this works even in edit mode / the JSON-editor path
   // where the teleported field isn't mounted — and reveals the inline error on
@@ -823,7 +905,7 @@ const savePipeline = async () => {
       message: t("pipeline.pipelineNameRequired"),
       variant: "warning",
     });
-    return;
+    return false;
   }
   // Find the input node
   const inputNodeIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
@@ -844,7 +926,7 @@ const savePipeline = async () => {
     if (showJsonEditorDialog.value == true) {
       validationErrors.value = [t("pipeline.sourceNodeRequired")];
     }
-    return;
+    return false;
   } else if (outputNodeIndex === -1) {
     toast({
       message: t("pipeline.destinationNodeRequired"),
@@ -853,7 +935,7 @@ const savePipeline = async () => {
     if (showJsonEditorDialog.value == true) {
       validationErrors.value = [t("pipeline.destinationNodeRequired")];
     }
-    return;
+    return false;
   } else {
     pipelineObj.currentSelectedPipeline.nodes.map((node: any) => {
       if (
@@ -884,21 +966,37 @@ const savePipeline = async () => {
     if (showJsonEditorDialog.value == true) {
       validationErrors.value = [t("pipeline.connectAllNodes")];
     }
-    return;
+    return false;
   }
 
   const isValid = isValidNodes(pipelineObj.currentSelectedPipeline.nodes);
   if (!isValid && showJsonEditorDialog.value == false) {
+    // The leave dialog's Save stops here too: the user answers this prompt in the editor, then the leave goes on.
+    basicPromptLeaveTarget = navigate ? null : leaveTarget;
+    basicPromptFrom = router.currentRoute.value.fullPath;
     confirmDialogBasicPipeline.value = true;
-    return;
+    return false;
   }
 
-  await onSubmitPipeline();
+  return onSubmitPipeline(navigate);
 };
 
 const confirmSaveBasicPipeline = async () => {
   confirmDialogBasicPipeline.value = false;
-  await onSubmitPipeline();
+  const target = basicPromptLeaveTarget;
+  basicPromptLeaveTarget = null;
+  if (!target) {
+    await onSubmitPipeline();
+    return;
+  }
+  if (!(await onSubmitPipeline(false))) return;
+  // The leave was refused, so it goes on only from where it started; a sign-out never does, as /logout would skip its own confirm.
+  if (
+    router.resolve(target).path === "/logout" ||
+    router.currentRoute.value.fullPath !== basicPromptFrom
+  )
+    return;
+  await router.push(target);
 };
 const validatePipeline = () => {
   // Find input node
@@ -926,16 +1024,12 @@ const validatePipeline = () => {
   return true;
 };
 
-const onSubmitPipeline = async () => {
+const onSubmitPipeline = async (navigate = true): Promise<boolean> => {
   isPipelineSaving.value = true;
-  // if(!validatePipeline()){
-  //   isPipelineSaving.value = false;
-  //   return;
-  // }
   if (showJsonEditorDialog.value == false) {
     if (!validatePipeline()) {
       isPipelineSaving.value = false;
-      return;
+      return false;
     }
   }
   const dismiss = toast({
@@ -945,133 +1039,69 @@ const onSubmitPipeline = async () => {
   });
 
   const saveOperation = savePipelineWrite.mutateAsync(pipelineObj.currentSelectedPipeline);
-
-  saveOperation
-    .then(() => {
-      if (pipelineObj.isEditPipeline && showJsonEditorDialog.value == false) {
-        pipelineObj.isEditPipeline = false;
-
-        router.push({
-          name: "pipelines",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-        toast({
-          message: t("pipeline.pipelineUpdated"),
-          variant: "success",
-        });
-      } else if (!pipelineObj.isEditPipeline && showJsonEditorDialog.value == false) {
-        showJsonEditorDialog.value = false;
-        router.push({
-          name: "pipelines",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-        toast({
-          message: t("pipeline.pipelineSaved"),
-          variant: "success",
-        });
-      } else if (pipelineObj.isEditPipeline && showJsonEditorDialog.value == true) {
-        showJsonEditorDialog.value = false;
-        toast({
-          message: t("pipeline.pipelineUpdated"),
-          variant: "success",
-        });
-      } else {
-        showJsonEditorDialog.value = false;
-        router.push({
-          name: "pipelines",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-        toast({
-          message: t("pipeline.pipelineSaved"),
-          variant: "success",
-        });
-      }
-    })
-    .catch((error) => {
-      if (pipelineObj.isEditPipeline) {
-        pipelineObj.isEditPipeline = true;
-      }
-
-      if (error.response?.data?.message === "Invalid Pipeline: empty edges list") {
-        toast({
-          message: t("pipeline.connectAllNodesShort"),
-          variant: "warning",
-        });
-        if (showJsonEditorDialog.value == true) {
-          validationErrors.value = [t("pipeline.connectAllNodes")];
-        }
-      } else {
-        if (error.response.status != 403) {
-          toast({
-            message: error.response?.data?.message || t("pipeline.errorSavingPipeline"),
-            variant: "error",
-          });
-          if (showJsonEditorDialog.value == true) {
-            validationErrors.value = [
-              error.response?.data?.message || t("pipeline.errorSavingPipeline"),
-            ];
-          }
-        }
-      }
-    })
-    .finally(() => {
-      isPipelineSaving.value = false;
-      dismiss();
-    });
   track("Button Click", {
     button: "Save Pipeline",
     page: "Add Pipeline",
   });
-};
 
-const openCancelDialog = () => {
-  if (
-    pipelineObj.dirtyFlag ||
-    (!pipelineObj.isEditPipeline && pipelineObj.currentSelectedPipeline.nodes.length > 1)
-  ) {
-    confirmDialogMeta.value.show = true;
-    confirmDialogMeta.value.title = t("common.cancelChanges");
-    confirmDialogMeta.value.message = t("pipeline.cancelChangesConfirm");
-    confirmDialogMeta.value.onConfirm = () => {
-      resetPipelineData();
-      router.push({
-        name: "pipelines",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-      track("Button Click", {
-        button: "Cancel Pipeline",
-        page: "Add Pipeline",
-      });
-    };
-  } else {
-    router.push({
-      name: "pipelines",
-      query: {
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
+  try {
+    await saveOperation;
+    const wasEdit = pipelineObj.isEditPipeline;
+    const fromJsonEditor = showJsonEditorDialog.value;
+    serverPipeline = projectPipeline(pipelineObj.currentSelectedPipeline);
+    pipelineDraft.markSaved();
+    showJsonEditorDialog.value = false;
+    if (wasEdit && !fromJsonEditor) pipelineObj.isEditPipeline = false;
+    // An edit applied from the JSON editor stays on the page.
+    if (navigate && !(wasEdit && fromJsonEditor)) goToPipelines();
+    toast({
+      message: wasEdit ? t("pipeline.pipelineUpdated") : t("pipeline.pipelineSaved"),
+      variant: "success",
     });
+    return true;
+  } catch (error: unknown) {
+    const response = (error as PipelineSaveError | null)?.response;
+    const serverMessage = response?.data?.message;
+    if (serverMessage === "Invalid Pipeline: empty edges list") {
+      toast({
+        message: t("pipeline.connectAllNodesShort"),
+        variant: "warning",
+      });
+      if (showJsonEditorDialog.value) {
+        validationErrors.value = [t("pipeline.connectAllNodes")];
+      }
+    } else if (response?.status !== 403) {
+      const message = raw(serverMessage) || t("pipeline.errorSavingPipeline");
+      toast({ message, variant: "error" });
+      if (showJsonEditorDialog.value) {
+        validationErrors.value = [message];
+      }
+    }
+    return false;
+  } finally {
+    isPipelineSaving.value = false;
+    dismiss();
   }
 };
-const resetConfirmDialog = () => {
-  confirmDialogMeta.value.show = false;
-  confirmDialogMeta.value.title = "";
-  confirmDialogMeta.value.message = "";
-  confirmDialogMeta.value.onConfirm = () => {};
-  confirmDialogMeta.value.data = null;
+
+const openCancelDialog = async () => {
+  const hadChanges = pipelineDraft.hasUnsavedChanges();
+  leaveTarget = router.resolve(pipelinesRoute()).fullPath;
+  if (!(await pipelineDraft.confirmLeave())) return;
+  if (hadChanges) {
+    track("Button Click", {
+      button: "Cancel Pipeline",
+      page: "Add Pipeline",
+    });
+  }
+  goToPipelines();
 };
 
 const resetBasicDialog = () => {
   // Cancelling the "save anyway?" prompt should only dismiss the dialog and keep
   // the user on the editor (matching the close/X button) — NOT navigate away to
   // the pipelines listing.
+  basicPromptLeaveTarget = null;
   confirmDialogBasicPipeline.value = false;
 };
 
@@ -1122,11 +1152,7 @@ const isValidNodes = (nodes: any) => {
 };
 
 const beforeUnloadHandler = (e: any) => {
-  //check is data updated or not
-  if (
-    pipelineObj.dirtyFlag ||
-    (pipelineObj.currentSelectedPipeline.nodes.length > 1 && !pipelineObj.isEditPipeline)
-  ) {
+  if (isPipelineDirty()) {
     // Display a confirmation message
     const confirmMessage = t("pipeline.unsavedMessage");
     e.returnValue = confirmMessage;

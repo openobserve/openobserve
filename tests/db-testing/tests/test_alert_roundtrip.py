@@ -31,6 +31,7 @@ def _alert_payload(name: str, stream: str, dest: str) -> dict:
         "priority": 2,
         "tags": ["roundtrip", "service:db-testing"],
         "runbook_url": "https://example.com/runbooks/roundtrip",
+        # Deduplication was removed; a client that still sends it must save, with the field dropped.
         "deduplication": {"enabled": True, "fingerprint_fields": ["level"], "time_window_minutes": 30},
         "notify_on_recovery": True,
         # Regression for #15434: a non-empty list forces the decode that broke on Postgres.
@@ -94,7 +95,7 @@ def _assert_filled(stored: dict, dest: str, *, recovery: bool = True) -> None:
     assert stored["destinations"] == [dest]
     assert stored["context_attributes"] == {"team": "qa", "service": "db-testing"}
     assert stored["tags"] == ["roundtrip", "service:db-testing"]
-    assert stored["deduplication"]["fingerprint_fields"] == ["level"]
+    assert "deduplication" not in stored
     assert stored["runbook_url"] == "https://example.com/runbooks/roundtrip"
 
 
@@ -132,17 +133,17 @@ class TestAlertRoundtrip:
         alert_id = _create(api, created_alerts, _alert_payload(unique_name("rt_clear"), test_stream, destination))
         stored = _read(api, alert_id)
 
-        stored.update(recovery_destinations=[], tags=[], context_attributes={}, deduplication={"enabled": False})
+        stored.update(recovery_destinations=[], tags=[], context_attributes={})
         stored.pop("runbook_url")
         cleared = _update(api, alert_id, stored)
         assert cleared["recovery_destinations"] == []
         assert cleared["context_attributes"] == {}
-        # The API omits empty tags, an unset runbook and disabled dedup instead of sending empties.
-        for absent in ("tags", "runbook_url", "deduplication"):
+        # The API omits empty tags and an unset runbook instead of sending empties.
+        for absent in ("tags", "runbook_url"):
             assert absent not in cleared, f"{absent} must be cleared, got {cleared[absent]!r}"
 
         filled = _alert_payload(cleared["name"], test_stream, destination)
-        refill = {k: filled[k] for k in ("recovery_destinations", "tags", "context_attributes", "runbook_url", "deduplication")}
+        refill = {k: filled[k] for k in ("recovery_destinations", "tags", "context_attributes", "runbook_url")}
         _assert_filled(_update(api, alert_id, {**cleared, **refill}), destination)
 
     def test_unicode_and_long_values_roundtrip(self, api, destination, test_stream, created_alerts):

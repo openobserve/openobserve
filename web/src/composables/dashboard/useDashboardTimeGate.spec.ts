@@ -78,6 +78,22 @@ describe("useDashboardTimeGate", () => {
   });
 
   describe("Auto Run on", () => {
+    it("applies the same calendar token again when the timezone moves its window", () => {
+      const yesterday = (startTime: number) => ({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:day:-1",
+        startTime,
+        endTime: startTime + 86_400_000_000,
+      });
+      const gate = createGate();
+      gate.onPick(yesterday(1_000_000_000));
+      expect(gate.applied.value).toEqual(yesterday(1_000_000_000));
+
+      gate.onPick(yesterday(1_000_000_000 - 19_800_000_000));
+      expect(gate.applied.value).toEqual(yesterday(1_000_000_000 - 19_800_000_000));
+      expect(onAutoApply).toHaveBeenCalledTimes(2);
+    });
+
     it("applies a relative preset at once", () => {
       const gate = createGate();
 

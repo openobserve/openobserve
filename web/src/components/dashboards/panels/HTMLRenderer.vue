@@ -88,12 +88,10 @@ export default defineComponent({
         tabId: props.tabId,
         panelId: props.panelId,
       };
-      return processVariableContent(
-        props.htmlContent,
-        props.variablesData,
-        context,
-        escapeHtmlValue,
-      );
+      // No allLabel: html panels keep the raw sentinel so hand-built var-x=_o2_all_ links round-trip.
+      return processVariableContent(props.htmlContent, props.variablesData, context, {
+        escapeValue: escapeHtmlValue,
+      });
     });
 
     // re-serializing through v-html would let CSSOM-decoded text re-parse as markup

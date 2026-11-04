@@ -32,13 +32,11 @@ pub const DEFAULT_GATE_WINDOW_SECS: u32 = 5 * 60;
 pub const DEFAULT_GATE_PASS_PERCENT: u32 = 95;
 pub const DEFAULT_PAGE_LIMIT: usize = 100;
 pub const MAX_PAGE_LIMIT: usize = 1000;
-/// Bulk moves accept at most this many collectors (§4.4).
-pub const MAX_MOVE_COLLECTORS: usize = 1000;
 
 /// Issues keyed by pipeline id; the empty key holds document-level issues.
 pub type Issues = BTreeMap<String, Vec<ConfigIssue>>;
 
-/// Derived when read from `last_seen` and the reported health, never stored (§4.7).
+/// Derived when read from `last_seen` and the reported health, never stored.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum CollectorStatus {
@@ -48,7 +46,7 @@ pub enum CollectorStatus {
     Offline,
 }
 
-/// Derived when read from the assignment and the collector's reports (§8.1).
+/// Derived when read from the assignment and the collector's reports.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DeliveryState {
@@ -71,7 +69,7 @@ pub struct Collector {
     pub version: Option<String>,
     pub outdated: bool,
     pub status: CollectorStatus,
-    /// The connection's peer address, honouring `X-Forwarded-For`.
+    /// The connection's client address, as `ZO_HTTP_REAL_IP_SOURCE` resolves it.
     pub last_connected_from: Option<String>,
     pub fleet: CollectorFleet,
     pub token_id: Option<String>,
@@ -171,7 +169,7 @@ pub struct CollectorAssignment {
     pub revision: i64,
 }
 
-/// The facts the delivery state is derived from (§9.7).
+/// The facts the delivery state is derived from.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct DeliveryEvidence {
     /// The last `RemoteConfigStatus` status, e.g. `APPLIED` or `FAILED`.
@@ -267,7 +265,7 @@ pub struct EnrollmentToken {
     pub max_uses: Option<i64>,
     pub fleet: CollectorFleet,
     pub revoked: bool,
-    /// Readable by anyone who can see the fleet; `None` on tokens created before values were kept.
+    /// Only for callers who may change the fleet; tokens predating stored values have none.
     pub token: Option<String>,
 }
 
@@ -440,14 +438,40 @@ pub struct AuditList {
     pub audit_disabled: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema, IntoParams)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct AuditQuery {
+    /// Epoch milliseconds; defaults to 30 days before `to`.
     pub from: Option<i64>,
+    /// Epoch milliseconds, exclusive; defaults to now.
     pub to: Option<i64>,
+    #[serde(default)]
+    pub offset: Option<usize>,
+    #[serde(default)]
+    pub limit: Option<usize>,
+    /// Only this fleet's events, which leaves out org-wide ones.
+    #[serde(default)]
+    pub fleet: Option<String>,
+    #[serde(default)]
+    pub module: Option<AuditModule>,
+    /// Matches the actor or the target, ignoring case.
+    #[serde(default)]
+    pub q: Option<String>,
 }
 
-/// Per-fleet overrides; `None` inherits the organization default (§4.8).
+/// The part of the fleet API an event was made through; `settings` is the org's fleet settings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum AuditModule {
+    Collectors,
+    Tokens,
+    Fleets,
+    Rollouts,
+    Configs,
+    Settings,
+}
+
+/// Per-fleet overrides; `None` inherits the organization default.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FleetSettings {
@@ -501,19 +525,22 @@ impl FleetSettings {
         self.or(org_defaults).or(&Self::builtin())
     }
 
+    /// The same bounds the settings form enforces, so the API cannot store what the UI refuses.
     pub fn validate(&self) -> Result<(), String> {
-        let positive = [
-            ("heartbeat_interval_secs", self.heartbeat_interval_secs),
-            ("offline_heartbeats", self.offline_heartbeats),
-            ("phase_timeout_secs", self.phase_timeout_secs),
+        let bounded = [
+            (
+                "heartbeat_interval_secs",
+                self.heartbeat_interval_secs,
+                5,
+                3600,
+            ),
+            ("offline_heartbeats", self.offline_heartbeats, 1, 100),
+            ("retention_days", self.retention_days, 0, 3650),
+            ("offline_ratio_percent", self.offline_ratio_percent, 1, 100),
+            ("phase_timeout_secs", self.phase_timeout_secs, 60, 86400),
         ];
-        for (name, value) in positive {
-            if value == Some(0) {
-                return Err(format!("{name} must be greater than 0"));
-            }
-        }
-        if self.offline_ratio_percent.is_some_and(|p| p > 100) {
-            return Err("offline_ratio_percent must be between 0 and 100".to_string());
+        for (name, value, min, max) in bounded {
+            in_range(name, value, min, max)?;
         }
         match self.gate {
             Some(gate) => gate.validate(),
@@ -522,7 +549,7 @@ impl FleetSettings {
     }
 }
 
-/// The verification gate: wait `observe_secs`, then measure over `window_secs` (§9.4).
+/// The verification gate: wait `observe_secs`, then measure over `window_secs`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GateSettings {
@@ -543,13 +570,9 @@ impl Default for GateSettings {
 
 impl GateSettings {
     pub fn validate(&self) -> Result<(), String> {
-        if self.window_secs == 0 {
-            return Err("gate.window_secs must be greater than 0".to_string());
-        }
-        if self.pass_percent == 0 || self.pass_percent > 100 {
-            return Err("gate.pass_percent must be between 1 and 100".to_string());
-        }
-        Ok(())
+        in_range("gate.observe_secs", Some(self.observe_secs), 0, 86400)?;
+        in_range("gate.window_secs", Some(self.window_secs), 30, 86400)?;
+        in_range("gate.pass_percent", Some(self.pass_percent), 1, 100)
     }
 }
 
@@ -630,19 +653,6 @@ pub struct RenameFleetRequest {
     pub name: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct MoveCollectorsRequest {
-    pub collector_ids: Vec<String>,
-    /// Destination fleet id.
-    pub to_fleet: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct MoveCollectorsResponse {
-    pub moved: usize,
-}
-
 /// Why a reference-protected delete was refused (409).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct References {
@@ -661,7 +671,7 @@ pub enum RolloutStart {
     At { at: i64 },
 }
 
-/// Phase sizes are counts of collectors, never percentages (§9.2).
+/// Phase sizes are counts of collectors, never percentages.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Batching {
@@ -708,6 +718,7 @@ pub struct PlanPreview {
 #[serde(rename_all = "snake_case")]
 pub enum RolloutStatus {
     Scheduled,
+    Waiting,
     InProgress,
     Halted,
     Completed,
@@ -717,11 +728,14 @@ pub enum RolloutStatus {
 
 impl RolloutStatus {
     pub fn is_active(self) -> bool {
-        matches!(self, Self::Scheduled | Self::InProgress | Self::Halted)
+        matches!(
+            self,
+            Self::Scheduled | Self::Waiting | Self::InProgress | Self::Halted
+        )
     }
 }
 
-/// The evidence class of a halt (§9.5); only the first two may roll back automatically.
+/// The evidence class of a halt; only the first two may roll back automatically.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HaltClass {
@@ -751,7 +765,6 @@ pub struct RolloutHalt {
     pub reason: String,
     /// Epoch milliseconds.
     pub at: i64,
-    /// The exits this halt offers (§9.6).
     pub exits: Vec<HaltExit>,
 }
 
@@ -1003,6 +1016,15 @@ fn default_fleet() -> String {
     crate::meta::folder::DEFAULT_FOLDER.to_string()
 }
 
+fn in_range(name: &str, value: Option<u32>, min: u32, max: u32) -> Result<(), String> {
+    match value {
+        Some(v) if !(min..=max).contains(&v) => {
+            Err(format!("{name} must be between {min} and {max}"))
+        }
+        _ => Ok(()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1204,6 +1226,7 @@ mod tests {
         assert_eq!(back, rollout());
         for (status, text) in [
             (RolloutStatus::Scheduled, "scheduled"),
+            (RolloutStatus::Waiting, "waiting"),
             (RolloutStatus::InProgress, "in_progress"),
             (RolloutStatus::Superseded, "superseded"),
             (RolloutStatus::RolledBack, "rolled_back"),
@@ -1284,6 +1307,34 @@ mod tests {
     }
 
     #[test]
+    fn settings_validation_matches_the_form_bounds() {
+        let heartbeat = |secs| FleetSettings {
+            heartbeat_interval_secs: Some(secs),
+            ..Default::default()
+        };
+        for secs in [1, 4, 3601, 86_400] {
+            assert!(heartbeat(secs).validate().is_err(), "{secs}");
+        }
+        for secs in [5, 30, 3600] {
+            assert!(heartbeat(secs).validate().is_ok(), "{secs}");
+        }
+        let gate = |window_secs| FleetSettings {
+            gate: Some(GateSettings {
+                window_secs,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert!(gate(29).validate().is_err());
+        assert!(gate(30).validate().is_ok());
+        let ratio = FleetSettings {
+            offline_ratio_percent: Some(0),
+            ..Default::default()
+        };
+        assert!(ratio.validate().is_err());
+    }
+
+    #[test]
     fn org_settings_fill_missing_fields_and_refuse_unknown_ones() {
         let decoded: Settings = serde_json::from_str("{}").unwrap();
         assert_eq!(decoded, Settings::default());
@@ -1315,12 +1366,7 @@ mod tests {
     }
 
     #[test]
-    fn move_and_fleet_types_serialize_as_the_api_documents() {
-        let req: MoveCollectorsRequest =
-            serde_json::from_str(r#"{"collector_ids":["c1"],"to_fleet":"f2"}"#).unwrap();
-        assert_eq!((req.collector_ids.len(), req.to_fleet.as_str()), (1, "f2"));
-        let old = r#"{"collector_ids":[],"dst_folder_id":"f"}"#;
-        assert!(serde_json::from_str::<MoveCollectorsRequest>(old).is_err());
+    fn fleet_types_serialize_as_the_api_documents() {
         let list = FleetList {
             total: 1,
             items: vec![Fleet {

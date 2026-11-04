@@ -113,7 +113,7 @@
               >
                 {{
                   t("aiObservability.experiments.form.datasetPinned", {
-                    version: selectedDatasetVersion,
+                    version: shownDatasetVersion,
                   })
                 }}
                 {{
@@ -533,7 +533,7 @@
                 >
                   {{
                     t("aiObservability.experiments.scorerApplicability", {
-                      scorer: entry.scorerId,
+                      scorer: scorerName(entry.scorerId),
                       version: entry.scorerVersion,
                       eligible: entry.eligibleSlotCount,
                       noReference: entry.noReferenceSlotCount,
@@ -562,6 +562,24 @@
       <footer
         class="bg-surface-base border-border-default sticky bottom-0 z-1 flex shrink-0 items-center justify-end gap-2 border-t px-5.5 py-3"
       >
+        <p
+          v-if="providerFailure"
+          role="alert"
+          class="text-status-error-text m-0 me-auto min-w-0 text-xs"
+          data-test="ai-experiment-form-provider-failure"
+        >
+          {{
+            t(
+              providerFailure.task
+                ? "aiObservability.experiments.form.taskProviderFailed"
+                : "aiObservability.experiments.form.judgeProviderFailed",
+              { provider: providerFailure.providerName },
+            )
+          }}
+          <template v-if="providerFailure.message">
+            {{ raw(`· ${providerFailure.message}`) }}
+          </template>
+        </p>
         <OButton
           type="button"
           variant="outline"
@@ -589,13 +607,7 @@
     </OPageLayout>
   </OForm>
 
-  <ConfirmDialog
-    v-model="leaveDialog.show"
-    :title="t('aiObservability.experiments.form.leaveTitle')"
-    :message="t('aiObservability.experiments.form.leaveMessage')"
-    @update:ok="leaveDialog.onConfirm"
-    @update:cancel="leaveDialog.show = false"
-  />
+  <EditorDraftDialogs :draft="experimentDraft" />
   <ConfirmDialog
     v-model="costDialog.show"
     :title="t('aiObservability.experiments.form.costConfirmTitle')"
@@ -606,10 +618,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { debounce } from "lodash-es";
 import { useStore } from "vuex";
-import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -619,6 +631,8 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, {
   commonInputFields,
@@ -657,6 +671,11 @@ import {
   withPreviewScorers,
 } from "../../views/AIObservability/experimentPreview";
 import { aiExperimentsRoute } from "../../views/AIObservability/experimentRoutes";
+import {
+  checkRunProviders,
+  runProviderIds,
+  type ProviderCheckFailure,
+} from "../../views/AIObservability/experimentProviderCheck";
 import ExperimentPreviewPanel from "./ExperimentPreviewPanel.vue";
 import {
   EXPERIMENT_ROW_SOURCES,
@@ -692,7 +711,6 @@ const previewRequests = createPreviewRequestGate();
 let previewedFor = "";
 const nextIdempotencyKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
 const idempotencyKey = ref(nextIdempotencyKey());
-const leaveDialog = reactive({ show: false, onConfirm: () => {} });
 // The body awaiting the user's OK to go over the cost warning threshold. Cancel
 // just closes the dialog: the form keeps its state and nothing is resent.
 const costDialog = reactive({
@@ -703,7 +721,10 @@ const costDialog = reactive({
 // True while a confirmed create runs: it starts from the dialog, outside the
 // form's own submit, so isSubmitting does not cover it.
 const sendingConfirmed = ref(false);
-let allowLeave = false;
+// Set while the leave dialog's Save runs, so a successful create stays on the page.
+let leaveSave: { saved: boolean } | null = null;
+// A continued prompt_ref draft keeps its own model and temperature over the resolved prompt's.
+let draftOverrides: { model: string; temperature: number } | null = null;
 
 /** A query value only when it is really there — an absent key must fall through
  *  to the form default, not overwrite it with "". */
@@ -745,6 +766,7 @@ const userPrompt = form.useStore((s: any) => s.values.userPrompt as string);
 const systemPrompt = form.useStore((s: any) => s.values.systemPrompt as string);
 const sources = form.useStore((s: any) => (s.values.sources ?? []) as string[]);
 const isDirty = form.useStore((s: any) => s.isDirty as boolean);
+const formValues = form.useStore((state) => state.values);
 
 const datasetSelected = computed(() => !!datasetId.value);
 const providerSelected = computed(() => !!providerId.value);
@@ -852,8 +874,16 @@ async function resolvePromptSelection() {
     });
     if (request !== promptResolveRequest) return;
     resolvedPrompt.value = resolved;
+    // A new version re-runs this resolve, so the draft's overrides wait for that one too.
+    const settled = promptVersion.value === String(resolved.version.version);
     form.setFieldValue("promptId", resolved.prompt.entityId);
     form.setFieldValue("promptVersion", String(resolved.version.version));
+    if (draftOverrides) {
+      form.setFieldValue("model", draftOverrides.model);
+      form.setFieldValue("temperature", draftOverrides.temperature);
+      if (settled) draftOverrides = null;
+      return;
+    }
     if (!model.value) form.setFieldValue("model", resolved.version.config.model ?? "");
     const baseTemperature = resolved.version.config.params?.temperature;
     if (typeof baseTemperature === "number") {
@@ -897,10 +927,16 @@ const selectedDataset = computed(
 );
 // A clone keeps the version its source pinned. Re-pinning to the dataset's head
 // would compare two runs over different rows and call the difference a result.
+// This is the pin key (a row version); `shownDatasetVersion` is what it reads as.
 const selectedDatasetVersion = computed(() =>
   cloneSource.value
     ? cloneSource.value.datasetVersion
     : (selectedDataset.value?.globalVersion ?? 0),
+);
+const shownDatasetVersion = computed(() =>
+  cloneSource.value
+    ? cloneSource.value.datasetWriteVersion
+    : (selectedDataset.value?.writeVersion ?? 0),
 );
 
 // preview() validates the entire create body, so it can only run once the task
@@ -915,7 +951,7 @@ const previewReady = computed(() => {
   return !!providerId.value && !!String(userPrompt.value ?? "").trim();
 });
 const datasetLabel = computed(() =>
-  selectedDataset.value ? `${selectedDataset.value.name} @ v${selectedDatasetVersion.value}` : "",
+  selectedDataset.value ? `${selectedDataset.value.name} @ v${shownDatasetVersion.value}` : "",
 );
 
 const datasetOptions = computed(() =>
@@ -960,6 +996,13 @@ const scorerOptions = computed(() =>
 );
 
 const scorerApplicability = computed(() => preview.value?.applicability?.scorerApplicability ?? []);
+
+/** Coverage lines name the scorer the user picked, not its entity id. A
+ *  scorer missing from the loaded list falls back to the id so the line still
+ *  says which one it is. */
+function scorerName(id: string): string {
+  return scorers.value.find((scorer) => entityId(scorer) === id)?.name ?? id;
+}
 
 /** First page of the selected dataset; source toggles filter it without refetching. */
 const datasetRows = ref<LlmDatasetItem[]>([]);
@@ -1153,6 +1196,7 @@ function previewKey(payload: ExperimentCreatePayload): string {
 
 async function onSubmit(values: ExperimentForm) {
   if (sendingConfirmed.value) return;
+  if (!(await providersAnswer(values))) return;
   // The server pins scorer versions itself; reusing the preview's pins when
   // one is in hand just closes the gap if a version ships mid-edit.
   const payload = buildPayload(values);
@@ -1170,19 +1214,58 @@ async function onSubmit(values: ExperimentForm) {
   await send(body);
 }
 
+/** Last provider test before Create & run; the footer shows its failure. */
+const providerFailure = ref<ProviderCheckFailure | null>(null);
+// A different provider or judge set makes the last result about another run.
+watch([providerId, scorerIds, taskType], () => (providerFailure.value = null));
+
+/** Sends Test Connection's request for every provider the run calls. Nothing
+ *  is created when one does not answer, and the form stays open with why. */
+async function providersAnswer(values: ExperimentForm): Promise<boolean> {
+  providerFailure.value = null;
+  const ids = runProviderIds({
+    taskType: values.taskType,
+    providerId: values.providerId,
+    scorerIds: values.scorerIds ?? [],
+    scorers: scorers.value,
+  });
+  if (!ids.length || !orgId.value) return true;
+  let known: Provider[];
+  let listLoaded = true;
+  try {
+    // Unfiltered and fresh: a judge provider need not be in the chat list.
+    known = await onlineEvalsService.providers.list(orgId.value);
+  } catch {
+    known = providers.value;
+    listLoaded = false;
+  }
+  providerFailure.value = await checkRunProviders(
+    ids,
+    known,
+    (payload, id) => onlineEvalsService.providers.testConfig(orgId.value, payload, id),
+    values.taskType === "remote" ? null : values.providerId,
+    listLoaded,
+  );
+  return providerFailure.value === null;
+}
+
 async function send(body: ExperimentCreatePayload) {
   try {
     const createdId = cloning.value
       ? await submitClone(body)
       : (await createExperimentWrite.mutateAsync(body)).experiment.id;
     idempotencyKey.value = nextIdempotencyKey();
-    allowLeave = true;
     toast({
       variant: "success",
       message: cloning.value
         ? t("aiObservability.experiments.cloneSuccess")
         : t("aiObservability.experiments.createSuccess"),
     });
+    if (leaveSave) {
+      leaveSave.saved = true;
+      return;
+    }
+    experimentDraft.markSaved();
     router.push(aiExperimentsRoute(orgId.value, { selectedId: createdId }));
   } catch (error: any) {
     // 412 = over the cost warning threshold. Nothing was stored, so the
@@ -1253,21 +1336,50 @@ onBeforeUnmount(() => runPreviewAfterTyping.cancel());
 watch(datasetId, loadDatasetRows, { immediate: true });
 watch([promptId, promptSelectionMode, promptLabel, promptVersion], resolvePromptSelection);
 
-onBeforeRouteLeave((to, _from, next) => {
-  if (allowLeave || !isDirty.value) {
-    next();
-    return;
-  }
-  // Cancel and ask in a dialog — browsers suppress confirm() during navigation.
-  next(false);
-  const destination = to.fullPath;
-  leaveDialog.onConfirm = () => {
-    leaveDialog.show = false;
-    allowLeave = true;
-    router.push(destination);
-  };
-  leaveDialog.show = true;
+const experimentDraft = useEditorDraft<ExperimentForm>({
+  kind: "experiment",
+  entityLabel: () => t("common.editorDraft.entities.experiment"),
+  // A clone draft is keyed by its source run, so its dot lands on that run's Clone action.
+  entityId: () => cloneOfId.value || null,
+  snapshot: () => ({ ...formValues.value }),
+  apply: async (data) => {
+    draftOverrides =
+      data.taskType === "prompt_ref" ? { model: data.model, temperature: data.temperature } : null;
+    for (const [field, value] of Object.entries(data)) {
+      form.setFieldValue(field as keyof ExperimentForm, value as never);
+    }
+    await nextTick();
+    if (!resolvingPrompt.value) draftOverrides = null;
+  },
+  base: () => (cloning.value ? cloneDefinition(cloneSource.value) : undefined),
+  hasChanges: () => isDirty.value,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
 });
+
+// Only what a clone copies is hashed; status and progress change while the source runs.
+function cloneDefinition(source: LlmExperiment | null) {
+  if (!source) return null;
+  return {
+    id: source.id,
+    name: source.name,
+    description: source.description,
+    datasetId: source.datasetId,
+    datasetVersion: source.datasetVersion,
+    datasetFilter: source.datasetFilter,
+    task: source.task,
+    scorers: source.scorers,
+    trialCount: source.trialCount,
+  };
+}
 
 onMounted(async () => {
   if (!orgId.value) return;
@@ -1284,15 +1396,16 @@ onMounted(async () => {
   // Registry reads are best-effort until their task type is selected.
   await Promise.all([loadRemoteTasks(), loadPrompts()]);
   providers.value = chatProviders(providers.value);
-  if (cloning.value) await loadCloneSource();
+  if (cloning.value && !(await loadCloneSource())) return;
   const preselected = providers.value.find((p) => p.isDefault ?? p.is_default);
   if (preselected && !providerId.value) form.setFieldValue("providerId", preselected.id);
   if (previewReady.value) runPreview();
+  await experimentDraft.start();
 });
 
 // Seeded field by field rather than through defaultValues: the source is only
 // in hand after a request, and the form is already mounted by then.
-async function loadCloneSource() {
+async function loadCloneSource(): Promise<boolean> {
   let source: LlmExperiment;
   try {
     // Smallest sample the server accepts, not none: only the definition is read
@@ -1304,7 +1417,7 @@ async function loadCloneSource() {
       message:
         raw(error?.response?.data?.message) || t("aiObservability.experiments.cloneLoadError"),
     });
-    return;
+    return false;
   }
   cloneSource.value = source;
   const values = experimentFormFromExperiment(
@@ -1314,5 +1427,6 @@ async function loadCloneSource() {
   for (const [field, value] of Object.entries(values)) {
     form.setFieldValue(field as keyof ExperimentForm, value as never);
   }
+  return true;
 }
 </script>

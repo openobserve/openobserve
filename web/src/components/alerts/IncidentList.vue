@@ -207,7 +207,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #cell-alert_count="{ row }">
-          <OTag type="countChip" value="neutral">{{ row.alert_count }}</OTag>
+          <div
+            v-if="row.alert_groups?.length"
+            class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
+          >
+            <OTag
+              v-for="group in row.alert_groups.slice(0, 2)"
+              :key="group.alert_id"
+              type="countChip"
+              value="neutral"
+              class="min-w-0"
+              data-test="incident-alert-group-chip"
+            >
+              <!-- One element, so the tooltip anchors on the whole label, truncated name included. -->
+              <span class="flex min-w-0">
+                <span class="truncate">{{ group.alert_name }}</span>
+                <span class="shrink-0">&nbsp;×{{ group.count }}</span>
+              </span>
+              <OTooltip
+                :delay="300"
+                :content="
+                  t(
+                    'alerts.incidents.alertGroupTooltip',
+                    { name: group.alert_name, count: group.count },
+                    group.count,
+                  )
+                "
+              />
+            </OTag>
+            <OTag
+              v-if="row.alert_groups.length > 2"
+              type="countChip"
+              value="neutral"
+              class="shrink-0"
+              data-test="incident-alert-group-more"
+            >
+              {{ t("alerts.incidents.moreAlertGroups", { count: row.alert_groups.length - 2 }) }}
+              <OTooltip :delay="300" :max-width="'28rem'">
+                <template #content>
+                  <div
+                    class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1"
+                    data-test="incident-alert-group-list"
+                  >
+                    <template v-for="group in row.alert_groups.slice(2)" :key="group.alert_id">
+                      <span class="truncate">{{ group.alert_name }}</span>
+                      <span class="text-right tabular-nums">×{{ group.count }}</span>
+                    </template>
+                  </div>
+                </template>
+              </OTooltip>
+            </OTag>
+          </div>
+          <OTag v-else type="countChip" value="neutral">{{ row.alert_count }}</OTag>
         </template>
         <template #cell-last_alert_at="{ row }">
           <OTimeCell
@@ -314,8 +365,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { useQuery } from "@tanstack/vue-query";
-import { incidentsQuery } from "@/services/incidents.queries";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { incidentsQuery, updateIncidentStatusMutation } from "@/services/incidents.queries";
+import { incidentRefusalToast, incidentStatusToast } from "@/utils/alerts/ackState";
+import type { AckAlertResponse, UnackAlertResponse } from "@/ts/interfaces/alert";
 import {
   defineComponent,
   ref,
@@ -330,7 +383,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
-import incidentsService, { type Incident } from "@/services/incidents";
+import { type Incident } from "@/services/incidents";
 import IncidentAiAnalysisCell from "@/components/alerts/IncidentAiAnalysisCell.vue";
 import { isLiveRca } from "@/utils/incidents/rcaCell";
 import { useListViewState } from "@/composables/useListViewState";
@@ -536,7 +589,7 @@ export default defineComponent({
         accessorKey: "group_values",
         resizable: true,
         hideable: true,
-        size: 500,
+        size: 320,
         meta: { align: "left" },
       },
       {
@@ -545,8 +598,8 @@ export default defineComponent({
         accessorKey: "alert_count",
         resizable: true,
         hideable: true,
-        size: 80,
-        meta: { align: "right" },
+        size: 260,
+        meta: { align: "left" },
       },
       {
         id: "last_alert_at",
@@ -771,7 +824,6 @@ export default defineComponent({
       { immediate: true },
     );
     watch(incidentsList.error, (error: any) => {
-      // The grouped access toast already reports a 403; a second red toast adds nothing.
       if (!error || forbidden.value) return;
       toast({ variant: "error", message: t("alerts.incidents.errorLoading") });
       console.error("Failed to load incidents:", error);
@@ -828,25 +880,41 @@ export default defineComponent({
       filterByStatus("active");
     };
 
+    // The mutation drops the alert, incident and on-call reads the one ack wrote.
+    const statusWrite = useMutation(() =>
+      updateIncidentStatusMutation(store.state.selectedOrganization.identifier),
+    );
     const updateStatus = async (
       incident: Incident,
       newStatus: "open" | "acknowledged" | "resolved",
     ) => {
       try {
-        const org = store.state.selectedOrganization.identifier;
-        await incidentsService.updateStatus(org, incident.id, newStatus);
-        toast({
-          variant: "success",
-          message: t("alerts.incidents.statusUpdated"),
+        const res = await statusWrite.mutateAsync({
+          id: incident.id,
+          status: newStatus,
+          from: incident.status,
         });
+        // Only the one ack's routes answer with what they did.
+        const { ack } = res as { ack?: AckAlertResponse | UnackAlertResponse };
+        toast(
+          incidentStatusToast(
+            newStatus,
+            ack,
+            incident.title || incident.id,
+            store.state.userInfo?.email,
+            t,
+          ) ?? { variant: "success", message: t("alerts.incidents.statusUpdated") },
+        );
         // Post-write reload: must reach the server.
         loadIncidents(true);
         store.dispatch("incidents/setShouldRefresh", true);
       } catch (error: any) {
-        toast({
-          variant: "error",
-          message: t("alerts.incidents.statusUpdateFailed"),
-        });
+        toast(
+          incidentRefusalToast(error, newStatus, t) ?? {
+            variant: "error",
+            message: t("alerts.incidents.statusUpdateFailed"),
+          },
+        );
         console.error("Failed to update incident status:", error);
       }
     };
@@ -863,11 +931,27 @@ export default defineComponent({
       updateStatus(incident, "acknowledged");
     };
 
-    const resolveIncident = (incident: Incident) => {
+    const resolveIncident = async (incident: Incident) => {
+      const ok = await confirm({
+        title: t("alerts.incidents.resolveConfirmTitle"),
+        message: t("alerts.incidents.resolveConfirmMessage"),
+        confirmLabel: t("alerts.incidents.resolve"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
       updateStatus(incident, "resolved");
     };
 
-    const reopenIncident = (incident: Incident) => {
+    const reopenIncident = async (incident: Incident) => {
+      const ok = await confirm({
+        title: t("alerts.incidents.reopenConfirmTitle"),
+        message: t("alerts.incidents.reopenConfirmMessage"),
+        confirmLabel: t("alerts.incidents.reopen"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
       updateStatus(incident, "open");
     };
 

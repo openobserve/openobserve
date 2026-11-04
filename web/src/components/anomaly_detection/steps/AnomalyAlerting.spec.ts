@@ -104,6 +104,19 @@ describe("AnomalyAlerting - destinations", () => {
     const selectEl = w.find('[data-test="anomaly-destination"]');
     expect(selectEl.exists()).toBe(true);
   });
+
+  it("leaves Jira destinations out of the options", async () => {
+    const w = await mountComp({
+      destinations: [...makeDestinations(), { name: "jira-ops", destination_type_name: "jira" }],
+    });
+    const select = w
+      .findAllComponents({ name: "OSelect" })
+      .find((c) => c.attributes("data-test") === "anomaly-destination");
+    expect(select?.props("options").map((d: { name: string }) => d.name)).toEqual([
+      "slack-dest",
+      "pagerduty-dest",
+    ]);
+  });
 });
 
 describe("AnomalyAlerting - emits", () => {
@@ -170,5 +183,16 @@ describe("AnomalyAlerting - direction and window share", () => {
     expect(w.find('[data-test="anomaly-window-share-error"]').text()).toBe(
       t("alerts.anomaly.windowBucketsRange"),
     );
+  });
+
+  it("names the notifications switch after its row label and state", async () => {
+    const w = await mountComp({ config: makeConfig({ alert_enabled: true }) });
+    const btn = w.find('[role="switch"]');
+    const name = btn
+      .attributes("aria-labelledby")!
+      .split(" ")
+      .map((id) => w.find(`#${id}`).text())
+      .join(" ");
+    expect(name).toBe("Notifications Enabled");
   });
 });

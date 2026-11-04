@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :back="{
-      label: t('modelPricing.header'),
+      label: backToGaps ? t('modelPricing.unpriced.title') : t('modelPricing.header'),
       onClick: goBack,
       dataTest: 'model-pricing-editor-back-btn',
     }"
@@ -783,6 +783,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="settleOtherModels(true)"
       @update:cancel="settleOtherModels(false)"
     />
+    <EditorDraftDialogs :draft="pricingDraft" />
   </OPageLayout>
 </template>
 
@@ -816,6 +817,8 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatUtcWindowsInTz } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
 import {
   findAmbiguousTiers,
   findUnreachableTiers,
@@ -876,7 +879,17 @@ const headerTitle = computed(() =>
   isEdit.value ? t("modelPricing.editTitle") : t("modelPricing.newTitle"),
 );
 
-const model = ref<any>(createEmptyModel());
+/** A new model can open prefilled through `?name=&match_pattern=`, as Pricing gaps' Create price does. */
+function prefilledNewModel() {
+  const empty = createEmptyModel();
+  if (route.query.id) return empty;
+  const { name, match_pattern } = route.query;
+  if (typeof name === "string") empty.name = name;
+  if (typeof match_pattern === "string") empty.match_pattern = match_pattern;
+  return empty;
+}
+
+const model = ref<any>(prefilledNewModel());
 
 // Dynamic defaults (edit-prefill projects the working model) → a typed computed.
 // `model.value` holds the API-shaped record (per-token price MAP); the form holds
@@ -1414,7 +1427,22 @@ function validateUsageKey(key: string): string | null {
   return null;
 }
 
+// Pricing gaps' Create price sets `from=gaps&stream=`, so Back and Save return to that stream's gaps.
+const backToGaps = computed(() => route.query.from === "gaps");
+
 function goBack() {
+  if (backToGaps.value) {
+    router.push({
+      name: "modelPricingGaps",
+      query: {
+        org_identifier: orgIdentifier.value,
+        stream: route.query.stream as string,
+        start_time: route.query.start_time,
+        end_time: route.query.end_time,
+      },
+    });
+    return;
+  }
   router.push({
     name: "modelPricing",
     query: { org_identifier: orgIdentifier.value },
@@ -1535,11 +1563,56 @@ async function save(value?: ModelPricingForm) {
         message: t("modelPricing.modelPricingSaved"),
       });
     }
+    if (leaveSave) {
+      leaveSave.saved = true;
+      return;
+    }
+    pricingDraft.markSaved();
     goBack();
   } catch (e: any) {
     notifyError(t("modelPricing.errSave"), e);
   }
 }
+
+const formValues = form.useStore((s): ModelPricingForm => s.values);
+// Set while the leave dialog's Save runs, so a successful save does not leave the editor itself.
+let leaveSave: { saved: boolean } | null = null;
+// The model as loaded in edit mode, or null once a load found it gone.
+const serverModel = ref<Record<string, unknown> | null>(null);
+
+// Only what this editor writes: `enabled` is toggled from the list and timestamps move on every save.
+type ComparableSource = Partial<
+  Record<"name" | "match_pattern" | "tiers" | "sort_order" | "valid_from", unknown>
+> | null;
+
+const comparableModel = (m: ComparableSource) => ({
+  name: m?.name ?? "",
+  match_pattern: m?.match_pattern ?? "",
+  tiers: m?.tiers ?? [],
+  sort_order: m?.sort_order ?? 0,
+  valid_from: m?.valid_from ?? null,
+});
+
+const pricingDraft = useEditorDraft<ModelPricingForm>({
+  kind: "model_pricing",
+  entityLabel: () => t("common.editorDraft.entities.model_pricing"),
+  entityId: () => (isEdit.value ? String(route.query.id) : null),
+  newVariant: () =>
+    route.query.id && route.query.duplicate === "true" ? `duplicate:${route.query.id}` : null,
+  snapshot: () => JSON.parse(JSON.stringify(formValues.value)) as ModelPricingForm,
+  apply: (data) => form.reset(data),
+  base: () => (route.query.id ? serverModel.value : null),
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+});
 
 onBeforeMount(async () => {
   const id = route.query.id as string | undefined;
@@ -1562,6 +1635,7 @@ onBeforeMount(async () => {
       const res = await modelPricingService.get(orgIdentifier.value, id);
       const found = res.data;
       if (found) {
+        serverModel.value = comparableModel(found);
         model.value = JSON.parse(JSON.stringify(found));
         if (isDuplicate) {
           model.value.id = null;
@@ -1577,7 +1651,10 @@ onBeforeMount(async () => {
       }
     } catch (e: any) {
       notifyError(t("modelPricing.errLoadModel"), e);
+      // A model that is gone still opens, so its stale draft is dropped; any other failure keeps it.
+      if (e?.response?.status !== 404) return;
     }
   }
+  await pricingDraft.start();
 });
 </script>

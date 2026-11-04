@@ -35,6 +35,7 @@ import {
 import { useI18nTyped } from "@/types/i18n";
 import type { InstallationView } from "@/types/slack";
 import SlackLinkedPeople from "./SlackLinkedPeople.vue";
+import SlackOncallUnlinked from "./SlackOncallUnlinked.vue";
 import { makeLinkingSchema, type LinkingForm } from "./SlackSettings.schema";
 
 const props = defineProps<{ installation: InstallationView }>();
@@ -64,6 +65,7 @@ const summary = computed(() => {
     ? t("slackApp.linking.mappedSummary", { domains: domainsText.value })
     : t("slackApp.linking.manualSummary", { domains: domainsText.value });
 });
+const noDomains = computed(() => !!view.value?.enabled && !view.value.domains.length);
 const autoCount = computed(() =>
   view.value ? view.value.counts.email + view.value.counts.admin_bulk : 0,
 );
@@ -158,7 +160,24 @@ const runLinkAll = async (): Promise<void> => {
               }}
             </span>
             <template v-else>
-              <span class="text-text-secondary text-sm" data-test="slack-linking-summary">
+              <span
+                v-if="noDomains"
+                class="text-status-warning-text text-sm"
+                data-test="slack-linking-no-domains"
+              >
+                {{ t("slackApp.linking.noDomains") }}
+                <template v-if="view.counts.skipped_domain > 0">
+                  ·
+                  {{
+                    t(
+                      "slackApp.linking.skippedDomain",
+                      { count: view.counts.skipped_domain },
+                      view.counts.skipped_domain,
+                    )
+                  }}
+                </template>
+              </span>
+              <span v-else class="text-text-secondary text-sm" data-test="slack-linking-summary">
                 {{ summary }}
               </span>
               <span class="text-text-secondary text-xs" data-test="slack-linking-counts">
@@ -248,6 +267,8 @@ const runLinkAll = async (): Promise<void> => {
         <OTag variant="success-soft" :label="t('slackApp.linking.enabled')" />
       </div>
     </OCard>
+
+    <SlackOncallUnlinked :installation="installation" />
 
     <SlackLinkedPeople v-model:open="peopleOpen" :installation-id="installation.id" />
   </section>

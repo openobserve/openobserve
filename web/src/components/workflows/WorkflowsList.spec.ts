@@ -55,6 +55,7 @@ vi.mock("@/services/workflows", async (importOriginal) => {
       listWorkflows: vi.fn(),
       deleteWorkflow: vi.fn(),
       enableWorkflow: vi.fn(),
+      getHttpTrigger: vi.fn(),
     },
   });
 });
@@ -77,12 +78,40 @@ vi.mock("@/components/workflows/WorkflowView.vue", () => ({
   },
 }));
 
+vi.mock("@/components/workflows/WorkflowHttpEndpointPanel.vue", () => ({
+  default: {
+    name: "WorkflowHttpEndpointPanel",
+    props: [
+      "open",
+      "workflowId",
+      "workflowName",
+      "kind",
+      "isDraftOnly",
+      "workflowEnabled",
+      "context",
+    ],
+    emits: ["update:open"],
+    template: '<div data-test="http-panel-stub" :data-open="String(open)" />',
+  },
+}));
+
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn(async () => true),
+  copyPendingText: vi.fn(async (text: Promise<string>) => {
+    await text;
+    return true;
+  }),
+}));
+
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import WorkflowsList from "./WorkflowsList.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import workflowService from "@/services/workflows";
+import { queryClient } from "@/composables/query/queryClient";
+import { copyPendingText } from "@/utils/clipboard";
 
 const t = (k: string, v?: any) => i18n.global.t(k, v ?? {});
 const listWorkflows = workflowService.listWorkflows as any;
@@ -174,7 +203,7 @@ const globalStubs = {
   },
   ConfirmDialog: {
     name: "ConfirmDialog",
-    props: ["modelValue", "title", "message"],
+    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
     emits: ["update:ok", "update:cancel", "update:modelValue"],
     template: '<div data-test="confirm-dialog-stub" :data-open="String(modelValue)" />',
   },
@@ -465,6 +494,14 @@ describe("WorkflowsList", () => {
           .props("columns")
           .map((c: any) => c.id),
       ).toEqual(["#", "name", "description", "trigger", "updated_at", "actions"]);
+    });
+
+    // Measured in the built UI: the Incident Event tag 94 + gap 4 + HTTP tag 63 + 16 cell padding.
+    it("sizes Trigger for an Incident Event tag and the HTTP tag side by side", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      const trigger = (table(wrapper).props("columns") as any[]).find((c) => c.id === "trigger");
+      expect(trigger.size).toBeGreaterThanOrEqual(177);
     });
 
     it("marks the actions column as an action column", async () => {
@@ -888,8 +925,34 @@ describe("WorkflowsList", () => {
 
       expect(confirm(wrapper).props("modelValue")).toBe(true);
       expect(confirm(wrapper).props("title")).toBe(t("workflow.deleteTitle"));
-      expect(confirm(wrapper).props("message")).toBe(t("workflow.deleteMessage"));
+      expect(confirm(wrapper).props("messageKeypath")).toBe("workflow.deleteMessage");
+      expect(confirm(wrapper).props("messageName")).toBe("workflow-1");
+      expect(confirm(wrapper).props("okVariant")).toBe("destructive");
       expect(deleteWorkflow).not.toHaveBeenCalled();
+    });
+
+    it("names the workflow in bold in the real ConfirmDialog", async () => {
+      const ODialogStub = {
+        name: "ODialog",
+        props: ["open", "primaryButtonLabel", "primaryButtonVariant"],
+        template: '<div v-if="open" data-test="o-dialog-stub"><slot /></div>',
+      };
+      wrapper = mount(WorkflowsList, {
+        global: {
+          plugins: [i18n, store],
+          stubs: { ...globalStubs, ConfirmDialog, ODialog: ODialogStub },
+        },
+      });
+      await flushPromises();
+      await openDelete(wrapper, "workflow-2");
+
+      const dialog = wrapper.findComponent(ODialogStub);
+      const name = dialog.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe("workflow-2");
+      expect(name.classes()).toContain("font-semibold");
+      expect(dialog.text()).toContain("Are you sure you want to delete the workflow-2 workflow?");
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      expect(dialog.props("primaryButtonLabel")).toBe(t("confirmDialog.ok"));
     });
 
     it("deletes on confirm, toasts and refetches", async () => {
@@ -1159,5 +1222,98 @@ describe("WorkflowsList", () => {
       expect(saved.filterQuery).toBe("abc");
       expect(saved.pageSize).toBe(100);
     });
+  });
+});
+
+describe("WorkflowsList HTTP endpoint", () => {
+  let wrapper: any = null;
+  const getHttpTrigger = (workflowService as any).getHttpTrigger;
+  const panel = (w: any) => w.findComponent({ name: "WorkflowHttpEndpointPanel" });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetListViewState();
+    queryClient.clear();
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: true };
+  });
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+  });
+
+  const load = async (list: any[]) => {
+    listWorkflows.mockResolvedValue({ data: list });
+    wrapper = mountList();
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("shows the HTTP tag on any kind with an endpoint", async () => {
+    const incident = {
+      id: "t1",
+      data: { node_type: "workflow_trigger", trigger_kind: "incident_event" },
+    };
+    const w = await load([
+      makeWorkflow(1, { http_endpoint_enabled: true }),
+      makeWorkflow(2, { http_endpoint_enabled: true, nodes: [incident] }),
+      makeWorkflow(3, { http_endpoint_enabled: true, is_draft: true }),
+      makeWorkflow(4),
+    ]);
+    expect(w.findAll('[data-test="workflow-list-http-tag"]')).toHaveLength(3);
+  });
+
+  it("has no HTTP tab", async () => {
+    const w = await load([makeWorkflow(1, { http_endpoint_enabled: true })]);
+    expect(w.find('[data-test="workflow-list-tab-http_request"]').exists()).toBe(false);
+  });
+
+  it("HTTP endpoint… opens the panel on any row", async () => {
+    const w = await load([makeWorkflow(1), makeWorkflow(2, { is_draft: true, enabled: false })]);
+    await w.find('[data-test="workflow-list-workflow-2-http-endpoint"]').trigger("click");
+    expect(panel(w).props()).toMatchObject({
+      open: true,
+      workflowId: "wf-2",
+      workflowName: "workflow-2",
+      isDraftOnly: true,
+      workflowEnabled: false,
+      context: "list",
+    });
+  });
+
+  it("Copy endpoint URL fetches the http_trigger query and copies its url", async () => {
+    getHttpTrigger.mockResolvedValue({ configured: true, url: "https://o2/h/1" });
+    const w = await load([makeWorkflow(1, { http_endpoint_enabled: true }), makeWorkflow(2)]);
+    expect(w.find('[data-test="workflow-list-workflow-2-copy-endpoint"]').exists()).toBe(false);
+    await w.find('[data-test="workflow-list-workflow-1-copy-endpoint"]').trigger("click");
+    await flushPromises();
+    expect(getHttpTrigger).toHaveBeenCalledWith({ org_identifier: expect.any(String), id: "wf-1" });
+    await expect(vi.mocked(copyPendingText).mock.calls[0][0]).resolves.toBe("https://o2/h/1");
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: t("toastMessages.workflows.endpointUrlCopied") }),
+    );
+  });
+
+  it("Copy endpoint URL toasts an error when the clipboard refuses the write", async () => {
+    getHttpTrigger.mockResolvedValue({ configured: true, url: "https://o2/h/1" });
+    vi.mocked(copyPendingText).mockImplementationOnce(async (text) => {
+      await text;
+      return false;
+    });
+    const w = await load([makeWorkflow(1, { http_endpoint_enabled: true })]);
+    await w.find('[data-test="workflow-list-workflow-1-copy-endpoint"]').trigger("click");
+    await flushPromises();
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error", message: t("common.copyError") }),
+    );
+  });
+
+  it("shows no HTTP tag, HTTP endpoint item or Copy endpoint URL when hooks are off", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+    const w = await load([makeWorkflow(1, { http_endpoint_enabled: true })]);
+    expect(w.find('[data-test="workflow-list-http-tag"]').exists()).toBe(false);
+    expect(w.find('[data-test="workflow-list-workflow-1-http-endpoint"]').exists()).toBe(false);
+    expect(w.find('[data-test="workflow-list-workflow-1-copy-endpoint"]').exists()).toBe(false);
+    expect(panel(w).exists()).toBe(false);
   });
 });

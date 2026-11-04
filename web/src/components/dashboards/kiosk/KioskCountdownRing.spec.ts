@@ -68,4 +68,12 @@ describe("KioskCountdownRing", () => {
     expect(wrapper.attributes("aria-label")).toBe("Next refresh at 23:16:30");
     expect(wrapper.findComponent(OTooltip).props("content")).toBe("Next refresh at 23:16:30");
   });
+
+  it("draws a smaller ring at the sm size", () => {
+    const md = mount(KioskCountdownRing, { props: { tooltip: raw("t") } });
+    const sm = mount(KioskCountdownRing, { props: { tooltip: raw("t"), size: "sm" } });
+    expect(md.classes()).toContain("size-7.5");
+    expect(sm.classes()).toContain("size-5");
+    expect(sm.classes()).not.toContain("size-7.5");
+  });
 });

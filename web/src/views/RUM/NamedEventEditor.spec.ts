@@ -67,8 +67,10 @@ const settle = async (n = 4) => {
     await flushPromises();
   }
 };
+// Focus first, as typing does: the draft baseline is taken before the first edit lands.
 const setValue = async (dt: string, value: string) => {
   const el = input(dt)!;
+  el.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
   el.value = value;
   el.dispatchEvent(new Event("input", { bubbles: true }));
   await flushPromises();
@@ -125,6 +127,7 @@ describe("NamedEventEditor (AC-44)", () => {
   const created = () => api.bodies("createEvent").map((b) => b.name);
 
   beforeEach(() => {
+    localStorage.clear();
     api.reset();
     toastMock.mockReset();
     resetNamedEvents();
@@ -261,22 +264,23 @@ describe("NamedEventEditor (AC-44)", () => {
     expect(router.currentRoute.value.query).toEqual(SCOPE);
   });
 
-  it("leaving with unsaved changes asks first; Stay keeps the edits and Discard leaves", async () => {
+  it("leaving with unsaved changes asks first; closing the dialog stays and Discard leaves", async () => {
     await mountAt(PA_ROUTES.eventNew);
     await setValue("rum-analytics-named-events-name", "Half done");
     q("rum-analytics-event-editor-cancel-btn")!.click();
     await settle();
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.eventNew);
-    const dialog = () => q("rum-analytics-event-editor-discard-dialog");
+    const dialog = () => q("editor-draft-leave-dialog");
     expect(dialog()?.textContent).toContain("unsaved changes");
-    dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-secondary-btn"]')!.click();
+    dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-close-btn"]')!.click();
     await settle();
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.eventNew);
     expect(input("rum-analytics-named-events-name")?.value).toBe("Half done");
-    await router.push({ name: PA_ROUTES.overview, query: SCOPE });
+    const navigation = router.push({ name: PA_ROUTES.overview, query: SCOPE });
     await settle();
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.eventNew);
-    dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-primary-btn"]')!.click();
+    dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-neutral-btn"]')!.click();
+    await navigation;
     await settle();
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.overview);
     expect(api.service.createEvent).not.toHaveBeenCalled();
@@ -424,7 +428,7 @@ describe("NamedEventEditor (AC-44)", () => {
     await settle();
     await router.push({ name: PA_ROUTES.overview, query: SCOPE });
     await settle();
-    expect(q("rum-analytics-event-editor-discard-dialog")).toBeNull();
+    expect(q("editor-draft-leave-dialog")).toBeNull();
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.overview);
     await router.push({ name: PA_ROUTES.eventNew, query: SCOPE });
     await settle();
@@ -437,7 +441,7 @@ describe("NamedEventEditor (AC-44)", () => {
     );
     await settle();
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.eventNew);
-    expect(q("rum-analytics-event-editor-discard-dialog")).toBeNull();
+    expect(q("editor-draft-leave-dialog")).toBeNull();
     expect(input("rum-analytics-named-events-name")?.value).toBe("Opened traces");
     expect(toastMock).not.toHaveBeenCalled();
     await setValue("rum-analytics-named-events-rule-0-value", "/web/traces");

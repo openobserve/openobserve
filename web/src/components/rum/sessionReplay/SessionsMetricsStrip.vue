@@ -79,6 +79,10 @@ const props = defineProps<{
   frustratedDelta?: number | null;
   /** Card whose segment filter is currently applied ("" when none). */
   activeCard: string;
+  /** The window totals are still loading, so the window-scoped tiles have no number yet. */
+  totalsPending?: boolean;
+  /** The page of sessions is still loading, so the page-scoped tiles have no number yet. */
+  pagePending?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -86,6 +90,9 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+// A count that is not in yet reads as zero, so pending tiles show a dash instead.
+const PENDING = "—";
 
 const rate = (count: number) =>
   props.total > 0 ? `${((count / props.total) * 100).toFixed(1)}%` : "";
@@ -126,7 +133,7 @@ const cards = computed(() => [
   {
     key: "sessions" as const,
     label: t("rum.sessions"),
-    value: props.total.toLocaleString(),
+    value: props.totalsPending ? PENDING : props.total.toLocaleString(),
     valueClass: "text-text-body",
     rate: "",
     ...deltaCaption(props.sessionsDeltaPct, t("rum.inTimeRange"), "%"),
@@ -135,40 +142,48 @@ const cards = computed(() => [
   {
     key: "errors" as const,
     label: t("rum.withErrors"),
-    value: props.errorSessions.toLocaleString(),
-    valueClass: props.errorSessions > 0 ? "text-severity-error-color" : "text-text-body",
-    rate: rate(props.errorSessions),
+    value: props.totalsPending ? PENDING : props.errorSessions.toLocaleString(),
+    valueClass:
+      !props.totalsPending && props.errorSessions > 0
+        ? "text-severity-error-color"
+        : "text-text-body",
+    rate: props.totalsPending ? "" : rate(props.errorSessions),
     ...deltaCaption(props.errorsDelta, t("rum.sessionsWithErrors")),
     selectable: true,
   },
   {
     key: "frustrated" as const,
     label: t("rum.frustrated"),
-    value: props.frustratedSessions.toLocaleString(),
-    valueClass: props.frustratedSessions > 0 ? "text-severity-warning-color" : "text-text-body",
-    rate: rate(props.frustratedSessions),
+    value: props.totalsPending ? PENDING : props.frustratedSessions.toLocaleString(),
+    valueClass:
+      !props.totalsPending && props.frustratedSessions > 0
+        ? "text-severity-warning-color"
+        : "text-text-body",
+    rate: props.totalsPending ? "" : rate(props.frustratedSessions),
     ...deltaCaption(props.frustratedDelta, t("rum.rageDeadClicks")),
     selectable: true,
   },
   {
     key: "duration" as const,
     label: t("rum.avgDuration"),
-    value: formatMs(props.avgDurationMs),
+    value: props.pagePending ? PENDING : formatMs(props.avgDurationMs),
     valueClass: "text-text-body",
     rate: "",
-    caption: t("rum.medianDuration", { duration: formatMs(props.medianDurationMs) }),
+    caption: t("rum.medianDuration", {
+      duration: props.pagePending ? PENDING : formatMs(props.medianDurationMs),
+    }),
     captionClass: "",
     selectable: false,
   },
   {
     key: "bounced" as const,
     label: t("rum.bounceRate"),
-    value: bounceRate.value,
+    value: props.pagePending ? PENDING : bounceRate.value,
     valueClass: "text-text-body",
     rate: "",
     caption: t("rum.ofTotal", {
-      count: props.bouncedSessions,
-      total: props.bounceBase ?? props.total,
+      count: props.pagePending ? PENDING : props.bouncedSessions,
+      total: props.pagePending ? PENDING : (props.bounceBase ?? props.total),
     }),
     captionClass: "",
     selectable: true,

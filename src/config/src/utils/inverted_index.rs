@@ -35,6 +35,7 @@ pub fn to_tantivy_name(from: &str) -> Option<String> {
         "logs" => StreamType::Logs,
         "metrics" => StreamType::Metrics,
         "traces" => StreamType::Traces,
+        "profiles" => StreamType::Profiles,
         "metadata" => StreamType::Metadata,
         _ => return None,
     };
@@ -88,6 +89,13 @@ mod tests {
                 ),
             ),
             (
+                "files/default/profiles/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                Some(
+                    "files/default/index/quickstart1_profiles/2024/02/16/16/7164299619311026293.ttv"
+                        .to_string(),
+                ),
+            ),
+            (
                 "files/default/metadata/quickstart1/2024/02/16/16/7164299619311026293.parquet",
                 Some(
                     "files/default/index/quickstart1_metadata/2024/02/16/16/7164299619311026293.ttv"
@@ -129,8 +137,7 @@ mod tests {
 
     #[test]
     fn test_convert_returns_none_for_unknown_stream_type() {
-        // service_graph / enrichment_tables / file_list are not handled by this
-        // converter — only logs/metrics/traces/metadata map to a tantivy index.
+        // only logs/metrics/traces/profiles/metadata map to a tantivy index
         let input = "files/default/service_graph/x/2024/02/16/16/1.parquet";
         assert_eq!(to_tantivy_name(input), None);
 

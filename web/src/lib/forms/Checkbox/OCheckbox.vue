@@ -159,9 +159,10 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       ]"
       @click="toggle"
     >
+      <!-- Clicks pass through the tick: unchecking removes it mid-click, and the label then re-clicks the box. -->
       <span
         v-if="checked === true"
-        class="text-checkbox-checked-fg flex size-full items-center justify-center"
+        class="text-checkbox-checked-fg pointer-events-none flex size-full items-center justify-center"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -179,7 +180,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       </span>
       <span
         v-else-if="checked === 'indeterminate'"
-        class="text-checkbox-checked-fg flex size-full items-center justify-center"
+        class="text-checkbox-checked-fg pointer-events-none flex size-full items-center justify-center"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"

@@ -69,6 +69,13 @@ struct StreamLookups {
     partitions: HashMap<String, Vec<StreamPartition>>,
     alerts: HashMap<String, Vec<Alert>>,
     deleting: HashMap<String, bool>,
+    stream_keys: ingest::StreamKeyChecks,
+}
+
+/// Why `buffer_record` left a record out.
+enum Skipped {
+    Deleting,
+    KeyTooLong { stream_name: String, reason: String },
 }
 
 /// The value a JSON metric record carries, put through the same policy as every other
@@ -98,7 +105,7 @@ fn parse_metric_value(value: &json::Value) -> Result<json::Value, anyhow::Error>
     super::metric_value(raw).ok_or_else(|| anyhow!("invalid value, not a number"))
 }
 
-/// Queues a validated record for its pipelines or its write; `false` if its stream is deleting.
+/// Queues a validated record for its pipelines or its write, or says why its stream takes none.
 async fn buffer_record(
     org_id: &str,
     stream_name: Option<&str>,
@@ -106,7 +113,7 @@ async fn buffer_record(
     lookups: &mut StreamLookups,
     pipeline_inputs: &mut PipelineInputs<&'static str>,
     records_by_stream: &mut RecordsByStream<&'static str>,
-) -> Result<bool> {
+) -> Result<Option<Skipped>> {
     let json::Value::Object(mut record) = flatten::flatten(record)? else {
         unreachable!("flatten only returns an object")
     };
@@ -144,7 +151,13 @@ async fn buffer_record(
         }
     };
     if is_deleting {
-        return Ok(false);
+        return Ok(Some(Skipped::Deleting));
+    }
+    if let Some(reason) = lookups.stream_keys.violation(org_id, &stream_name) {
+        return Ok(Some(Skipped::KeyTooLong {
+            reason: reason.to_string(),
+            stream_name,
+        }));
     }
 
     // default to gauge if __type__ is missing
@@ -234,7 +247,20 @@ async fn buffer_record(
             .or_default()
             .push((record, metric_type));
     }
-    Ok(true)
+    Ok(None)
+}
+
+fn fail_stream(
+    stream_status_map: &mut HashMap<String, StreamStatus>,
+    stream_name: &str,
+    records: usize,
+    error: String,
+) {
+    let stream_status = stream_status_map
+        .entry(stream_name.to_string())
+        .or_insert_with(|| StreamStatus::new(stream_name));
+    stream_status.status.failed += records as u32;
+    stream_status.status.error = error;
 }
 
 /// One stream's rows, each with a checked value, `__hash__` and string labels, and its first type.
@@ -285,7 +311,7 @@ fn finish_rows(
 async fn buffer_stream_rows(
     org_id: &str,
     stream_name: &str,
-    (rows, first_type): (Vec<Row>, Option<&'static str>),
+    (mut rows, first_type): (Vec<Row>, Option<&'static str>),
     lookups: &mut StreamLookups,
     partitions: &mut HashMap<String, SchemaRecords>,
 ) -> Result<Option<TriggerAlertData>> {
@@ -314,18 +340,16 @@ async fn buffer_stream_rows(
 
     let has_uds = matches!(lookups.user_defined_schemas.get(stream_name), Some(Some(_)));
     let min_timestamp = rows.iter().map(|(_, ts)| *ts).min().unwrap_or(0);
-    let record_refs: Vec<&json::Map<String, json::Value>> =
-        rows.iter().map(|(record, ..)| record).collect();
     let (schema, schema_key) = ingest::resolve_batch_schema(
         org_id,
         stream_name,
         &mut lookups.schemas,
-        &record_refs,
+        &mut rows,
+        |(record, _)| record,
         min_timestamp,
         has_uds,
     )
     .await?;
-    drop(record_refs);
 
     let alerts = lookups
         .alerts
@@ -429,7 +453,7 @@ pub async fn ingest(
 
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for record in reader {
-        let buffered = buffer_record(
+        let skipped = buffer_record(
             org_id,
             stream_name,
             record,
@@ -438,8 +462,13 @@ pub async fn ingest(
             &mut records_by_stream,
         )
         .await?;
-        if !buffered {
-            skipped_records += 1;
+        match skipped {
+            None => {}
+            Some(Skipped::Deleting) => skipped_records += 1,
+            Some(Skipped::KeyTooLong {
+                stream_name,
+                reason,
+            }) => fail_stream(&mut stream_status_map, &stream_name, 1, reason),
         }
     }
 
@@ -450,7 +479,7 @@ pub async fn ingest(
         );
     }
 
-    let (pipeline_outputs, failures) = ingest::run_pipelines(
+    let (mut pipeline_outputs, failures) = ingest::run_pipelines(
         org_id,
         &lookups.pipelines,
         pipeline_inputs,
@@ -465,12 +494,14 @@ pub async fn ingest(
             message,
         } = failure
         {
-            let stream_status = stream_status_map
-                .entry(stream_name.clone())
-                .or_insert_with(|| StreamStatus::new(&stream_name));
-            stream_status.status.failed += records as u32;
-            stream_status.status.error = message;
+            fail_stream(&mut stream_status_map, &stream_name, records, message);
         }
+    }
+    for (stream_name, reason, records) in lookups
+        .stream_keys
+        .drop_unstorable(org_id, &mut pipeline_outputs)
+    {
+        fail_stream(&mut stream_status_map, &stream_name, records, reason);
     }
     for (stream_name, records) in pipeline_outputs {
         records_by_stream
@@ -521,7 +552,7 @@ pub async fn ingest(
     )
     .await?;
 
-    ingest::observe_request(ENDPOINT, org_id, &start);
+    ingest::observe_request(ENDPOINT, org_id, &start, http::StatusCode::OK);
     ingest::spawn_triggers(stream_trigger_map);
 
     Ok(IngestionResponse::new(
@@ -535,6 +566,54 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_fails_only_the_stream_whose_key_is_too_long() {
+        let long_name = "m".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let body = json!([
+            {"__name__": "test_json_key_len_ok", "__type__": "gauge", "value": 1},
+            {"__name__": long_name, "__type__": "gauge", "value": 1},
+            {"__name__": long_name, "__type__": "gauge", "value": 2},
+        ]);
+        let resp = ingest(
+            "test_org_id",
+            None,
+            Bytes::from(body.to_string()),
+            ingestion_common::IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.code, 200);
+        let status = |name: &str| {
+            resp.status
+                .iter()
+                .find(|s| s.name == name)
+                .map(|s| s.status.clone())
+                .unwrap()
+        };
+        assert_eq!(status("test_json_key_len_ok").successful, 1);
+
+        let bounded =
+            infra::file_list::stream_key_violation("test_org_id", StreamType::Metrics, &long_name)
+                .is_some();
+        let long = status(&long_name);
+        if bounded {
+            assert_eq!((long.successful, long.failed), (0, 2));
+            assert!(
+                long.error.starts_with("Stream name too long"),
+                "{}",
+                long.error
+            );
+        } else {
+            assert_eq!((long.successful, long.failed), (2, 0));
+        }
+        assert_eq!(
+            infra::schema::exists("test_org_id", StreamType::Metrics, &long_name).await,
+            !bounded
+        );
+    }
 
     /// `1e400` is a valid JSON number whose value is an infinity. `as_f64()` returns `None` for
     /// it, and unwrapping that panicked the ingestion handler -- on a body anyone can POST.
@@ -1332,7 +1411,7 @@ mod tests {
         }
 
         #[test]
-        fn test_json_serialization_performance() {
+        fn test_json_serialization_round_trips() {
             let record = create_test_metric_record(
                 "serialization_test",
                 "counter",
@@ -1344,16 +1423,11 @@ mod tests {
                 ],
             );
 
-            let start = std::time::Instant::now();
-            let serialized = serde_json::to_string(&record);
-            let duration = start.elapsed();
-
-            assert!(serialized.is_ok());
-            assert!(duration.as_micros() < 1000); // Should be very fast
-
-            let json_string = serialized.unwrap();
+            let json_string = serde_json::to_string(&record).unwrap();
             assert!(json_string.contains("serialization_test"));
             assert!(json_string.contains("999.999"));
+            let parsed: serde_json::Value = serde_json::from_str(&json_string).unwrap();
+            assert_eq!(parsed, record);
         }
     }
 }

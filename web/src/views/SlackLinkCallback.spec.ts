@@ -22,12 +22,14 @@ import { leaveFor, recallLinkRequest, rememberLinkRequest } from "@/utils/slackL
 import { makeSlackStore, ok } from "@/test/unit/helpers/slack";
 import { createStore } from "vuex";
 import organizations from "@/services/organizations";
+import { ensureBrowserRum } from "@/utils/rum/ensureBrowserRum";
 import SlackLinkCallback from "./SlackLinkCallback.vue";
 
 vi.mock("@/services/slack", () => ({
   default: { confirmLinkRequest: vi.fn(), resendLinkRequest: vi.fn() },
 }));
 vi.mock("@/services/organizations", () => ({ default: { list: vi.fn() } }));
+vi.mock("@/utils/rum/ensureBrowserRum", () => ({ ensureBrowserRum: vi.fn() }));
 vi.mock("@/utils/slackLink", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/slackLink")>()),
   leaveFor: vi.fn(),
@@ -88,6 +90,11 @@ afterEach(() => {
 });
 
 describe("SlackLinkCallback", () => {
+  it("starts RUM from the full config of the org this page resolved", async () => {
+    await mountCallback();
+    expect(ensureBrowserRum).toHaveBeenCalledWith("acme");
+  });
+
   it("confirms the code, shows Linked as, then strips the query and forgets the request", async () => {
     rememberLinkRequest("req-1.sig", "#help");
     const replaceState = vi.spyOn(window.history, "replaceState");

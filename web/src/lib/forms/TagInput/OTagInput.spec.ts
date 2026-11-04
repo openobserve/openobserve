@@ -325,4 +325,18 @@ describe("OTagInput", () => {
       expect(wrapper.find('[data-test="tag-input-wrapper"]').exists()).toBe(true);
     });
   });
+
+  it("routes aria-* attrs to the real control, not the wrapper", () => {
+    wrapper = mount(OTagInput, {
+      props: { modelValue: [] },
+      attrs: { "aria-label": "Name", "aria-labelledby": "lbl", "aria-describedby": "desc" },
+    });
+    const control = wrapper.find('[data-test="tag-input-field"]');
+    expect(control.attributes("aria-label")).toBe("Name");
+    expect(control.attributes("aria-labelledby")).toBe("lbl");
+    expect(control.attributes("aria-describedby")).toBe("desc");
+    expect(wrapper.element.getAttribute("aria-label")).toBeNull();
+    expect(wrapper.element.getAttribute("aria-labelledby")).toBeNull();
+    expect(wrapper.element.getAttribute("aria-describedby")).toBeNull();
+  });
 });

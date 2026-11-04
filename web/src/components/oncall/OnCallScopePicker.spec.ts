@@ -24,7 +24,7 @@ import i18n from "@/locales";
 const stubs = {
   OSelect: {
     name: "OSelect",
-    props: ["modelValue", "options"],
+    props: ["modelValue", "options", "creatable"],
     template: `<div :data-test="$attrs['data-test']" :data-value="modelValue"><button
         v-for="option in options"
         :key="String(option.value)"
@@ -106,6 +106,31 @@ describe("OnCallScopePicker", () => {
       .map((node) => node.attributes("data-value"));
     expect(values).toEqual(["", "", ""]);
     expect(wrapper.find('[data-test="oncall-scope-picker-empty"]').exists()).toBe(true);
+  });
+
+  /// R10: the lists hold only what discovery has seen; Advanced takes any other value.
+  it("says its lists are what service discovery has seen and points to Advanced", () => {
+    expect(render().find('[data-test="oncall-scope-values-source"]').text()).toBe(
+      "These lists show the values service discovery has seen. To match any other value, use Advanced.",
+    );
+  });
+
+  // S12: a service discovery has not seen yet can still be typed, and says so.
+  it("takes a typed service and marks it as not seen yet", async () => {
+    const wrapper = render();
+    const service = wrapper
+      .findAllComponents({ name: "OSelect" })
+      .find((select) => select.attributes("data-test") === "oncall-scope-segment-service")!;
+    expect(service.props("creatable")).toBe(true);
+
+    service.vm.$emit("create", "inventory-service");
+    expect(lastEmit(wrapper)).toEqual({ service: "inventory-service" });
+
+    await wrapper.setProps({ modelValue: { service: "inventory-service" } });
+    const typed = (service.props("options") as any[]).find((o) => o.value === "inventory-service");
+    expect(typed.subLabel).toBe("Not seen in your data yet");
+    const seen = (service.props("options") as any[]).find((o) => o.value === "cart-svc");
+    expect(seen.subLabel).toBeUndefined();
   });
 
   it("claims a whole cluster from one segment", async () => {

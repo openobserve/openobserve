@@ -186,7 +186,7 @@ describe("HTMLRenderer", () => {
         "<h1>{{title}}</h1><p>Welcome {{userName}}</p>",
         { title: "Dashboard", userName: "John" },
         { panelId: undefined, tabId: undefined },
-        escapeHtmlValue,
+        { escapeValue: escapeHtmlValue },
       );
     });
 
@@ -334,7 +334,7 @@ describe("HTMLRenderer", () => {
         '<iframe src="https://example.com" allowfullscreen></iframe>',
         expect.objectContaining({
           ADD_TAGS: ["iframe", "style"],
-          ADD_ATTR: ["allowfullscreen", "frameborder", "loading", "csp"],
+          ADD_ATTR: ["allowfullscreen", "frameborder", "loading", "csp", "target"],
           FORCE_BODY: true,
         }),
       );

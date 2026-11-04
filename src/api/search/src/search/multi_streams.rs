@@ -82,7 +82,7 @@ use crate::{
     description = "Executes SQL queries that can span across multiple data streams within the organization. This enables cross-stream analytics, joins, and aggregations to analyze data relationships and patterns across different log streams, metrics, or traces. The query engine automatically handles data from different streams and returns unified results.",
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("validate" = bool, Query, description = "Validate query fields against stream schema and User-Defined Schema (UDS). When enabled, returns error if queried fields are not in schema or not allowed by UDS"),
+        ("validate" = Option<bool>, Query, description = "Validate query fields against stream schema and User-Defined Schema (UDS). When enabled, returns error if queried fields are not in schema or not allowed by UDS"),
     ),
     request_body(
         content = inline(search::MultiStreamRequest),
@@ -98,6 +98,7 @@ use crate::{
         }
     })
     ),
+    security(("Authorization" = [])),
     responses(
         (
             status = 200,
@@ -142,6 +143,10 @@ use crate::{
             content_type = "application/json",
             body = (),
         )
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn search_multi(
@@ -256,10 +261,13 @@ pub async fn search_multi(
                     .await;
             // Enrichment tables have no retention and must be searched in full; skip the clamp.
             if stream_type != StreamType::EnrichmentTables
-                && max_query_range > 0
-                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
+                && let Some(clamped) = config::utils::query_range::clamp_start_time(
+                    req.query.start_time,
+                    req.query.end_time,
+                    max_query_range,
+                )
             {
-                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+                req.query.start_time = clamped;
                 range_error = format!(
                     "{} Query duration for stream {} is modified due to query range restriction of {} hours",
                     range_error, stream_name, max_query_range
@@ -403,7 +411,6 @@ pub async fn search_multi(
                 multi_res.scan_size += res.scan_size;
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.extend(res.columns);
-                multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
                 multi_res.cached_ratio = res.cached_ratio;
 
@@ -659,6 +666,7 @@ pub async fn search_multi(
         "end_time": 1675185660872049i64
     })
     ),
+    security(("Authorization" = [])),
     responses(
         (
             status = 200,
@@ -688,6 +696,10 @@ pub async fn search_multi(
             content_type = "application/json",
             body = (),
         )
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn _search_partition_multi(
@@ -822,7 +834,7 @@ pub async fn _search_partition_multi(
 
 /// SearchAround
 #[utoipa::path(
-    post,
+    get,
     path = "/{org_id}/{stream_names}/_around_multi",
     context_path = "/api",
     tag = "Search",
@@ -835,8 +847,9 @@ pub async fn _search_partition_multi(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_names" = String, Path, description = "base64 encoded comma separated stream names"),
-        ("key" = i64, Query, description = "around key"),
-        ("size" = i64, Query, description = "around size"),
+        ("key" = Option<i64>, Query, description = "around key; defaults to 0"),
+        ("size" = Option<i64>, Query, description = "around size; defaults to 10"),
+        ("sql" = Option<String>, Query, description = "comma separated base64 url encoded SQL, one per stream"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
     ),
     responses(
@@ -867,6 +880,10 @@ pub async fn _search_partition_multi(
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Search", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn around_multi(
@@ -1040,7 +1057,6 @@ fn parse_simple_multi_stream_request(
         end_time: simple_req.query.end_time,
         sort_by: None,
         quick_mode: simple_req.query.quick_mode,
-        query_type: "".to_string(),
         track_total_hits: simple_req.query.track_total_hits,
         uses_zo_fn: simple_req.query.query_fn.is_some(),
         query_fn: simple_req.query.query_fn,
@@ -1548,6 +1564,8 @@ pub async fn report_to_audit(
                 trace_id: Some(trace_id.to_string()),
             },
             delegated: None,
+            fleet_id: None,
+            target: None,
         })
         .await;
     }
@@ -1608,7 +1626,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -1662,7 +1679,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros() - 3_600_000_000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -1691,7 +1707,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -1725,7 +1740,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some("base64_encoded_vrl_function".to_string()),
@@ -1760,7 +1774,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -1803,7 +1816,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -1839,7 +1851,6 @@ mod tests {
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
@@ -1906,7 +1917,6 @@ mod tests {
             end_time: 4000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some("dG9wX2xldmVsX3ZybA==".to_string()), // "top_level_vrl" base64
@@ -1948,7 +1958,6 @@ mod tests {
             end_time: 2000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some("dG9wX2xldmVsX3ZybA==".to_string()), // "top_level_vrl"
@@ -2012,7 +2021,6 @@ mod tests {
             end_time: 2000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some(encoded),
@@ -2078,7 +2086,6 @@ mod tests {
             end_time: 2000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some(encoded),
@@ -2152,7 +2159,6 @@ mod tests {
             end_time: 2000,
             sort_by: None,
             quick_mode: false,
-            query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: Some(encoded),

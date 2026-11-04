@@ -119,7 +119,12 @@ impl FirstDataIo for LiveIo {
         stream_name: &str,
     ) -> Vec<Option<i64>> {
         let mut created = Vec::new();
-        for kind in [StreamType::Logs, StreamType::Metrics, StreamType::Traces] {
+        for kind in [
+            StreamType::Logs,
+            StreamType::Metrics,
+            StreamType::Traces,
+            StreamType::Profiles,
+        ] {
             for name in db::schema::list_streams_from_cache(org_id, kind).await {
                 if !is_user_data_stream(kind, &name) || (kind == stream_type && name == stream_name)
                 {

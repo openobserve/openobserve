@@ -332,7 +332,8 @@ describe("ExperimentDetailPage", () => {
 
     const tasks = wrapper.get('[data-test="ai-experiment-detail-progress"]');
     expect(tasks.text()).toContain("Tasks");
-    expect(tasks.text()).toContain("29/30");
+    // Succeeded over total: the 4 failed slots are finished, not done.
+    expect(tasks.text()).toContain("25/30");
     expect(tasks.text()).toContain("25 succeeded · 4 failed · 1 pending · 0 skipped");
 
     const scores = wrapper.get('[data-test="ai-experiment-detail-scoring"]');
@@ -666,7 +667,7 @@ describe("ExperimentDetailPage", () => {
     const state = mounted.$.setupState;
     state.selectedRowDetail = {
       experimentId: "exp-1",
-      snapshot: { datasetId: "ds-1", datasetVersion: 1 },
+      snapshot: { datasetId: "ds-1", datasetVersion: 1, datasetWriteVersion: 1 },
       navigation: {
         rowIndex: 0,
         totalRows: 1,
@@ -1011,6 +1012,28 @@ describe("ExperimentDetailPage", () => {
         query: expect.objectContaining({ clone_of: "exp-1" }),
       }),
     );
+  });
+
+  it("drops the previous experiment's rows from the table when the route switches experiments", async () => {
+    get.mockResolvedValue(makeExperimentDetail(makeExperiment({ id: "exp-1" })));
+    const wrapper = mount(ExperimentDetailPage, {
+      global: {
+        stubs: {
+          OTable: {
+            props: ["loadingResetKey"],
+            template: `<table :data-reset="loadingResetKey" />`,
+          },
+        },
+      },
+    });
+    await flushPromises();
+    const resetKey = () => wrapper.get("table").attributes("data-reset");
+    expect(resetKey()).toBe("exp-1");
+
+    route.params.id = "exp-2";
+    await flushPromises();
+    expect(resetKey()).toBe("exp-2");
+    route.params.id = "exp-1";
   });
 
   it("re-fetches the results from the table toolbar", async () => {

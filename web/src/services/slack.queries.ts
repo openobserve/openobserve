@@ -31,6 +31,7 @@ import type {
   SlackCredentialsRequest,
   SlackInstallExchangeRequest,
   SlackInstallSource,
+  SlackInstallStartRequest,
   SlackLinkingUpdateRequest,
   SlackManifestParams,
   SlackOidcCallbackRequest,
@@ -90,6 +91,13 @@ export const slackChannelDefaultsQuery = (org: string, id: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+export const slackOncallUnlinkedQuery = (org: string, id: string) =>
+  queryOptions({
+    queryKey: slackKeys.oncallUnlinked(org, id),
+    queryFn: async () => (await slack.listOncallUnlinked(org, id)).data,
+    staleTime: NORMAL_STALE_TIME,
+  });
+
 export const slackHelpContactQuery = (org: string, id: string) =>
   queryOptions({
     queryKey: slackKeys.helpContact(org, id),
@@ -124,8 +132,9 @@ export const slackMyLinksQuery = (org: string) =>
 // The popup composable toasts start and exchange failures itself.
 export const installStartMutation = (org: string, options?: SlackRequestOptions) =>
   mutationOptions({
-    mutationFn: async (source: SlackInstallSource) =>
-      (await slack.installStart(org, { source }, options)).data,
+    mutationFn: async (body: SlackInstallSource | SlackInstallStartRequest) =>
+      (await slack.installStart(org, typeof body === "string" ? { source: body } : body, options))
+        .data,
     meta: { silentError: true },
   });
 
@@ -288,4 +297,10 @@ export const deleteLinkMutation = (org: string) =>
       await slack.deleteLink(org, linkId);
     },
     meta: { invalidates: [slackKeys.all(org)] },
+  });
+
+export const remindOncallUnlinkedMutation = (org: string, id: string) =>
+  mutationOptions({
+    mutationFn: async () => (await slack.remindOncallUnlinked(org, id)).data,
+    meta: { invalidates: [slackKeys.oncallUnlinked(org, id)], silentError: true },
   });

@@ -251,6 +251,40 @@ describe("useStreams Composable", () => {
       expect(result.list).toEqual([{ name: "from-query" }]);
     });
 
+    it("does not write a list into the store once the org has switched mid-fetch", async () => {
+      queryClient.clear();
+      let release: (v: any) => void = () => {};
+      vi.mocked(StreamService.nameList).mockReturnValueOnce(
+        new Promise((r) => (release = r)) as any,
+      );
+
+      const pending = streamsInstance.getStreams("logs", false, false);
+      await vi.waitFor(() => expect(StreamService.nameList).toHaveBeenCalled());
+      mockStore.state.selectedOrganization.identifier = "other-org";
+      release({ data: { list: [{ name: "usage", stream_type: "logs" }] } });
+      await pending;
+
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith("streams/setStreams", expect.anything());
+    });
+
+    it("does not write the all-types lists into the store once the org has switched", async () => {
+      queryClient.clear();
+      let release: (v: any) => void = () => {};
+      vi.mocked(StreamService.nameList).mockReturnValue(new Promise((r) => (release = r)) as any);
+
+      const pending = streamsInstance.getStreams("all", false, false);
+      await vi.waitFor(() => expect(StreamService.nameList).toHaveBeenCalled());
+      mockStore.state.selectedOrganization.identifier = "other-org";
+      release({ data: { list: [{ name: "usage", stream_type: "logs" }] } });
+      await pending;
+
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith("streams/setStreams", expect.anything());
+      expect(mockStore.commit).not.toHaveBeenCalledWith(
+        "streams/updateStreamsFetched",
+        expect.anything(),
+      );
+    });
+
     it("rejects with the CancelledError itself when the fetch is cancelled", async () => {
       queryClient.clear();
       mockStore.state.streams.logs = null;
@@ -415,6 +449,84 @@ describe("useStreams Composable", () => {
       const results = await streamsInstance.getMultiStreams(streams);
 
       expect(results).toEqual([null, null]);
+    });
+  });
+
+  describe("Schema prefetch", () => {
+    const listStream = (name: string, schema: any[] = []) => {
+      mockStore.state.streams.logs = { list: [{ name, schema }] } as any;
+      mockStore.state.streams.streamsIndexMapping.logs = { [name]: 0 } as any;
+    };
+
+    it("lets getStream use a schema request started before the stream list arrived", async () => {
+      streamsInstance.prefetchStreamSchema("prefetch-a", "logs");
+      expect(StreamService.schema).toHaveBeenCalledTimes(1);
+      expect(StreamService.schema).toHaveBeenCalledWith("test-org", "prefetch-a", "logs", {
+        silentForbidden: true,
+      });
+
+      listStream("prefetch-a");
+      const stream = await streamsInstance.getStream("prefetch-a", "logs", true);
+
+      expect(StreamService.schema).toHaveBeenCalledTimes(1);
+      expect(stream).toBeTruthy();
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "streams/setStreams",
+        expect.objectContaining({ streamType: "logs" }),
+      );
+    });
+
+    it("hands a prefetched schema to one read only", async () => {
+      streamsInstance.prefetchStreamSchema("prefetch-b", "logs");
+      listStream("prefetch-b");
+      await streamsInstance.getStream("prefetch-b", "logs", true);
+      await streamsInstance.getStream("prefetch-b", "logs", true);
+      expect(StreamService.schema).toHaveBeenCalledTimes(2);
+    });
+
+    it("asks the server again when the read is forced", async () => {
+      streamsInstance.prefetchStreamSchema("prefetch-c", "logs");
+      listStream("prefetch-c");
+      await streamsInstance.getStream("prefetch-c", "logs", true, true);
+      expect(StreamService.schema).toHaveBeenCalledTimes(2);
+    });
+
+    it("ignores a prefetch older than its time to live", async () => {
+      const now = Date.now();
+      const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+      streamsInstance.prefetchStreamSchema("prefetch-d", "logs");
+      clock.mockReturnValue(now + 31_000);
+      listStream("prefetch-d");
+      await streamsInstance.getStream("prefetch-d", "logs", true);
+      clock.mockRestore();
+      expect(StreamService.schema).toHaveBeenCalledTimes(2);
+    });
+
+    it("starts nothing when the schema is already loaded", () => {
+      listStream("prefetch-e", [{ name: "field1", type: "string" }]);
+      streamsInstance.prefetchStreamSchema("prefetch-e", "logs");
+      expect(StreamService.schema).not.toHaveBeenCalled();
+    });
+
+    it("starts one request for repeated prefetches of the same stream", () => {
+      streamsInstance.prefetchStreamSchema("prefetch-f", "logs");
+      streamsInstance.prefetchStreamSchema("prefetch-f", "logs");
+      expect(StreamService.schema).toHaveBeenCalledTimes(1);
+    });
+
+    it("drops a failed prefetch so the next read asks the server again", async () => {
+      vi.mocked(StreamService.schema).mockRejectedValueOnce(new Error("offline"));
+      streamsInstance.prefetchStreamSchema("prefetch-g", "logs");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      listStream("prefetch-g");
+      await expect(streamsInstance.getStream("prefetch-g", "logs", true)).resolves.toBeTruthy();
+      expect(StreamService.schema).toHaveBeenCalledTimes(2);
+    });
+
+    it("ignores a prefetch without a stream name or type", () => {
+      streamsInstance.prefetchStreamSchema("", "logs");
+      streamsInstance.prefetchStreamSchema("prefetch-h", "");
+      expect(StreamService.schema).not.toHaveBeenCalled();
     });
   });
 
@@ -785,11 +897,14 @@ describe("useStreams Composable", () => {
       expect(result.list).toEqual([{ name: "log1" }, { name: "metric1" }]);
     });
 
-    it("leaves cached profiles streams out of the all-streams payload", () => {
+    it("includes cached profiles streams in the all-streams payload", () => {
       mockStore.state.streams.logs = { list: [{ name: "log1" }] };
       (mockStore.state.streams as any).profiles = { list: [{ name: "prof1" }] };
 
-      expect(streamsInstance.getAllStreamsPayload().list).toEqual([{ name: "log1" }]);
+      expect(streamsInstance.getAllStreamsPayload().list).toEqual([
+        { name: "log1" },
+        { name: "prof1" },
+      ]);
     });
 
     it("should add new streams only if they don't exist", () => {
@@ -1053,13 +1168,21 @@ describe("useStreams Composable", () => {
   describe("Forced full read and fetched-at", () => {
     it("a forced read of the whole list fetches every type, memory hits included", async () => {
       queryClient.clear();
-      for (const type of ["logs", "metrics", "traces", "enrichment_tables", "index", "metadata"]) {
+      for (const type of [
+        "logs",
+        "metrics",
+        "traces",
+        "profiles",
+        "enrichment_tables",
+        "index",
+        "metadata",
+      ]) {
         (mockStore.state.streams as any)[type] = { list: [{ name: "cached" }] };
       }
 
       await streamsInstance.getStreams("all", false, false, true);
 
-      expect(StreamService.nameList).toHaveBeenCalledTimes(6);
+      expect(StreamService.nameList).toHaveBeenCalledTimes(7);
     });
 
     it("getStreamsFetchedAt reports the oldest type list, or nothing when none is cached", async () => {

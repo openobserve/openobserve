@@ -211,7 +211,10 @@ onUnmounted(() => {
         <!-- Message + inline action -->
         <div :class="['flex flex-wrap items-start gap-x-3 gap-y-1.5', title ? 'mt-1' : '']">
           <ToastDescription
-            :class="['text-sm leading-snug', title ? 'text-toast-fg-secondary' : 'text-toast-fg']"
+            :class="[
+              'text-sm leading-snug break-words whitespace-pre-line',
+              title ? 'text-toast-fg-secondary' : 'text-toast-fg',
+            ]"
             data-test="o-toast-message"
           >
             {{ message }}

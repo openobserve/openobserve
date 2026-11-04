@@ -35,6 +35,17 @@ const flattenObject = (obj: any, prefix = ""): Record<string, any> => {
 };
 
 // Hiding never needs a run; showing a hidden PromQL query does, since it was never sent.
+// Chart types whose PromQL loader keeps more series than the default cap (see promqlSeriesCap).
+const OWN_PROMQL_SERIES_CAP_TYPES = new Set(["state-timeline", "hostmap"]);
+
+const promqlSeriesCapKind = (type: unknown) =>
+  typeof type === "string" && OWN_PROMQL_SERIES_CAP_TYPES.has(type) ? type : "default";
+
+/** Whether a PromQL panel moved to a chart type that loads a different number of series. */
+const promqlSeriesCapChanged = (oldConfig: any, newConfig: any): boolean =>
+  newConfig?.queryType === "promql" &&
+  promqlSeriesCapKind(oldConfig?.type) !== promqlSeriesCapKind(newConfig?.type);
+
 const isUnhiddenPromQL = (newConfig: any, key: string): boolean =>
   newConfig?.queryType === "promql" && !flattenObject(newConfig)[key];
 
@@ -79,5 +90,5 @@ export const checkIfConfigChangeRequiredApiCallOrNot = (
     .filter((key) => !key.endsWith(".hide") || isUnhiddenPromQL(newConfig, key))
     .some((key) => Array.from(API_REQUIRING_CHANGES).some((apiKey) => key.startsWith(apiKey)));
 
-  return configNeedsApiCall;
+  return configNeedsApiCall || promqlSeriesCapChanged(oldConfig, newConfig);
 };

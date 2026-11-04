@@ -45,7 +45,7 @@ use super::{caller, parse, parse_query, parse_value, respond, respond_with};
     description = "Returns the Slack authorize URL for the shared Cloud app, with the source signed into the state. Cloud only; self-hosted answers 404.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    request_body(content = Object, description = "`{\"source\": \"destination_form\" | \"settings\" | \"upgrade_banner\" | \"reinstall\"}`; `reinstall` creates no destination and no channel default", content_type = "application/json"),
+    request_body(content = Object, description = "`{\"source\": \"destination_form\" | \"settings\" | \"upgrade_banner\" | \"reinstall\"}`; `reinstall` creates no destination and no channel default; `create_destination: true` (the Slack app form) makes the exchange create the Slack app destination", content_type = "application/json"),
     responses(
         (status = 200, description = "`{\"authorization_url\"}`", content_type = "application/json", body = Object),
         (status = 400, description = "Unknown source", content_type = "application/json", body = ()),

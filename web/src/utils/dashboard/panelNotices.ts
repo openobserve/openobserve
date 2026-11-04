@@ -16,9 +16,18 @@
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { addCommasToNumber } from "@/utils/formatters";
+import type { RegionJoinInfo } from "./convertMapsData";
+import type { SankeyNotice } from "./convertSankeyData";
 import type { PanelDiagnostics, SeriesLimitInfo } from "./panelDiagnostics";
 
-export type PanelNoticeId = "function-error" | "series-cap" | "partial" | "interrupted";
+export type PanelNoticeId =
+  | "function-error"
+  | "series-cap"
+  | "unmatched-regions"
+  | "return-links"
+  | "skipped-rows"
+  | "partial"
+  | "interrupted";
 
 export type PanelNoticeActionId = "use-top-n" | "edit-function" | "refresh";
 
@@ -40,10 +49,12 @@ export interface PanelNoticeInput {
   seriesLimit?: SeriesLimitInfo | null;
   seriesLimitMessage?: string;
   seriesTotalBound?: SeriesTotalBound;
+  sankeyNotice?: SankeyNotice | null;
   serverPartial?: boolean;
   partialReasons?: string[];
   interrupted?: boolean;
   functionErrors?: string[];
+  regionJoin?: RegionJoinInfo | null;
   canEdit?: boolean;
   canRefresh?: boolean;
 }
@@ -111,6 +122,56 @@ const seriesCapNotice = (input: PanelNoticeInput, t: TranslateFn): PanelNotice =
   };
 };
 
+const unmatchedRegionsNotice = (join: RegionJoinInfo, t: TranslateFn): PanelNotice => {
+  const details: string[] = [];
+  if (join.unmatched.length) {
+    const more = join.unmatchedTotal - join.unmatched.length;
+    details.push(
+      more > 0
+        ? t("dashboard.panelErrorButtons.unmatchedRegionsListMore", {
+            names: join.unmatched.join(", "),
+            count: addCommasToNumber(more),
+          })
+        : join.unmatched.join(", "),
+    );
+  }
+  if (join.missingLabel) {
+    details.push(
+      t(
+        "dashboard.panelErrorButtons.unmatchedRegionsMissingLabel",
+        { count: addCommasToNumber(join.missingLabel.count), label: join.missingLabel.label },
+        join.missingLabel.count,
+      ),
+    );
+  }
+  // Unmatched names and unlabeled series are different units, so the chip counts only one.
+  const missingOnly = join.unmatchedTotal ? undefined : join.missingLabel;
+  const count = missingOnly ? missingOnly.count : join.unmatchedTotal;
+  return {
+    id: "unmatched-regions",
+    tone: "warning",
+    icon: "public",
+    chipLabel: missingOnly
+      ? t(
+          "dashboard.panelErrorButtons.unlabeledSeriesChip",
+          { count: addCommasToNumber(count) },
+          count,
+        )
+      : t(
+          "dashboard.panelErrorButtons.unmatchedRegionsChip",
+          { count: addCommasToNumber(count) },
+          count,
+        ),
+    title: missingOnly
+      ? t("dashboard.panelErrorButtons.unlabeledSeriesTitle")
+      : t("dashboard.panelErrorButtons.unmatchedRegionsTitle"),
+    body: missingOnly
+      ? t("dashboard.panelErrorButtons.unlabeledSeriesBody")
+      : t("dashboard.panelErrorButtons.unmatchedRegionsBody"),
+    details,
+  };
+};
+
 /** The header notices in severity order: errors first, then what was hidden, then what was cut short. */
 export const buildPanelNotices = (input: PanelNoticeInput, t: TranslateFn): PanelNotice[] => {
   const notices: PanelNotice[] = [];
@@ -135,6 +196,39 @@ export const buildPanelNotices = (input: PanelNoticeInput, t: TranslateFn): Pane
   }
 
   if (input.seriesLimit || input.seriesLimitMessage) notices.push(seriesCapNotice(input, t));
+
+  if (input.regionJoin) notices.push(unmatchedRegionsNotice(input.regionJoin, t));
+
+  const returnLinks = input.sankeyNotice?.returnLinks ?? 0;
+  if (returnLinks) {
+    notices.push({
+      id: "return-links",
+      tone: "warning",
+      icon: "alt-route",
+      chipLabel: t(
+        "dashboard.panelErrorButtons.returnLinksChip",
+        { count: returnLinks },
+        returnLinks,
+      ),
+      title: t("dashboard.panelErrorButtons.returnLinksTitle"),
+      body: t("dashboard.panelErrorButtons.returnLinksBody", { count: returnLinks }, returnLinks),
+      details: [],
+    });
+  }
+
+  const skippedRows = input.sankeyNotice?.skippedRows ?? 0;
+  if (skippedRows) {
+    const count = addCommasToNumber(skippedRows);
+    notices.push({
+      id: "skipped-rows",
+      tone: "warning",
+      icon: "visibility-off",
+      chipLabel: t("dashboard.panelErrorButtons.skippedRowsChip", { count }, skippedRows),
+      title: t("dashboard.panelErrorButtons.skippedRowsTitle"),
+      body: t("dashboard.panelErrorButtons.skippedRowsBody", { count }, skippedRows),
+      details: [],
+    });
+  }
 
   if (input.serverPartial) {
     notices.push({

@@ -60,6 +60,7 @@ pub use watcher::{
 };
 
 const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
+const STREAM_NAME_TOO_LONG: &str = "stream_name_too_long";
 /// Shared by both ingestion-window discard messages and the test for them.
 const WINDOW_DISCARD_MARKER: &str = " data can be ingested. Data discarded.";
 
@@ -140,6 +141,27 @@ impl std::error::Error for StreamSettingsError {}
 pub struct SavedStreamSettings {
     pub settings: StreamSettings,
     pub previous_settings: Option<StreamSettings>,
+}
+
+/// Rejects a stream whose file_list key or org cannot be stored, counting it as an ingest error.
+pub fn check_stream_key_len(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Result<()> {
+    let Some(violation) = infra::file_list::stream_key_violation(org_id, stream_type, stream_name)
+    else {
+        return Ok(());
+    };
+    metrics::INGEST_ERRORS
+        .with_label_values(&[
+            org_id,
+            stream_type.as_str(),
+            stream_name,
+            STREAM_NAME_TOO_LONG,
+        ])
+        .inc();
+    Err(anyhow::anyhow!("{violation}. Data discarded."))
 }
 
 /// Validate, normalize, and persist stream settings stored in schema metadata.
@@ -946,6 +968,20 @@ pub fn check_schema_for_defined_schema_fields(
                 }
             }
         }
+        StreamType::Profiles => {
+            fields.insert("stack".to_string());
+            fields.insert("value".to_string());
+            fields.insert("profile_type".to_string());
+            fields.insert("profile_unit".to_string());
+            fields.insert("service_name".to_string());
+            fields.insert("otel_scope_name".to_string());
+            fields.insert("service_instance_id".to_string());
+            fields.insert("host_name".to_string());
+            fields.insert("process_pid".to_string());
+            fields.insert("profile_duration_nanos".to_string());
+            fields.insert("trace_id".to_string());
+            fields.insert("span_id".to_string());
+        }
         _ => {}
     }
     fields
@@ -1057,6 +1093,20 @@ mod tests {
         assert!(!is_window_discard_error(&anyhow::anyhow!(
             "Record flattening error"
         )));
+    }
+
+    #[test]
+    fn test_check_stream_key_len_counts_and_discards() {
+        let over = "s".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let result = check_stream_key_len("org", StreamType::Logs, &over);
+        assert_eq!(
+            result.is_err(),
+            infra::file_list::stream_key_violation("org", StreamType::Logs, &over).is_some()
+        );
+        if let Err(err) = result {
+            assert!(err.to_string().ends_with("Data discarded."), "{err}");
+        }
+        assert!(check_stream_key_len("org", StreamType::Logs, "s").is_ok());
     }
 
     #[test]
@@ -1265,6 +1315,33 @@ mod tests {
         assert!(result.contains("service_name"));
         assert!(result.contains("duration"));
         assert!(result.contains("my_field"));
+    }
+
+    #[test]
+    fn test_check_schema_for_defined_schema_fields_profiles_adds_query_columns() {
+        let schema = Schema::new(vec![] as Vec<Field>);
+        let input = vec!["k8s_pod_name".to_string()];
+        let result = check_schema_for_defined_schema_fields(StreamType::Profiles, &schema, input);
+        let mut fields = result.iter().map(String::as_str).collect::<Vec<_>>();
+        fields.sort_unstable();
+        assert_eq!(
+            fields,
+            [
+                "host_name",
+                "k8s_pod_name",
+                "otel_scope_name",
+                "process_pid",
+                "profile_duration_nanos",
+                "profile_type",
+                "profile_unit",
+                "service_instance_id",
+                "service_name",
+                "span_id",
+                "stack",
+                "trace_id",
+                "value",
+            ]
+        );
     }
 
     #[test]

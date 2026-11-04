@@ -58,9 +58,19 @@ pub async fn get_pipelines(
 }
 
 /// The handler has already checked the caller's org-wide fleet access, so this runs as the server.
-pub async fn list_audit(org_id: &str, query: AuditQuery) -> Result<AuditList, anyhow::Error> {
-    o2_enterprise::enterprise::fleet::audit::list_audit(org_id, query, now_micros(), search_audit)
-        .await
+pub async fn list_audit(
+    org_id: &str,
+    query: AuditQuery,
+    fleets: Option<&HashSet<String>>,
+) -> Result<AuditList, anyhow::Error> {
+    use o2_enterprise::enterprise::fleet::audit::{self, AuditColumns};
+
+    let schema = infra::schema::get(META_ORG_ID, AUDIT_STREAM, StreamType::Logs).await?;
+    let columns = AuditColumns {
+        fleet_id: schema.field_with_name("fleet_id").is_ok(),
+        target: schema.field_with_name("target").is_ok(),
+    };
+    audit::list_audit(org_id, query, fleets, columns, now_micros(), search_audit).await
 }
 
 /// The check `/prometheus/api/v1/query` makes per metric stream; a refused query is `None`.
@@ -83,7 +93,7 @@ async fn instant(
         step: INSTANT_STEP_MICROS,
         query_exemplars: false,
         use_cache: None,
-        search_type: None,
+        search_type: Some(search::SearchEventType::Other),
         search_event_context: None,
         regions: vec![],
         clusters: vec![],
@@ -122,6 +132,7 @@ async fn search_audit(
     sql: String,
     start_time: i64,
     end_time: i64,
+    from: i64,
     size: i64,
 ) -> Result<Vec<serde_json::Value>, anyhow::Error> {
     // Until the first audit row is written the stream does not exist, and a search of it errors.
@@ -132,7 +143,7 @@ async fn search_audit(
     let req = search::Request {
         query: search::Query {
             sql,
-            from: 0,
+            from,
             size,
             start_time,
             end_time,
@@ -142,7 +153,7 @@ async fn search_audit(
         regions: vec![],
         clusters: vec![],
         timeout: 0,
-        search_type: None,
+        search_type: Some(search::SearchEventType::Other),
         search_event_context: None,
         use_cache: false,
         clear_cache: false,

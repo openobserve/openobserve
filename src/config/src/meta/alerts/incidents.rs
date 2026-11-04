@@ -348,6 +348,19 @@ pub struct Incident {
     /// Why automatic analysis runs never start for this incident (`l0_off`).
     #[serde(default)]
     pub rca_off_reason: Option<String>,
+
+    /// Every alert that fired into the incident and how often, most-fired first; list only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_groups: Option<Vec<IncidentAlertGroup>>,
+}
+
+/// One alert's firings within an incident, for the list row.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct IncidentAlertGroup {
+    pub alert_id: String,
+    pub alert_name: String,
+    /// Times this alert fired into the incident
+    pub count: i32,
 }
 
 /// Alert info within an incident (junction table representation)
@@ -444,6 +457,16 @@ impl IncidentCorrelationOutcome {
             | Self::NewAlertTypeJoined { service_name, .. }
             | Self::ExistingAlertRepeated { service_name, .. }
             | Self::SeverityEscalated { service_name, .. } => service_name,
+        }
+    }
+
+    /// The incident a NEW alert just joined; `None` for a new incident or a member firing again.
+    pub fn joined_by_new_alert(&self) -> Option<&str> {
+        match self {
+            Self::NewAlertTypeJoined { incident_id, .. } => Some(incident_id),
+            Self::NewIncidentCreated { .. }
+            | Self::ExistingAlertRepeated { .. }
+            | Self::SeverityEscalated { .. } => None,
         }
     }
 }
@@ -615,6 +638,11 @@ pub enum IncidentEventType {
         reason: String,
     },
 
+    /// A person resolved one of the incident's pages, which ended its acknowledgement.
+    AckEndedByPageResolve {
+        user_id: String,
+    },
+
     DimensionsUpgraded {
         from_key: String,
         to_key: String,
@@ -725,6 +753,7 @@ impl IncidentEventType {
         "Acknowledged",
         "Resolved",
         "Reopened",
+        "AckEndedByPageResolve",
         "DimensionsUpgraded",
         "TitleChanged",
         "AssignmentChanged",
@@ -807,6 +836,12 @@ impl IncidentEvent {
 
     pub fn resolved(user_id: Option<String>) -> Self {
         Self::now(IncidentEventType::Resolved { user_id })
+    }
+
+    pub fn ack_ended_by_page_resolve(user_id: impl Into<String>) -> Self {
+        Self::now(IncidentEventType::AckEndedByPageResolve {
+            user_id: user_id.into(),
+        })
     }
 
     pub fn reopened(user_id: impl Into<String>, reason: impl Into<String>) -> Self {
@@ -934,6 +969,45 @@ impl IncidentEvent {
 mod tests {
     use super::*;
 
+    /// Only a new alert joining counts; the same alert firing again never re-pages.
+    #[test]
+    fn test_only_a_new_alert_joining_names_the_incident() {
+        let (id, svc) = (|| "inc_1".to_string(), || "checkout".to_string());
+        let cases = [
+            (
+                IncidentCorrelationOutcome::NewAlertTypeJoined {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                Some("inc_1"),
+            ),
+            (
+                IncidentCorrelationOutcome::ExistingAlertRepeated {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                None,
+            ),
+            (
+                IncidentCorrelationOutcome::SeverityEscalated {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                None,
+            ),
+            (
+                IncidentCorrelationOutcome::NewIncidentCreated {
+                    incident_id: id(),
+                    service_name: svc(),
+                },
+                None,
+            ),
+        ];
+        for (outcome, want) in cases {
+            assert_eq!(outcome.joined_by_new_alert(), want, "{outcome:?}");
+        }
+    }
+
     /// A node that predates an event type must still recover the whole timeline.
     ///
     /// Without the `Unknown` catch-all the array parse fails on the first unrecognized
@@ -1028,6 +1102,9 @@ mod tests {
             IncidentEventType::Reopened {
                 user_id: "u".into(),
                 reason: "r".into(),
+            },
+            IncidentEventType::AckEndedByPageResolve {
+                user_id: "u".into(),
             },
             IncidentEventType::DimensionsUpgraded {
                 from_key: "a".into(),
@@ -1805,6 +1882,7 @@ mod tests {
             muted_by_downtime_id: None,
             rca: None,
             rca_off_reason: None,
+            alert_groups: None,
         }
     }
 

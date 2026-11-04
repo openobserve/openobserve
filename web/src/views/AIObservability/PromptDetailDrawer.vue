@@ -45,6 +45,7 @@
         </div>
         <div class="flex items-center gap-2 max-lg:w-full">
           <OButton
+            v-if="showPlayground"
             variant="outline"
             size="sm"
             icon-left="play-arrow"
@@ -252,6 +253,7 @@
                   class="min-w-0 flex-1"
                   :placeholder="t('aiObservability.promptManagement.form.searchCommitMessage')"
                   clearable
+                  :aria-label="t('aiObservability.promptManagement.form.searchCommitMessage')"
                   data-test="prompt-version-search"
                 />
                 <OSelect
@@ -336,6 +338,38 @@
         </template>
       </div>
     </div>
+
+    <ODialog
+      :open="labelToDelete !== null"
+      size="sm"
+      persistent
+      :title="t('aiObservability.promptManagement.removeLabelNamed', { name: labelShown.name })"
+      :primary-button-label="t('aiObservability.promptManagement.delete')"
+      primary-button-variant="destructive"
+      :secondary-button-label="t('common.cancel')"
+      data-test="prompt-detail-delete-label-dialog"
+      @update:open="(open: boolean) => !open && settleLabelDelete(false)"
+      @click:primary="settleLabelDelete(true)"
+      @click:secondary="settleLabelDelete(false)"
+    >
+      <i18n-t
+        :keypath="
+          labelShown.protected
+            ? 'aiObservability.promptManagement.protectedLabelDeleteMessage'
+            : 'aiObservability.promptManagement.removeLabelHelp'
+        "
+        tag="p"
+      >
+        <template #name>
+          <span
+            data-test="prompt-detail-delete-label-name"
+            class="text-text-heading font-semibold break-all"
+            >{{ labelShown.name }}</span
+          >
+        </template>
+        <template #version>{{ labelShown.version }}</template>
+      </i18n-t>
+    </ODialog>
   </ODrawer>
 </template>
 
@@ -363,6 +397,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -388,8 +423,14 @@ const props = withDefaults(
     initialVersion?: number | null;
     initialTab?: string;
     protectedLabels?: string[];
+    showPlayground?: boolean;
   }>(),
-  { initialVersion: null, initialTab: "configuration", protectedLabels: () => [] },
+  {
+    initialVersion: null,
+    initialTab: "configuration",
+    protectedLabels: () => [],
+    showPlayground: true,
+  },
 );
 
 const moveLabelMutation = useMutation(() => movePromptLabelMutation(props.orgId));
@@ -415,6 +456,10 @@ const compareBaseId = ref("");
 const compareHeadId = ref("");
 const diffMode = ref<"split" | "unified">("split");
 const labelBusy = ref(false);
+const labelToDelete = ref<{ name: string; version: number; protected: boolean } | null>(null);
+// Set on open only, so title and message stay put while the dialog fades out.
+const labelShown = ref({ name: "", version: 0, protected: false });
+let resolveLabelDelete: ((ok: boolean) => void) | null = null;
 let loadGeneration = 0;
 
 const visibleLabels = computed(
@@ -483,7 +528,7 @@ const payloadText = (payload: unknown) =>
   typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
 const jsonText = (value: unknown) => (value == null ? "—" : JSON.stringify(value, null, 2));
 
-const versionColumns: OTableColumnDef<PromptVersion>[] = [
+const allVersionColumns: OTableColumnDef<PromptVersion>[] = [
   {
     id: "version",
     accessorKey: "version",
@@ -518,6 +563,12 @@ const versionColumns: OTableColumnDef<PromptVersion>[] = [
   },
   { id: "actions", isAction: true, header: raw(""), accessorKey: "id", size: 56 },
 ];
+// The actions column holds only the Playground button.
+const versionColumns = computed(() =>
+  props.showPlayground
+    ? allVersionColumns
+    : allVersionColumns.filter((column) => column.id !== "actions"),
+);
 
 function viewVersion(version: number) {
   selectedVersion.value = version;
@@ -545,7 +596,7 @@ async function confirmProtectedLabel(
             version,
           })
         : t("aiObservability.promptManagement.protectedLabelDeleteMessage", {
-            label: raw(label),
+            name: raw(label),
             version,
           }),
     confirmLabel:
@@ -618,6 +669,21 @@ async function moveLabel(name: string, version: number): Promise<boolean> {
   }
 }
 
+function askDeleteLabel(name: string, version: number): Promise<boolean> {
+  settleLabelDelete(false);
+  return new Promise((resolve) => {
+    resolveLabelDelete = resolve;
+    labelToDelete.value = { name, version, protected: props.protectedLabels.includes(name) };
+    labelShown.value = { ...labelToDelete.value };
+  });
+}
+
+function settleLabelDelete(ok: boolean) {
+  resolveLabelDelete?.(ok);
+  resolveLabelDelete = null;
+  labelToDelete.value = null;
+}
+
 async function deleteLabel(label: PromptLabel) {
   if (
     !props.prompt ||
@@ -631,22 +697,7 @@ async function deleteLabel(label: PromptLabel) {
   const orgId = props.orgId;
   labelBusy.value = true;
   try {
-    if (
-      !(await confirm({
-        title: t("aiObservability.promptManagement.removeLabelNamed", { name: label.name }),
-        message: props.protectedLabels.includes(label.name)
-          ? t("aiObservability.promptManagement.protectedLabelDeleteMessage", {
-              label: label.name,
-              version: label.version,
-            })
-          : t("aiObservability.promptManagement.removeLabelHelp", {
-              name: label.name,
-              version: label.version,
-            }),
-        confirmLabel: t("aiObservability.promptManagement.delete"),
-      }))
-    )
-      return;
+    if (!(await askDeleteLabel(label.name, label.version))) return;
     if (props.orgId !== orgId || props.prompt?.entityId !== entityId) return;
     await deleteLabelMutation.mutateAsync({ entityId, name: label.name, ifVersion: label.version });
     await refreshLabels(orgId, entityId);

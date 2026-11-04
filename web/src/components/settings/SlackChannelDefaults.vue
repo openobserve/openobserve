@@ -32,6 +32,8 @@ import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { alertRoutesByChannel } from "@/utils/slackAppDestination";
 import {
   deleteChannelDefaultMutation,
   putChannelDefaultMutation,
@@ -73,6 +75,10 @@ const ownerName = (row: SlackChannelDefaultRow) =>
   instanceAdmin.value && row.org_id ? raw(row.org_name || row.org_id) : null;
 
 const defaults = useQuery(() => slackChannelDefaultsQuery(org.value, props.installationId));
+const destinations = useQuery(() => destinationsQuery(org.value, "alert"));
+const alertRoutes = computed(() =>
+  alertRoutesByChannel(destinations.data.value ?? [], props.installationId),
+);
 const put = useMutation(() => putChannelDefaultMutation(org.value, props.installationId));
 const remove = useMutation(() => deleteChannelDefaultMutation(org.value, props.installationId));
 
@@ -237,8 +243,17 @@ const save = async (value: DefaultForm): Promise<void> => {
           }}
         </template>
       </template>
-      <template #cell-alert_routes>
-        <span class="text-text-muted">{{ raw("—") }}</span>
+      <template #cell-alert_routes="{ row }">
+        <template v-if="alertRoutes[row.channel_id]">
+          {{
+            t(
+              "slackApp.channels.alertRoutes",
+              { count: alertRoutes[row.channel_id] },
+              alertRoutes[row.channel_id],
+            )
+          }}
+        </template>
+        <span v-else class="text-text-muted">{{ raw("—") }}</span>
       </template>
       <template #cell-set_by="{ row }">
         <span v-if="!canChange(row) && ownOrgOnly" class="text-text-muted">{{ raw("—") }}</span>
@@ -389,7 +404,8 @@ const save = async (value: DefaultForm): Promise<void> => {
     <ConfirmDialog
       v-model="removeOpen"
       :title="t('slackApp.channels.removeTitle', { channel: removing?.channel_name ?? '' })"
-      :message="t('slackApp.channels.removeMessage', { channel: removing?.channel_name ?? '' })"
+      message-keypath="slackApp.channels.removeMessage"
+      :message-name="removing ? `#${removing.channel_name}` : ''"
       :ok-label="t('slackApp.channels.remove')"
       ok-variant="destructive"
       focus-cancel

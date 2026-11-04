@@ -430,6 +430,47 @@ describe("PromQLTableChart", () => {
     });
   });
 
+  describe("Legend footer pagination", () => {
+    const twelveRows = Array.from({ length: 12 }, (_, i) => ({
+      __legend__: "series1",
+      timestamp: `2023-01-01T00:${String(i).padStart(2, "0")}:00Z`,
+      value: i,
+    }));
+
+    const mountPaginated = () =>
+      createWrapper({
+        data: { columns: mockTableData.columns, rows: twelveRows },
+        config: { ...mockConfig, table_pagination: true, table_pagination_rows_per_page: 10 },
+      });
+
+    it("shows the page range, page size and navigation from the table's pagination state", async () => {
+      wrapper = mountPaginated();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="dashboard-table-row-count"]').text()).toBe("1-10 of 12");
+      expect(wrapper.find('[data-test="dashboard-table-pagination-next-page"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dashboard-table-pagination-last-page"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dashboard-table-rows-per-page-select"]').text()).toContain(
+        "10",
+      );
+    });
+
+    it("reaches the remaining rows on the next page", async () => {
+      wrapper = mountPaginated();
+      await flushPromises();
+
+      await wrapper.find('[data-test="dashboard-table-pagination-next-page"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="dashboard-table-row-count"]').text()).toBe("11-12 of 12");
+      expect(wrapper.findAll('tbody tr[data-test^="o2-table-row-"]').length).toBe(2);
+    });
+  });
+
   describe("Event Handling", () => {
     it("should emit row-click when TableRenderer emits row-click", async () => {
       wrapper = createWrapper();
@@ -438,7 +479,52 @@ describe("PromQLTableChart", () => {
       await tableRenderer.vm.$emit("row-click", mockTableData.rows[0]);
 
       expect(wrapper.emitted("row-click")).toBeTruthy();
-      expect(wrapper.emitted("row-click")[0]).toEqual([mockTableData.rows[0]]);
+      expect(wrapper.emitted("row-click")[0][0]).toEqual(mockTableData.rows[0]);
+    });
+
+    it("keys rows on the label, legend and timestamp columns, never the values or the synthetic id", () => {
+      wrapper = createWrapper({
+        data: {
+          ...mockTableData,
+          columns: [
+            { name: "job", label: "job", field: "job" },
+            { name: "timestamp", label: "Timestamp", field: "timestamp" },
+            { name: "value_max", label: "Max", field: "value_max" },
+            { name: "value", label: "Value", field: "value" },
+          ],
+        },
+      });
+      expect(wrapper.findComponent({ name: "TableRenderer" }).props("rowKeyFields")).toEqual([
+        "job",
+        "timestamp",
+        "__legend__",
+      ]);
+    });
+
+    it("forwards the clicked row and its index with the click event", async () => {
+      wrapper = createWrapper();
+      const evt = new MouseEvent("click");
+
+      const tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
+      await tableRenderer.vm.$emit("row-click", evt, mockTableData.rows[1], 1);
+
+      expect(wrapper.emitted("row-click")[0]).toEqual([evt, mockTableData.rows[1], 1]);
+    });
+  });
+
+  describe("Expandable rows", () => {
+    it("leaves rows unexpandable when table_expandable_rows is unset", () => {
+      wrapper = createWrapper();
+
+      const tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
+      expect(tableRenderer.props("expandableRows")).toBe(false);
+    });
+
+    it("passes table_expandable_rows to TableRenderer", () => {
+      wrapper = createWrapper({ config: { ...mockConfig, table_expandable_rows: true } });
+
+      const tableRenderer = wrapper.findComponent({ name: "TableRenderer" });
+      expect(tableRenderer.props("expandableRows")).toBe(true);
     });
   });
 

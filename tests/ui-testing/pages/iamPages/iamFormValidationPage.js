@@ -355,6 +355,12 @@ export class IamFormValidationPage {
         return this.page.locator(this.editBasicUserFirstBtn).count();
     }
 
+    async clickFirstEditUserButton() {
+        await this.page.locator(this.editBasicUserFirstBtn).first().click();
+    }
+
+    getUrlWithUserActionPattern() { return /[?&]action=(update|add)\b|[?&]email=/; }
+
     async navigateToUsersTab() {
         await this.navigateToIam();
         const tab = this.page.locator(this.iamUsersTab);

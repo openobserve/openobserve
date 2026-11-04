@@ -153,6 +153,14 @@ describe("TracesNoEventsState", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
+    it("names a calendar period in the no-events message, never as a NaN count", async () => {
+      wrapper.unmount();
+      mockSearchObj.data.datetime.relativeTimePeriod = "calendar:month:-1";
+      wrapper = mountComponent();
+      expect(wrapper.text()).toContain("Last month");
+      expect(wrapper.text()).not.toContain("NaN");
+    });
+
     it("should NOT render any expand range card (feature removed)", () => {
       expect(wrapper.find('[data-test="traces-no-events-expand-range-card"]').exists()).toBe(false);
     });

@@ -308,6 +308,7 @@
         <ConfirmDialog
           :title="t('search_scheduler_job.delete_job_title')"
           :message="t('search_scheduler_job.delete_job_message')"
+          ok-variant="destructive"
           @update:ok="deleteSearchJob"
           @update:cancel="confirmDelete = false"
           v-model="confirmDelete"

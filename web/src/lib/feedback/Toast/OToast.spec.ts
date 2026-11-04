@@ -30,6 +30,15 @@ describe("OToast", () => {
     expect(document.body.textContent).toContain("Hello world");
   });
 
+  it("keeps each line of a multi-line message on its own line", async () => {
+    mountToast({ id: "1", open: true, message: "First: a; b\nSecond: c" });
+    await vueNextTick();
+    const body = document.body.querySelector('[data-test="o-toast-message"]');
+    expect(body?.textContent).toContain("First: a; b\nSecond: c");
+    expect(body?.className).toContain("whitespace-pre-line");
+    expect(body?.className).toContain("break-words");
+  });
+
   it("renders title when provided", async () => {
     mountToast({ id: "1", open: true, message: "Body text", title: "My Title" });
     await vueNextTick();

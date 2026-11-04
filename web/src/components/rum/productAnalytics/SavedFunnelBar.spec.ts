@@ -566,9 +566,10 @@ describe("SavedFunnelBar, the builder header (AC-67, AC-68, AC-70)", () => {
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.funnelBuilder);
     await menu("delete").trigger("click");
     await settle();
-    expect(confirmMock.mock.calls.at(-1)![0].message).toBe(
-      'Delete "Signup" for everyone in this organization? Links to it will fall back to the steps they carried.',
-    );
+    const call = confirmMock.mock.calls.at(-1)![0];
+    expect(call.messageKeypath).toBe("rum.analytics.saved.deleteMessage");
+    expect(call.messageName).toBe("Signup");
+    expect(call.confirmVariant).toBe("destructive");
     expect(api.funnels.has(row.id)).toBe(false);
     const pa = useProductAnalytics();
     expect(pa.openedFunnel.value).toBeNull();

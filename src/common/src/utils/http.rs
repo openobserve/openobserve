@@ -60,7 +60,30 @@ pub fn get_search_type_from_request(
         .get("search_type")
         .map(|s| s.parse::<SearchEventType>())
         .transpose()
-        .map_err(Error::other)
+        .map_err(Error::other)?
+        .map(client_search_type)
+        .transpose()
+}
+
+/// The body's search type, else the URL's; either is refused when only the server may set it.
+pub fn get_client_search_type(
+    body: Option<SearchEventType>,
+    query: &HashMap<String, String>,
+) -> Result<Option<SearchEventType>, Error> {
+    match body {
+        Some(search_type) => client_search_type(search_type).map(Some),
+        None => get_search_type_from_request(query),
+    }
+}
+
+/// Only the public dashboard build runs as `public_dashboard`, which takes the build slots.
+pub fn client_search_type(search_type: SearchEventType) -> Result<SearchEventType, Error> {
+    if search_type == SearchEventType::PublicDashboard {
+        return Err(Error::other(
+            "invalid SearchEventType `public_dashboard`, it is set only by public dashboards",
+        ));
+    }
+    Ok(search_type)
 }
 
 #[inline(always)]
@@ -332,6 +355,32 @@ mod tests {
 
         query.insert("search_type".to_string(), "invalid".to_string());
         assert!(get_search_type_from_request(&query).is_err());
+    }
+
+    #[test]
+    fn a_client_cannot_name_the_public_dashboard_search_type() {
+        let mut query = HashMap::<String, String>::new();
+        for name in ["public_dashboard", "publicdashboard", "Public_Dashboard"] {
+            query.insert("search_type".to_string(), name.to_string());
+            let err = get_search_type_from_request(&query).unwrap_err();
+            assert!(
+                err.to_string().contains("public_dashboard"),
+                "{name}: {err}"
+            );
+        }
+        let body = Some(SearchEventType::PublicDashboard);
+        assert!(get_client_search_type(body, &HashMap::new()).is_err());
+
+        query.insert("search_type".to_string(), "dashboards".to_string());
+        let body = Some(SearchEventType::UI);
+        assert_eq!(
+            get_client_search_type(body, &query).unwrap(),
+            Some(SearchEventType::UI)
+        );
+        assert_eq!(
+            get_client_search_type(None, &query).unwrap(),
+            Some(SearchEventType::Dashboards)
+        );
     }
 
     #[test]

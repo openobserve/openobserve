@@ -44,6 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm"
           :disabled="!templates.length"
+          :aria-label="
+            hasNewDraft ? t('common.editorDraft.newDot', { label: t('alerts.add') }) : undefined
+          "
           @click="
             activeTab === 'anomalyDetection'
               ? router.push({
@@ -56,8 +59,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 })
               : showAddUpdateFn({})
           "
-          >{{ t(`alerts.add`) }}</OButton
-        >
+          >{{ t(`alerts.add`) }}
+          <EditorDraftDot
+            v-if="hasNewDraft"
+            :saved-at="newDraftSavedAt"
+            corner
+            data-test="alert-list-add-alert-draft-dot"
+          />
+        </OButton>
       </template>
 
       <template #actions-overflow>
@@ -78,6 +87,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             side="bottom"
             shortcut-id="alertsImport"
           />
+        </OButton>
+        <OButton
+          v-if="showAlertLibrary"
+          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
+          variant="outline"
+          size="sm"
+          icon-left="menu-book"
+          data-test="alert-list-alert-library-btn"
+          @click="goToAlertLibrary"
+        >
+          <template v-if="!isCompactToolbar">{{ t("alerts.alertLibrary") }}</template>
+          <OTooltip v-if="isCompactToolbar" :content="t('alerts.alertLibrary')" side="bottom" />
         </OButton>
       </template>
 
@@ -106,7 +127,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               show-index
               row-key="alert_id"
               :loading="loading"
+              :loading-reset-key="`${activeFolderId}:${activeTab}`"
               :forbidden="forbidden"
+              forbidden-resource="alert_folders"
               pagination="client"
               :page-size="pageSize"
               :page-size-options="pageSizeOptions"
@@ -139,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OStatStrip
                     :items="summaryStats"
                     :loading="loading"
+                    compact
                     selectable
                     :selected-key="stateFilter"
                     default-key="total"
@@ -246,6 +270,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
                   <OTruncatedText>{{ row.name || "--" }}</OTruncatedText>
+                  <EditorDraftDot
+                    v-if="alertDrafts.ids.has(row.alert_id)"
+                    :saved-at="alertDrafts.savedAt(row.alert_id)"
+                    :data-test="`alert-list-${row.name}-draft-dot`"
+                  />
+                  <AckChip
+                    v-if="row.ack"
+                    :ack="row.ack"
+                    :data-test="`alert-list-${row.name}-acked`"
+                  />
                   <MutedChip
                     v-if="row.active_downtime"
                     :downtime="row.active_downtime"
@@ -471,6 +505,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     size="sm"
                   />
+                  <OTag
+                    v-else
+                    variant="default-soft"
+                    dot
+                    :label="t('alerts.groups.firingCount', { count: 0 })"
+                    size="sm"
+                    :data-test="`alert-list-${row.name}-groups-none-firing`"
+                  />
                   <span class="text-text-secondary text-2xs">
                     {{
                       t("alerts.groups.ofNGroups", {
@@ -504,6 +546,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon="notifications-paused"
                     size="sm"
                     :label="t('alerts.downtimes.mute.firingMuted')"
+                    :data-test="`alert-list-${row.name}-last-outcome`"
+                  />
+                </OTooltip>
+                <OTooltip v-else-if="isAckedFiring(row)" :content="runOutcomeTooltip(row)">
+                  <OTag
+                    variant="default-soft"
+                    icon="person"
+                    size="sm"
+                    :label="t('alerts.ack.firingAcknowledged')"
                     :data-test="`alert-list-${row.name}-last-outcome`"
                   />
                 </OTooltip>
@@ -667,12 +718,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       {{ t("common.move") }}
                     </ODropdownItem>
+                    <template v-if="canAcknowledgeRow(row)">
+                      <ODropdownSeparator />
+                      <ODropdownItem
+                        :data-test="`alert-list-${row.name}-acknowledge`"
+                        @select="acknowledgeRow(row)"
+                      >
+                        <template #icon-left>
+                          <OIcon name="check" size="sm" />
+                        </template>
+                        {{ t("alerts.ack.acknowledge") }}
+                      </ODropdownItem>
+                    </template>
                     <template v-if="downtimesEnabled">
                       <ODropdownSeparator />
+                      <template v-if="isAlertScopedMute(row) && row.active_downtime">
+                        <MuteMenuItems
+                          labels="extend"
+                          until-clear
+                          :data-test-prefix="`alert-list-${row.name}-extend`"
+                          @preset="(secs) => extendRow(row, { minutes: secs / 60 })"
+                          @until-clear="extendRow(row, { untilClear: true })"
+                          @until="openExtendUntil(row)"
+                        />
+                        <ODropdownItem
+                          variant="destructive"
+                          :data-test="`alert-list-${row.name}-end-mute`"
+                          @select="endRowMute(row)"
+                        >
+                          <template #icon-left>
+                            <OIcon name="notifications-active" size="sm" />
+                          </template>
+                          {{ t("alerts.downtimes.mute.endNow") }}
+                        </ODropdownItem>
+                      </template>
                       <MuteMenuItems
+                        v-else
                         :data-test-prefix="`alert-list-${row.name}-mute`"
-                        @preset="(secs) => muteAndRefresh([row], secs)"
-                        @until="openMuteDialog([row])"
+                        :until-clear="isAlertScopedMute(row)"
+                        @preset="(secs) => muteRowFor(row, secs)"
+                        @until-clear="muteRowUntilClear(row)"
+                        @until="openRowMuteDialog(row)"
                       />
                     </template>
                     <ODropdownSeparator />
@@ -746,16 +832,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OEmptyState
                   v-else
-                  size="hero"
+                  size="block"
                   preset="no-alerts"
                   :filtered="!!(filterQuery || searchQuery || stateFilter)"
                   @action="
                     (id) =>
-                      id === 'clear-filters'
-                        ? ((filterQuery = ''), (searchQuery = ''), (stateFilter = null))
-                        : showAddUpdateFn({})
+                      id === 'clear-filters' &&
+                      ((filterQuery = ''), (searchQuery = ''), (stateFilter = null))
                   "
-                />
+                >
+                  <!-- First run only: the filtered state keeps its single Clear filters action. -->
+                  <template v-if="!(filterQuery || searchQuery || stateFilter)" #actions>
+                    <OButton
+                      v-if="showAlertLibrary"
+                      variant="primary"
+                      size="lg"
+                      icon-left="menu-book"
+                      data-test="alert-list-empty-alert-library"
+                      @click="goToAlertLibrary"
+                    >
+                      {{ t("alerts.alertLibrary") }}
+                    </OButton>
+                    <OButton
+                      v-if="!showAlertLibrary"
+                      variant="primary"
+                      size="lg"
+                      icon-left="add"
+                      data-test="alert-list-empty-new-alert"
+                      @click="showAddUpdateFn({})"
+                    >
+                      {{ t("emptyState.noAlerts.action") }}
+                    </OButton>
+                    <OButton
+                      variant="outline"
+                      size="lg"
+                      icon-left="upload-file"
+                      data-test="alert-list-empty-import"
+                      @click="importAlert"
+                    >
+                      {{ t("alerts.importAlert") }}
+                    </OButton>
+                    <OButton
+                      v-if="showAlertLibrary"
+                      variant="outline"
+                      size="lg"
+                      icon-left="add"
+                      data-test="alert-list-empty-new-alert"
+                      @click="showAddUpdateFn({})"
+                    >
+                      {{ t("emptyState.noAlerts.action") }}
+                    </OButton>
+                  </template>
+                </OEmptyState>
               </template>
 
               <template #selection-actions>
@@ -804,8 +932,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <MuteMenuItems
                     data-test-prefix="alert-list-bulk-mute"
+                    :until-clear="!!bulkMuteAlert"
                     @preset="(secs) => muteAndRefresh(selectedAlerts, secs)"
-                    @until="openMuteDialog(selectedAlerts)"
+                    @until-clear="bulkMuteAlert && muteRowUntilClear(bulkMuteAlert)"
+                    @until="openBulkMuteDialog"
                   />
                 </ODropdown>
                 <OButton
@@ -850,7 +980,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('alerts.deleteAlertTitle')"
-      :message="t('alerts.deleteAlertMessage')"
+      message-keypath="alerts.deleteAlertMessage"
+      :message-name="selectedDelete?.name"
+      ok-variant="destructive"
       @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -859,6 +991,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('alerts.deleteAlertsTitle')"
       :message="t('alerts.confirmDeleteAlerts', { count: selectedAlerts.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteAlerts"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -935,7 +1068,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="downtimesEnabled"
       v-model:open="muteDialogOpen"
       :selection="muteSelection"
+      :alert="muteAlertContext"
       @muted="refreshAlerts"
+    />
+    <AlertMuteUntilDialog
+      v-if="downtimesEnabled"
+      v-model:open="extendUntilOpen"
+      :target="extendUntilRow ? rowActionTarget(extendUntilRow) : null"
+      :downtime="extendUntilRow ? rowMuteRef(extendUntilRow) : null"
+      @done="refreshAlerts"
     />
     <ExportResourceDialog
       v-model:open="showExportDialog"
@@ -1018,6 +1159,14 @@ import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import MutedChip from "./downtimes/MutedChip.vue";
+import AckChip from "./AckChip.vue";
+import AlertMuteUntilDialog from "./AlertMuteUntilDialog.vue";
+import {
+  useAlertActions,
+  type AlertActionTarget,
+  type AlertMuteRef,
+} from "@/composables/alerts/useAlertActions";
+import type { AlertMuteEnd, QuickMuteAlertContext } from "@/utils/downtimes/quickMute";
 import MuteMenuItems from "./downtimes/MuteMenuItems.vue";
 import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
 import { useRowMute } from "@/composables/downtimes/useRowMute";
@@ -1056,17 +1205,33 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import {
+  ALERT_DRAFT_KIND,
+  ANOMALY_DRAFT_VARIANT,
+  dropDraftOfMissingAlert,
+  findDeletedAlertIds,
+  isNotFoundError,
+  type AlertSavedOptions,
+} from "@/utils/alerts/alertEditorDraft";
 
 // import alertList from "./alerts";
+
+type AlertRowRef = { alert_id?: unknown; folder_name?: { id?: unknown } };
 
 export default defineComponent({
   name: "AlertList",
   components: {
     MutedChip,
+    AckChip,
+    AlertMuteUntilDialog,
     MuteMenuItems,
     QuickMuteDialog,
     OPageLayout,
     AddAlert: defineAsyncComponent(() => import("@/components/alerts/AddAlert.vue")),
+    EditorDraftDot,
     OEmptyState,
     ConfirmDialog,
     ImportAlert,
@@ -1143,7 +1308,8 @@ export default defineComponent({
       searchQuery: "",
       filterQuery: "",
       searchAcrossFolders: false,
-      stateFilter: null as "active" | "paused" | "failed" | "firing" | "recent" | null,
+      stateFilter: null as
+        "active" | "paused" | "failed" | "firing" | "acknowledged" | "recent" | null,
       sortBy: "",
       sortOrder: "asc" as "asc" | "desc",
       perPage: 20,
@@ -1156,6 +1322,13 @@ export default defineComponent({
     );
     const showAddAlertDialog: any = ref(false);
     const selectedDelete: any = ref(null);
+    const alertDrafts = useEditorDraftIds(ALERT_DRAFT_KIND);
+    const dropAlertDrafts = (alertIds: string[]) => {
+      const org = String(store.state.selectedOrganization?.identifier ?? "");
+      alertIds.forEach((entityId) =>
+        deleteEditorDraftsFor({ kind: ALERT_DRAFT_KIND, org, entityId }),
+      );
+    };
     const isUpdated: any = ref(false);
     /**
      * Render a multi-alert group count, marking it as a lower bound when the
@@ -1284,7 +1457,8 @@ export default defineComponent({
         params: { alert_id: row.alert_id },
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: row.folder_id || router.currentRoute.value.query.folder || "default",
+          // The row's own folder: a cross-folder search lists alerts of other folders.
+          folder: row.folder_name?.id,
           tab: activeTab.value,
         },
       });
@@ -1328,6 +1502,18 @@ export default defineComponent({
     );
 
     const filteredResults: Ref<any[]> = ref([]);
+    // The Add button opens a new anomaly detection on the anomaly tab, which drafts in its own slot.
+    const hasNewDraft = computed(() =>
+      activeTab.value === "anomalyDetection"
+        ? alertDrafts.hasNewVariant(ANOMALY_DRAFT_VARIANT)
+        : alertDrafts.hasNew,
+    );
+    // The date belongs to the draft this tab's Add button opens.
+    const newDraftSavedAt = computed(() =>
+      activeTab.value === "anomalyDetection"
+        ? alertDrafts.savedAtVariant(ANOMALY_DRAFT_VARIANT)
+        : alertDrafts.savedAt(null),
+    );
 
     // ── "Calm Signal" table helpers ─────────────────────────────────────────
     // Keyed on firing time, not run time; raw µs keeps it timezone-independent.
@@ -1428,6 +1614,9 @@ export default defineComponent({
     const isFiringRow = (row: any): boolean =>
       showRunOutcome(row) && isFiringOutcome(row?.last_outcome);
 
+    // The list's ack exists only while it is in force, so it needs no firing check of its own.
+    const isAckedFiring = (row: any): boolean => isFiringRow(row) && !!row?.ack;
+
     // Never present the outcome as live state: it is the result of the LAST
     // evaluation, so it is always qualified with when that ran.
     const runOutcomeTooltip = (row: any) => {
@@ -1500,6 +1689,7 @@ export default defineComponent({
       let paused = 0;
       let failed = 0;
       let firing = 0;
+      let acknowledged = 0;
       let recent = 0;
       for (const r of rows) {
         // active = unpaused (enabled); paused = disabled. These two partition the
@@ -1510,9 +1700,10 @@ export default defineComponent({
         if (r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed")
           failed += 1;
         if (isFiringRow(r)) firing += 1;
+        if (isAckedFiring(r)) acknowledged += 1;
         if (recencyLevel(r.last_satisfied_at_raw) === "hot") recent += 1;
       }
-      return { active, paused, failed, firing, recent, total: rows.length };
+      return { active, paused, failed, firing, acknowledged, recent, total: rows.length };
     });
 
     // Stat tiles for the summary strip. `tone` is the single source of colour so
@@ -1544,6 +1735,15 @@ export default defineComponent({
           tone: "error",
           max: share,
           dataTest: "alert-summary-firing",
+        },
+        {
+          key: "acknowledged",
+          label: t("alerts.ack.tile"),
+          value: v(c.acknowledged),
+          icon: "person",
+          tone: "blue",
+          max: share,
+          dataTest: "alert-summary-acknowledged",
         },
         {
           key: "recent",
@@ -1590,14 +1790,15 @@ export default defineComponent({
     // Clicking a summary tile filters the table to that state (toggle); the
     // "total" tile clears it. Counts on the tiles stay full (from filteredResults)
     // so you always see the folder totals; only the table rows are filtered.
-    const stateFilter = ref<"active" | "paused" | "failed" | "firing" | "recent" | null>(
-      savedAlertListFilters.stateFilter,
-    );
+    const stateFilter = ref<
+      "active" | "paused" | "failed" | "firing" | "acknowledged" | "recent" | null
+    >(savedAlertListFilters.stateFilter);
     const displayedAlerts = computed(() => {
       const rows = filteredResults.value || [];
       const f = stateFilter.value;
       if (!f) return rows;
       if (f === "firing") return rows.filter(isFiringRow);
+      if (f === "acknowledged") return rows.filter(isAckedFiring);
       if (f === "recent")
         return rows.filter((r: any) => recencyLevel(r.last_satisfied_at_raw) === "hot");
       if (f === "failed")
@@ -1616,7 +1817,7 @@ export default defineComponent({
       stateFilter.value =
         stateFilter.value === key
           ? null
-          : (key as "active" | "paused" | "failed" | "firing" | "recent");
+          : (key as "active" | "paused" | "failed" | "firing" | "acknowledged" | "recent");
     };
 
     const activeFolderToMove = ref("default");
@@ -1684,7 +1885,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.status,
+          size: 176,
           minSize: 130,
           meta: { align: "left" },
         },
@@ -2125,6 +2326,7 @@ export default defineComponent({
             last_outcome_at: data.last_outcome_at ?? null,
             last_outcome_since: data.last_outcome_since ?? null,
             active_downtime: data.active_downtime ?? null,
+            ack: data.ack ?? null,
             selected: false,
             type: data.condition.type,
             // The SLO this alert belongs to (Feature 5, Phase 2). Read from the
@@ -2228,7 +2430,6 @@ export default defineComponent({
         console.error(error);
         dismiss();
         forbidden.value = error?.response?.status === 403;
-        // The grouped access toast already reports a 403; a second red toast adds nothing.
         if (!forbidden.value) {
           toast({
             variant: "error",
@@ -2353,6 +2554,99 @@ export default defineComponent({
       const id = await muteRows(rows, seconds);
       if (id) await refreshAlerts();
       return id;
+    };
+
+    // ── Acknowledge and the alert's own mute (MK-3) ─────────────────────────
+    const alertActions = useAlertActions();
+    const extendUntilOpen = ref(false);
+    const extendUntilRow = ref<any>(null);
+
+    // Anomaly configs have no alert-scoped routes, so they keep the generic downtime mute.
+    const isAlertScopedMute = (row: any): boolean => row?.type !== "anomaly";
+
+    const rowActionTarget = (row: any): AlertActionTarget => ({
+      alertId: String(row.alert_id),
+      name: row.name,
+      folderId: row.folder_name?.id || undefined,
+    });
+
+    const rowMuteRef = (row: any): AlertMuteRef | null =>
+      row?.active_downtime
+        ? {
+            id: row.active_downtime.id,
+            ends_at: row.active_downtime.ends_at,
+            version: row.active_downtime.version,
+          }
+        : null;
+
+    // A multi-alert is offered Acknowledge while any firing group is still un-acked.
+    const canAcknowledgeRow = (row: any): boolean => {
+      if (!isAlertScopedMute(row) || !isFiringRow(row)) return false;
+      if (!row.ack) return true;
+      return !!row.multi_alert && (row.ack.groups_acked ?? 0) < (row.groups_firing ?? 0);
+    };
+
+    const refreshAfter = async (ok: boolean) => {
+      if (ok) await refreshAlerts();
+      return ok;
+    };
+
+    const acknowledgeRow = async (row: any) =>
+      refreshAfter(
+        await alertActions.acknowledge(
+          rowActionTarget(row),
+          row.multi_alert ? { allGroups: true } : {},
+        ),
+      );
+
+    const muteRowWith = async (row: any, end: AlertMuteEnd) =>
+      refreshAfter(await alertActions.mute(rowActionTarget(row), end));
+
+    const muteRowFor = async (row: any, seconds: number) =>
+      isAlertScopedMute(row)
+        ? muteRowWith(row, { minutes: Math.round(seconds / 60) })
+        : muteAndRefresh([row], seconds);
+
+    const muteRowUntilClear = (row: any) => muteRowWith(row, { untilClear: true });
+
+    const extendRow = async (row: any, end: AlertMuteEnd) => {
+      const downtime = rowMuteRef(row);
+      if (!downtime) return false;
+      return refreshAfter(await alertActions.extend(rowActionTarget(row), downtime, end));
+    };
+
+    const endRowMute = async (row: any) => {
+      const downtime = rowMuteRef(row);
+      if (!downtime) return false;
+      return refreshAfter(await alertActions.endMute(rowActionTarget(row), downtime.id));
+    };
+
+    // Until… for one alert opens the alert-scoped Quick Mute, so an on-call responder can use it.
+    const muteAlertContext = ref<QuickMuteAlertContext | null>(null);
+
+    const openRowMuteDialog = (row: any) => {
+      muteAlertContext.value = isAlertScopedMute(row) ? rowActionTarget(row) : null;
+      openMuteDialog([row]);
+    };
+
+    const bulkMuteAlert = computed(() =>
+      selectedAlerts.value.length === 1 && isAlertScopedMute(selectedAlerts.value[0])
+        ? selectedAlerts.value[0]
+        : null,
+    );
+
+    const openBulkMuteDialog = () => {
+      if (bulkMuteAlert.value) {
+        openRowMuteDialog(bulkMuteAlert.value);
+        return;
+      }
+      muteAlertContext.value = null;
+      openMuteDialog(selectedAlerts.value);
+    };
+
+    const openExtendUntil = (row: any) => {
+      extendUntilRow.value = row;
+      extendUntilOpen.value = true;
     };
 
     const refreshAlerts = async () => {
@@ -2506,12 +2800,29 @@ export default defineComponent({
           if (!(await divertSloAlert(alert))) {
             showAddUpdateFn({ row: alert });
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("AlertList: Failed to load alert", error);
-          toast({
-            variant: "error",
-            message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
-          });
+          if (error?.response?.status === 403) return;
+          const draftDropped =
+            isNotFoundError(error) &&
+            dropDraftOfMissingAlert({
+              org: String(store.state.selectedOrganization?.identifier ?? ""),
+              entityId: alertId,
+              userEmail: String(store.state.userInfo?.email ?? ""),
+            });
+          toast(
+            draftDropped
+              ? {
+                  variant: "info",
+                  message: t("common.editorDraft.itemDeleted", {
+                    entity: t("common.editorDraft.entities.alert"),
+                  }),
+                }
+              : {
+                  variant: "error",
+                  message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
+                },
+          );
         }
       }
 
@@ -2545,12 +2856,13 @@ export default defineComponent({
         .then((list: any) => {
           destinations.value = list as any;
         })
-        .catch(() =>
+        .catch((err: { response?: { status?: number } }) => {
+          if (err?.response?.status === 403) return;
           toast({
             variant: "error",
             message: t("toastMessages.alerts.errorWhileFetchingDestinations"),
-          }),
-        );
+          });
+        });
     };
 
     const getTemplates = (force = false) => {
@@ -2568,12 +2880,13 @@ export default defineComponent({
         .then((list: any) => {
           templates.value = list;
         })
-        .catch(() =>
+        .catch((err: { response?: { status?: number } }) => {
+          if (err?.response?.status === 403) return;
           toast({
             variant: "error",
             message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
-          }),
-        );
+          });
+        });
     };
     // The form's refresh event carries no payload, so a bare `getTemplates` handler would never see `force`.
     const refreshTemplates = () => getTemplates(true);
@@ -2706,6 +3019,10 @@ export default defineComponent({
           activeFolderId.value = folderIdToBeCloned.value;
         } catch (e: any) {
           dismiss();
+          if (e?.response?.status === 403) {
+            showForm.value = false;
+            return;
+          }
           toast({
             variant: "error",
             message: e?.response?.data?.message || t("alerts.messages.cloneAnomalyFailed"),
@@ -2749,6 +3066,10 @@ export default defineComponent({
           activeFolderId.value = folderIdToBeCloned.value;
         } catch (e: any) {
           dismiss();
+          if (e?.response?.status === 403) {
+            showForm.value = false;
+            return;
+          }
           toast({
             variant: "error",
             message: e?.response?.data?.message,
@@ -2827,12 +3148,12 @@ export default defineComponent({
             }
           })
           .catch((e: any) => {
+            dismiss();
             if (e.response?.status == 403) {
               showForm.value = false;
               isSubmitting.value = false;
               return;
             }
-            dismiss();
             toast({
               variant: "error",
               message: e.response.data.message,
@@ -2850,7 +3171,7 @@ export default defineComponent({
         });
       }
     };
-    const refreshList = async (folderId?: string) => {
+    const refreshList = async (folderId?: string, options?: AlertSavedOptions) => {
       //here we are fetching the alerts from the server because after creating the alert we should get the latest alerts
       //and then we are setting the activeFolderId to the folderId
       //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
@@ -2870,6 +3191,8 @@ export default defineComponent({
       if (filterQuery.value) {
         filterAlertsByQuery(filterQuery.value);
       }
+      // The leave dialog's Save: the pending navigation decides where the user goes.
+      if (options?.navigate === false) return;
       await hideForm();
       activeFolderId.value = resolvedFolderId;
     };
@@ -2945,6 +3268,7 @@ export default defineComponent({
     const dropAlerts = (alertIds: any[]) => {
       const gone = new Set(alertIds.filter(Boolean).map((id: any) => String(id)));
       if (!gone.size) return;
+      dropAlertDrafts([...gone]);
 
       const keep = (row: any) => !gone.has(String(row?.alert_id));
       // Read before the splice below removes the rows this has to inspect.
@@ -3150,6 +3474,18 @@ export default defineComponent({
       });
     };
 
+    // Raw split (no trim), the same rule AlertSectionTabs hides the Library tab by.
+    const showAlertLibrary = computed(
+      () => !(store.state.zoConfig?.custom_hide_menus ?? "").split(",").includes("alertLibrary"),
+    );
+
+    const goToAlertLibrary = () => {
+      router.push({
+        name: "alertLibrary",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    };
+
     const goToAlertInsights = () => {
       router.push({
         name: "alertInsights",
@@ -3208,6 +3544,7 @@ export default defineComponent({
         alertsToExport.value = [alert];
         showExportDialog.value = true;
       } catch (error: any) {
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message:
@@ -3250,6 +3587,7 @@ export default defineComponent({
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
         }
       } catch (error: any) {
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message: error?.response?.data?.message || t("alerts.messages.triggerAlertFailed"),
@@ -3268,6 +3606,7 @@ export default defineComponent({
           message: t("toastMessages.alerts.retrainingTriggered"),
         });
       } catch (error: any) {
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message: error?.response?.data?.message || t("alerts.messages.triggerRetrainingFailed"),
@@ -3562,8 +3901,9 @@ export default defineComponent({
             }),
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error exporting alerts:", error);
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message: t("toastMessages.alerts.errorExportingAlertsPleaseTryAgain"),
@@ -3697,9 +4037,10 @@ export default defineComponent({
         if (filterQuery.value) {
           filterAlertsByQuery(filterQuery.value);
         }
-      } catch (error) {
+      } catch (error: any) {
         dismiss();
         console.error(`Error ${action}ing alerts:`, error);
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message:
@@ -3801,11 +4142,17 @@ export default defineComponent({
             response.data.successful.map((entry: any) => entry?.alert_id ?? entry?.id ?? entry),
           );
         } else {
+          const org = String(store.state.selectedOrganization.identifier);
+          const requested = selectedAlerts.value.map((row: AlertRowRef) => String(row?.alert_id));
           selectedAlerts.value = [];
           // Forced: the point of this branch is to hear it from the server, and an
           // unforced read inside staleTime answers from cache without asking.
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
           if (filterQuery.value) filterAlertsByQuery(filterQuery.value);
+          // The list may now show another folder, so each alert is asked for by id and only a 404 proves it gone.
+          dropAlertDrafts(
+            await findDeletedAlertIds(requested, (id) => alertsService.get_by_alert_id(org, id)),
+          );
         }
       } catch (error: any) {
         dismiss();
@@ -3815,7 +4162,7 @@ export default defineComponent({
           error.response?.data?.message ||
           error?.message ||
           t("alerts.messages.bulkDeleteAlertsFailed");
-        if (error.response?.status != 403 || error?.status != 403) {
+        if (error.response?.status !== 403 && error?.status !== 403) {
           toast({
             variant: "error",
             message: errorMessage,
@@ -3922,6 +4269,9 @@ export default defineComponent({
       showDeleteDialogFn,
       duplicateAlert,
       showAddAlertDialog,
+      alertDrafts,
+      hasNewDraft,
+      newDraftSavedAt,
       showForm,
       toBeCloneAlertName,
       toBeClonedAlert,
@@ -3954,6 +4304,23 @@ export default defineComponent({
       alertStateLoadingMap,
       showRunOutcome,
       isMutedFiring,
+      isAckedFiring,
+      canAcknowledgeRow,
+      acknowledgeRow,
+      isAlertScopedMute,
+      rowActionTarget,
+      rowMuteRef,
+      muteAlertContext,
+      openRowMuteDialog,
+      bulkMuteAlert,
+      openBulkMuteDialog,
+      muteRowFor,
+      muteRowUntilClear,
+      extendRow,
+      endRowMute,
+      openExtendUntil,
+      extendUntilOpen,
+      extendUntilRow,
       runOutcomeTooltip,
       toggleAlertState,
       templates,
@@ -3961,6 +4328,8 @@ export default defineComponent({
       refreshDestination,
       showImportAlertDialog,
       importAlert,
+      showAlertLibrary,
+      goToAlertLibrary,
       goToAlertInsights,
       goToAlertHistory,
       getTemplates,

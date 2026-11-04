@@ -64,6 +64,9 @@ pub fn matching_blocks(index: &Index, matchers: &Matchers) -> Result<Vec<usize>>
                 .field_with_name(&matcher.name)
                 .is_err()
             {
+                if matcher.is_match("") {
+                    continue;
+                }
                 return Ok(Vec::new());
             }
             bail!("MIDX lacks identity label {}", matcher.name);

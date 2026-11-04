@@ -16,11 +16,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
+import { defineComponent } from "vue";
 import i18n from "@/locales";
 import slack from "@/services/slack";
 import SlackSelfHostedWizard from "./SlackSelfHostedWizard.vue";
 import {
-  ConfirmDialogStub,
   FAKE_APP_TOKEN,
   FAKE_CONFIG_ACCESS_TOKEN,
   FAKE_CONFIG_REFRESH_TOKEN,
@@ -92,11 +92,32 @@ const errorHandler = vi.fn();
 const metaStore = () =>
   createStore({
     state: {
-      selectedOrganization: { identifier: "_meta", name: "_meta" },
+      selectedOrganization: { identifier: "_meta", label: "_meta" },
       userInfo: { email: "root@acme.example" },
       zoConfig: { slack_enabled: true, meta_org: "_meta" },
     },
   });
+
+// Adds the named-message props the shared stub does not declare.
+const NamedConfirmDialogStub = defineComponent({
+  name: "ConfirmDialog",
+  props: {
+    modelValue: { type: Boolean, default: false },
+    title: { type: String, default: "" },
+    message: { type: String, default: "" },
+    messageKeypath: { type: String, default: "" },
+    messageName: { type: String, default: "" },
+    okLabel: { type: String, default: "" },
+    okVariant: { type: String, default: "primary" },
+  },
+  emits: ["update:ok", "update:cancel", "update:modelValue"],
+  template: `
+    <div v-if="modelValue" data-test-stub="confirm-dialog">
+      <span data-test-stub="confirm-message">{{ message }}</span>
+      <span data-test-stub="confirm-name">{{ messageName }}</span>
+      <button data-test-stub="confirm-ok" @click="$emit('update:modelValue', false); $emit('update:ok')">{{ okLabel }}</button>
+    </div>`,
+});
 
 const mountWizard = async (
   installation: InstallationView | null = null,
@@ -109,7 +130,7 @@ const mountWizard = async (
     global: {
       plugins: [i18n, store],
       config: { errorHandler },
-      stubs: { OTable: OTableStub, ConfirmDialog: ConfirmDialogStub },
+      stubs: { OTable: OTableStub, ConfirmDialog: NamedConfirmDialogStub },
     },
   });
   await flushPromises();
@@ -212,12 +233,30 @@ describe("SlackSelfHostedWizard Step 0", () => {
     expect(w.find('[data-test="slack-wizard-next"]').attributes("disabled")).toBeUndefined();
   });
 
-  it("R-37 the no-Helm hint names only the master key, never a super-cluster key", async () => {
+  it("R-37 / S7 the no-Helm hint shows only under a failing master-key check, and never names a super-cluster key", async () => {
+    vi.mocked(slack.getPrerequisites).mockReturnValue(
+      ok({
+        checks: [
+          {
+            id: "master_key",
+            status: "fail",
+            detail: "Not set",
+            variable: "O2_MASTER_ENCRYPTION_KEY",
+            fix: "openssl rand -base64 64",
+          },
+        ],
+      }) as any,
+    );
     const w = await mountWizard();
-    expect(w.text()).toContain(
-      "Installed without Helm? Set O2_MASTER_ENCRYPTION_KEY, restart, then Re-check.",
+    expect(w.find('[data-test="slack-prereq-helm-hint"]').text()).toBe(
+      "Installed without Helm? Set it in the server environment, restart, then Re-check.",
     );
     expect(w.text()).not.toMatch(/super.cluster|replicat|O2_SUPER_CLUSTER_SECRET_KEY/i);
+
+    vi.mocked(slack.getPrerequisites).mockReturnValue(ok({ checks: passing }) as any);
+    await w.find('[data-test="slack-prereq-recheck"]').trigger("click");
+    await flushPromises();
+    expect(w.text()).not.toContain("Installed without Helm");
   });
 
   it("AC-7.1 blocks Next while a check fails", async () => {
@@ -294,6 +333,30 @@ describe("SlackSelfHostedWizard Step 2", () => {
       expect(w.find(`[data-test="slack-wizard-${field}"]`).exists()).toBe(false);
     }
     expect(w.text()).not.toMatch(/xoxb/);
+  });
+
+  it("S9 switches the path from a link under the token field, never from the footer", async () => {
+    const w = await toStep2();
+    expect(w.find('[data-test="slack-wizard-token-help"]').text()).toContain(
+      "paste the refresh token",
+    );
+    const footer = w.find('[data-test="slack-wizard-create"]').element.parentElement!;
+    const labels = () =>
+      Array.from(footer.querySelectorAll("button")).map((b) => b.textContent?.trim());
+    expect(labels()).toEqual(["Back", "Create the app"]);
+    const link = w.find('[data-test="slack-wizard-manual"]');
+    expect(link.text()).toBe("No configuration token? Set up manually");
+    expect(
+      w
+        .find('[data-test="slack-wizard-config-token"]')
+        .element.compareDocumentPosition(link.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await link.trigger("click");
+    await flushPromises();
+    expect(w.find('[data-test="slack-wizard-manual"]').text()).toBe(
+      "Use a configuration token instead",
+    );
+    expect(labels()).toEqual(["Back", "Save credentials"]);
   });
 
   it("AC-7.3 creates the app from the configuration token and moves to Install", async () => {
@@ -476,7 +539,10 @@ describe("SlackSelfHostedWizard Step 3", () => {
   it("AC-7.8 Start over removes the pending app and returns to Create the app", async () => {
     const w = await mountWizard(pending);
     await w.find('[data-test="slack-wizard-start-over"]').trigger("click");
-    expect(w.find('[data-test-stub="confirm-message"]').text()).toContain("A0SAMPLE01");
+    expect(w.find('[data-test-stub="confirm-name"]').text()).toBe("A0SAMPLE01");
+    const dialog = w.findComponent(NamedConfirmDialogStub);
+    expect(dialog.props("messageKeypath")).toBe("slackApp.wizard.install.startOverMessage");
+    expect(dialog.props("okVariant")).toBe("destructive");
     await w.find('[data-test-stub="confirm-ok"]').trigger("click");
     await flushPromises();
     expect(slack.uninstallInstallation).toHaveBeenCalledWith("acme", "inst-1");
@@ -881,6 +947,50 @@ describe("SlackSelfHostedWizard on an instance workspace's team (M3, R-81, R-82)
     });
     expect(slack.uninstallInstallation).toHaveBeenCalledWith("_meta", "inst-1");
     expect(w.emitted("done")).toHaveLength(1);
+  });
+
+  it("S10 says OpenObserve was unreachable when the create request gets no response", async () => {
+    vi.mocked(slack.createInstallation).mockReturnValue(
+      Promise.reject(
+        Object.assign(new Error("Network Error"), { code: "ERR_NETWORK", request: {} }),
+      ) as any,
+    );
+    const w = await mountWizard();
+    await toCreate(w);
+    await submitToken(w);
+    expect(step(w)).toBe("2");
+    const banner = w.find('[data-test="slack-wizard-unreachable"]');
+    expect(banner.attributes("role")).toBe("alert");
+    expect(banner.text()).toContain("Couldn't reach OpenObserve. Nothing was created.");
+    expect(banner.text()).toContain("http vs https");
+    expect(banner.text()).toContain("POST /api/acme/slack/installations · no response");
+    expect(w.find('[data-test="slack-wizard-create-error"]').exists()).toBe(false);
+    expect(w.text()).not.toContain("Unknown error");
+    const token = w.find('[data-test="slack-wizard-config-token"] input')
+      .element as HTMLInputElement;
+    expect(token.value).toBe("xoxe-1-sample");
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it("S10 the unreachable banner in Set up manually names no token and no Create button", async () => {
+    vi.mocked(slack.createInstallation).mockReturnValue(
+      Promise.reject(
+        Object.assign(new Error("Network Error"), { code: "ERR_NETWORK", request: {} }),
+      ) as any,
+    );
+    const w = await mountWizard();
+    await toCreate(w);
+    await w.find('[data-test="slack-wizard-manual"]').trigger("click");
+    await flushPromises();
+    await w.find('[data-test="slack-wizard-client-id"] input').setValue("1.2");
+    await w.find('[data-test="slack-wizard-client-secret"] input').setValue("sec");
+    await w.find('[data-test="slack-wizard-create-form"]').trigger("submit");
+    await vi.waitFor(() =>
+      expect(w.find('[data-test="slack-wizard-unreachable"]').exists()).toBe(true),
+    );
+    const banner = w.find('[data-test="slack-wizard-unreachable"]').text();
+    expect(banner).toContain("http vs https");
+    expect(banner).not.toMatch(/token|Create the app/i);
   });
 
   it("a refused config token shows the server message verbatim", async () => {

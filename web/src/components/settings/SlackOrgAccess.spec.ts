@@ -180,6 +180,10 @@ describe("SlackOrgAccess (row 24, mockup M1)", () => {
     const confirm = body().find('[data-test="slack-org-access-confirm"]');
     expect(confirm.text()).toContain("Remove staging from Acme Corp?");
     expect(confirm.text()).toContain("People in staging stop getting answers from Acme Corp.");
+    expect(
+      confirm.find('[data-test="slack-org-access-removal-lead"] span.font-semibold').text(),
+    ).toBe("staging");
+    expect(dialogButton("o-dialog-primary-btn")!.classes()).toContain("bg-button-destructive");
     expect(confirm.text()).toContain("1 channel default is removed (#staging-alerts)");
     expect(confirm.text()).toContain(
       "12 linked people: 9 move to another org they belong to, 3 are unlinked",

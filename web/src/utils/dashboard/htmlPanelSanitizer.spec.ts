@@ -136,7 +136,7 @@ describe("htmlPanelSanitizer", () => {
           "<div title='${x}'>Hello ${x}</div>",
           { values: [{ name: "x", type: "textbox", value: payload }] },
           undefined,
-          escapeHtmlValue,
+          { escapeValue: escapeHtmlValue },
         ),
       );
 
@@ -153,7 +153,7 @@ describe("htmlPanelSanitizer", () => {
             "<style>.a { font-family: ${x}; }</style><p>ok</p>",
             { values: [{ name: "x", type: "textbox", value }] },
             undefined,
-            escapeHtmlValue,
+            { escapeValue: escapeHtmlValue },
           ),
         );
 
@@ -174,12 +174,110 @@ describe("htmlPanelSanitizer", () => {
           "<a class=${x}>t</a>",
           { values: [{ name: "x", type: "textbox", value }] },
           undefined,
-          escapeHtmlValue,
+          { escapeValue: escapeHtmlValue },
         ),
       );
 
       expect(out.querySelector("a")?.hasAttribute("style")).toBe(false);
       expect(out.querySelector("a")?.getAttribute("class")).toBe(value);
+    });
+
+    it("keeps target=_blank on links and forms and forces rel=noopener noreferrer", () => {
+      const out = render(
+        '<a href="https://example.com/a" target="_blank" rel="opener">a</a>' +
+          '<a href="https://example.com/b" target=" _BLANK ">b</a>' +
+          '<form action="https://example.com/f" target="_blank"></form>',
+      );
+      const [a, b] = Array.from(out.querySelectorAll("a"));
+      const form = out.querySelector("form");
+
+      expect(a.getAttribute("target")).toBe("_blank");
+      expect(a.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(b.getAttribute("target")).toBe("_blank");
+      expect(b.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(form?.getAttribute("target")).toBe("_blank");
+      expect(form?.getAttribute("rel")).toBe("noopener noreferrer");
+    });
+
+    it("applies the same target rule to area and SVG links", () => {
+      const out = render(
+        '<map name="m"><area href="https://example.com/a" target="_blank"><area href="/x" target="f1"></map>' +
+          '<svg><a href="https://example.com/s" target="_blank"><text>s</text></a><a href="/y" target="f1"><text>t</text></a></svg>',
+      );
+      const [area, namedArea] = Array.from(out.querySelectorAll("area"));
+      const [svgLink, namedSvgLink] = Array.from(out.querySelectorAll("svg a"));
+
+      expect(area.getAttribute("target")).toBe("_blank");
+      expect(area.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(namedArea.hasAttribute("target")).toBe(false);
+      expect(svgLink.getAttribute("target")).toBe("_blank");
+      expect(svgLink.getAttribute("rel")).toBe("noopener noreferrer");
+      expect(namedSvgLink.hasAttribute("target")).toBe(false);
+    });
+
+    it("drops any target other than _blank and leaves untargeted links alone", () => {
+      const out = render(
+        '<iframe name="f1" src="https://example.com"></iframe>' +
+          '<a href="/web/x" target="f1">named</a>' +
+          '<a href="https://example.com" target="_top">top</a>' +
+          '<form action="/web/x" target="f1"></form>' +
+          '<a href="https://example.com" rel="nofollow">plain</a>',
+      );
+      const [named, top, plain] = Array.from(out.querySelectorAll("a"));
+
+      expect(named.hasAttribute("target")).toBe(false);
+      expect(top.hasAttribute("target")).toBe(false);
+      expect(out.querySelector("form")?.hasAttribute("target")).toBe(false);
+      expect(plain.hasAttribute("target")).toBe(false);
+      expect(plain.getAttribute("rel")).toBe("nofollow");
+    });
+
+    it("handles a form whose own attribute methods are shadowed by named controls", () => {
+      const shadow = () => {
+        throw new Error("shadowed");
+      };
+      // jsdom has no form named-property getters, so shadow the prototype instead
+      Object.defineProperty(HTMLFormElement.prototype, "getAttribute", {
+        value: shadow,
+        configurable: true,
+      });
+      try {
+        const [blank, named] = Array.from(
+          render(
+            '<form action="https://example.com/f" target="_blank"></form>' +
+              '<form action="https://example.com/g" target="f1"></form>',
+          ).querySelectorAll("form"),
+        );
+        expect(Element.prototype.getAttribute.call(blank, "target")).toBe("_blank");
+        expect(Element.prototype.getAttribute.call(blank, "rel")).toBe("noopener noreferrer");
+        expect(Element.prototype.hasAttribute.call(named, "target")).toBe(false);
+      } finally {
+        Reflect.deleteProperty(HTMLFormElement.prototype, "getAttribute");
+      }
+    });
+
+    it("drops a form whose nodeName is shadowed by a named control, without throwing", () => {
+      Object.defineProperty(HTMLFormElement.prototype, "nodeName", {
+        get: () => document.createElement("input"),
+        configurable: true,
+      });
+      try {
+        const out = render(
+          '<form action="https://example.com/f" target="_blank"></form>' +
+            '<a href="https://example.com" target="_blank">x</a>',
+        );
+        expect(out.querySelector("form")).toBeNull();
+        expect(out.querySelector("a")?.getAttribute("rel")).toBe("noopener noreferrer");
+      } finally {
+        Reflect.deleteProperty(HTMLFormElement.prototype, "nodeName");
+      }
+    });
+
+    it("keeps no javascript: href on a _blank link", () => {
+      const link = render('<a href="javascript:alert(1)" target="_blank">x</a>').querySelector("a");
+
+      expect(link?.hasAttribute("href")).toBe(false);
+      expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
     });
 
     it("registers its iframe hook once, on a private DOMPurify instance", () => {

@@ -13,12 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { computed } from "vue";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import SlackPrerequisites from "./SlackPrerequisites.vue";
 import type { SlackPrerequisiteCheck } from "@/types/slack";
 import { OTableStub } from "@/test/unit/helpers/slack";
+
+const breakpoint = vi.hoisted(() => ({ mobile: false }));
+vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/composables/useBreakpoint")>();
+  return {
+    ...original,
+    default: () => ({
+      ...original.default(),
+      isMobile: computed(() => breakpoint.mobile),
+      mdUp: computed(() => !breakpoint.mobile),
+    }),
+  };
+});
+
+const SUMMARY = '[data-test="slack-prereq-summary"]';
+const HELM_HINT =
+  "Installed without Helm? Set it in the server environment, restart, then Re-check.";
 
 // Row 3 shape (ENT prereq::prerequisites).
 const checks: SlackPrerequisiteCheck[] = [
@@ -87,12 +105,62 @@ describe("SlackPrerequisites", () => {
     expect(w.emitted("blocking")?.at(-1)).toEqual([true]);
   });
 
-  it("reports nothing blocking once every check passes or warns", () => {
+  it("S4 reports nothing blocking but still counts the warning once no check fails", () => {
     const w = mountChecks(checks.filter((c) => c.status !== "fail"));
-    expect(w.find('[data-test="slack-prereq-summary"]').text()).toContain(
-      "Every prerequisite passes",
-    );
+    const summary = w.find(SUMMARY).text();
+    expect(summary).toContain("All required checks pass");
+    expect(summary).toContain("1 warning");
+    expect(summary).toContain("you can continue");
+    expect(summary).not.toContain("Every prerequisite passes");
+    expect(w.find('[data-test="slack-prereq-can-continue"]').classes()).toContain("max-md:hidden");
     expect(w.emitted("blocking")?.at(-1)).toEqual([false]);
+  });
+
+  it("wraps a long fix command inside its box instead of running under the copy icon", () => {
+    const fix = mountChecks().findAll('[data-test="slack-prereq-fix"]')[0];
+    expect(fix.classes()).toEqual(
+      expect.arrayContaining(["[&>code]:whitespace-pre-wrap", "[&>code]:wrap-anywhere"]),
+    );
+  });
+
+  it("S4 says every prerequisite passes only without warnings, and adds the warnings to a failure", () => {
+    const clean = mountChecks(checks.filter((c) => c.status === "pass"));
+    expect(clean.find(SUMMARY).text()).toBe("Every prerequisite passes");
+    const both = mountChecks().find(SUMMARY).text();
+    expect(both).toContain("1 of 4 failed");
+    expect(both).toContain("1 warning");
+  });
+
+  it("S7 shows the no-Helm hint under the master-key row only while that check fails", () => {
+    expect(mountChecks().text()).not.toContain("Installed without Helm");
+    const failing = checks.map((c) =>
+      c.id === "master_key"
+        ? { ...c, status: "fail" as const, detail: "Not set", fix: "O2_MASTER_ENCRYPTION_KEY=…" }
+        : c,
+    );
+    const rows = mountChecks(failing).findAll('[data-test-stub="otable-row"]');
+    expect(rows[0].find('[data-test="slack-prereq-helm-hint"]').text()).toBe(HELM_HINT);
+    expect(rows[3].find('[data-test="slack-prereq-helm-hint"]').exists()).toBe(false);
+  });
+
+  it("S12 stacks each check above its result below md instead of a table", () => {
+    breakpoint.mobile = true;
+    try {
+      const w = mountChecks();
+      expect(w.find('[data-test-stub="otable"]').exists()).toBe(false);
+      const row = w.find('[data-test="slack-prereq-row-web_url"]');
+      expect(row.text()).toContain("ZO_WEB_URL");
+      expect(row.text()).toContain("Is http://localhost:5080; Slack needs https");
+      expect(row.find('[data-test="slack-prereq-fix"]').text()).toContain(
+        "ZO_WEB_URL=https://o2.example.com",
+      );
+      expect(w.find('[data-test="slack-prereq-row-delegation_key"]').text()).toContain(
+        "Delegation key",
+      );
+      expect(w.find(SUMMARY).text()).toContain("1 of 4 failed");
+    } finally {
+      breakpoint.mobile = false;
+    }
   });
 
   it("asks the parent to re-check", async () => {

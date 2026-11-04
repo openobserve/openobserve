@@ -92,10 +92,11 @@ const baseClasses = computed<string>(() =>
           : "px-2",
     "font-normal text-sm whitespace-nowrap",
     isVertical.value ? "rounded-default" : "rounded-t-default",
-    "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
+    "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke] duration-(--duration-hover-out) hover:duration-(--duration-hover-in)",
     "select-none",
-    "ring-offset-1 ring-offset-surface-base",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tabs-indicator",
+    "focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-focus-ring-accent",
+    // The horizontal strip scrolls on x, which clips y as well, so an outside outline would lose its bottom edge.
+    isVertical.value ? "focus-visible:outline-offset-2" : "focus-visible:-outline-offset-2",
   ].join(" "),
 );
 

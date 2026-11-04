@@ -51,8 +51,14 @@ cloud = [
 ]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
+cpu-profiling = [
+    "openobserve-api-http/cpu-profiling",
+    "openobserve-jobs/cpu-profiling",
+    "openobserve-core/cpu-profiling",
+]
 profiling = [
     "jemalloc",
+    "cpu-profiling",
     "openobserve-api-http/profiling",
     "openobserve-jobs/profiling",
     "openobserve-core/profiling",
@@ -445,14 +451,14 @@ arrow-schema = { version = "59.3.0", features = ["serde"] }
 parquet = { version = "59.3.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.13.2", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.62", features = ["serde", "visitor"] }
-vortex = { git = "https://github.com/openobserve/vortex", rev = "553d6d78ebe372ff6737c7ed17f1aae3b2fc0244", features = [
+vortex = { git = "https://github.com/openobserve/vortex", rev = "fcbcd3d0676a58858eaf589c7a68e417a8c43739", features = [
     "tokio",
 ] }
-vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "553d6d78ebe372ff6737c7ed17f1aae3b2fc0244", features = [
+vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "fcbcd3d0676a58858eaf589c7a68e417a8c43739", features = [
     "pco",
     "zstd",
 ] }
-vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "553d6d78ebe372ff6737c7ed17f1aae3b2fc0244" }
+vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "fcbcd3d0676a58858eaf589c7a68e417a8c43739" }
 hashbrown = { version = "0.17.1", features = ["serde"] }
 dotenv_config = "0.2"
 dotenvy = "0.15"
@@ -580,6 +586,7 @@ tiktoken-rs = "0.9.1"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
+tokio-util = "0.7"
 tonic = { version = "0.14", features = [
     "gzip",
     "zstd",
@@ -615,3 +622,5 @@ zstd = "0.13"
 [patch.crates-io]
 object_store = { git = "https://github.com/openobserve/arrow-rs-object-store", branch = "openobserve-v0.13.2" }
 sqlparser = { git = "https://github.com/openobserve/sqlparser-rs", branch = "0.62.0-patch" }
+# crates.io 3.5.0 reads past short inputs via _mm_loadu_si128 and trips debug UB checks on x86; 3.5.0-fix adds ogxd/gxhash#118 with unchanged hashes
+gxhash = { git = "https://github.com/openobserve/gxhash", branch = "3.5.0-fix" }

@@ -24,8 +24,6 @@
 // allowlist, and panelValidation.ts / CUSTOM_QUERY_CHART_TYPES are panel-editor
 // only. What is not pinned here ships unchecked.
 
-import { readFileSync } from "node:fs";
-import { resolve as resolvePath } from "node:path";
 import * as acorn from "acorn";
 import DOMPurify from "dompurify";
 import * as walk from "acorn-walk";
@@ -33,6 +31,7 @@ import { describe, it, expect, vi } from "vitest";
 import { kubernetesPage, FLEET_DRILLDOWN_EVENT, FLEET_DRILLDOWN_TAB } from "./kubernetes.page";
 import { validateUserCode } from "@/utils/dashboard/convertCustomChartData";
 import { processPromQLData } from "@/utils/dashboard/promql/shared/dataProcessor";
+import { PROMQL_MODULAR_CHART_TYPES } from "@/utils/dashboard/promql/shared/types";
 import { b64DecodeUnicodeSafe } from "@/utils/zincutils";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
 import { raw } from "@/types/i18n";
@@ -1539,19 +1538,11 @@ describe("summary — the fleet resource bars are NATIVE panels, not a second cu
   });
 
   it("routes through the modular converter the app actually registers", () => {
-    // resolve.ts passes `type` through with no allowlist, so nothing else checks that
-    // the string names a type convertPromQLData will dispatch on. Read from the
-    // converter's own source because NEW_CHART_TYPES is a function-local const: an
-    // export would widen that module's API purely for this assertion.
-    const source = readFileSync(
-      resolvePath(__dirname, "../../../../utils/dashboard/convertPromQLData.ts"),
-      "utf8",
-    );
-    const list = source.slice(source.indexOf("NEW_CHART_TYPES"));
-    const routed = list.slice(0, list.indexOf("]"));
-    expect(routed, "h-bar is no longer routed to the modular converter").toContain(
-      `"${panel(CPU_ID).type}"`,
-    );
+    // resolve.ts passes `type` through with no allowlist, so nothing else checks the converter dispatches on it.
+    expect(
+      PROMQL_MODULAR_CHART_TYPES,
+      "h-bar is no longer routed to the modular converter",
+    ).toContain(panel(CPU_ID).type);
   });
 
   it("reports ABSOLUTE cores, with no normalisation and no division at all", () => {

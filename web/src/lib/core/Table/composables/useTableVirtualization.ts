@@ -26,6 +26,11 @@ export interface VirtualizationOptions {
    */
   dynamicRowHeight?: MaybeRefOrGetter<boolean>;
   /**
+   * In variable-height mode, add the height of the row's expanded detail row
+   * (the next sibling marked `data-row-expansion`) to the row's measured size.
+   */
+  includeExpansionRow?: MaybeRefOrGetter<boolean>;
+  /**
    * Keep the scroll element's raw offset stable while measured row heights
    * change. Delegated tables need this because their scroll element can also
    * contain content above the virtual list; applying the list's measurement
@@ -56,6 +61,7 @@ export function useTableVirtualization(options: VirtualizationOptions) {
     expandedRowHeights,
     overscan = 100,
     dynamicRowHeight,
+    includeExpansionRow,
     preserveScrollOffsetOnRowResize,
     totalCount,
   } = options;
@@ -99,7 +105,11 @@ export function useTableVirtualization(options: VirtualizationOptions) {
               const isExpandedRow = (row?.original as any)?.isExpandedRow;
               const dyn = !!toValue(dynamicRowHeight);
               if (isExpandedRow || dyn) {
-                const height = element.getBoundingClientRect().height;
+                let height = element.getBoundingClientRect().height;
+                const detail = element.nextElementSibling;
+                if (toValue(includeExpansionRow) && detail?.hasAttribute?.("data-row-expansion")) {
+                  height += detail.getBoundingClientRect().height;
+                }
                 if (isExpandedRow && expandedRowHeights?.value) {
                   expandedRowHeights.value[idx] = height;
                 }

@@ -136,6 +136,7 @@
               :panelSchema="panel.schema"
               :selectedTimeObj="selectedTimeObj"
               :variablesData="{}"
+              :shouldRefreshWithoutCache="!ANOMALIES_USE_CACHE"
               searchType="ui"
               :data-test="`alerts-anomalydetectionchart-${panel.key}-panel`"
             />
@@ -210,6 +211,9 @@ const DROP_TOKEN = "--color-status-warning-text";
 const BAND_TOKEN = "--color-chart-band";
 const AXIS_TOKEN = "--color-text-secondary";
 const GRID_TOKEN = "--color-border-default";
+
+// A detector writes a bucket's row a run after it closes, so a result-cached range keeps that tail empty for good.
+const ANOMALIES_USE_CACHE = false;
 
 const RANGE_MS: Record<string, number> = {
   "1h": 60 * 60 * 1000,
@@ -456,6 +460,8 @@ async function loadMetric() {
         signal: mine.signal,
       },
       "ui",
+      false,
+      ANOMALIES_USE_CACHE,
     );
     if (controller !== mine) return;
     metricRows.value = toAnomalyBandRows(res?.data?.hits ?? []);

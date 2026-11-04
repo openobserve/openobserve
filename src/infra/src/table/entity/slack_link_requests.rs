@@ -38,6 +38,8 @@ pub struct Model {
     pub updated_at: i64,
     pub origin_region: String,
     pub deleted_at: Option<i64>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub held_action: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

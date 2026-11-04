@@ -91,6 +91,7 @@ vi.mock("../query/sqlUtils", () => ({
 }));
 
 vi.mock("./colorPalette", () => ({
+  createDistinctSeriesColor: vi.fn(() => () => undefined),
   ColorModeWithoutMinMax: vi.fn(),
   getSeriesColor: vi.fn(() => "#ff0000"),
   getSQLMinMaxValue: vi.fn(() => [0, 100]),
@@ -4175,6 +4176,62 @@ describe("convertSQLData", () => {
         ]);
       });
 
+      it.each([
+        ["line", { lineStyle: { type: "dashed" } }],
+        ["bar", { itemStyle: { opacity: 0.5 } }],
+      ])(
+        "draws a compared %s series in its series' colour, set apart by style",
+        async (type, style) => {
+          const searchData = [
+            [{ timestamp: "2023-01-01", value: 10 }],
+            [{ timestamp: "2023-01-02", value: 20 }],
+          ];
+          const resultMetaData = { value: [[mockResultMetaData[0]], [mockResultMetaData[0]]] };
+          const metadata = {
+            queries: [
+              { panelQueryIndex: 0, timeRangeGap: { seconds: 0, periodAsStr: "" } },
+              {
+                panelQueryIndex: 0,
+                timeRangeGap: { seconds: 3_600_000, periodAsStr: "1 Hour ago" },
+              },
+            ],
+          };
+          const schema = {
+            ...mockPanelSchema,
+            type,
+            queries: [
+              {
+                fields: {
+                  x: [{ alias: "timestamp", label: "Timestamp" }],
+                  y: [{ alias: "value", label: "Count" }],
+                  z: [],
+                  breakdown: [],
+                },
+              },
+            ],
+          };
+          const result = await convertMultiSQLData(
+            schema,
+            searchData,
+            mockStore,
+            mockChartPanelRef,
+            mockHoveredSeriesState,
+            resultMetaData,
+            metadata,
+            mockChartPanelStyle,
+            mockAnnotations,
+          );
+
+          const [current, compared] = result.options.series.filter(
+            (s: { name?: string }) => s.name,
+          );
+          expect(compared.name).toBe("Count (1 Hour ago)");
+          expect(compared.color).toBe(current.color);
+          expect(compared).toMatchObject(style);
+          expect(current.lineStyle?.type).not.toBe("dashed");
+          expect(current.itemStyle?.opacity).toBeUndefined();
+        },
+      );
       it("should handle metadata queries without periodAsStr", async () => {
         const schema = mockPanelSchema;
         const searchData = [
@@ -9648,6 +9705,51 @@ describe("convertSQLData", () => {
   });
 
   describe("Show Gridlines Configuration", () => {
+    it.each([
+      [true, true],
+      [false, false],
+      [undefined, true],
+    ])(
+      "h-bar with show_gridlines=%s draws value-axis gridlines=%s and none on the category axis",
+      async (showGridlines, expected) => {
+        const schema = {
+          ...mockPanelSchema,
+          type: "h-bar",
+          config: { ...mockPanelSchema.config, show_gridlines: showGridlines },
+          queries: [
+            {
+              fields: { x: [{ alias: "category" }], y: [{ alias: "value" }], z: [], breakdown: [] },
+            },
+          ],
+        };
+        const searchData = [
+          [
+            { category: "A", value: 100 },
+            { category: "B", value: 200 },
+          ],
+        ];
+
+        const result = await convertSQLData(
+          schema,
+          searchData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockResultMetaData,
+          mockMetadata,
+          mockChartPanelStyle,
+          mockAnnotations,
+        );
+
+        const valueAxes = [result.options.xAxis].flat();
+        const categoryAxes = [result.options.yAxis].flat();
+        expect(valueAxes[0].type).toBe("value");
+        expect(categoryAxes[0].type).toBe("category");
+        valueAxes.forEach((axis: any) => expect(axis.splitLine.show).toBe(expected));
+        categoryAxes.forEach((axis: any) => expect(axis.splitLine.show).toBe(false));
+      },
+    );
+
     it("should use default gridlines (true) when config is undefined", async () => {
       const schema = {
         ...mockPanelSchema,
@@ -9847,6 +9949,42 @@ describe("convertSQLData", () => {
         expect(result.options.yAxis.splitLine.show).toBe(null);
       }
       expect(result.options).toBeDefined();
+    });
+  });
+
+  describe("Scatter point size and opacity", () => {
+    const searchData = [
+      [
+        { timestamp: "2024-01-01T00:00:00Z", value: 10 },
+        { timestamp: "2024-01-01T01:00:00Z", value: 30 },
+      ],
+    ];
+    const scatterSeries = async (config: Record<string, any>) => {
+      const result = await convertSQLData(
+        { ...mockPanelSchema, type: "scatter", config },
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+      );
+      return result.options.series.find((s: any) => s.type === "scatter");
+    };
+
+    it("keeps 5 px points and the chart's default opacity when unset", async () => {
+      const series = await scatterSeries({});
+      expect(series.symbolSize).toBe(5);
+      expect(series.itemStyle?.opacity).toBeUndefined();
+    });
+
+    it("draws points at the configured size and opacity", async () => {
+      const series = await scatterSeries({ symbol_size: 11, symbol_opacity: 30 });
+      expect(series.symbolSize).toBe(11);
+      expect(series.itemStyle.opacity).toBe(0.3);
+      expect(series.color).toBeDefined();
     });
   });
 

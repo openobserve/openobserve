@@ -373,7 +373,22 @@ pub async fn get_optional(
     org_id: &str,
     email: &str,
 ) -> Result<Option<OrgUserRecord>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    get_optional_on(get_orm_client_ro().await, org_id, email).await
+}
+
+/// [`get_optional`] from the primary, for gates that must not trail a lagging replica.
+pub async fn get_optional_primary(
+    org_id: &str,
+    email: &str,
+) -> Result<Option<OrgUserRecord>, errors::Error> {
+    get_optional_on(get_orm_client_rw().await, org_id, email).await
+}
+
+async fn get_optional_on(
+    client: &DatabaseConnection,
+    org_id: &str,
+    email: &str,
+) -> Result<Option<OrgUserRecord>, errors::Error> {
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))

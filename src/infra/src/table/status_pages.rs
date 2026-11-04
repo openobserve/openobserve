@@ -38,13 +38,18 @@ use crate::{
     errors,
 };
 
-/// The three columns the auto-incident engine needs per mapped check —
+/// The columns the auto-incident engine needs per mapped check —
 /// deliberately not the whole row (config/secrets are KB each).
 #[derive(Clone, Debug)]
 pub struct CheckStateRow {
     pub id: String,
+    pub org_id: String,
+    /// Badge of the latest run; the No data rule reads it, the engine never does.
     pub last_check_status: i32,
-    pub consecutive_failures: i32,
+    /// Consecutive Down run verdicts.
+    pub down_runs: i32,
+    /// Consecutive Up run verdicts.
+    pub up_runs: i32,
     pub last_triggered_at: i64,
 }
 
@@ -117,8 +122,10 @@ pub async fn get_check_states<C: ConnectionTrait>(
     let mut q = synthetics_checks::Entity::find()
         .select_only()
         .column(synthetics_checks::Column::Id)
+        .column(synthetics_checks::Column::OrgId)
         .column(synthetics_checks::Column::LastCheckStatus)
-        .column(synthetics_checks::Column::ConsecutiveFailures)
+        .column(synthetics_checks::Column::StatusDownRuns)
+        .column(synthetics_checks::Column::StatusUpRuns)
         .column(synthetics_checks::Column::LastTriggeredAt)
         .column(synthetics_checks::Column::UpdatedAt)
         .filter(synthetics_checks::Column::Id.is_in(check_ids.iter().cloned()));
@@ -126,21 +133,23 @@ pub async fn get_check_states<C: ConnectionTrait>(
         q = q.filter(synthetics_checks::Column::UpdatedAt.gt(watermark));
     }
     let rows = q
-        .into_tuple::<(String, i32, i32, i64, i64)>()
+        .into_tuple::<(String, String, i32, i32, i32, i64, i64)>()
         .all(conn)
         .await?;
     let mut max_updated = since.unwrap_or(0);
     let out = rows
         .into_iter()
         .map(
-            |(id, last_check_status, consecutive_failures, last_triggered_at, updated_at)| {
+            |(id, org_id, last_check_status, down_runs, up_runs, last_triggered_at, updated_at)| {
                 if updated_at > max_updated {
                     max_updated = updated_at;
                 }
                 CheckStateRow {
                     id,
+                    org_id,
                     last_check_status,
-                    consecutive_failures,
+                    down_runs,
+                    up_runs,
                     last_triggered_at,
                 }
             },

@@ -193,6 +193,20 @@ describe("FeatureComparisonTable", () => {
     expect(chips.length).toBeGreaterThan(0);
   });
 
+  it("should render translated pillar names, including RUM", () => {
+    const wrapper = mount(FeatureComparisonTable, {
+      global: {
+        plugins: [i18n, store],
+      },
+    });
+
+    const labels = wrapper
+      .findAll('[data-test="feature-comparison-table-pillar-chip"]')
+      .map((chip) => chip.text());
+    expect(labels).toContain("RUM");
+    expect(labels.some((label) => label.startsWith("about."))).toBe(false);
+  });
+
   it("should display edition names Open Source, Enterprise, Cloud", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {

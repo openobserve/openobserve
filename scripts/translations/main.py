@@ -44,6 +44,7 @@ from translator import (
     load_state,
     new_counters,
     save_state,
+    set_trace_outcome,
     translate_pending,
     write_json,
 )
@@ -177,6 +178,16 @@ def main():
     print(
         f"Done. translated={counters['translated']}, kept={counters['kept']}, "
         f"failed={counters['failed']} across {len(locales)} language(s)."
+    )
+    set_trace_outcome(
+        "partial_success" if counters["failed"] else "success",
+        {
+            "ai.translations.translated": counters["translated"],
+            "ai.translations.kept": counters["kept"],
+            "ai.translations.failed": counters["failed"],
+            "ai.translations.locales": len(locales),
+            "process.exit_code": 3 if counters["failed"] else 0,
+        },
     )
 
     if counters["failed"]:

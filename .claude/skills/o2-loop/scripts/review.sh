@@ -138,8 +138,12 @@ find_codex() {
     command -v codex
     return
   fi
-  local bundled="/Applications/ChatGPT.app/Contents/Resources/codex"
-  [ -x "$bundled" ] && echo "$bundled"
+  local bundled
+  # Newer ChatGPT.app builds ship the CLI under codex-cli/bin; older ones put it directly in Resources.
+  for bundled in /Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex /Applications/ChatGPT.app/Contents/Resources/codex; do
+    [ -f "$bundled" ] && [ -x "$bundled" ] && { echo "$bundled"; return; }
+  done
+  return 1
 }
 
 select_backend() {

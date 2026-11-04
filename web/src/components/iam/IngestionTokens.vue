@@ -458,7 +458,6 @@ export default defineComponent({
     // The query owns its failure now, so this reports it once per error however
     // the read was triggered.
     watch(tokensList.error, (e: any) => {
-      // The grouped access toast already reports a 403; a second red toast adds nothing.
       if (!e || forbidden.value) return;
       toast({
         variant: "error",
@@ -553,9 +552,11 @@ export default defineComponent({
       if (!generate) {
         const confirmed = await confirm({
           title: t("ingestion.splunkTokenRevokeTitle"),
-          message: t("ingestion.splunkTokenRevokeMessage"),
+          messageKeypath: "ingestion.splunkTokenRevokeMessage",
+          messageName: name,
           confirmLabel: t("ingestion.splunkTokenRevoke"),
           cancelLabel: t("common.cancel"),
+          confirmVariant: "destructive",
         });
         if (!confirmed) return;
       }

@@ -37,6 +37,7 @@ import {
 import type { FunnelDef } from "@/utils/rum/productAnalyticsQueries";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import { forwardFunnelLink, isProductAnalyticsPath } from "@/utils/rum/funnelLinks";
+import { confirmForcedSignOutDiscard, draftSignOutForced } from "@/utils/drafts/draftSession";
 
 export { forwardFunnelLink, isProductAnalyticsPath };
 
@@ -145,9 +146,14 @@ export default function useFunnelDraft(): FunnelDraft {
 
 /** Asks before a route outside Product Analytics, or a reload, drops a saved funnel's unsaved edits. */
 export function useFunnelLeaveGuard(draft: FunnelDraft): void {
-  onBeforeRouteLeave((to) =>
-    !draft.dirty.value || isProductAnalyticsPath(to.path) ? true : draft.confirmDiscard(),
-  );
+  const { confirm } = useConfirmDialog();
+  const { t } = useI18nTyped();
+  onBeforeRouteLeave((to) => {
+    if (!draft.dirty.value || isProductAnalyticsPath(to.path)) return true;
+    return draftSignOutForced.value
+      ? confirmForcedSignOutDiscard(confirm, t)
+      : draft.confirmDiscard();
+  });
   const onUnload = (e: BeforeUnloadEvent) => {
     if (draft.dirty.value) e.preventDefault();
   };

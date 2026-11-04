@@ -481,6 +481,20 @@ describe("CheckVariablesPanel", () => {
       expect(wrapper.find(sel("-remove-dialog")).text()).toContain("referenced by 2 steps");
     });
 
+    it("names the variable in bold and keeps a space before the warning", async () => {
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], journey) });
+
+      await wrapper.find(sel("-remove-0-btn")).trigger("click");
+      const dialog = wrapper.find(sel("-remove-dialog"));
+      const name = dialog.find(sel("-remove-name"));
+      expect(name.text()).toBe("BASE_URL");
+      expect(name.classes()).toContain("font-semibold");
+      expect(dialog.find("p").text()).toBe(
+        "The BASE_URL variable will be removed from this check. It is referenced by 2 steps, which will no longer resolve.",
+      );
+      expect(wrapper.findComponent(ODialogStub).props("primaryButtonVariant")).toBe("destructive");
+    });
+
     it("should not warn for a variable referenced only by a superstring token", async () => {
       // "BASE" is a prefix of "BASE_URL" — {{BASE_URL}} must not count for it.
       const varBase = { id: "var-c", name: "BASE", value: "x", secure: false, example: "" };

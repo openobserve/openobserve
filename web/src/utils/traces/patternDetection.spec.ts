@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { buildPatternConsolidatedTree } from "./patternDetection";
+import { buildPathPatterns, buildPatternConsolidatedTree } from "./patternDetection";
 
 const span = (id: string, service: string, durationMs: number, children: any[] = []) => ({
   spanId: id,
@@ -51,5 +51,48 @@ describe("buildPatternConsolidatedTree", () => {
     expect(patterns.get("a")!.metrics).toMatchObject({ count: 2, min: 10, max: 100 });
     expect(patterns.get("a→b")!.spanIds).toEqual(["x"]);
     expect(patterns.get("a→c")!.metrics).toMatchObject({ count: 1, min: 30, max: 30 });
+  });
+});
+
+describe("buildPathPatterns", () => {
+  it("keys spans by their service ancestor path, merging consecutive spans of one service", () => {
+    const tree = [
+      span("f1", "frontend", 100, [
+        span("f2", "frontend", 90, [span("l1", "leaf", 3)]),
+        span("c1", "checkout", 20, [span("l2", "leaf", 1), span("l3", "leaf", 2)]),
+      ]),
+    ];
+    const patterns = buildPathPatterns(tree);
+    expect([...patterns.keys()].sort()).toEqual([
+      "frontend",
+      "frontend→checkout",
+      "frontend→checkout→leaf",
+      "frontend→leaf",
+    ]);
+    expect(patterns.get("frontend")?.metrics.count).toBe(2);
+    expect(patterns.get("frontend→leaf")?.metrics.avg).toBe(3);
+    expect(patterns.get("frontend→checkout→leaf")?.metrics.count).toBe(2);
+    expect(patterns.get("frontend→checkout→leaf")?.metrics.avg).toBe(1.5);
+  });
+
+  it("stops tracking a path once it revisits a service", () => {
+    const tree = [
+      span("a1", "a", 10, [span("b1", "b", 5, [span("a2", "a", 2, [span("c1", "c", 1)])])]),
+    ];
+    expect([...buildPathPatterns(tree).keys()].sort()).toEqual(["a", "a→b"]);
+  });
+
+  it("handles a 20,000-level chain alternating two services", () => {
+    const root: any = span("s0", "a", 20_000);
+    let tail = root;
+    for (let i = 1; i < 20_000; i++) {
+      const next = span(`s${i}`, i % 2 ? "b" : "a", 20_000 - i);
+      tail.spans = [next];
+      tail = next;
+    }
+    const patterns = buildPathPatterns([root]);
+    expect(patterns.size).toBe(2);
+    expect(patterns.get("a")?.metrics.count).toBe(1);
+    expect(patterns.get("a→b")?.metrics.count).toBe(1);
   });
 });

@@ -187,7 +187,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('alert_destinations.deleteDestinationTitle')"
-      :message="t('alert_destinations.deleteDestinationMessage')"
+      message-keypath="alert_destinations.deleteDestinationMessage"
+      :message-name="confirmDelete.data?.name"
+      ok-variant="destructive"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
@@ -196,6 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('alert_destinations.deleteDestinationsTitle')"
       :message="t('alerts.confirmDeleteDestinations', { count: selectedDestinations.length })"
+      ok-variant="destructive"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -727,7 +730,7 @@ export default defineComponent({
           error.response?.data?.message ||
           error?.message ||
           t("alerts.messages.bulkDeleteDestinationsFailed");
-        if (error.response?.status != 403 || error?.status != 403) {
+        if (error.response?.status !== 403 && error?.status !== 403) {
           toast({
             variant: "error",
             message: errorMessage,

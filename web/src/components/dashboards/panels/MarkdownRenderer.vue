@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent } from "vue";
 import { useTheme } from "@/composables/useTheme";
 import { renderMarkdownPanel } from "@/utils/dashboard/markdownPanel";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "MarkdownRenderer",
@@ -51,13 +52,16 @@ export default defineComponent({
   },
   setup(props): any {
     const { isDark } = useTheme();
+    const { t } = useI18nTyped();
 
     const renderedHtml = computed(() => {
       const context = {
         tabId: props.tabId,
         panelId: props.panelId,
       };
-      return renderMarkdownPanel(props.markdownContent, props.variablesData, context);
+      return renderMarkdownPanel(props.markdownContent, props.variablesData, context, {
+        allLabel: t("dashboard.variableQueryValueSelector.all"),
+      });
     });
 
     return {

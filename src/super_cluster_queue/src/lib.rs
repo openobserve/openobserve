@@ -15,6 +15,7 @@
 
 #![cfg(feature = "enterprise")]
 
+mod alert_acks;
 mod alert_states;
 mod alerts;
 mod anomaly_detection;
@@ -43,6 +44,7 @@ mod org_ingestion_token;
 mod org_user;
 mod organization;
 mod pipelines;
+mod public_dashboards;
 mod ratelimit;
 mod re_pattern;
 mod reports;
@@ -50,7 +52,6 @@ mod rum_analytics;
 mod scheduler;
 mod schemas;
 mod search_job;
-mod semantic_groups;
 mod service_streams;
 mod short_urls;
 mod status_pages;
@@ -58,6 +59,7 @@ mod synthetics;
 mod synthetics_locations;
 mod synthetics_probe_tokens;
 mod synthetics_variables;
+mod system_settings;
 mod templates;
 mod user;
 
@@ -101,6 +103,14 @@ async fn incident_msg(msg: Message) -> infra::errors::Result<()> {
     }
 }
 
+/// The `dashboard` key carries two payloads; older regions skip byte 96, a public link row.
+async fn dashboard_msg(msg: Message) -> infra::errors::Result<()> {
+    match msg.message_type {
+        MessageType::PublicDashboardsTable => public_dashboards::process(msg).await,
+        _ => dashboards::process(msg).await,
+    }
+}
+
 /// Creates a super cluster queue for each super cluster topic and begins
 /// polling messages from each queue in a separate thread.
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -123,6 +133,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_kv_msg: kv::process,
         on_service_streams_msg: service_streams::process,
         on_rum_analytics_msg: rum_analytics::process,
+        on_system_settings_msg: system_settings::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,
@@ -130,11 +141,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let alerts_queue = AlertsQueue {
         on_alert_msg: alerts::process,
         on_scheduler_msg: scheduler::process,
-        on_semantic_groups_msg: semantic_groups::process,
         on_incident_msg: incident_msg,
         on_anomaly_detection_msg: anomaly_detection::process,
         on_alert_state_msg: alert_states::process,
         on_downtime_msg: downtimes::process,
+        on_alert_ack_msg: alert_acks::process,
     };
     // On-call rides the scheduler topic with the triggers it belongs to, so a
     // response record always lands before the escalation timer that names it.
@@ -146,7 +157,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_search_job_msg: search_job::process,
     };
     let dashboards_queue = DashboardsQueue {
-        on_dashboard_msg: dashboards::process,
+        on_dashboard_msg: dashboard_msg,
         on_report_msg: reports::process,
     };
     let pipelines_queue = PipelinesQueue {

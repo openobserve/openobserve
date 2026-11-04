@@ -14,13 +14,20 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h, nextTick, reactive } from "vue";
 import { createStore } from "vuex";
 import { onBeforeRouteLeave } from "vue-router";
+import {
+  beginDraftSignOut,
+  cancelDraftSignOut,
+  signOutLeaveWillAsk,
+} from "@/utils/drafts/draftSession";
 import { addPanel, getDashboard, getPanel, updateDashboard, updatePanel } from "@/utils/commons";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { contextRegistry } from "@/composables/contextProviders";
+import { click, clickIn } from "@/test/unit/helpers/draftDom";
 import {
   PANEL_DRAFT_VERSION,
   cleanupPanelDrafts,
@@ -205,13 +212,24 @@ const OPageHeaderStub = {
 const newScope = { userEmail: "me@x.io", org: "org1", dashboardId: "dash1" };
 const editScope = { ...newScope, panelId: "p1" };
 
-const flush = async () => {
-  for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
-};
+// Registering the dashboards context is the opening sequence's last step.
+const setActiveContext = vi.spyOn(contextRegistry, "setActive");
+const opened = () => setActiveContext.mock.calls.some(([key]) => key === "dashboards");
+
+const waitOpened = () =>
+  vi.waitFor(() => {
+    if (!opened()) throw new Error("the editor is still opening");
+  });
+
+// The opening sequence either parks on the restore dialog or runs to its end.
+const settle = () =>
+  vi.waitFor(() => {
+    if (!restoreDialog() && !opened()) throw new Error("the editor is still opening");
+  });
 
 let store: any;
 
-const mountEditor = async ({ settle = true } = {}) => {
+const mountEditor = async () => {
   store = createStore({
     state: {
       selectedOrganization: { identifier: "org1" },
@@ -234,7 +252,7 @@ const mountEditor = async ({ settle = true } = {}) => {
       },
     },
   });
-  if (settle) await flush();
+  await settle();
   return wrapper;
 };
 
@@ -272,26 +290,28 @@ const unloadEvent = () => {
 const q = (selector: string) => document.querySelector(selector) as HTMLElement | null;
 const restoreDialog = () => q('[data-test="dashboard-panel-draft-restore-dialog"]');
 const leaveDialog = () => q('[data-test="dashboard-panel-leave-dialog"]');
-const restoreButton = (name: "continue" | "fresh") =>
-  q(
-    name === "continue"
-      ? '[data-test="dashboard-panel-draft-continue"]'
-      : '[data-test="dashboard-panel-draft-restore-dialog"] [data-test="o-dialog-secondary-btn"]',
-  )!;
-const leaveButton = (name: "save" | "keep" | "discard") =>
-  q(
-    {
-      save: '[data-test="dashboard-panel-leave-save"]',
-      keep: '[data-test="dashboard-panel-leave-dialog"] [data-test="o-dialog-secondary-btn"]',
-      discard: '[data-test="dashboard-panel-leave-dialog"] [data-test="o-dialog-neutral-btn"]',
-    }[name],
-  )!;
+const clickRestore = (name: "continue" | "fresh") =>
+  name === "continue"
+    ? click("dashboard-panel-draft-continue")
+    : clickIn("dashboard-panel-draft-restore-dialog", "o-dialog-secondary-btn");
+const keepButton = () =>
+  q('[data-test="dashboard-panel-leave-dialog"] [data-test="o-dialog-secondary-btn"]');
+const clickLeave = (name: "save" | "keep" | "discard") => {
+  if (name === "save") click("dashboard-panel-leave-save");
+  else
+    clickIn(
+      "dashboard-panel-leave-dialog",
+      `o-dialog-${name === "keep" ? "secondary" : "neutral"}-btn`,
+    );
+};
+const leaveAsked = () => vi.waitFor(() => expect(leaveDialog()).not.toBeNull());
+// Escape on the restore dialog starts fresh, so the opening sequence runs on before the test goes on.
 const pressEscape = async () => {
   document.activeElement?.dispatchEvent(
     new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
   );
   document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-  await flush();
+  await waitOpened();
 };
 
 const routeWith = (query: Record<string, string>) =>
@@ -356,18 +376,17 @@ describe("AddPanel drafts and Save and keep editing", () => {
       seedDraft(newScope);
       wrapper = await mountEditor();
 
-      restoreButton("continue").click();
-      await flush();
+      clickRestore("continue");
+      await waitOpened();
 
-      expect(restoreDialog()).toBeNull();
+      await vi.waitFor(() => expect(restoreDialog()).toBeNull());
       expect(wrapper.vm.dashboardPanelData.data.title).toBe("Draft title");
       expect(wrapper.vm.form.state.values.title).toBe("Draft title");
       expect(getDashboard).toHaveBeenCalled();
       // The new-panel draft goes back to the tab it was written in, which still exists.
       expect(nav.route.query.tab).toBe("t2");
       const { next, done } = leave();
-      await flush();
-      expect(leaveDialog()).not.toBeNull();
+      await leaveAsked();
       wrapper.vm.onLeaveChoice("stay");
       await done;
       expect(next).toHaveBeenCalledWith(false);
@@ -386,8 +405,8 @@ describe("AddPanel drafts and Save and keep editing", () => {
       });
       wrapper = await mountEditor();
 
-      restoreButton("continue").click();
-      await flush();
+      clickRestore("continue");
+      await waitOpened();
 
       const names = wrapper.vm.currentDashboardData.data.variables.list.map((v: any) => v.name);
       expect(names).toEqual(["taken", "fresh_var"]);
@@ -399,8 +418,8 @@ describe("AddPanel drafts and Save and keep editing", () => {
       seedDraft(newScope);
       wrapper = await mountEditor();
 
-      restoreButton("fresh").click();
-      await flush();
+      clickRestore("fresh");
+      await waitOpened();
 
       expect(readPanelDraft(newScope)).toBeNull();
       expect(wrapper.vm.dashboardPanelData.data.title).toBe("");
@@ -411,8 +430,8 @@ describe("AddPanel drafts and Save and keep editing", () => {
       seedDraft(newScope, { tabId: "gone" });
       wrapper = await mountEditor();
 
-      restoreButton("continue").click();
-      await flush();
+      clickRestore("continue");
+      await waitOpened();
 
       expect(nav.route.query.tab).toBe("t1");
     });
@@ -422,7 +441,7 @@ describe("AddPanel drafts and Save and keep editing", () => {
       wrapper = await mountEditor();
 
       await pressEscape();
-      expect(restoreDialog()?.isConnected ?? false).toBe(false);
+      await vi.waitFor(() => expect(restoreDialog()?.isConnected ?? false).toBe(false));
       expect(wrapper.vm.dashboardPanelData.data.title).toBe("");
 
       await userEdits(wrapper, "New work");
@@ -438,8 +457,8 @@ describe("AddPanel drafts and Save and keep editing", () => {
       await userEdits(wrapper, "New work");
 
       const { next, done } = leave();
-      await flush();
-      leaveButton("keep").click();
+      await leaveAsked();
+      clickLeave("keep");
       await done;
 
       expect(next).toHaveBeenCalledWith();
@@ -465,8 +484,8 @@ describe("AddPanel drafts and Save and keep editing", () => {
       nav.route = routeWith({ panelId: "p1" });
       wrapper = await mountEditor();
 
-      restoreButton("continue").click();
-      await flush();
+      clickRestore("continue");
+      await waitOpened();
 
       expect(wrapper.vm.dashboardPanelData.data.title).toBe("Draft title");
       expect(wrapper.vm.dashboardPanelData.data.layout).toEqual(serverPanel().layout);
@@ -478,8 +497,8 @@ describe("AddPanel drafts and Save and keep editing", () => {
       });
       wrapper = await mountEditor();
 
-      restoreButton("continue").click();
-      await flush();
+      clickRestore("continue");
+      await waitOpened();
 
       expect(wrapper.vm.dashboardPanelData.data.layout).toBeUndefined();
     });
@@ -513,7 +532,7 @@ describe("AddPanel drafts and Save and keep editing", () => {
 
       wrapper.unmount();
       wrapper = null;
-      await flush();
+      await flushPromises();
 
       expect(getDashboard).not.toHaveBeenCalled();
       expect(readPanelDraft(newScope)?.data.title).toBe("Draft title");
@@ -608,8 +627,7 @@ describe("AddPanel drafts and Save and keep editing", () => {
       await userEdits(wrapper, "Edited");
 
       const { next, done } = leave();
-      await flush();
-      expect(leaveDialog()).not.toBeNull();
+      await leaveAsked();
       await pressEscape();
       await done;
 
@@ -623,8 +641,8 @@ describe("AddPanel drafts and Save and keep editing", () => {
       await wrapper.vm.handleSaveVariable({ variableData: { name: "session_var2" } });
 
       const { next, done } = leave();
-      await flush();
-      leaveButton("keep").click();
+      await leaveAsked();
+      clickLeave("keep");
       await done;
 
       expect(next).toHaveBeenCalledWith();
@@ -643,8 +661,8 @@ describe("AddPanel drafts and Save and keep editing", () => {
       });
 
       const { next, done } = leave();
-      await flush();
-      leaveButton("keep").click();
+      await leaveAsked();
+      clickLeave("keep");
       await done;
       setItem.mockRestore();
 
@@ -661,12 +679,72 @@ describe("AddPanel drafts and Save and keep editing", () => {
       expect(readPanelDraft(newScope)).not.toBeNull();
 
       const { next, done } = leave();
-      await flush();
-      leaveButton("discard").click();
+      await leaveAsked();
+      clickLeave("discard");
       await done;
 
       expect(next).toHaveBeenCalledWith();
       expect(readPanelDraft(newScope)).toBeNull();
+    });
+
+    it("after Discard, a redirect of the same leave does not ask again", async () => {
+      wrapper = await mountEditor();
+      await userEdits(wrapper, "Throw away");
+      const first = leave("/logout");
+      await leaveAsked();
+      clickLeave("discard");
+      await first.done;
+
+      const second = leave("/login");
+      await second.done;
+      expect(leaveDialog()).toBeNull();
+      expect(second.next).toHaveBeenCalledWith();
+    });
+
+    it("offers no Keep draft while signing out, and says drafts are discarded", async () => {
+      wrapper = await mountEditor();
+      await userEdits(wrapper, "Signing out");
+      beginDraftSignOut();
+      try {
+        const { done } = leave("/logout");
+        await leaveAsked();
+        expect(keepButton()).toBeNull();
+        expect(
+          document.body.querySelector('[data-test="dashboard-panel-leave-sign-out"]'),
+        ).not.toBeNull();
+        expect(
+          document.body.querySelector('[data-test="dashboard-panel-leave-message"]')?.textContent,
+        ).toContain("Save the panel or discard your changes.");
+        clickLeave("discard");
+        await done;
+      } finally {
+        cancelDraftSignOut();
+      }
+    });
+
+    it("tells the sign-out it will ask, so the layout skips its own draft count", async () => {
+      wrapper = await mountEditor();
+      expect(signOutLeaveWillAsk()).toBe(false);
+      await userEdits(wrapper, "Unsaved");
+      expect(signOutLeaveWillAsk()).toBe(true);
+      wrapper.unmount();
+      wrapper = null;
+      expect(signOutLeaveWillAsk()).toBe(false);
+    });
+
+    it("a forced sign-out keeps the panel as a draft and leaves without asking", async () => {
+      wrapper = await mountEditor();
+      await userEdits(wrapper, "Kept on forced sign-out");
+      beginDraftSignOut({ forced: true });
+      try {
+        const { next, done } = leave("/logout");
+        await done;
+        expect(leaveDialog()).toBeNull();
+        expect(next).toHaveBeenCalledWith();
+        expect(readPanelDraft(newScope)?.data.title).toBe("Kept on forced sign-out");
+      } finally {
+        cancelDraftSignOut();
+      }
     });
 
     it("Save saves without opening the dashboard, deletes the draft and continues the navigation", async () => {
@@ -676,8 +754,8 @@ describe("AddPanel drafts and Save and keep editing", () => {
       window.dispatchEvent(new Event("pagehide"));
 
       const { next, done } = leave("/logs");
-      await flush();
-      leaveButton("save").click();
+      await leaveAsked();
+      clickLeave("save");
       await done;
 
       expect(updatePanel).toHaveBeenCalledTimes(1);
@@ -691,8 +769,8 @@ describe("AddPanel drafts and Save and keep editing", () => {
       await userEdits(wrapper, "  ");
 
       const { next, done } = leave();
-      await flush();
-      leaveButton("save").click();
+      await leaveAsked();
+      clickLeave("save");
       await done;
 
       expect(addPanel).not.toHaveBeenCalled();
@@ -707,8 +785,8 @@ describe("AddPanel drafts and Save and keep editing", () => {
       await userEdits(wrapper, "Conflicting");
 
       const { next, done } = leave("/logs");
-      await flush();
-      leaveButton("save").click();
+      await leaveAsked();
+      clickLeave("save");
       await done;
       expect(next).toHaveBeenCalledWith(false);
       expect(conflict.open).not.toBeNull();
@@ -743,7 +821,7 @@ describe("AddPanel drafts and Save and keep editing", () => {
       vi.mocked(getDashboard).mockClear();
 
       await wrapper.vm.saveAndStay();
-      await flush();
+      await vi.waitFor(() => expect(toasts.positive).toHaveBeenCalledTimes(1));
 
       expect(updatePanel).toHaveBeenCalledTimes(1);
       expect(nav.push).not.toHaveBeenCalled();
@@ -767,7 +845,7 @@ describe("AddPanel drafts and Save and keep editing", () => {
       expect(readPanelDraft(newScope)).not.toBeNull();
 
       await wrapper.vm.saveAndStay();
-      await flush();
+      await vi.waitFor(() => expect(toasts.positive).toHaveBeenCalledTimes(1));
 
       expect(addPanel).toHaveBeenCalledTimes(1);
       const panelId = wrapper.vm.dashboardPanelData.data.id;
@@ -839,12 +917,11 @@ describe("AddPanel drafts and Save and keep editing", () => {
       const shortcuts = vi.mocked(useShortcuts).mock.calls.at(-1)![0] as any[];
       const save = shortcuts.find((s) => s.id === "panelEditorSave").handler;
       const first = save();
-      await flush();
+      await vi.waitFor(() => expect(addPanel).toHaveBeenCalledTimes(1));
       const second = save();
-      await flush();
       release();
       await Promise.all([first, second]);
-      await flush();
+      await flushPromises();
 
       expect(addPanel).toHaveBeenCalledTimes(1);
     });
@@ -858,7 +935,7 @@ describe("AddPanel drafts and Save and keep editing", () => {
         () => new Promise((resolve) => (release = () => resolve(undefined as any))),
       );
       const running = wrapper.vm.saveAndStay();
-      await flush();
+      await vi.waitFor(() => expect(updatePanel).toHaveBeenCalledTimes(1));
 
       expect(await wrapper.vm.submitPanel("none")).toBe(false);
       release();
@@ -873,7 +950,7 @@ describe("AddPanel drafts and Save and keep editing", () => {
 
       const shortcuts = vi.mocked(useShortcuts).mock.calls.at(-1)![0] as any[];
       await shortcuts.find((s) => s.id === "panelEditorSave").handler();
-      await flush();
+      await vi.waitFor(() => expect(toasts.positive).toHaveBeenCalledTimes(1));
 
       expect(updatePanel).toHaveBeenCalledTimes(1);
       expect(nav.push).not.toHaveBeenCalled();
@@ -886,9 +963,12 @@ describe("AddPanel drafts and Save and keep editing", () => {
       await userEdits(wrapper, "Plain save");
 
       await wrapper.vm.submitPanel("view");
-      await flush();
 
-      expect(nav.push).toHaveBeenCalledWith(expect.objectContaining({ path: "/dashboards/view" }));
+      await vi.waitFor(() =>
+        expect(nav.push).toHaveBeenCalledWith(
+          expect.objectContaining({ path: "/dashboards/view" }),
+        ),
+      );
       expect(analytics.track).toHaveBeenCalledWith("dashboard_panel_saved", {
         chart_type: "line",
         is_new: false,

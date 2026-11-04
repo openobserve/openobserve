@@ -21,7 +21,7 @@
         class="me-3 flex min-w-0 items-center text-xl tracking-[0.005em] max-md:me-0 max-md:flex-1 max-md:basis-full"
       >
         <OTruncatedText data-test="dashboard-viewpanel-title">
-          {{ dashboardPanelData.data.title }}
+          {{ panelTitle }}
         </OTruncatedText>
         <ExemplarToggle
           v-if="viewExemplarsEligible"
@@ -49,6 +49,7 @@
           class="hover:bg-interactive-hover-bg h-7.5 min-h-7.5 transition-all duration-200"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
+          calendar-presets
           @update:model-value="timeGate.onPick"
           @show="timeGate.onShow"
           @hide="onTimePickerHide"
@@ -184,6 +185,12 @@
                   class="me-2 flex shrink-0 items-center justify-end"
                   data-test="view-panel-last-refreshed-at"
                 >
+                  <PanelViewToggle
+                    v-if="showDataViewToggle"
+                    v-model="previewView"
+                    class="my-2 ms-2 me-auto"
+                    data-test-prefix="dashboard-viewpanel"
+                  />
                   <!-- Error/Warning tooltips -->
                   <PanelErrorButtons
                     :error="errorMessage"
@@ -202,42 +209,54 @@
                     :viewOnly="false"
                   />
                 </div>
-                <PanelSchemaRenderer
-                  class="min-h-0 flex-1"
-                  v-if="chartData"
-                  :key="dashboardPanelData.data.type"
-                  :panelSchema="chartData"
-                  :dashboard-id="dashboardId"
-                  :folder-id="folderId"
-                  :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                  :variablesData="currentVariablesDataRef"
-                  :currentVariablesData="liveVariablesData"
-                  :tabId="currentTabId"
-                  :panelId="currentPanelId"
-                  :width="6"
-                  :searchType="searchType"
-                  :showLegendsButton="true"
-                  :exemplars-override="viewExemplarOverride"
-                  @error="handleChartApiError"
-                  @updated:data-zoom="onDataZoom"
-                  @update:initialVariableValues="onUpdateInitialVariableValues"
-                  @last-triggered-at-update="handleLastTriggeredAtUpdate"
-                  @result-metadata-update="handleResultMetadataUpdate"
-                  @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
-                  @series-limit-update="handleSeriesLimitUpdate"
-                  @limit-number-of-series-warning-message-update="
-                    handleLimitNumberOfSeriesWarningMessage
-                  "
-                  @sparkline-warning-update="handleSparklineWarningUpdate"
-                  @is-partial-data-update="handleIsPartialDataUpdate"
-                  @loading-state-change="handleLoadingStateChange"
-                  @is-cached-data-differ-with-current-time-range-update="
-                    handleIsCachedDataDifferWithCurrentTimeRangeUpdate
-                  "
-                  @show-legends="showLegendsDialog = true"
-                  data-test="dashboard-viewpanel-panel-schema-renderer"
-                  ref="panelSchemaRendererRef"
-                />
+                <div class="relative flex min-h-0 flex-1 flex-col">
+                  <PanelSchemaRenderer
+                    class="min-h-0 flex-1"
+                    v-if="chartData"
+                    :key="dashboardPanelData.data.type"
+                    :panelSchema="chartData"
+                    :dashboard-id="dashboardId"
+                    :folder-id="folderId"
+                    :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                    :variablesData="currentVariablesDataRef"
+                    :currentVariablesData="liveVariablesData"
+                    :tabId="currentTabId"
+                    :panelId="currentPanelId"
+                    :width="6"
+                    :searchType="searchType"
+                    :showLegendsButton="true"
+                    :exemplars-override="viewExemplarOverride"
+                    @error="handleChartApiError"
+                    @updated:data-zoom="onDataZoom"
+                    @update:initialVariableValues="onUpdateInitialVariableValues"
+                    @last-triggered-at-update="handleLastTriggeredAtUpdate"
+                    @result-metadata-update="handleResultMetadataUpdate"
+                    @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
+                    @series-limit-update="handleSeriesLimitUpdate"
+                    @region-join-update="handleRegionJoinUpdate"
+                    @sankey-notice-update="handleSankeyNoticeUpdate"
+                    @limit-number-of-series-warning-message-update="
+                      handleLimitNumberOfSeriesWarningMessage
+                    "
+                    @sparkline-warning-update="handleSparklineWarningUpdate"
+                    @is-partial-data-update="handleIsPartialDataUpdate"
+                    @loading-state-change="handleLoadingStateChange"
+                    @is-cached-data-differ-with-current-time-range-update="
+                      handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                    "
+                    @show-legends="showLegendsDialog = true"
+                    data-test="dashboard-viewpanel-panel-schema-renderer"
+                    ref="panelSchemaRendererRef"
+                  />
+                  <PanelDataView
+                    v-if="showDataOverlay && chartData"
+                    class="absolute inset-0 z-10"
+                    :data="previewRawData"
+                    :query-type="dashboardPanelData.data.queryType"
+                    :loading="isPanelLoading"
+                    data-test-prefix="dashboard-viewpanel"
+                  />
+                </div>
               </div>
               <DashboardErrorsComponent
                 :errors="errorData"
@@ -271,6 +290,7 @@ import {
 } from "vue";
 
 import { useI18nTyped } from "@/types/i18n";
+import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
 import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -279,6 +299,9 @@ import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue";
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
+import PanelDataView from "@/components/dashboards/addPanel/PanelDataView.vue";
+import PanelViewToggle from "@/components/dashboards/PanelViewToggle.vue";
+import { usePanelDataView } from "@/composables/dashboard/usePanelDataView";
 // import _ from "lodash-es";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { parseDuration } from "@/utils/date";
@@ -301,7 +324,7 @@ import {
   DASHBOARD_FRESH_PANEL_TIME,
   freshTimeFromAppliedRange,
 } from "@/composables/dashboard/dashboardFreshPanelTime";
-import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
 import { pickerValueToTimeObj, toPickerSavedDate } from "@/utils/dashboard/panelTimeUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
@@ -334,6 +357,8 @@ export default defineComponent({
     DashboardErrorsComponent,
     VariablesValueSelector,
     PanelSchemaRenderer,
+    PanelDataView,
+    PanelViewToggle,
     AutoRefreshInterval,
     HistogramIntervalDropDown,
     ShowLegendsPopup,
@@ -404,6 +429,15 @@ export default defineComponent({
       dashboardPanelDataPageKey,
       t,
     );
+    const {
+      previewView,
+      showDataViewToggle,
+      showDataOverlay,
+      rawData: previewRawData,
+    } = usePanelDataView({
+      panelType: () => dashboardPanelData.data.type,
+      renderer: panelSchemaRendererRef,
+    });
     // The applied range the chart loads with; the picker's own value is `timeGate.picked`.
     const selectedDate: any = ref(props.selectedDateForViewPanel);
     const dateTimePickerRef: any = ref(null);
@@ -466,6 +500,8 @@ export default defineComponent({
       handleResultMetadataUpdate,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
     const limitNumberOfSeriesWarningMessage = ref("");
     const sparklineWarning = ref("");
@@ -758,20 +794,7 @@ export default defineComponent({
           props.initialVariableValues.values &&
           props.initialVariableValues.values.length > 0
         ) {
-          // Update variablesManager with passed values
-          props.initialVariableValues.values.forEach((passedVar: any) => {
-            // Find and update the variable in the manager (global scope)
-            const globalVar = variablesManager.variablesData.global.find(
-              (v: any) => v.name === passedVar.name,
-            );
-            if (globalVar) {
-              globalVar.value = passedVar.value;
-              globalVar.isVariablePartialLoaded = true;
-              globalVar.isLoading = false;
-              // Set pending to false to prevent API call
-              globalVar.isVariableLoadingPending = false;
-            }
-          });
+          variablesManager.adoptLoadedValues(props.initialVariableValues.values);
 
           // Also populate currentVariablesDataRef with passed values
           Object.assign(currentVariablesDataRef, props.initialVariableValues);
@@ -832,9 +855,9 @@ export default defineComponent({
       const appliedTime = pickerValueToTimeObj(selectedDate.value);
       if (!appliedTime) return;
 
-      // CRITICAL: Clear panelIdToBeRefreshed to ensure panel refreshes
+      // CRITICAL: Clear panelRefreshTargets to ensure panel refreshes
       // In view panel mode, when time changes, this panel should always refresh
-      panelIdToBeRefreshed.value = null;
+      panelRefreshTargets.clear();
 
       dashboardPanelData.meta.dateTime = appliedTime;
 
@@ -959,6 +982,12 @@ export default defineComponent({
       return props.panelId;
     });
 
+    const panelTitle = usePanelTitle({
+      title: () => dashboardPanelData.data.title,
+      variablesData: () => currentVariablesDataRef,
+      context: () => ({ tabId: currentTabId.value, panelId: currentPanelId.value }),
+    });
+
     // Same session key as the dashboard header, so the full-screen choice carries back to the grid.
     const viewExemplarsEligible = computed(() => isExemplarEligible(chartData.value));
     const {
@@ -1015,6 +1044,7 @@ export default defineComponent({
       goBack,
       currentDashboard,
       dashboardPanelData,
+      panelTitle,
       chartData,
       selectedDate,
       errorData,
@@ -1056,6 +1086,8 @@ export default defineComponent({
       noticeProps,
       handlePanelDiagnosticsUpdate,
       handleSeriesLimitUpdate,
+      handleRegionJoinUpdate,
+      handleSankeyNoticeUpdate,
       canEditFromNotice,
       onNoticeEditPanel,
       limitNumberOfSeriesWarningMessage,
@@ -1071,6 +1103,10 @@ export default defineComponent({
       showLegendsDialog,
       currentPanelData,
       panelSchemaRendererRef,
+      previewView,
+      showDataViewToggle,
+      showDataOverlay,
+      previewRawData,
       isPartialData,
       isPanelLoading,
       isCachedDataDifferWithCurrentTimeRange,

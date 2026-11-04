@@ -22,6 +22,7 @@
           ref="dateTimePickerRef"
           v-model="selectedDate"
           :auto-apply-dashboard="true"
+          calendar-presets
           class="flex-none"
           data-test="scorer-detail-runs-window"
         />
@@ -238,6 +239,7 @@
             <ScorerVersionsTab
               :versions="versions"
               :loading="versionsLoading"
+              :loading-reset-key="scorerIdRef"
               :active-version="row.version"
             />
           </div>
@@ -254,6 +256,7 @@
             :columns="runColumns"
             row-key="id"
             :loading="isLoadingRuns"
+            :loading-reset-key="scorerIdRef"
             :show-global-filter="false"
             :show-footer="false"
             :page-size="20"

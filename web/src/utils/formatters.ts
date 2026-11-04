@@ -162,7 +162,9 @@ export const formatSizeFromMB = (sizeInMB: string | number) => {
   const units = ["KB", "MB", "GB", "TB", "PB"];
   let index = 1;
 
-  while (size >= 1024 && index < units.length - 1) {
+  // Compare the rounded value, so 1023.996 MB moves up to "1.00 GB" rather
+  // than printing as "1024.00 MB".
+  while (Number(size.toFixed(2)) >= 1024 && index < units.length - 1) {
     size /= 1024;
     index++;
   }
@@ -361,8 +363,8 @@ export function utcMinuteToTzHhmm(minute: number, timeZone: string): string {
   return formatter.format(d);
 }
 
-/** Short display name for an IANA timezone, e.g. "GMT+5:30" or "PST". */
-export function timezoneAbbr(timeZone: string): string {
+/** Short display name for an IANA timezone at `at` (default now), e.g. "GMT+5:30" or "PST". */
+export function timezoneAbbr(timeZone: string, at: Date = new Date()): string {
   const formatter = cachedFormatter(
     abbrFormatters,
     timeZone,
@@ -373,7 +375,7 @@ export function timezoneAbbr(timeZone: string): string {
       }),
   );
   if (!formatter) return timeZone;
-  const parts = formatter.formatToParts(new Date());
+  const parts = formatter.formatToParts(at);
   return parts.find((p) => p.type === "timeZoneName")?.value ?? timeZone;
 }
 

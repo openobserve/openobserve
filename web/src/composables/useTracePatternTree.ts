@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { Ref, ref } from "vue";
+import { Ref } from "vue";
 import { useTreeVisualization, TreeNode } from "@/composables/useTreeVisualization";
 import { CallPattern } from "@/utils/traces/patternDetection";
 
@@ -23,7 +23,8 @@ import { CallPattern } from "@/utils/traces/patternDetection";
  */
 export function useTracePatternTree(
   patterns: Ref<Map<string, CallPattern>>,
-  isDarkMode: Ref<boolean> = ref(false),
+  isDarkMode: Ref<boolean>,
+  pathPatterns: Ref<Map<string, CallPattern>>,
 ) {
   /**
    * Transform simplified service relationships to TreeNode format
@@ -84,6 +85,8 @@ export function useTracePatternTree(
     const buildServiceTree = (
       serviceName: string,
       visited = new Set<string>(),
+      edgePattern?: CallPattern,
+      parentPath = "",
     ): TreeNode | null => {
       if (visited.has(serviceName)) return null; // Prevent cycles
       visited.add(serviceName);
@@ -92,12 +95,13 @@ export function useTracePatternTree(
       if (!serviceInfo) return null;
 
       globalVisited.add(serviceName);
+      const path = parentPath ? `${parentPath}→${serviceName}` : serviceName;
 
       // Create children from outgoing relationships
       const children: TreeNode[] = [];
       serviceInfo.children.forEach((pattern) => {
         const targetService = pattern.pathSignature.split("→")[1];
-        const childNode = buildServiceTree(targetService, new Set(visited));
+        const childNode = buildServiceTree(targetService, new Set(visited), pattern, path);
         if (childNode) {
           // Preserve child's own metrics (already set by its buildServiceTree call).
           // Only add edge-specific info — don't override with pattern.metrics spread.
@@ -111,20 +115,20 @@ export function useTracePatternTree(
         }
       });
 
-      // Use the service's own self-pattern for its metrics (own span durationMs).
-      // Falls back to children aggregation only if no self-pattern exists.
-      const selfPattern = patternMap.get(serviceName);
+      // Metrics come from the spans on this node's own branch; the edge and self patterns cover paths the trace never took.
+      const metricsPattern =
+        pathPatterns.value.get(path) ?? edgePattern ?? patternMap.get(serviceName);
       const totalCalls =
-        selfPattern?.metrics?.count ||
+        metricsPattern?.metrics?.count ||
         serviceInfo.children.reduce((sum, p) => sum + p.metrics.count, 0);
       const avgDuration =
-        selfPattern?.metrics?.avg ||
+        metricsPattern?.metrics?.avg ??
         (serviceInfo.children.length > 0
           ? serviceInfo.children.reduce((sum, p) => sum + p.metrics.avg * p.metrics.count, 0) /
             Math.max(totalCalls, 1)
           : 0);
       const avgErrorRate =
-        selfPattern?.metrics?.errorRate ??
+        metricsPattern?.metrics?.errorRate ??
         (serviceInfo.children.length > 0
           ? serviceInfo.children.reduce(
               (sum, p) => sum + p.metrics.errorRate * p.metrics.count,
@@ -139,7 +143,7 @@ export function useTracePatternTree(
         errorRate: avgErrorRate,
         children: children.length > 0 ? children : undefined,
         metadata: {
-          ...selfPattern?.metrics,
+          ...metricsPattern?.metrics,
           serviceName,
           count: totalCalls,
           avg: Math.round(avgDuration * 100) / 100,

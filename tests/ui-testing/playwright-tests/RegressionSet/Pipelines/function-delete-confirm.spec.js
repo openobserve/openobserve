@@ -40,7 +40,7 @@ test.describe("Function delete confirmation", () => {
 
     expect(dialogText,
       'Bug #2812: deleting a function must raise a confirmation, not delete silently'
-    ).toContain('Are you sure you want to delete transform?');
+    ).toContain(`Are you sure you want to delete the ${functionName} function?`);
 
     await pm.functionsPage.cancelDeleteConfirm();
     await pm.functionsPage.expectFunctionInList(functionName);

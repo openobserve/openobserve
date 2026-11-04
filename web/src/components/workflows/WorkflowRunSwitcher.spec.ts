@@ -63,7 +63,7 @@ const globalCfg = {
     OIcon: stub("OIcon", ["name", "size"]),
     OBadge: stub("OBadge", ["variant", "size"]),
     OTooltip: stub("OTooltip", ["side", "content", "maxWidth"]),
-    OTimeCell: stub("OTimeCell", ["value", "unit", "mode", "timezone", "emptyLabel"]),
+    OTimeCell: stub("OTimeCell", ["value", "unit", "mode", "timezone", "emptyLabel", "format"]),
     ORefreshButton: stub("ORefreshButton", ["lastRunAt", "loading"]),
     OButton: stub("OButton", ["variant", "size", "iconLeft", "loading"]),
   },
@@ -117,6 +117,14 @@ describe("WorkflowRunSwitcher — test runs in the History dropdown", () => {
 
   // The regression risk: a draft's history is almost entirely test runs, and
   // that is exactly what its author wants to see.
+  it("dates each run like the run chip (Oct 21, 2026 09:39)", async () => {
+    workflowObj.currentSelectedWorkflow.isDraft = false;
+    workflowObj.runsHistory.list = [REAL_RUN("r1")] as any;
+    const wrapper = mountSwitcher();
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "OTimeCell" }).props("format")).toBe("MMM d, yyyy HH:mm");
+  });
+
   it("shows test runs on a DRAFT", async () => {
     workflowObj.currentSelectedWorkflow.isDraft = true;
     workflowObj.runsHistory.list = [TEST_RUN("t1"), REAL_RUN("r1")] as any;
@@ -187,5 +195,48 @@ describe("WorkflowRunSwitcher — test runs in the History dropdown", () => {
     expect(runIds(wrapper)).toEqual(["new", "old"]);
     await wrapper.findAll(".o-dropdown-item")[1].trigger("click");
     expect(wrapper.emitted("select")?.[0]).toEqual(["old"]);
+  });
+});
+
+describe("WorkflowRunSwitcher — stored run status", () => {
+  const tags = (wrapper: any) =>
+    wrapper
+      .findAllComponents({ name: "OTag" })
+      .filter((c: any) => c.props("type") === "hookRunStatus")
+      .map((c: any) => c.props("value"));
+
+  beforeEach(() => {
+    workflowObj.runsHistory = {
+      list: [],
+      fetchedAt: 0,
+      params: { start: 0, end: 0 },
+      loading: false,
+    } as any;
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf-1",
+      nodes: [],
+      edges: [],
+      isDraft: true,
+    } as any;
+  });
+
+  it("renders each run's status through the hookRunStatus badge group, never from error", async () => {
+    workflowObj.runsHistory.list = [
+      { ...REAL_RUN("a"), start_time: 3, status: "succeeded", error: "warning text" },
+      { ...REAL_RUN("b"), start_time: 2, status: "failed", error: null },
+      { ...REAL_RUN("c"), start_time: 1, event_type: "Webhook", status: "expired" },
+    ] as any;
+    const wrapper = mount(WorkflowRunSwitcher, {
+      props: { currentRunId: "", orgId: "default", workflowId: "wf-1" },
+      global: {
+        ...globalCfg,
+        stubs: {
+          ...globalCfg.stubs,
+          OTag: { name: "OTag", props: ["type", "value", "size"], template: "<b />" },
+        },
+      },
+    });
+    await flushPromises();
+    expect(tags(wrapper)).toEqual(["succeeded", "failed", "expired"]);
   });
 });

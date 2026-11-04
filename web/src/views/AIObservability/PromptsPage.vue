@@ -19,8 +19,26 @@
       >
         <OTooltip :content="t('aiObservability.promptManagement.settings')" />
       </OButton>
-      <OButton variant="primary" size="sm" data-test="prompt-new" @click="openCreate">
+      <OButton
+        variant="primary"
+        size="sm"
+        data-test="prompt-new"
+        :aria-label="
+          promptDrafts.hasNew
+            ? t('common.editorDraft.newDot', {
+                label: t('aiObservability.promptManagement.newPrompt'),
+              })
+            : undefined
+        "
+        @click="openCreate"
+      >
         {{ t("aiObservability.promptManagement.newPrompt") }}
+        <EditorDraftDot
+          v-if="promptDrafts.hasNew"
+          :saved-at="promptDrafts.savedAt(null)"
+          corner
+          data-test="prompt-new-draft-dot"
+        />
       </OButton>
     </template>
     <template #sidebar>
@@ -33,6 +51,7 @@
         :columns="columns"
         row-key="entityId"
         :loading="promptQuery.isPending.value"
+        :loading-reset-key="activeFolderId"
         :error="listError"
         :forbidden="errorStatus(promptQuery.error.value) === 403"
         :frame="false"
@@ -132,7 +151,16 @@
           />
         </template>
         <template #cell-name="{ row }">
-          <OButton variant="ghost" size="xs" @click.stop="openDetail(row)">{{ row.name }}</OButton>
+          <span class="inline-flex items-center gap-2">
+            <OButton variant="ghost" size="xs" @click.stop="openDetail(row)">{{
+              row.name
+            }}</OButton>
+            <EditorDraftDot
+              v-if="promptDrafts.ids.has(row.entityId)"
+              :saved-at="promptDrafts.savedAt(row.entityId)"
+              :data-test="`prompt-${row.entityId}-draft-dot`"
+            />
+          </span>
         </template>
         <template #cell-description="{ row }">
           <span class="text-text-body">{{ row.description || raw("—") }}</span>
@@ -218,6 +246,7 @@
       :initial-version="routeVersion"
       :initial-tab="detailTab"
       :protected-labels="protectedLabels"
+      :show-playground="!hidesOnlineEvalEntries(store.state.zoConfig)"
       @update:open="closeDetail"
       @updated="replacePrompt"
       @edit="openEditorForVersion"
@@ -317,6 +346,10 @@ import PromptSettingsDrawer from "./PromptSettingsDrawer.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import PromptTrafficPanel from "./PromptTrafficPanel.vue";
 import { storePromptPlaygroundHandoff } from "./promptPlaygroundHandoff";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { hidesOnlineEvalEntries } from "@/composables/shared/useOnlineEvalsGate";
 
 const store = useStore();
 const { t } = useI18nTyped();
@@ -336,6 +369,7 @@ const settingsOpen = ref(false);
 const moveOpen = ref(false);
 const movingPrompt = ref<Prompt | null>(null);
 const moveDestination = ref("");
+const promptDrafts = useEditorDraftIds("prompt");
 
 const orgId = computed(() =>
   String(store.state.selectedOrganization?.identifier ?? route.query.org_identifier ?? ""),
@@ -653,16 +687,18 @@ async function archive(prompt: Prompt) {
   if (
     !(await confirm({
       title: t("aiObservability.promptManagement.archivePrompt"),
-      message: t("aiObservability.promptManagement.archivePromptConfirmMessage", {
-        name: raw(prompt.name),
-      }),
+      messageKeypath: "aiObservability.promptManagement.archivePromptConfirmMessage",
+      messageName: prompt.name,
       confirmLabel: t("aiObservability.promptManagement.archive"),
+      confirmVariant: "destructive",
     }))
   )
     return;
   if (requestedOrg !== orgId.value) return;
   try {
     const updated = await archiveMutation.mutateAsync(prompt.entityId);
+    // An archived prompt takes no new versions, so its version draft can never be saved.
+    deleteEditorDraftsFor({ kind: "prompt", org: requestedOrg, entityId: prompt.entityId });
     if (requestedOrg !== orgId.value) return;
     replacePrompt(updated);
     toast({ variant: "success", message: t("aiObservability.promptManagement.archiveSuccess") });

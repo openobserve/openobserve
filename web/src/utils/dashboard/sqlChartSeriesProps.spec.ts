@@ -119,6 +119,26 @@ describe("sqlChartSeriesProps - getPropsByChartTypeForSeries", () => {
       const result = getPropsByChartTypeForSeries(makeSchema("scatter")) as any;
       expect(result.symbolSize).toBe(5);
     });
+
+    it("leaves the item opacity to the chart when symbol_opacity is unset", () => {
+      const result = getPropsByChartTypeForSeries(makeSchema("scatter")) as any;
+      expect(result.itemStyle).toBeUndefined();
+    });
+
+    it("reads symbol_size and symbol_opacity from the config", () => {
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("scatter", { symbol_size: 12, symbol_opacity: 40 }),
+      ) as any;
+      expect(result.symbolSize).toBe(12);
+      expect(result.itemStyle).toEqual({ opacity: 0.4 });
+    });
+
+    it("keeps an opacity of 0 instead of falling back", () => {
+      const result = getPropsByChartTypeForSeries(
+        makeSchema("scatter", { symbol_opacity: 0 }),
+      ) as any;
+      expect(result.itemStyle).toEqual({ opacity: 0 });
+    });
   });
 
   describe("pie chart", () => {

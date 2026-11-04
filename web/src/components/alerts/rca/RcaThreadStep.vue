@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p
         v-if="step.note"
         data-test="rca-thread-step-note"
-        class="text-text-body text-compact m-0 [text-wrap:pretty] break-words"
+        class="text-text-body text-compact m-0 [text-wrap:pretty] break-words whitespace-pre-line"
       >
         <template v-for="(segment, idx) in noteSegments" :key="idx">
           <template v-if="segment.kind === 'text'">
@@ -151,10 +151,12 @@ const props = withDefaults(
     runLive: boolean;
     /** The live run is paused for an answer, so its unfinished step is not working. */
     runWaiting?: boolean;
+    /** The step counts as finished; an ended run's step that Resume repeats does not. */
+    finished?: boolean;
     /** Evidence id → entry number from the run's summary; null when no summary is loaded, so chips show the raw id. */
     evidenceNumbers?: Map<string, number> | null;
   }>(),
-  { runWaiting: false, evidenceNumbers: null },
+  { runWaiting: false, finished: true, evidenceNumbers: null },
 );
 
 defineEmits<{
@@ -166,13 +168,13 @@ const { t } = useI18nTyped();
 
 const callsListId = useId();
 
-/** running: the live step; waiting: paused for an answer; stopped: the run's end cut it off; warn: a tool failed. */
+/** running: the live step; waiting: paused for an answer; stopped: the step did not finish; warn: a tool failed. */
 const status = computed<"running" | "waiting" | "stopped" | "warn" | "ok">(() => {
   if (props.step.ended_at === null) {
     if (!props.runLive) return "stopped";
     return props.runWaiting ? "waiting" : "running";
   }
-  if (isInterruptedStep(props.step)) return "stopped";
+  if (!props.finished || isInterruptedStep(props.step)) return "stopped";
   return props.step.tool_calls.some((call) => call.status === "error") ? "warn" : "ok";
 });
 

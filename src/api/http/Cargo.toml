@@ -42,7 +42,8 @@ vectorscan = [
     "openobserve-core/vectorscan",
     "stream/vectorscan",
 ]
-profiling = ["openobserve-api-management/profiling"]
+cpu-profiling = ["openobserve-api-management/cpu-profiling"]
+profiling = ["cpu-profiling", "openobserve-api-management/profiling"]
 
 [dependencies]
 common.workspace = true
@@ -95,6 +96,8 @@ futures-util.workspace = true
 
 [dev-dependencies]
 base64.workspace = true
+sea-orm.workspace = true
+svix-ksuid.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 zstd.workspace = true

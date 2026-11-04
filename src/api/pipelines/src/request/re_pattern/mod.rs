@@ -120,6 +120,10 @@ pub struct BuiltInPatternsQuery {
     post,
     path = "/{org_id}/re_patterns",
     context_path = "/api",
+    operation_id = "SaveRegexPattern",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Create a new regex pattern",
     description = "Stores a new regular expression pattern for log processing and data extraction",
     request_body(
@@ -127,16 +131,16 @@ pub struct BuiltInPatternsQuery {
         description = "re_pattern to add",
         content_type = "application/json",
     ),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
-    tag = "RePattern"
+    tag = "RePattern",
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RePatterns", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn save(
     Path(org_id): Path<String>,
@@ -188,13 +192,16 @@ pub async fn save(
 /// get pattern with given id if present
 #[utoipa::path(
     get,
-    path = "/{org_id}/re_patterns/{id}",
+    path = "/{org_id}/re_patterns/{pattern_id}",
     context_path = "/api",
+    operation_id = "GetRegexPattern",
     summary = "Get regex pattern by ID",
     description = "Retrieves a specific regex pattern using its unique identifier",
     params(
-        ("id" = String, Path, description = "id of the pattern to retrieve", example = "12345")
+        ("org_id" = String, Path, description = "Organization name"),
+        ("pattern_id" = String, Path, description = "id of the pattern to retrieve", example = "12345")
     ),
+    security(("Authorization" = [])),
     responses(
         (
             status = 200,
@@ -204,7 +211,11 @@ pub async fn save(
         ),
         (status = 404, description = "Pattern not found", content_type = "text/plain")
     ),
-    tag = "RePattern"
+    tag = "RePattern",
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RePatterns", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get(Path((org_id, id)): Path<(String, String)>) -> Response {
     #[cfg(feature = "vectorscan")]
@@ -247,8 +258,13 @@ pub async fn get(Path((org_id, id)): Path<(String, String)>) -> Response {
     get,
     path = "/{org_id}/re_patterns",
     context_path = "/api",
+    operation_id = "ListRegexPatterns",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "List all regex patterns for organization",
     description = "Lists all regex patterns available within the specified organization",
+    security(("Authorization" = [])),
     responses(
         (
             status = 200,
@@ -257,7 +273,11 @@ pub async fn get(Path((org_id, id)): Path<(String, String)>) -> Response {
             content_type = "application/json",
         ),
     ),
-    tag = "RePattern"
+    tag = "RePattern",
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RePatterns", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list(Path(org_id): Path<String>) -> Response {
     #[cfg(feature = "vectorscan")]
@@ -282,22 +302,24 @@ pub async fn list(Path(org_id): Path<String>) -> Response {
 /// delete pattern with given id
 #[utoipa::path(
     delete,
-    path = "/{org_id}/re_patterns/{id}",
+    path = "/{org_id}/re_patterns/{pattern_id}",
     context_path = "/api",
+    operation_id = "DeleteRegexPattern",
     summary = "Delete regex pattern by ID",
     description = "Removes a regex pattern from the system using its identifier",
     params(
-        ("id" = String, Path, description = "id of the pattern to delete", example = "12345")
+        ("org_id" = String, Path, description = "Organization name"),
+        ("pattern_id" = String, Path, description = "id of the pattern to delete", example = "12345")
     ),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(MetaHttpResponse)),
     ),
-    tag = "RePattern"
+    tag = "RePattern",
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RePatterns", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete(Path((org_id, id)): Path<(String, String)>) -> Response {
     #[cfg(feature = "vectorscan")]
@@ -351,6 +373,7 @@ pub async fn delete(Path((org_id, id)): Path<(String, String)>) -> Response {
     delete,
     path = "/{org_id}/re_patterns/bulk",
     context_path = "/api",
+    operation_id = "DeleteRegexPatternsBulk",
     summary = "Delete regex pattern in bulk",
     description = "Removes multiple regex patterns from the system using its identifiers",
     params(
@@ -361,15 +384,15 @@ pub async fn delete(Path((org_id, id)): Path<(String, String)>) -> Response {
         description = "re_patterns to delete",
         content_type = "application/json",
     ),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 200, description = "Success", content_type = "application/json", body = crate::request::BulkDeleteResponse),
     ),
-    tag = "RePattern"
+    tag = "RePattern",
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RePatterns", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete_bulk(
     Path(org_id): Path<String>,
@@ -484,28 +507,30 @@ pub async fn delete_bulk(
 /// update the pattern for given id
 #[utoipa::path(
     put,
-    path = "/{org_id}/re_patterns/{id}",
+    path = "/{org_id}/re_patterns/{pattern_id}",
     context_path = "/api",
+    operation_id = "UpdateRegexPattern",
     summary = "Update regex pattern by ID",
     description = "Modifies an existing regex pattern's configuration and rules",
     params(
-        ("id" = String, Path, description = "id of the pattern to update", example = "12345")
+        ("org_id" = String, Path, description = "Organization name"),
+        ("pattern_id" = String, Path, description = "id of the pattern to update", example = "12345")
     ),
     request_body(
         content = inline(PatternCreateRequest),
         description = "updated pattern data",
         content_type = "application/json",
     ),
+    security(("Authorization" = [])),
     responses(
-        (
-            status = 200,
-            description = "Empty response",
-            body = (),
-            content_type = "application/json",
-        ),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
-    tag = "RePattern"
+    tag = "RePattern",
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RePatterns", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn update(
     Path((org_id, id)): Path<(String, String)>,
@@ -558,6 +583,7 @@ pub async fn update(
     post,
     path = "/{org_id}/re_patterns/test",
     context_path = "/api",
+    operation_id = "TestRegexPattern",
     summary = "Test regex pattern against sample data",
     description = "Tests a regex pattern against sample input strings to validate pattern matching",
     request_body(
@@ -565,6 +591,8 @@ pub async fn update(
         description = "re_pattern to test and strings to test against",
         content_type = "application/json",
     ),
+    params(("org_id" = String, Path, description = "Organization name")),
+    security(("Authorization" = [])),
     responses(
         (
             status = 200,
@@ -574,7 +602,11 @@ pub async fn update(
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
-    tag = "RePattern"
+    tag = "RePattern",
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RePatterns", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn test(Json(req): Json<PatternTestRequest>) -> Response {
     #[cfg(feature = "vectorscan")]
@@ -620,12 +652,15 @@ pub async fn test(Json(req): Json<PatternTestRequest>) -> Response {
     get,
     path = "/{org_id}/re_patterns/built-in",
     context_path = "/api",
+    operation_id = "ListBuiltInRegexPatterns",
     summary = "Get built-in regex patterns from GitHub",
     description = "Fetches curated regex patterns from the pyWhat project on GitHub. Supports search and tag filtering. Uses frontend caching only.",
     params(
+        ("org_id" = String, Path, description = "Organization name"),
         ("search" = Option<String>, Query, description = "Search query to filter patterns by name, description, or tags"),
         ("tags" = Option<Vec<String>>, Query, description = "Filter patterns by specific tags")
     ),
+    security(("Authorization" = [])),
     responses(
         (
             status = 200,
@@ -635,7 +670,11 @@ pub async fn test(Json(req): Json<PatternTestRequest>) -> Response {
         ),
         (status = 500, description = "Failed to fetch patterns", content_type = "application/json")
     ),
-    tag = "RePattern"
+    tag = "RePattern",
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RePatterns", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_built_in_patterns(
     // _org_id intentionally unused: this endpoint fetches public patterns from GitHub,

@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="dialogConfig.showPrimaryButton"
             variant="on-dark-primary"
+            size="cta"
             data-test="enterprise-features-primary-btn"
             class="text-theme-accent! bg-white!"
             @click="handlePrimaryButtonClick"
@@ -57,11 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="dialogConfig.showContactSales"
             variant="on-dark-ghost"
+            size="cta"
             @click="contactSales"
           >
             {{ t("about.enterprise_offer.buttons.contact_sales") }}
           </OButton>
-          <OButton v-else variant="on-dark-ghost" @click="openDocsLink">
+          <OButton v-else variant="on-dark-ghost" size="cta" @click="openDocsLink">
             {{ t("about.enterprise_offer.buttons.learn_more") }}
           </OButton>
         </div>

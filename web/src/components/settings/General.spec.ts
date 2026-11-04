@@ -312,6 +312,12 @@ describe("General", () => {
   });
 
   describe("Form inputs", () => {
+    it("gives the max series input an accessible name", () => {
+      const wrapper = createWrapper();
+      const input = wrapper.find('[data-test="general-settings-max-series-per-query"]');
+      expect(input.find("input").attributes("aria-label")).toBe("Max Series Per Query");
+    });
+
     it("should keep the scrape interval and max series inputs (data-tests preserved)", () => {
       const wrapper = createWrapper();
       expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(true);
@@ -857,6 +863,18 @@ describe("General", () => {
       expect(deleteDialog.attributes("data-size")).toBe("sm");
       expect(deleteDialog.attributes("data-primary-label")).toBe("OK");
       expect(deleteDialog.attributes("data-secondary-label")).toBe("Cancel");
+    });
+
+    it("names the logo theme in bold and uses a destructive OK button", async () => {
+      const wrapper = createWrapper();
+      wrapper.vm.confirmDeleteLogo("dark");
+      await nextTick();
+      const dialog = wrapper.findAllComponents({ name: "ODialog" })[0];
+      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      const message = wrapper.find('[data-test="general-delete-image-message"]');
+      const name = message.find("span.font-semibold");
+      expect(name.text()).toBe("Dark Mode");
+      expect(message.text()).toContain("Dark Mode");
     });
 
     it("forwards title and size to the color picker ODialog", () => {

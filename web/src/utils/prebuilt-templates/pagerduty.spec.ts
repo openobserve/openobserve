@@ -63,17 +63,6 @@ describe("pagerduty template", () => {
       expect(pagerdutyConfig.method).toBe("post");
     });
 
-    it("has URL validator", () => {
-      expect(typeof pagerdutyConfig.urlValidator).toBe("function");
-    });
-
-    it("validates PagerDuty URLs", () => {
-      expect(pagerdutyConfig.urlValidator("https://events.pagerduty.com/v2/enqueue")).toBe(true);
-      expect(pagerdutyConfig.urlValidator("https://example.com")).toBe(false);
-      expect(pagerdutyConfig.urlValidator("https://events.pagerduty.com/v2/other")).toBe(false);
-      expect(pagerdutyConfig.urlValidator("invalid-url")).toBe(false);
-    });
-
     it("integration key validator validates key length", () => {
       const integrationKeyField = pagerdutyConfig.credentialFields.find(
         (f) => f.key === "integrationKey",
@@ -105,6 +94,12 @@ describe("pagerduty template", () => {
       expect(severityField).toBeDefined();
       expect(severityField?.type).toBe("select");
       expect(severityField?.options).toBeDefined();
+    });
+
+    it("has an optional EU region toggle", () => {
+      const euRegionField = pagerdutyConfig.credentialFields.find((f) => f.key === "euRegion");
+      expect(euRegionField?.type).toBe("toggle");
+      expect(euRegionField?.required).toBe(false);
     });
 
     it("keeps PagerDuty substitution metadata out of generic credential metadata", () => {

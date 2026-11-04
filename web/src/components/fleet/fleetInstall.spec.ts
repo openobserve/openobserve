@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   GATEWAY_RELEASE,
+  HELM_ENV,
   INSTALL_ENV,
   installCommand,
   opampEndpoint,
@@ -42,16 +43,17 @@ describe("installCommand", () => {
     expect(cmd).toContain("--org 'acme'");
     expect(cmd).toContain("--token 'o2ft_abc123'");
     expect(cmd).toContain("--version '0.163.1'");
-    expect(cmd).not.toContain("--transport");
+    expect(cmd).toContain("--transport ws");
   });
 
   it("uses the macOS script on macOS", () => {
     expect(installCommand("macos", target)).toContain("/agents/main/fleet/install.sh");
   });
 
-  it("adds --transport http only when the proxy cannot carry WebSocket", () => {
+  it("always names the transport, so the scripts' own default never decides it", () => {
     expect(installCommand("linux", { ...target, http: true })).toContain("--transport http");
     expect(installCommand("windows", { ...target, http: true })).toContain("-Transport http");
+    expect(installCommand("windows", target)).toContain("-Transport ws");
   });
 
   it("leaves the version to the script when the org sets none", () => {
@@ -98,6 +100,9 @@ describe("installCommand", () => {
     expect(cmd).toContain("--set image.repository=o2cr.ai/openobserve/otel-fleet-collector");
     expect(cmd).toContain("--set image.tag='0.163.1'");
     expect(cmd).toContain("--set opamp.endpoint='wss://o2.example.com/api/acme/v1/opamp'");
+    expect(installCommand("kubernetes", { ...target, http: true })).toContain(
+      "--set opamp.endpoint='https://o2.example.com/api/acme/v1/opamp'",
+    );
   });
 
   it("installs agents as the otel-fleet-collector release with the chart's agent default", () => {
@@ -115,6 +120,32 @@ describe("installCommand", () => {
     expect(cmd).toContain("--set gateway.enabled=true");
     expect(cmd).not.toContain("replicas");
     expect(cmd).toContain("--set opamp.token='o2ft_abc123'");
+  });
+
+  it("names the cluster only once one is given, for agents and gateways", () => {
+    for (const role of ["agent", "gateway"] as const) {
+      expect(installCommand("kubernetes", { ...target, role })).not.toContain("clusterName");
+      expect(installCommand("kubernetes", { ...target, role, clusterName: "  " })).not.toContain(
+        "clusterName",
+      );
+      expect(installCommand("kubernetes", { ...target, role, clusterName: " prod-us " })).toContain(
+        "--set-string clusterName='prod-us'",
+      );
+    }
+  });
+
+  it("escapes the backslashes and commas Helm would read in a cluster name", () => {
+    expect(installCommand("kubernetes", { ...target, clusterName: "eu,west" })).toContain(
+      "--set-string clusterName='eu\\,west'",
+    );
+    expect(installCommand("kubernetes", { ...target, clusterName: "a\\,b" })).toContain(
+      "--set-string clusterName='a\\\\\\,b'",
+    );
+  });
+
+  it("lists the chart's cluster name and node IP variables as Helm-provided", () => {
+    expect(HELM_ENV).toContain("K8S_CLUSTER_NAME");
+    expect(HELM_ENV).toContain("K8S_NODE_IP");
   });
 
   it("ignores the role outside Kubernetes", () => {

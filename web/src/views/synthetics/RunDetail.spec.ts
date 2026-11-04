@@ -341,6 +341,35 @@ describe("RunDetail", () => {
 
       w.unmount();
     });
+
+    it("shows no status badge while the run loads, then the loaded run's status", async () => {
+      // Reassign the shared wrapper so afterEach unmounts it even when an assertion fails.
+      wrapper.unmount();
+      mockRunDetailRef.value = null;
+      let finishFetch!: () => void;
+      mockFetchRun.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishFetch = resolve;
+          }),
+      );
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="synthetics-run-detail-info-skeleton"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-run-detail-status-badge"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("synthetics.results.passed");
+
+      mockRunDetailRef.value = { ...mockRunDetail, status: "failed" };
+      mockLoading.value = false;
+      finishFetch();
+      await flushPromises();
+
+      const badge = wrapper.find('[data-test="synthetics-run-detail-status-badge"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBe("synthetics.results.failed");
+    });
   });
 });
 
@@ -569,6 +598,25 @@ describe("RunDetail — id-less error override (quota / reaper rows)", () => {
     expect(w.find('[data-test="synthetics-run-detail-error-desc"]').exists()).toBe(false);
   });
 
+  it("headlines a dead-letter message without its cut '(phase' group", async () => {
+    mockRunDetailRef.value = null;
+    w = mountComponent({
+      drawerMode: true,
+      overrideMonitorType: "browser",
+      overrideError: {
+        ...overrideError,
+        errorSource: "dispatch",
+        message:
+          "no probe claimed the check for this location before its schedule window closed (phase: never claimed; 0 dispatch attempt(s)); a probe may be unable to reach the callback endpoint http://localhost:5080",
+      },
+    });
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-run-detail-error-type"]').text()).toBe(
+      "no probe claimed the check for this location before its schedule window closed",
+    );
+  });
+
   it("renders the error view even for a protocol monitor type (skips ProtocolRunSummary)", async () => {
     mockRunDetailRef.value = null;
     w = mountComponent({ drawerMode: true, overrideMonitorType: "http", overrideError });
@@ -792,6 +840,94 @@ describe("RunDetail — start load (row 0)", () => {
     const defs = panel.props("stepDefs") as Map<string, { name: string }>;
     expect(defs.get("_start")?.name).toBe("synthetics.runDetail.startLoadLabel https://app.test/");
     expect(panel.text()).not.toContain("_start");
+    w.unmount();
+  });
+});
+
+// ── Step outcomes and locators (ENT#3140 B2/B3) ──────────────────────────────
+describe("RunDetail — skipped / unknown steps and locators", () => {
+  const detail = {
+    ...mockRunDetail,
+    status: "failed",
+    recordedSteps: [
+      { id: "s1", action: "navigate", name: "Open home", url: "https://app.test/" },
+      {
+        id: "s2",
+        action: "click",
+        name: "Dismiss banner",
+        locator: { candidates: [{ kind: "role", value: "button[name=Close]" }] },
+      },
+      { id: "s3", action: "click", name: "Sign in", selector: "#signin" },
+      { id: "s4", action: "wait", name: "Settle" },
+    ],
+    lastAttemptSteps: [
+      { step_id: "s1", status: "ok", duration_ms: 10, error: "", screenshot_key: null },
+      {
+        step_id: "s2",
+        status: "skipped",
+        duration_ms: 5,
+        error: "optional step: banner not present",
+        screenshot_key: null,
+      },
+      { step_id: "s3", status: "fail", duration_ms: 20, error: "timeout", screenshot_key: null },
+      { step_id: "s4", status: "weird", duration_ms: 1, error: "", screenshot_key: null },
+    ],
+  };
+
+  afterEach(() => {
+    mockRunDetailRef.value = { ...mockRunDetail };
+  });
+
+  async function mountWith() {
+    mockRunDetailRef.value = null;
+    const w = mountComponent();
+    await flushPromises();
+    mockRunDetailRef.value = { ...detail };
+    await flushPromises();
+    return w;
+  }
+
+  it("keeps pass, fail, skipped and unknown distinct", async () => {
+    const w = await mountWith();
+    const steps = (w.vm as any).steps;
+    expect(steps.map((s: any) => s.status)).toEqual(["pass", "skipped", "fail", "unknown"]);
+    expect((w.vm as any).stepDotState(steps[1])).toBe("skip");
+    // Unknown must never take the pass colour.
+    expect((w.vm as any).stepDotState(steps[3])).toBeUndefined();
+    expect((w.vm as any).stepStatusBadge(steps[1])?.label).toBe(
+      "synthetics.runDetail.stepStatusSkipped",
+    );
+    expect((w.vm as any).stepStatusBadge(steps[0])).toBeNull();
+    w.unmount();
+  });
+
+  it("shows the skipped count on the steps tab", async () => {
+    const w = await mountWith();
+    expect(w.find('[data-test="synthetics-run-detail-skipped-count"]').exists()).toBe(true);
+    w.unmount();
+  });
+
+  it("resolves the locator with effectiveSelector and never falls back to the step id", async () => {
+    const w = await mountWith();
+    const steps = (w.vm as any).steps;
+    expect(steps[1].selector).toBe("button[name=Close]");
+    expect(steps[2].selector).toBe("#signin");
+    expect(steps[0].selector).toBeNull();
+    expect(steps[3].selector).toBeNull();
+    expect(steps[3].detail).toBe("");
+    w.unmount();
+  });
+
+  it("renders Selector and Step ID on the failed step, and the skip reason when expanded", async () => {
+    const w = await mountWith();
+    // The failed step auto-expands.
+    expect(w.find('[data-test="synthetics-run-detail-step-selector"]').text()).toContain("#signin");
+    expect(w.find('[data-test="synthetics-run-detail-step-id"]').text()).toContain("s3");
+    (w.vm as any).handleUpdateExpanded(["2"]);
+    await flushPromises();
+    expect(w.find('[data-test="synthetics-run-detail-step-skip-reason"]').text()).toContain(
+      "banner not present",
+    );
     w.unmount();
   });
 });

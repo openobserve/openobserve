@@ -38,7 +38,6 @@ import {
   attr,
   block,
   boolWhen,
-  bool,
   document,
   isFilled,
   list,
@@ -178,16 +177,6 @@ function triggerConditionBlock(source: unknown, query: Record<string, unknown>):
   ]);
 }
 
-function deduplicationBlock(source: unknown): Node[] {
-  if (!source || typeof source !== "object") return [];
-  const d = source as Record<string, unknown>;
-  return block("deduplication", [
-    ...attr("enabled", bool(d.enabled)),
-    ...attr("fingerprint_fields", list(d.fingerprint_fields)),
-    ...attr("time_window_minutes", num(d.time_window_minutes)),
-  ]);
-}
-
 /** Anomaly-detection configs and truncated payloads have no provider resource. */
 function unsupportedReason(alert: Record<string, unknown>): TerraformUnsupportedReason | null {
   if (alert.alert_type === "anomaly_detection") return "anomaly";
@@ -229,7 +218,6 @@ function alertResource(
     ...attr("workflows", list(alert.workflows)),
     ...queryConditionBlock(alert.query_condition, INDENT, dropped),
     ...triggerConditionBlock(alert.trigger_condition, query),
-    ...deduplicationBlock(alert.deduplication),
   ];
 
   return resourceBlock("openobserve_alert", label, nodes);

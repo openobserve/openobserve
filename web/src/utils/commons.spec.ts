@@ -48,7 +48,13 @@ import {
   moveModuleToAnotherFolder,
   checkIfVariablesAreLoaded,
   getDashboard,
+  fetchLatestDashboard,
+  fetchServerDashboard,
+  getLoadedDashboardVersion,
+  hasUnsavedDashboardEdits,
+  isDashboardStoredAtOldVersion,
 } from "./commons";
+import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import { gt } from "@/types/i18n";
 
 // Mock dependencies
@@ -83,6 +89,7 @@ vi.mock("../services/common", async (importOriginal) => {
 });
 
 vi.mock("./dashboard/convertDashboardSchemaVersion", () => ({
+  CURRENT_DASHBOARD_SCHEMA_VERSION: 8,
   convertDashboardSchemaVersion: vi.fn((data) => data),
 }));
 
@@ -103,6 +110,7 @@ vi.mock("moment", () => ({
 import dashboardService from "../services/dashboards";
 import commonService from "../services/common";
 import { readPanelDraft, writePanelDraft } from "@/composables/dashboard/usePanelDraft";
+import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 
 const draftInput = {
   tabId: "tab-1",
@@ -116,6 +124,13 @@ const draftScope = (dashboardId: string, panelId?: string) => ({
   org: "test-org",
   dashboardId,
   panelId,
+});
+
+const settingsDraftScope = (entityId: string) => ({
+  kind: "dashboard_settings" as const,
+  org: "test-org",
+  entityId,
+  userEmail: "me@x.io",
 });
 
 describe("Commons Utility Functions", () => {
@@ -558,6 +573,19 @@ describe("Commons Utility Functions", () => {
 
       expect(readPanelDraft(draftScope("d1", "p1"))).toBeNull();
       expect(readPanelDraft(draftScope("d2"))).not.toBeNull();
+      localStorage.clear();
+    });
+
+    it("removes the settings drafts of bulk-deleted dashboards", () => {
+      localStorage.clear();
+      mockStore.state.organizationData.allDashboardList = {};
+      writeEditorDraft(settingsDraftScope("d1"), { data: { tab: "generalSettings" } });
+      writeEditorDraft(settingsDraftScope("d2"), { data: { tab: "generalSettings" } });
+
+      evictDashboardsFromCache(mockStore, new Map([["folder-a", ["d1"]]]));
+
+      expect(readEditorDraft(settingsDraftScope("d1"))).toBeNull();
+      expect(readEditorDraft(settingsDraftScope("d2"))).not.toBeNull();
       localStorage.clear();
     });
 
@@ -1696,6 +1724,21 @@ describe("Commons Utility Functions", () => {
       expect(readPanelDraft(draftScope("dashboard-kept", "panel-1"))).not.toBeNull();
       localStorage.clear();
     });
+
+    it("removes the deleted dashboard's settings draft only", async () => {
+      localStorage.clear();
+      mockStore.state.organizationData.allDashboardList = {};
+      mockStore.state.organizationData.allDashboardData = {};
+      vi.mocked(dashboardService.delete).mockResolvedValue({ success: true } as never);
+      writeEditorDraft(settingsDraftScope("dashboard-gone"), { data: { tab: "generalSettings" } });
+      writeEditorDraft(settingsDraftScope("dashboard-kept"), { data: { tab: "generalSettings" } });
+
+      await deleteDashboardById(mockStore, "dashboard-gone", "f");
+
+      expect(readEditorDraft(settingsDraftScope("dashboard-gone"))).toBeNull();
+      expect(readEditorDraft(settingsDraftScope("dashboard-kept"))).not.toBeNull();
+      localStorage.clear();
+    });
   });
 
   describe("createFolder and updateFolder", () => {
@@ -1843,6 +1886,91 @@ describe("Commons Utility Functions", () => {
     });
   });
 
+  describe("stored schema version", () => {
+    const respond = (version: number, doc: any) =>
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version, [`v${version}`]: doc, hash: 5 },
+      });
+
+    it("remembers the version the server stores, not the one the browser upgraded it to", async () => {
+      vi.mocked(convertDashboardSchemaVersion).mockImplementationOnce((d: any) => ({
+        ...d,
+        version: 8,
+      }));
+      respond(3, { version: 3, tabs: [] });
+      await fetchLatestDashboard(mockStore, "d3", "default");
+      expect(getLoadedDashboardVersion("d3")?.storedVersion).toBe(3);
+      expect(getLoadedDashboardVersion("d3")?.snapshot.version).toBe(8);
+      expect(isDashboardStoredAtOldVersion("d3")).toBe(true);
+      expect(isDashboardStoredAtOldVersion("never-loaded")).toBe(false);
+    });
+
+    it("is not old at the current version", async () => {
+      respond(8, { version: 8, tabs: [] });
+      await fetchLatestDashboard(mockStore, "d8", "default");
+      expect(getLoadedDashboardVersion("d8")?.storedVersion).toBe(8);
+      expect(isDashboardStoredAtOldVersion("d8")).toBe(false);
+    });
+
+    it("reports the stored version of the server's copy too", async () => {
+      respond(3, { version: 3, tabs: [] });
+      expect((await fetchServerDashboard(mockStore, "d3", "default")).storedVersion).toBe(3);
+    });
+  });
+
+  describe("hasUnsavedDashboardEdits", () => {
+    const stored = () => ({
+      version: 8,
+      title: "T",
+      tabs: [
+        {
+          tabId: "a",
+          name: "A",
+          panels: [{ id: "p1", layout: { x: 0, y: 0, w: 4, h: 4, i: 1 }, queries: [] }],
+        },
+        { tabId: "b", name: "B", panels: [] },
+      ],
+    });
+    const reversedKeys = (v: any): any =>
+      Array.isArray(v)
+        ? v.map(reversedKeys)
+        : v && typeof v === "object"
+          ? Object.fromEntries(
+              Object.entries(v)
+                .reverse()
+                .map(([k, x]) => [k, reversedKeys(x)]),
+            )
+          : v;
+    const load = async () => {
+      mockStore.dispatch.mockImplementation((type: string, payload: any) => {
+        if (type === "setDashboardData")
+          mockStore.state.organizationData.allDashboardData = payload;
+      });
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version: 8, v8: stored(), hash: 5 },
+      });
+      return getDashboard(mockStore, "dash", "default");
+    };
+
+    it("sees no edit right after load, though the viewer filled in variables", async () => {
+      const dashboard = await load();
+      expect(dashboard.variables).toEqual({ showDynamicFilters: false, list: [] });
+      expect(hasUnsavedDashboardEdits("dash", dashboard)).toBe(false);
+      expect(hasUnsavedDashboardEdits("dash", reversedKeys(dashboard))).toBe(false);
+    });
+
+    it.each([
+      ["a moved panel", (d: any) => (d.tabs[0].panels[0].layout.y = 8)],
+      ["reordered tabs", (d: any) => d.tabs.reverse()],
+      ["a renamed dashboard", (d: any) => (d.title = "U")],
+      ["a new variable", (d: any) => d.variables.list.push({ name: "env" })],
+    ])("sees %s", async (_, edit) => {
+      const dashboard = await load();
+      edit(dashboard);
+      expect(hasUnsavedDashboardEdits("dash", dashboard)).toBe(true);
+    });
+  });
+
   describe("moveDashboardToAnotherFolder", () => {
     it("should move dashboards between folders", async () => {
       const dashboardIds = ["dashboard-1", "dashboard-2"];
@@ -1880,5 +2008,29 @@ describe("Commons Utility Functions", () => {
         folder_id,
       );
     });
+  });
+
+  describe("getDashboard — prototype keys", () => {
+    it.each(["__proto__", "constructor", "prototype"])(
+      "never hands back the object behind %s",
+      async (id) => {
+        const result = await getDashboard(mockStore, id, "default");
+
+        expect(result).toEqual({});
+        expect(result).not.toBe(Object.prototype);
+        expect(({} as any).variables).toBeUndefined();
+      },
+    );
+
+    it.each(["toString", "hasOwnProperty"])(
+      "fetches %s instead of reading it off the prototype",
+      async (id) => {
+        vi.mocked(dashboardService.get_Dashboard).mockRejectedValueOnce(new Error("404"));
+
+        await expect(getDashboard(mockStore, id, "default")).rejects.toThrow("404");
+        expect(dashboardService.get_Dashboard).toHaveBeenCalledTimes(1);
+        expect((Object.prototype.toString as any).variables).toBeUndefined();
+      },
+    );
   });
 });

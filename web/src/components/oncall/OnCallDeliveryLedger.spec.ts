@@ -39,7 +39,7 @@ describe("OnCallDeliveryLedger", () => {
   it("shows the receipt per send: who, channel, landed or failed", () => {
     const text = render([row(), row({ recipient: "bo@o2.ai", delivered: false })]).text();
     expect(text).toContain("ana@o2.ai");
-    expect(text).toContain("Landed");
+    expect(text).toContain("Sent");
     expect(text).toContain("Failed");
   });
 

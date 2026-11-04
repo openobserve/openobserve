@@ -122,3 +122,36 @@ describe("single-brace delimiter", () => {
     expect(tokenFor("service", "single")).toBe("{service}");
   });
 });
+
+describe("dollar delimiter", () => {
+  it("opens on a bare `$` and on `${`, marking the braced form", () => {
+    expect(openTokenAt("by $ra", 6, "dollar")).toEqual({ query: "ra", start: 3, braced: false });
+    expect(openTokenAt("$", 1, "dollar")).toEqual({ query: "", start: 0, braced: false });
+    expect(openTokenAt("by ${r", 6, "dollar")).toEqual({ query: "r", start: 3, braced: true });
+  });
+
+  it("takes a `:format` query only inside braces", () => {
+    expect(openTokenAt("${rack:cs", 9, "dollar")).toEqual({
+      query: "rack:cs",
+      start: 0,
+      braced: true,
+    });
+    expect(openTokenAt("$rack:cs", 8, "dollar")).toBeNull();
+  });
+
+  it("does not open past a closed token or a space", () => {
+    expect(openTokenAt("${rack}", 7, "dollar")).toBeNull();
+    expect(openTokenAt("$rack x", 7, "dollar")).toBeNull();
+  });
+
+  it("finds bare, braced and formatted tokens under the caret", () => {
+    expect(tokenAtCaret("in $rack now", 5, "dollar")).toBe("rack");
+    expect(tokenAtCaret("${rack:csv}", 3, "dollar")).toBe("rack");
+  });
+
+  it("inserts bare names bare unless braced, and formatted names always braced", () => {
+    expect(tokenFor("rack", "dollar")).toBe("$rack");
+    expect(tokenFor("rack", "dollar", true)).toBe("${rack}");
+    expect(tokenFor("rack:pipe", "dollar")).toBe("${rack:pipe}");
+  });
+});

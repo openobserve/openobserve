@@ -95,6 +95,12 @@ const ODialogStub = {
   `,
 };
 
+// vue-i18n is mocked above, so <i18n-t> is stubbed to expose its keypath and #name slot.
+const I18nTStub = {
+  props: ["keypath", "tag"],
+  template: `<component :is="tag || 'span'" :data-keypath="keypath"><slot name="name" /></component>`,
+};
+
 describe("TabsDeletePopUp", () => {
   let wrapper: VueWrapper<any>;
 
@@ -120,6 +126,7 @@ describe("TabsDeletePopUp", () => {
         plugins: [],
         stubs: {
           ODialog: ODialogStub,
+          "i18n-t": I18nTStub,
         },
       },
     });
@@ -205,7 +212,23 @@ describe("TabsDeletePopUp", () => {
       const paraElement = wrapper.find('[data-test="dashboard-tab-delete-tab-para"]');
 
       expect(paraElement.exists()).toBe(true);
-      expect(paraElement.text()).toContain("This action cannot be undone");
+      expect(paraElement.attributes("data-keypath")).toBe(
+        "dashboard.tabsDeletePopUp.confirmMessage",
+      );
+    });
+
+    it("names the tab in bold in the message", () => {
+      wrapper = createWrapper();
+
+      const name = wrapper.find('[data-test="dashboard-tab-delete-tab-name"]');
+      expect(name.text()).toBe("Tab to Delete");
+      expect(name.classes()).toContain("font-semibold");
+    });
+
+    it("uses a destructive confirm button", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.findComponent(ODialogStub).props("primaryButtonVariant")).toBe("destructive");
     });
 
     it("should handle missing tab gracefully in the title", () => {

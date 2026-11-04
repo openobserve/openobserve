@@ -178,7 +178,9 @@
     <ConfirmDialog
       v-model="confirmDeleteOpen"
       :title="t('onlineEvals.deleteTitle', { label: t('onlineEvals.singular.providers') })"
-      :message="t('onlineEvals.deleteConfirmMessage', { name: pendingDeleteRow?.name ?? '' })"
+      message-keypath="onlineEvals.deleteConfirmMessage"
+      :message-name="pendingDeleteRow?.name ?? ''"
+      ok-variant="destructive"
       @update:ok="performDelete"
       @update:cancel="cancelDelete"
     />
@@ -274,7 +276,6 @@ const forbidden = computed(() => {
   return e?.status === 403 || e?.response?.status === 403;
 });
 const lastUpdatedAt = providersList.dataUpdatedAt;
-// The grouped access toast already reports a 403; a second red toast adds nothing.
 watch(providersList.error, (err: any) => {
   if (err && !forbidden.value) showError(err, t("llmProviders.loadError"));
 });

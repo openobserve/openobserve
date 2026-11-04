@@ -28,7 +28,7 @@ use openobserve_core::auth::check_permissions;
 use openobserve_core::{
     alerts::{
         destinations,
-        notifications::{TestSendError, check_rate_limit, test_send as core_test_send},
+        notifications::{TestSendError, check_rate_limit, jira, test_send as core_test_send},
     },
     auth::UserEmail,
     http::destination_error_response,
@@ -40,6 +40,9 @@ use crate::{
     models::destinations::{Destination, DestinationType, DestinationUseResponse},
     request::{BulkDeleteRequest, BulkDeleteResponse},
 };
+
+/// Per-destination PUT checks in flight at once when the org-wide one fails.
+const PERMISSION_CONCURRENCY: usize = 16;
 
 #[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -55,6 +58,12 @@ pub struct TestDestinationRequest {
     pub destination_type: DestinationType,
     /// Email recipients for email destination testing
     pub recipients: Option<Vec<String>>,
+    /// Template a `slack_app` test renders on a sample alert; the org default when absent.
+    #[serde(default)]
+    pub template: Option<String>,
+    /// The `slack_app` target under test, with the destination body's snake_case fields.
+    #[serde(default)]
+    pub slack_app: Option<crate::models::destinations::SlackAppFields>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
@@ -90,8 +99,8 @@ pub struct TestDestinationResponse {
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test"})),
-        ("x-o2-mcp" = json!({"description": "Test alert destination connectivity", "category": "alerts"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false, "description": "Test alert destination connectivity", "category": "alerts"}))
     )
 )]
 pub async fn test_destination(
@@ -101,6 +110,7 @@ pub async fn test_destination(
     match test_req.destination_type {
         DestinationType::Email => test_email_destination(&org_id, &test_req).await,
         DestinationType::Http => test_http_destination(&test_req).await,
+        DestinationType::SlackApp => test_slack_app_destination(&org_id, &test_req).await,
         other => MetaHttpResponse::json(TestDestinationResponse {
             success: false,
             status_code: None,
@@ -137,6 +147,39 @@ async fn test_email_destination(org_id: &str, test_req: &TestDestinationRequest)
             error: Some(e.to_string()),
         }),
     }
+}
+
+/// Posts now through the bot, so the form shows Slack's own answer, never a queued "ok".
+async fn test_slack_app_destination(org_id: &str, test_req: &TestDestinationRequest) -> Response {
+    let Some(fields) = test_req.slack_app.clone() else {
+        return MetaHttpResponse::json(TestDestinationResponse {
+            success: false,
+            status_code: None,
+            response_body: None,
+            error: Some("A Slack app test needs the slackApp target".to_string()),
+        });
+    };
+    let target = fields.into_target();
+    let sent = openobserve_core::alerts::slack_publish::send_form_test(
+        org_id,
+        &target,
+        test_req.template.as_deref(),
+    )
+    .await;
+    MetaHttpResponse::json(match sent {
+        Ok(detail) => TestDestinationResponse {
+            success: true,
+            status_code: None,
+            response_body: Some(detail),
+            error: None,
+        },
+        Err(e) => TestDestinationResponse {
+            success: false,
+            status_code: None,
+            response_body: None,
+            error: Some(e.to_string()),
+        },
+    })
 }
 
 async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
@@ -254,6 +297,75 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
     }
 }
 
+/// JiraDestinationSetup
+#[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/destinations/jira/setup",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "JiraDestinationSetup",
+    summary = "Look up Jira data for the destination form",
+    description = "Checks Jira credentials and returns the projects, issue types or create-screen fields \
+                   the Jira destination form needs, or creates one test issue. Nothing is stored.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    request_body(content = inline(jira::SetupRequest), description = "Jira credentials and the lookup to run", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test"}))
+    )
+)]
+pub async fn jira_setup(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<jira::SetupRequest>,
+) -> Response {
+    let _user_id = &user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    if let Some(refused) = saved_token_refusal(&req, async |name: &str| {
+        check_permissions(
+            name,
+            &org_id,
+            _user_id,
+            "destinations",
+            "PUT",
+            None,
+            false,
+            false,
+            false,
+        )
+        .await
+    })
+    .await
+    {
+        return refused;
+    }
+
+    match jira::setup(&org_id, req).await {
+        Ok(body) => MetaHttpResponse::json(body),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+/// 403 when a saved token's destination fails `may_edit`, since the route only checks the org.
+#[cfg(any(feature = "enterprise", test))]
+async fn saved_token_refusal(
+    req: &jira::SetupRequest,
+    may_edit: impl AsyncFnOnce(&str) -> bool,
+) -> Option<Response> {
+    let name = jira::saved_destination_name(req)?;
+    (!may_edit(name).await).then(|| MetaHttpResponse::forbidden("Unauthorized Access"))
+}
+
 /// CreateDestination
 #[utoipa::path(
     post,
@@ -296,6 +408,7 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
 pub async fn save_destination(
     Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
     Json(dest): Json<Destination>,
 ) -> Response {
     // Check the module query parameter to determine if this is an alert or pipeline destination
@@ -306,7 +419,7 @@ pub async fn save_destination(
         Ok(dest) => dest,
         Err(e) => return destination_error_response(e),
     };
-    match destinations::save("", dest, true).await {
+    match destinations::save_by("", dest, true, &user_email.user_id).await {
         Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Destination saved")
                 .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
@@ -349,6 +462,7 @@ pub async fn save_destination(
 pub async fn update_destination(
     Path((org_id, name)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
     Json(dest): Json<Destination>,
 ) -> Response {
     // Check the module query parameter to determine if this is an alert or pipeline destination
@@ -359,7 +473,7 @@ pub async fn update_destination(
         Ok(dest) => dest,
         Err(e) => return destination_error_response(e),
     };
-    match destinations::save(&name, dest, false).await {
+    match destinations::save_by(&name, dest, false, &user_email.user_id).await {
         Ok(_) => MetaHttpResponse::ok("Destination updated"),
         Err(e) => destination_error_response(e),
     }
@@ -373,9 +487,9 @@ pub async fn update_destination(
     tag = "Alerts",
     operation_id = "GetDestination",
     summary = "Get alert destination",
-    description = "Retrieves the configuration details for a specific alert destination. Returns the complete destination \
-                   setup including delivery method, authentication credentials, notification settings, and other \
-                   configuration parameters. Used for reviewing and managing existing destination configurations.",
+    description = "Retrieves the configuration details for a specific alert destination: delivery method, notification \
+                   settings and other configuration parameters. Callers without PUT on the destination get the URL \
+                   cut to its origin and header values and credential metadata blanked.",
     security(
         ("Authorization"= [])
     ),
@@ -392,9 +506,18 @@ pub async fn update_destination(
         ("x-o2-mcp" = json!({"description": "Get destination details", "category": "alerts"}))
     )
 )]
-pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Response {
+pub async fn get_destination(
+    Path((org_id, name)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     match destinations::get(&org_id, &name).await {
-        Ok(data) => MetaHttpResponse::json(Destination::from(data)),
+        Ok(data) => {
+            let mut dest = Destination::from(data);
+            if !can_write_destination(&org_id, &user_email.user_id, &name).await {
+                dest.redact_secrets();
+            }
+            MetaHttpResponse::json(dest)
+        }
         Err(e) => MetaHttpResponse::not_found(e),
     }
 }
@@ -410,7 +533,8 @@ pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Re
     description = "Retrieves a list of all alert destinations configured for an organization. Optionally filter by module \
                    type (alert or pipeline) to get specific destination categories. Returns destination names, types, and \
                    basic configuration details to help administrators manage notification routing and review available \
-                   delivery options.",
+                   delivery options. Destinations the caller may not PUT come with the URL cut to its origin and header \
+                   values and credential metadata blanked.",
     security(
         ("Authorization"= [])
     ),
@@ -435,7 +559,7 @@ pub async fn get_destination(Path((org_id, name)): Path<(String, String)>) -> Re
 pub async fn list_destinations(
     Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let module = query.get("module").map(|s| s.as_str());
     // Opt-in, mirroring ListAlerts' `include_dependencies`: off the hot list path by default.
@@ -467,6 +591,7 @@ pub async fn list_destinations(
     match destinations::list(&org_id, module, _permitted).await {
         Ok(data) => {
             let mut items: Vec<Destination> = data.into_iter().map(Destination::from).collect();
+            redact_unwritable(&org_id, &user_email.user_id, &mut items).await;
             if include_usage {
                 // Same all_usage() the delete guard uses, attached only to this response's rows.
                 match destinations::all_usage(&org_id).await {
@@ -628,8 +753,8 @@ pub async fn delete_destination_bulk(
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List prebuilt alert destination templates", "category": "alerts"}))
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false, "description": "List prebuilt alert destination templates", "category": "alerts"}))
     )
 )]
 pub async fn list_prebuilt_destinations(Path(org_id): Path<String>) -> Response {
@@ -695,7 +820,7 @@ pub struct TestSendResponse {
         (status = 429, description = "Rate limited", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test_send"})),
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
@@ -783,6 +908,84 @@ pub async fn test_send(
     }
 }
 
+/// The URL and headers can post as the org, so only a destination writer reads them whole.
+async fn can_write_destination(org_id: &str, user_id: &str, name: &str) -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        check_permissions(
+            name,
+            org_id,
+            user_id,
+            "destinations",
+            "PUT",
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, user_id, name);
+        true
+    }
+}
+
+/// Blanks the secrets of each destination the caller may not PUT, with one org-wide check first.
+async fn redact_unwritable(org_id: &str, user_id: &str, items: &mut [Destination]) {
+    use futures::StreamExt;
+
+    let names: Vec<String> = items
+        .iter()
+        .filter(|d| d.has_secrets())
+        .map(|d| d.name.clone())
+        .collect();
+    if names.is_empty() || can_write_every_destination(org_id, user_id).await {
+        return;
+    }
+    let writable: std::collections::HashSet<String> = futures::stream::iter(names)
+        .map(|name| async move {
+            can_write_destination(org_id, user_id, &name)
+                .await
+                .then_some(name)
+        })
+        .buffer_unordered(PERMISSION_CONCURRENCY)
+        .filter_map(|name| async move { name })
+        .collect()
+        .await;
+    for item in items
+        .iter_mut()
+        .filter(|d| d.has_secrets() && !writable.contains(&d.name))
+    {
+        item.redact_secrets();
+    }
+}
+
+/// One check for standard writers and `_all_` grants.
+async fn can_write_every_destination(org_id: &str, user_id: &str) -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        check_permissions(
+            org_id,
+            org_id,
+            user_id,
+            "destinations",
+            "PUT",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, user_id);
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::future::Future;
@@ -791,7 +994,7 @@ mod tests {
     use db::alerts::destinations::DestinationError;
     use openobserve_core::http::destination_error_response;
 
-    use super::{TestDestinationRequest, test_destination};
+    use super::{TestDestinationRequest, jira, saved_token_refusal, test_destination};
     use crate::models::destinations::DestinationType;
 
     fn status(err: DestinationError) -> StatusCode {
@@ -853,6 +1056,8 @@ mod tests {
             skip_tls_verify: None,
             destination_type: DestinationType::Http,
             recipients: None,
+            template: None,
+            slack_app: None,
         };
         let resp = test_destination(Path("default".to_string()), Json(req)).await;
         let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
@@ -1016,10 +1221,51 @@ mod tests {
     }
 
     #[test]
+    fn test_jira_token_refusals_are_bad_request() {
+        assert_eq!(
+            status(DestinationError::JiraTokenMissing),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status(DestinationError::JiraTokenChanged),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
     fn test_email_send_failed_is_bad_request() {
         assert_eq!(
             status(DestinationError::EmailSendFailed("timeout".to_string())),
             StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[tokio::test]
+    async fn jira_setup_refuses_a_saved_token_the_caller_may_not_edit() {
+        let req = |token: &str| -> jira::SetupRequest {
+            serde_json::from_value(serde_json::json!({
+                "url": "https://acme.atlassian.net", "deployment": "cloud",
+                "email": "ops@acme.com", "token": token, "destination": "Jira OPS",
+                "action": "test_issue",
+            }))
+            .unwrap()
+        };
+        let denied = saved_token_refusal(&req(" "), async |name: &str| {
+            assert_eq!(name, "Jira OPS");
+            false
+        })
+        .await;
+        assert_eq!(denied.map(|r| r.status()), Some(StatusCode::FORBIDDEN));
+        assert!(
+            saved_token_refusal(&req(""), async |_: &str| true)
+                .await
+                .is_none()
+        );
+        // A typed token uses no saved one, so the org-level route check covers it.
+        assert!(
+            saved_token_refusal(&req("typed"), async |_: &str| false)
+                .await
+                .is_none()
         );
     }
 }

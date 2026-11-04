@@ -212,6 +212,13 @@ describe("RemoteTaskDetailPage", () => {
     discardDraft.mockResolvedValue(undefined);
     await wrapper.get('[data-test="ai-remote-task-detail-discard-draft"]').trigger("click");
     await flushPromises();
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageKeypath: "aiObservability.remoteTasks.detail.discardDraftMessage",
+        messageName: "summarizer",
+        confirmVariant: "destructive",
+      }),
+    );
     expect(discardDraft).toHaveBeenCalledWith("acme", "head-1");
   });
 

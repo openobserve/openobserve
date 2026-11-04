@@ -25,6 +25,8 @@ use config::{
     },
     utils::{json, rand::generate_random_string, time},
 };
+#[cfg(feature = "cloud")]
+use db::organization::get_org_setting;
 use db::{self, org_users, user::is_root_user};
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
@@ -46,6 +48,8 @@ use {
 
 #[cfg(feature = "cloud")]
 use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
+#[cfg(feature = "cloud")]
+use crate::org_domain_ownership::get_cached_org_for_domain;
 use crate::{
     auth::{delete_org_tuples, save_org_tuples},
     common::{
@@ -61,8 +65,8 @@ use crate::{
 };
 
 const MASKED_TOKEN: &str = "NOT_AVAILABLE";
-// API version prefixes: an org with one of these ids makes `/api/v2/...` paths ambiguous.
-const RESERVED_ORG_IDS: [&str; 3] = ["v1", "v2", "v3"];
+// API version and public dashboard route prefixes: such an org id makes `/api/<id>/` ambiguous.
+const RESERVED_ORG_IDS: [&str; 4] = ["v1", "v2", "v3", "public_dashboards"];
 
 /// Checks if a service account token should be masked
 /// Returns true if:
@@ -786,6 +790,9 @@ fn validate_auto_created_org_id(org_id: &str) -> Result<(), anyhow::Error> {
             "Organization identifier {org_id} is reserved"
         ));
     }
+    if let Some(violation) = infra::file_list::org_id_violation(org_id) {
+        return Err(anyhow::anyhow!(violation));
+    }
     Ok(())
 }
 
@@ -1098,6 +1105,21 @@ pub async fn generate_invitation(
             .is_err()
         {
             return Err(anyhow::anyhow!("Email Domain not allowed for {invitee}"));
+        }
+
+        let Some((_, domain)) = invitee.split_once('@') else {
+            return Err(anyhow::anyhow!("invalid email id {invitee}"));
+        };
+
+        if let Some(linked_org) = get_cached_org_for_domain(domain).await {
+            let settings = get_org_setting(&linked_org).await?;
+            for mapping in settings.domain_org_mappings {
+                if mapping.domain == domain && mapping.org_id == org_id {
+                    return Err(anyhow::anyhow!(
+                        "invitee '{invitee}' domain is already mapped to org {org_id} so cannot send invite"
+                    ));
+                }
+            }
         }
 
         if get_billing_by_org_id(org_id).await?.is_none() {
@@ -1678,8 +1700,25 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_auto_created_org_id_follows_the_org_column_limit() {
+        let fits = "o".repeat(infra::file_list::ORG_ID_MAX_LEN);
+        assert!(validate_auto_created_org_id(&fits).is_ok());
+        let long_org = format!("{fits}o");
+        let bounded = infra::file_list::org_id_violation(&long_org).is_some();
+        assert_eq!(validate_auto_created_org_id(&long_org).is_err(), bounded);
+    }
+
+    #[test]
     fn test_validate_auto_created_org_id_rejects_api_version_prefixes() {
         for org_id in ["v1", "v2", "v3", "V2"] {
+            let err = validate_auto_created_org_id(org_id).unwrap_err();
+            assert!(err.to_string().contains("reserved"), "{org_id}: {err}");
+        }
+    }
+
+    #[test]
+    fn test_validate_auto_created_org_id_rejects_the_public_dashboards_prefix() {
+        for org_id in ["public_dashboards", "Public_Dashboards"] {
             let err = validate_auto_created_org_id(org_id).unwrap_err();
             assert!(err.to_string().contains("reserved"), "{org_id}: {err}");
         }

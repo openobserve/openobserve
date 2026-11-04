@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import i18n from "@/locales";
 import {
   buildKioskQuery,
   computeFitCellHeight,
@@ -197,6 +198,31 @@ describe("kiosk helpers", () => {
     expect(formatRelativePeriod("2d", t)).toBe('common.pastDay:{"count":2}');
     expect(formatRelativePeriod("now-1h", t)).toBeNull();
     expect(formatRelativePeriod(undefined, t)).toBeNull();
+  });
+
+  it("formats an older calendar period in the active UI language", () => {
+    const previous = i18n.global.locale;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-08T03:00:00Z"));
+    localStorage.setItem("timezone", "UTC");
+    try {
+      (i18n.global as { locale: unknown }).locale = "de";
+      const expected = new Intl.DateTimeFormat("de-DE", {
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      }).format(Date.UTC(2026, 7, 1));
+      expect(formatRelativePeriod("calendar:month:-2", t)).toBe(expected);
+    } finally {
+      (i18n.global as { locale: unknown }).locale = previous;
+      localStorage.removeItem("timezone");
+      vi.useRealTimers();
+    }
+  });
+
+  it("labels a calendar period by its name", () => {
+    expect(formatRelativePeriod("calendar:month:-1", t)).toBe("common.lastMonth");
+    expect(formatRelativePeriod("calendar:day:0", t)).toBe("common.today");
   });
 
   it("summarizes a panel error to its first meaningful line", () => {

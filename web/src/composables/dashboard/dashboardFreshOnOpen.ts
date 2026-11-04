@@ -14,10 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { InjectionKey } from "vue";
+import type { PanelTimeSource } from "@/utils/dashboard/panelTimeUtils";
 
 export interface DashboardFreshOnOpen {
   /** Whether the panel's effective time range is relative; read when the panel loads, not live. */
   isRelativeRange: (panel: any) => boolean;
+  /** Whether the panel's effective range is a calendar period, whose cache must come from that same period. */
+  isCalendarRange?: (panel: PanelTimeSource) => boolean;
   /** Whether a panel restored from cache re-queries; read when the panel loads, not live. */
   appliesTo: (panel: any) => boolean;
   wasRefreshed: (key: string) => boolean;
@@ -32,14 +35,17 @@ export const DASHBOARD_FRESH_ON_OPEN: InjectionKey<DashboardFreshOnOpen> =
 export const createDashboardFreshOnOpen = ({
   isAutoRunOn,
   isRelativeRange,
+  isCalendarRange = () => false,
 }: {
   isAutoRunOn: () => boolean;
   isRelativeRange: (panel: any) => boolean;
+  isCalendarRange?: (panel: PanelTimeSource) => boolean;
 }): DashboardFreshOnOpen => {
   // Lives as long as one dashboard visit, so a revisited tab restores its fresh entry without a query.
   const refreshed = new Set<string>();
   return {
     isRelativeRange,
+    isCalendarRange,
     appliesTo: (panel) => isAutoRunOn() && isRelativeRange(panel),
     wasRefreshed: (key) => refreshed.has(key),
     markRefreshed: (key) => {

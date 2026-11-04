@@ -31,7 +31,7 @@ pub struct Model {
     /// When the scheduler last fanned out this check (microseconds).
     pub last_triggered_at: i64,
     /// Denormalised status from the most recent completed check.
-    /// 0=Unknown, 1=Up, 2=Warning, 3=Down
+    /// 0=Unknown, 1=Up, 2=Warning, 3=Down, 4=Error (no verdict: dispatch/lease failure)
     pub last_check_status: i32,
     /// Runs that have failed back to back; reset to 0 by a pass. Compared
     /// against `settings.alert_if_fails` to decide whether to notify.
@@ -48,6 +48,12 @@ pub struct Model {
     /// a certificate is `warning` on every run for weeks — so it needs
     /// transition-based suppression rather than a time window.
     pub degraded_notified_at: i64,
+    /// Consecutive status page Down verdicts, capped at 10.
+    pub status_down_runs: i32,
+    /// Consecutive status page Up verdicts, capped at 10.
+    pub status_up_runs: i32,
+    /// `scheduled_ts` of the last run applied to the streaks, in microseconds.
+    pub status_run_ts: i64,
     pub owner: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -88,6 +94,9 @@ mod tests {
             last_alert_at: 0,
             alerting: false,
             degraded_notified_at: 0,
+            status_down_runs: 0,
+            status_up_runs: 0,
+            status_run_ts: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,

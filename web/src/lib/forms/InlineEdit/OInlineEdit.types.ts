@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { I18nText } from "@/types/i18n";
+import type { TemplateDelimiter, TemplateSuggestion } from "../TemplateInput/OTemplateInput.types";
 
 /**
  * OInlineEdit.types.ts — single source of truth for OInlineEdit's public types.
@@ -45,6 +46,10 @@ export interface InlineEditProps {
   errorMessage?: I18nText;
   /** Whether Enter also submits the owning form; `false` makes Enter only commit. @default true */
   submitOnEnter?: boolean;
+  /** Tokens offered at the caret while editing, as in OTemplateInput; absent or empty means none. */
+  suggestions?: TemplateSuggestion[];
+  /** Token syntax the suggestions open on and insert. @default "double" */
+  delimiter?: TemplateDelimiter;
 }
 
 export interface InlineEditEmits {

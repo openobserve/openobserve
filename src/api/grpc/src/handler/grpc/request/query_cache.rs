@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use openobserve_core::public_dashboards::status;
 use proto::cluster_rpc::{
-    DeleteResultCacheRequest, DeleteResultCacheResponse, query_cache_server::QueryCache,
+    DeleteResultCacheRequest, DeleteResultCacheResponse, PublicDashboardStatusRequest,
+    PublicDashboardStatusResponse, query_cache_server::QueryCache,
 };
 use search_service::cache::cacher;
 use tonic::{Request, Response, Status};
@@ -39,6 +41,22 @@ impl QueryCache for QueryCacheServerImpl {
             .is_ok();
 
         Ok(Response::new(DeleteResultCacheResponse { deleted }))
+    }
+
+    async fn public_dashboard_status(
+        &self,
+        request: Request<PublicDashboardStatusRequest>,
+    ) -> Result<Response<PublicDashboardStatusResponse>, Status> {
+        let req = request.into_inner();
+        if req.link_ids.len() > status::MAX_BATCH {
+            return Err(Status::invalid_argument("too many public links"));
+        }
+        let reports = status::local_reports(&req.org_id, &req.link_ids, req.with_sources)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+        let reports = config::utils::json::to_string(&reports)
+            .map_err(|e| Status::internal(e.to_string()))?;
+        Ok(Response::new(PublicDashboardStatusResponse { reports }))
     }
 }
 

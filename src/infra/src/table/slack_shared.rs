@@ -220,7 +220,11 @@ mod tests {
             parse_enum::<ThreadKind>("kind", "link").unwrap(),
             ThreadKind::Link
         );
-        assert!(parse_enum::<ThreadKind>("kind", "alert").is_err());
+        assert_eq!(
+            parse_enum::<ThreadKind>("kind", "alert").unwrap(),
+            ThreadKind::Alert
+        );
+        assert!(parse_enum::<ThreadKind>("kind", "digest").is_err());
     }
 
     #[test]

@@ -54,6 +54,15 @@ function render(props: Record<string, unknown> = {}) {
 }
 
 describe("OnCallWhoIsOn", () => {
+  /// A deleted team has no rotation to add, so the setup prompt would be a dead end.
+  it("points a deleted team's page at a handoff, not at team setup", () => {
+    const text = render({ teamDeleted: true }).find('[data-test="oncall-who-is-on-nobody"]').text();
+
+    expect(text).toBe(
+      "Nobody is on call: the team was deleted. Hand this page off to another team.",
+    );
+  });
+
   /// A team with nothing resolving is the failure this card exists to surface,
   /// not an empty card.
   it("says plainly when the schedule resolves to nobody", () => {
@@ -112,7 +121,7 @@ describe("OnCallWhoIsOn", () => {
     });
 
     expect(wrapper.find('[data-test="oncall-who-is-on-primary-reach"]').text()).toBe("unreached");
-    expect(wrapper.find('[data-test="oncall-who-is-on-reach-bo@o2.ai"]').text()).toBe("reached");
+    expect(wrapper.find('[data-test="oncall-who-is-on-reach-bo@o2.ai"]').text()).toBe("sent");
   });
 
   /// One landed send is enough: a retry that failed after a message arrived
@@ -132,7 +141,7 @@ describe("OnCallWhoIsOn", () => {
         delivery({ recipient: "ana@o2.ai", delivered: true }),
       ],
     });
-    expect(wrapper.find('[data-test="oncall-who-is-on-primary-reach"]').text()).toBe("reached");
+    expect(wrapper.find('[data-test="oncall-who-is-on-primary-reach"]').text()).toBe("sent");
   });
 
   it("says nothing about somebody this page never tried", () => {

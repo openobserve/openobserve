@@ -72,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="primary"
           icon-right="arrow-forward"
+          size="cta"
           class="w-full"
           data-test="onboarding-get-started-choose-btn"
           @click="emit('browse')"
@@ -100,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <SampleLivePreview class="h-[10.25rem]" data-test="onboarding-get-started-sample-preview" />
         <OButton
           variant="outline"
+          size="cta"
           class="w-full"
           data-test="onboarding-get-started-sample-btn"
           @click="emit('sample')"

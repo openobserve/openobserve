@@ -100,6 +100,27 @@ function streamEntry(searchObj: FreeTextSearchObj, name: string): StreamWithSche
   return (searchObj.data.streamResults?.list ?? []).find((stream) => stream?.name === name);
 }
 
+async function fetchSchemas(
+  searchObj: FreeTextSearchObj,
+  names: string[],
+  fetchStream: (name: string) => Promise<StreamWithSchema | null | undefined>,
+  now: number,
+): Promise<void> {
+  await Promise.all(
+    names.map(async (name) => {
+      const key = schemaKey(searchObj, name);
+      try {
+        const stream = await fetchStream(name);
+        if (!Array.isArray(stream?.schema)) throw new Error("schema missing");
+        freshSchemas.set(key, { at: now, stream: { ...stream, name } });
+        failedSchemas.delete(key);
+      } catch {
+        failedSchemas.add(key);
+      }
+    }),
+  );
+}
+
 export function buildFilterContext(
   searchObj: FreeTextSearchObj,
   zoConfig: FreeTextZoConfig | null | undefined,
@@ -378,19 +399,18 @@ export async function refreshFreeTextSchemas(
     const fresh = freshSchemas.get(schemaKey(searchObj, name));
     return !fresh || now - fresh.at > FREE_TEXT_SCHEMA_MAX_AGE_MS;
   });
-  await Promise.all(
-    stale.map(async (name) => {
-      const key = schemaKey(searchObj, name);
-      try {
-        const stream = await fetchStream(name);
-        if (!Array.isArray(stream?.schema)) throw new Error("schema missing");
-        freshSchemas.set(key, { at: now, stream: { ...stream, name } });
-        failedSchemas.delete(key);
-      } catch {
-        failedSchemas.add(key);
-      }
-    }),
+  await fetchSchemas(searchObj, stale, fetchStream, now);
+}
+
+export async function loadPendingFreeTextSchemas(
+  searchObj: FreeTextSearchObj,
+  fetchStream: (name: string) => Promise<StreamWithSchema | null | undefined>,
+): Promise<void> {
+  // The stream list ships schema: [] until a stream's schema is fetched, so empty counts as unloaded.
+  const pending = (searchObj.data.stream.selectedStream ?? []).filter(
+    (name) => !streamEntry(searchObj, name)?.schema?.length,
   );
+  await fetchSchemas(searchObj, pending, fetchStream, Date.now());
 }
 
 export function resetFreeTextSchemasForTests(): void {

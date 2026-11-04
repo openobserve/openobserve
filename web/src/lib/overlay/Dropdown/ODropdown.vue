@@ -69,6 +69,11 @@ const internalOpen = ref(props.open ?? false);
 // Used by the close-on-scroll handler to tell whether a scroll moves this
 // dropdown's trigger (vs. an unrelated section).
 const triggerRef = ref<{ $el?: Node } | null>(null);
+// Scroll events arrive a frame late, so a scroll from before the open is only real if the trigger moved since.
+let openTriggerTop: number | null = null;
+let openTriggerLeft: number | null = null;
+// One layout read per frame: a sticky trigger never moves, so per-event reads would force layout throughout a long scroll.
+let triggerMoveFrame: number | null = null;
 
 watch(
   () => props.open,
@@ -259,26 +264,48 @@ function handleViewportScroll(event: Event) {
   // Only close when the scrolled container actually holds this dropdown's
   // trigger — scrolling an unrelated section must not dismiss the menu.
   const triggerEl = triggerRef.value?.$el as Node | undefined;
-  if (triggerEl && target.contains(triggerEl)) {
-    handleOpenChange(false);
+  if (!triggerEl || !target.contains(triggerEl) || triggerMoveFrame !== null) return;
+  triggerMoveFrame = requestAnimationFrame(closeIfTriggerMoved);
+}
+
+function closeIfTriggerMoved() {
+  triggerMoveFrame = null;
+  if (!internalOpen.value) return;
+  const triggerEl = triggerRef.value?.$el;
+  if (triggerEl instanceof Element) {
+    const { top, left } = triggerEl.getBoundingClientRect();
+    if (top === openTriggerTop && left === openTriggerLeft) return;
   }
+  handleOpenChange(false);
+}
+
+function cancelTriggerMoveCheck() {
+  if (triggerMoveFrame === null) return;
+  cancelAnimationFrame(triggerMoveFrame);
+  triggerMoveFrame = null;
 }
 
 watch(internalOpen, (open) => {
   if (typeof window === "undefined") return;
   if (open) {
+    const triggerEl = triggerRef.value?.$el;
+    const rect = triggerEl instanceof Element ? triggerEl.getBoundingClientRect() : null;
+    openTriggerTop = rect?.top ?? null;
+    openTriggerLeft = rect?.left ?? null;
     window.addEventListener("scroll", handleViewportScroll, {
       capture: true,
       passive: true,
     });
   } else {
     window.removeEventListener("scroll", handleViewportScroll, true);
+    cancelTriggerMoveCheck();
   }
 });
 
 onBeforeUnmount(() => {
   if (typeof window !== "undefined") {
     window.removeEventListener("scroll", handleViewportScroll, true);
+    cancelTriggerMoveCheck();
   }
 });
 </script>
@@ -304,7 +331,7 @@ onBeforeUnmount(() => {
           'min-w-40 p-1 max-lg:max-w-[calc(100vw-1rem)]',
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           // Surface
-          'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
+          'bg-dropdown-bg rounded-default shadow-overlay border border-transparent',
           // Typography
           'text-dropdown-item-text text-sm',
           // Animation — clip-path reveal: the menu is unveiled at full size from

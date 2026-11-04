@@ -27,7 +27,8 @@ const alignClasses: Record<NonNullable<ButtonGroupProps["align"]>, string> = {
 <template>
   <div
     :class="[
-      'inline-flex overflow-hidden',
+      // Never clip overflow here: it hides a child's offset focus outline; z-1 lifts it over the neighbour.
+      'inline-flex [&_:focus-visible]:z-1',
       radiusClasses[props.radius],
       alignClasses[props.align],
       props.orientation === 'vertical' ? 'flex-col' : 'flex-row',
@@ -40,8 +41,8 @@ const alignClasses: Record<NonNullable<ButtonGroupProps["align"]>, string> = {
         : '',
       // First child: keep only the start-side radius (RTL-safe logical properties)
       props.orientation === 'horizontal'
-        ? '[&>*:first-child]:rounded-e-none [&>*:last-child]:rounded-s-none'
-        : '[&>*:first-child]:rounded-b-none [&>*:last-child]:rounded-t-none',
+        ? '[&>*:first-child:not(:only-child)]:rounded-e-none [&>*:last-child:not(:only-child)]:rounded-s-none'
+        : '[&>*:first-child:not(:only-child)]:rounded-b-none [&>*:last-child:not(:only-child)]:rounded-t-none',
       // Middle children: strip all radii
       '[&>*:not(:first-child):not(:last-child)]:rounded-none',
       // Bordered (outline) children would otherwise stack two 1px edges at every join.

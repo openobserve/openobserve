@@ -17,17 +17,17 @@ import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 
 import LibraryRail from "./LibraryRail.vue";
-import type { LibraryFacet } from "./libraryFacets";
+import type { LibraryCategoryFacet, LibraryFacet } from "./libraryFacets";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 
-const categories: LibraryFacet[] = [
-  { id: "kafka", label: raw("Kafka"), count: 12 },
-  { id: "clickhouse", label: raw("Clickhouse"), count: 23 },
+const categories: LibraryCategoryFacet[] = [
+  { id: "kafka", label: raw("Kafka"), count: 12, pack: "message-brokers" },
+  { id: "clickhouse", label: raw("Clickhouse"), count: 23, pack: "databases" },
   // id-vs-label discriminator: "cert-m" is in the id, not in "Cert Manager".
-  { id: "cert-manager", label: raw("Cert Manager"), count: 8 },
+  { id: "cert-manager", label: raw("Cert Manager"), count: 8, pack: "k8s" },
   // The dead end.
-  { id: "retired", label: raw("Retired"), count: 0 },
+  { id: "retired", label: raw("Retired"), count: 0, pack: "databases" },
 ];
 
 const severities: LibraryFacet[] = [
@@ -89,6 +89,63 @@ describe("LibraryRail", () => {
       "Kafka",
     );
     expect(wrapper.find('[data-test="alert-library-rail-count-kafka"]').text()).toBe("12");
+  });
+
+  // ── pack headings ────────────────────────────────────────────────────────
+  it("lists each technology under its pack heading, packs in label order", () => {
+    const wrapper = mountRail();
+    const headings = wrapper.findAll('[data-test^="alert-library-rail-pack-heading-"]');
+    expect(headings.map((heading) => heading.text())).toEqual([
+      "Databases",
+      "Kubernetes",
+      "Message brokers",
+    ]);
+    const group = wrapper.find('[data-test="alert-library-rail-pack-message-brokers"]');
+    expect(group.find('[data-test="alert-library-rail-category-kafka"]').exists()).toBe(true);
+    expect(group.find('[data-test="alert-library-rail-category-clickhouse"]').exists()).toBe(false);
+    // The group is named by its heading for assistive tech.
+    expect(group.attributes("role")).toBe("group");
+    expect(group.attributes("aria-labelledby")).toBe(
+      "alert-library-rail-pack-heading-message-brokers",
+    );
+  });
+
+  it("makes the pack heading a label, not a select-all", async () => {
+    const wrapper = mountRail();
+    const heading = wrapper.find('[data-test="alert-library-rail-pack-heading-databases"]');
+    expect(heading.element.tagName).toBe("H3");
+    expect(heading.find("button, [role='checkbox']").exists()).toBe(false);
+    await heading.trigger("click");
+    expect(wrapper.emitted("update:selectedCategories")).toBeUndefined();
+  });
+
+  it("drops a pack heading once none of its technologies are listed", async () => {
+    const wrapper = mountRail();
+    await type(wrapper, "kafka");
+    expect(wrapper.find('[data-test="alert-library-rail-pack-heading-databases"]').exists()).toBe(
+      false,
+    );
+    expect(
+      wrapper.find('[data-test="alert-library-rail-pack-heading-message-brokers"]').exists(),
+    ).toBe(true);
+  });
+
+  it("shows every technology of a pack whose name matches the search", async () => {
+    const wrapper = mountRail();
+    await type(wrapper, "message");
+    expect(wrapper.find('[data-test="alert-library-rail-category-kafka"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-library-rail-category-clickhouse"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("still hides a dead-end row when its pack name matches", async () => {
+    const wrapper = mountRail();
+    await type(wrapper, "databases");
+    expect(wrapper.find('[data-test="alert-library-rail-category-clickhouse"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.find('[data-test="alert-library-rail-category-retired"]').exists()).toBe(false);
   });
 
   // ── severity ─────────────────────────────────────────────────────────────

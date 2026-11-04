@@ -37,9 +37,13 @@ export interface EmptyStateAction {
   icon: IconName | (string & {});
   /** i18n key for the card title. */
   titleKey: I18nKey;
+  /** Interpolation values for `titleKey` (e.g. the integration a card opens). */
+  titleParams?: Record<string, string>;
   /** i18n key for the card description (optional). */
   descriptionKey?: I18nKey;
-  /** Identifier emitted with the `action` event so call sites can route. */
+  /** Interpolation values for `descriptionKey`. */
+  descriptionParams?: Record<string, string>;
+  /** Identifier emitted with the `action` event so call sites can route; also the action's `data-test` suffix. */
   id: string;
 }
 
@@ -506,6 +510,12 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-public-links": {
+    illustration: "connect",
+    variant: "neutral",
+    titleKey: "emptyState.noPublicLinks.title",
+    descriptionKey: "emptyState.noPublicLinks.description",
+  },
   "no-oncall-teams": {
     illustration: "users",
     variant: "create",
@@ -924,7 +934,9 @@ export const emptyStatePresets = {
   // LLM Insights dashboard — single empty-state shape (used for all three
   // "no data" cases: no LLM streams in the org, the active stream has no
   // gen_ai_* fields, or the window came up empty). Filtered branch is
-  // intentionally not used (the page exposes no filter UI to clear).
+  // intentionally not used (the page exposes no filter UI to clear). The page
+  // puts its integration-specific cards (the guide the user most likely needs)
+  // before this catch-all, plus popular-guide chips under them.
   "no-llm-insights": {
     illustration: "constellation",
     variant: "create",
@@ -932,8 +944,8 @@ export const emptyStatePresets = {
     descriptionKey: "emptyState.noLLMInsights.description",
     actions: [
       {
-        id: "instrument",
-        icon: "auto-awesome",
+        id: "all-integrations",
+        icon: "widgets",
         titleKey: "emptyState.noLLMInsights.action",
         descriptionKey: "emptyState.noLLMInsights.actionDesc",
       },
@@ -1052,6 +1064,60 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-linked-domains": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noLinkedDomains.title",
+    descriptionKey: "emptyState.noLinkedDomains.description",
+    actions: [
+      {
+        id: "dns",
+        icon: "dns",
+        titleKey: "emptyState.noLinkedDomains.dns",
+        descriptionKey: "emptyState.noLinkedDomains.dnsDesc",
+      },
+      {
+        id: "request",
+        icon: "send",
+        titleKey: "emptyState.noLinkedDomains.request",
+        descriptionKey: "emptyState.noLinkedDomains.requestDesc",
+      },
+    ],
+  },
+  "no-domain-mappings": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noDomainMappings.title",
+    descriptionKey: "emptyState.noDomainMappings.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noDomainMappings.action",
+        descriptionKey: "emptyState.noDomainMappings.actionDesc",
+      },
+    ],
+  },
+  "no-blocked-users": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noBlockedUsers.title",
+    descriptionKey: "emptyState.noBlockedUsers.description",
+    actions: [
+      {
+        id: "create",
+        icon: "block",
+        titleKey: "emptyState.noBlockedUsers.action",
+        descriptionKey: "emptyState.noBlockedUsers.actionDesc",
+      },
+    ],
+  },
+  "no-domain-requests": {
+    illustration: "check",
+    variant: "neutral",
+    titleKey: "emptyState.noDomainRequests.title",
+    descriptionKey: "emptyState.noDomainRequests.description",
+  },
 } satisfies Record<string, EmptyStatePreset>;
 
 export type EmptyStatePresetName = keyof typeof emptyStatePresets;
@@ -1082,6 +1148,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-service-accounts": "emptyState.nouns.serviceAccounts",
   "no-invitations": "emptyState.nouns.invitations",
   "no-dashboards-in-folder": "emptyState.nouns.dashboards",
+  "no-public-links": "emptyState.nouns.publicLinks",
   "no-groups": "emptyState.nouns.groups",
   "no-roles": "emptyState.nouns.roles",
   "no-anomaly-configs": "emptyState.nouns.anomalyConfigs",
@@ -1110,4 +1177,8 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-synthetic-monitors": "emptyState.nouns.monitors",
   "no-model-pricing": "emptyState.nouns.modelPricing",
   "no-saved-funnels": "emptyState.nouns.savedFunnels",
+  "no-linked-domains": "emptyState.nouns.linkedDomains",
+  "no-domain-mappings": "emptyState.nouns.domainMappings",
+  "no-domain-requests": "emptyState.nouns.domainRequests",
+  "no-blocked-users": "emptyState.nouns.blockedUsers",
 };

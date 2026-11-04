@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="group_name"
           :loading="loading"
           :forbidden="forbidden"
+          forbidden-resource="groups"
           :selected-ids="selectedGroupNames"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
@@ -203,10 +204,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ConfirmDialog
       :title="t('iam.appGroups.deleteGroupTitle')"
-      :message="
-        t('iam.appGroups.deleteGroupConfirm', { name: deleteConformDialog?.data?.group_name })
-      "
+      message-keypath="iam.appGroups.deleteGroupConfirm"
+      :message-name="deleteConformDialog.data?.group_name"
       :warning-message="deleteImpactMessage"
+      ok-variant="destructive"
       @update:ok="_deleteGroup"
       @update:cancel="deleteConformDialog.show = false"
       v-model="deleteConformDialog.show"
@@ -214,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('iam.appGroups.bulkDeleteGroupsTitle')"
       :message="t('iam.appGroups.bulkDeleteGroupsConfirm', { count: selectedGroups.length })"
+      ok-variant="destructive"
       :warning-message="bulkDeleteImpactMessage"
       @update:ok="bulkDeleteUserGroups"
       @update:cancel="confirmBulkDelete = false"
@@ -641,7 +643,7 @@ const bulkDeleteUserGroups = async () => {
     selectedGroups.value = [];
     confirmBulkDelete.value = false;
   } catch (error: any) {
-    if (error.response?.status != 403 || error?.status != 403) {
+    if (error.response?.status !== 403 && error?.status !== 403) {
       toast({
         message:
           error.response?.data?.message || error?.message || t("iam.appGroups.errorDeletingGroups"),

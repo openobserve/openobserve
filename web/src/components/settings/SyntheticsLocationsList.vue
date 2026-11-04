@@ -570,7 +570,9 @@ export default defineComponent({
     const confirmDelete = async (row: SyntheticsLocationRecord) => {
       const ok = await confirm({
         title: t("synthetics.locations.deleteConfirmTitle"),
-        message: t("synthetics.locations.deleteConfirmMessage"),
+        messageKeypath: "synthetics.locations.deleteConfirmMessage",
+        messageName: row.label,
+        confirmVariant: "destructive",
       });
       if (ok) {
         await deleteLocation(row.id);
@@ -600,6 +602,7 @@ export default defineComponent({
       const ok = await confirm({
         title: t("synthetics.locations.bulkDeleteConfirmTitle"),
         message: t("synthetics.locations.bulkDeleteConfirmMessage", { count }),
+        confirmVariant: "destructive",
       });
       if (ok) {
         await bulkDeleteLocations();

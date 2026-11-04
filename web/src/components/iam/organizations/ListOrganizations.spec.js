@@ -1,11 +1,13 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { resetListViewState } from "@/composables/useListViewState";
 import { createRouter, createMemoryHistory } from "vue-router";
 import i18n from "@/locales";
 import ListOrganizations from "./ListOrganizations.vue";
 import organizationsService from "@/services/organizations";
 import config from "@/aws-exports";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 // Mock the organizations service
 vi.mock("@/services/organizations", async (importOriginal) => {
@@ -128,6 +130,20 @@ describe("ListOrganizations", () => {
   afterEach(() => {
     vi.clearAllMocks();
     wrapper.unmount();
+    resetListViewState();
+  });
+
+  it("keeps the search text when the user comes back to the list", async () => {
+    wrapper.vm.filterQuery = "acme";
+    const again = mount(ListOrganizations, {
+      global: {
+        plugins: [i18n, router],
+        provide: { store: mockStore },
+        stubs: { AddUpdateOrganization: true, NoData: true, OTable: true },
+      },
+    });
+    expect(again.vm.filterQuery).toBe("acme");
+    again.unmount();
   });
 
   describe("Component Initialization", () => {
@@ -594,6 +610,21 @@ describe("ListOrganizations", () => {
       await flushPromises();
 
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test-api-key-123");
+    });
+
+    it("names the organization and uses a destructive button in the delete confirm", async () => {
+      const { currentDialog, handleCancel } = useConfirmDialog();
+      const pending = wrapper.vm.deleteOrganization({ name: "Acme", identifier: "acme" });
+      await flushPromises();
+
+      expect(currentDialog.value).toMatchObject({
+        messageKeypath: "iam.listOrganizations.deleteConfirm",
+        messageName: "Acme",
+        confirmVariant: "destructive",
+      });
+      handleCancel();
+      await pending;
+      expect(organizationsService.delete_org).not.toHaveBeenCalled();
     });
   });
 

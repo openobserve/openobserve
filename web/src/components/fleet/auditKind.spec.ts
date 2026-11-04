@@ -18,10 +18,10 @@ import { auditKind } from "./auditKind";
 
 describe("auditKind", () => {
   it("files each action under what it acted on", () => {
-    expect(auditKind("fleet.audit.setDesired")).toBe("rollout");
+    expect(auditKind("fleet.audit.setDesired")).toBe("fleet");
     expect(auditKind("fleet.audit.autoRollback")).toBe("rollout");
     expect(auditKind("fleet.audit.publishedVersion")).toBe("configuration");
-    expect(auditKind("fleet.audit.movedCollectors")).toBe("collector");
+    expect(auditKind("fleet.audit.movedByToken")).toBe("collector");
     expect(auditKind("fleet.audit.updatedFleetSettings")).toBe("fleet");
     expect(auditKind("fleet.audit.updatedSettings")).toBe("settings");
     expect(auditKind("fleet.audit.revokedToken")).toBe("token");
@@ -29,6 +29,7 @@ describe("auditKind", () => {
 
   it("keeps an action it does not know under other, with or without the key prefix", () => {
     expect(auditKind("fleet.audit.someFutureAction")).toBe("other");
+    expect(auditKind("fleet.audit.assignedFleetConfig")).toBe("other");
     expect(auditKind("createdToken")).toBe("token");
   });
 });

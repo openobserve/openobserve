@@ -7,11 +7,12 @@ import type {
   StepperRegisterAPI,
   StepRegistration,
 } from "./OStepper.types";
-import { computed, provide, reactive } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from "vue";
 import { STEPPER_CONTEXT_KEY, STEPPER_REGISTER_KEY } from "./OStepper.types";
 import type { Component, VNodeChild } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
@@ -52,6 +53,42 @@ provide(STEPPER_REGISTER_KEY, registerAPI);
 const sortedSteps = computed<StepRegistration[]>(() =>
   [...registeredSteps.values()].sort((a, b) => a.name - b.name),
 );
+
+const { isMobile } = useBreakpoint();
+const headerEl = ref<HTMLElement | null>(null);
+const headerScrolls = ref(false);
+const activePosition = computed(
+  () => sortedSteps.value.findIndex((step) => step.name === props.modelValue) + 1,
+);
+
+const measureHeader = (): void => {
+  const el = headerEl.value;
+  headerScrolls.value = !!el && el.scrollWidth > el.clientWidth + 1;
+};
+
+// Below md the header scrolls sideways; centring the active trigger keeps it in view after Next.
+const revealActiveStep = (): void => {
+  const el = headerEl.value;
+  const active = el?.querySelector<HTMLElement>('[aria-current="step"]');
+  if (!el || !active || !isMobile.value) return;
+  el.scrollLeft = active.offsetLeft - (el.clientWidth - active.offsetWidth) / 2;
+};
+
+let headerObserver: ResizeObserver | null = null;
+onMounted(() => {
+  measureHeader();
+  revealActiveStep();
+  if (typeof ResizeObserver !== "undefined" && headerEl.value) {
+    headerObserver = new ResizeObserver(measureHeader);
+    headerObserver.observe(headerEl.value);
+  }
+});
+onBeforeUnmount(() => headerObserver?.disconnect());
+watch([() => props.modelValue, sortedSteps], async () => {
+  await nextTick();
+  measureHeader();
+  revealActiveStep();
+});
 
 // ΓöÇΓöÇ Navigation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 function onStepClick(name: number): void {
@@ -131,71 +168,86 @@ function triggerClasses(step: StepRegistration): string {
       OStep children register themselves on mount; this flex re-renders
       reactively whenever a step's done/error state changes.
     -->
-    <div
-      v-if="isHorizontal && !hideHeader"
-      role="list"
-      :aria-label="t('components.stepper.steps')"
-      class="bg-surface-base! sticky top-0 z-10 flex w-full items-start pb-2"
-    >
-      <template v-for="(step, index) in sortedSteps" :key="step.name">
-        <!-- Step trigger (indicator circle + title) -->
-        <div role="listitem" class="flex shrink-0 flex-col items-center">
-          <button
-            type="button"
-            :class="triggerClasses(step)"
-            :disabled="!canNavigateTo(step)"
-            :aria-current="step.name === modelValue ? 'step' : undefined"
-            :aria-disabled="!canNavigateTo(step) && step.name !== modelValue ? true : undefined"
-            @click="canNavigateTo(step) && onStepClick(step.name)"
-          >
-            <!-- Indicator circle -->
-            <span :class="indicatorClasses(step)" aria-hidden="true">
-              <OIcon
-                name="check"
-                size="sm"
-                v-if="step.done && !step.error"
-                class="size-4"
-                :stroke-width="2.5"
-              />
-              <OIcon
-                name="error-outline"
-                size="sm"
-                v-else-if="step.error"
-                class="size-4"
-                :stroke-width="2.5"
-              />
-              <OIcon
-                v-else-if="typeof step.icon === 'string'"
-                :name="step.icon as any"
-                class="size-4"
-              />
-              <component :is="step.icon as Component" v-else-if="step.icon" class="size-4" />
-              <span v-else>{{ step.name }}</span>
-            </span>
-            <!-- Title + Description (stacked vertically, right of indicator) -->
-            <span class="flex min-w-0 flex-col items-start">
-              <span :class="titleClasses(step)">{{ step.title }}</span>
-              <span v-if="step.slots.description" class="mt-0.5 leading-tight">
-                <StepDescription :render="step.slots.description" />
+    <div v-if="isHorizontal && !hideHeader" class="bg-surface-base! sticky top-0 z-10">
+      <div
+        ref="headerEl"
+        role="list"
+        :aria-label="t('components.stepper.steps')"
+        class="relative flex w-full items-start pb-2 max-md:[scrollbar-width:none] max-md:overflow-x-auto max-md:[&::-webkit-scrollbar]:hidden"
+      >
+        <template v-for="(step, index) in sortedSteps" :key="step.name">
+          <!-- Step trigger (indicator circle + title) -->
+          <div role="listitem" class="flex shrink-0 flex-col items-center">
+            <button
+              type="button"
+              :class="triggerClasses(step)"
+              :disabled="!canNavigateTo(step)"
+              :aria-current="step.name === modelValue ? 'step' : undefined"
+              :aria-disabled="!canNavigateTo(step) && step.name !== modelValue ? true : undefined"
+              @click="canNavigateTo(step) && onStepClick(step.name)"
+            >
+              <!-- Indicator circle -->
+              <span :class="indicatorClasses(step)" aria-hidden="true">
+                <OIcon
+                  name="check"
+                  size="sm"
+                  v-if="step.done && !step.error"
+                  class="size-4"
+                  :stroke-width="2.5"
+                />
+                <OIcon
+                  name="error-outline"
+                  size="sm"
+                  v-else-if="step.error"
+                  class="size-4"
+                  :stroke-width="2.5"
+                />
+                <OIcon
+                  v-else-if="typeof step.icon === 'string'"
+                  :name="step.icon as any"
+                  class="size-4"
+                />
+                <component :is="step.icon as Component" v-else-if="step.icon" class="size-4" />
+                <span v-else>{{ step.name }}</span>
               </span>
-              <span
-                v-else-if="step.description"
-                class="text-2xs text-text-secondary mt-0.5 leading-tight"
-              >
-                {{ step.description }}
+              <!-- Title + Description (stacked vertically, right of indicator) -->
+              <span class="flex min-w-0 flex-col items-start">
+                <span :class="titleClasses(step)">{{ step.title }}</span>
+                <span v-if="step.slots.description" class="mt-0.5 leading-tight">
+                  <StepDescription :render="step.slots.description" />
+                </span>
+                <span
+                  v-else-if="step.description"
+                  class="text-2xs text-text-secondary mt-0.5 leading-tight"
+                >
+                  {{ step.description }}
+                </span>
               </span>
-            </span>
-          </button>
-        </div>
+            </button>
+          </div>
 
-        <!-- Connector line between consecutive steps -->
-        <div
-          v-if="index < sortedSteps.length - 1"
-          class="mx-1 mt-5.5 h-px min-w-2 flex-1 shrink"
-          :class="step.done ? 'bg-stepper-connector-done' : 'bg-stepper-connector'"
-          aria-hidden="true"
-        />
-      </template>
+          <!-- Connector line between consecutive steps -->
+          <div
+            v-if="index < sortedSteps.length - 1"
+            class="mx-1 mt-5.5 h-px min-w-2 flex-1 shrink"
+            :class="step.done ? 'bg-stepper-connector-done' : 'bg-stepper-connector'"
+            aria-hidden="true"
+          />
+        </template>
+      </div>
+      <div
+        v-if="headerScrolls"
+        class="from-surface-base pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l to-transparent md:hidden"
+        aria-hidden="true"
+      />
+      <p
+        v-if="sortedSteps.length > 1 && activePosition > 0"
+        class="text-text-secondary m-0 pb-2 text-xs md:hidden"
+        data-test="o-stepper-count"
+      >
+        {{ t("components.stepper.stepOf", { current: activePosition, total: sortedSteps.length })
+        }}<template v-if="headerScrolls"> · {{ t("components.stepper.swipeHint") }}</template>
+      </p>
     </div>
 
     <!-- Step content panels (OStep children render here for both orientations).

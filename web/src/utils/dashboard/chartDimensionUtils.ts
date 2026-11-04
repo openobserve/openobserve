@@ -50,12 +50,14 @@ export const calculateWidthText = (text: string, fontSize: string = "12px"): num
  * @param lo - axis extent minimum
  * @param hi - axis extent maximum
  * @param splitNumber - desired number of intervals (ECharts default: 5)
+ * @param minInterval - the axis minInterval; the interval never goes below it
  * @return {number[]} the tick values, lowest first
  */
 export const calculateNiceTickValues = (
   lo: number,
   hi: number,
   splitNumber: number = 5,
+  minInterval: number = 0,
 ): number[] => {
   const span = hi - lo;
   if (!(span > 0) || !Number.isFinite(span)) return [lo];
@@ -64,7 +66,8 @@ export const calculateNiceTickValues = (
   const exp10 = 10 ** Math.floor(Math.log10(step));
   const f = step / exp10;
   const nf = f < 1.5 ? 1 : f < 2.5 ? 2 : f < 4 ? 3 : f < 7 ? 5 : 10;
-  const interval = nf * exp10;
+  // ECharts raises its nice interval to the axis minInterval, so the prediction must too.
+  const interval = Math.max(nf * exp10, minInterval > 0 ? minInterval : 0);
 
   const ticks: number[] = [];
   for (let k = Math.floor(lo / interval); k <= Math.ceil(hi / interval); k++) {

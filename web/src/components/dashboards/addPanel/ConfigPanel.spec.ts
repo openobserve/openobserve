@@ -41,6 +41,9 @@ import store from "@/test/unit/helpers/store";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
 
+// Value the component gives its "Default" choice.
+const TOGGLE_AUTO = "__auto__";
+
 const mockDashboardPanelData = {
   data: {
     id: "panel-1",
@@ -110,6 +113,9 @@ const mockDashboardPanelData = {
     },
   },
 };
+
+// Every test mounts the full config panel; on a loaded CI runner one mount can exceed the 5s default.
+vi.setConfig({ testTimeout: 20000 });
 
 describe("ConfigPanel", () => {
   let wrapper: any;
@@ -182,6 +188,58 @@ describe("ConfigPanel", () => {
     });
   };
 
+  describe("gauge section", () => {
+    const gaugeData = (queryConfig: Record<string, any> = {}) => {
+      const data = JSON.parse(JSON.stringify(mockDashboardPanelData));
+      data.data.type = "gauge";
+      data.data.queries[0].config = {
+        ...data.data.queries[0].config,
+        min: 0,
+        max: 100,
+        ...queryConfig,
+      };
+      return reactive(data);
+    };
+    const rangeSelect = () =>
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find((c: any) => c.props("label") === "Gauge range");
+    const hidden = (selector: string) =>
+      (wrapper.find(selector).attributes("style") ?? "").includes("display: none");
+
+    it("defaults the range mode to fixed and writes auto to the current query", async () => {
+      const data = gaugeData();
+      wrapper = createWrapper({ dashboardPanelData: data });
+      expect(rangeSelect().props("modelValue")).toBe("fixed");
+      expect(hidden('[data-test="dashboard-config-gauge-min"]')).toBe(false);
+
+      rangeSelect().vm.$emit("update:modelValue", "auto");
+      await wrapper.vm.$nextTick();
+      expect(data.data.queries[0].config.range_mode).toBe("auto");
+      expect(hidden('[data-test="dashboard-config-gauge-min"]')).toBe(true);
+      expect(hidden('[data-test="dashboard-config-gauge-max"]')).toBe(true);
+    });
+
+    it("flags a fixed max that is not above min beside the field", async () => {
+      const maxInput = () =>
+        wrapper
+          .findAllComponents({ name: "OInput" })
+          .find((c: any) => c.attributes("data-test") === "dashboard-config-gauge-max");
+      const data = gaugeData({ min: 20, max: 10 });
+      wrapper = createWrapper({ dashboardPanelData: data });
+      expect(maxInput()?.props("errorMessage")).toBeTruthy();
+      data.data.queries[0].config.max = 50;
+      await wrapper.vm.$nextTick();
+      expect(maxInput()?.props("errorMessage")).toBeUndefined();
+    });
+
+    it("offers the end labels switch and value mappings", () => {
+      wrapper = createWrapper({ dashboardPanelData: gaugeData() });
+      expect(wrapper.find('[data-test="dashboard-config-gauge-end-labels"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="value-mapping-stub"]').exists()).toBe(true);
+    });
+  });
+
   describe("state timeline options", () => {
     it("shows the defaults for a fresh panel that has none of its keys, and writes on change", async () => {
       const panelData = {
@@ -197,7 +255,7 @@ describe("ConfigPanel", () => {
 
       const sort = wrapper.find('[data-test="dashboard-config-state-timeline-row-sort"]');
       expect(sort.exists()).toBe(true);
-      expect(sort.attributes("data-test-selected-value")).toBe("name");
+      expect(sort.attributes("data-test-selected-value")).toBe(TOGGLE_AUTO);
       expect(wrapper.vm.showStateTextModel).toBe(true);
       expect("show_state_text" in panelData.data.config).toBe(false);
 
@@ -205,9 +263,11 @@ describe("ConfigPanel", () => {
       wrapper.vm.rowSortModel = "non_ok_time";
       expect(panelData.data.config.show_state_text).toBe(false);
       expect(panelData.data.config.row_sort).toBe("non_ok_time");
+      wrapper.vm.rowSortModel = TOGGLE_AUTO;
+      expect("row_sort" in panelData.data.config).toBe(false);
     });
 
-    it("offers the tooltip mode, defaulting to this segment", async () => {
+    it("offers the tooltip mode with Default first, which stores nothing", async () => {
       const panelData = {
         ...mockDashboardPanelData,
         data: {
@@ -221,11 +281,13 @@ describe("ConfigPanel", () => {
 
       const mode = wrapper.find('[data-test="dashboard-config-state-timeline-tooltip-mode"]');
       expect(mode.exists()).toBe(true);
-      expect(mode.attributes("data-test-selected-value")).toBe("segment");
+      expect(mode.attributes("data-test-selected-value")).toBe(TOGGLE_AUTO);
       expect("tooltip_mode" in panelData.data.config).toBe(false);
 
       wrapper.vm.tooltipModeModel = "all_rows";
       expect(panelData.data.config.tooltip_mode).toBe("all_rows");
+      wrapper.vm.tooltipModeModel = TOGGLE_AUTO;
+      expect("tooltip_mode" in panelData.data.config).toBe(false);
     });
   });
 
@@ -341,6 +403,17 @@ describe("ConfigPanel", () => {
       expect(wrapper.vm.dashboardPanelData.data.description).toBe("New description");
     });
 
+    it("drops decimals instead of storing an empty string when the field is cleared", async () => {
+      wrapper = createWrapper();
+      const config = wrapper.vm.dashboardPanelData.data.config;
+      config.decimals = 3;
+
+      const decimalsInput = wrapper.findComponent('[data-test="dashboard-config-decimals"]');
+      await decimalsInput.vm.$emit("update:modelValue", "");
+
+      expect("decimals" in config).toBe(false);
+    });
+
     it("should handle empty description", () => {
       // Create fresh mock data with empty description to ensure test isolation
       const freshMockData = {
@@ -411,6 +484,173 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Map pan and zoom switch", () => {
+    const mapsPanel = (queryType: string, enableRoam?: boolean) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type: "maps",
+        queryType,
+        config: { ...mockDashboardPanelData.data.config, enable_roam: enableRoam },
+      },
+    });
+    const roamSwitch = () => wrapper.findComponent('[data-test="dashboard-config-map-roam"]');
+
+    it("shows each query type's default when unset: on for PromQL, off for SQL", () => {
+      wrapper = createWrapper({ dashboardPanelData: mapsPanel("promql") }, { promqlMode: true });
+      expect(roamSwitch().props("modelValue")).toBe(true);
+      wrapper.unmount();
+
+      wrapper = createWrapper({ dashboardPanelData: mapsPanel("sql") });
+      expect(roamSwitch().props("modelValue")).toBe(false);
+    });
+
+    it("writes config.enable_roam", async () => {
+      const panel = mapsPanel("sql");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await roamSwitch().vm.$emit("update:modelValue", true);
+      expect(panel.data.config.enable_roam).toBe(true);
+    });
+
+    it("reflects a saved value over the default", () => {
+      wrapper = createWrapper(
+        { dashboardPanelData: mapsPanel("promql", false) },
+        { promqlMode: true },
+      );
+      expect(roamSwitch().props("modelValue")).toBe(false);
+    });
+
+    it("follows the config search", async () => {
+      const hidden = () => (roamSwitch().attributes("style") ?? "").includes("display: none");
+      wrapper = createWrapper({ dashboardPanelData: mapsPanel("sql") });
+      wrapper.vm.searchQuery = "pan and";
+      await wrapper.vm.$nextTick();
+      expect(hidden()).toBe(false);
+      wrapper.vm.searchQuery = "map";
+      await wrapper.vm.$nextTick();
+      expect(hidden()).toBe(true);
+    });
+
+    it("is absent for geomap", () => {
+      wrapper = createWrapper({
+        dashboardPanelData: {
+          ...mockDashboardPanelData,
+          data: {
+            ...mockDashboardPanelData.data,
+            type: "geomap",
+            config: {
+              ...mockDashboardPanelData.data.config,
+              map_view: { lat: 0, lng: 0, zoom: 1 },
+            },
+          },
+        },
+      });
+      expect(wrapper.find('[data-test="dashboard-config-map-roam"]').exists()).toBe(false);
+    });
+
+    it("opens a geomap saved with a null map view and base map on the default view", () => {
+      wrapper = createWrapper({
+        dashboardPanelData: {
+          ...mockDashboardPanelData,
+          data: {
+            ...mockDashboardPanelData.data,
+            type: "geomap",
+            config: { ...mockDashboardPanelData.data.config, map_view: null, base_map: null },
+          },
+        },
+      });
+      const config = wrapper.vm.dashboardPanelData.data.config;
+      expect(config.map_view).toEqual({ zoom: 1, lat: 0, lng: 0 });
+      expect(config.base_map).toEqual({ type: "osm" });
+    });
+  });
+
+  describe("PromQL series limit", () => {
+    const panelOf = (type: string) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        queryType: "promql",
+        queries: [{ query: "up", config: {} }],
+        config: { ...mockDashboardPanelData.data.config },
+      },
+    });
+    const limitInput = () =>
+      wrapper.findComponent('[data-test="dashboard-config-promql-series-limit"]');
+
+    it("stores a whole number between 1 and the server cap and clears an empty field", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, max_dashboard_series: 100 };
+      const panel = panelOf("stacked");
+      wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
+
+      await limitInput().vm.$emit("update:modelValue", 20.7);
+      expect(panel.data.config.promql_series_limit).toBe(20);
+      await limitInput().vm.$emit("update:modelValue", 500);
+      expect(panel.data.config.promql_series_limit).toBe(100);
+      await limitInput().vm.$emit("update:modelValue", 0);
+      expect(panel.data.config.promql_series_limit).toBe(1);
+      await limitInput().vm.$emit("update:modelValue", -5);
+      expect(panel.data.config.promql_series_limit).toBe(1);
+      await limitInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.promql_series_limit).toBeNull();
+    });
+
+    it("shows the effective default, capped by the server, as the placeholder", () => {
+      store.state.zoConfig = { ...store.state.zoConfig, max_dashboard_series: 40 };
+      wrapper = createWrapper({ dashboardPanelData: panelOf("stacked") }, { promqlMode: true });
+
+      expect(limitInput().props("placeholder")).toBe("40");
+      store.state.zoConfig = { ...store.state.zoConfig, max_dashboard_series: 100 };
+    });
+
+    it("is absent for chart types on the line/area path", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") }, { promqlMode: true });
+      expect(limitInput().exists()).toBe(false);
+    });
+  });
+
+  describe("Line thickness", () => {
+    const panelOf = (line_thickness: unknown) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type: "line",
+          config: { ...mockDashboardPanelData.data.config, line_thickness },
+        },
+      });
+    const thicknessInput = () =>
+      wrapper.findComponent('[data-test="dashboard-config-line_thickness"]');
+
+    it("stores the typed number as is and flags one outside (0, 10]", async () => {
+      const panel = panelOf(1.5);
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await thicknessInput().vm.$emit("update:modelValue", "3");
+      expect(panel.data.config.line_thickness).toBe(3);
+      expect(thicknessInput().props("errorMessage")).toBeUndefined();
+
+      await thicknessInput().vm.$emit("update:modelValue", "0");
+      expect(panel.data.config.line_thickness).toBe(0);
+      expect(thicknessInput().props("modelValue")).toBe(0);
+      expect(thicknessInput().props("errorMessage")).toBeTruthy();
+
+      await thicknessInput().vm.$emit("update:modelValue", "11");
+      expect(thicknessInput().props("errorMessage")).toBeTruthy();
+    });
+
+    it("clears an emptied field and restores the default on blur", async () => {
+      const panel = panelOf(2);
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await thicknessInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.line_thickness).toBeNull();
+      await thicknessInput().vm.$emit("blur");
+      expect(panel.data.config.line_thickness).toBe(1.5);
+    });
+  });
+
   describe("Axis labels mode", () => {
     const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
       ...mockDashboardPanelData,
@@ -447,6 +687,101 @@ describe("ConfigPanel", () => {
     it("is absent in PromQL mode", () => {
       wrapper = createWrapper({ dashboardPanelData: panelOf("line") }, { promqlMode: true });
       expect(toggleOf()).toBeUndefined();
+    });
+  });
+
+  describe("Empty-state text and y-axis minimum step", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          type,
+          config: { ...mockDashboardPanelData.data.config, ...config },
+        },
+      });
+    const input = (dataTest: string) => wrapper.findComponent(`[data-test="${dataTest}"]`);
+
+    it("writes no_data_text and clears it to null when emptied", async () => {
+      const panel = panelOf("line");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await input("dashboard-config-no-data-text").vm.$emit("update:modelValue", "Set $meter");
+      expect(panel.data.config.no_data_text).toBe("Set $meter");
+      await input("dashboard-config-no-data-text").vm.$emit("update:modelValue", "  ");
+      expect(panel.data.config.no_data_text).toBeNull();
+    });
+
+    it("suggests the dashboard's variables when typing $ in the empty-state text", () => {
+      wrapper = createWrapper({
+        dashboardPanelData: panelOf("line"),
+        variablesData: {
+          values: [
+            { name: "meter", type: "query_values", multiSelect: true },
+            { name: "site", type: "constant" },
+          ],
+        },
+      });
+      const field = wrapper.findComponent({ name: "OTemplateInput" });
+      expect(field.props("delimiter")).toBe("dollar");
+      expect(field.props("suggestions").map((s: { name: string }) => s.name)).toEqual([
+        "meter",
+        "meter:csv",
+        "meter:pipe",
+        "meter:doublequote",
+        "meter:singlequote",
+        "site",
+      ]);
+    });
+
+    it.each(["html", "markdown"])("offers no empty-state text for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      expect(wrapper.find('[data-test="dashboard-config-no-data-text"]').exists()).toBe(false);
+    });
+
+    it("writes a positive y_axis_min_interval and null otherwise", async () => {
+      const panel = panelOf("line");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      const field = () => input("dashboard-config-y_axis_min_interval");
+      await field().vm.$emit("update:modelValue", "1");
+      expect(panel.data.config.y_axis_min_interval).toBe(1);
+      await field().vm.$emit("update:modelValue", "0");
+      expect(panel.data.config.y_axis_min_interval).toBeNull();
+      await field().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.y_axis_min_interval).toBeNull();
+    });
+
+    it("explains the minimum step under the field", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") });
+      expect(wrapper.text()).toContain(
+        "Smallest gap between ticks. 1 gives whole numbers for counts.",
+      );
+    });
+
+    it("labels the series overrides button Add, or Edit with the count once rules exist", () => {
+      const button = () =>
+        wrapper.find('[data-test="dashboard-addpanel-config-series-overrides-add-btn"]');
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") });
+      expect(button().text()).toBe("Add series override");
+      wrapper.unmount();
+      const rules = [
+        {
+          field: { matchBy: "series", value: "a" },
+          config: [{ type: "line_style", value: "dashed" }],
+        },
+        {
+          field: { matchBy: "series_regex", value: "^b" },
+          config: [{ type: "line_width", value: 3 }],
+        },
+      ];
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line", { override_config: rules }) });
+      expect(button().text()).toBe("Edit series overrides (2)");
+    });
+
+    it.each(["pie", "table", "metric"])("offers no minimum step for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      expect(wrapper.find('[data-test="dashboard-config-y_axis_min_interval"]').exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -803,6 +1138,43 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Legend values", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config, show_legends: true, ...config },
+      },
+    });
+    const toggleOf = () =>
+      wrapper
+        .findAllComponents({ name: "OToggleGroup" })
+        .find((group: any) => group.text().includes("Legend values"));
+
+    it.each(["pie", "donut"])(
+      "reads unset as none and writes value and percent for %s",
+      async (type) => {
+        const panel: any = panelOf(type);
+        wrapper = createWrapper({ dashboardPanelData: panel });
+        expect(toggleOf()?.props("modelValue")).toEqual([]);
+        expect(toggleOf()?.text()).toContain("ValuePercent");
+        await toggleOf()?.vm.$emit("update:modelValue", ["percent", "value"]);
+        expect(panel.data.config.legend_values).toEqual(["value", "percent"]);
+        await toggleOf()?.vm.$emit("update:modelValue", []);
+        expect(panel.data.config.legend_values).toEqual([]);
+      },
+    );
+
+    it("is absent when the legend is hidden or the chart is not a pie", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("pie", { show_legends: false }) });
+      expect(toggleOf()).toBeUndefined();
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf("bar") });
+      expect(toggleOf()).toBeUndefined();
+    });
+  });
+
   describe("Time shift (Comparison against)", () => {
     const shiftedPanel = (queryType: string) => ({
       ...mockDashboardPanelData,
@@ -941,44 +1313,6 @@ describe("ConfigPanel", () => {
     });
   });
 
-  describe("Panel Type Handling", () => {
-    it("should handle different panel types", () => {
-      const chartTypes = ["line", "bar", "area", "pie", "table"];
-
-      chartTypes.forEach((type) => {
-        const panelData = {
-          ...mockDashboardPanelData,
-          data: { ...mockDashboardPanelData.data, type },
-        };
-
-        wrapper = createWrapper({ dashboardPanelData: panelData });
-        expect(wrapper.exists()).toBe(true);
-
-        if (wrapper) {
-          wrapper.unmount();
-        }
-      });
-    });
-
-    it("should show different configurations for different chart types", () => {
-      // Test line chart
-      wrapper = createWrapper();
-      const lineConfig = wrapper.html();
-      wrapper.unmount();
-
-      // Test table
-      const tableData = {
-        ...mockDashboardPanelData,
-        data: { ...mockDashboardPanelData.data, type: "table" },
-      };
-      wrapper = createWrapper({ dashboardPanelData: tableData });
-      const tableConfig = wrapper.html();
-
-      // Configurations should be different
-      expect(lineConfig).not.toBe(tableConfig);
-    });
-  });
-
   describe("Configuration Updates", () => {
     it("should emit configuration changes", async () => {
       wrapper = createWrapper();
@@ -1029,161 +1363,12 @@ describe("ConfigPanel", () => {
     });
   });
 
-  describe("Validation", () => {
-    it("should handle invalid step values", async () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-      await wrapper.vm.$nextTick();
-
-      const stepValueInput = wrapper.findComponent('[data-test="dashboard-config-step-value"]');
-      if (stepValueInput.exists()) {
-        await stepValueInput.vm.$emit("update:modelValue", "-1");
-        expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBeDefined();
-      } else {
-        expect(wrapper.exists()).toBe(true);
-      }
-    });
-
-    it("should handle non-numeric step values", async () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-      await wrapper.vm.$nextTick();
-
-      const stepValueInput = wrapper.findComponent('[data-test="dashboard-config-step-value"]');
-      if (stepValueInput.exists()) {
-        await stepValueInput.vm.$emit("update:modelValue", "invalid");
-        expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBeDefined();
-      } else {
-        expect(wrapper.exists()).toBe(true);
-      }
-    });
-
-    it("should validate configuration completeness", () => {
-      wrapper = createWrapper();
-
-      // Check if component has valid configuration structure
-      expect(wrapper.vm.dashboardPanelData).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data).toBeDefined();
-    });
-  });
-
-  describe("Accessibility", () => {
-    it("should have proper labels for form inputs", () => {
-      wrapper = createWrapper();
-
-      const descriptionInput = wrapper.find('[data-test="dashboard-config-description"]');
-      expect(descriptionInput.exists()).toBe(true);
-    });
-
-    it("should provide tooltips for complex fields", () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-
-      const infoIcons = wrapper.findAll('[data-test="dashboard-config-top_results-info"]');
-      if (infoIcons.length > 0) {
-        expect(infoIcons[0].exists()).toBe(true);
-      } else {
-        expect(wrapper.exists()).toBe(true);
-      }
-    });
-
-    it("should support keyboard navigation", async () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-      await wrapper.vm.$nextTick();
-
-      const descriptionInput = wrapper.find('[data-test="dashboard-config-description"]');
-      expect(descriptionInput.exists()).toBe(true);
-
-      const stepValueInput = wrapper.find('[data-test="dashboard-config-step-value"]');
-      if (stepValueInput.exists()) {
-        await stepValueInput.trigger("focus");
-        expect(stepValueInput.exists()).toBe(true);
-      } else {
-        expect(wrapper.exists()).toBe(true);
-      }
-    });
-  });
-
-  describe("Error Handling", () => {
-    it("should handle missing panel data gracefully", () => {
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      wrapper = createWrapper({ dashboardPanelData: null });
-
-      expect(wrapper.exists()).toBe(true);
-      consoleWarnSpy.mockRestore();
-    });
-
-    it("should handle malformed configuration data", () => {
-      const malformedData = {
-        data: {
-          id: "panel-1",
-          type: "line",
-          queries: [
-            {
-              fields: { breakdown: [] },
-              config: { limit: 1000 },
-            },
-          ],
-          config: {
-            legend_width: { value: null, unit: "px" },
-          },
-        },
-        layout: {
-          currentQueryIndex: 0,
-        },
-        meta: {
-          stream: {
-            selectedStreamFields: [],
-          },
-        },
-      };
-
-      wrapper = createWrapper({ dashboardPanelData: malformedData });
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should provide fallback values for missing config properties", () => {
-      const incompleteData = {
-        data: {
-          id: "panel-1",
-          type: "line",
-          queries: [
-            {
-              fields: { breakdown: [] },
-              config: { limit: 1000 },
-            },
-          ],
-          config: {
-            legend_width: { value: null, unit: "px" },
-          },
-        },
-        layout: {
-          currentQueryIndex: 0,
-        },
-        meta: {
-          stream: {
-            selectedStreamFields: [],
-          },
-        },
-      };
-
-      wrapper = createWrapper({ dashboardPanelData: incompleteData });
-
-      expect(wrapper.vm.dashboardPanelData.data.config).toBeDefined();
-    });
-  });
-
   describe("Show Gridlines Toggle", () => {
     it("should render show gridlines toggle", () => {
       wrapper = createWrapper();
 
       const gridlinesToggle = wrapper.find('[data-test="dashboard-config-show-gridlines"]');
       expect(gridlinesToggle.exists()).toBe(true);
-    });
-
-    it("should initialize gridlines to true by default", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.dashboardPanelData.data.config.show_gridlines).toBe(true);
     });
 
     it("should bind gridlines value to toggle", async () => {
@@ -1256,12 +1441,6 @@ describe("ConfigPanel", () => {
       expect(trellisToggle.exists()).toBe(true);
     });
 
-    it("should initialize group_by_y_axis as false by default", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.dashboardPanelData.data.config.trellis.group_by_y_axis).toBe(false);
-    });
-
     it("should show helpful tooltip for trellis group by y-axis", () => {
       const trellisEnabledData = {
         ...mockDashboardPanelData,
@@ -1295,12 +1474,6 @@ describe("ConfigPanel", () => {
   });
 
   describe("Top Results Others Configuration", () => {
-    it("should initialize top_results_others as false by default", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.dashboardPanelData.data.config.top_results_others).toBe(false);
-    });
-
     it("should show top results others toggle for supported chart types", () => {
       const supportedChartTypes = [
         "area",
@@ -1358,12 +1531,6 @@ describe("ConfigPanel", () => {
   });
 
   describe("Connect Null Values Configuration", () => {
-    it("should initialize connect_nulls as false by default", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.dashboardPanelData.data.config.connect_nulls).toBe(false);
-    });
-
     it("should show connect nulls toggle for area and line charts", () => {
       const supportedTypes = ["area", "line", "area-stacked"];
 
@@ -1410,12 +1577,6 @@ describe("ConfigPanel", () => {
   });
 
   describe("No Value Replacement Configuration", () => {
-    it("should initialize no_value_replacement as empty string by default", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.dashboardPanelData.data.config.no_value_replacement).toBe("");
-    });
-
     it("should show no value replacement input for supported chart types", () => {
       const supportedTypes = ["area", "line", "area-stacked", "bar", "stacked"];
 
@@ -1519,18 +1680,6 @@ describe("ConfigPanel", () => {
     });
   });
   describe("Table Configuration Options", () => {
-    it("should initialize table_transpose as false by default", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.dashboardPanelData.data.config.table_transpose).toBe(false);
-    });
-
-    it("should initialize table_dynamic_columns as false by default", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.dashboardPanelData.data.config.table_dynamic_columns).toBe(false);
-    });
-
     it("should show table transpose toggle for table panels", () => {
       const tableData = {
         ...mockDashboardPanelData,
@@ -1596,85 +1745,6 @@ describe("ConfigPanel", () => {
         '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
       );
       expect(addBtn.exists()).toBe(false);
-    });
-  });
-
-  describe("Component Initialization Logic", () => {
-    it("should initialize all default configuration values on mount", () => {
-      // Create a completely fresh mock data with minimal config to test initialization
-      const minimalMockData = {
-        data: {
-          id: "test-panel",
-          title: "Test",
-          description: "",
-          type: "line",
-          queries: [
-            {
-              fields: { breakdown: [] },
-              config: { limit: 1000 },
-            },
-          ],
-          config: {}, // Empty config to test initialization
-        },
-        layout: { currentQueryIndex: 0 },
-        meta: { stream: { selectedStreamFields: [] } },
-      };
-
-      wrapper = createWrapper({ dashboardPanelData: minimalMockData });
-
-      const config = wrapper.vm.dashboardPanelData.data.config;
-
-      // Check that all expected default values are set by the component's onBeforeMount
-      expect(config.show_gridlines).toBe(true);
-      expect(config.connect_nulls).toBe(false);
-      expect(config.wrap_table_cells).toBe(false);
-      expect(config.table_transpose).toBe(false);
-      expect(config.table_dynamic_columns).toBe(false);
-      expect(config.top_results_others).toBe(false);
-
-      // For some values, just check they are defined (may have different defaults)
-      expect(config.no_value_replacement).toBeDefined();
-      expect(config.trellis).toBeDefined();
-      expect(config.trellis.group_by_y_axis).toBe(false);
-    });
-
-    it("should initialize nested configuration objects", () => {
-      wrapper = createWrapper();
-
-      const config = wrapper.vm.dashboardPanelData.data.config;
-
-      expect(config.trellis).toBeDefined();
-      expect(config.trellis.layout).toBeDefined();
-      expect(config.trellis.num_of_columns).toBeDefined();
-      expect(config.trellis.group_by_y_axis).toBeDefined();
-
-      expect(config.legend_width).toBeDefined();
-      expect(config.legend_width.value).toBeDefined();
-      expect(config.legend_width.unit).toBeDefined();
-
-      expect(config.map_symbol_style).toBeDefined();
-      expect(config.label_option).toBeDefined();
-    });
-
-    it("should handle partial configuration data gracefully", () => {
-      const partialData = {
-        ...mockDashboardPanelData,
-        data: {
-          ...mockDashboardPanelData.data,
-          config: {
-            // Only some config properties
-            step_value: 0,
-          },
-        },
-      };
-
-      wrapper = createWrapper({ dashboardPanelData: partialData });
-
-      // Should still initialize missing properties
-      const config = wrapper.vm.dashboardPanelData.data.config;
-      expect(config.show_gridlines).toBe(true);
-      expect(config.trellis).toBeDefined();
-      expect(config.legend_width).toBeDefined();
     });
   });
 
@@ -1767,50 +1837,6 @@ describe("ConfigPanel", () => {
       if (topResultsInput.exists()) {
         expect(topResultsInput.attributes("disabled")).toBeUndefined();
       }
-    });
-  });
-
-  describe("Performance", () => {
-    it("should not cause unnecessary re-renders", async () => {
-      wrapper = createWrapper();
-      const renderSpy = vi.spyOn(wrapper.vm, "$forceUpdate");
-
-      // Multiple prop updates
-      await wrapper.setProps({ promqlMode: true });
-      await wrapper.setProps({ promqlMode: false });
-      await wrapper.setProps({ promqlMode: true });
-
-      expect(renderSpy).not.toHaveBeenCalled();
-    });
-
-    it("should debounce rapid configuration changes", async () => {
-      wrapper = createWrapper();
-      const emitSpy = vi.spyOn(wrapper.vm, "$emit");
-
-      const descriptionInput = wrapper.findComponent('[data-test="dashboard-config-description"]');
-
-      // Rapid changes
-      await descriptionInput.vm.$emit("update:modelValue", "A");
-      await descriptionInput.vm.$emit("update:modelValue", "AB");
-      await descriptionInput.vm.$emit("update:modelValue", "ABC");
-
-      // Should not emit for every character change
-      expect(emitSpy).not.toHaveBeenCalledTimes(3);
-    });
-
-    it("should efficiently handle multiple configuration toggles", async () => {
-      wrapper = createWrapper();
-
-      // Multiple toggle changes
-      wrapper.vm.dashboardPanelData.data.config.show_gridlines = false;
-      wrapper.vm.dashboardPanelData.data.config.connect_nulls = true;
-      wrapper.vm.dashboardPanelData.data.config.wrap_table_cells = true;
-
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.dashboardPanelData.data.config.show_gridlines).toBe(false);
-      expect(wrapper.vm.dashboardPanelData.data.config.connect_nulls).toBe(true);
-      expect(wrapper.vm.dashboardPanelData.data.config.wrap_table_cells).toBe(true);
     });
   });
 
@@ -2010,543 +2036,18 @@ describe("ConfigPanel", () => {
     });
   });
 
-  describe("Advanced Configuration Edge Cases", () => {
-    it("should handle legend width configuration with extreme values", () => {
-      const extremePanelData = {
-        ...mockDashboardPanelData,
-        data: {
-          ...mockDashboardPanelData.data,
-          config: {
-            ...mockDashboardPanelData.data.config,
-            legend_width: { value: 9999, unit: "px" },
-            show_legends: true,
-            legends_position: "right",
-            legends_type: "plain",
-          },
-        },
-      };
-
-      wrapper = createWrapper({ dashboardPanelData: extremePanelData });
-      // Component may reset legend_width based on visibility conditions
-      const legendWidth = wrapper.vm.dashboardPanelData.data.config.legend_width;
-      expect(legendWidth).toBeDefined();
-    });
-
-    it("should handle legend width with percentage values", () => {
-      const percentagePanelData = {
-        ...mockDashboardPanelData,
-        data: {
-          ...mockDashboardPanelData.data,
-          config: {
-            ...mockDashboardPanelData.data.config,
-            legend_width: { value: 25, unit: "%" },
-            show_legends: true,
-          },
-        },
-      };
-
-      wrapper = createWrapper({ dashboardPanelData: percentagePanelData });
-      expect(wrapper.vm.dashboardPanelData.data.config.legend_width.unit).toBe("%");
-    });
-
-    it("should handle negative step values gracefully", async () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-      await wrapper.vm.$nextTick();
-
-      // Set negative step value
-      wrapper.vm.dashboardPanelData.data.config.step_value = -10;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBe(-10);
-    });
-
-    it("should handle extremely large step values", async () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-      await wrapper.vm.$nextTick();
-
-      wrapper.vm.dashboardPanelData.data.config.step_value = Number.MAX_SAFE_INTEGER;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBe(Number.MAX_SAFE_INTEGER);
-    });
-
-    it("should handle special characters in description field", async () => {
-      wrapper = createWrapper();
-
-      const specialCharsDescription = "Special chars: <>\"'&\n\t\n\\/@#$%^&*()";
-      const descriptionInput = wrapper.findComponent('[data-test="dashboard-config-description"]');
-      await descriptionInput.vm.$emit("update:modelValue", specialCharsDescription);
-
-      expect(wrapper.vm.dashboardPanelData.data.description).toBe(specialCharsDescription);
-    });
-
-    it("should handle very long description text", async () => {
-      wrapper = createWrapper();
-
-      const longDescription = "A".repeat(10000); // Very long description
-      const descriptionInput = wrapper.findComponent('[data-test="dashboard-config-description"]');
-      await descriptionInput.vm.$emit("update:modelValue", longDescription);
-
-      expect(wrapper.vm.dashboardPanelData.data.description).toBe(longDescription);
-    });
-
-    it("should maintain focus when toggling between configurations", async () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-      await wrapper.vm.$nextTick();
-
-      const stepValueInput = wrapper.findComponent('[data-test="dashboard-config-step-value"]');
-      if (stepValueInput.exists()) {
-        await stepValueInput.vm.$emit("update:modelValue", "30");
-
-        expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBe("30");
-      }
-    });
-  });
-
-  describe("Complex Trellis Configuration Scenarios", () => {
-    it("should handle trellis with custom layout and extreme column numbers", () => {
-      const trellisData = {
-        ...mockDashboardPanelData,
-        data: {
-          ...mockDashboardPanelData.data,
-          config: {
-            ...mockDashboardPanelData.data.config,
-            trellis: {
-              layout: "custom",
-              num_of_columns: 16, // Maximum
-              group_by_y_axis: true,
-            },
-          },
-          queries: [
-            {
-              ...mockDashboardPanelData.data.queries[0],
-              fields: {
-                breakdown: [{ field: "service" }, { field: "environment" }], // Multiple breakdown fields
-              },
-            },
-          ],
-        },
-      };
-
-      wrapper = createWrapper({ dashboardPanelData: trellisData });
-
-      expect(wrapper.vm.dashboardPanelData.data.config.trellis.num_of_columns).toBe(16);
-      expect(wrapper.vm.dashboardPanelData.data.config.trellis.group_by_y_axis).toBe(true);
-    });
-
-    it("should handle trellis column number validation", async () => {
-      const trellisData = {
-        ...mockDashboardPanelData,
-        data: {
-          ...mockDashboardPanelData.data,
-          config: {
-            ...mockDashboardPanelData.data.config,
-            trellis: {
-              layout: "custom",
-              num_of_columns: 1,
-              group_by_y_axis: false,
-            },
-          },
-        },
-      };
-
-      wrapper = createWrapper({ dashboardPanelData: trellisData });
-
-      // Try to set invalid column number (> 16)
-      wrapper.vm.dashboardPanelData.data.config.trellis.num_of_columns = 20;
-      await wrapper.vm.$nextTick();
-
-      // The component doesn't automatically clamp the value, so we just check it's set
-      expect(wrapper.vm.dashboardPanelData.data.config.trellis.num_of_columns).toBe(20);
-    });
-
-    it("should handle trellis with different chart types", () => {
-      const chartTypes = ["area", "bar", "line", "stacked", "area-stacked"];
-
-      chartTypes.forEach((type) => {
-        const trellisData = {
-          ...mockDashboardPanelData,
-          data: {
-            ...mockDashboardPanelData.data,
-            type,
-            config: {
-              ...mockDashboardPanelData.data.config,
-              trellis: {
-                layout: "auto",
-                group_by_y_axis: true,
-              },
-            },
-            queries: [
-              {
-                ...mockDashboardPanelData.data.queries[0],
-                fields: {
-                  breakdown: [{ field: "service" }],
-                },
-              },
-            ],
-          },
-        };
-
-        wrapper = createWrapper({ dashboardPanelData: trellisData });
-        expect(wrapper.vm.dashboardPanelData.data.type).toBe(type);
-        expect(wrapper.vm.dashboardPanelData.data.config.trellis.group_by_y_axis).toBe(true);
-
-        if (wrapper) {
-          wrapper.unmount();
-        }
-      });
-    });
-  });
-
-  describe("Input Validation and Constraints", () => {
-    it("should handle empty/null config objects", () => {
-      const minimalData = {
-        data: {
-          id: "test",
-          title: "Test",
-          description: "",
-          type: "line",
-          queries: [
-            {
-              fields: { breakdown: [] },
-              config: { limit: 1000 },
-            },
-          ],
-          config: {}, // Empty config instead of null
-        },
-        layout: { currentQueryIndex: 0 },
-        meta: { stream: { selectedStreamFields: [] } },
-      };
-
-      wrapper = createWrapper({ dashboardPanelData: minimalData });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle malformed trellis configuration", () => {
-      const malformedTrellisData = {
-        ...mockDashboardPanelData,
-        data: {
-          ...mockDashboardPanelData.data,
-          config: {
-            ...mockDashboardPanelData.data.config,
-            trellis: null, // Malformed trellis
-          },
-        },
-      };
-
-      wrapper = createWrapper({ dashboardPanelData: malformedTrellisData });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle step value with decimal places", async () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-      await wrapper.vm.$nextTick();
-
-      const stepValueInput = wrapper.findComponent('[data-test="dashboard-config-step-value"]');
-      if (stepValueInput.exists()) {
-        await stepValueInput.vm.$emit("update:modelValue", "30.5");
-        expect(wrapper.vm.dashboardPanelData.data.config.step_value).toBe("30.5");
-      }
-    });
-
-    it("should handle non-standard config property types", () => {
-      const nonStandardData = {
-        ...mockDashboardPanelData,
-        data: {
-          ...mockDashboardPanelData.data,
-          config: {
-            ...mockDashboardPanelData.data.config,
-            custom_property: "test",
-            numeric_string: "123",
-            boolean_string: "true",
-          },
-        },
-      };
-
-      wrapper = createWrapper({ dashboardPanelData: nonStandardData });
-      expect(wrapper.vm.dashboardPanelData.data.config.custom_property).toBe("test");
-    });
-  });
-
-  describe("Memory and Performance Edge Cases", () => {
-    it("should handle rapid configuration changes without memory leaks", async () => {
-      wrapper = createWrapper();
-
-      // Simulate rapid changes
-      for (let i = 0; i < 100; i++) {
-        wrapper.vm.dashboardPanelData.data.config.show_gridlines = i % 2 === 0;
-        wrapper.vm.dashboardPanelData.data.config.connect_nulls = i % 3 === 0;
-        await wrapper.vm.$nextTick();
-      }
-
-      expect(wrapper.vm.dashboardPanelData.data.config.show_gridlines).toBeDefined();
-    });
-
-    it("should handle large number of breakdown fields efficiently", () => {
-      const manyBreakdownFields = Array.from({ length: 50 }, (_, i) => ({
-        field: `field_${i}`,
-      }));
-
-      const largeBreakdownData = {
-        ...mockDashboardPanelData,
-        data: {
-          ...mockDashboardPanelData.data,
-          queries: [
-            {
-              ...mockDashboardPanelData.data.queries[0],
-              fields: {
-                breakdown: manyBreakdownFields,
-              },
-            },
-          ],
-        },
-      };
-
-      wrapper = createWrapper({ dashboardPanelData: largeBreakdownData });
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown).toHaveLength(50);
-    });
-
-    it("should handle complex nested configuration updates", async () => {
-      wrapper = createWrapper();
-
-      // Deep nested updates
-      wrapper.vm.dashboardPanelData.data.config.map_symbol_style.size_by_value.min = 0.1;
-      wrapper.vm.dashboardPanelData.data.config.map_symbol_style.size_by_value.max = 999.9;
-      wrapper.vm.dashboardPanelData.data.config.label_option.rotate = 45;
-
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.dashboardPanelData.data.config.map_symbol_style.size_by_value.min).toBe(
-        0.1,
-      );
-      expect(wrapper.vm.dashboardPanelData.data.config.map_symbol_style.size_by_value.max).toBe(
-        999.9,
-      );
-      expect(wrapper.vm.dashboardPanelData.data.config.label_option.rotate).toBe(45);
-    });
-  });
-
   describe("Component Integration and Props Handling", () => {
-    it("should handle ColorBySeries stub properly", () => {
-      const colorBySeriesData = {
-        field1: "#ff0000",
-        field2: "#00ff00",
-        field3: "#0000ff",
-      };
-
-      wrapper = createWrapper({ colorBySeriesData });
-      const colorBySeriesStub = wrapper.find('[data-test="color-by-series-stub"]');
-      expect(colorBySeriesStub.exists()).toBe(true);
-    });
-
-    it("should render stubbed components when they exist", () => {
-      wrapper = createWrapper();
-
-      // Test that component is properly mounted and stubbed components configuration exists
-      expect(wrapper.vm).toBeDefined();
-      expect(wrapper.exists()).toBe(true);
-
-      // Verify the component has the proper stubbed components configured in the mount options
-      expect(wrapper.element).toBeDefined();
-    });
-
-    it("should handle all props variations simultaneously", () => {
-      const complexProps = {
-        dashboardPanelData: mockDashboardPanelData,
-        variablesData: {
-          values: [
-            { name: "var1", value: "test1" },
-            { name: "var2", value: ["test2", "test3"] },
-          ],
+    it("shows the palette for sankey panels but not the per-series colours", async () => {
+      wrapper = createWrapper({
+        dashboardPanelData: {
+          ...mockDashboardPanelData,
+          data: { ...mockDashboardPanelData.data, type: "sankey" },
         },
-        panelData: { chartType: "line", options: {} },
-        promqlMode: true,
-        colorBySeriesData: { series1: "#ff0000" },
-        panelSchema: { type: "line", config: {} },
-        overrideConfig: { legend: { show: true } },
-        valueMappingData: [{ from: 0, to: 100, text: "Range" }],
-      };
-
-      wrapper = createWrapper(complexProps, { promqlMode: true });
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.props().variablesData).toEqual(complexProps.variablesData);
-    });
-  });
-
-  describe("Computed Properties and Watchers", () => {
-    it("should handle computed property dependencies", () => {
-      wrapper = createWrapper();
-
-      // Test computed properties that depend on reactive data
-      expect(wrapper.vm.showTrellisConfig).toBeDefined();
-      expect(wrapper.vm.trellisOptions).toBeDefined();
-      expect(wrapper.vm.legendTypeOptions).toBeDefined();
-    });
-
-    it("should handle reactive updates to panel type", async () => {
-      wrapper = createWrapper();
-
-      // Change panel type and verify reactivity
-      wrapper.vm.dashboardPanelData.data.type = "gauge";
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("gauge");
-    });
-
-    it("should handle reactive updates to config properties", async () => {
-      wrapper = createWrapper();
-
-      // Multiple reactive updates
-      const updates = {
-        show_gridlines: true,
-        connect_nulls: true,
-        wrap_table_cells: true,
-        table_transpose: true,
-        top_results_others: true,
-      };
-
-      for (const [key, value] of Object.entries(updates)) {
-        wrapper.vm.dashboardPanelData.data.config[key] = value;
-        await wrapper.vm.$nextTick();
-        expect(wrapper.vm.dashboardPanelData.data.config[key]).toBe(value);
-      }
-    });
-  });
-
-  describe("Error Recovery and Resilience", () => {
-    it("should recover from temporary invalid configurations", () => {
-      wrapper = createWrapper();
-
-      // Temporarily set invalid config
-      const originalConfig = wrapper.vm.dashboardPanelData.data.config;
-      wrapper.vm.dashboardPanelData.data.config = null;
-
-      expect(wrapper.exists()).toBe(true);
-
-      // Restore valid config
-      wrapper.vm.dashboardPanelData.data.config = originalConfig;
-      expect(wrapper.vm.dashboardPanelData.data.config).toBeDefined();
-    });
-
-    it("should handle undefined dashboard panel data gracefully", () => {
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      wrapper = createWrapper({ dashboardPanelData: undefined });
-      expect(wrapper.exists()).toBe(true);
-
-      consoleWarnSpy.mockRestore();
-    });
-
-    it("should handle circular reference in configuration", () => {
-      wrapper = createWrapper();
-
-      // Create a circular reference scenario
-      const circularRef = { self: null };
-      circularRef.self = circularRef;
-
-      // This should not break the component
-      expect(() => {
-        wrapper.vm.dashboardPanelData.data.config.circular = circularRef;
-      }).not.toThrow();
-    });
-  });
-
-  describe("Accessibility and User Experience", () => {
-    it("should maintain correct tab order for form elements", async () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-      await wrapper.vm.$nextTick();
-
-      const formElements = wrapper.findAll("[data-test]");
-      expect(formElements.length).toBeGreaterThan(0);
-
-      // Each form element should be keyboard accessible
-      formElements.forEach((element) => {
-        expect(element.exists()).toBe(true);
       });
-    });
-
-    it("should provide appropriate aria labels and descriptions", () => {
-      wrapper = createWrapper({}, { promqlMode: true });
-
-      // Check for accessibility attributes on key elements
-      const descriptionInput = wrapper.find('[data-test="dashboard-config-description"]');
-      expect(descriptionInput.exists()).toBe(true);
-    });
-
-    it("should handle high contrast mode compatibility", () => {
-      wrapper = createWrapper();
-
-      // Component should render without errors in different display modes
-      expect(wrapper.find('[data-test="dashboard-config-description"]').exists()).toBe(true);
-    });
-  });
-
-  describe("Integration with External Dependencies", () => {
-    it("should handle store updates correctly", async () => {
-      wrapper = createWrapper();
-
-      // Simulate store updates
-      if (wrapper.vm.store && wrapper.vm.store.state) {
-        wrapper.vm.store.state.selectedOrganization = { identifier: "new-org" };
-        await wrapper.vm.$nextTick();
-      }
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle i18n translation updates", () => {
-      wrapper = createWrapper();
-
-      // Component should handle translation changes
-      expect(wrapper.text()).toContain("Description");
-    });
-
-    it("should handle theme changes", async () => {
-      wrapper = createWrapper();
-
-      // Simulate theme change
-      document.body.classList.add("dark-theme");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.exists()).toBe(true);
-
-      // Cleanup
-      document.body.classList.remove("dark-theme");
-    });
-  });
-
-  describe("Component Lifecycle and Cleanup", () => {
-    it("should initialize properly with all default values", () => {
-      wrapper = createWrapper();
-
-      // Check that all expected default values are set
-      const config = wrapper.vm.dashboardPanelData.data.config;
-      expect(config).toBeDefined();
-      expect(config.show_gridlines).toBeDefined();
-      expect(config.connect_nulls).toBeDefined();
-    });
-
-    it("should cleanup properly on unmount", () => {
-      wrapper = createWrapper();
-      const componentInstance = wrapper.vm;
-
-      expect(() => {
-        wrapper.unmount();
-      }).not.toThrow();
-
-      // Verify cleanup occurred
-      expect(componentInstance).toBeDefined();
-    });
-
-    it("should handle multiple mount/unmount cycles", () => {
-      for (let i = 0; i < 5; i++) {
-        wrapper = createWrapper();
-        expect(wrapper.exists()).toBe(true);
-        wrapper.unmount();
-      }
-
-      // Final wrapper for other tests
-      wrapper = createWrapper();
+      expect(wrapper.vm.showColorPalette).toBe(true);
+      expect(wrapper.find('[data-test="color-by-series-stub"]').exists()).toBe(false);
     });
   });
 
@@ -2667,24 +2168,6 @@ describe("ConfigPanel", () => {
 
       const paginationToggle = wrapper.find('[data-test="dashboard-config-show-pagination"]');
       expect(paginationToggle.exists()).toBe(false);
-    });
-
-    it("should initialize table_pagination as false by default", () => {
-      const tableData = {
-        ...mockDashboardPanelData,
-        data: {
-          ...mockDashboardPanelData.data,
-          type: "table",
-          config: {
-            ...mockDashboardPanelData.data.config,
-            table_pagination: false,
-          },
-        },
-      };
-
-      wrapper = createWrapper({ dashboardPanelData: tableData });
-
-      expect(wrapper.vm.dashboardPanelData.data.config.table_pagination).toBe(false);
     });
 
     it("should toggle pagination value when clicked", async () => {
@@ -2882,54 +2365,11 @@ describe("ConfigPanel", () => {
   });
 
   describe("searchQuery state", () => {
-    it("should initialize searchQuery as empty string", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.searchQuery).toBe("");
-    });
-
     it("should update searchQuery when set directly", async () => {
       wrapper = createWrapper();
       wrapper.vm.searchQuery = "legend";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.searchQuery).toBe("legend");
-    });
-  });
-
-  describe("expandedSections state", () => {
-    it("should initialize expandedSections with all sections true", () => {
-      wrapper = createWrapper();
-      const sections = wrapper.vm.expandedSections;
-      expect(typeof sections).toBe("object");
-      for (const val of Object.values(sections)) {
-        expect(val).toBe(true);
-      }
-    });
-
-    it("should have an entry for every expected section", () => {
-      wrapper = createWrapper();
-      const expectedSections = [
-        "general",
-        "geographic",
-        "legend",
-        "data",
-        "axis",
-        "labels",
-        "lineStyle",
-        "table",
-        "valueTransformations",
-        "fieldOverrides",
-        "map",
-        "gauge",
-        "layout",
-        "colors",
-        "drilldown",
-        "comparison",
-        "markLines",
-        "background",
-      ];
-      for (const s of expectedSections) {
-        expect(wrapper.vm.expandedSections).toHaveProperty(s);
-      }
     });
   });
 
@@ -3000,12 +2440,6 @@ describe("ConfigPanel", () => {
   });
 
   describe("isSectionVisible()", () => {
-    it("returns a boolean for known section IDs", () => {
-      wrapper = createWrapper();
-      const result = wrapper.vm.isSectionVisible("general");
-      expect(typeof result).toBe("boolean");
-    });
-
     it("returns false for unknown section IDs", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.isSectionVisible("nonexistent" as any)).toBe(false);
@@ -3018,12 +2452,6 @@ describe("ConfigPanel", () => {
   });
 
   describe("isConfigOptionVisible()", () => {
-    it("returns a boolean", () => {
-      wrapper = createWrapper();
-      const result = wrapper.vm.isConfigOptionVisible("general", "description");
-      expect(typeof result).toBe("boolean");
-    });
-
     it("description option is visible when no search query", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.isConfigOptionVisible("general", "description")).toBe(true);
@@ -3109,5 +2537,220 @@ describe("ConfigPanel", () => {
       const expansionItems = wrapper.findAllComponents({ name: "OCollapsible" });
       expect(expansionItems.length).toBeGreaterThan(0);
     });
+  });
+
+  describe("Sparkline section", () => {
+    const metricPanel = (queryType: string, queryTypes: string[]) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type: "metric",
+        queryType,
+        queries: queryTypes.map((query_type) => ({ query: "x", config: { query_type } })),
+        config: { ...mockDashboardPanelData.data.config },
+      },
+    });
+
+    it("is shown for a range or mixed PromQL metric", () => {
+      wrapper = createWrapper(
+        { dashboardPanelData: metricPanel("promql", ["instant", "range"]) },
+        { promqlMode: true },
+      );
+      expect(wrapper.vm.promqlAllInstant).toBe(false);
+      expect(wrapper.text()).toContain("Sparkline");
+    });
+
+    it("is dropped when every PromQL query is instant", () => {
+      wrapper = createWrapper(
+        { dashboardPanelData: metricPanel("promql", ["instant", "instant"]) },
+        { promqlMode: true },
+      );
+      expect(wrapper.vm.promqlAllInstant).toBe(true);
+      expect(wrapper.text()).not.toContain("Sparkline");
+    });
+
+    it("stays for an SQL metric whatever its queries carry", () => {
+      wrapper = createWrapper({ dashboardPanelData: metricPanel("sql", ["instant"]) });
+      expect(wrapper.vm.promqlAllInstant).toBe(false);
+    });
+  });
+
+  describe("Area fill", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config, ...config },
+      },
+    });
+    const opacityInput = () => wrapper.findComponent('[data-test="dashboard-config-fill_opacity"]');
+    const gradientSwitch = () =>
+      wrapper.findComponent('[data-test="dashboard-config-fill_gradient"]');
+
+    it("stores the opacity, clamps it to 0-100 on blur and clears an empty input to null", async () => {
+      const panel = reactive(panelOf("area"));
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await opacityInput().vm.$emit("update:modelValue", "35");
+      expect(panel.data.config.fill_opacity).toBe(35);
+      await opacityInput().vm.$emit("update:modelValue", "140");
+      await opacityInput().vm.$emit("blur");
+      expect(panel.data.config.fill_opacity).toBe(100);
+      await opacityInput().vm.$emit("update:modelValue", "-3");
+      await opacityInput().vm.$emit("blur");
+      expect(panel.data.config.fill_opacity).toBe(0);
+      await opacityInput().vm.$emit("update:modelValue", "");
+      await opacityInput().vm.$emit("blur");
+      expect(panel.data.config.fill_opacity).toBeNull();
+    });
+
+    it("shows the clamped value after typing past 100 when 100 was already stored", async () => {
+      const panel = reactive(panelOf("area", { fill_opacity: 100 }));
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await opacityInput().vm.$emit("update:modelValue", "1000");
+      expect(opacityInput().props("modelValue")).toBe(1000);
+      await opacityInput().vm.$emit("blur");
+      expect(panel.data.config.fill_opacity).toBe(100);
+      expect(opacityInput().props("modelValue")).toBe(100);
+    });
+
+    it("shows the gradient on when unset and stores the toggle", async () => {
+      const panel = panelOf("area");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      expect(gradientSwitch().props("modelValue")).toBe(true);
+      await gradientSwitch().vm.$emit("update:modelValue", false);
+      expect(panel.data.config.fill_gradient).toBe(false);
+    });
+
+    it("shows the gradient off for a saved flat fill", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("area", { fill_gradient: false }) });
+      expect(gradientSwitch().props("modelValue")).toBe(false);
+    });
+
+    it.each(["area-stacked", "line", "bar"])("is absent for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      expect(opacityInput().exists()).toBe(false);
+      expect(gradientSwitch().exists()).toBe(false);
+    });
+  });
+
+  describe("Scatter point size and opacity", () => {
+    const panelOf = (type: string) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config },
+      },
+    });
+    const sizeInput = () => wrapper.findComponent('[data-test="dashboard-config-symbol_size"]');
+    const opacityInput = () =>
+      wrapper.findComponent('[data-test="dashboard-config-symbol_opacity"]');
+
+    it("stores the typed size, fractions included, and an empty input as null", async () => {
+      const panel = panelOf("scatter");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await sizeInput().vm.$emit("update:modelValue", 12);
+      expect(panel.data.config.symbol_size).toBe(12);
+      await sizeInput().vm.$emit("update:modelValue", 0.5);
+      expect(panel.data.config.symbol_size).toBe(0.5);
+      await sizeInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.symbol_size).toBeNull();
+    });
+
+    it("flags a size of 0 or less, or above the max, instead of clearing it", async () => {
+      const panel = reactive(panelOf("scatter"));
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(sizeInput().props("error")).toBe(false);
+      for (const bad of [0, -3, 5000]) {
+        await sizeInput().vm.$emit("update:modelValue", bad);
+        expect(panel.data.config.symbol_size).toBe(bad);
+        expect(sizeInput().props("error")).toBe(true);
+      }
+      await sizeInput().vm.$emit("update:modelValue", 8);
+      expect(sizeInput().props("error")).toBe(false);
+    });
+
+    it("titles the section for points on a scatter chart", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("scatter") });
+      expect(wrapper.text()).toContain("Point style");
+    });
+
+    it("clamps the opacity to 0-100 and clears an empty input to null", async () => {
+      const panel = panelOf("scatter");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await opacityInput().vm.$emit("update:modelValue", 40);
+      expect(panel.data.config.symbol_opacity).toBe(40);
+      await opacityInput().vm.$emit("update:modelValue", 140);
+      expect(panel.data.config.symbol_opacity).toBe(100);
+      await opacityInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.symbol_opacity).toBeNull();
+    });
+
+    it("is shown for scatter in PromQL mode too, and absent for other charts", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("scatter") }, { promqlMode: true });
+      expect(sizeInput().exists()).toBe(true);
+      expect(opacityInput().exists()).toBe(true);
+      wrapper.unmount();
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") });
+      expect(sizeInput().exists()).toBe(false);
+      expect(opacityInput().exists()).toBe(false);
+    });
+  });
+
+  describe("Bar width and bar track", () => {
+    const panelOf = (type: string) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config },
+      },
+    });
+    const widthInput = () => wrapper.findComponent('[data-test="dashboard-config-bar-width"]');
+
+    it("stores what was typed, and stores an empty input as auto", async () => {
+      const panel = panelOf("h-bar");
+      wrapper = createWrapper({ dashboardPanelData: panel });
+
+      await widthInput().vm.$emit("update:modelValue", 24);
+      expect(panel.data.config.bar_width).toBe(24);
+      await widthInput().vm.$emit("update:modelValue", -3);
+      expect(panel.data.config.bar_width).toBe(-3);
+      await widthInput().vm.$emit("update:modelValue", "");
+      expect(panel.data.config.bar_width).toBeNull();
+    });
+
+    it("flags a width below 1, above the max or with a fraction", async () => {
+      const panel = reactive(panelOf("h-bar"));
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(widthInput().props("error")).toBe(false);
+      for (const bad of [0, -3, 12.6, 5000]) {
+        await widthInput().vm.$emit("update:modelValue", bad);
+        expect(widthInput().props("error")).toBe(true);
+      }
+      await widthInput().vm.$emit("update:modelValue", 13);
+      expect(widthInput().props("error")).toBe(false);
+    });
+
+    it.each([
+      ["h-bar", false, true, true],
+      ["bar", false, false, false],
+      ["stacked", true, true, false],
+    ])(
+      "shows the width and track controls for %s (promql %s) only where a converter reads them",
+      (type, promqlMode, hasWidth, hasTrack) => {
+        wrapper = createWrapper({ dashboardPanelData: panelOf(type) }, { promqlMode });
+        expect(widthInput().exists()).toBe(hasWidth);
+        expect(wrapper.find('[data-test="dashboard-config-show-bar-track"]').exists()).toBe(
+          hasTrack,
+        );
+      },
+    );
   });
 });

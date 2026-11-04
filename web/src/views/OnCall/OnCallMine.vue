@@ -30,18 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   narrowed rather than rendering a second copy of it.
 -->
 <template>
-  <!-- Reached from the profile menu, behind the same gate as the On-Call nav entry. -->
+  <!-- Reached from the On-Call menu and from a channel chip. -->
   <OPageLayout
     bleed
     data-test="oncall-mine-page"
     :title="t('oncall.mineTitle')"
     :subtitle="t('oncall.mineSubtitle')"
     icon="person"
-    :back="{
-      label: t('oncall.backToResponses'),
-      to: { name: 'onCallResponses', query: { org_identifier: orgId } },
-      dataTest: 'oncall-mine-back-btn',
-    }"
+    :back="back"
     scroll
   >
     <template #actions>
@@ -81,6 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Phone first: until it is verified, nothing below can reach the reader. -->
       <OnCallPhoneCard ref="phoneRef" />
 
+      <OnCallSlackCard v-if="slackOffered" ref="slackRef" />
+
       <div
         class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-2 border px-4 py-3"
         data-test="oncall-mine-teams"
@@ -96,6 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("oncall.mineOnCallNow") }}
           </OTag>
         </span>
+
+        <OEmptyState
+          v-if="loadError !== null"
+          size="inline"
+          variant="error"
+          :title="t('oncall.mineTeamsLoadFailed')"
+          :description="raw(loadError)"
+          :action-label="t('oncall.retry')"
+          data-test="oncall-mine-teams-error"
+          @action="refreshPage"
+        />
 
         <div
           v-for="team in mine?.teams ?? []"
@@ -149,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <OText
-          v-if="loaded && !(mine?.teams ?? []).length"
+          v-if="loaded && loadError === null && !(mine?.teams ?? []).length"
           variant="meta"
           data-test="oncall-mine-no-teams"
         >
@@ -164,11 +173,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallMyDeliveries from "@/components/oncall/OnCallMyDeliveries.vue";
 import OnCallPhoneCard from "@/components/oncall/OnCallPhoneCard.vue";
+import OnCallSlackCard from "@/components/oncall/OnCallSlackCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
@@ -180,8 +190,9 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { queryClient } from "@/composables/query/queryClient";
 import { myOnCallQuery } from "@/services/oncall.queries";
 import type { MyOnCall } from "@/ts/interfaces/oncall";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { isOnCallUnavailable } from "@/utils/oncall";
+import { readSlackOrgConfig } from "@/utils/slackSettings";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -192,6 +203,24 @@ const mine = ref<MyOnCall | null>(null);
 const loaded = ref(false);
 const lastFetchedAt = ref<number | null>(null);
 const unavailable = ref(false);
+/// Set only when the first load fails; a failed refresh keeps the teams on screen instead.
+const loadError = ref<string | null>(null);
+
+// Opened from the On-Call menu or a channel chip, so Back returns there when the history has it.
+const back = computed<{
+  label?: I18nText;
+  to?: RouteLocationRaw;
+  onClick?: () => void;
+  dataTest: string;
+}>(() =>
+  window.history.state?.back
+    ? { onClick: () => router.back(), dataTest: "oncall-mine-back-btn" }
+    : {
+        label: t("oncall.backToResponses"),
+        to: { name: "onCallResponses", query: { org_identifier: orgId.value } },
+        dataTest: "oncall-mine-back-btn",
+      },
+);
 
 const teamNames = computed(() =>
   Object.fromEntries((mine.value?.teams ?? []).map((team) => [team.team_id, team.team_name])),
@@ -212,6 +241,7 @@ async function fetchMine(force = false) {
       });
     }
     mine.value = await queryClient.fetchQuery(options);
+    loadError.value = null;
     lastFetchedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
   } catch (err: any) {
     if (isOnCallUnavailable(err)) {
@@ -228,6 +258,7 @@ async function fetchMine(force = false) {
       return;
     }
     mine.value = null;
+    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
   } finally {
     loaded.value = true;
   }
@@ -251,12 +282,21 @@ function openTeam(teamId: string) {
 const refreshing = ref(false);
 const deliveriesRef = ref<{ refresh: () => Promise<void> } | null>(null);
 const phoneRef = ref<{ refresh: () => Promise<void> } | null>(null);
+const slackRef = ref<{ refresh: () => Promise<void> } | null>(null);
+
+// Members hear nothing about Slack while it is off, as in the policy editor.
+const slackOffered = computed(() => readSlackOrgConfig(store.state.zoConfig).enabled);
 
 /// Named, so the click event cannot land on `force`.
 async function refreshPage() {
   refreshing.value = true;
   try {
-    await Promise.all([fetchMine(true), deliveriesRef.value?.refresh(), phoneRef.value?.refresh()]);
+    await Promise.all([
+      fetchMine(true),
+      deliveriesRef.value?.refresh(),
+      phoneRef.value?.refresh(),
+      slackRef.value?.refresh(),
+    ]);
   } finally {
     refreshing.value = false;
   }

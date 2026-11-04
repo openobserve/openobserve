@@ -939,6 +939,9 @@ mod tests {
         };
 
         let row = |id: &str, name: &str, destinations: &[&str]| Downtime {
+            alert_groups: None,
+            end_on_clear: None,
+            source: None,
             id: id.to_string(),
             org: "acme".to_string(),
             folder_id: "default".to_string(),

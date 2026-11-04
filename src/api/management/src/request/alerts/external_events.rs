@@ -71,6 +71,25 @@ pub fn org_status_refusal(
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/incidents/events",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "IngestExternalIncidentEvents",
+    summary = "Ingest events from an external alert source",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = serde_json::Value, description = "Alert payload: one object, or an array of objects for the generic format", content_type = "application/json"),
+    responses(
+        (status = 202, description = "Accepted; carries the accepted and rejected counts and the per-alert errors", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn ingest_events(
     Path(org_id): Path<String>,
     headers: HeaderMap,
@@ -81,6 +100,26 @@ pub async fn ingest_events(
 }
 
 #[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/incidents/events/{token}",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "IngestExternalIncidentEventsWithToken",
+    summary = "Ingest events using a token in the URL",
+    security(),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("token" = String, Path, description = "Integration token"),
+    ),
+    request_body(content = serde_json::Value, description = "Alert payload: one object, or an array of objects for the generic format", content_type = "application/json"),
+    responses(
+        (status = 202, description = "Accepted; carries the accepted and rejected counts and the per-alert errors", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn ingest_events_url_token(
     Path((org_id, token)): Path<(String, String)>,
     headers: HeaderMap,
@@ -228,6 +267,25 @@ async fn handle_events(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/incidents/events",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "IngestExternalIncidentEvents",
+    summary = "Ingest events from an external alert source",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = serde_json::Value, description = "Alert payload: one object, or an array of objects for the generic format", content_type = "application/json"),
+    responses(
+        (status = 202, description = "Accepted; carries the accepted and rejected counts and the per-alert errors", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn ingest_events(
     _path: Path<String>,
     _headers: HeaderMap,
@@ -237,6 +295,26 @@ pub async fn ingest_events(
 }
 
 #[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/incidents/events/{token}",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "IngestExternalIncidentEventsWithToken",
+    summary = "Ingest events using a token in the URL",
+    security(),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("token" = String, Path, description = "Integration token"),
+    ),
+    request_body(content = serde_json::Value, description = "Alert payload: one object, or an array of objects for the generic format", content_type = "application/json"),
+    responses(
+        (status = 202, description = "Accepted; carries the accepted and rejected counts and the per-alert errors", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn ingest_events_url_token(
     _path: Path<(String, String)>,
     _headers: HeaderMap,

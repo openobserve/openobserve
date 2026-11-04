@@ -59,6 +59,7 @@ const stubs = {
       "rules",
       "signals",
       "aliases",
+      "services",
       "teamId",
       "teamName",
       "teams",
@@ -71,7 +72,7 @@ const stubs = {
     ],
     template: "<div />",
   },
-  ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue"], template: "<div />" },
+  ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue", "okVariant"], template: "<div />" },
 };
 
 function render() {
@@ -145,6 +146,33 @@ describe("OnCallOwnership", () => {
     await flushPromises();
     expect(list(wrapper).props("rules")).toHaveLength(1);
     expect(list(wrapper).props("signals")).toHaveLength(1);
+  });
+
+  // S12: a stream name is not a service, and a value a rule already uses is one even if discovery never saw it.
+  it("offers discovered services minus stream names, plus services the team's rules already use", async () => {
+    correlation.getServicesList.mockResolvedValue({
+      data: [
+        { service_name: "checkout", set_id: "k8s", disambiguation: {} },
+        { service_name: "slo_slices", set_id: "default", named_after_stream: true },
+      ],
+    } as any);
+    service.ownershipStats.mockResolvedValue({
+      data: {
+        total: 2,
+        rules: [
+          { rule_id: "r1", dimensions: { service: "inventory-service" }, health: "active" },
+          { rule_id: "r2", dimensions: { service: "checkout" }, health: "active" },
+        ],
+      },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(
+      list(wrapper)
+        .props("services")
+        .map((one: any) => one.name),
+    ).toEqual(["checkout", "inventory-service"]);
   });
 
   /// The catch-all is a row of the same list now, so the nomination has to
@@ -221,6 +249,18 @@ describe("OnCallOwnership", () => {
     });
     expect(service.createOwnershipRule).not.toHaveBeenCalled();
     expect(service.deleteOwnershipRule).not.toHaveBeenCalled();
+  });
+
+  it("asks to remove a rule with a destructive confirm button", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    list(wrapper).vm.$emit("remove", { rule_id: "r9" });
+    await wrapper.vm.$nextTick();
+    const dialog = wrapper.findAllComponents({ name: "ConfirmDialog" })[0];
+
+    expect(dialog.props("modelValue")).toBe(true);
+    expect(dialog.props("okVariant")).toBe("destructive");
   });
 
   it("deletes a rule by its rule id once confirmed", async () => {

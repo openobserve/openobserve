@@ -129,6 +129,9 @@ describe("SlackLinkedPeople", () => {
     await flushPromises();
     await w.find('[data-test="slack-people-unlink-link-1"]').trigger("click");
     expect(w.find('[data-test-stub="confirm-title"]').text()).toContain("dana@acme.example");
+    const confirmDialog = w.find('[data-test-stub="confirm-dialog"]');
+    expect(confirmDialog.attributes("message-keypath")).toBe("slackApp.people.unlinkMessage");
+    expect(confirmDialog.attributes("message-name")).toBe("dana@acme.example");
     await w.find('[data-test-stub="confirm-ok"]').trigger("click");
     await flushPromises();
     expect(slack.deleteLink).toHaveBeenCalledWith("acme", "link-1");

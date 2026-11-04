@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="email"
           :loading="loading"
           :forbidden="forbidden"
+          forbidden-resource="service_accounts"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -287,9 +288,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="service-accounts-list-delete-dialog"
       v-model="confirmDelete"
       :title="t('serviceAccounts.confirmDeleteHead')"
-      :message="t('serviceAccounts.confirmDeleteMsg', { identifier: deleteUserEmailIdentifier })"
+      message-keypath="serviceAccounts.confirmDeleteMsg"
+      :message-name="deleteUserEmailIdentifier"
       :ok-label="t('serviceAccounts.confirmDeleteBtn')"
-      ok-color="destructive"
+      ok-variant="destructive"
       @update:ok="deleteUser"
       @update:cancel="confirmDelete = false"
     />
@@ -300,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('serviceAccounts.confirmBulkDeleteHead')"
       :message="t('serviceAccounts.confirmBulkDeleteMsg', { count: selectedAccounts.length })"
       :ok-label="t('serviceAccounts.confirmBulkDeleteBtn', { count: selectedAccounts.length })"
-      ok-color="destructive"
+      ok-variant="destructive"
       @update:ok="bulkDeleteServiceAccounts"
       @update:cancel="confirmBulkDelete = false"
     />
@@ -555,7 +557,6 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
-import config from "@/aws-exports";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import AddServiceAccount from "./AddServiceAccount.vue";
@@ -677,8 +678,9 @@ export default defineComponent({
     // OpenObserve authenticates API requests with HTTP Basic auth —
     // base64("<identifier>:<token>"), NOT a Bearer token. The service account's
     // email is the username and the token is the password.
+    // The host the UI's own API calls use; Cloud regions accept the account only there (e.g. us2.openobserve.ai).
     const tokenEndpoint = computed(() =>
-      config.isCloud === "true" ? "https://api.openobserve.ai" : window.location.origin,
+      new URL(store.state.API_ENDPOINT || "/", window.location.origin).href.replace(/\/$/, ""),
     );
 
     const tokenBasicCredential = computed(() =>
@@ -1193,7 +1195,7 @@ export default defineComponent({
         confirmBulkDelete.value = false;
         await getServiceAccountsUsers(true);
       } catch (err: any) {
-        if (err.response?.status != 403 || err?.status != 403) {
+        if (err.response?.status !== 403 && err?.status !== 403) {
           toast({
             message:
               err?.response?.data?.message ||
@@ -1277,7 +1279,6 @@ export default defineComponent({
       t,
       router,
       store,
-      config,
       serviceAccountsState,
       columns,
       loading,

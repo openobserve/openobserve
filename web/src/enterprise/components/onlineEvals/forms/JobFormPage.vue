@@ -7,7 +7,7 @@
     <OPageLayout
       :back="{
         label: t('onlineEvals.job.backTo'),
-        onClick: () => $emit('cancel'),
+        onClick: cancel,
         dataTest: 'job-form-back-btn',
       }"
       bleed
@@ -274,7 +274,7 @@
           variant="outline"
           size="sm-action"
           :disabled="isSubmitting"
-          @click="$emit('cancel')"
+          @click="cancel"
         >
           {{ t("onlineEvals.buttons.cancel") }}
         </OButton>
@@ -318,11 +318,12 @@
         </OButton>
       </footer>
     </OPageLayout>
+    <EditorDraftDialogs :draft="jobDraft" />
   </OForm>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -333,11 +334,9 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
-import onlineEvalsService, {
-  type EvalJob,
-  type Scorer,
-  type SpanSelector,
-} from "@/services/online-evals.service";
+import { type EvalJob, type Scorer, type SpanSelector } from "@/services/online-evals.service";
+import { saveEvalJobMutation, setJobActiveMutation } from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import {
   entityId,
   samplingModeOf,
@@ -348,6 +347,7 @@ import {
   valueOf,
 } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
+import { leavesEvalForm } from "../utils/routeSync";
 import { parseSamplingRate, samplingRateForForm, samplingRatePercent } from "../utils/jobSampling";
 import {
   buildJobFilterConditionPayload,
@@ -380,6 +380,9 @@ import JobFilterBuilder from "./job/JobFilterBuilder.vue";
 import JobInputMapping from "./job/JobInputMapping.vue";
 import JobPreviewPanel from "./job/JobPreviewPanel.vue";
 import { makeJobFormSchema, type JobForm } from "./JobFormPage.schema";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import type { V2Group } from "@/utils/alerts/alertDataTransforms";
 
 const props = defineProps<{
   orgId: string;
@@ -391,9 +394,13 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "saved"): void;
   (e: "cancel"): void;
+  /** Saved from the leave dialog: the list reloads while the pending navigation closes the form. */
+  (e: "persisted"): void;
 }>();
 
 const { t } = useI18nTyped();
+const saveJob = useMutation(() => saveEvalJobMutation(props.orgId));
+const setJobActive = useMutation(() => setJobActiveMutation(props.orgId));
 
 // Co-located Zod schema (factory keeps messages i18n-driven). The form is
 // mounted fresh per create/edit action, so building it once is safe.
@@ -607,9 +614,10 @@ async function loadStreamFields() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   void loadTraceStreams();
   void loadStreamFields();
+  await jobDraft.start();
 });
 
 const samplingModeOptions = computed(() => [
@@ -626,7 +634,7 @@ const targetScopeOptions = computed(() => [
 watch(
   () => formValues.value.targetScope,
   (targetScope, previousScope) => {
-    if (targetScope === previousScope) return;
+    if (targetScope === previousScope || applyingDraft) return;
     if (targetScope !== "trace") {
       spanSelectors.value = [];
       spanSelectorBindings.value = {};
@@ -735,6 +743,85 @@ function initScorerVersions(row: EvalJob | null) {
   );
 }
 
+interface JobDraft {
+  values: JobForm;
+  endSignalGroup: V2Group;
+  inputMappings: Record<string, Record<string, string>>;
+  spanSelectors: SpanSelector[];
+  spanSelectorBindings: Record<string, string>;
+  scorerVersions: Record<string, number | null>;
+}
+
+// Set while a continued draft lands, so the scope watcher does not reset its completion window and selectors.
+let applyingDraft = false;
+// Set while the leave dialog's Save runs, so a successful save neither closes the form nor reloads the page.
+let leaveSave: { saved: boolean } | null = null;
+
+// Run state, health and timestamps change on their own; only what the form edits is hashed.
+const RUN_STATE_KEYS = new Set([
+  "status",
+  "version",
+  "health",
+  "pipelineId",
+  "pipeline_id",
+  "createdAt",
+  "created_at",
+  "updatedAt",
+  "updated_at",
+]);
+
+function jobDefinition(row: EvalJob | null) {
+  if (!row) return null;
+  return Object.fromEntries(Object.entries(row).filter(([key]) => !RUN_STATE_KEYS.has(key)));
+}
+
+const jobDraft = useEditorDraft<JobDraft>({
+  kind: "eval_job",
+  entityLabel: () => t("common.editorDraft.entities.eval_job"),
+  // "Draft" already names a job that has never been activated.
+  serverDraftItem: true,
+  entityId: () => (props.mode === "edit" ? (props.row?.id ?? null) : null),
+  snapshot: () => ({
+    values: { ...formValues.value, scorerIds: [...formValues.value.scorerIds] },
+    endSignalGroup: endSignalGroup.value,
+    inputMappings: inputMappings.value,
+    spanSelectors: spanSelectors.value,
+    spanSelectorBindings: spanSelectorBindings.value,
+    scorerVersions: scorerVersions.value,
+  }),
+  apply: async (data) => {
+    applyingDraft = true;
+    try {
+      form.reset({ ...initForm(null), ...data.values });
+      endSignalGroup.value = data.endSignalGroup;
+      inputMappings.value = data.inputMappings;
+      spanSelectors.value = data.spanSelectors;
+      spanSelectorBindings.value = data.spanSelectorBindings;
+      scorerVersions.value = data.scorerVersions;
+      await nextTick();
+    } finally {
+      applyingDraft = false;
+    }
+  },
+  base: () => (props.mode === "edit" ? jobDefinition(props.row) : undefined),
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    activateOnSave.value = false;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  leaveOnRouteUpdate: leavesEvalForm,
+});
+
+async function cancel() {
+  if (await jobDraft.confirmLeave()) emit("cancel");
+}
+
 function syncMappings() {
   const { nextMappings, nextVersions } = syncJobInputMappings(
     formValues.value.scorerIds,
@@ -813,14 +900,14 @@ async function onSubmit(value: JobForm) {
     };
 
     if (props.mode === "edit" && props.row) {
-      await onlineEvalsService.jobs.update(props.orgId, props.row.id, payload);
+      await saveJob.mutateAsync({ id: props.row.id, payload });
       // Promote a draft to active when the user chose Save & Activate. Only
       // drafts surface that button (showActivateChoice), so activateAfter can
       // only be true for a draft here; the isDraft guard is defensive and
       // matches the template (a missing status is treated as draft).
       if (activateAfter && isDraft.value) {
         try {
-          await onlineEvalsService.jobs.activate(props.orgId, props.row.id);
+          await setJobActive.mutateAsync({ id: props.row.id, active: true });
           toast({
             variant: "success",
             message: t("onlineEvals.job.savedAndActivated"),
@@ -839,10 +926,10 @@ async function onSubmit(value: JobForm) {
         });
       }
     } else {
-      const created = await onlineEvalsService.jobs.create(props.orgId, payload);
+      const created = await saveJob.mutateAsync({ payload });
       if (activateAfter && created?.id) {
         try {
-          await onlineEvalsService.jobs.activate(props.orgId, created.id);
+          await setJobActive.mutateAsync({ id: created.id, active: true });
           toast({
             variant: "success",
             message: t("onlineEvals.job.createdAndActivated"),
@@ -861,6 +948,12 @@ async function onSubmit(value: JobForm) {
         });
       }
     }
+    if (leaveSave) {
+      leaveSave.saved = true;
+      emit("persisted");
+      return;
+    }
+    jobDraft.markSaved();
     emit("saved");
   } catch (err: any) {
     showError(err, t("onlineEvals.job.saveError"));

@@ -20,6 +20,7 @@ import { useMutation } from "@tanstack/vue-query";
 import { useRoute, useRouter } from "vue-router";
 import SlackLinkCard from "@/components/slack/SlackLinkCard.vue";
 import { useSlackLinkOrg } from "@/composables/slack/useSlackLinkOrg";
+import { ensureBrowserRum } from "@/utils/rum/ensureBrowserRum";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { IllustrationName } from "@/lib/core/EmptyState/illustrations";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -128,6 +129,7 @@ const openSettings = (): void => {
 };
 
 onMounted(() => {
+  whenResolved(() => void ensureBrowserRum(org.value));
   const error = queryString(route.query.error);
   const code = queryString(route.query.code);
   const state = queryString(route.query.state);

@@ -41,9 +41,12 @@ const hoisted = vi.hoisted(() => ({
   },
 }));
 
+const switchRoute = vi.hoisted(() => ({ query: {} as Record<string, string> }));
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), currentRoute: { value: switchRoute } }),
   useRoute: () => ({ params: {}, query: {} }),
+  onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 // Passthrough spy: real toasts still render, and specs can read what was raised.
@@ -318,6 +321,35 @@ describe("AddDestination - custom path schema gating + payload parity", () => {
 
     expect(form.state.isValid).toBe(false);
     expect(destinationService.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("AddDestination - refused save", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it.each([
+    ["create", undefined],
+    ["update", { name: "dest1", url: "https://example.com/webhook", method: "post", type: "http" }],
+  ])("closes its loading toast when a %s is refused with a 403", async (op, destination) => {
+    const dismissLoading = vi.fn();
+    vi.mocked(toast).mockReturnValueOnce(dismissLoading);
+    const service = destinationService as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    service[op].mockRejectedValueOnce({ response: { status: 403 } });
+    wrapper = mountComp({ isAlerts: true, ...(destination ? { destination } : {}) });
+    await flushPromises();
+    const form = destination ? getForm(wrapper) : await toCustomHttp(wrapper);
+    form.setFieldValue("name", "dest1");
+    form.setFieldValue("url", "https://example.com/webhook");
+    form.setFieldValue("method", "post");
+    form.setFieldValue("template", "tmpl1");
+    await nextTick();
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(service[op]).toHaveBeenCalledTimes(1);
+    expect(dismissLoading).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).toEqual(["loading"]);
   });
 });
 
@@ -710,11 +742,11 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
       url: VALID_SLACK,
       type: "http",
       method: "post",
+      destination_type_name: "slack",
       template: "prebuilt_slack",
       skip_tls_verify: false,
       headers: {},
-      // prebuilt_type drives type resolution (Priority 1); credential_* metadata
-      // + the url are restored by extractPrebuiltCredentials.
+      // credential_* metadata and the url refill the form.
       metadata: {
         prebuilt_type: "slack",
         credential_channel: "#ops",
@@ -760,12 +792,74 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
     expect(hoisted.mockCreatePrebuilt).not.toHaveBeenCalled();
   });
 
+  it("EDIT mode: a custom webhook to a ServiceNow URL stays custom and keeps its token header", async () => {
+    const headers = { Authorization: "Bearer tok" };
+    const customServiceNow: any = {
+      name: "snow-token",
+      url: "https://acme.service-now.com/api/now/table/incident",
+      type: "http",
+      method: "post",
+      template: "prebuilt_servicenow",
+      skip_tls_verify: false,
+      headers,
+      metadata: {},
+    };
+    wrapper = mountComp({ isAlerts: true, destination: customServiceNow });
+    await flushPromises();
+    const form = getForm(wrapper);
+
+    expect(form.state.values.destination_type).toBe("custom");
+    expect(form.state.values.apiHeaders).toEqual([{ key: "Authorization", value: "Bearer tok" }]);
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(hoisted.mockUpdatePrebuilt).not.toHaveBeenCalled();
+    expect((destinationService.update as any).mock.calls[0][0].data.headers).toEqual(headers);
+  });
+
+  it.each([
+    [
+      "email",
+      // The server does not store metadata for email, so the template is its only marker.
+      {
+        name: "ops-mail",
+        type: "email",
+        emails: ["ops@acme.co"],
+        template: "prebuilt_email",
+        metadata: {},
+      },
+    ],
+    [
+      "pagerduty",
+      {
+        name: "pd-api",
+        type: "http",
+        method: "post",
+        url: "https://events.pagerduty.com/v2/enqueue",
+        destination_type_name: "pagerduty",
+        skip_tls_verify: false,
+        headers: {},
+        metadata: {},
+      },
+    ],
+  ])(
+    "EDIT mode: a %s destination the server treats as prebuilt opens as prebuilt",
+    async (type, destination: any) => {
+      wrapper = mountComp({ isAlerts: true, destination });
+      await flushPromises();
+
+      expect(getForm(wrapper).state.values.destination_type).toBe(type);
+    },
+  );
+
   it("restores PagerDuty severity from its substitution metadata on edit", async () => {
     const existingPagerDuty = {
       name: "pagerduty-alerts",
       url: "https://events.pagerduty.com/v2/enqueue",
       type: "http",
       method: "post",
+      destination_type_name: "pagerduty",
       template: "prebuilt_pagerduty",
       skip_tls_verify: false,
       headers: {},
@@ -782,6 +876,27 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
     const credentials = getForm(wrapper).state.values.credentials;
     expect(credentials.integrationKey).toBe("x".repeat(32));
     expect(credentials.severity).toBe("critical");
+  });
+
+  it.each([
+    ["https://events.eu.pagerduty.com/v2/enqueue", true],
+    ["https://events.pagerduty.com/v2/enqueue", false],
+  ])("restores the PagerDuty EU region toggle from the saved URL %s", async (url, euRegion) => {
+    const existingPagerDuty = {
+      name: "pagerduty-alerts",
+      url,
+      type: "http",
+      method: "post",
+      destination_type_name: "pagerduty",
+      template: "prebuilt_pagerduty",
+      skip_tls_verify: false,
+      headers: {},
+      metadata: { prebuilt_type: "pagerduty", routing_key: "x".repeat(32), severity: "critical" },
+    };
+    wrapper = mountComp({ isAlerts: true, destination: existingPagerDuty });
+    await flushPromises();
+
+    expect(getForm(wrapper).state.values.credentials.euRegion).toBe(euRegion);
   });
 
   // The DOM wiring that makes Enter-in-any-field AND the footer Save submit the
@@ -1061,6 +1176,7 @@ describe("AddDestination - Slack setup flow", () => {
       url: VALID_SLACK,
       type: "http",
       method: "post",
+      destination_type_name: "slack",
       template: "prebuilt_slack",
       skip_tls_verify: false,
       headers: {},
@@ -1094,6 +1210,7 @@ describe("AddDestination - Slack setup flow", () => {
       url: VALID_SLACK,
       type: "http",
       method: "post",
+      destination_type_name: "slack",
       template: "prebuilt_slack",
       skip_tls_verify: false,
       headers: {},
@@ -1115,6 +1232,7 @@ describe("AddDestination - Slack setup flow", () => {
       url: VALID_SLACK,
       type: "http",
       method: "post",
+      destination_type_name: "slack",
       template: "prebuilt_slack",
       skip_tls_verify: false,
       headers: {},
@@ -1159,6 +1277,7 @@ describe("AddDestination - Slack setup flow", () => {
       url: VALID_SLACK,
       type: "http",
       method: "post",
+      destination_type_name: "slack",
       template: "prebuilt_slack",
       skip_tls_verify: false,
       headers: {},
@@ -1198,6 +1317,7 @@ describe("AddDestination - Slack setup flow", () => {
       url: VALID_SLACK,
       type: "http",
       method: "post",
+      destination_type_name: "slack",
       template: "prebuilt_slack",
       skip_tls_verify: false,
       headers: {},
@@ -1368,6 +1488,162 @@ describe("AddDestination — email recipients are org users", () => {
   });
 });
 
+describe("AddDestination - Slack app type (MK-7)", () => {
+  const SlackAppFormStub = {
+    name: "SlackAppDestinationForm",
+    props: ["destination", "templates"],
+    emits: ["saved", "cancel"],
+    template: '<div data-test="slack-app-form-stub"></div>',
+  };
+  const zo = (store.state as any).zoConfig;
+  let slackWas: unknown;
+
+  const mountWithForm = (props: Record<string, any> = {}) =>
+    mount(AddDestination, {
+      props: { templates: [], destination: null, isAlerts: true, ...props },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          SlackAppDestinationForm: SlackAppFormStub,
+          SlackAppSwitchBanner: true,
+          PrebuiltDestinationSelector: {
+            name: "PrebuiltDestinationSelector",
+            template: '<div data-test="prebuilt-destination-selector-stub"></div>',
+            props: ["modelValue", "searchQuery", "slackApp", "unavailableReason", "canManageSlack"],
+            emits: ["update:modelValue", "select", "update:searchQuery"],
+          },
+          AddUser: true,
+          DestinationPreview: true,
+          AppTabs: true,
+        },
+      },
+    });
+
+  beforeEach(() => {
+    slackWas = zo.slack_enabled;
+    zo.slack_enabled = true;
+    config.isEnterprise = "true";
+  });
+  afterEach(() => {
+    zo.slack_enabled = slackWas;
+  });
+
+  it("offers the Slack app tile only while Slack is on", async () => {
+    wrapper = mountWithForm();
+    const picker = wrapper.findComponent({ name: "PrebuiltDestinationSelector" });
+    expect(picker.props("slackApp")).toBe(true);
+    wrapper.unmount();
+    zo.slack_enabled = false;
+    wrapper = mountWithForm();
+    expect(wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).props("slackApp")).toBe(
+      false,
+    );
+  });
+
+  it("passes the picker why the Slack app is off", async () => {
+    const reasonWas = zo.slack_disabled_reason;
+    try {
+      zo.slack_enabled = false;
+      for (const reason of ["flag", "master_key", "super_cluster"]) {
+        zo.slack_disabled_reason = reason;
+        wrapper = mountWithForm();
+        const picker = wrapper.findComponent({ name: "PrebuiltDestinationSelector" });
+        expect(picker.props("unavailableReason")).toBe(reason);
+        wrapper.unmount();
+      }
+      config.isEnterprise = "false";
+      zo.slack_disabled_reason = "flag";
+      wrapper = mountWithForm();
+      expect(
+        wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).props("unavailableReason"),
+      ).toBe("edition");
+    } finally {
+      zo.slack_disabled_reason = reasonWas;
+    }
+  });
+
+  it("tells the picker whether the user is an org admin who can turn Slack on", async () => {
+    const adminWas = zo.is_org_admin;
+    try {
+      zo.slack_enabled = false;
+      zo.is_org_admin = true;
+      wrapper = mountWithForm();
+      expect(
+        wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).props("canManageSlack"),
+      ).toBe(true);
+      wrapper.unmount();
+      zo.is_org_admin = false;
+      wrapper = mountWithForm();
+      expect(
+        wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).props("canManageSlack"),
+      ).toBe(false);
+    } finally {
+      zo.is_org_admin = adminWas;
+    }
+  });
+
+  it("swaps the webhook fields and footer for the Slack app form", async () => {
+    wrapper = mountWithForm();
+    wrapper.vm.selectDestinationType("slack_app");
+    await flushPromises();
+    expect(wrapper.find('[data-test="slack-app-form-stub"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-destination-submit-btn"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).exists()).toBe(true);
+  });
+
+  it("opens a refused switch in the prefilled Slack app form", async () => {
+    switchRoute.query = {
+      name: "alerts-test",
+      slack_app_installation: "inst-test",
+      slack_app_refusal: "shared_channel_unconfirmed",
+    };
+    try {
+      wrapper = mountWithForm({
+        destination: {
+          name: "alerts-test",
+          type: "http",
+          template: "prebuilt_slack",
+          url: "https://hooks.slack.com/services/T0000TEST/B0000TEST/secret",
+          metadata: { slack_channel_id: "C0000TEST", slack_team_id: "T0000TEST" },
+        },
+      });
+      await flushPromises();
+      const form = wrapper.findComponent({ name: "SlackAppDestinationForm" });
+      expect(form.exists()).toBe(true);
+      expect(form.props("destination")).toMatchObject({
+        name: "alerts-test",
+        type: "slack_app",
+        installation_id: "inst-test",
+        channel_id: "C0000TEST",
+        template: "prebuilt_slack",
+        previous_webhook: { url: "https://hooks.slack.com/services/T0000TEST/B0000TEST/secret" },
+      });
+    } finally {
+      switchRoute.query = {};
+    }
+  });
+
+  it("edits a Slack app destination with the same form, and closes once it saved", async () => {
+    const destination = {
+      name: "sre-prod-slack",
+      type: "slack_app",
+      template: "prebuilt_slack",
+      installation_id: "inst-1",
+      channel_id: "C9",
+      channel_name: "sre-prod",
+    };
+    wrapper = mountWithForm({ destination });
+    await flushPromises();
+    const form = wrapper.findComponent({ name: "SlackAppDestinationForm" });
+    expect(form.props("destination")).toMatchObject({ name: "sre-prod-slack" });
+    expect(wrapper.findComponent({ name: "PrebuiltDestinationSelector" }).exists()).toBe(false);
+    form.vm.$emit("saved");
+    await flushPromises();
+    expect(wrapper.emitted("get:destinations")).toHaveLength(1);
+    expect(wrapper.emitted("cancel:hideform")).toHaveLength(1);
+  });
+});
+
 describe("AddDestination — email destinations", () => {
   const TEMPLATES = [
     { name: "email_tpl", type: "email", body: "" },
@@ -1422,6 +1698,46 @@ describe("AddDestination — email destinations", () => {
     expect(wrapper.find('[data-test="prebuilt-additional-settings"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
       true,
+    );
+  });
+
+  it("keeps Save hidden for Jira until the create screen has loaded", async () => {
+    wrapper = mountComp();
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "jira");
+    form.setFieldValue("type", "http");
+    form.setFieldValue("credentials", {
+      deployment: "cloud",
+      connectedAs: "Alerts Bot",
+      projectKey: "OPS",
+      issueTypeId: "10004",
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="add-destination-submit-btn"]').exists()).toBe(false);
+  });
+
+  it("hides Additional Settings for Jira once it is ready to save", async () => {
+    wrapper = mountComp();
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "jira");
+    form.setFieldValue("type", "http");
+    form.setFieldValue("credentials", {
+      deployment: "cloud",
+      connectedAs: "Alerts Bot",
+      projectKey: "OPS",
+      issueTypeId: "10004",
+      createMeta: {
+        projectName: "Operations",
+        issueTypeName: "Bug",
+        hasLabels: true,
+        requiredFields: [],
+      },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="add-destination-submit-btn"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="prebuilt-additional-settings"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
+      false,
     );
   });
 

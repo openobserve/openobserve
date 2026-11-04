@@ -491,12 +491,12 @@ const wrapperClasses = computed(() => [
         :id="errorId"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         :data-test-error-text="effectiveError"
-        class="text-input-error-text text-xs leading-none"
+        class="text-input-error-text text-xs leading-snug"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span v-else-if="helpText" class="text-input-hint text-xs leading-none">
+      <span v-else-if="helpText" class="text-input-hint text-xs leading-snug">
         {{ helpText }}
       </span>
       <span v-else class="flex-1" />

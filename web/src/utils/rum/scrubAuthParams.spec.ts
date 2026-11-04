@@ -41,6 +41,38 @@ describe("scrubAuthParams", () => {
     expect(scrubAuthParams(undefined)).toBeUndefined();
   });
 
+  it("redacts a public dashboard slug in the page URL and keeps its query and hash", () => {
+    expect(
+      scrubAuthParams("https://cloud.openobserve.ai/web/public/dashboards/Zx9_kQ-12ab?tz=UTC#top"),
+    ).toBe("https://cloud.openobserve.ai/web/public/dashboards/redacted?tz=UTC#top");
+    expect(scrubAuthParams("/web/public/dashboards/Zx9_kQ-12ab")).toBe(
+      "/web/public/dashboards/redacted",
+    );
+  });
+
+  it("redacts a public dashboard slug in its API URLs, under any base path", () => {
+    expect(scrubAuthParams("https://o2.example.com/api/public_dashboards/Zx9_kQ-12ab")).toBe(
+      "https://o2.example.com/api/public_dashboards/redacted",
+    );
+    expect(scrubAuthParams("/o2/api/public_dashboards/Zx9_kQ-12ab/data?key=r3600&rev=a1")).toBe(
+      "/o2/api/public_dashboards/redacted/data?key=r3600&rev=a1",
+    );
+  });
+
+  it("redacts a slug inside a network error message", () => {
+    expect(
+      scrubAuthParams("XHR error GET https://o2.example.com/api/public_dashboards/Zx9/data"),
+    ).toBe("XHR error GET https://o2.example.com/api/public_dashboards/redacted/data");
+  });
+
+  it("leaves the signed-in public link admin APIs alone", () => {
+    const url = "/api/default/public_dashboards/status?ids=a,b";
+    expect(scrubAuthParams(url)).toBe(url);
+    expect(scrubAuthParams("/web/dashboards/public-links?org_identifier=default")).toBe(
+      "/web/dashboards/public-links?org_identifier=default",
+    );
+  });
+
   it("does not touch parameters that merely contain the token names", () => {
     const url = "/web/tokens?id_token_name=prod&use_code=true";
     expect(scrubAuthParams(url)).toBe(url);

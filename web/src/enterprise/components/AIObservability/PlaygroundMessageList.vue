@@ -175,7 +175,7 @@
     <!-- One control, not one per role: the common case is continuing the
          conversation, and the role that continues it is derivable. The chevron
          is there for the times it is not. -->
-    <div class="inline-flex items-stretch self-start">
+    <div class="inline-flex items-stretch self-start [&_button:focus-visible]:z-1">
       <OButton
         variant="outline"
         size="xs"

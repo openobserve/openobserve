@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use config::meta::{
     dashboards::{
         Dashboard, ListDashboardsParams, v1::Dashboard as DashboardV1,
@@ -24,8 +26,8 @@ use config::meta::{
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
-    IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
-    TransactionTrait, TryIntoModel, prelude::Expr, sea_query::Func,
+    IntoActiveModel, JoinType, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
+    RelationTrait, Set, TransactionTrait, TryIntoModel, prelude::Expr, sea_query::Func,
 };
 use serde_json::Value as JsonValue;
 use svix_ksuid::KsuidLike;
@@ -148,6 +150,18 @@ pub async fn get_by_id(
     Ok(Some((folder, dash)))
 }
 
+/// [`get_by_id`] from the primary, for a build that must see the latest saved dashboard.
+pub async fn get_by_id_primary(
+    org_id: &str,
+    dashboard_id: &str,
+) -> Result<Option<(Folder, Dashboard)>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let Some((folder_m, dash_m)) = get_model_by_id(client, org_id, dashboard_id).await? else {
+        return Ok(None);
+    };
+    Ok(Some((folder_m.into(), dash_m.try_into()?)))
+}
+
 /// Lists dashboards.
 pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
     let client = get_orm_client_ro().await;
@@ -161,6 +175,50 @@ pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard
         })
         .collect::<Result<_, errors::Error>>()?;
     Ok(dashboards)
+}
+
+/// A dashboard's title and its current folder, as listed next to its public links.
+#[derive(Clone, Debug)]
+pub struct DashboardLabel {
+    pub title: String,
+    pub folder_id: String,
+    pub folder_name: String,
+}
+
+/// Title and folder for each given dashboard in one query; deleted ones are absent from the map.
+pub async fn labels_by_ids(
+    org_id: &str,
+    dashboard_ids: &[String],
+) -> Result<HashMap<String, DashboardLabel>, errors::Error> {
+    if dashboard_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let client = get_orm_client_ro().await;
+    let rows: Vec<(String, String, String, String)> = dashboards::Entity::find()
+        .select_only()
+        .column(dashboards::Column::DashboardId)
+        .column(dashboards::Column::Title)
+        .column(folders::Column::FolderId)
+        .column(folders::Column::Name)
+        .join(JoinType::InnerJoin, dashboards::Relation::Folders.def())
+        .filter(folders::Column::Org.eq(org_id))
+        .filter(dashboards::Column::DashboardId.is_in(dashboard_ids.iter().cloned()))
+        .into_tuple()
+        .all(client)
+        .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, title, folder_id, folder_name)| {
+            (
+                id,
+                DashboardLabel {
+                    title,
+                    folder_id,
+                    folder_name,
+                },
+            )
+        })
+        .collect())
 }
 
 pub async fn list_ids_by_org(org_id: &str) -> Result<Vec<(String, String)>, errors::Error> {
@@ -650,6 +708,20 @@ mod tests {
         // data is null, not an object — injection is skipped, deserialization must fail
         let model = make_model(1, serde_json::Value::Null);
         assert!(Dashboard::try_from(model).is_err());
+    }
+
+    #[test]
+    fn default_refresh_interval_survives_db_save_and_load() {
+        let inner: DashboardV8 = serde_json::from_value(serde_json::json!({
+            "version": 8,
+            "title": "My Dashboard",
+            "description": "",
+            "defaultRefreshInterval": 30
+        }))
+        .unwrap();
+        let data = inner_data_as_json(inner.into()).unwrap();
+        let loaded = Dashboard::try_from(make_model(8, data)).unwrap();
+        assert_eq!(loaded.v8.unwrap().default_refresh_interval, Some(30));
     }
 
     #[test]

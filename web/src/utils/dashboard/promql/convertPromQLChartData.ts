@@ -13,10 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { unref, type MaybeRef } from "vue";
 import { gt } from "@/types/i18n";
+import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
+import { CHART_SELECTION_FILL } from "@/utils/chartTheme";
 
-import { PromQLResponse, ConversionContext, PromQLChartConverter } from "./shared/types";
-import { processPromQLData } from "./shared/dataProcessor";
+import {
+  PromQLResponse,
+  ConversionContext,
+  PromQLChartConverter,
+  ProcessedPromQLData,
+} from "./shared/types";
+import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
+import { addCommasToNumber } from "@/utils/formatters";
+import { getPromqlSeriesLimit, processPromQLData } from "./shared/dataProcessor";
 import { TimeSeriesConverter } from "./convertPromQLTimeSeriesChart";
 import { PieConverter } from "./convertPromQLPieChart";
 import { TableConverter } from "./convertPromQLTableChart";
@@ -27,6 +37,8 @@ import { BarConverter } from "./convertPromQLBarChart";
 import { GeoConverter } from "./convertPromQLGeoChart";
 import { MapsConverter } from "./convertPromQLMapsChart";
 import { applyLegendConfiguration } from "../legendConfiguration";
+
+type AnnotationList = NonNullable<Parameters<typeof getAnnotationsData>[0]>["value"];
 
 /**
  * Registry of all chart type converters
@@ -101,6 +113,14 @@ export async function convertPromQLChartData(
     legends: [],
     hoveredSeriesState: hoveredSeriesState || null,
   };
+  const seriesLimit = getSeriesLimit(searchQueryData, processedData, context);
+  if (seriesLimit) {
+    extras.seriesLimit = seriesLimit;
+    extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarningCounts", {
+      shown: addCommasToNumber(seriesLimit.shown),
+      total: addCommasToNumber(seriesLimit.total),
+    });
+  }
 
   // Step 4: Delegate to chart-specific converter
   // Each converter knows how to transform data for its chart type(s)
@@ -134,9 +154,9 @@ export async function convertPromQLChartData(
   }
 
   // Step 7: Apply annotations (if applicable)
-  // Annotations are mark lines/areas that overlay on the chart
-  if (annotations?.length && chartConfig.series) {
-    applyAnnotations(options, annotations);
+  // Stacked is the only modular chart whose x categories are the step timestamps.
+  if (chartType === "stacked" && options.series?.length) {
+    applyAnnotations(options, annotations, processedData[0]?.timestamps ?? [], store);
   }
 
   // Step 8: Handle empty data case
@@ -159,73 +179,102 @@ export async function convertPromQLChartData(
   return { options, extras };
 }
 
-/**
- * Apply mark lines/areas for annotations
- *
- * Annotations allow users to highlight specific values or time ranges on charts.
- * This function converts annotation data into ECharts mark line/area configurations.
- *
- * @param options - Chart options to modify
- * @param annotations - Array of annotation configurations
- */
-function applyAnnotations(options: any, annotations: any[]): void {
-  if (!Array.isArray(options.series)) return;
+/** Count the current-period series dropped by the panel cap or by the streaming loader. */
+function getSeriesLimit(
+  searchQueryData: PromQLResponse[],
+  processedData: ProcessedPromQLData[],
+  context: ConversionContext,
+): SeriesLimitInfo | null {
+  // A histogram heatmap reports its cut in whole histograms, not bucket series.
+  if (processedData.some((queryData) => queryData.histogramsLimited)) return null;
+  const isPrimary = (index: number) => !context.nameSuffixes?.[index];
+  const resultOf = (queryData: PromQLResponse) => queryData?.data?.result || queryData?.result;
+  const primaryResults = searchQueryData.filter(
+    (queryData, index) => isPrimary(index) && resultOf(queryData)?.length,
+  );
+  const received = primaryResults.reduce(
+    (count, queryData) => count + (resultOf(queryData)?.length ?? 0),
+    0,
+  );
+  const shown = processedData.reduce(
+    (count, queryData) =>
+      queryData.seriesRole === "shifted" ? count : count + queryData.series.length,
+    0,
+  );
+  const streamed = context.metadata?.seriesLimiting;
+  // Streaming stats are summed over every stream, so with a shifted period they no longer describe the current one.
+  const streamedDrop =
+    !!streamed &&
+    searchQueryData.every((_, index) => isPrimary(index)) &&
+    (streamed.uniqueSeriesSeen ?? streamed.metricsStored) > streamed.metricsStored;
+  const total = streamedDrop ? Math.max(received, streamed.uniqueSeriesSeen) : received;
+  if (total <= shown) return null;
+  const perQuery = Math.min(
+    getPromqlSeriesLimit(context.panelSchema.config, context.store),
+    streamed?.maxSeries ?? Infinity,
+  );
+  return { shown, total, cap: perQuery * Math.max(primaryResults.length, 1) };
+}
 
-  // Apply annotations to the first series
-  // (annotations typically apply to the entire chart, not individual series)
-  if (options.series[0]) {
-    const markLines: any[] = [];
-    const markAreas: any[] = [];
+/** Draw dashboard annotations on a category time axis, snapping each time to its nearest step. */
+function applyAnnotations(
+  options: { series?: unknown[] },
+  annotations: MaybeRef<AnnotationList | null>,
+  timestamps: Array<[number, Date | string]>,
+  store: { state: { timezone: string } },
+): void {
+  // The panel loader hands over a Ref; specs and other callers pass a plain array.
+  const list = unref(annotations);
+  if (!Array.isArray(list) || list.length === 0 || timestamps.length === 0) return;
 
-    annotations.forEach((annotation) => {
-      if (!annotation.show) return;
-
-      if (annotation.type === "line") {
-        markLines.push({
-          name: annotation.name,
-          xAxis: annotation.axis === "x" ? annotation.value : null,
-          yAxis: annotation.axis === "y" ? annotation.value : null,
-          label: {
-            show: annotation.show_label !== false,
-            formatter: annotation.name ? "{b}: {c}" : "{c}",
-            position: annotation.label_position || "insideEndTop",
-          },
-          lineStyle: {
-            color: annotation.color || "#FF0000",
-            type: annotation.line_style || "solid",
-            width: annotation.width || 2,
-          },
-        });
-      } else if (annotation.type === "area") {
-        markAreas.push([
-          {
-            name: annotation.name,
-            xAxis: annotation.axis === "x" ? annotation.start : null,
-            yAxis: annotation.axis === "y" ? annotation.start : null,
-          },
-          {
-            xAxis: annotation.axis === "x" ? annotation.end : null,
-            yAxis: annotation.axis === "y" ? annotation.end : null,
-            itemStyle: {
-              color: annotation.color || "rgba(255, 0, 0, 0.1)",
-            },
-          },
-        ]);
-      }
+  const first = timestamps[0][0];
+  const last = timestamps[timestamps.length - 1][0];
+  // Annotation times are microseconds; PromQL steps are seconds.
+  const nearestIndex = (seconds: number): number => {
+    let nearest = 0;
+    timestamps.forEach(([ts], index) => {
+      if (Math.abs(ts - seconds) < Math.abs(timestamps[nearest][0] - seconds)) nearest = index;
     });
+    return nearest;
+  };
+  const inRange = (seconds: number) =>
+    Number.isFinite(seconds) && seconds >= first && seconds <= last;
 
-    if (markLines.length > 0) {
-      options.series[0].markLine = {
-        ...options.series[0].markLine,
-        data: [...(options.series[0].markLine?.data || []), ...markLines],
-      };
-    }
+  const { markLines, markAreas } = getAnnotationsData({ value: list }, store.state.timezone);
+  const lines = markLines
+    .filter((line: any) => inRange(line.annotationDetails?.start_time / 1_000_000))
+    .map((line: any) => ({
+      ...line,
+      xAxis: nearestIndex(line.annotationDetails.start_time / 1_000_000),
+    }));
+  const areas = markAreas
+    .filter(([from]: any[]) => {
+      const start = from.annotationDetails?.start_time / 1_000_000;
+      const end = from.annotationDetails?.end_time / 1_000_000;
+      return Number.isFinite(start) && Number.isFinite(end) && end >= first && start <= last;
+    })
+    .map(([from, to]: any[]) => [
+      {
+        ...from,
+        xAxis: nearestIndex(Math.max(from.annotationDetails.start_time / 1_000_000, first)),
+      },
+      { ...to, xAxis: nearestIndex(Math.min(from.annotationDetails.end_time / 1_000_000, last)) },
+    ]);
+  if (lines.length === 0 && areas.length === 0) return;
 
-    if (markAreas.length > 0) {
-      options.series[0].markArea = {
-        ...options.series[0].markArea,
-        data: markAreas,
-      };
-    }
-  }
+  options.series?.push({
+    type: "line",
+    data: [],
+    markLine: {
+      itemStyle: { color: "rgba(108, 122, 125, 1)" },
+      silent: false,
+      animation: false,
+      data: lines,
+    },
+    markArea: {
+      itemStyle: { color: CHART_SELECTION_FILL },
+      data: areas,
+    },
+    zlevel: 2,
+  });
 }

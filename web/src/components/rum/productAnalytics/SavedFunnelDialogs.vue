@@ -328,8 +328,10 @@ const reloadConflict = () => {
 const remove = async (f: SavedFunnel): Promise<boolean> => {
   const ok = await confirm({
     title: t("rum.analytics.saved.deleteTitle"),
-    message: t("rum.analytics.saved.deleteMessage", { name: raw(f.name) }),
+    messageKeypath: "rum.analytics.saved.deleteMessage",
+    messageName: f.name,
     confirmLabel: t("rum.analytics.saved.delete"),
+    confirmVariant: "destructive",
   });
   if (!ok) return false;
   try {
@@ -348,6 +350,7 @@ const removeMany = async (rows: readonly SavedFunnel[]): Promise<string[]> => {
     title: t("rum.analytics.saved.bulkDeleteTitle"),
     message: t("rum.analytics.saved.bulkDeleteMessage", { count: rows.length }, rows.length),
     confirmLabel: t("rum.analytics.saved.delete"),
+    confirmVariant: "destructive",
   });
   if (!ok) return [];
   const gone = await sf.removeMany(

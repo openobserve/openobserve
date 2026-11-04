@@ -21,7 +21,8 @@ use config::meta::alerts::{
     incidents::IncidentEvent,
     rca_runs::{
         RcaRun, RcaRunItem, RcaSummary, ReportFormat, RunError, RunMode, RunState, RunStats,
-        RunSubjectType, RunSummaryFields, RunTrigger, is_live_blocking, is_stale, next_previous,
+        RunSubjectType, RunSummaryFields, RunTrigger, is_live_blocking, is_stale, is_v1_run_id,
+        next_previous,
     },
     rca_steering::SteerRecord,
 };
@@ -142,6 +143,7 @@ pub struct RunUpdate {
 pub struct RunSummaryPatch {
     pub steps: Option<u32>,
     pub tool_calls: Option<u32>,
+    pub reusable_steps: Option<u32>,
     pub detail: Option<Option<String>>,
     pub cancelled_by: Option<String>,
     pub unblocked_by: Option<String>,
@@ -583,6 +585,9 @@ fn merge_summary(mut summary: RunSummaryFields, upd: &RunUpdate) -> RunSummaryFi
         if let Some(tool_calls) = p.tool_calls {
             summary.tool_calls = tool_calls;
         }
+        if p.reusable_steps.is_some() {
+            summary.reusable_steps = p.reusable_steps;
+        }
         if let Some(detail) = p.detail.as_ref() {
             summary.detail = detail.clone();
         }
@@ -869,6 +874,9 @@ async fn final_stats_with<C: TransactionTrait>(
             if let Some(tool_calls) = p.tool_calls {
                 summary.tool_calls = tool_calls;
             }
+            if p.reusable_steps.is_some() {
+                summary.reusable_steps = p.reusable_steps;
+            }
             if p.unblocked_by.is_some() {
                 summary.unblocked_by = p.unblocked_by.clone();
             }
@@ -1006,6 +1014,21 @@ pub async fn newest_completed_for_incident(
     .await
 }
 
+/// The newest completed run on the alert itself, whatever started it; read on the primary.
+pub async fn newest_completed_for_alert(
+    org_id: &str,
+    alert_id: &str,
+) -> Result<Option<Model>, DbErr> {
+    newest_completed_with(
+        get_orm_client_rw().await,
+        org_id,
+        Condition::all()
+            .add(rca_runs::Column::SubjectType.eq(RunSubjectType::Alert.as_str()))
+            .add(rca_runs::Column::SubjectId.eq(alert_id)),
+    )
+    .await
+}
+
 /// `started_at` of the incident's oldest run; pre-run reports are older than it.
 pub async fn first_started_at_for_incident(
     org_id: &str,
@@ -1062,6 +1085,27 @@ pub async fn list_running(limit: u64) -> Result<Vec<Model>, DbErr> {
         .filter(rca_runs::Column::State.eq(RunState::Running.as_str()))
         .order_by_asc(rca_runs::Column::UpdatedAt)
         .limit(limit)
+        .all(get_orm_client_rw().await)
+        .await
+}
+
+/// Live rows (`running`, `waiting_input`) on an alert or its incident; staleness is the caller's.
+pub async fn list_live_for_alert(
+    org_id: &str,
+    alert_id: &str,
+    incident_id: Option<&str>,
+) -> Result<Vec<Model>, DbErr> {
+    let mut subject = Condition::any().add(rca_runs::Column::SubjectId.eq(alert_id));
+    if let Some(incident_id) = incident_id {
+        subject = subject.add(rca_runs::Column::IncidentId.eq(incident_id));
+    }
+    rca_runs::Entity::find()
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .filter(subject)
+        .filter(
+            rca_runs::Column::State
+                .is_in([RunState::Running.as_str(), RunState::WaitingInput.as_str()]),
+        )
         .all(get_orm_client_rw().await)
         .await
 }
@@ -1322,9 +1366,14 @@ pub fn summary_from_incident(
     );
     let started_at = inc.rca_started_at.unwrap_or_default();
     let updated_at = inc.rca_updated_at.unwrap_or(started_at);
+    let report_format = if is_v1_run_id(&run_id) {
+        ReportFormat::V1
+    } else {
+        ReportFormat::V2
+    };
     Some(RcaSummary {
         run_id,
-        report_format: ReportFormat::V2,
+        report_format,
         state,
         stale: is_stale(state, updated_at, now_us, rca_timeout_secs),
         started_at,
@@ -1334,6 +1383,12 @@ pub fn summary_from_incident(
         summary: decode_summary(inc.rca_summary.as_deref()),
         detail: None,
     })
+}
+
+/// Runs the v1 run-pointer backfill migration over the current rows; for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn backfill_v1_pointers_for_tests() -> Result<(), DbErr> {
+    super::migration::backfill_v1_rca_pointer(get_orm_client_rw().await).await
 }
 
 #[cfg(test)]

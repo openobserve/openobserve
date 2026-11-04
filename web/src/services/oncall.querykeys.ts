@@ -31,6 +31,8 @@ export const oncallKeys = {
   /** Every team's list and per-team entry — the scope a team write drops. */
   teamsAll: (org: string) => orgKey(org, "oncall", "teams"),
   teams: (org: string) => orgKey(org, "oncall", "teams", "list"),
+  /** Every team's room destinations, read together for the Slack app's on-call room check. */
+  teamRooms: (org: string) => orgKey(org, "oncall", "teams", "rooms"),
   /** One team's whole prefix: detail, roster, schedule, policy and everything derived from them. */
   team: (org: string, teamId: string) => orgKey(org, "oncall", "teams", teamId),
   teamOverview: (org: string, teamId: string) => orgKey(org, "oncall", "teams", teamId, "overview"),
@@ -153,6 +155,8 @@ export const oncallKeys = {
   contactsAll: (org: string) => orgKey(org, "oncall", "contacts"),
   contact: (org: string, userEmail: string) => orgKey(org, "oncall", "contacts", userEmail),
   telephony: (org: string) => orgKey(org, "oncall", "telephony"),
+  /** Under `telephony`, so a telephony write drops the live check with the settings. */
+  telephonyStatus: (org: string) => orgKey(org, "oncall", "telephony", "status"),
 
   routingConfig: (org: string) => orgKey(org, "oncall", "routing", "config"),
 };

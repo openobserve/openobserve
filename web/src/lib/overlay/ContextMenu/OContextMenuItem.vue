@@ -56,7 +56,7 @@ function onSelect(event: Event) {
       'relative flex items-center gap-2',
       'rounded-default w-full px-3 py-1.5',
       'cursor-pointer outline-none select-none',
-      'transition-colors duration-150',
+      'transition-colors duration-(--duration-hover-out) data-[highlighted]:duration-(--duration-hover-in)',
       unavailable
         ? 'text-dropdown-item-disabled focus-visible:ring-focus-ring-accent cursor-not-allowed focus-visible:ring-2 focus-visible:ring-inset'
         : variantClasses[variant],

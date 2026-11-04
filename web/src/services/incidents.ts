@@ -16,6 +16,7 @@
 import http, { attemptTokenRefresh } from "./http";
 import store from "@/stores";
 import analytics from "./product_analytics";
+import type { AckAlertResponse, UnackAlertResponse } from "@/ts/interfaces/alert";
 import type { TranslateFn } from "@/types/i18n";
 import serviceStreamsApi, {
   type CorrelationRequest,
@@ -54,6 +55,8 @@ export interface Incident {
   rca: RcaSummary | null;
   /** Why no automatic run started for this incident (e.g. "l0_off"), or null. */
   rca_off_reason?: string | null;
+  /** List only: every alert that fired into the incident and how often, most-fired first. */
+  alert_groups?: { alert_id: string; alert_name: string; count: number }[];
 }
 
 export type RcaRunState = "running" | "waiting_input" | "completed" | "failed" | "cancelled";
@@ -102,6 +105,8 @@ export interface RcaSummaryFields {
   stage_count: number;
   steps: number;
   tool_calls: number;
+  /** Ended run: the finished steps a Resume keeps, the drawer's count too. */
+  reusable_steps?: number | null;
   steered_by: string[];
   unblocked_by: string | null;
   /** The error reason of a failed run, or the blocked detail. */
@@ -301,6 +306,8 @@ export interface RcaThread {
   truncated: boolean;
   /** With `truncated`: the last saved seq (-1: none). */
   saved_through_seq?: number;
+  /** Ended run: the finished steps a Resume keeps; absent when live or nothing to keep. */
+  reusable_steps?: number;
 }
 
 export type RcaSteerKind = "message" | "answer" | "hypothesis_action" | "guidance";
@@ -767,6 +774,20 @@ const parseLiveFrame = (frame: string): RcaLiveEvent | null => {
   }
 };
 
+/** The incident after a one-ack write; a failed read does not undo the write it follows. */
+async function readBack(
+  org_identifier: string,
+  incident_id: string,
+): Promise<{ data?: IncidentWithAlerts }> {
+  try {
+    return await incidents.get(org_identifier, incident_id);
+  } catch (error) {
+    // The write stands; the query invalidation that follows refetches the incident.
+    console.error(`[incidents] could not read ${incident_id} back after the write:`, error);
+    return {};
+  }
+}
+
 const incidents = {
   /**
    * List incidents with optional filtering and pagination
@@ -804,6 +825,22 @@ const incidents = {
     return http().get<ExternalAlertPayload>(
       `/api/v2/${org_identifier}/alerts/incidents/external-alerts/${external_alert_id}/payload`,
     );
+  },
+
+  /** Acknowledges the incident, its alerts and its pages, then reads it back. */
+  acknowledge: async (org_identifier: string, incident_id: string) => {
+    const ack = await http().post<AckAlertResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents/${encodeURIComponent(incident_id)}/acknowledge`,
+    );
+    return { ...(await readBack(org_identifier, incident_id)), ack: ack.data };
+  },
+
+  /** Clears the incident's acknowledgement everywhere and restarts its pages, then reads it back. */
+  unacknowledge: async (org_identifier: string, incident_id: string) => {
+    const ack = await http().post<UnackAlertResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents/${encodeURIComponent(incident_id)}/unacknowledge`,
+    );
+    return { ...(await readBack(org_identifier, incident_id)), ack: ack.data };
   },
 
   /**

@@ -56,6 +56,8 @@ export interface HitsCompletePayload {
   isPagination?: boolean;
 }
 
+export const REFRESH_QUERY_ORIGIN = "auto-refresh";
+
 let jobRequestCounter = 0;
 let activeQueryOrigin: string | undefined;
 
@@ -66,7 +68,10 @@ const hitsCompleteListeners = new Set<(payload: HitsCompletePayload) => void>();
 const crossingExemption: DrawerCloseExemption = ({ isPagination, searchObj }) =>
   isPagination && !!navigationOf(searchObj)?.pendingPageSelection;
 
-export const drawerCloseExemptions: DrawerCloseExemption[] = [crossingExemption];
+const refreshExemption: DrawerCloseExemption = ({ isPagination, searchObj, origin }) =>
+  !isPagination && keepsDetailOnRefresh(searchObj, origin);
+
+export const drawerCloseExemptions: DrawerCloseExemption[] = [crossingExemption, refreshExemption];
 
 export function closeDrawerForQuery(
   searchObj: RowNavSearchObj,
@@ -86,6 +91,13 @@ export function withQueryOrigin<T>(origin: string | undefined, build: () => T): 
   } finally {
     activeQueryOrigin = previous;
   }
+}
+
+export function keepsDetailOnRefresh(
+  searchObj: RowNavSearchObj,
+  origin: string | undefined = activeQueryOrigin,
+): boolean {
+  return origin === REFRESH_QUERY_ORIGIN && searchObj.meta.showDetailTab;
 }
 
 export function resetRowSelection(searchObj: RowNavSearchObj): void {

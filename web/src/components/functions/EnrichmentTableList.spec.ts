@@ -19,6 +19,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import EnrichmentTableList from "./EnrichmentTableList.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import streamService from "@/services/stream";
 import analytics from "@/services/product_analytics";
 
@@ -108,8 +109,9 @@ const globalStubs = {
   },
   NoData: { template: '<div data-test="no-data-stub">No Data</div>' },
   ConfirmDialog: {
+    name: "ConfirmDialog",
     template: '<div data-test="confirm-dialog-stub" />',
-    props: ["modelValue"],
+    props: ["modelValue", "title", "okVariant"],
     emits: ["update:modelValue", "update:ok", "update:cancel"],
   },
   EnrichmentSchema: {
@@ -158,11 +160,11 @@ const makeStore = () =>
     },
   });
 
-const mountComponent = () =>
+const mountComponent = (extraStubs: Record<string, unknown> = {}) =>
   mount(EnrichmentTableList, {
     global: {
       plugins: [i18n, store],
-      stubs: globalStubs,
+      stubs: { ...globalStubs, ...extraStubs },
     },
   });
 
@@ -461,6 +463,28 @@ describe("EnrichmentTableList", () => {
       expect(vm.confirmDelete).toBe(true);
     });
 
+    it("names the table in bold in the real confirm dialog with a destructive button", async () => {
+      const wrapper = mountComponent({
+        ConfirmDialog: false,
+        ODialog: { template: "<div><slot /></div>" },
+      });
+      await flushPromises();
+
+      (wrapper.vm as any).showDeleteDialogFn(makeTable({ name: "geo_ip" }));
+      await flushPromises();
+
+      const dialog = wrapper
+        .findAllComponents(ConfirmDialog)
+        .find((c) => c.props("messageKeypath") === "function.deleteEnrichmentTableConfirm");
+      expect(dialog?.props("okVariant")).toBe("destructive");
+      const name = dialog!.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe("geo_ip");
+      expect(name.classes()).toContain("font-semibold");
+      expect(dialog!.text()).toContain(
+        "Are you sure you want to delete the geo_ip enrichment table?",
+      );
+    });
+
     it("confirmDelete is false initially", async () => {
       const wrapper = mountComponent();
       await flushPromises();
@@ -501,6 +525,13 @@ describe("EnrichmentTableList", () => {
       vm.openBulkDeleteDialog();
 
       expect(vm.confirmBulkDelete).toBe(true);
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find(
+          (c: any) =>
+            c.props("title") === i18n.global.t("function.bulkDeleteEnrichmentTablesTitle"),
+        );
+      expect(dialog!.props("okVariant")).toBe("destructive");
     });
 
     it("selectedEnrichmentTableIds computed returns array of names from selectedEnrichmentTables", async () => {

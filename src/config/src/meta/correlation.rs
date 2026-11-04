@@ -24,7 +24,7 @@ use utoipa::ToSchema;
 /// Used for:
 /// - Mapping equivalent field names across logs, traces, and metrics (e.g., `service`,
 ///   `service.name`, `app` all mean "service identity")
-/// - Alert deduplication fingerprinting
+/// - Incident correlation and alert dimensions
 /// - Populating `ServiceIdentityConfig` via the recommendations UI
 ///
 /// # Field Name Overlaps
@@ -249,6 +249,17 @@ impl ServiceIdentityConfig {
         }
     }
 
+    /// The ids ingest may name a service from, in config order. [pure]
+    pub fn naming_alias_ids(&self) -> Vec<String> {
+        let mut seen = std::collections::HashSet::new();
+        self.tracked_alias_ids
+            .iter()
+            .chain(self.sets.iter().flat_map(|set| set.distinguish_by.iter()))
+            .filter(|id| *id != "service" && seen.insert(id.as_str()))
+            .cloned()
+            .collect()
+    }
+
     /// Validate a user-supplied config. Requires at least 1 set.
     /// (The empty default_config() is only used as a fallback before first save.)
     pub fn validate(&self) -> Result<(), String> {
@@ -369,6 +380,41 @@ pub fn obsolete_set_ids(old: &ServiceIdentityConfig, new: &ServiceIdentityConfig
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A set's `distinguish_by` names services at ingest, so the list must count it too.
+    #[test]
+    fn test_naming_alias_ids_are_tracked_then_each_sets_distinguish_by() {
+        let set = IdentitySet {
+            id: "k8s".into(),
+            label: "Kubernetes".into(),
+            distinguish_by: vec!["k8s-cluster".into(), "environment".into(), "service".into()],
+        };
+        // No saved config: `new_default()` with the env ids the loader fills in.
+        let no_config = |env: &[&str]| ServiceIdentityConfig {
+            tracked_alias_ids: env.iter().map(|s| s.to_string()).collect(),
+            ..ServiceIdentityConfig::new_default()
+        };
+        let cases = [
+            (
+                "tracked then each set's distinguish_by, deduped, no service",
+                ServiceIdentityConfig {
+                    sets: vec![set],
+                    tracked_alias_ids: vec!["k8s-cluster".into()],
+                    service_optional: false,
+                },
+                vec!["k8s-cluster", "environment"],
+            ),
+            (
+                "no saved config: the env ids",
+                no_config(&["service", "k8s-namespace"]),
+                vec!["k8s-namespace"],
+            ),
+            ("no saved config and no env ids", no_config(&[]), vec![]),
+        ];
+        for (case, config, want) in cases {
+            assert_eq!(config.naming_alias_ids(), want, "{case}");
+        }
+    }
 
     #[test]
     fn test_semantic_field_group_id_validation() {

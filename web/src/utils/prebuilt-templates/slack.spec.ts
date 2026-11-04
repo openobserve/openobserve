@@ -63,17 +63,12 @@ describe("slack template", () => {
       expect(slackConfig.method).toBe("post");
     });
 
-    it("has URL validator function", () => {
-      expect(typeof slackConfig.urlValidator).toBe("function");
-    });
-
     it.each([
       "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX",
       "https://hooks.slack.com/services/T000/B000/secret/",
       "https://hooks.slack-gov.com/services/T000/B000/secret",
     ])("accepts a complete Slack webhook URL: %s", (url) => {
       expect(isValidSlackWebhookUrl(url)).toBe(true);
-      expect(slackConfig.urlValidator(url)).toBe(true);
     });
 
     it.each([
@@ -100,7 +95,6 @@ describe("slack template", () => {
       "invalid-url",
     ])("rejects an incomplete or unsafe Slack webhook URL: %s", (url) => {
       expect(isValidSlackWebhookUrl(url)).toBe(false);
-      expect(slackConfig.urlValidator(url)).toBe(false);
     });
 
     it("has credential fields", () => {
@@ -150,7 +144,7 @@ describe("slack template", () => {
     });
 
     it("has display name", () => {
-      expect(slackDestinationType.name).toBe("Slack");
+      expect(slackDestinationType.name).toBe("Slack webhook");
     });
 
     it("has description", () => {

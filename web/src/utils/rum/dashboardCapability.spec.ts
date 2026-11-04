@@ -25,6 +25,7 @@
 import { describe, it, expect } from "vitest";
 import {
   filterDashboardBySchema,
+  keepPlatformPanels,
   presentFieldsFromSchemaMap,
   CAPABILITY_GATED_FIELDS,
   type DashboardPanel,
@@ -796,6 +797,31 @@ describe("dashboardCapability", () => {
       });
       rows.forEach((width) => expect(width).toBeLessThanOrEqual(12));
       expect(Math.min(...panels.map((p) => p.layout.x))).toBe(0);
+    });
+  });
+
+  describe("keepPlatformPanels", () => {
+    const panel = (i: number, y: number, o2Platform?: string) => ({
+      layout: { x: 0, y, w: 192, h: 4, i },
+      o2Platform,
+      queries: [],
+    });
+
+    it("keeps only panels tagged for the platform and packs them to the top", () => {
+      const out = keepPlatformPanels(
+        { panels: [panel(1, 0), panel(2, 4, "browser"), panel(3, 8, "mobile")] },
+        "mobile",
+      );
+      expect(out.panels).toHaveLength(1);
+      expect(out.panels?.[0].layout.y).toBe(0);
+    });
+
+    it("handles the tabs shape", () => {
+      const out = keepPlatformPanels(
+        { tabs: [{ panels: [panel(1, 0, "browser"), panel(2, 4, "mobile")] }] },
+        "mobile",
+      );
+      expect(out.tabs?.[0].panels).toHaveLength(1);
     });
   });
 });

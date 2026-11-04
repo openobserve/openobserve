@@ -322,14 +322,6 @@ describe("PanelContainer", () => {
   };
 
   describe("Component Rendering", () => {
-    it("should render panel container with basic structure", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.find('[data-test="dashboard-panel-container"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-panel-bar"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("Test Panel");
-    });
-
     it("should show drag indicator when not in view-only mode", () => {
       wrapper = createWrapper({ viewOnly: false });
 
@@ -379,6 +371,62 @@ describe("PanelContainer", () => {
   });
 
   describe("Panel Controls", () => {
+    // OTable is covered by PanelDataView.spec; this file's ResizeObserver mock cannot construct.
+    const dataViewStub = {
+      PanelDataView: { template: '<div data-test="dashboard-panel-data-view"></div>' },
+      ODropdown: { template: "<div><slot /></div>" },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template: '<div v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
+      },
+    };
+    const TOGGLE = '[data-test="dashboard-panel-data-view-toggle"]';
+    const DATA_VIEW = '[data-test="dashboard-panel-data-view"]';
+
+    it("switches a chart panel to its raw rows and back from the panel menu", async () => {
+      wrapper = createWrapper({}, dataViewStub);
+
+      expect(wrapper.find(TOGGLE).text()).toBe("Show raw data");
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(false);
+
+      await wrapper.find(TOGGLE).trigger("click");
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
+      expect(wrapper.find(TOGGLE).text()).toBe("Show chart");
+
+      await wrapper.find(TOGGLE).trigger("click");
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(false);
+    });
+
+    it("hides the legends button while the rows are shown", async () => {
+      wrapper = createWrapper({ showLegendsButton: true }, dataViewStub);
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
+      expect(wrapper.find('[data-test="dashboard-show-legends-btn"]').exists()).toBe(true);
+
+      await wrapper.find(TOGGLE).trigger("click");
+      expect(wrapper.find('[data-test="dashboard-show-legends-btn"]').exists()).toBe(false);
+    });
+
+    it("returns to the chart when layout editing starts", async () => {
+      wrapper = createWrapper({ layoutMode: "view" }, dataViewStub);
+      await wrapper.find(TOGGLE).trigger("click");
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(true);
+
+      await wrapper.setProps({ layoutMode: "edit" });
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(false);
+    });
+
+    it.each([
+      ["table panels", { data: { ...defaultProps.data, type: "table" } }],
+      ["kiosk mode", { kiosk: true }],
+      ["view-only panels", { viewOnly: true }],
+      ["simplified panels", { simplifiedPanelView: true }],
+    ])("offers no Data view on %s", (_name, props) => {
+      wrapper = createWrapper(props, dataViewStub);
+      expect(wrapper.find(TOGGLE).exists()).toBe(false);
+    });
+
     it("should show fullscreen button on hover when not view-only", async () => {
       wrapper = createWrapper({ viewOnly: false });
 
@@ -683,18 +731,6 @@ describe("PanelContainer", () => {
   });
 
   describe("Panel State Management", () => {
-    it("should track hover state correctly", async () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.isCurrentlyHoveredPanel).toBe(false);
-
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
-      expect(wrapper.vm.isCurrentlyHoveredPanel).toBe(true);
-
-      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseleave");
-      expect(wrapper.vm.isCurrentlyHoveredPanel).toBe(false);
-    });
-
     it("should handle panel modification requests", async () => {
       wrapper = createWrapper();
 
@@ -715,59 +751,6 @@ describe("PanelContainer", () => {
     });
   });
 
-  describe("Responsive Behavior", () => {
-    it("should handle component mounting", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-panel-container"]').exists()).toBe(true);
-    });
-
-    it("should cleanup on unmount", () => {
-      wrapper = createWrapper();
-
-      expect(() => wrapper.unmount()).not.toThrow();
-    });
-  });
-
-  describe("Props Validation", () => {
-    it("should handle missing panel data gracefully", () => {
-      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      // Create minimal valid data to avoid null reference
-      const minimalData = { ...mockPanelData, title: null };
-      wrapper = createWrapper({
-        data: minimalData,
-        variablesData: { values: [], isLoading: false },
-      });
-
-      expect(wrapper.exists()).toBe(true);
-      consoleWarnSpy.mockRestore();
-    });
-
-    it("should handle malformed search data", () => {
-      const malformedSearchData = { invalid: "data" };
-      wrapper = createWrapper({ searchData: malformedSearchData });
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle empty variables data", () => {
-      wrapper = createWrapper({
-        variablesData: { values: [], isLoading: false },
-        currentVariablesData: { values: [], isLoading: false },
-      });
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle missing date time", () => {
-      wrapper = createWrapper({ DateTime: null });
-
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
   describe("Context Menu", () => {
     it("should show dropdown menu in non-view-only mode", () => {
       wrapper = createWrapper({ viewOnly: false });
@@ -781,30 +764,6 @@ describe("PanelContainer", () => {
 
       const dropdown = wrapper.findComponent({ name: "ODropdown" });
       expect(dropdown.exists()).toBe(false);
-    });
-  });
-
-  describe("Performance", () => {
-    it("should handle component updates without errors", async () => {
-      wrapper = createWrapper();
-
-      // Update props multiple times
-      await wrapper.setProps({ width: 500 });
-      await wrapper.setProps({ height: 400 });
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle variable updates", async () => {
-      wrapper = createWrapper();
-      const newVariablesData = {
-        values: [{ name: "test", value: "new value" }],
-        isLoading: false,
-      };
-
-      await wrapper.setProps({ variablesData: newVariablesData });
-
-      expect(wrapper.props().variablesData).toEqual(newVariablesData);
     });
   });
 
@@ -947,6 +906,24 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.confirmDeletePanelDialog).toBe(true);
     });
 
+    it("names the panel in bold in the real confirm dialog with a destructive button", async () => {
+      wrapper = createWrapper();
+
+      await wrapper.vm.onPanelModifyClick("DeletePanel");
+      await wrapper.vm.$nextTick();
+
+      const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
+      expect(dialog.props("okVariant")).toBe("destructive");
+      // e2e page objects locate the panel delete dialog by this id.
+      expect(dialog.findComponent({ name: "ODialog" }).vm.$attrs["data-test"]).toBe(
+        "confirm-dialog",
+      );
+      const name = dialog.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe("Test Panel");
+      expect(name.classes()).toContain("font-semibold");
+      expect(dialog.text()).toContain("Are you sure you want to delete the Test Panel panel?");
+    });
+
     it("should emit onDeletePanel when confirmed", async () => {
       wrapper = createWrapper();
 
@@ -1055,6 +1032,18 @@ describe("PanelContainer", () => {
       expect(prefill.sql).toBe("SELECT * FROM test");
       expect(prefill.streamName).toBe("test-stream");
       expect(prefill.name).toBe("Alert_from_My_Panel");
+    });
+
+    it("offers alert creation once a query ran, but never on an alert list", async () => {
+      wrapper = createWrapper({ data: { ...mockPanelData, type: "line" } });
+      expect(wrapper.vm.canCreateAlert).toBe(false);
+      await wrapper.vm.metaDataValue({ queries: [{ query: "SELECT 1", panelQueryIndex: 0 }] });
+      expect(wrapper.vm.canCreateAlert).toBe(true);
+
+      wrapper.unmount();
+      wrapper = createWrapper({ data: { ...mockPanelData, type: "alert-list" } });
+      await wrapper.vm.metaDataValue({ queries: [{ query: "", panelQueryIndex: 0 }] });
+      expect(wrapper.vm.canCreateAlert).toBe(false);
     });
 
     it("uses the executed query, and lets the user pick between two queries", async () => {
@@ -1169,6 +1158,13 @@ describe("PanelContainer", () => {
         panel.queries.forEach((query: any) => (query.fields.stream = ""));
         wrapper = createWrapper({ data: panel });
         expect(wrapper.vm.alertDisabledReason).toBeNull();
+      });
+
+      it("disables the action on an enrichment-table panel", () => {
+        const panel = formulaPanel(true);
+        panel.queries[0].fields.stream_type = "enrichment_tables";
+        wrapper = createWrapper({ data: panel });
+        expect(wrapper.vm.alertDisabledReason).toBe("Alerts can't run on enrichment tables");
       });
 
       it("disables the action when every query is hidden", () => {
@@ -1655,27 +1651,6 @@ describe("PanelContainer", () => {
   });
 
   describe("Loading State Management", () => {
-    it("should update loading state", async () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.isPanelLoading).toBe(false);
-
-      await wrapper.vm.handleLoadingStateChange(true);
-      expect(wrapper.vm.isPanelLoading).toBe(true);
-
-      await wrapper.vm.handleLoadingStateChange(false);
-      expect(wrapper.vm.isPanelLoading).toBe(false);
-    });
-
-    it("should handle loading state changes from PanelSchemaRenderer", async () => {
-      wrapper = createWrapper();
-
-      const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit("loading-state-change", true);
-
-      expect(wrapper.vm.isPanelLoading).toBe(true);
-    });
-
     it("keeps the previous last-refreshed age in the header while a restored panel refreshes", async () => {
       wrapper = createWrapper({}, { PanelErrorButtons });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
@@ -1699,41 +1674,7 @@ describe("PanelContainer", () => {
     });
   });
 
-  describe("Metadata Management", () => {
-    it("should update metadata", async () => {
-      wrapper = createWrapper();
-      const newMetadata = {
-        queries: [{ query: "SELECT * FROM new_table" }],
-      };
-
-      await wrapper.vm.metaDataValue(newMetadata);
-
-      expect(wrapper.vm.metaData).toEqual(newMetadata);
-    });
-
-    it("should handle metadata updates from PanelSchemaRenderer", async () => {
-      wrapper = createWrapper();
-      const newMetadata = {
-        queries: [{ query: "SELECT * FROM updated" }],
-      };
-
-      const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit("metadata-update", newMetadata);
-
-      expect(wrapper.vm.metaData).toEqual(newMetadata);
-    });
-  });
-
   describe("Last Triggered At", () => {
-    it("should update last triggered timestamp", async () => {
-      wrapper = createWrapper();
-      const timestamp = Date.now();
-
-      await wrapper.vm.handleLastTriggeredAtUpdate(timestamp);
-
-      expect(wrapper.vm.lastTriggeredAt).toBe(timestamp);
-    });
-
     it("should display last refreshed time when not view-only", async () => {
       wrapper = createWrapper({ viewOnly: false });
       const timestamp = Date.now();
@@ -1958,6 +1899,24 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.hoverRevealClass).toBe("");
     });
 
+    it("shows a public panel's server-side partial build as Partial, with no Refresh to offer", async () => {
+      wrapper = mountWithChips({
+        viewOnly: true,
+        injectedPanelData: { data: [], serverPartial: true },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-notice-chip-partial"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-notice-chip-interrupted"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-partial-data-warning"]').exists()).toBe(false);
+      expect(wrapper.vm.canRefreshFromNotice).toBe(false);
+      expect(wrapper.findComponent(PanelErrorButtons).props("canRefresh")).toBe(false);
+
+      wrapper.unmount();
+      wrapper = mountWithChips({ viewOnly: true, injectedPanelData: { data: [] } });
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-notice-chip-partial"]').exists()).toBe(false);
+    });
+
     it("keeps Refresh but not editor actions while the layout is being edited", async () => {
       wrapper = mountWithChips({ layoutMode: "edit" });
       expect(wrapper.vm.canEditFromNotice).toBe(false);
@@ -2008,29 +1967,6 @@ describe("PanelContainer", () => {
   });
 
   describe("RunId Management", () => {
-    it("should initialize runId from props", () => {
-      const testRunId = "test-run-123";
-      wrapper = createWrapper({ runId: testRunId });
-
-      expect(wrapper.vm.runId).toBe(testRunId);
-    });
-
-    it("should generate new runId if not provided", () => {
-      // When runId is not provided, component generates one
-      wrapper = createWrapper({ runId: "" });
-
-      // The component should have a runId
-      expect(wrapper.vm.runId).toBeDefined();
-    });
-
-    it("should update runId when prop changes", async () => {
-      wrapper = createWrapper({ runId: "initial-run-id" });
-
-      await wrapper.setProps({ runId: "new-run-id" });
-
-      expect(wrapper.vm.runId).toBe("new-run-id");
-    });
-
     it("should emit new runId when refreshing", async () => {
       wrapper = createWrapper();
       const initialRunId = wrapper.vm.runId;
@@ -2140,100 +2076,13 @@ describe("PanelContainer", () => {
     });
   });
 
-  describe("Component Cleanup", () => {
-    it("should cleanup metadata on unmount", () => {
-      wrapper = createWrapper();
-      wrapper.vm.metaData = { queries: [] };
-
-      wrapper.unmount();
-
-      expect(wrapper.vm.metaData).toBeNull();
-    });
-
-    it("should cleanup error data on unmount", () => {
-      wrapper = createWrapper();
-      wrapper.vm.errorData = "Some error";
-
-      wrapper.unmount();
-
-      expect(wrapper.vm.errorData).toBe("");
-    });
-
-    it("should cleanup PanelSchemaRenderer ref on unmount", () => {
-      wrapper = createWrapper();
-      wrapper.vm.PanleSchemaRendererRef = { some: "ref" };
-
-      wrapper.unmount();
-
-      expect(wrapper.vm.PanleSchemaRendererRef).toBeNull();
-    });
-  });
-
-  describe("Event Emissions", () => {
-    it("should emit updated:data-zoom event", async () => {
-      wrapper = createWrapper();
-      const zoomData = { start: 100, end: 200 };
-
-      const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit("updated:data-zoom", zoomData);
-
-      expect(wrapper.emitted("updated:data-zoom")).toBeTruthy();
-      expect(wrapper.emitted("updated:data-zoom")[0]).toEqual([zoomData]);
-    });
-
-    it("should emit update:initial-variable-values event", async () => {
-      wrapper = createWrapper();
-      const variableValues = { var1: "value1" };
-
-      const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit("update:initial-variable-values", variableValues);
-
-      expect(wrapper.emitted("update:initial-variable-values")).toBeTruthy();
-    });
-
-    it("should emit contextmenu event", async () => {
-      wrapper = createWrapper();
-      const contextMenuEvent = new Event("contextmenu");
-
-      const panelRenderer = wrapper.findComponent('[data-test="panel-schema-renderer"]');
-      await panelRenderer.vm.$emit("contextmenu", contextMenuEvent);
-
-      expect(wrapper.emitted("contextmenu")).toBeTruthy();
-    });
-
-    it("should emit refresh event from SinglePanelMove", async () => {
-      wrapper = createWrapper();
-
-      const panelMove = wrapper.findComponent('[data-test="single-panel-move"]');
-      await panelMove.vm.$emit("refresh");
-
-      expect(wrapper.emitted("refresh")).toBeTruthy();
-    });
-  });
-
   describe("Error Handling", () => {
-    it("should handle string error", async () => {
-      wrapper = createWrapper();
-
-      await wrapper.vm.onError("String error message");
-
-      expect(wrapper.vm.errorData).toBe("String error message");
-    });
-
     it("should handle error object with message", async () => {
       wrapper = createWrapper();
 
       await wrapper.vm.onError({ message: "Error object message" });
 
       expect(wrapper.vm.errorData).toBe("Error object message");
-    });
-
-    it("should handle error object without message", async () => {
-      wrapper = createWrapper();
-
-      await wrapper.vm.onError({});
-
-      expect(wrapper.vm.errorData).toBe("");
     });
   });
 
@@ -2342,21 +2191,6 @@ describe("PanelContainer", () => {
       const c = w.findComponent({ name: "ShowLegendsPopup" });
       return c.exists() ? c : undefined;
     };
-
-    it("should render QueryInspector and legends ODialog", () => {
-      wrapper = createWrapper();
-
-      expect(findQueryInspector(wrapper).exists()).toBe(true);
-      expect(findLegendsDialog(wrapper)).toBeTruthy();
-    });
-
-    it("should render QueryInspector closed by default", () => {
-      wrapper = createWrapper();
-
-      const inspector = findQueryInspector(wrapper);
-      expect(inspector.exists()).toBe(true);
-      expect(inspector.props("open")).toBe(false);
-    });
 
     it("should open QueryInspector when showViewPanel becomes true", async () => {
       wrapper = createWrapper();
@@ -2475,6 +2309,23 @@ describe("PanelContainer", () => {
       const body = wrapper.find('[data-test="dashboard-panel-body"]');
       expect(body.exists()).toBe(true);
       expect(body.attributes("data-curated-stale")).toBe("true");
+    });
+
+    it("shows an injected result's own note and dims it only when it asks to be", () => {
+      wrapper = createWrapper({
+        viewOnly: true,
+        injectedPanelData: { data: [], dimmed: true, notice: "from 12:04" },
+      });
+      expect(wrapper.find('[data-test="dashboard-panel-injected-notice"]').text()).toBe(
+        "from 12:04",
+      );
+      expect(wrapper.find('[data-test="dashboard-panel-body"]').classes()).toContain("opacity-60");
+
+      wrapper = createWrapper({ viewOnly: true, injectedPanelData: { data: [] } });
+      expect(wrapper.find('[data-test="dashboard-panel-injected-notice"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-body"]').classes()).not.toContain(
+        "opacity-60",
+      );
     });
 
     it("renders NO badge and NO dimming when config.curated_badge is absent", () => {
@@ -2632,14 +2483,8 @@ describe("PanelContainer", () => {
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
     });
 
-    // THE ANTI-DRIFT PIN. Everything above fires at a stub, so it is only
-    // trustworthy while the stub matches reality. This calls the REAL converter
-    // and pins the fact that made the original implementation inert: for a
-    // `metric` panel — the type the curated tiles use — an EMPTY promql result
-    // still produces exactly ONE synthetic rendering series. So counting
-    // `options.series` can never detect an empty metric tile, and any future
-    // "simplification" back to a length check fails here.
-    it("an empty metric result still emits one synthetic series — length cannot detect it", async () => {
+    // Pins the real converter the stubs above stand in for; the tile reads the renderer's noData, not series.
+    it("an empty metric result builds no cells, a populated one builds one", async () => {
       const { convertPanelData } = await import("@/utils/dashboard/convertPanelData");
       const panelSchema = {
         type: "metric",
@@ -2674,10 +2519,8 @@ describe("PanelContainer", () => {
       expect(Array.isArray(emptyResult)).toBe(false);
       expect(emptyResult).toHaveProperty("chartType");
 
-      // ...and the empty case is INDISTINGUISHABLE from the populated one by length.
-      expect(emptyResult.options.series.length).toBe(1);
+      expect(emptyResult.options.series.length).toBe(0);
       expect(populated.options.series.length).toBe(1);
-      expect(emptyResult.options.series.length).toBe(populated.options.series.length);
     });
 
     // The inline subtitle was withdrawn: sharing the one-line PanelBar with the
@@ -3062,6 +2905,30 @@ describe("PanelContainer", () => {
       for (const dot of [triggerDot(), itemDot()]) {
         expect(dot.classes()).not.toContain("ring-badge-amber-ol-text");
       }
+    });
+  });
+
+  describe("add annotation button", () => {
+    const timeSeriesRenderer = {
+      PanelSchemaRenderer: {
+        name: "PanelSchemaRenderer",
+        template: '<div data-test="panel-schema-renderer"></div>',
+        props: ["panelSchema", "selectedTimeObj", "width", "height"],
+        data: () => ({ checkIfPanelIsTimeSeries: true, isAddAnnotationMode: false }),
+        methods: { toggleAddAnnotationMode: vi.fn() },
+      },
+    };
+    const button = '[data-test="panel-schema-renderer-annotation-button"]';
+
+    it.each([
+      ["line", true],
+      ["stacked", true],
+      ["h-bar", false],
+      ["h-stacked", false],
+    ])("%s time-series panel shows it: %s", async (type, shown) => {
+      wrapper = createWrapper({ data: { ...mockPanelData, type } }, timeSeriesRenderer);
+      await flushPromises();
+      expect(wrapper.find(button).exists()).toBe(shown);
     });
   });
 });

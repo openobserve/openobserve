@@ -202,6 +202,30 @@ describe("convertPromQLData with time-shifted results", () => {
   const names = (result: any) =>
     (result.options.series ?? []).map((s: any) => s?.name).filter(Boolean);
 
+  it("area-stacked: a past period's stack lifts y_axis_max on its own, never on top", async () => {
+    const pods = (shiftS: number, value: string) =>
+      matrix(
+        series(
+          { pod: "api-1" },
+          ts.map((t) => t - shiftS),
+          value,
+        ),
+        series(
+          { pod: "api-2" },
+          ts.map((t) => t - shiftS),
+          value,
+        ),
+      );
+    const result = await convert(
+      { ...panel("area-stacked"), config: { y_axis_max: 1 } },
+      [pods(0, "1"), pods(DAY_S, "5")],
+      meta([{ panelQueryIndex: 0 }, { panelQueryIndex: 0, gapMs: DAY_MS, period: "1 day ago" }]),
+      stepMeta(2, 60),
+    );
+
+    expect(result.options.yAxis.max).toBe(10);
+  });
+
   it("shows the current series and one per offset, suffixed with the period", async () => {
     const result = await convert(
       panel("line"),
@@ -363,6 +387,18 @@ describe("convertPromQLData with time-shifted results", () => {
       }
     });
 
+    it("keeps the panel line thickness on the dashed twin", async () => {
+      const result = await convert(
+        { ...panel("line"), config: { line_thickness: 3 } },
+        [twoPods(), twoPods(DAY_S)],
+        oneDay,
+        stepMeta(2, 60),
+      );
+      const [primary, shifted] = pair(result, "api-1");
+      expect(primary.lineStyle.width).toBe(3);
+      expect(shifted.lineStyle).toMatchObject({ width: 3, type: "dashed" });
+    });
+
     it("in the Explorer, draws it dotted so it reads apart from a dashed forecast", async () => {
       const result = await convert(
         explorer(),
@@ -495,6 +531,33 @@ describe("convertPromQLData with time-shifted results", () => {
       },
     );
 
+    it("halves the default 0.8 on an unset scatter twin, as with the placeholder 80", async () => {
+      const result = await convert(
+        panel("scatter"),
+        [twoPods(), twoPods(DAY_S)],
+        oneDay,
+        stepMeta(2, 60),
+      );
+      const [, shifted] = pair(result, "api-1");
+      expect(shifted.itemStyle.opacity).toBeCloseTo(0.4);
+    });
+
+    it("scales a scatter's point opacity, and halves it on the twin", async () => {
+      const result = await convert(
+        { ...panel("scatter"), config: { symbol_opacity: 60, symbol_size: 8 } },
+        [twoPods(), twoPods(DAY_S)],
+        oneDay,
+        stepMeta(2, 60),
+      );
+
+      const [primary, shifted] = pair(result, "api-1");
+      expect(primary.itemStyle.opacity).toBeCloseTo(0.6);
+      expect(shifted.itemStyle.opacity).toBeCloseTo(0.3);
+      expect(primary.itemStyle.color).toBeDefined();
+      expect(primary.symbolSize).toBe(8);
+      expect(shifted.symbolSize).toBe(8);
+    });
+
     it("keeps line and area series unfaded, the dash marks them", async () => {
       for (const type of ["line", "area"]) {
         const result = await convert(
@@ -614,6 +677,72 @@ describe("convertPromQLData with time-shifted results", () => {
     expect(names(result)).toEqual(["api-1", "api-1 (1 day ago)"]);
   });
 
+  it.each(["area-stacked", "stacked", "h-stacked"])(
+    "gives each period its own stack in %s, so a past period never adds to current totals",
+    async (type) => {
+      const result = await convert(
+        panel(type),
+        [twoPods(), twoPods(DAY_S)],
+        meta([{ panelQueryIndex: 0 }, { panelQueryIndex: 0, gapMs: DAY_MS, period: "1 day ago" }]),
+        stepMeta(2, 60),
+      );
+
+      const stacks = new Map(
+        result.options.series.filter((s: any) => s.name).map((s: any) => [s.name, s.stack]),
+      );
+      expect(stacks.get("api-1")).toBe(stacks.get("api-2"));
+      expect(stacks.get("api-1 (1 day ago)")).toBe(stacks.get("api-2 (1 day ago)"));
+      expect(stacks.get("api-1 (1 day ago)")).not.toBe(stacks.get("api-1"));
+    },
+  );
+
+  it.each(["area-stacked", "stacked", "h-stacked"])(
+    "totals each period apart in the %s tooltip, so the past period never adds to the current Total",
+    async (type) => {
+      const pods = (shiftS: number, a: string, b: string) =>
+        matrix(
+          series(
+            { pod: "api-1" },
+            ts.map((t) => t - shiftS),
+            a,
+          ),
+          series(
+            { pod: "api-2" },
+            ts.map((t) => t - shiftS),
+            b,
+          ),
+        );
+      const result = await convert(
+        { ...panel(type), config: { decimals: 0 } },
+        [pods(0, "2", "3"), pods(DAY_S, "10", "20")],
+        meta([{ panelQueryIndex: 0 }, { panelQueryIndex: 0, gapMs: DAY_MS, period: "1 day ago" }]),
+        stepMeta(2, 60),
+      );
+
+      const params = result.options.series
+        .map((s: any, seriesIndex: number) => ({ s, seriesIndex }))
+        .filter(({ s }: any) => s.name)
+        .map(({ s, seriesIndex }: any) => {
+          const point = s.data[0];
+          return {
+            seriesIndex,
+            seriesName: s.name,
+            marker: "",
+            dataIndex: 0,
+            axisValue: "t0",
+            data: point,
+            value: point,
+          };
+        });
+      expect(params).toHaveLength(4);
+      const html = result.options.tooltip.formatter(params);
+
+      expect(html).toContain("<strong>Total : 5</strong>");
+      expect(html).toContain("<strong>Total (1 day ago) : 30</strong>");
+      expect(html).not.toContain(": 35");
+    },
+  );
+
   it("names and configures shifted series through the map on the modular (stacked) path", async () => {
     const result = await convert(
       panel("stacked", [
@@ -631,5 +760,34 @@ describe("convertPromQLData with time-shifted results", () => {
       "B api-1 (1 day ago)",
       "B api-2 (1 day ago)",
     ]);
+  });
+});
+
+describe("PromQL h-stacked category labels in the dashboard timezone", () => {
+  const at = (iso: string) => Date.parse(iso) / 1000;
+  const run = (timezone: string) =>
+    convertPromQLData(
+      { id: "p1", type: "h-stacked", config: {}, queries: [{ config: {} }] },
+      [
+        matrix({
+          metric: { job: "a" },
+          values: [
+            [at("2026-10-24T12:00:00Z"), "1"],
+            [at("2026-10-24T23:30:00Z"), "2"],
+          ],
+        }),
+      ],
+      { state: { zoConfig: { max_dashboard_series: 100 }, timezone, theme: "light" } },
+      { value: { offsetWidth: 500, offsetHeight: 300 } },
+      null,
+      [],
+    );
+
+  it("dates steps that fall on two days only in the zone", async () => {
+    expect((await run("Asia/Kolkata")).options.yAxis.data).toEqual(["10-24 17:30", "10-25 05:00"]);
+  });
+
+  it("keeps time-only labels where both steps share a UTC date", async () => {
+    expect((await run("UTC")).options.yAxis.data).toEqual(["12:00:00", "23:30:00"]);
   });
 });

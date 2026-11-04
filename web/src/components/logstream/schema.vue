@@ -444,9 +444,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               {{
                                 patternAssociations[row.name]?.length
-                                  ? t("logStream.viewPatternsCount", {
-                                      count: patternAssociations[row.name]?.length,
-                                    })
+                                  ? t(
+                                      "logStream.viewPatternsCount",
+                                      { count: patternAssociations[row.name]?.length },
+                                      patternAssociations[row.name]?.length,
+                                    )
                                   : t("logStream.addPattern")
                               }}
                               <OIcon
@@ -658,10 +660,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex items-center justify-between max-md:flex-wrap max-md:gap-y-1"
                   >
                     <div class="flex items-center gap-2 max-md:flex-wrap">
-                      <span v-if="activeMainTab == 'schemaSettings'" class="px-2 py-2"
-                        ><strong> {{ selectedFields.length }}</strong>
-                        {{ t("logStream.fieldsSelected") }}</span
+                      <i18n-t
+                        v-if="activeMainTab == 'schemaSettings'"
+                        keypath="logStream.fieldsSelected"
+                        :plural="selectedFields.length"
+                        tag="span"
+                        class="px-2 py-2"
+                        data-test="schema-fields-selected-count"
                       >
+                        <template #count
+                          ><strong>{{ selectedFields.length }}</strong></template
+                        >
+                      </i18n-t>
                       <OButton
                         v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
                         data-test="schema-add-field-button"
@@ -691,11 +701,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="schema-delete-button"
                         variant="outline"
                         size="sm-action"
-                        @click="
-                          activeMainTab == 'schemaSettings'
-                            ? (confirmQueryModeChangeDialog = true)
-                            : (confirmDeleteDatesDialog = true)
-                        "
+                        @click="openDeleteConfirm"
                         icon-left="delete"
                       >
                         {{ t("logStream.delete") }}
@@ -772,15 +778,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODrawer>
 
   <ConfirmDialog
-    :title="t('logStream.deleteActionTitle')"
-    :message="t('logStream.deleteActionMessage')"
+    :title="t('logStream.deleteActionTitle', deleteConfirmCount)"
+    :message="t('logStream.deleteActionMessage', { count: deleteConfirmCount })"
+    ok-variant="destructive"
     @update:ok="deleteFields()"
     @update:cancel="confirmQueryModeChangeDialog = false"
     v-model="confirmQueryModeChangeDialog"
   />
   <ConfirmDialog
     :title="t('logStream.deleteDatesTitle')"
-    :message="t('logStream.deleteDatesMessage')"
+    :message="t('logStream.deleteDatesMessage', { count: deleteConfirmCount })"
+    ok-variant="destructive"
     @update:ok="deleteDates()"
     @update:cancel="confirmDeleteDatesDialog = false"
     v-model="confirmDeleteDatesDialog"
@@ -958,6 +966,8 @@ export default defineComponent({
     const flattenLevel = ref<number | undefined>(undefined);
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDeleteDatesDialog = ref(false);
+    // Snapshot at open: the selection is cleared while the dialog is still closing.
+    const deleteConfirmCount = ref(0);
     const confirmAddPerformanceFieldsDialog = ref(false);
     const missingPerformanceFields = ref<MissingPerformanceField[]>([]);
     const pendingSelectedFields = ref<string[]>([]);
@@ -1209,8 +1219,9 @@ export default defineComponent({
       approxPartition.value = false;
     });
 
+    // only the logs ingest path writes the original record
     const showStoreOriginalDataToggle = computed(() => {
-      return modelValue.stream_type !== "traces";
+      return modelValue.stream_type === "logs";
     });
     //here we added a watcher to
     //1. if user defined schema is enabled then we need to show the schema fields tab and also need to make sure that it would be the active tab
@@ -2294,6 +2305,16 @@ export default defineComponent({
       onSubmit();
     };
 
+    const openDeleteConfirm = () => {
+      if (activeMainTab.value == "schemaSettings") {
+        deleteConfirmCount.value = selectedFields.value.length;
+        confirmQueryModeChangeDialog.value = true;
+      } else {
+        deleteConfirmCount.value = selectedDateFields.value.length;
+        confirmDeleteDatesDialog.value = true;
+      }
+    };
+
     const groupPatternAssociationsByField = (
       associations: PatternAssociation[],
     ): Record<string, PatternAssociation[]> => {
@@ -2505,6 +2526,8 @@ export default defineComponent({
       formatSizeFromMB,
       confirmQueryModeChangeDialog,
       confirmDeleteDatesDialog,
+      deleteConfirmCount,
+      openDeleteConfirm,
       confirmAddPerformanceFieldsDialog,
       missingPerformanceFields,
       pendingSelectedFields,

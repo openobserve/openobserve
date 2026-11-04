@@ -35,6 +35,12 @@ export const SINGLE_CLOSED_TOKEN_RE = /(?<![{$])\{\s*([A-Za-z_]\w*)\s*\}(?!\})/g
 /** An open single `{`, with the same exclusions as the closed form. */
 export const SINGLE_OPEN_TOKEN_RE = /(?<![{$])\{\s*([A-Za-z0-9_]*)$/;
 
+/** A closed `${name}`, `${name:format}` or bare `$name` token. */
+export const DOLLAR_CLOSED_TOKEN_RE = /\$\{\s*([A-Za-z_]\w*)\s*(?::\s*\w+\s*)?\}|\$([A-Za-z_]\w*)/g;
+
+/** An open `${name` (optionally `:format`) or bare `$name`; only the braced form takes a format. */
+export const DOLLAR_OPEN_TOKEN_RE = /\$(?:\{\s*([A-Za-z0-9_]*(?::[A-Za-z]*)?)|([A-Za-z0-9_]*))$/;
+
 // Long enough that passing through a token on the way elsewhere does not flash the peek.
 const PEEK_DELAY_MS = 300;
 
@@ -46,11 +52,15 @@ export function tokenAtCaret(
   caret: number,
   delimiter: TemplateDelimiter = "double",
 ): string | null {
-  const closed = delimiter === "single" ? SINGLE_CLOSED_TOKEN_RE : CLOSED_TOKEN_RE;
+  const closed = {
+    double: CLOSED_TOKEN_RE,
+    single: SINGLE_CLOSED_TOKEN_RE,
+    dollar: DOLLAR_CLOSED_TOKEN_RE,
+  }[delimiter];
   for (const found of text.matchAll(closed)) {
     const start = found.index;
     const end = start + found[0].length;
-    if (caret >= start && caret <= end) return found[1];
+    if (caret >= start && caret <= end) return found[1] ?? found[2];
   }
   return null;
 }
@@ -61,14 +71,24 @@ export function openTokenAt(
   caret: number,
   delimiter: TemplateDelimiter = "double",
 ): OpenToken | null {
-  const open = delimiter === "single" ? SINGLE_OPEN_TOKEN_RE : OPEN_TOKEN_RE;
-  const found = open.exec(text.slice(0, caret));
+  const before = text.slice(0, caret);
+  const start = (match: RegExpExecArray) => caret - match[0].length;
+  if (delimiter === "dollar") {
+    const found = DOLLAR_OPEN_TOKEN_RE.exec(before);
+    if (!found) return null;
+    const braced = found[1] !== undefined;
+    return { query: found[1] ?? found[2], start: start(found), braced };
+  }
+  const found = (delimiter === "single" ? SINGLE_OPEN_TOKEN_RE : OPEN_TOKEN_RE).exec(before);
   if (!found) return null;
-  return { query: found[1], start: caret - found[0].length };
+  return { query: found[1], start: start(found) };
 }
 
-/** The `{{name}}` (or `{name}`) text the list and the peek both render. */
-export function tokenFor(name: string, delimiter: TemplateDelimiter = "double") {
+/** The token text the list and the peek both render; `braced` picks `${name}` over `$name`. */
+export function tokenFor(name: string, delimiter: TemplateDelimiter = "double", braced = false) {
+  if (delimiter === "dollar") {
+    return raw(braced || name.includes(":") ? `\${${name}}` : `$${name}`);
+  }
   return raw(delimiter === "single" ? `{${name}}` : `{{${name}}}`);
 }
 
@@ -85,7 +105,7 @@ export function useTemplateSuggest<T extends TemplateSuggestion>(
   const peekName = ref<string | null>(null);
   let peekTimer: ReturnType<typeof setTimeout> | null = null;
   const delimiter = (): TemplateDelimiter => options.delimiter?.() ?? "double";
-  const format = (name: string) => tokenFor(name, delimiter());
+  const format = (name: string) => tokenFor(name, delimiter(), open.value?.braced);
 
   const matches = computed<T[]>(() => {
     const token = open.value;

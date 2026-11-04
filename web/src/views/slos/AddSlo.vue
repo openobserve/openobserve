@@ -34,7 +34,7 @@
     title-data-test="slos-addslo-title"
   >
     <template #actions>
-      <OButton variant="outline" size="sm-action" @click="cancel">
+      <OButton variant="outline" size="sm-action" data-test="slos-addslo-cancel" @click="cancel">
         {{ t("common.cancel") }}
       </OButton>
       <OButton
@@ -42,7 +42,7 @@
         size="sm-action"
         :loading="saving"
         data-test="slos-addslo-save"
-        @click="save"
+        @click="save()"
       >
         {{ t("common.save") }}
       </OButton>
@@ -582,6 +582,7 @@
         </OFormSection>
       </div>
     </div>
+    <EditorDraftDialogs :draft="sloDraft" />
   </OPageLayout>
 </template>
 
@@ -618,6 +619,9 @@ import { formatTarget, formatWindow, sliTypeLabel } from "@/composables/useSloFo
 import { smallestLegalSlice } from "@/utils/slos/alertSource";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { SloEligibleAlert } from "@/ts/interfaces/slo";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 
 const { t } = useI18nTyped();
 const route = useRoute();
@@ -1329,7 +1333,8 @@ const saveSlo = useMutation(() =>
   ),
 );
 
-async function save() {
+/** Resolves true once the SLO is saved; `navigate: false` keeps the user on the page. */
+async function save({ navigate = true }: { navigate?: boolean } = {}): Promise<boolean> {
   // Block the request outright. Sending a knowingly-invalid definition just to
   // read the server's rejection is what produced "Request failed with status
   // code 422" with no indication of which field was at fault.
@@ -1339,14 +1344,16 @@ async function save() {
     // so a banner alone still leaves the user hunting for it.
     await scrollToFirstError();
     toast({ variant: "error", message: t("alerts.messages.fixHighlightedFields") });
-    return;
+    return false;
   }
 
   saving.value = true;
   try {
     await saveSlo.mutateAsync(payload());
     toast({ variant: "success", message: t("slos.saved") });
-    router.push(backTarget.value);
+    sloDraft.markSaved();
+    if (navigate) router.push(backTarget.value);
+    return true;
   } catch (e: any) {
     // The backend's budget rejection carries its arithmetic (§6b.4d); show it
     // verbatim rather than replacing it with a generic message. A rejected
@@ -1361,22 +1368,61 @@ async function save() {
         e?.message ||
         t("slos.saveFailed"),
     });
+    return false;
   } finally {
     saving.value = false;
   }
 }
 
-function cancel() {
-  router.push(backTarget.value);
+async function cancel() {
+  if (await sloDraft.confirmLeave()) router.push(backTarget.value);
 }
+
+interface SloDraftData {
+  form: Record<string, unknown>;
+  groupBy: string[];
+  metricsLanguage: "sql" | "prom_ql";
+}
+
+const sloDraftSnapshot = (): SloDraftData => ({
+  form: JSON.parse(JSON.stringify(form)),
+  groupBy: [...groupByList.value],
+  metricsLanguage: metricsLanguage.value,
+});
+
+// The edited SLO as the form shows it after loading; the raw item carries live status that changes every minute.
+let serverSlo: SloDraftData | null = null;
+
+const sloDraft = useEditorDraft<SloDraftData>({
+  kind: "slo",
+  entityLabel: () => t("common.editorDraft.entities.slo"),
+  entityId: () => sloId.value,
+  snapshot: sloDraftSnapshot,
+  apply: async (data) => {
+    // The language goes first so the shape watchers see the draft's own language, not a flip.
+    onMetricsLanguageChange(data.metricsLanguage);
+    Object.assign(form, JSON.parse(JSON.stringify(data.form)));
+    groupByList.value = [...data.groupBy];
+    await loadStreams(form.config.stream_type);
+  },
+  base: () => (isEdit.value ? serverSlo : undefined),
+  save: () => save({ navigate: false }),
+});
 
 onMounted(async () => {
   // Hydrate the SLO first so an edit reports its stored stream_type, then load
   // that type's streams — otherwise the picker opens empty and the stream the
   // SLO already uses looks unset.
-  await load();
+  await load().catch((e: unknown) => {
+    if ((e as { response?: { status?: number } } | null)?.response?.status === 404) {
+      deleteEditorDraftsFor({ kind: "slo", org: String(org.value ?? ""), entityId: sloId.value });
+    }
+    throw e;
+  });
   await loadStreams(form.config.stream_type);
   // The stream watcher does not fire for the hydrated value.
   await loadStreamFields(form.config.stream ?? "");
+  if (isEdit.value) serverSlo = sloDraftSnapshot();
+  await sloDraft.start();
 });
 </script>

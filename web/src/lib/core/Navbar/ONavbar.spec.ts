@@ -149,6 +149,18 @@ describe("ONavbar", () => {
       expect(wrapper.findAll('[data-test^="nav-group-"]')).toHaveLength(0);
     });
 
+    it("draws placeholder tiles while the menu is loading", () => {
+      wrapper = mountNavbar({ linksList: [], loading: true });
+      expect(wrapper.find('[data-test="navbar-rail-skeleton"]').exists()).toBe(true);
+      expect(wrapper.findAll('[data-test^="menu-link-"]')).toHaveLength(0);
+    });
+
+    it("replaces the placeholder tiles with the menu once it is ready", () => {
+      wrapper = mountNavbar({ loading: false });
+      expect(wrapper.find('[data-test="navbar-rail-skeleton"]').exists()).toBe(false);
+      expect(wrapper.findAll('[data-test^="menu-link-"]')).toHaveLength(3);
+    });
+
     it("passes the paywall verdict for each plain link's destination to its tile", () => {
       paywalled.add("/logs");
       wrapper = mountNavbar();
@@ -207,7 +219,7 @@ describe("ONavbar", () => {
       const reliability = wrapper.find('[data-test="nav-group-reliability"]');
       expect(reliability.exists()).toBe(true);
       expect(reliability.attributes("data-children")).toBe(
-        "alertList,alertDestinations,alertTemplates,alertLibrary,alertCalibration,onCallResponses,onCallTeams,onCallRouting",
+        "alertList,alertDestinations,alertTemplates,alertLibrary,alertCalibration,onCallResponses,onCallTeams,onCallRouting,onCallMine",
       );
       expect(reliability.attributes("data-filtered")).toBe(
         "sloList,incidentList,downtimes,alertSources",
@@ -645,6 +657,17 @@ describe("ONavbar", () => {
       await shortRouterInstance.push("/x4");
       await flushPromises();
       expect(nav.scrollTop).toBe(30);
+    });
+
+    it("a query-only replace after a rail click leaves the half-faded tile where the pointer is", async () => {
+      await mountShort();
+      clickTile("x4");
+      await shortRouterInstance.push("/x4");
+      await flushPromises();
+      expect(nav.scrollTop).toBe(0);
+      await shortRouterInstance.replace({ path: "/x4", query: { period: "15m" } });
+      await flushPromises();
+      expect(nav.scrollTop).toBe(0);
     });
 
     it("a flyout-item click marks through the injected function", async () => {

@@ -18,6 +18,7 @@ import { flushPromises, shallowMount } from "@vue/test-utils";
 import { inject, reactive } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
 import { AUTO_RUN_STORAGE_KEY, useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
+import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
 
 const MINUTE = 60 * 1_000_000;
 
@@ -37,6 +38,7 @@ vi.mock("vue-router", () => ({
     replace: routerReplace,
     back: vi.fn(),
     options: { history: { state: { back: null } } },
+    afterEach: vi.fn(() => vi.fn()),
   }),
   onBeforeRouteLeave: vi.fn(),
   onBeforeRouteUpdate: vi.fn(),
@@ -60,8 +62,15 @@ const dashboard = {
   title: "Dashboard",
   variables: { list: [] },
   tabs: [
-    { tabId: "t1", name: "Tab 1", panels: [{ id: "P2", config: {} }] },
-    { tabId: "t2", name: "Tab 2", panels: [] },
+    {
+      tabId: "t1",
+      name: "Tab 1",
+      panels: [
+        { id: "P2", config: {} },
+        { id: "P3", config: {} },
+      ],
+    },
+    { tabId: "t2", name: "Tab 2", panels: [{ id: "P4", config: {} }] },
   ],
 };
 
@@ -336,6 +345,39 @@ describe("ViewDashboard time range gate", () => {
 
     expect(refreshButton().props("variant")).toBe("pending");
     expect(refreshTooltip()).toBe("Refresh to apply the time range and variable changes");
+  });
+
+  describe("single-panel refresh targets", () => {
+    afterEach(() => panelRefreshTargets.clear());
+
+    it("a panel's own refresh keeps every earlier unsettled target", async () => {
+      await mountDashboard();
+
+      wrapper.vm.refreshPanelRequest("P2", false);
+      wrapper.vm.refreshPanelRequest("P3", false);
+
+      expect([...panelRefreshTargets]).toEqual([
+        ["P2", false],
+        ["P3", false],
+      ]);
+    });
+
+    it("a refresh that sets no panel time adds no target, since that panel never loads", async () => {
+      await mountDashboard();
+
+      wrapper.vm.refreshPanelRequest("missing", false);
+
+      expect(panelRefreshTargets.size).toBe(0);
+    });
+
+    it("a refresh of a panel on another tab adds no target, since it never loads", async () => {
+      await mountDashboard();
+
+      wrapper.vm.refreshPanelRequest("P4", false);
+
+      expect(wrapper.vm.currentTimeObjPerPanel.P4).toBeDefined();
+      expect(panelRefreshTargets.size).toBe(0);
+    });
   });
 
   describe("everything that loads data reads the applied range", () => {

@@ -51,7 +51,6 @@ export function promqlPanelSchema(args: PanelArgs): Record<string, any> {
       axis_border_show: true,
       unit: args.unit,
       unit_custom: null,
-      // The area/bar converter reads `mark_line`; `mark_lines` is only read by the newer chart types.
       mark_line: (args.markLines ?? []).map((m) => ({
         type: "yAxis",
         value: m.value,

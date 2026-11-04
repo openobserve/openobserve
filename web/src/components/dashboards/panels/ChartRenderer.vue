@@ -77,6 +77,7 @@ import {
   onActivated,
   onDeactivated,
   inject,
+  toRaw,
   type PropType,
 } from "vue";
 import type { I18nText } from "@/types/i18n";
@@ -96,6 +97,11 @@ import {
   SankeyChart,
   TreeChart,
   GraphChart,
+  PictorialBarChart,
+  TreemapChart,
+  SunburstChart,
+  FunnelChart,
+  BoxplotChart,
 } from "echarts/charts";
 import {
   TitleComponent,
@@ -163,6 +169,11 @@ echarts.use([
   SankeyChart,
   TreeChart,
   GraphChart,
+  PictorialBarChart,
+  TreemapChart,
+  SunburstChart,
+  FunnelChart,
+  BoxplotChart,
   LabelLayout,
   UniversalTransition,
   CanvasRenderer,
@@ -311,8 +322,12 @@ export default defineComponent({
         params.seriesIndex = params?.dataIndex;
       }
 
-      // Sankey and heatmap series are not lines to single out, and unnamed heatmaps share ECharts' default name.
-      if (params?.componentSubType === "sankey" || params?.componentSubType === "heatmap") {
+      // These series are not lines to single out, and unnamed heatmaps share ECharts' default name.
+      if (
+        ["sankey", "heatmap", "treemap", "sunburst", "funnel", "graph"].includes(
+          params?.componentSubType,
+        )
+      ) {
         params.seriesName = "";
         params.seriesIndex = -1;
       }
@@ -341,6 +356,14 @@ export default defineComponent({
       throttledSetHoveredSeriesName("");
     };
 
+    // A pie legend that shows percents reads its selection from the source option, so keep it in step.
+    const syncPieLegendSelection = (selected: Record<string, boolean>) => {
+      const sourceOptions = toRaw(props.data?.options);
+      if (sourceOptions?.legend?.selected && sourceOptions.series?.[0]?.type === "pie") {
+        sourceOptions.legend.selected = selected;
+      }
+    };
+
     const legendSelectChangedFn = (params: any) => {
       // check if all series are selected (all will be false)
       if (Object.values(params.selected).every((value: any) => value === false)) {
@@ -362,7 +385,13 @@ export default defineComponent({
         if (series?._legendFollows !== undefined) {
           params.selected[series.name] = params.selected[series._legendFollows] !== false;
         }
+        // A series an override hides from the chart shows only while it is the one clicked.
+        if (series?._hiddenFromChart && params.name !== series.name) {
+          params.selected[series.name] = false;
+        }
       }
+
+      syncPieLegendSelection({ ...params.selected });
 
       // get legend
       const legendOption = chart?.getOption()?.legend[0];
@@ -381,6 +410,8 @@ export default defineComponent({
       chart?.dispatchAction({
         type: "restore",
       });
+      // Restore returns to the last full option, which may carry an isolated slice, not to all visible.
+      syncPieLegendSelection({ ...(chart?.getOption()?.legend?.[0]?.selected ?? {}) });
       // we need that toolbox datazoom button initially selected
       chart?.dispatchAction({
         type: "takeGlobalCursor",
@@ -597,7 +628,7 @@ export default defineComponent({
         followOverlayLeave(overlay);
         return;
       }
-      if (hoveredSeriesState) hoveredSeriesState.setIndex(-1, -1, -1, null);
+      hoveredSeriesState?.value?.setIndex(-1, -1, -1, null);
     };
 
     // The overlays are teleported out of the chart, so leaving one for anywhere but the chart is leaving the chart.

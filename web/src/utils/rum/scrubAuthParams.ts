@@ -17,8 +17,17 @@
 // that URL verbatim, so the sign-in tokens end up in the RUM stream.
 const AUTH_PARAM = /([?#&](?:id_token|access_token|refresh_token|code)=)[^&#]*/g;
 
-/** Replace sign-in token values in a URL's query or hash with "redacted", keeping every other parameter. */
+// A public dashboard's slug is its bearer secret: anyone holding the page URL
+// (/web/public/dashboards/<slug>) or its API URL (/api/public_dashboards/<slug>/…)
+// can read the dashboard, so neither may reach telemetry.
+const PUBLIC_SLUG = /(\/(?:public\/dashboards|api\/public_dashboards)\/)[^/?#\s]+/g;
+
+/**
+ * Replace the secrets a URL can carry with "redacted": sign-in token values in its
+ * query or hash, and a public dashboard slug in its path. Everything else is kept.
+ * Safe on any text that embeds a URL, such as a network error message.
+ */
 export function scrubAuthParams(url: string | undefined): string | undefined {
   if (!url) return url;
-  return url.replace(AUTH_PARAM, "$1redacted");
+  return url.replace(AUTH_PARAM, "$1redacted").replace(PUBLIC_SLUG, "$1redacted");
 }

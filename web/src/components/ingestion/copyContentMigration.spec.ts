@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createMemoryHistory, createRouter } from "vue-router";
 import type { Component } from "vue";
 import CredentialCodeBlock from "./CredentialCodeBlock.vue";
+import { queryClient } from "@/composables/query/queryClient";
 import { OPEN_TOKEN_PICKER, maskSecret } from "@/composables/useCredentialSnippet";
 import { FIRST_EVENT_SNIPPET_COPIED } from "@/composables/firstEvent/firstEventCopied";
 import { b64EncodeStandard } from "@/utils/formatters";
@@ -31,10 +32,32 @@ const track = vi.fn();
 vi.mock("@/services/product_analytics", () => ({
   default: { track: (...args: unknown[]) => track(...args) },
 }));
+const credentialApi = vi.hoisted(() => ({
+  get_organization_passcode: vi.fn(),
+  list_org_ingestion_tokens: vi.fn(),
+}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: credentialApi });
+});
 
 const PASSCODE = "o2tokenSECRETvalue0123456789";
+const STAGING = "stagingTOKENvalue987654321";
 const EMAIL = "you@acme.io";
 const BASIC = b64EncodeStandard(`${EMAIL}:${PASSCODE}`);
+
+const tokens = () => [
+  { name: "default", token: PASSCODE, enabled: true },
+  { name: "staging", token: STAGING, enabled: true },
+];
+
+// the credential reads settle through the query client's own timer
+const settle = async () => {
+  for (let i = 0; i < 3; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+  }
+};
 
 const makeStore = (overrides: Record<string, unknown> = {}) =>
   createStore({
@@ -47,10 +70,7 @@ const makeStore = (overrides: Record<string, unknown> = {}) =>
       organizationData: {
         organizationPasscode: PASSCODE,
         organizationPasscodeForbidden: false,
-        orgTokens: [
-          { name: "default", token: PASSCODE, enabled: true },
-          { name: "staging", token: "stagingTOKENvalue987654321", enabled: true },
-        ],
+        orgTokens: tokens(),
         rumToken: { rum_token: "" },
         organizationSettings: {},
         ...overrides,
@@ -59,6 +79,27 @@ const makeStore = (overrides: Record<string, unknown> = {}) =>
     mutations: {
       setOrganizationPasscode(state: any, value: string) {
         state.organizationData.organizationPasscode = value;
+      },
+      setOrganizationPasscodeForbidden(state: any, value: boolean) {
+        state.organizationData.organizationPasscodeForbidden = value;
+      },
+      setOrganizationPasscodeUser() {},
+      setOrgTokens(state: any, value: unknown[]) {
+        state.organizationData.orgTokens = value;
+      },
+    },
+    actions: {
+      setOrganizationPasscode({ commit }, value: string) {
+        commit("setOrganizationPasscode", value);
+      },
+      setOrganizationPasscodeForbidden({ commit }, value: boolean) {
+        commit("setOrganizationPasscodeForbidden", value);
+      },
+      setOrganizationPasscodeUser({ commit }, value: string) {
+        commit("setOrganizationPasscodeUser", value);
+      },
+      setOrgTokens({ commit }, value: unknown[]) {
+        commit("setOrgTokens", value);
       },
     },
   });
@@ -80,6 +121,17 @@ const FALLBACK_ONLY = new Set([
   "./setupCard/DataSourceSetupCard.vue",
   "./ai/AIIntegrationDetail.vue",
 ]);
+
+beforeEach(() => {
+  credentialApi.list_org_ingestion_tokens.mockResolvedValue({ data: { data: tokens() } });
+  credentialApi.get_organization_passcode.mockResolvedValue({
+    data: { data: { passcode: PASSCODE, user: EMAIL } },
+  });
+});
+
+afterEach(() => {
+  queryClient.clear();
+});
 
 const pageModules = import.meta.glob<{ default: Component }>("./**/*.vue");
 const migratedPages = Object.keys(sources)
@@ -122,7 +174,7 @@ describe("CopyContent migration", () => {
           stubs: { IngestionDocLink: true, AIIntegrationCard: true, SetupCardRenderer: true },
         },
       });
-      await flushPromises();
+      await settle();
       const blocks = wrapper.findAllComponents(CredentialCodeBlock);
       if (FALLBACK_ONLY.has(path)) {
         expect(blocks.length).toBeLessThanOrEqual(1);
@@ -146,16 +198,19 @@ describe("CredentialCodeBlock", () => {
 
   const router = makeRouter();
 
-  const mountBlock = (
+  const mountBlock = async (
     content = template,
     store = makeStore(),
     provide: Record<symbol, unknown> = {},
-  ) =>
-    mount(CredentialCodeBlock, {
+  ) => {
+    const wrapper = mount(CredentialCodeBlock, {
       props: { content, slug: "curl" },
       global: { plugins: [store, router], provide: { store, ...provide } },
       attachTo: document.body,
     });
+    await settle();
+    return wrapper;
+  };
 
   beforeEach(async () => {
     await router.push("/ingestion/custom/logs/curl");
@@ -171,7 +226,7 @@ describe("CredentialCodeBlock", () => {
   });
 
   it("shows the masked snippet and copies the real one with the token name", async () => {
-    const wrapper = mountBlock();
+    const wrapper = await mountBlock();
     const pre = wrapper.find('[data-test="ingestion-curl-code-block-pre"]');
     expect(pre.text()).toContain(maskSecret(PASSCODE));
     expect(wrapper.html()).not.toContain(PASSCODE);
@@ -185,37 +240,39 @@ describe("CredentialCodeBlock", () => {
     wrapper.unmount();
   });
 
-  it("insets the code from the block border, as CopyContent did", () => {
-    const wrapper = mountBlock();
+  it("insets the code from the block border, as CopyContent did", async () => {
+    const wrapper = await mountBlock();
     const pre = wrapper.find('[data-test="ingestion-curl-code-block-pre"]');
     expect(pre.attributes("style")).toContain("padding: 0.75rem");
     wrapper.unmount();
   });
 
-  it("masks [BASIC_PASSCODE] too", () => {
-    const wrapper = mountBlock("Authorization: Basic [BASIC_PASSCODE]");
+  it("masks [BASIC_PASSCODE] too", async () => {
+    const wrapper = await mountBlock("Authorization: Basic [BASIC_PASSCODE]");
     expect(wrapper.html()).not.toContain(BASIC);
     expect(wrapper.text()).toContain(maskSecret(BASIC));
     wrapper.unmount();
   });
 
-  it("says the hidden token is included, with no click-to-copy hint", () => {
-    const wrapper = mountBlock();
+  it("says the hidden token is included, with no click-to-copy hint", async () => {
+    const wrapper = await mountBlock();
     expect(wrapper.find('[data-test="ingestion-curl-code-block-hint"]').text()).toBe(
       "Copy includes the org's ingestion token, which stays hidden here.",
     );
     wrapper.unmount();
   });
 
-  it("shows no hint for a snippet without a token", () => {
-    const wrapper = mountBlock("curl https://h/api/acme-prod/default/_json");
+  it("shows no hint for a snippet without a token", async () => {
+    const wrapper = await mountBlock("curl https://h/api/acme-prod/default/_json");
     expect(wrapper.find('[data-test="ingestion-curl-code-block-hint"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
   it("restarts the page's first-event watch on a copy, like every other copy", async () => {
     const copied = vi.fn();
-    const wrapper = mountBlock(template, makeStore(), { [FIRST_EVENT_SNIPPET_COPIED]: copied });
+    const wrapper = await mountBlock(template, makeStore(), {
+      [FIRST_EVENT_SNIPPET_COPIED]: copied,
+    });
     await wrapper.find('[data-test="ingestion-curl-code-block-copy-btn"]').trigger("click");
     await flushPromises();
     expect(copied).toHaveBeenCalledTimes(1);
@@ -223,7 +280,7 @@ describe("CredentialCodeBlock", () => {
   });
 
   it("copies with no first-event watch on the page", async () => {
-    const wrapper = mountBlock();
+    const wrapper = await mountBlock();
     await wrapper.find('[data-test="ingestion-curl-code-block-copy-btn"]').trigger("click");
     await flushPromises();
     expect(copyMock).toHaveBeenCalledTimes(1);
@@ -232,7 +289,7 @@ describe("CredentialCodeBlock", () => {
 
   it("opens the injected token picker from the toolbar link", async () => {
     const openPicker = vi.fn();
-    const wrapper = mountBlock(template, makeStore(), { [OPEN_TOKEN_PICKER]: openPicker });
+    const wrapper = await mountBlock(template, makeStore(), { [OPEN_TOKEN_PICKER]: openPicker });
     const link = wrapper.find('[data-test="ingestion-curl-code-block-token-link"]');
     expect(link.text()).toBe("org token · default");
     await link.trigger("click");
@@ -242,21 +299,22 @@ describe("CredentialCodeBlock", () => {
 
   it("recomputes the name, the mask and the copied token when the token changes", async () => {
     const store = makeStore();
-    const wrapper = mountBlock(template, store);
-    store.commit("setOrganizationPasscode", "stagingTOKENvalue987654321");
+    const wrapper = await mountBlock(template, store);
+    store.commit("setOrganizationPasscode", STAGING);
     await flushPromises();
     expect(wrapper.find('[data-test="ingestion-curl-code-block-token-link"]').text()).toBe(
       "org token · staging",
     );
-    expect(wrapper.text()).toContain(maskSecret("stagingTOKENvalue987654321"));
+    expect(wrapper.text()).toContain(maskSecret(STAGING));
     await wrapper.find('[data-test="ingestion-curl-code-block-copy-btn"]').trigger("click");
     await flushPromises();
-    expect(copyMock.mock.calls[0][0]).toContain("stagingTOKENvalue987654321");
+    expect(copyMock.mock.calls[0][0]).toContain(STAGING);
     wrapper.unmount();
   });
 
-  it("shows the forbidden banner instead of a hollow snippet", () => {
-    const wrapper = mountBlock(template, makeStore({ organizationPasscodeForbidden: true }));
+  it("shows the forbidden banner instead of a hollow snippet", async () => {
+    credentialApi.get_organization_passcode.mockRejectedValue({ response: { status: 403 } });
+    const wrapper = await mountBlock(template, makeStore({ organizationPasscodeForbidden: true }));
     expect(
       wrapper.find('[data-test="ingestion-curl-code-block-passcode-forbidden"]').exists(),
     ).toBe(true);
@@ -264,8 +322,8 @@ describe("CredentialCodeBlock", () => {
     wrapper.unmount();
   });
 
-  it("renders a snippet without credentials unmasked, with no token link", () => {
-    const wrapper = mountBlock("echo hello");
+  it("renders a snippet without credentials unmasked, with no token link", async () => {
+    const wrapper = await mountBlock("echo hello");
     expect(wrapper.find('[data-test="ingestion-curl-code-block-reveal-btn"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="ingestion-curl-code-block-token-link"]').exists()).toBe(false);
     wrapper.unmount();

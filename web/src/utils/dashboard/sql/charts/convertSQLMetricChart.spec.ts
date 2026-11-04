@@ -115,6 +115,12 @@ describe("applyMetricChart", () => {
       expect(ctx.options.series[0]._metricText).toBe("300");
     });
 
+    it("carries the unformatted value and field name for the drilldown", () => {
+      const ctx = makeMockContext();
+      applyMetricChart(ctx);
+      expect(ctx.options.series[0]).toMatchObject({ _metricRaw: 300, _metricName: "Value" });
+    });
+
     it("stores _metricLayout sized to the panel for icon positioning", () => {
       const ctx = makeMockContext();
       applyMetricChart(ctx);

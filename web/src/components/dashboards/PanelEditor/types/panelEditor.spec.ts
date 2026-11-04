@@ -320,10 +320,24 @@ describe("panelEditor types and utilities", () => {
         expect(ALL_CHART_TYPES).toContain("markdown");
         expect(ALL_CHART_TYPES).toContain("custom_chart");
         expect(ALL_CHART_TYPES).toContain("state-timeline");
+        expect(ALL_CHART_TYPES).toContain("sunburst");
+        expect(ALL_CHART_TYPES).toContain("funnel");
+        expect(ALL_CHART_TYPES).toContain("node-graph");
+        expect(ALL_CHART_TYPES).toContain("alert-list");
+        expect(ALL_CHART_TYPES).toContain("flame-graph");
+        expect(ALL_CHART_TYPES).toContain("boxplot");
+        expect(ALL_CHART_TYPES).toContain("logs");
+        expect(ALL_CHART_TYPES).toContain("hostmap");
+        expect(ALL_CHART_TYPES).toContain("treemap");
       });
 
-      it("should have 20 chart types", () => {
-        expect(ALL_CHART_TYPES.length).toBe(20);
+      it("includes the bar gauge, which needs aggregation", () => {
+        expect(ALL_CHART_TYPES).toContain("bar-gauge");
+        expect(AGGREGATION_REQUIRED_CHART_TYPES).toContain("bar-gauge");
+      });
+
+      it("lists each chart type once", () => {
+        expect(new Set(ALL_CHART_TYPES).size).toBe(ALL_CHART_TYPES.length);
       });
     });
 
@@ -348,6 +362,8 @@ describe("panelEditor types and utilities", () => {
         expect(AGGREGATION_REQUIRED_CHART_TYPES).toContain("heatmap");
         expect(AGGREGATION_REQUIRED_CHART_TYPES).toContain("geomap");
         expect(AGGREGATION_REQUIRED_CHART_TYPES).toContain("sankey");
+        expect(AGGREGATION_REQUIRED_CHART_TYPES).toContain("treemap");
+        expect(AGGREGATION_REQUIRED_CHART_TYPES).toContain("funnel");
       });
 
       it("should not contain table chart type", () => {
@@ -366,8 +382,10 @@ describe("panelEditor types and utilities", () => {
         expect(AGGREGATION_REQUIRED_CHART_TYPES).not.toContain("custom_chart");
       });
 
-      it("should have 16 chart types", () => {
-        expect(AGGREGATION_REQUIRED_CHART_TYPES.length).toBe(16);
+      it("lists each chart type once", () => {
+        expect(new Set(AGGREGATION_REQUIRED_CHART_TYPES).size).toBe(
+          AGGREGATION_REQUIRED_CHART_TYPES.length,
+        );
       });
     });
 
@@ -380,8 +398,19 @@ describe("panelEditor types and utilities", () => {
       });
 
       it("all chart types should be accounted for", () => {
+        // Distribution summarises raw values, so it does not require aggregation.
         const regularChartTypes = ALL_CHART_TYPES.filter(
-          (type) => !["html", "markdown", "custom_chart"].includes(type),
+          (type) =>
+            ![
+              "html",
+              "markdown",
+              "custom_chart",
+              "distribution",
+              "alert-list",
+              "flame-graph",
+              "boxplot",
+              "logs",
+            ].includes(type),
         );
 
         regularChartTypes.forEach((type) => {

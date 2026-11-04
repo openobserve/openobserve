@@ -41,26 +41,25 @@ use usage_reporting::http_report_metrics;
 
 use crate::{search as SearchService, service::setup_tracing_with_trace_id};
 
+pub mod ack;
 pub mod alert;
 #[cfg(feature = "enterprise")]
 pub mod alert_calibration;
+pub mod auto_investigate_decisions;
 pub mod backfill;
 pub mod composite;
 pub mod composite_graph_lock;
-#[cfg(feature = "enterprise")]
-pub mod deduplication;
 pub mod derived_streams;
 pub mod destination_usage;
 pub mod destinations;
 pub mod downtimes;
 pub mod external_alerts;
 #[cfg(feature = "enterprise")]
-pub mod grouping;
-#[cfg(feature = "enterprise")]
 pub mod incidents;
-pub mod notifications;
+pub mod lifecycle;
 #[cfg(feature = "enterprise")]
-pub mod org_config;
+pub mod mute;
+pub mod notifications;
 mod prom_rule;
 #[cfg(feature = "enterprise")]
 pub mod rca_live;
@@ -74,6 +73,10 @@ pub mod rca_steering;
 pub mod rca_turn;
 pub mod recovery;
 pub mod scheduler;
+pub mod slack_destination;
+pub mod slack_investigate;
+pub mod slack_publish;
+pub mod slack_view;
 pub mod templates;
 
 #[async_trait]
@@ -541,7 +544,6 @@ impl QueryConditionExt for QueryCondition {
                 sort_by: None,
                 quick_mode: false,
                 track_total_hits: false,
-                query_type: "".to_string(),
                 uses_zo_fn: false,
                 query_fn: self.vrl_function.clone(),
                 skip_wal: false,
@@ -579,22 +581,11 @@ impl QueryConditionExt for QueryCondition {
             let req = config::meta::search::Request {
                 query: config::meta::search::Query {
                     sql: sql.clone(),
-                    from: 0,
                     size,
                     start_time: start_time.unwrap(),
                     end_time,
-                    quick_mode: false,
-                    query_type: "".to_string(),
-                    track_total_hits: false,
-                    uses_zo_fn: false,
                     query_fn: encode_query_fn,
-                    skip_wal: false,
-                    sampling_config: None,
-                    sampling_ratio: None,
-                    streaming_output: false,
-                    streaming_id: None,
-                    histogram_interval: 0,
-                    timezone: None,
+                    ..Default::default()
                 },
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],
@@ -891,7 +882,7 @@ async fn check_query_streams(
 
         if let Some(settings) = infra::schema::get_settings(org_id, &stream, stream_type).await {
             let max_query_range = settings.max_query_range;
-            if max_query_range > 0 && period > max_query_range * 60 {
+            if max_query_range > 0 && period > max_query_range.saturating_mul(60) {
                 return Err(anyhow::anyhow!(
                     "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
                 ));
@@ -919,23 +910,12 @@ async fn run_alert_count_query(
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: config::meta::alerts::level::count_query_sql(sql),
-            from: 0,
             // COUNT(*) over a subquery yields exactly one row.
             size: 1,
             start_time,
             end_time,
-            quick_mode: false,
-            query_type: "".to_string(),
-            track_total_hits: false,
-            uses_zo_fn: false,
             query_fn: None, // guard upstream: hybrid excludes VRL alerts
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],

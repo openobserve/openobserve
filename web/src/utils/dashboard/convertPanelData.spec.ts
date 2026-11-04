@@ -280,9 +280,37 @@ describe("convertPanelData", () => {
         mockAnnotations,
       );
 
-      expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, mockData);
+      expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, mockData, undefined);
       expect(result.chartType).toBe("custom_chart");
       expect(result).toHaveProperty("customData");
+    });
+
+    it("passes the chart context through to the sandbox", async () => {
+      const panelSchema = { type: "custom_chart", queries: [{ query: "SELECT * FROM test" }] };
+      const context = {
+        variables: { service: "api" },
+        timeRange: { start: 1, end: 2 },
+        timezone: "UTC",
+        theme: "light" as const,
+      };
+
+      const { runJavaScriptCode } = await import("./convertCustomChartData");
+      await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+        false,
+        undefined,
+        context,
+      );
+
+      expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, mockData, context);
     });
 
     it("should handle custom chart type with no data", async () => {
@@ -1298,7 +1326,7 @@ describe("convertPanelData", () => {
         mockAnnotations,
       );
 
-      expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, promqlData);
+      expect(runJavaScriptCode).toHaveBeenCalledWith(panelSchema, promqlData, undefined);
       expect(result.chartType).toBe("custom_chart");
     });
   });

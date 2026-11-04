@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div data-test="add-report-folder-select" class="o2-input" style="width: 15.625rem">
                 <SelectFolderDropdown
+                  :key="folderPickerKey"
                   :activeFolderId="selectedReportFolderId"
                   type="reports"
                   :disableDropdown="isEditingReport"
@@ -618,13 +619,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
   </OPageLayout>
-  <ConfirmDialog
-    v-model="dialog.show"
-    :title="dialog.title"
-    :message="dialog.message"
-    @update:ok="dialog.okCallback"
-    @update:cancel="dialog.show = false"
-  />
+  <EditorDraftDialogs :draft="reportDraft" />
 </template>
 
 <script setup lang="ts">
@@ -644,7 +639,10 @@ import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import { useListBackNavigation } from "@/composables/useListBackNavigation";
 
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { reportDraftId } from "@/components/reports/reportDraft";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useReo } from "@/services/reodotdev_analytics";
 import SelectFolderDropdown from "@/components/common/sidebar/SelectFolderDropDown.vue";
@@ -765,14 +763,6 @@ const formData = ref(defaultReport);
 
 const { track } = useReo();
 
-const dialog = ref({
-  show: false,
-  // raw("") is only the empty placeholder — the real values are assigned from t().
-  title: raw(""),
-  message: raw(""),
-  okCallback: () => {},
-});
-
 const timeTabs = [
   {
     label: t("reports.scheduleNow"),
@@ -837,8 +827,7 @@ const buildFormValues = (overrides: Partial<CreateReportForm> = {}): CreateRepor
   ...overrides,
 });
 
-// Seed the form's values (create-query / edit prefill). Async-arriving data is
-// applied with `form.reset(values)`, not a per-field setFieldValue loop.
+// Replaces every value at once, for the edit prefill and a restored draft.
 const seedForm = async (values: CreateReportForm) => {
   await nextTick();
   form.reset(values);
@@ -850,9 +839,16 @@ const snapshot = () =>
   JSON.stringify({
     // `variables` are now form-owned, so form.state.values already covers them.
     values: form.state.values ?? {},
+    // The report's folder lives outside the form, so moving it is an edit of its own.
+    folderId: selectedReportFolderId.value,
   });
 
 onBeforeMount(async () => {
+  const initialReportFolderId = selectedReportFolderId.value;
+  const initialQuery = router.currentRoute.value.query;
+  // Needs nothing fetched, so it is seeded before the user can flip the switch.
+  if (!(initialQuery.report_id || initialQuery.name) && initialQuery.type === "cached")
+    form.setFieldValue("isCachedReport", true, { dontUpdateMeta: true });
   await getFoldersListByType(store, "reports");
   await getDashboaordFolders();
 
@@ -860,8 +856,10 @@ onBeforeMount(async () => {
   isEditingReport.value = !!(query?.report_id || query?.name);
 
   if (!isEditingReport.value) {
-    await setInitialReportData();
-    originalReportData.value = snapshot();
+    const seeded = await setInitialReportData();
+    // Built from what the page seeds, not read back, so edits made while loading still count as changes.
+    originalReportData.value = JSON.stringify({ values: seeded, folderId: initialReportFolderId });
+    await reportDraft.start();
   } else {
     isFetchingReport.value = true;
 
@@ -878,8 +876,21 @@ onBeforeMount(async () => {
         await setupEditingReport(res.data);
         originalReportData.value = snapshot();
         if (query?.step === "destinations") step.value = 3;
+        serverReportId = reportDraftId(
+          selectedReportFolderId.value,
+          String(res.data?.name ?? reportName),
+        );
+        serverReportBase = reportDraftBase();
+        await reportDraft.start();
       })
       .catch((err) => {
+        if (err?.response?.status === 404 && reportName) {
+          deleteEditorDraftsFor({
+            kind: "report",
+            org,
+            entityId: reportDraftId(selectedReportFolderId.value, reportName),
+          });
+        }
         // Optional chaining throughout: this catch also receives non-HTTP
         // rejections (a TypeError from malformed data, or the literal `true`
         // setDashboardOptions rejects with), so `err.response` may be undefined.
@@ -1040,16 +1051,28 @@ const setInitialReportData = async () => {
   // Load the options the query-seeded selections need (no cascade @update fires
   // for programmatic seeding, so load them here).
   if (dashboardFolderId) await setDashboardOptions(dashboardFolderId);
-  if (dashboardFolderId && dashboardId) setDashboardTabOptions(dashboardId);
 
-  const row = {
+  const seededRow = {
     ...createReportDefaults().dashboards[0],
     folder: dashboardFolderId ?? "",
     dashboard: dashboardFolderId && dashboardId ? dashboardId : "",
     tabs: dashboardId && tabId ? tabId : "",
   };
 
-  await seedForm(buildFormValues({ isCachedReport: cached, dashboards: [row] }));
+  // Per-field writes into still-untouched fields only: the user may have typed or picked while the fetches ran.
+  const seed = { dontUpdateMeta: true };
+  const row = form.state.values.dashboards?.[0];
+  const folderUntouched = !row?.folder;
+  if (folderUntouched && seededRow.folder)
+    form.setFieldValue("dashboards[0].folder", seededRow.folder, seed);
+  if (folderUntouched && seededRow.dashboard && !row?.dashboard) {
+    setDashboardTabOptions(seededRow.dashboard);
+    form.setFieldValue("dashboards[0].dashboard", seededRow.dashboard, seed);
+  }
+  if (folderUntouched && seededRow.tabs && !row?.tabs)
+    form.setFieldValue("dashboards[0].tabs", seededRow.tabs, seed);
+
+  return buildFormValues({ isCachedReport: cached, dashboards: [seededRow] });
 };
 
 // Cascade: USER picks a folder → clear that row's dependent dashboard/tabs + load
@@ -1068,34 +1091,38 @@ const onFolderSelection = async (id: string, index = 0) => {
   }
 };
 
+let dashboardOptionsRequest = 0;
+
 const setDashboardOptions = (id: string) => {
-  dashboardOptions.value.length = 0;
+  const request = ++dashboardOptionsRequest;
+  dashboardOptions.value = [];
   isFetchingDashboard.value = true;
   return new Promise((resolve, reject) => {
     dashboardService
       .list(0, 10000, "name", false, "", store.state.selectedOrganization.identifier, id, "")
       .then((response: any) => {
-        response.data.dashboards
+        // A later folder pick owns the list; an older response landing after it must not fill it.
+        if (request !== dashboardOptionsRequest) return resolve(true);
+        dashboardOptions.value = response.data.dashboards
           .map((dash: any) => Object.values(dash).filter((dash) => dash)[0])
-          .forEach(
-            (dashboard: { title: string; dashboardId: string; tabs: any[]; version: number }) => {
-              dashboardOptions.value.push({
-                label: raw(dashboard.title),
-                value: dashboard.dashboardId,
-                tabs: dashboard?.tabs?.map((tab) => ({
-                  label: raw(tab.name),
-                  value: tab.tabId,
-                })) || [{ label: t("reports.destinationDefault"), value: "default" }],
-                version: dashboard.version,
-              });
-              options.value["dashboards"] = [...dashboardOptions.value];
-            },
+          .map(
+            (dashboard: { title: string; dashboardId: string; tabs: any[]; version: number }) => ({
+              label: raw(dashboard.title),
+              value: dashboard.dashboardId,
+              tabs: dashboard?.tabs?.map((tab) => ({
+                label: raw(tab.name),
+                value: tab.tabId,
+              })) || [{ label: t("reports.destinationDefault"), value: "default" }],
+              version: dashboard.version,
+            }),
           );
-
+        options.value["dashboards"] = [...dashboardOptions.value];
         resolve(true);
       })
       .catch((_err) => reject(true))
-      .finally(() => (isFetchingDashboard.value = false));
+      .finally(() => {
+        if (request === dashboardOptionsRequest) isFetchingDashboard.value = false;
+      });
   });
 };
 
@@ -1116,6 +1143,73 @@ const setDashboardTabOptions = (dashboardId: any) => {
 };
 
 const showCustomDimensions = ref(false);
+
+interface ReportDraftData {
+  values: CreateReportForm;
+  step: number;
+  folderId: string;
+  showCustomDimensions: boolean;
+}
+
+// Taken at load, so moving the report to another folder in the form keeps the same draft.
+let serverReportId: string | null = null;
+let serverReportBase: { values: CreateReportForm; folderId: string } | null = null;
+// Set while the leave dialog's Save runs, so a successful save does not navigate on its own.
+let leaveSave: { saved: boolean } | null = null;
+
+const reportDraftBase = () => {
+  const values = JSON.parse(JSON.stringify(form.state.values ?? {})) as CreateReportForm;
+  // The picker fills a relative range's from/to from the current time, so they are not server state.
+  values.dashboards = (values.dashboards ?? []).map((row) =>
+    row.timerange?.type === "relative"
+      ? { ...row, timerange: { ...row.timerange, from: 0, to: 0 } }
+      : row,
+  );
+  return { values, folderId: selectedReportFolderId.value };
+};
+
+// The picker reads its active folder only on mount, so a restored folder needs a fresh picker.
+const folderPickerKey = ref(0);
+
+const applyReportDraft = async (data: ReportDraftData) => {
+  selectedReportFolderId.value = data.folderId || selectedReportFolderId.value;
+  folderPickerKey.value++;
+  showCustomDimensions.value = data.showCustomDimensions;
+  const row = data.values.dashboards?.[0];
+  // The selects only list options for a folder/dashboard the user picked, so load them for the restored row.
+  if (row?.folder) {
+    await setDashboardOptions(row.folder).catch(() => undefined);
+    if (row.dashboard) setDashboardTabOptions(row.dashboard);
+  }
+  await seedForm(buildFormValues(data.values));
+  step.value = data.step;
+};
+
+const reportDraft = useEditorDraft<ReportDraftData>({
+  kind: "report",
+  entityLabel: () => t("common.editorDraft.entities.report"),
+  entityId: () => serverReportId,
+  snapshot: () => ({
+    // form.state is a plain snapshot; the draft's change watcher needs the reactive store value.
+    values: formValuesRef.value,
+    step: step.value,
+    folderId: selectedReportFolderId.value,
+    showCustomDimensions: showCustomDimensions.value,
+  }),
+  apply: applyReportDraft,
+  base: () => (serverReportId ? serverReportBase : undefined),
+  hasChanges: () => originalReportData.value !== snapshot(),
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+});
 
 // True when EVERY dashboard row's report type is PDF — show/hide the imagePreview
 // toggle (preview only applies to PDF). Reads the form-owned rows via the mirror.
@@ -1325,6 +1419,11 @@ const saveReport = async (value: CreateReportForm) => {
           ? t("toastMessages.reports.reportUpdatedSuccessfully")
           : t("toastMessages.reports.reportSavedSuccessfully"),
       });
+      if (leaveSave) {
+        leaveSave.saved = true;
+        return;
+      }
+      reportDraft.markSaved();
       goToReports();
     })
     .catch((error) => {
@@ -1508,18 +1607,15 @@ const setupEditingReport = async (report: any) => {
   );
 };
 
-const openCancelDialog = () => {
-  if (originalReportData.value === snapshot()) {
-    goToReports();
+const openCancelDialog = async () => {
+  const hadChanges = reportDraft.hasUnsavedChanges();
+  if (!(await reportDraft.confirmLeave())) return;
+  if (!hadChanges) {
     track("Button Click", {
       button: "Cancel Report",
       page: "Add Report",
     });
-    return;
   }
-  dialog.value.show = true;
-  dialog.value.title = t("common.discardChanges");
-  dialog.value.message = t("reports.cancelReportChangesConfirm");
-  dialog.value.okCallback = goToReports;
+  goToReports();
 };
 </script>

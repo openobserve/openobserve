@@ -21,6 +21,7 @@ import { useRoute } from "vue-router";
 import SlackLinkCard from "@/components/slack/SlackLinkCard.vue";
 import SlackLinkRefusal from "@/components/slack/SlackLinkRefusal.vue";
 import { useSlackLinkOrg } from "@/composables/slack/useSlackLinkOrg";
+import { ensureBrowserRum } from "@/utils/rum/ensureBrowserRum";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { resendLinkRequestMutation, startLinkRequestMutation } from "@/services/slack.queries";
 import { useI18nTyped } from "@/types/i18n";
@@ -89,7 +90,10 @@ const sendNewLink = async (): Promise<void> => {
   }
 };
 
-onMounted(() => whenResolved(begin));
+onMounted(() => {
+  whenResolved(() => void ensureBrowserRum(org.value));
+  whenResolved(begin);
+});
 </script>
 
 <template>

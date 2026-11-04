@@ -31,8 +31,20 @@ Control endpoints (JSON):
   a delete's per-resource ``results`` (``delete_status`` other than 200 makes O2 refuse the delete),
   and 404 ``No pending confirmation`` once the confirmation was answered or dropped. An answer with
   ``"match": "<text>"`` is only served to a turn whose question contains that text, so other tests'
-  background turns never take it
+  background turns never take it. ``{"report": "<markdown>", "probable_cause"?: "<text>"}`` is served
+  to the next RCA turn (``/o2_agent/sre-rca/query/stream``) whose question contains its ``match``:
+  the replayed run's ``submit_report`` carries that markdown and probable cause; other turns never
+  take it. A non-streamed ``/query`` also takes a ``report`` answer, as its ``response``
 - ``GET  /_mock/frames``        the recorded frames file
+
+An RCA turn (``/o2_agent/sre-rca/query/stream``) is OpenObserve's durable chat: it replays the
+opencode events of one graded run (``o2ai_rca_events.json``, the core crate's ledger fixture, kept
+in step by ``rca_turn::tests::the_pytest_o2ai_mock_replays_the_graded_run_fixture``) as o2-ai forwards
+them: a ``sync_state`` frame, one ``sync`` frame per event after the request's ``known_seq``, then
+``complete`` with ``last_seq``. Without them OpenObserve ends the turn ``persistence_failed`` and
+the run never completes.
+
+``O2AI_MOCK_LOG=<path>`` also appends every recorded request as a JSON line, reset or not.
 
 o2-ai paths: ``POST /o2_agent/<agent>/query/stream`` (SSE), ``POST /o2_agent/<agent>/query``
 (JSON); every other path answers ``{}`` and is recorded (feedback, confirm, cancel, session).
@@ -42,9 +54,11 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 import threading
 import time
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -52,6 +66,8 @@ from typing import Any
 log = logging.getLogger("o2ai-mock")
 
 FRAMES_FILE = Path(__file__).with_name("o2ai_frames.json")
+RCA_EVENTS_FILE = Path(__file__).with_name("o2ai_rca_events.json")
+RCA_AGENT = "/sre-rca/"
 CONFIRMATIONS_FILE = Path(__file__).with_name("o2ai_confirmations.json")
 
 # What O2 answered o2-ai's delete with, per status, as o2-ai's perform_resource_delete reports it.
@@ -74,6 +90,7 @@ class State:
     def __init__(self) -> None:
         self.lock = threading.Lock()
         self.frames = json.loads(FRAMES_FILE.read_text())
+        self.rca_events = json.loads(RCA_EVENTS_FILE.read_text())
         self.confirmations = json.loads(CONFIRMATIONS_FILE.read_text())
         self.reset()
 
@@ -90,6 +107,9 @@ class State:
         entry = {"method": method, "path": path, "headers": headers, "body": body, "at": time.time()}
         with self.lock:
             self.requests.append(entry)
+        if os.environ.get("O2AI_MOCK_LOG"):
+            with open(os.environ["O2AI_MOCK_LOG"], "a") as f:
+                f.write(json.dumps(entry) + "\n")
         return entry
 
     def stamp(self, entry: dict[str, Any], key: str) -> None:
@@ -126,7 +146,14 @@ class State:
     def next_answer(self, query: str = "") -> dict[str, Any]:
         with self.lock:
             for i, answer in enumerate(self.queue):
-                if answer.get("match", "") in query:
+                if "report" not in answer and answer.get("match", "") in query:
+                    return self.queue.pop(i)
+            return {"turn": self.default_turn}
+
+    def next_report(self, query: str = "") -> dict[str, Any]:
+        with self.lock:
+            for i, answer in enumerate(self.queue):
+                if "report" in answer and answer.get("match", "") in query:
                     return self.queue.pop(i)
             return {"turn": self.default_turn}
 
@@ -150,6 +177,25 @@ def confirm_reply(pending: dict[str, Any], approved: bool, confirmations: dict[s
     deleted = sum(1 for r in results if r["deleted"])
     return {"approved": True, "deleted": deleted == len(results), "count": deleted, "total": len(results),
             "results": results}
+
+
+def rca_run_events(events: list[dict[str, Any]], session_id: str, answer: dict[str, Any]) -> list[dict[str, Any]]:
+    """The fixture run under this turn's opencode session, with the scripted report in its ``submit_report``."""
+    out = json.loads(json.dumps(events))
+    for event in out:
+        event["aggregateID"] = session_id
+        data = event.get("data") or {}
+        for holder in (data, data.get("info") or {}, data.get("part") or {}):
+            if "sessionID" in holder:
+                holder["sessionID"] = session_id
+        part = data.get("part") or {}
+        if part.get("type") == "tool" and part.get("tool") == "submit_report":
+            submitted = part["state"]["input"]
+            if "report" in answer:
+                submitted["markdown"] = answer["report"]
+            if "probable_cause" in answer and "verdict" in submitted:
+                submitted["verdict"]["probable_cause"] = answer["probable_cause"]
+    return out
 
 
 def error_answer(name: str, session_id: str) -> tuple[int, dict[str, Any]]:
@@ -218,7 +264,28 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.flush()
         self.close_connection = True
 
+    def _rca_turn(self, body: Any, entry: dict[str, Any]) -> None:
+        """o2-ai's durable RCA turn: sync_state, the run's events after ``known_seq``, complete."""
+        body = body if isinstance(body, dict) else {}
+        answer = STATE.next_report(str(body.get("query", "")))
+        if "error" in answer:
+            self._json(*error_answer(answer["error"], self.headers.get("x-o2-assistant-session-id", "")))
+            return
+        known_seq = int(body.get("known_seq", -1))
+        session_id = "ses_" + (self.headers.get("x-o2-assistant-session-id") or uuid.uuid4().hex)[:8]
+        events = [e for e in rca_run_events(STATE.rca_events, session_id, answer) if e["seq"] > known_seq]
+        last_seq = events[-1]["seq"] if events else known_seq
+        frames: list[dict[str, Any]] = [{"type": "sync_state", "available": True, "reason": "",
+                                         "opencode_session_id": session_id, "known_seq": known_seq,
+                                         "local_max_seq": known_seq, "behind": False}]
+        frames.extend({"type": "sync", "seq": e["seq"], "event": e} for e in events)
+        frames.append({"type": "complete", "last_seq": last_seq, "history": [], "compacted": False, "usage": {}})
+        self._sse(frames, answer.get("hold_secs", 0), entry)
+
     def _stream_turn(self, body: Any, entry: dict[str, Any]) -> None:
+        if RCA_AGENT in self.path:
+            self._rca_turn(body, entry)
+            return
         answer = STATE.next_answer(str((body or {}).get("query", "")) if isinstance(body, dict) else "")
         session_id = self.headers.get("x-o2-assistant-session-id", "")
         if "error" in answer:
@@ -233,7 +300,10 @@ class Handler(BaseHTTPRequestHandler):
             self._sse(STATE.frames["turns"][answer["turn"]], answer.get("hold_secs", 0), entry)
 
     def _query(self) -> None:
-        answer = STATE.next_answer()
+        answer = STATE.next_report()
+        if "report" in answer:
+            self._json(200, {"response": answer["report"], "history": [], "compacted": False, "usage": {}})
+            return
         if "error" in answer:
             self._json(*error_answer(answer["error"], self.headers.get("x-o2-assistant-session-id", "")))
             return

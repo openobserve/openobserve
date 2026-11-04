@@ -115,7 +115,25 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 115: create rca_steering and add the input columns to rca_runs.
 // 116: add favicon_img to status_pages.
 // 117: create the fleet tables.
-pub const DB_SCHEMA_VERSION: u64 = 118;
+// 118: add the lease columns to org_cleanup_tasks.
+// 119: create public_dashboards, public_dashboard_org_settings and public_dashboard_outbox.
+// 120: add search_type to search_queue.
+// 121: point pre-run incidents' run summary at their newest v1 report.
+// 122: add firing_started_at to alert_states.
+// 123: create alert_acks.
+// 124: add alert_groups, end_on_clear and mute_source to downtimes.
+// 125: create slack_alert_messages.
+// 126: add held_action to slack_link_requests.
+// 127: add group_label_set to alert_states.
+// 128: widen alert_dedup_state.fingerprint to varchar(256).
+// 129: add source, query_key, streams, run_count, updated_at and status to query_history.
+// 130: add suppress_repeats to alerts.
+// 131: org domain mapping migrations
+// 132: create oncall_chat_messages; add oncall_teams slack columns.
+// 133: add status page run streaks to synthetics.
+// 134: add write_version to llm_dataset_items, so one write request is one Dataset version.
+// 135: create the three workflow HTTP trigger tables; index workflow_run_data.run_id.
+pub const DB_SCHEMA_VERSION: u64 = 135;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -515,6 +533,11 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
         "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
         SyntheticsReloadClass::Hot,
     ),
+    ("ZO_SYNTHETICS_LEASE_BATCH_SIZE", SyntheticsReloadClass::Hot),
+    (
+        "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK",
+        SyntheticsReloadClass::Hot,
+    ),
     // Were `HotViaLimits` while these lived in `o2_enterprise` and had to be
     // pushed across a seam into this crate. They are declared here now, so the
     // seam and its class are both gone and they are plainly `Hot`.
@@ -569,6 +592,8 @@ pub(crate) fn synthetics_restart_required_changes(
         devices: _,
         scheduler_jitter_enabled: _,
         orphan_detection_enabled: _,
+        lease_batch_size: _,
+        max_inflight_per_tick: _,
     } = new;
 
     let mut changed = Vec::new();
@@ -665,11 +690,22 @@ pub fn load_config() -> Result<(), anyhow::Error> {
 }
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
     tokio::sync::OnceCell::const_new();
+static CHROME_SEMAPHORE: std::sync::OnceLock<tokio::sync::Semaphore> = std::sync::OnceLock::new();
 
 pub async fn get_chrome_launch_options() -> &'static Option<BrowserConfig> {
     CHROME_LAUNCHER_OPTIONS
         .get_or_init(init_chrome_launch_options)
         .await
+}
+
+/// Caps concurrent headless Chrome processes at the CPU limit; hold a permit while one runs.
+pub fn chrome_semaphore() -> &'static tokio::sync::Semaphore {
+    CHROME_SEMAPHORE.get_or_init(|| {
+        let cfg = get_config();
+        // cpu_num is floored at 2 and real_cpu_num ignores the memory limit, so take the smaller.
+        let permits = cfg.limit.cpu_num.min(cfg.limit.real_cpu_num);
+        tokio::sync::Semaphore::new(max(1, permits))
+    })
 }
 
 async fn init_chrome_launch_options() -> Option<BrowserConfig> {
@@ -1064,6 +1100,7 @@ pub struct Config {
     pub enrichment_table: EnrichmentTable,
     pub slo: Slo,
     pub synthetics: Synthetics,
+    pub public_dashboards: PublicDashboards,
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
     pub self_profiles: SelfProfiles,
@@ -1103,14 +1140,14 @@ impl PublicAiChat {
     }
 }
 
-/// Background self CPU/memory profile ingest into `_meta.self_profiles`.
-/// Gated at runtime by `enabled`; sampling code is compile-gated on `profiling`.
+/// Background self CPU/memory profile ingest into the `default` profiles stream.
+/// Gated at runtime by `enabled`; CPU needs `cpu-profiling`, memory needs `profiling`.
 #[derive(Debug, Serialize, EnvConfig, Default)]
 pub struct SelfProfiles {
     #[env_config(
         name = "ZO_SELF_PROFILES_ENABLED",
         default = false,
-        help = "Enable background self CPU/memory profile sampling into _meta.self_profiles"
+        help = "Enable background self CPU/memory profile sampling into the default profiles stream"
     )]
     pub enabled: bool,
     #[env_config(
@@ -1177,6 +1214,101 @@ pub struct DatabaseMonitoring {
         help = "Rollup window and job cadence in seconds. This is also the freshness floor: rolled-up data is up to one interval stale, and the read path covers the remainder with a live delta query over un-rolled-up spans. Lowering it shrinks that delta (cheaper reads, fresher pages) at the cost of a more frequent rollup job and more `_o2_db_stats` rows."
     )]
     pub rollup_interval_secs: u64,
+}
+
+/// Public (unauthenticated) dashboards; clamped in `check_public_dashboards_config`.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct PublicDashboards {
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_ENABLED",
+        default = true,
+        help = "Master switch for public dashboards. The public routes always exist and answer 404 while this is false."
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_RPM",
+        default = 240,
+        help = "Per-IP requests-per-minute limit on the public dashboard routes (0 disables)."
+    )]
+    pub rpm: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_SLUG_RPM",
+        default = 1200,
+        help = "Per-link requests-per-minute limit on public data responses that carry a body (0 disables)."
+    )]
+    pub slug_rpm: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_LINKS_PER_ORG",
+        default = 50,
+        help = "Public links an org may have; the org settings row can lower it (at least 1)."
+    )]
+    pub max_links_per_org: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_PANELS",
+        default = 50,
+        help = "Panels a public link can show, counted across every tab (at least 1)."
+    )]
+    pub max_panels: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_LINKS_PER_DASHBOARD",
+        default = 10,
+        help = "Public links one dashboard may have (at least 1)."
+    )]
+    pub max_links_per_dashboard: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MIN_REFRESH_SECS",
+        default = 60,
+        help = "Shortest effective refresh interval of a public link range, in seconds (at least 60)."
+    )]
+    pub min_refresh_secs: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_PANEL_AGE_HOURS",
+        default = 24,
+        help = "Oldest retained panel data a public link may serve after failed refreshes, in hours (at least 1)."
+    )]
+    pub max_panel_age_hours: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_COLD_WAITERS",
+        default = 200,
+        help = "Requests that may wait on one cold build per querier; later ones get 202 (at least 1)."
+    )]
+    pub max_cold_waiters: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_INFLIGHT_BUILDS",
+        default = 8,
+        help = "Public dashboard builds running at once per querier (at least 1)."
+    )]
+    pub max_inflight_builds: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_INFLIGHT_BUILDS_PER_ORG",
+        default = 1,
+        help = "Public dashboard builds of one org running at once per querier (at least 1)."
+    )]
+    pub max_inflight_builds_per_org: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_PANEL_CONCURRENCY",
+        default = 1,
+        help = "Panel queries one public dashboard build runs at once (at least 1)."
+    )]
+    pub panel_concurrency: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_QUERY_TIMEOUT_SECS",
+        default = 60,
+        help = "Timeout of one public dashboard panel query, in seconds (1 to ZO_QUERY_TIMEOUT)."
+    )]
+    pub query_timeout_secs: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_BUILD_TIMEOUT_SECS",
+        default = 300,
+        help = "Timeout of one whole public dashboard build, in seconds (at least the query timeout)."
+    )]
+    pub build_timeout_secs: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_TIME_SHIFTS",
+        default = true,
+        help = "Run time-shifted panel queries on public links; false shows those panels as unsupported."
+    )]
+    pub time_shifts: bool,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -1375,6 +1507,23 @@ pub struct Synthetics {
         help = "Kill switch for orphan detection, which reports enabled checks no scheduler is claiming."
     )]
     pub orphan_detection_enabled: bool,
+    /// Jobs leased per pool in one dispatcher lease call. Must be > 0; a
+    /// non-positive value falls back to the default. Read per tick.
+    #[env_config(
+        name = "ZO_SYNTHETICS_LEASE_BATCH_SIZE",
+        default = 10,
+        help = "Jobs the dispatcher leases per pool per lease call. Must be greater than 0."
+    )]
+    pub lease_batch_size: i64,
+    /// Upper bound on jobs the dispatcher leases across all pools in one tick.
+    /// While a pool's batch comes back full the dispatcher keeps leasing, up to
+    /// this cap. Must be > 0; a non-positive value falls back to the default.
+    #[env_config(
+        name = "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK",
+        default = 100,
+        help = "Cap on jobs the dispatcher leases across all pools in one 2s tick. Must be greater than 0."
+    )]
+    pub max_inflight_per_tick: i64,
 }
 
 /// Feature 5 — SLO measurement (`alerts_2.md` §6b).
@@ -2424,7 +2573,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_MODEL_PRICING_ENABLED",
         default = true,
-        help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
+        help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, no cost is computed for spans that do not report one."
     )]
     pub model_pricing_enabled: bool,
     #[env_config(
@@ -2525,8 +2674,8 @@ pub struct Common {
     pub auto_query_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_PROFILING_ENABLED",
-        default = false,
-        help = "Show the Profiles module in the UI. Early-stage feature, hidden by default; ingestion and APIs stay available regardless"
+        default = true,
+        help = "Show the Profiles module in the UI. Ingestion and APIs stay available regardless"
     )]
     pub profiling_enabled: bool,
     #[env_config(
@@ -2746,7 +2895,7 @@ pub struct Limit {
         help = "Count-based alerts whose row sentinel exceeds this switch to a COUNT(*) decision query plus a 100-row payload sample (alerts_2.md 4.4c). Clamped up to the 100-row floor."
     )]
     pub alert_hybrid_count_threshold: i64,
-    #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
+    #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 50)]
     pub alert_schedule_concurrency: i64,
     #[env_config(
         name = "ZO_ALERT_MAX_GROUPS",
@@ -2793,7 +2942,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_QUERY_HISTORY_RETENTION_DAYS",
         default = 14,
-        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less keeps every entry forever; it does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
+        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less removes the age limit; each user still keeps at most 500 unstarred entries per source (logs, traces, metrics, dbm, profiles), the oldest of that source pruned first. It does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
     )]
     pub query_history_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
@@ -3082,6 +3231,12 @@ pub struct Limit {
     )]
     pub max_dashboard_state_timeline_series: usize,
     #[env_config(
+        name = "ZO_MAX_DASHBOARD_HOSTMAP_CELLS",
+        default = 5000,
+        help = "maximum cells a host map panel draws, also the PromQL series it loads; the rest are counted in a notice"
+    )]
+    pub max_dashboard_hostmap_cells: usize,
+    #[env_config(
         name = "ZO_SEARCH_MINI_PARTITION_DURATION_SECS",
         default = 60,
         help = "Duration of each mini search partition in seconds"
@@ -3131,6 +3286,72 @@ pub struct Limit {
         help = "Default is 30 days, how many days in past to retain the errored workflow input files"
     )]
     pub workflow_error_retention_secs: i64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_IP_RPM",
+        default = 6000,
+        help = "Requests per minute one client IP may send to workflow HTTP endpoints"
+    )]
+    pub workflow_hook_ip_rpm: u32,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_PREAUTH_SLOTS",
+        default = 256,
+        help = "Workflow HTTP endpoint requests read at once before authentication"
+    )]
+    pub workflow_hook_preauth_slots: usize,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_UNRESOLVED_IP_SLOTS",
+        default = 16,
+        help = "Pre-authentication slots shared by requests whose client IP is unknown"
+    )]
+    pub workflow_hook_unresolved_ip_slots: usize,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_RPM",
+        default = 1200,
+        help = "Workflow HTTP endpoint requests per minute per organization"
+    )]
+    pub workflow_hook_org_rpm: u32,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_BYTES_PER_MIN",
+        default = 16777216,
+        help = "Workflow HTTP endpoint body bytes per minute per organization; run history keeps about 3x this per minute for ZO_WORKFLOW_ERROR_RETAIN_DURATION"
+    )]
+    pub workflow_hook_org_bytes_per_min: u32,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_QUEUE_MAX",
+        default = 1000,
+        help = "Queued workflow HTTP runs allowed per organization"
+    )]
+    pub workflow_hook_org_queue_max: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_ORG_CONCURRENCY",
+        default = 2,
+        help = "Workflow HTTP runs executing at once per organization, at most ZO_WORKFLOW_HOOK_CONCURRENCY"
+    )]
+    pub workflow_hook_org_concurrency: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_CONCURRENCY",
+        default = 8,
+        help = "Workflow HTTP runs executing at once per region"
+    )]
+    pub workflow_hook_concurrency: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_RUN_TIMEOUT",
+        default = 900,
+        help = "Seconds a workflow HTTP run may take before it is cancelled"
+    )]
+    pub workflow_hook_run_timeout_secs: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_QUEUE_TTL",
+        default = 3600,
+        help = "Seconds a workflow HTTP run may wait in the queue before it expires"
+    )]
+    pub workflow_hook_queue_ttl_secs: u64,
+    #[env_config(
+        name = "ZO_WORKFLOW_HOOK_WORKER_DISABLED",
+        default = false,
+        help = "Never run the workflow HTTP worker on this node"
+    )]
+    pub workflow_hook_worker_disabled: bool,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -3910,6 +4131,8 @@ pub fn init() -> Config {
     // check synthetics config — infallible on purpose, see the function
     check_synthetics_config(&mut cfg);
 
+    check_public_dashboards_config(&mut cfg);
+
     cfg
 }
 
@@ -3972,13 +4195,8 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.file_move_thread_num == 0 {
         cfg.limit.file_move_thread_num = cpu_num;
     }
-    // HACK for file_merge_thread_num equal to CPU core
     if cfg.limit.file_merge_thread_num == 0 {
-        if cfg.common.local_mode {
-            cfg.limit.file_merge_thread_num = std::cmp::max(1, cpu_num / 2);
-        } else {
-            cfg.limit.file_merge_thread_num = cpu_num;
-        }
+        cfg.limit.file_merge_thread_num = std::cmp::max(1, cpu_num / 2);
     }
     // HACK for mem_dump_thread_num equal to CPU core
     if cfg.limit.mem_dump_thread_num == 0 {
@@ -4023,6 +4241,9 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.max_dashboard_state_timeline_series < 1 {
         cfg.limit.max_dashboard_state_timeline_series = 2000;
+    }
+    if cfg.limit.max_dashboard_hostmap_cells < 1 {
+        cfg.limit.max_dashboard_hostmap_cells = 5000;
     }
 
     // check query timeout
@@ -4079,7 +4300,45 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     cfg.limit.editor_suggest_mode = normalize_editor_suggest_mode(&cfg.limit.editor_suggest_mode)?;
 
+    check_workflow_hook_limits(&mut cfg.limit);
+
     Ok(())
+}
+
+fn check_workflow_hook_limits(limit: &mut Limit) {
+    if limit.workflow_hook_ip_rpm == 0 {
+        limit.workflow_hook_ip_rpm = 6000;
+    }
+    if limit.workflow_hook_preauth_slots == 0 {
+        limit.workflow_hook_preauth_slots = 256;
+    }
+    if limit.workflow_hook_unresolved_ip_slots == 0 {
+        limit.workflow_hook_unresolved_ip_slots = 16;
+    }
+    if limit.workflow_hook_org_rpm == 0 {
+        limit.workflow_hook_org_rpm = 1200;
+    }
+    if limit.workflow_hook_org_bytes_per_min == 0 {
+        limit.workflow_hook_org_bytes_per_min = 16777216;
+    }
+    if limit.workflow_hook_org_queue_max == 0 {
+        limit.workflow_hook_org_queue_max = 1000;
+    }
+    if limit.workflow_hook_org_concurrency == 0 {
+        limit.workflow_hook_org_concurrency = 2;
+    }
+    if limit.workflow_hook_concurrency == 0 {
+        limit.workflow_hook_concurrency = 8;
+    }
+    if limit.workflow_hook_run_timeout_secs == 0 {
+        limit.workflow_hook_run_timeout_secs = 900;
+    }
+    if limit.workflow_hook_queue_ttl_secs == 0 {
+        limit.workflow_hook_queue_ttl_secs = 3600;
+    }
+    limit.workflow_hook_org_concurrency = limit
+        .workflow_hook_org_concurrency
+        .min(limit.workflow_hook_concurrency);
 }
 
 fn normalize_editor_suggest_mode(raw: &str) -> Result<String, anyhow::Error> {
@@ -5089,6 +5348,48 @@ fn validate_synthetics_ceilings(cfg: &Synthetics) -> Result<(), String> {
 /// be the worse outage. On rejection the built-in ceilings stand, so the failure
 /// mode is "stricter than the operator intended", never "accepts checks that get
 /// killed mid-run".
+/// Clamps the public dashboard keys into their valid ranges; runs after the query timeout is set.
+fn check_public_dashboards_config(cfg: &mut Config) {
+    // A querier builds into the disk cache, so without one every link would answer 503.
+    let serves_reads = cfg.common.node_role.split(',').any(|r| {
+        matches!(
+            r.trim().parse::<cluster::Role>(),
+            Ok(cluster::Role::All | cluster::Role::Querier)
+        )
+    });
+    if serves_reads && !cfg.disk_cache.enabled && cfg.public_dashboards.enabled {
+        log::warn!(
+            "ZO_DISK_CACHE_ENABLED is off, so public dashboards are turned off \
+             (ZO_PUBLIC_DASHBOARD_ENABLED=false)"
+        );
+        cfg.public_dashboards.enabled = false;
+    }
+    let query_timeout = u32::try_from(cfg.limit.query_timeout).unwrap_or(u32::MAX);
+    let pd = &mut cfg.public_dashboards;
+    for v in [
+        &mut pd.max_links_per_org,
+        &mut pd.max_panels,
+        &mut pd.max_links_per_dashboard,
+        &mut pd.max_panel_age_hours,
+        &mut pd.max_cold_waiters,
+        &mut pd.max_inflight_builds,
+        &mut pd.max_inflight_builds_per_org,
+        &mut pd.panel_concurrency,
+    ] {
+        *v = (*v).max(1);
+    }
+    pd.min_refresh_secs = pd.min_refresh_secs.max(60);
+    pd.query_timeout_secs = pd.query_timeout_secs.clamp(1, query_timeout.max(1));
+    pd.build_timeout_secs = pd.build_timeout_secs.max(pd.query_timeout_secs);
+    // The Enterprise default Long user cap is 2; more panel queries per build queue behind it.
+    if pd.panel_concurrency > 2 {
+        log::warn!(
+            "ZO_PUBLIC_DASHBOARD_PANEL_CONCURRENCY={} is above the default Enterprise Long user cap of 2",
+            pd.panel_concurrency
+        );
+    }
+}
+
 fn check_synthetics_config(cfg: &mut Config) {
     if let Err(e) = validate_synthetics_ceilings(&cfg.synthetics) {
         log::error!(
@@ -5102,6 +5403,21 @@ fn check_synthetics_config(cfg: &mut Config) {
             crate::meta::synthetics::DEFAULT_MAX_CHECK_BUDGET_SECS;
         cfg.synthetics.job_lease_secs = crate::meta::synthetics::DEFAULT_JOB_LEASE_SECS;
         cfg.synthetics.max_net_timeout_ms = crate::meta::synthetics::DEFAULT_MAX_NET_TIMEOUT_MS;
+    }
+
+    if cfg.synthetics.lease_batch_size <= 0 {
+        log::error!(
+            "ZO_SYNTHETICS_LEASE_BATCH_SIZE ({}) must be greater than 0, using 10",
+            cfg.synthetics.lease_batch_size
+        );
+        cfg.synthetics.lease_batch_size = 10;
+    }
+    if cfg.synthetics.max_inflight_per_tick <= 0 {
+        log::error!(
+            "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK ({}) must be greater than 0, using 100",
+            cfg.synthetics.max_inflight_per_tick
+        );
+        cfg.synthetics.max_inflight_per_tick = 100;
     }
 
     // Every synthetics var now has exactly one name, in every build — which
@@ -5284,6 +5600,8 @@ mod tests {
         "ZO_SYNTHETICS_DEVICES",
         "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
         "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
+        "ZO_SYNTHETICS_LEASE_BATCH_SIZE",
+        "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK",
     ];
 
     fn synthetics_names_in_class(class: SyntheticsReloadClass) -> Vec<&'static str> {
@@ -5303,8 +5621,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            16,
-            "Synthetics has 16 keys; every one needs a reload class"
+            18,
+            "Synthetics has 18 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -5336,7 +5654,9 @@ mod tests {
                 "ZO_SYNTHETICS_JOB_LEASE_SECS",
                 "ZO_SYNTHETICS_LAMBDA_BROWSER",
                 "ZO_SYNTHETICS_LAMBDA_NET",
+                "ZO_SYNTHETICS_LEASE_BATCH_SIZE",
                 "ZO_SYNTHETICS_MAX_CHECK_BUDGET_SECS",
+                "ZO_SYNTHETICS_MAX_INFLIGHT_PER_TICK",
                 "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
                 "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
                 "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
@@ -5399,6 +5719,8 @@ mod tests {
         cfg.devices = "desktop:800:600".to_string();
         cfg.scheduler_jitter_enabled = !cfg.scheduler_jitter_enabled;
         cfg.orphan_detection_enabled = !cfg.orphan_detection_enabled;
+        cfg.lease_batch_size += 1;
+        cfg.max_inflight_per_tick += 1;
     }
 
     #[test]
@@ -6343,6 +6665,37 @@ mod tests {
     }
 
     #[test]
+    fn workflow_hook_limits_replace_zeros_and_cap_org_concurrency() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.workflow_hook_ip_rpm = 0;
+        cfg.limit.workflow_hook_org_bytes_per_min = 0;
+        cfg.limit.workflow_hook_queue_ttl_secs = 0;
+        cfg.limit.workflow_hook_concurrency = 3;
+        cfg.limit.workflow_hook_org_concurrency = 5;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.workflow_hook_ip_rpm, 6000);
+        assert_eq!(cfg.limit.workflow_hook_org_bytes_per_min, 16_777_216);
+        assert_eq!(cfg.limit.workflow_hook_queue_ttl_secs, 3600);
+        assert_eq!(cfg.limit.workflow_hook_org_concurrency, 3);
+
+        let defaults = Config::init().unwrap().limit;
+        assert_eq!(
+            (
+                defaults.workflow_hook_org_rpm,
+                defaults.workflow_hook_org_bytes_per_min,
+                defaults.workflow_hook_org_queue_max,
+                defaults.workflow_hook_concurrency,
+                defaults.workflow_hook_org_concurrency,
+                defaults.workflow_hook_run_timeout_secs,
+                defaults.workflow_hook_preauth_slots,
+                defaults.workflow_hook_unresolved_ip_slots,
+            ),
+            (1200, 16_777_216, 1000, 8, 2, 900, 256, 16)
+        );
+        assert!(!defaults.workflow_hook_worker_disabled);
+    }
+
+    #[test]
     fn test_check_limit_config_batch_size_clamping() {
         let mut cfg = Config::init().unwrap();
         cfg.limit.batch_size = 0;
@@ -6373,6 +6726,19 @@ mod tests {
         cfg.limit.max_dashboard_state_timeline_series = 50;
         check_limit_config(&mut cfg).unwrap();
         assert_eq!(cfg.limit.max_dashboard_state_timeline_series, 50);
+    }
+
+    #[test]
+    fn test_check_limit_config_dashboard_hostmap_cells() {
+        let mut cfg = Config::init().unwrap();
+        assert_eq!(cfg.limit.max_dashboard_hostmap_cells, 5000);
+        cfg.limit.max_dashboard_hostmap_cells = 0;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_hostmap_cells, 5000);
+
+        cfg.limit.max_dashboard_hostmap_cells = 300;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.max_dashboard_hostmap_cells, 300);
     }
 
     #[test]
@@ -6607,5 +6973,82 @@ mod tests {
         assert_eq!(select_ext_auth_salt("env", "stored"), "env");
         assert_eq!(select_ext_auth_salt("", "stored"), "stored");
         assert_eq!(select_ext_auth_salt("", ""), LEGACY_EXT_AUTH_SALT);
+    }
+
+    #[test]
+    fn test_chrome_semaphore_never_exceeds_cpu_limit() {
+        let cfg = get_config();
+        let permits = chrome_semaphore().available_permits();
+        assert!(permits >= 1);
+        assert!(permits <= cfg.limit.real_cpu_num);
+        assert!(permits <= cfg.limit.cpu_num);
+    }
+
+    #[test]
+    fn public_dashboard_defaults_and_clamps() {
+        let mut cfg = Config::init().expect("config init");
+        let pd = &cfg.public_dashboards;
+        assert!(pd.enabled && pd.time_shifts);
+        assert_eq!(
+            (pd.rpm, pd.slug_rpm, pd.max_links_per_org, pd.max_panels),
+            (240, 1200, 50, 50)
+        );
+        assert_eq!(
+            (
+                pd.max_links_per_dashboard,
+                pd.min_refresh_secs,
+                pd.max_panel_age_hours
+            ),
+            (10, 60, 24)
+        );
+        assert_eq!(
+            (
+                pd.max_cold_waiters,
+                pd.max_inflight_builds,
+                pd.max_inflight_builds_per_org
+            ),
+            (200, 8, 1)
+        );
+        assert_eq!(
+            (
+                pd.panel_concurrency,
+                pd.query_timeout_secs,
+                pd.build_timeout_secs
+            ),
+            (1, 60, 300)
+        );
+
+        cfg.limit.query_timeout = 30;
+        cfg.public_dashboards.min_refresh_secs = 10;
+        cfg.public_dashboards.max_panels = 0;
+        cfg.public_dashboards.query_timeout_secs = 90;
+        cfg.public_dashboards.build_timeout_secs = 5;
+        check_public_dashboards_config(&mut cfg);
+        let pd = &cfg.public_dashboards;
+        assert_eq!(pd.min_refresh_secs, 60);
+        assert_eq!(pd.max_panels, 1);
+        assert_eq!(pd.query_timeout_secs, 30);
+        assert_eq!(pd.build_timeout_secs, 30);
+
+        cfg.public_dashboards.query_timeout_secs = 0;
+        check_public_dashboards_config(&mut cfg);
+        assert_eq!(cfg.public_dashboards.query_timeout_secs, 1);
+    }
+
+    #[test]
+    fn public_dashboards_turn_off_without_the_disk_cache() {
+        let mut cfg = Config::init().expect("config init");
+        check_public_dashboards_config(&mut cfg);
+        assert!(cfg.public_dashboards.enabled);
+
+        // Only a node that serves public reads needs the disk cache.
+        cfg.disk_cache.enabled = false;
+        cfg.common.node_role = "ingester".to_string();
+        check_public_dashboards_config(&mut cfg);
+        assert!(cfg.public_dashboards.enabled);
+
+        cfg.common.node_role = "ingester,querier".to_string();
+        check_public_dashboards_config(&mut cfg);
+        assert!(!cfg.public_dashboards.enabled);
     }
 }

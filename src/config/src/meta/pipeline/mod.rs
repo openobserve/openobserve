@@ -272,6 +272,56 @@ impl Pipeline {
         }
     }
 
+    /// The first Stream/Query node, else the source, naming another org; empty org is this one.
+    /// [pure]
+    pub fn cross_org(&self) -> Option<CrossOrg<'_>> {
+        let foreign = |org: &str| !org.is_empty() && org != self.org;
+        let node = self.nodes.iter().find_map(|node| match &node.data {
+            NodeData::Stream(params) if foreign(params.org_id.as_ref()) => Some(CrossOrg::Stream {
+                node_id: &node.id,
+                params,
+            }),
+            NodeData::Query(query) if foreign(&query.org_id) => Some(CrossOrg::Query(query)),
+            _ => None,
+        });
+        if node.is_some() {
+            return node;
+        }
+        let source_org: &str = match &self.source {
+            PipelineSource::Realtime(params) => params.org_id.as_ref(),
+            PipelineSource::Scheduled(derived_stream) => &derived_stream.org_id,
+        };
+        foreign(source_org).then_some(CrossOrg::Source(&self.source))
+    }
+
+    /// The refusal for [`Pipeline::cross_org`], naming the stream and both orgs. [pure]
+    pub fn cross_org_refusal(&self) -> Option<String> {
+        let stream = |role: &str, params: &StreamParams| {
+            let what = format!(
+                "{role} stream {}/{}",
+                params.stream_type, params.stream_name
+            );
+            (what, params.org_id.to_string())
+        };
+        let query = |query: &DerivedStream| {
+            let what = format!("scheduled query on {} streams", query.stream_type);
+            (what, query.org_id.clone())
+        };
+        let (what, org) = match self.cross_org()? {
+            CrossOrg::Stream { node_id, params } => {
+                let is_source = self.nodes.first().is_some_and(|first| first.id == node_id);
+                stream(if is_source { "source" } else { "destination" }, params)
+            }
+            CrossOrg::Query(derived_stream) => query(derived_stream),
+            CrossOrg::Source(PipelineSource::Realtime(params)) => stream("source", params),
+            CrossOrg::Source(PipelineSource::Scheduled(derived_stream)) => query(derived_stream),
+        };
+        Some(format!(
+            "Pipeline {what} points at organization {org}; pipeline streams must be in organization {}",
+            self.org
+        ))
+    }
+
     /// Verifies the pipeline is valid by:
     /// 0. non-empty name
     /// 1. non-empty nodes list
@@ -584,6 +634,17 @@ where
             edges,
         })
     }
+}
+
+/// What in a pipeline names an org other than the pipeline's own.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CrossOrg<'a> {
+    Stream {
+        node_id: &'a str,
+        params: &'a StreamParams,
+    },
+    Query(&'a DerivedStream),
+    Source(&'a PipelineSource),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -2074,5 +2135,113 @@ mod tests {
             false
         ));
         assert!(!is_forbidden_destination("app", "app_copy", true));
+    }
+
+    #[test]
+    fn test_cross_org_refusal() {
+        let stream = |id: &str, org: &str, name: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(StreamParams::new(org, name, StreamType::Logs)),
+                0.0,
+                0.0,
+                "default".to_string(),
+            )
+        };
+        let query = |id: &str, org: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Query(DerivedStream {
+                    org_id: org.to_string(),
+                    stream_type: StreamType::Metrics,
+                    ..Default::default()
+                }),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let refusal = |what: &str, org: &str| {
+            Some(format!(
+                "Pipeline {what} points at organization {org}; pipeline streams must be in organization a"
+            ))
+        };
+        let cases = [
+            (
+                vec![stream("src", "a", "in"), stream("dst", "a", "out")],
+                None,
+            ),
+            (
+                vec![stream("src", "", "in"), stream("dst", "", "out")],
+                None,
+            ),
+            (vec![query("src", ""), stream("dst", "a", "out")], None),
+            (vec![function_node("f"), stream("dst", "a", "out")], None),
+            (
+                vec![stream("src", "b", "in"), stream("dst", "a", "out")],
+                refusal("source stream logs/in", "b"),
+            ),
+            (
+                vec![stream("src", "a", "in"), stream("dst", "c", "out")],
+                refusal("destination stream logs/out", "c"),
+            ),
+            (
+                vec![query("src", "b"), stream("dst", "a", "out")],
+                refusal("scheduled query on metrics streams", "b"),
+            ),
+        ];
+        let pipeline = |source: PipelineSource, nodes| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "a".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source,
+            kind: PipelineKind::User,
+            nodes,
+            edges: vec![],
+        };
+        for (nodes, expected) in cases {
+            let pipeline = pipeline(PipelineSource::default(), nodes);
+            assert_eq!(
+                pipeline.cross_org_refusal(),
+                expected,
+                "{:?}",
+                pipeline.nodes
+            );
+        }
+        let scheduled = |org: &str| {
+            PipelineSource::Scheduled(DerivedStream {
+                org_id: org.to_string(),
+                stream_type: StreamType::Metrics,
+                ..Default::default()
+            })
+        };
+        let realtime =
+            |org: &str| PipelineSource::Realtime(StreamParams::new(org, "s", StreamType::Logs));
+        let sources = [
+            (scheduled("a"), None),
+            (scheduled(""), None),
+            (
+                scheduled("b"),
+                refusal("scheduled query on metrics streams", "b"),
+            ),
+            (realtime("a"), None),
+            (realtime("b"), refusal("source stream logs/s", "b")),
+        ];
+        for (source, expected) in sources {
+            let pipeline = pipeline(source, vec![query("src", "a"), stream("dst", "a", "out")]);
+            assert_eq!(
+                pipeline.cross_org_refusal(),
+                expected,
+                "{:?}",
+                pipeline.source
+            );
+            assert_eq!(
+                matches!(pipeline.cross_org(), Some(CrossOrg::Source(_))),
+                expected.is_some()
+            );
+        }
     }
 }

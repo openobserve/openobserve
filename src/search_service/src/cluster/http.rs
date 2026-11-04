@@ -46,7 +46,6 @@ pub async fn search(
 ) -> Result<search::Response> {
     let start = std::time::Instant::now();
     let trace_id = req.trace_id.clone();
-    let query_type = query.query_type.to_lowercase();
     let track_total_hits = query.track_total_hits;
 
     // handle request time range
@@ -82,7 +81,6 @@ pub async fn search(
 
     // hits
     if !merge_batches.is_empty() {
-        let schema = merge_batches[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = merge_batches.iter().collect();
         let mut json_rows = record_batches_to_json_rows(&batches_query_ref)
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
@@ -94,7 +92,7 @@ pub async fn search(
             json_rows.truncate(default_query_limit);
         }
 
-        let mut sources: Vec<json::Value> = if query_fn.is_empty() {
+        let sources: Vec<json::Value> = if query_fn.is_empty() {
             json_rows
                 .into_iter()
                 .filter(|v| !v.is_empty())
@@ -200,13 +198,6 @@ pub async fn search(
             }
         };
 
-        // handle query type: json, metrics, table
-        if query_type == "table" {
-            (result.columns, sources) = super::handle_table_response(schema, sources);
-        } else if query_type == "metrics" {
-            sources = super::handle_metrics_response(sources);
-        }
-
         if use_query_fn {
             for source in sources {
                 if source.is_object() {
@@ -265,12 +256,6 @@ pub async fn search(
         QUERY_PARQUET_CACHE_RATIO
             .with_label_values(&[&sql.org_id, &sql.stream_type.to_string()])
             .observe(cached_ratio);
-    }
-
-    if query_type == "table" {
-        result.response_type = "table".to_string();
-    } else if query_type == "metrics" {
-        result.response_type = "matrix".to_string();
     }
 
     // set order by

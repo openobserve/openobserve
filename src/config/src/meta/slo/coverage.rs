@@ -130,9 +130,11 @@ pub fn evaluation_is_measured(outcome: &RunOutcome) -> bool {
         | RunOutcome::Suppressed => true,
         // Observed nothing: the query failed, the run was skipped, or the
         // outcome belongs to a non-condition module.
-        RunOutcome::Error | RunOutcome::Skipped | RunOutcome::Succeeded | RunOutcome::Pending => {
-            false
-        }
+        RunOutcome::Error
+        | RunOutcome::Skipped
+        | RunOutcome::Succeeded
+        | RunOutcome::Pending
+        | RunOutcome::AckEvent => false,
     }
 }
 

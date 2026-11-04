@@ -120,23 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
               </span>
 
-              <div class="bg-text-label h-4 w-px py-0" />
-
-              <!-- Error Count Badge -->
-              <span class="inline-flex">
-                <OTag
-                  type="logsResultChip"
-                  value="error"
-                  size="sm"
-                  data-test="trace-details-error-spans-count"
-                  class="py-1!"
-                >
-                  <span
-                    >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
-                  >
-                </OTag>
-                <OTooltip :content="raw(errorSpansCount + ' ' + t('traces.errorsLabel'))" />
-              </span>
+              <template v-if="errorSpans.length">
+                <div class="bg-text-label h-4 w-px py-0" />
+                <TraceErrorSpansMenu :errors="errorSpans" compact @select="selectErrorSpan" />
+              </template>
             </div>
           </template>
 
@@ -228,12 +215,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="showCloseButton"
               data-test="trace-details-close-btn"
-              variant="ghost"
+              variant="outline"
               size="icon-xs"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
-              <OTooltip :content="t('common.cancel')" />
+              <OTooltip :content="t('common.close')" />
             </OButton>
           </template>
         </OPageHeader>
@@ -355,21 +342,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
               </span>
 
-              <div class="bg-text-label h-4 w-px py-0" />
-
-              <!-- Error Count Badge -->
-              <span class="me-[0.85rem] inline-flex">
-                <OTag
-                  type="logsResultChip"
-                  value="error"
-                  data-test="trace-details-error-spans-count"
-                >
-                  <span
-                    >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
-                  >
-                </OTag>
-                <OTooltip :content="raw(errorSpansCount + ' ' + t('traces.errorsLabel'))" />
-              </span>
+              <template v-if="errorSpans.length">
+                <div class="bg-text-label h-4 w-px py-0" />
+                <span class="me-[0.85rem] inline-flex">
+                  <TraceErrorSpansMenu :errors="errorSpans" @select="selectErrorSpan" />
+                </span>
+              </template>
             </div>
           </div>
 
@@ -414,13 +392,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="isStandaloneMode && showCloseButton"
               data-test="trace-details-close-btn"
-              variant="ghost"
+              variant="outline"
               size="icon-xs"
               class="me-1!"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
-              <OTooltip :content="t('common.cancel')" />
+              <OTooltip :content="t('common.close')" />
             </OButton>
           </div>
         </header>
@@ -904,12 +882,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <!-- Chart Container -->
-              <div class="min-h-0 flex-1 overflow-hidden p-2.5">
+              <div class="relative min-h-0 flex-1 overflow-hidden p-2.5">
                 <ChartRenderer
                   ref="chartRendererRef"
                   data-test="trace-details-service-map-chart"
                   :data="traceServiceMapChartOptions"
+                  :key="traceGraphChartKey"
                   class="h-full"
+                />
+                <ChartZoomControls
+                  v-if="traceGraphHasChart"
+                  data-test-prefix="trace-graph"
+                  @zoom-in="zoomTraceGraphIn"
+                  @zoom-out="zoomTraceGraphOut"
+                  @fit="fitTraceGraph"
                 />
               </div>
             </div>
@@ -1010,6 +996,8 @@ import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceDAG from "./TraceDAG.vue";
 import TraceHeader from "./TraceHeader.vue";
+import TraceErrorSpansMenu from "./components/TraceErrorSpansMenu.vue";
+import { errorSpansDeepestFirst } from "./utils/traceErrorSummary";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
@@ -1036,7 +1024,7 @@ import {
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
-import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
+import { buildPathPatterns, buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
 import type { TreeNode as PatternTreeNode } from "@/composables/useTreeVisualization";
 import type { EnrichedSpan } from "@/ts/interfaces/traces/span.types";
@@ -1094,6 +1082,8 @@ import {
 import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
 import { useServiceCorrelation, type KeyFieldsConfig } from "@/composables/useServiceCorrelation";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
+import ChartZoomControls from "@/components/traces/ChartZoomControls.vue";
+import useChartZoom from "@/composables/traces/useChartZoom";
 
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(() => import("@/components/traces/FlameGraphView.vue"));
@@ -1307,7 +1297,9 @@ export default defineComponent({
     TraceTree,
     TraceDAG,
     TraceHeader,
+    TraceErrorSpansMenu,
     FlameGraphView,
+    ChartZoomControls,
     OToggleGroup,
     OToggleGroupItem,
     OButton,
@@ -1361,6 +1353,18 @@ export default defineComponent({
 
     // Chart renderer ref for tooltip integration
     const chartRendererRef = ref<any>(null);
+    // Recreating the chart drops the tree view's hover listeners, so fit re-attaches them.
+    const {
+      chartKey: traceGraphChartKey,
+      zoomIn: zoomTraceGraphIn,
+      zoomOut: zoomTraceGraphOut,
+      fitToScreen: fitTraceGraph,
+    } = useChartZoom(
+      () => chartRendererRef.value?.chart,
+      () => {
+        setupTooltips();
+      },
+    );
     // The tree view's span sidebar; it owns the correlation lookup.
     const treeSidebarRef = ref<any>(null);
 
@@ -1384,6 +1388,7 @@ export default defineComponent({
 
     // Pattern View - new functionality
     const consolidatedPatterns = ref(new Map());
+    const tracePathPatterns = ref(new Map());
     const { isDark: isDarkMode } = useTheme();
 
     // Set up pattern tree composable and visualization engine
@@ -1393,7 +1398,10 @@ export default defineComponent({
       getNodeLabel: getPatternNodeLabel,
       getNodeTooltip: getPatternNodeTooltip,
       getNodeErrorRate: getPatternNodeErrorRate,
-    } = useTracePatternTree(consolidatedPatterns, isDarkMode);
+    } = useTracePatternTree(consolidatedPatterns, isDarkMode, tracePathPatterns);
+    const traceGraphTree = computed(() =>
+      filterTraceTree(patternTreeData.value, traceGraphSearch.value),
+    );
 
     // Computed chart options that switches between pattern and span views
     const traceServiceMapChartOptions = computed(() => {
@@ -1455,7 +1463,7 @@ export default defineComponent({
         errorRate: node.errorRate ?? 0,
         metadata: node.metadata,
       });
-      const treeData = filterTraceTree(patternTreeData.value, traceGraphSearch.value);
+      const treeData = traceGraphTree.value;
       // ECharts' tree series throws on empty data and leaves the chart stuck until reload.
       if (!treeData.length) return { options: {}, notMerge: true };
       const chartOptions = generateEChartsOptions(
@@ -1480,6 +1488,10 @@ export default defineComponent({
         lazyUpdate: true,
       };
     });
+
+    const traceGraphHasChart = computed(
+      () => !!(traceServiceMapChartOptions.value.options as { series?: unknown }).series,
+    );
 
     const spanDimensions = {
       height: 30,
@@ -1764,11 +1776,7 @@ export default defineComponent({
     });
 
     // Computed properties for new header
-    const errorSpansCount = computed(() => {
-      const spans = effectiveSpanList.value;
-      if (!spans || spans.length === 0) return 0;
-      return spans.filter((span: any) => span.span_status === "ERROR").length;
-    });
+    const errorSpans = computed(() => errorSpansDeepestFirst(effectiveSpanList.value ?? []));
 
     const rootServiceName = computed(() => {
       if (traceTree.value.length > 0) {
@@ -2174,7 +2182,10 @@ export default defineComponent({
           tooltipCleanup = setupTraceNodeTooltips(
             chart,
             {
-              treeData: patternTreeData.value,
+              // A getter, so a hover resolves its tree path in the tree the chart draws now, even after a search.
+              get treeData() {
+                return traceGraphTree.value;
+              },
               getNodeTooltip: getPatternNodeTooltip,
               getNodeErrorRate: getPatternNodeErrorRate,
             } as TreeVisualizationData,
@@ -2894,6 +2905,7 @@ export default defineComponent({
       });
 
       // Build consolidated patterns for pattern view
+      tracePathPatterns.value = buildPathPatterns(traceTree.value);
       consolidatedPatterns.value = buildPatternConsolidatedTree(traceTree.value);
       // console.log('[DEBUG] consolidatedPatterns size:', consolidatedPatterns.value?.size || 0);
       // console.log('[DEBUG] consolidatedPatterns keys:', Array.from(consolidatedPatterns.value?.keys() || []));
@@ -3275,6 +3287,10 @@ export default defineComponent({
       }
     };
 
+    const selectErrorSpan = (spanId: string) => {
+      updateSelectedSpan(spanId, true);
+    };
+
     const handleDAGNodeClick = (spanId: string) => {
       updateSelectedSpan(spanId);
     };
@@ -3454,6 +3470,11 @@ export default defineComponent({
       traceServiceMap,
       traceServiceMapChartOptions,
       chartRendererRef,
+      traceGraphChartKey,
+      traceGraphHasChart,
+      zoomTraceGraphIn,
+      zoomTraceGraphOut,
+      fitTraceGraph,
       treeSidebarRef,
       activeVisual,
       traceVisuals,
@@ -3545,7 +3566,8 @@ export default defineComponent({
       hasLLMSpans,
       hasPreviewableSpans,
       // New header computed properties
-      errorSpansCount,
+      errorSpans,
+      selectErrorSpan,
       rootServiceName,
       traceStartTime,
       canManualEvaluate,

@@ -886,6 +886,9 @@ pub enum GenerateReportError {
     #[error(transparent)]
     JoinHandlerError(#[from] tokio::task::JoinError),
 
+    #[error(transparent)]
+    ChromeSemaphoreError(#[from] tokio::sync::AcquireError),
+
     #[error("[REPORT] main element not rendered yet for dashboard {dashboard_id}: {e}")]
     MainElementNotRendered {
         dashboard_id: String,
@@ -941,6 +944,7 @@ async fn generate_report(
         );
     }
 
+    let _chrome_permit = config::chrome_semaphore().acquire().await?;
     log::info!("launching browser for dashboard {dashboard_id}");
     let (mut browser, mut handler) =
         Browser::launch(get_chrome_launch_options().await.as_ref().unwrap().clone()).await?;

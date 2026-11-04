@@ -154,10 +154,11 @@ describe("PrebuiltDestinationForm - rendering per type", () => {
     expect(wrapper.find('[data-test="msteams-webhook-url-input"]').exists()).toBe(true);
   });
 
-  it("renders pagerduty integration key + severity select", () => {
+  it("renders pagerduty integration key + severity select + eu-region toggle", () => {
     wrapper = mountComp({ destinationType: "pagerduty" });
     expect(wrapper.find('[data-test="pagerduty-integration-key-input"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="pagerduty-severity-select"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="pagerduty-eu-region-toggle"]').exists()).toBe(true);
   });
 
   it("renders opsgenie api key + priority + eu-region toggle", () => {

@@ -107,6 +107,15 @@ describe("PromQL metric panels in Series Formatting", () => {
     expect(names[1]).toContain("web");
   });
 
+  it("lists every series of a query, since each becomes its own cell", async () => {
+    const source = metricSource("{job}");
+    source.data[0].result.push({
+      metric: { __name__: "http_requests_total", job: "web" },
+      values: [[1760000000, "2"]],
+    });
+    expect(await getPromqlMetricSeriesNames(source, store)).toEqual(["api", "web"]);
+  });
+
   const listedInDialog = async (previewSource: any) => {
     const ChartRendererStub = defineComponent({ name: "ChartRenderer", render: () => h("div") });
     wrapper = mount(OverrideConfigPopup, {

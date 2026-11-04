@@ -32,6 +32,7 @@ use config::{
     get_config, get_instance_id,
     meta::{
         cluster::{NodeStatus, Role, RoleGroup},
+        feature::{Feature, FeatureState},
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
         slack::DisabledReason,
@@ -76,7 +77,8 @@ use {
         settings::{get_logo, get_logo_dark, get_logo_text},
     },
     o2_enterprise::enterprise::license::{
-        block_feature_for_report_failure, last_reported_timestamp,
+        block_feature_for_report_failure, check_features, last_reported_timestamp,
+        runtime_definition,
     },
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
@@ -190,6 +192,7 @@ struct ConfigResponse<'a> {
     query_default_limit: i64,
     max_dashboard_series: usize,
     max_dashboard_state_timeline_series: usize,
+    max_dashboard_hostmap_cells: usize,
     streaming_enabled: bool,
     histogram_enabled: bool,
     timechart_enabled: bool,
@@ -232,6 +235,10 @@ struct ConfigResponse<'a> {
     anomaly_detection_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
+    /// Hides the publish button and the Public links view when the feature is off.
+    public_dashboards_enabled: bool,
+    /// The clamped operator refresh floor; the share form shows each range's floor from it.
+    public_dashboard_min_refresh_secs: u32,
     oncall_enabled: bool,
     slack_enabled: bool,
     /// The same reason for every org, null when on.
@@ -244,6 +251,10 @@ struct ConfigResponse<'a> {
     synthetics_recorder_extension_url: String,
     /// The only DBM flag (`ZO_DB_MONITORING_ENABLED`): one OSS switch for every signal.
     database_monitoring_enabled: bool,
+    /// Off hides recent searches in the UI; the server then records nothing.
+    query_history_enabled: bool,
+    /// Days unstarred recent searches are kept; 0 or less keeps them until the per-page cap.
+    query_history_retention_days: i64,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -260,6 +271,11 @@ struct ConfigResponse<'a> {
     billing_group_allowed_orgs: String,
     #[cfg(feature = "enterprise")]
     workflows_enabled: bool,
+    workflow_hooks_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    feature_revision: u32,
+    features: HashMap<Feature, FeatureState>,
+    feature_names: HashMap<String, String>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -314,7 +330,6 @@ struct ConfigBootstrapResponse {
     custom_hide_self_logo: bool,
     /// The editors need it before the authenticated config lands, or `off` arrives too late.
     editor_suggest_mode: String,
-    rum: Rum,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -457,11 +472,29 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
         custom_logo_dark_img,
         custom_hide_self_logo,
         editor_suggest_mode: cfg.limit.editor_suggest_mode.clone(),
-        rum: Rum::from_cfg(cfg.clone()),
     })
 }
 
 /// Full UI configuration; `search_inspector_enabled` and `is_org_admin` are per caller and org.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/config",
+    context_path = "/api",
+    tag = "Meta",
+    operation_id = "GetOrgConfig",
+    summary = "Get the configuration for an organization",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn zo_config(
     Path(org_id): Path<String>,
     user_email: Option<Headers<UserEmail>>,
@@ -511,33 +544,51 @@ pub async fn zo_config(
     let custom_hide_menus = enterprise_value!("", &o2cfg.common.custom_hide_menus);
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
     // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
-    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled && o2cfg.ai.has_agent_target());
-    let ai_chat_persistence_enabled = enterprise_value!(
+    let ai_enabled = enterprise_value!(
         false,
-        o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && o2cfg.ai.chat_persistence_enabled
+        o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && check_features(&[Feature::AiAssistant])
     );
-    let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
+    let ai_chat_persistence_enabled =
+        enterprise_value!(false, ai_enabled && o2cfg.ai.chat_persistence_enabled);
+    let incidents_enabled = enterprise_value!(
+        false,
+        o2cfg.incidents.enabled && check_features(&[Feature::Incidents])
+    );
+    let downtimes_enabled = enterprise_value!(
+        false,
+        o2cfg.downtimes.enabled && check_features(&[Feature::Alerts])
+    );
+    let alert_calibration_enabled = enterprise_value!(
+        false,
+        o2cfg.alert_calibration.enabled && check_features(&[Feature::Alerts])
+    );
     // Incident analysis needs RCA on and an agent to answer.
     let incidents_rca_enabled = enterprise_value!(
         false,
-        o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
+        incidents_enabled
+            && o2cfg.incidents.rca_enabled
+            && openobserve_core::alerts::incidents::rca_agent_available()
     );
-    let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
     let fleet_enabled = enterprise_value!(false, openobserve_core::fleet::enabled());
-    let alert_calibration_enabled = enterprise_value!(false, o2cfg.alert_calibration.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
     // Composite alerts are not available in super-cluster mode (§18, §19.2).
     let composite_alerts_available =
         config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
-    let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
+    let online_evals_enabled = enterprise_value!(
+        false,
+        o2cfg.llm_eval_config.enabled && check_features(&[Feature::AiObservability])
+    );
     let synthetics_enabled = cfg.synthetics.enabled;
     // Private agents stay enterprise, so an OSS build shows synthetics without them.
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
     let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
-    let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
+    let oncall_enabled = enterprise_value!(
+        false,
+        o2cfg.oncall.enabled && check_features(&[Feature::Oncall])
+    );
     let slack_disabled_reason = enterprise_value!(
         Some(DisabledReason::Edition),
         o2_enterprise::enterprise::slack::disabled_reason(&org_id)
@@ -567,7 +618,59 @@ pub async fn zo_config(
     let billing_group_allowed_orgs = o2cfg.cloud.billing_group_allowed_orgs.clone();
 
     #[cfg(feature = "enterprise")]
-    let workflows_enabled = o2cfg.common.workflows_enabled;
+    let workflows_enabled = o2cfg.common.workflows_enabled && check_features(&[Feature::Workflows]);
+    #[cfg(feature = "enterprise")]
+    let workflow_hooks_enabled = openobserve_core::workflows::http_trigger::hooks_enabled();
+    #[cfg(not(feature = "enterprise"))]
+    let workflow_hooks_enabled = false;
+
+    #[cfg(feature = "enterprise")]
+    let featuremap: HashMap<Feature, FeatureState> = Feature::all()
+        .map(|variant| {
+            // operator-off hides whatever the license says; operator-on but unlicensed locks
+            let switched_on = match variant {
+                Feature::AiAssistant => o2cfg.ai.enabled,
+                Feature::Incidents => o2cfg.incidents.enabled,
+                Feature::Oncall => o2cfg.oncall.enabled,
+                Feature::Workflows => o2cfg.common.workflows_enabled,
+                _ => true,
+            };
+            let entitled = check_features(&[variant]);
+            let key: &str = variant.into();
+            let listed = o2cfg
+                .common
+                .custom_hide_menus
+                .split(',')
+                .any(|m| m.trim() == key);
+            let state = if listed || !switched_on {
+                FeatureState::Hidden
+            } else if entitled {
+                FeatureState::Enabled
+            } else {
+                FeatureState::Locked
+            };
+            (variant, state)
+        })
+        .collect();
+    #[cfg(not(feature = "enterprise"))]
+    let featuremap: HashMap<Feature, FeatureState> = [
+        Feature::AiAssistant,
+        Feature::AiObservability,
+        Feature::Incidents,
+        Feature::Oncall,
+        Feature::Workflows,
+    ]
+    .into_iter()
+    .map(|variant| (variant, FeatureState::Locked))
+    .collect();
+    #[cfg(feature = "enterprise")]
+    let feature_names: HashMap<String, String> = runtime_definition()
+        .features
+        .iter()
+        .filter_map(|(key, gate)| Some((key.clone(), gate.display_name.clone()?)))
+        .collect();
+    #[cfg(not(feature = "enterprise"))]
+    let feature_names: HashMap<String, String> = HashMap::new();
 
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -621,6 +724,7 @@ pub async fn zo_config(
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
         max_dashboard_state_timeline_series: cfg.limit.max_dashboard_state_timeline_series,
+        max_dashboard_hostmap_cells: cfg.limit.max_dashboard_hostmap_cells,
         streaming_enabled: cfg.http_streaming.streaming_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
         timechart_enabled: cfg.limit.timechart_enabled,
@@ -655,6 +759,8 @@ pub async fn zo_config(
         anomaly_detection_enabled,
         composite_alerts_available,
         synthetics_enabled,
+        public_dashboards_enabled: cfg.public_dashboards.enabled,
+        public_dashboard_min_refresh_secs: cfg.public_dashboards.min_refresh_secs,
         oncall_enabled,
         slack_enabled: slack_disabled_reason.is_none(),
         slack_disabled_reason,
@@ -662,6 +768,8 @@ pub async fn zo_config(
         synthetics_browser_max_steps,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,
+        query_history_enabled: cfg.limit.query_history_enabled,
+        query_history_retention_days: cfg.limit.query_history_retention_days,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled,
@@ -678,6 +786,11 @@ pub async fn zo_config(
         billing_group_allowed_orgs,
         #[cfg(feature = "enterprise")]
         workflows_enabled,
+        workflow_hooks_enabled,
+        #[cfg(feature = "enterprise")]
+        feature_revision: runtime_definition().feature_revision,
+        features: featuremap,
+        feature_names,
     })
 }
 
@@ -721,6 +834,7 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
             use_all_org: true,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         },
         user.role,
         user.is_external,
@@ -1079,6 +1193,8 @@ pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl Into
             trace_id: None,
         },
         delegated: None,
+        fleet_id: None,
+        target: None,
     })
     .await;
     (
@@ -1200,6 +1316,8 @@ pub async fn redirect(
             trace_id: None,
         },
         delegated: None,
+        fleet_id: None,
+        target: None,
     };
 
     let state_cookie = cookies.get(LOGIN_STATE_COOKIE).map(|c| c.value());
@@ -1280,11 +1398,11 @@ pub async fn redirect(
                         Ok(v) => v.map(|(new_user, pending_invites)| {
                             format!("&new_user_login={new_user}&pending_invites={pending_invites}")
                         }),
-                        Err(_) => {
+                        Err(e) => {
                             return Response::builder()
                                 .status(StatusCode::UNAUTHORIZED)
                                 .header(header::CONTENT_TYPE, "application/json")
-                                .body(Body::from("\"Email Domain not allowed\""))
+                                .body(Body::from(e.to_string()))
                                 .unwrap();
                         }
                     };
@@ -1451,6 +1569,8 @@ pub async fn refresh_token_with_dex(
             trace_id: None,
         },
         delegated: None,
+        fleet_id: None,
+        target: None,
     };
 
     let token = if let Some(cookie) = cookies.get("auth_tokens") {
@@ -1742,6 +1862,8 @@ pub async fn logout(
                 trace_id: None,
             },
             delegated: None,
+            fleet_id: None,
+            target: None,
         })
         .await;
     }
@@ -2545,6 +2667,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_zo_config_serves_the_public_dashboard_refresh_floor() {
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["public_dashboard_min_refresh_secs"], 60);
+        assert_eq!(json["public_dashboards_enabled"], true);
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_query_history_settings() {
+        let cfg = get_config();
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["query_history_enabled"],
+            cfg.limit.query_history_enabled
+        );
+        assert_eq!(
+            json["query_history_retention_days"],
+            cfg.limit.query_history_retention_days
+        );
+    }
+
+    #[tokio::test]
     async fn test_zo_config_reports_slack_per_org() {
         let reason = if cfg!(feature = "enterprise") {
             "flag"
@@ -2581,8 +2730,34 @@ mod tests {
         let json = zo_config_json().await;
         assert_eq!(
             json["incidents_rca_enabled"],
-            o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
+            openobserve_core::alerts::incidents::incidents_enabled()
+                && o2cfg.incidents.rca_enabled
+                && openobserve_core::alerts::incidents::rca_agent_available()
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_zo_config_online_evals_need_the_observability_license() {
+        let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+        let json = zo_config_json().await;
+        assert_eq!(
+            json["online_evals_enabled"],
+            o2cfg.llm_eval_config.enabled && check_features(&[Feature::AiObservability])
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_zo_config_feature_names_come_from_the_embedded_definition() {
+        let json = zo_config_json().await;
+        for (key, gate) in &runtime_definition().features {
+            assert_eq!(
+                json["feature_names"][key].as_str(),
+                gate.display_name.as_deref(),
+                "{key}"
+            );
+        }
     }
 
     #[cfg(not(feature = "enterprise"))]

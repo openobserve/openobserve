@@ -340,7 +340,15 @@
                         v-else
                         class="bg-surface-base border-border-default flex h-27.75 flex-col items-center justify-center border-s border-e border-b"
                       >
-                        <div v-if="!testLoading && outputString.length === 0">
+                        <div
+                          v-if="!testLoading && testedPolicy === 'DropField'"
+                          data-test="associated-regex-patterns-field-dropped"
+                        >
+                          <span class="text-text-secondary text-center text-xs font-[400]">
+                            {{ t("regex_patterns.field_dropped") }}
+                          </span>
+                        </div>
+                        <div v-else-if="!testLoading && outputString.length === 0">
                           <OIcon name="lightbulb" size="md" class="text-icon-color" />
                           <span class="text-text-secondary text-center text-xs font-[400]">
                             {{ t("regex_patterns.click_test_input_hint") }}
@@ -503,6 +511,8 @@ export default defineComponent({
     const testLoading = ref(false);
     const showWarningDialogToRemovePattern = ref(false);
     const outputString = ref("");
+    // Drop returns "", so an empty output alone cannot tell "not run" from "dropped".
+    const testedPolicy = ref<string | null>(null);
     const expandState = ref({
       regexTestString: true,
       outputString: false,
@@ -512,14 +522,25 @@ export default defineComponent({
       try {
         expandState.value.outputString = true;
         outputString.value = "";
+        testedPolicy.value = null;
         testLoading.value = true;
+        const sentPolicy = policy.value;
+        const sentString = testString.value;
         const response = await regexPatternsService.test(
           store.state.selectedOrganization.identifier,
           userClickedPattern.value.pattern,
-          [testString.value],
-          policy.value,
+          [sentString],
+          sentPolicy,
         );
         outputString.value = response.data.results[0];
+        // An edit during the request already cleared the marker; do not restore it for old inputs.
+        if (
+          outputString.value === "" &&
+          policy.value === sentPolicy &&
+          testString.value === sentString
+        ) {
+          testedPolicy.value = sentPolicy;
+        }
       } catch (error) {
         const e = error as { response?: { data?: { message?: string } } };
         toast({
@@ -595,6 +616,9 @@ export default defineComponent({
         appliedPatternsMap.value = new Map(props.data.map((p: any) => [p.pattern_id, p]));
       },
     );
+    watch([policy, testString], () => {
+      testedPolicy.value = null;
+    });
     watch(
       () => policy.value,
       (newVal) => {
@@ -778,6 +802,7 @@ export default defineComponent({
     const resetInputValues = () => {
       testString.value = "";
       outputString.value = "";
+      testedPolicy.value = null;
       expandState.value.outputString = false;
       expandState.value.regexTestString = true;
     };
@@ -842,6 +867,7 @@ export default defineComponent({
       testLoading,
       testStringOutput,
       outputString,
+      testedPolicy,
       expandState,
       outlinedLightbulb: "lightbulb",
       resetInputValues,

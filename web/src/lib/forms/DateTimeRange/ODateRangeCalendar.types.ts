@@ -23,4 +23,6 @@ export interface DateRangeCalendarEmits {
   (_e: "update:startDate", _value: string): void;
   /** Fired when the user completes the range by selecting an end date. Value is YYYY/MM/DD. */
   (_e: "update:endDate", _value: string): void;
+  /** A first click waiting for its end date (YYYY/MM/DD), or null once the range is complete. */
+  (_e: "update:pendingDate", _value: string | null): void;
 }

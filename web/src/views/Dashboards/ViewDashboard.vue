@@ -118,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :auto-apply-dashboard="true"
             :initialTimezone="initialTimezone"
             :disable="arePanelsLoading"
+            calendar-presets
             @update:modelValue="timeGate.onPick"
             @show="timeGate.onShow"
             @hide="onTimePickerHide"
@@ -332,6 +333,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-toolbar"
               data-test="dashboard-share-btn"
             />
+            <span
+              v-if="!isFullscreen && store.state.zoConfig?.public_dashboards_enabled"
+              v-show="store.state.printMode !== true"
+              class="inline-flex items-center"
+              data-test="dashboard-publish-public"
+            >
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                data-test="dashboard-publish-public-btn"
+                icon-left="public"
+                :aria-label="t('dashboard.publicDashboard.shareTooltip')"
+                @click="showPublicLinksPanel = true"
+              >
+                <OTooltip :content="t('dashboard.publicDashboard.shareTooltip')" />
+              </OButton>
+            </span>
+            <PublicLinksPanel
+              v-if="
+                currentDashboardData.data?.dashboardId &&
+                store.state.zoConfig?.public_dashboards_enabled
+              "
+              v-model="showPublicLinksPanel"
+              :dashboard-id="currentDashboardData.data.dashboardId"
+              :dashboard-title="currentDashboardData.data?.title"
+              :variables-config="currentDashboardData.data?.variables"
+              :time-obj="currentTimeObj"
+              :current-values="variablesData"
+              :dashboard-data="currentDashboardData.data"
+              :dashboard-variables="variablesManager"
+              :folder-id="(route.query.folder as string) ?? 'default'"
+            />
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
@@ -340,8 +373,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-setting-btn"
               @click="openSettingsDialog"
               icon-left="settings"
+              :aria-label="hasSettingsDraft ? settingsButtonLabel : undefined"
             >
-              <OTooltip :content="t('dashboard.setting')" />
+              <OTooltip :content="settingsButtonLabel" />
+              <EditorDraftDot
+                v-if="hasSettingsDraft"
+                corner
+                :tooltip="false"
+                data-test="dashboard-setting-btn-draft-dot"
+              />
             </OButton>
             <OButton
               variant="outline"
@@ -577,35 +617,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :open="discardDialog.open"
           size="sm"
           :title="t('dashboard.layoutEdit.discardTitle')"
+          :persistent="discardForced"
+          :show-close="!discardForced"
           :secondary-button-label="
-            discardDialog.reason === 'leave'
-              ? t('dashboard.layoutEdit.stay')
-              : t('dashboard.layoutEdit.keepEditing')
+            discardForced
+              ? undefined
+              : discardDialog.reason === 'leave'
+                ? t('dashboard.layoutEdit.stay')
+                : t('dashboard.layoutEdit.keepEditing')
           "
           :primary-button-label="
-            discardDialog.reason === 'leave'
-              ? t('dashboard.layoutEdit.discardAndLeave')
-              : t('dashboard.layoutEdit.discard')
+            discardForced
+              ? t('dashboard.layoutEdit.discardAndSignOut')
+              : discardDialog.reason === 'leave'
+                ? t('dashboard.layoutEdit.discardAndLeave')
+                : t('dashboard.layoutEdit.discard')
           "
           primary-button-variant="destructive"
-          initial-focus="secondary"
+          :initial-focus="discardForced ? 'primary' : 'secondary'"
           data-test="dashboard-edit-discard-dialog"
           @update:open="(open) => !open && settleDiscard(false)"
           @click:secondary="settleDiscard(false)"
           @click:primary="settleDiscard(true)"
         >
           {{
-            discardDialog.reason === "leave"
+            discardForced
               ? t(
-                  "dashboard.layoutEdit.leaveMessage",
+                  "dashboard.layoutEdit.leaveMessageForced",
                   { count: layoutChangeCount },
                   layoutChangeCount,
                 )
-              : t(
-                  "dashboard.layoutEdit.discardMessage",
-                  { count: layoutChangeCount },
-                  layoutChangeCount,
-                )
+              : discardDialog.reason === "leave"
+                ? t(
+                    "dashboard.layoutEdit.leaveMessage",
+                    { count: layoutChangeCount },
+                    layoutChangeCount,
+                  )
+                : t(
+                    "dashboard.layoutEdit.discardMessage",
+                    { count: layoutChangeCount },
+                    layoutChangeCount,
+                  )
           }}
         </ODialog>
       </OPageLayout>
@@ -634,9 +686,15 @@ import { ANNOTATION_PREVIEW_CONTEXT_KEY } from "@/composables/dashboard/useDashb
 import ShareButton from "@/components/common/ShareButton.vue";
 import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from "vue-router";
+import {
+  onBeforeRouteLeave,
+  onBeforeRouteUpdate,
+  useRouter,
+  type RouteLocationNormalized,
+} from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
-import { parseDuration, generateDurationLabel } from "../../utils/date";
+import { generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import { useRoute } from "vue-router";
 import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { deletePanel } from "../../utils/commons";
@@ -646,6 +704,7 @@ import {
 } from "@/utils/dashboard/panelTimeUtils";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
+import PublicLinksPanel from "@/components/dashboards/PublicLinksPanel.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import useNotifications from "@/composables/useNotifications";
 import {
@@ -680,15 +739,20 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useLayoutEditDraft } from "@/composables/dashboard/useLayoutEditDraft";
 import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
+import { draftSignOutForced } from "@/utils/drafts/draftSession";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
-import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import {
   arePickerValuesEqual,
   hasPanelTime,
   isEffectivePanelTimeRelative,
+  isEffectivePanelTimeCalendar,
   pickerValueToTimeObj,
   queryChangeAffectsPanelTimes,
   toPickerSavedDate,
@@ -723,6 +787,7 @@ import {
   resolveKioskRefresh,
   stripKioskParams,
 } from "@/utils/dashboard/kiosk";
+import { minAutoRefreshSeconds, resolveOpenRefreshInterval } from "@/utils/dashboard/autoRefresh";
 import {
   PLAYLIST_VIEW_PATH,
   isPlaylistEmbed,
@@ -758,6 +823,7 @@ export default defineComponent({
     OPageLayout,
     DateTimePickerDashboard,
     ShareButton,
+    PublicLinksPanel,
     AutoRefreshInterval,
     ExportDashboard,
     DashboardSettings,
@@ -778,6 +844,7 @@ export default defineComponent({
     KioskStrip,
     KioskSetupPopover,
     PlaylistHoldingCard,
+    EditorDraftDot,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -919,6 +986,10 @@ export default defineComponent({
 
     // refresh interval v-model
     const refreshInterval = ref(0);
+    // The URL's refresh as a dashboard opens; null once applied, so reloading the same dashboard keeps the viewer's choice.
+    let openingUrlRefresh: { value: typeof route.query.refresh } | null = {
+      value: route.query.refresh,
+    };
 
     // initial timezone, which will come from the route query
     const initialTimezone = ref(route.query.timezone ?? null);
@@ -986,6 +1057,8 @@ export default defineComponent({
       isAutoRunOn: () => isAutoRunOn.value,
       isRelativeRange: (panel) =>
         isEffectivePanelTimeRelative(panel, route.query, selectedDate.value),
+      isCalendarRange: (panel) =>
+        isEffectivePanelTimeCalendar(panel, route.query, selectedDate.value),
     });
     provide(DASHBOARD_FRESH_ON_OPEN, freshOnOpen);
     // A cross-dashboard drilldown keeps this view mounted, so each dashboard it opens is a new visit.
@@ -996,6 +1069,7 @@ export default defineComponent({
 
     // variables data
     const variablesData = reactive({});
+    const showPublicLinksPanel = ref(false);
     const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
 
     const variablesDataUpdated = (data: any) => {
@@ -1077,13 +1151,18 @@ export default defineComponent({
       return !isEqual(normalizedCurrent, normalizedRefreshed);
     });
 
+    // Panel calendar windows a zone change moved while Auto Run was off; Refresh or Auto Run applies them.
+    const zonePendingPanels = ref<Record<string, { start_time: Date; end_time: Date }>>({});
+    const zoneRefreshPending = computed(
+      () => !isAutoRunOn.value && Object.keys(zonePendingPanels.value).length > 0,
+    );
     const isRefreshPending = computed(
-      () => isVariablesChanged.value || timeGate.needsRefresh.value,
+      () => isVariablesChanged.value || timeGate.needsRefresh.value || zoneRefreshPending.value,
     );
 
     const refreshTooltip = computed(() => {
       if (isAutoRunOn.value) return t("dashboard.viewDashboard.autoRunDescription");
-      if (timeGate.needsRefresh.value) {
+      if (timeGate.needsRefresh.value || zoneRefreshPending.value) {
         return isVariablesChanged.value
           ? t("dashboard.refreshToApplyTimeRangeAndVariables")
           : t("dashboard.refreshToApplyTimeRange");
@@ -1157,6 +1236,7 @@ export default defineComponent({
     const isInternalUrlUpdate = ref(false);
 
     const loadDashboard = async (onlyIfRequired = false) => {
+      zonePendingPanels.value = {};
       // check if drilldown or soft-refresh request
       if (onlyIfRequired) {
         // if current dashboard id and tab is same,  skip loading
@@ -1216,6 +1296,7 @@ export default defineComponent({
 
       // Set the dashboard data - RenderDashboardCharts will initialize the variables manager
       currentDashboardData.data = dashboard;
+      applyOpeningRefresh(dashboard);
 
       // set selected tab from query params
       const selectedTab = dashboard?.tabs?.find((tab: any) => tab.tabId === route.query.tab);
@@ -1262,6 +1343,23 @@ export default defineComponent({
       }
     };
 
+    const applyOpeningRefresh = (dashboard: any) => {
+      if (!openingUrlRefresh) return;
+      const urlRefresh = openingUrlRefresh.value;
+      openingUrlRefresh = null;
+      const configuredMin = store.state?.zoConfig?.min_auto_refresh_interval;
+      // A TV must keep refreshing: a too-low value is raised to the server minimum, not turned off.
+      if (urlRefresh !== undefined && kioskMode.value) {
+        refreshInterval.value = resolveKioskRefresh(urlRefresh, configuredMin);
+        return;
+      }
+      refreshInterval.value = resolveOpenRefreshInterval({
+        urlRefresh,
+        savedDefault: dashboard?.defaultRefreshInterval,
+        minSeconds: minAutoRefreshSeconds(configuredMin),
+      });
+    };
+
     // The mounted picker reads its v-model only once, so a range applied by another dashboard's URL is pushed in.
     const showAppliedDateInPicker = () => {
       if (!dateTimePicker.value || !selectedDate.value) return;
@@ -1285,6 +1383,20 @@ export default defineComponent({
     const openSettingsDialog = () => {
       showDashboardSettingsDialog.value = true;
     };
+
+    const settingsDrafts = useEditorDraftIds("dashboard_settings");
+    const draftLabel = useDraftLabel();
+    const hasSettingsDraft = computed(() =>
+      settingsDrafts.ids.has(String(route.query.dashboard ?? "")),
+    );
+    const settingsButtonLabel = computed(() =>
+      hasSettingsDraft.value
+        ? draftLabel(
+            t("dashboard.setting"),
+            settingsDrafts.savedAt(String(route.query.dashboard ?? "")),
+          )
+        : t("dashboard.setting"),
+    );
 
     const openLayoutConfig = (id: string) => {
       selectedPanelConfig.value.show = true;
@@ -1365,6 +1477,10 @@ export default defineComponent({
     };
 
     const discardDialog = reactive({ open: false, reason: "exit" as "exit" | "leave" });
+    // The password changed and the sign-out goes on whatever is answered, so Stay would only pretend to keep the edits.
+    const discardForced = computed(
+      () => discardDialog.reason === "leave" && draftSignOutForced.value,
+    );
     let resolveDiscard: ((confirmed: boolean) => void) | null = null;
 
     const confirmDiscard = (reason: "exit" | "leave") =>
@@ -1456,10 +1572,10 @@ export default defineComponent({
       return globalTime;
     };
 
-    // Compute time for a single specific panel (for panel-level refresh)
-    const computeSinglePanelTime = (panelId: string) => {
+    // Compute time for a single specific panel (for panel-level refresh); true when it set one
+    const computeSinglePanelTime = (panelId: string): boolean => {
       if (!currentDashboardData.data?.tabs || !dateTimePicker.value) {
-        return;
+        return false;
       }
 
       // Find the panel across all tabs
@@ -1474,7 +1590,7 @@ export default defineComponent({
 
       const globalTime = getAppliedGlobalTime();
       if (!targetPanel || !globalTime) {
-        return;
+        return false;
       }
 
       // Check if panel has its own time configuration
@@ -1482,10 +1598,9 @@ export default defineComponent({
         // Panel has panel-level time - only update this specific panel's time
         // DO NOT update __global to avoid triggering refreshes in other panels
         const effectiveTime = computePanelTime(targetPanel, globalTime);
-        if (effectiveTime) {
-          // CRITICAL: Update only this panel's time property, don't replace entire object
-          currentTimeObjPerPanel.value[panelId] = effectiveTime;
-        }
+        if (!effectiveTime) return false;
+        // CRITICAL: Update only this panel's time property, don't replace entire object
+        currentTimeObjPerPanel.value[panelId] = effectiveTime;
       } else {
         // Panel depends on global time
         // Create a panel-specific time entry (even though it normally uses __global)
@@ -1493,6 +1608,7 @@ export default defineComponent({
         // CRITICAL: Update only this panel's time property, don't replace entire object
         currentTimeObjPerPanel.value[panelId] = globalTime;
       }
+      return true;
     };
 
     provide(DASHBOARD_FRESH_PANEL_TIME, (panelId) => {
@@ -1514,14 +1630,14 @@ export default defineComponent({
       );
     };
 
-    const spanOf = (time: any) =>
-      time?.start_time && time?.end_time
-        ? time.end_time.getTime() - time.start_time.getTime()
-        : null;
+    // Compared instead of the span because a calendar period's span grows with now.
+    let globalRelativePeriod: string | null = null;
 
     // Compute times for all panels in all tabs
     // @param forceRefresh - If true, always create new time objects to force all panels to refresh
     const computeAllPanelTimes = (forceRefresh = false) => {
+      // A forced recompute resolves every panel in the current zone, so nothing is left waiting from a zone change.
+      if (forceRefresh) zonePendingPanels.value = {};
       const globalTime = getAppliedGlobalTime();
       if (!currentDashboardData.data?.tabs || !dateTimePicker.value || !globalTime) {
         return;
@@ -1530,10 +1646,14 @@ export default defineComponent({
       // A non-forced recompute must not advance a relative range: its resolved now drifts a few hundred ms between calls during load, refiring every global panel's time watcher (cache paint → spurious refetch).
       const existingGlobalTime = currentTimeObjPerPanel.value.__global;
       const isRelativeGlobal = selectedDate.value?.valueType === "relative";
+      const relativePeriod = isRelativeGlobal
+        ? (selectedDate.value?.relativeTimePeriod ?? null)
+        : null;
       const globalTimeChanged = isRelativeGlobal
-        ? spanOf(existingGlobalTime) !== spanOf(globalTime)
+        ? globalRelativePeriod !== relativePeriod
         : !areTimesEqual(existingGlobalTime, globalTime);
       const shouldUpdateGlobal = forceRefresh || !existingGlobalTime || globalTimeChanged;
+      if (shouldUpdateGlobal) globalRelativePeriod = relativePeriod;
 
       // Build the new panel times object
       const newPanelTimes: Record<string, any> = {
@@ -1585,13 +1705,63 @@ export default defineComponent({
       });
     };
 
+    // A zone change from any picker (header, panel, ViewPanel) moves every calendar window, which no single picker re-emits.
+    const reResolveCalendarRanges = () => {
+      const applied = selectedDate.value;
+      const picked = timeGate.picked.value;
+      // A header pick still waiting for Refresh is the range the user chose, so it is the one to keep or move.
+      const held = picked && !arePickerValuesEqual(picked, applied) ? picked : applied;
+      if (held?.valueType === "relative" && parseCalendarToken(held.relativeTimePeriod)) {
+        const window = getConsumableRelativeTime(held.relativeTimePeriod);
+        if (window)
+          timeGate.onPick({ ...held, startTime: window.startTime, endTime: window.endTime });
+      }
+      const globalTime = getAppliedGlobalTime();
+      if (!globalTime) return;
+      const moved: [string, { start_time: Date; end_time: Date }][] = [];
+      for (const tab of currentDashboardData.data?.tabs ?? []) {
+        for (const panel of tab.panels ?? []) {
+          if (!hasPanelTime(panel)) continue;
+          if (!isEffectivePanelTimeCalendar(panel, route.query, selectedDate.value)) continue;
+          const next = computePanelTime(panel, globalTime);
+          const current = currentTimeObjPerPanel.value[panel.id];
+          // Only a moved start counts; a "so far" end always differs by the moment it was read.
+          if (next && current?.start_time?.getTime() !== next.start_time?.getTime()) {
+            moved.push([panel.id, next]);
+          }
+        }
+      }
+      if (!isAutoRunOn.value) {
+        zonePendingPanels.value = Object.fromEntries(moved);
+        return;
+      }
+      zonePendingPanels.value = {};
+      for (const [id, next] of moved) currentTimeObjPerPanel.value[id] = next;
+    };
+    watch(
+      () => store.state.timezone,
+      async () => {
+        // A panel picker re-applies its own panel a tick after the zone changes; waiting lets that path win, so it loads once.
+        await nextTick();
+        await nextTick();
+        reResolveCalendarRanges();
+      },
+    );
+    watch(isAutoRunOn, (isOn) => {
+      if (!isOn) return;
+      for (const [id, next] of Object.entries(zonePendingPanels.value)) {
+        currentTimeObjPerPanel.value[id] = next;
+      }
+      zonePendingPanels.value = {};
+    });
+
     // when the applied range changes, update the current time object for the dashboard
     watch(selectedDate, async () => {
       const appliedTime = getAppliedGlobalTime();
       if (appliedTime && dateTimePicker.value) {
-        // CRITICAL: Clear panelIdToBeRefreshed to ensure all panels refresh
+        // CRITICAL: Clear panelRefreshTargets to ensure all panels refresh
         // When global date time changes, all panels should update
-        panelIdToBeRefreshed.value = null;
+        panelRefreshTargets.clear();
 
         currentTimeObj.value = appliedTime;
 
@@ -1644,6 +1814,7 @@ export default defineComponent({
         // loadDashboard() is already called during onMounted setup.
         if (!oldDashboardId) return;
         if (newDashboardId && newDashboardId !== oldDashboardId) {
+          openingUrlRefresh = { value: route.query.refresh };
           isDashboardLoading.value = true;
           try {
             await loadDashboard();
@@ -1817,9 +1988,9 @@ export default defineComponent({
     };
 
     const runRefresh = async (withoutCache = false) => {
-      // CRITICAL FIX: Clear panelIdToBeRefreshed for global refresh
+      // CRITICAL FIX: Clear panelRefreshTargets for global refresh
       // This allows all panels to refresh, not just the one previously refreshed
-      panelIdToBeRefreshed.value = null;
+      panelRefreshTargets.clear();
 
       // A global refresh overrides every per-panel choice; panels read the flag when their query fires.
       shouldRefreshWithoutCachePerPanel.value = { __global: withoutCache === true };
@@ -1960,15 +2131,12 @@ export default defineComponent({
           params.refresh,
           store.state?.zoConfig?.min_auto_refresh_interval,
         );
-      } else if (params.refresh) {
-        const refreshInSecs = parseDuration(params.refresh);
-        if (store.state?.zoConfig?.min_auto_refresh_interval) {
-          if (refreshInSecs < store.state?.zoConfig?.min_auto_refresh_interval) {
-            refreshInterval.value = 0;
-          } else {
-            refreshInterval.value = refreshInSecs;
-          }
-        }
+      } else if (params.refresh !== undefined) {
+        refreshInterval.value = resolveOpenRefreshInterval({
+          urlRefresh: params.refresh,
+          savedDefault: undefined,
+          minSeconds: minAutoRefreshSeconds(store.state?.zoConfig?.min_auto_refresh_interval),
+        });
       }
 
       // check if timezone query params exist
@@ -2551,17 +2719,43 @@ export default defineComponent({
       leaveKioskState();
     };
 
+    // A later leave guard (the settings drawer's) can still keep the user here, so leaving acts only once the navigation lands.
+    let onLanded: { to: RouteLocationNormalized; run: () => void } | null = null;
+    const removeLandedHook = router.afterEach((to, _from, failure) => {
+      if (onLanded?.to !== to) return;
+      const { run } = onLanded;
+      onLanded = null;
+      if (!failure) run();
+    });
+    onUnmounted(() => {
+      removeLandedHook();
+      // A redirect never reports the original navigation, but unmounting means the user did leave.
+      const pending = onLanded;
+      onLanded = null;
+      pending?.run();
+    });
+
     // Unsaved layout edits are the store's cached dashboard object, so a confirmed leave must roll them back.
-    onBeforeRouteLeave(() => {
+    onBeforeRouteLeave((to) => {
       if (!layoutDraft.isDirty.value) {
-        layoutDraft.finish();
-        clearPrintModeOnLeave();
+        onLanded = {
+          to,
+          run: () => {
+            layoutDraft.finish();
+            clearPrintModeOnLeave();
+          },
+        };
         return;
       }
       return confirmDiscard("leave").then((confirmed) => {
         if (!confirmed) return false;
-        layoutDraft.discard();
-        clearPrintModeOnLeave();
+        onLanded = {
+          to,
+          run: () => {
+            layoutDraft.discard();
+            clearPrintModeOnLeave();
+          },
+        };
         return true;
       });
     });
@@ -2571,7 +2765,7 @@ export default defineComponent({
       if (to.query.dashboard === from.query.dashboard || !layoutDraft.isDirty.value) return;
       return confirmDiscard("leave").then((confirmed) => {
         if (!confirmed) return false;
-        layoutDraft.discard();
+        onLanded = { to, run: () => layoutDraft.discard() };
         return true;
       });
     });
@@ -2580,17 +2774,16 @@ export default defineComponent({
     const shouldRefreshWithoutCachePerPanel = ref({});
 
     const refreshPanelRequest = (panelId, shouldRefreshWithoutCache) => {
-      // Set the panel ID to be refreshed
-      panelIdToBeRefreshed.value = panelId;
-
       // Store the shouldRefreshWithoutCache value for this panel
       shouldRefreshWithoutCachePerPanel.value = {
         ...shouldRefreshWithoutCachePerPanel.value,
         [panelId]: shouldRefreshWithoutCache || false,
       };
 
-      // Recompute time for this specific panel only
-      computeSinglePanelTime(panelId);
+      // Only a shown panel whose time was set loads, so only it can settle and end the refresh.
+      if (computeSinglePanelTime(panelId) && getPanelFromTab(selectedTabId.value, panelId)) {
+        panelRefreshTargets.set(panelId, false);
+      }
 
       setTimeString();
     };
@@ -2711,6 +2904,9 @@ export default defineComponent({
       selectedDate,
       currentTimeObj,
       currentTimeObjPerPanel,
+      computeAllPanelTimes,
+      reResolveCalendarRanges,
+      zoneRefreshPending,
       shouldRefreshWithoutCachePerPanel,
       refreshInterval,
       // ----------------
@@ -2729,12 +2925,16 @@ export default defineComponent({
       refreshedVariablesDataUpdated,
       onDeletePanel,
       variablesData,
+      variablesManager,
+      showPublicLinksPanel,
       variablesDataUpdated,
       showDashboardSettingsDialog,
       hasUnsavedConflict,
       resolveSaveConflict,
       saveConflictState: dashboardSaveConflictState,
       openSettingsDialog,
+      hasSettingsDraft,
+      settingsButtonLabel,
       loadDashboard,
       refreshPanelRequest,
       updateRunId,
@@ -2781,6 +2981,7 @@ export default defineComponent({
       saveLayout,
       requestExitLayoutEdit,
       discardDialog,
+      discardForced,
       settleDiscard,
       folderNameFromFolderId,
       showJsonEditorDialog,

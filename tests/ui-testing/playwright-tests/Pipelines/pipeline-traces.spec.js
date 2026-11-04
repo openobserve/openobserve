@@ -502,7 +502,7 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await pageManager.pipelinesPage.selectStreamOptionByName(TRACES_STREAM);
     await pageManager.pipelinesPage.saveInputNodeStream();
 
-    // onBeforeRouteLeave must hold the navigation behind the confirm dialog; accepting it completes the navigation.
+    // The route guard holds the navigation behind the leave dialog; Discard completes it.
     await pageManager.pipelinesPage.clickDashboardsMenu();
     await pageManager.pipelinesPage.acceptUnsavedChangesPromptAndExpectDashboards();
 

@@ -20,3 +20,7 @@ rustflags = ["-C", "target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2"]
 
 [target.x86_64-pc-windows-msvc]
 rustflags = ["-C", "target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2"]
+
+[env]
+# test threads get the 16 MB stack of the server's runtime threads (THREAD_STACK_SIZE); debug async code outgrows 2 MB
+RUST_MIN_STACK = "16777216"

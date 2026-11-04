@@ -200,7 +200,9 @@ describe("menu terms (AC-12)", () => {
     expect(fr.common.logs).toBe("Logs");
     expect(fr.menu.downtimes).toBe("Périodes de maintenance");
     expect(fr.settings.lightMode).toBe("Mode clair");
-    expect(read("fr-FR")).not.toMatch(/[Cc]analisation|[Ii]ndisponibilit|[Bb]uteur/);
+    expect(read("fr-FR")).not.toMatch(
+      /[Cc]analisation|[Ii]ndisponibilit|[Bb]uteur|[Cc]ombustion|[Gg]rumes|[Ss]urveillance réelle|[Pp]ériode d'arrêt/,
+    );
   });
 
   it("de-DE says Alarme in the header and the menu, like its items", () => {

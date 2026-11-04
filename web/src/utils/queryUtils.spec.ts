@@ -949,6 +949,24 @@ describe("processQueryMetadataErrors", () => {
     expect(result).toContain("Simple error");
   });
 
+  it("keeps a chunk's single function_error string whole", () => {
+    const metadata = [[{ function_error: "Whole message" }]];
+
+    expect(processQueryMetadataErrors(metadata)).toBe("Whole message");
+  });
+
+  it("drops blank and non-text entries of a function_error list", () => {
+    const metadata = [[{ function_error: ["", "Error F", { code: 1 }] }]];
+
+    expect(processQueryMetadataErrors(metadata)).toBe("Error F");
+  });
+
+  it("puts each message of a flat function_error list on its own line", () => {
+    const metadata = [{ function_error: ["Error D", "Error E"] }];
+
+    expect(processQueryMetadataErrors(metadata)).toBe("Error D\nError E");
+  });
+
   it("deduplicates repeated messages", () => {
     const metadata = [
       [

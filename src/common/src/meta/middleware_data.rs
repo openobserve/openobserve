@@ -80,17 +80,17 @@ impl RumExtraData {
             })
     }
 
-    /// Try to extract the ootags/o2tags string from the request body.
-    /// Only parses the first JSON object — either the first NDJSON line
-    /// (up to `\n`) or the entire body if it's a single JSON object.
-    /// Returns `None` if the body is empty, not a JSON object, or
-    /// doesn't contain an `ootags`/`o2tags` field.
+    /// Returns the first ootags/o2tags of the first NDJSON line, a single object or array element.
     fn extract_tags_from_body_bytes(body: &[u8]) -> Option<String> {
         // Skip leading whitespace that some NDJSON encoders may emit
         let start = body
             .iter()
             .position(|&b| !matches!(b, b' ' | b'\t' | b'\r' | b'\n'))
             .unwrap_or(body.len());
+        if start < body.len() && body[start] == b'[' {
+            // The first element's tags apply to an array batch, as NDJSON's first line does.
+            return Self::tags_of(Self::first_array_element(&body[start..])?.as_object()?);
+        }
         if start >= body.len() || body[start] != b'{' {
             return None;
         }
@@ -100,7 +100,33 @@ impl RumExtraData {
             .map(|p| start + p)
             .unwrap_or(body.len());
         let json: serde_json::Value = serde_json::from_slice(&body[start..end]).ok()?;
-        let obj = json.as_object()?;
+        Self::tags_of(json.as_object()?)
+    }
+
+    /// Reads only the first element of exactly one well-formed JSON array.
+    fn first_array_element(body: &[u8]) -> Option<serde_json::Value> {
+        struct First;
+        impl<'de> serde::de::Visitor<'de> for First {
+            type Value = Option<serde_json::Value>;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a JSON array")
+            }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                self,
+                mut seq: A,
+            ) -> Result<Self::Value, A::Error> {
+                let first = seq.next_element()?;
+                while seq.next_element::<serde::de::IgnoredAny>()?.is_some() {}
+                Ok(first)
+            }
+        }
+        let mut de = serde_json::Deserializer::from_slice(body);
+        let first = serde::Deserializer::deserialize_seq(&mut de, First).ok()?;
+        de.end().ok()?;
+        first
+    }
+
+    fn tags_of(obj: &serde_json::Map<String, serde_json::Value>) -> Option<String> {
         obj.get("ootags")
             .or_else(|| obj.get("o2tags"))
             .and_then(|v| v.as_str())
@@ -412,5 +438,61 @@ mod tests {
 
         let result = RumExtraData::filter_tags(&data);
         assert!(result.is_empty());
+    }
+
+    fn body_tags(body: &str) -> Option<String> {
+        RumExtraData::extract_tags_from_body_bytes(body.as_bytes())
+    }
+
+    #[test]
+    fn test_body_tags_object_paths_unchanged() {
+        assert_eq!(body_tags(r#"{"o2tags":"a:b"}"#).as_deref(), Some("a:b"));
+        assert_eq!(
+            body_tags("  {\"ootags\":\"a:b\"}\n{\"o2tags\":\"c:d\"}").as_deref(),
+            Some("a:b")
+        );
+        assert_eq!(body_tags(r#"{"m":1}"#), None);
+        assert_eq!(body_tags(""), None);
+    }
+
+    #[test]
+    fn test_body_tags_array_uses_first_element() {
+        let body = r#"[{"m":1,"o2tags":"env:dev,service:x"},{"o2tags":"env:other"}]"#;
+        assert_eq!(body_tags(body).as_deref(), Some("env:dev,service:x"));
+        assert_eq!(
+            body_tags(&format!(" \r\n\t{body}\n")).as_deref(),
+            Some("env:dev,service:x")
+        );
+    }
+
+    #[test]
+    fn test_body_tags_pretty_printed_array_and_ootags_alias() {
+        let body = "[\n  {\n    \"m\": 1,\n    \"ootags\": \"env:dev\"\n  },\n  {\"m\": 2}\n]\n";
+        assert_eq!(body_tags(body).as_deref(), Some("env:dev"));
+    }
+
+    #[test]
+    fn test_body_tags_array_without_usable_first_element_is_none() {
+        for body in [
+            r#"[{"m":1},{"o2tags":"env:dev"}]"#,
+            "[]",
+            "[1,{\"o2tags\":\"a:b\"}]",
+            r#"[[{"o2tags":"a:b"}]]"#,
+            r#"[{"o2tags":"a:b"},"#,
+            r#"[{"o2tags":"a:b"}] {"m":1}"#,
+            r#"[{"o2tags":5}]"#,
+            r#"[{"o2tags":"a:b"}]x"#,
+            r#"[{"o2tags":"a:b"},{"m":1}"#,
+            r#"[{"o2tags":"a:b"},{"m":1}]]"#,
+        ] {
+            assert_eq!(body_tags(body), None, "{body}");
+        }
+    }
+
+    #[test]
+    fn test_body_tags_array_first_element_with_very_large_later_element() {
+        let big = "x".repeat(1_000_000);
+        let body = format!(r#"[{{"o2tags":"a:b"}},{{"m":"{big}"}}]"#);
+        assert_eq!(body_tags(&body).as_deref(), Some("a:b"));
     }
 }

@@ -18,7 +18,7 @@
 use std::collections::HashMap;
 
 use config::meta::{
-    downtimes::{Downtime, DowntimeSchedule, Repeat},
+    downtimes::{Downtime, DowntimeSchedule, MuteSource, Repeat},
     folder::{DEFAULT_FOLDER, FolderType},
 };
 use sea_orm::{
@@ -277,6 +277,9 @@ pub async fn put_with<C: ConnectionTrait>(
                     Column::Reason,
                     Column::Condition,
                     Column::Targets,
+                    Column::AlertGroups,
+                    Column::EndOnClear,
+                    Column::MuteSource,
                     Column::ShowBanner,
                     Column::Repeat,
                     Column::StartsAt,
@@ -548,6 +551,9 @@ pub async fn insert_tombstone_with<C: ConnectionTrait>(
     deleted_at: i64,
 ) -> Result<bool, errors::Error> {
     let tombstone = ActiveModel {
+        alert_groups: Set(None),
+        end_on_clear: Set(None),
+        mute_source: Set(None),
         id: Set(id.to_string()),
         org: Set(org.to_string()),
         folder_id: Set(folder_pk.to_string()),
@@ -796,6 +802,17 @@ fn to_active_model(d: &Downtime, folder_pk: String) -> Result<ActiveModel, error
         reason: Set(d.reason.clone()),
         condition: Set(d.condition.as_ref().map(serde_json::to_value).transpose()?),
         targets: Set(serde_json::to_value(&d.targets)?),
+        alert_groups: Set(d
+            .alert_groups
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()?),
+        end_on_clear: Set(d
+            .end_on_clear
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()?),
+        mute_source: Set(d.source.map(|s| s.as_str().to_string())),
         show_banner: Set(d.show_banner),
         repeat: Set(d.schedule.repeat.to_i16()),
         starts_at: Set(d.schedule.starts_at),
@@ -828,6 +845,17 @@ fn from_model(m: Model, folder_id: String) -> Result<Downtime, errors::Error> {
     Ok(Downtime {
         condition: m.condition.map(serde_json::from_value).transpose()?,
         targets: serde_json::from_value(m.targets)?,
+        alert_groups: m
+            .alert_groups
+            .as_deref()
+            .map(serde_json::from_str)
+            .transpose()?,
+        end_on_clear: m
+            .end_on_clear
+            .as_deref()
+            .map(serde_json::from_str)
+            .transpose()?,
+        source: m.mute_source.as_deref().and_then(MuteSource::parse),
         schedule: DowntimeSchedule {
             repeat,
             starts_at: m.starts_at,
@@ -961,6 +989,9 @@ mod tests {
 
     fn downtime(id: &str, repeat: Repeat, ends_at: Option<i64>) -> Downtime {
         Downtime {
+            alert_groups: None,
+            end_on_clear: None,
+            source: None,
             id: id.to_string(),
             org: "acme".to_string(),
             folder_id: "default".to_string(),

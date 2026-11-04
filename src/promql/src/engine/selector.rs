@@ -646,7 +646,8 @@ pub(super) fn equal_matcher_filters(matchers: &Matchers) -> Vec<(String, Vec<Str
         .matchers
         .iter()
         .filter_map(|mat| {
-            if mat.op == MatchOp::Equal {
+            // An absent label is stored under the `null` partition, not under "".
+            if mat.op == MatchOp::Equal && !mat.value.is_empty() {
                 Some((mat.name.to_string(), vec![mat.value.to_string()]))
             } else {
                 None
@@ -734,6 +735,19 @@ mod tests {
         assert_eq!(metrics.len(), 2);
         assert_eq!(metrics[&11].samples.len(), 2);
         assert_eq!(metrics[&22].samples.len(), 1);
+    }
+
+    #[test]
+    fn test_equal_matcher_filters_skip_empty_value() {
+        let promql_parser::parser::Expr::VectorSelector(selector) =
+            promql_parser::parser::parse(r#"m{env="prod",region="",zone!="a"}"#).unwrap()
+        else {
+            panic!("expected a vector selector");
+        };
+        assert_eq!(
+            equal_matcher_filters(&selector.matchers),
+            vec![("env".to_string(), vec!["prod".to_string()])]
+        );
     }
 
     #[tokio::test]

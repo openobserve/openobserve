@@ -15,6 +15,8 @@
 
 import { computed } from "vue";
 import { gt, type I18nKey } from "@/types/i18n";
+import { getIntlLocale } from "@/locales";
+import { formatCalendarLabel } from "@/utils/dashboard/calendarPeriods";
 
 /**
  * `gt()` rather than a threaded `t`: this is a module-scope pure helper that
@@ -23,6 +25,8 @@ import { gt, type I18nKey } from "@/types/i18n";
  */
 export function periodToLabel(period: string): string {
   if (!period || period === "absolute") return "";
+  const calendarLabel = formatCalendarLabel(period, null, gt, getIntlLocale());
+  if (calendarLabel) return calendarLabel;
   const value = parseInt(period, 10);
   const unit = period.slice(-1);
   // One pipe-plural message key per unit — each message carries the whole sentence
@@ -39,6 +43,7 @@ export function periodToLabel(period: string): string {
   return gt(units[unit] ?? "common.pastUnit", { count: value });
 }
 
+/** A rolling period that contains `period`. */
 export function nextWiderPeriod(period: string): string {
   const value = parseInt(period, 10);
   const unit = period.slice(-1);
@@ -83,6 +88,7 @@ export default function useWidenRange(
   const suggestedPeriodLabel = computed(() => periodToLabel(suggestedPeriod.value));
   const expandRangeSublabel = computed(() => {
     if (!isRelative.value) return absoluteExpandDesc;
+    if (!suggestedPeriod.value) return "";
     return `${currentPeriodLabel.value} → ${suggestedPeriodLabel.value}`;
   });
 

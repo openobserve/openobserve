@@ -12,7 +12,7 @@
     <OPageLayout
       :back="{
         label: t('onlineEvals.scorer.backTo'),
-        onClick: () => $emit('cancel'),
+        onClick: cancel,
         dataTest: 'scorer-form-back-btn',
       }"
       bleed
@@ -179,13 +179,25 @@
                 </div>
               </div>
 
-              <div>
+              <div class="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
                 <OFormInput
                   name="model"
                   :label="t('onlineEvals.scorer.modelLabel')"
                   :placeholder="t('onlineEvals.scorer.modelPlaceholder')"
                   size="sm"
                   data-test="scorer-form-model-input"
+                />
+                <OFormInput
+                  name="temperature"
+                  :label="t('onlineEvals.scorer.temperatureLabel')"
+                  :placeholder="t('onlineEvals.scorer.temperaturePlaceholder')"
+                  :help-text="t('onlineEvals.scorer.temperatureHelp')"
+                  type="number"
+                  size="sm"
+                  :min="0"
+                  :max="2"
+                  step="0.1"
+                  data-test="scorer-form-temperature-input"
                 />
               </div>
 
@@ -618,7 +630,7 @@
           variant="outline"
           size="sm-action"
           :disabled="isSubmitting"
-          @click="$emit('cancel')"
+          @click="cancel"
         >
           {{ t("onlineEvals.buttons.cancel") }}
         </OButton>
@@ -674,12 +686,13 @@
         </template>
       </ODialog>
     </OPageLayout>
+    <EditorDraftDialogs :draft="scorerDraft" />
   </OForm>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -709,6 +722,11 @@ import { extractTemplateVariables, formatTemplateVariable, showError } from "../
 import { useScorerTest } from "../composables/useScorerTest";
 import ScorerTestPanel from "./scorer/ScorerTestPanel.vue";
 import { makeScorerFormSchema, type ScorerForm } from "./ScorerFormPage.schema";
+import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useEditorDraft } from "@/composables/useEditorDraft";
+import { leavesEvalForm } from "../utils/routeSync";
+import { saveScorerMutation } from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 
 const props = defineProps<{
   orgId: string;
@@ -724,11 +742,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "saved"): void;
   (e: "cancel"): void;
+  /** Saved from the leave dialog: the list reloads while the pending navigation closes the form. */
+  (e: "persisted"): void;
   (e: "request-versions", scoreConfigId: string): void;
   (e: "refresh-providers"): void;
 }>();
 
 const { t } = useI18nTyped();
+const saveScorer = useMutation(() => saveScorerMutation(props.orgId));
 
 // Co-located Zod schema (factory keeps messages i18n-driven). The form is
 // mounted fresh for each create/edit action, so building it once is safe.
@@ -796,6 +817,7 @@ function buildScorerTestPayload() {
         params: {
           provider_id: formValues.value.providerId,
           ...(formValues.value.model.trim() ? { model: formValues.value.model.trim() } : {}),
+          ...temperatureParam(formValues.value.temperature),
           include_reasoning: formValues.value.includeReasoning,
           ...(cleanedExtraFields.value.length
             ? { extra_metadata_fields: cleanedExtraFields.value }
@@ -1112,10 +1134,11 @@ watch(decisionProvider, (isDecision) => {
 
 const promptVariables = computed(() => extractTemplateVariables(formValues.value.template || ""));
 
-onMounted(() => {
+onMounted(async () => {
   if (props.mode === "edit" && formValues.value.producesScoreConfigId) {
     void prepareSelectedScoreConfigVersion(true);
   }
+  await scorerDraft.start();
 });
 
 type AuthType = "" | "bearer" | "basic" | "api_key";
@@ -1176,6 +1199,12 @@ function readCustomHeaders(rawHeaders: any): CustomHeader[] {
     .map((h) => ({ key: String(h.key || ""), value: String(h.value || "") }));
 }
 
+/** `{ temperature }` when the field holds a number, else nothing (judge default). */
+function temperatureParam(raw: string | number | undefined): { temperature?: number } {
+  const text = String(raw ?? "").trim();
+  return text ? { temperature: Number(text) } : {};
+}
+
 function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
   if (!row) {
     return {
@@ -1187,6 +1216,7 @@ function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
       pinScoreConfigVersion: false,
       providerId: "",
       model: "",
+      temperature: "",
       remoteEndpoint: "",
       template: "Evaluate {{ input }} and {{ output }}.",
       includeReasoning: true,
@@ -1224,6 +1254,7 @@ function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
     ),
     providerId: String(row.params?.provider_id || ""),
     model: String(row.params?.model || ""),
+    temperature: typeof row.params?.temperature === "number" ? String(row.params.temperature) : "",
     remoteEndpoint: String(row.params?.endpoint || ""),
     template: row.template || "",
     includeReasoning: row.params?.include_reasoning !== false,
@@ -1278,6 +1309,10 @@ async function prepareSelectedScoreConfigVersion(keepSelectedVersion: boolean) {
 // Save spinner spans the save.
 async function save(value: ScorerForm) {
   if (!props.orgId) return;
+  if (scorerDraft.pendingReentries().some((path) => secretInUse(path, value))) {
+    toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
+    return;
+  }
   try {
     const isLlmJudge = value.scorerType === "llm_judge";
     // producesScoreConfigVersion / pinScoreConfigVersion are set programmatically
@@ -1302,6 +1337,7 @@ async function save(value: ScorerForm) {
           params: {
             provider_id: value.providerId,
             ...(value.model.trim() ? { model: value.model.trim() } : {}),
+            ...temperatureParam(value.temperature),
             include_reasoning: value.includeReasoning,
             ...(extraFields.length ? { extra_metadata_fields: extraFields } : {}),
           },
@@ -1313,27 +1349,110 @@ async function save(value: ScorerForm) {
           params: buildRemoteParams(value),
         };
 
-    if (props.mode === "edit" && props.row) {
-      await onlineEvalsService.scorers.update(props.orgId, entityId(props.row), {
+    await saveScorer.mutateAsync({
+      id: props.mode === "edit" && props.row ? entityId(props.row) : undefined,
+      payload: {
         name: value.name.trim(),
         description: value.description?.trim() || null,
         scorer: scorerPayload,
-      });
-    } else {
-      await onlineEvalsService.scorers.create(props.orgId, {
-        name: value.name.trim(),
-        description: value.description?.trim() || null,
-        scorer: scorerPayload,
-      });
-    }
+      },
+    });
     toast({
       variant: "success",
       message: t("onlineEvals.saved", { label: t("onlineEvals.singular.scorers") }),
     });
+    if (leaveSave) {
+      leaveSave.saved = true;
+      emit("persisted");
+      return;
+    }
+    scorerDraft.markSaved();
     emit("saved");
   } catch (err: any) {
     showError(err, t("onlineEvals.scorer.saveError"));
   }
+}
+interface ScorerDraft {
+  values: ScorerForm;
+}
+
+// Set while the leave dialog's Save runs, so a successful save neither closes the form nor reloads the page.
+let leaveSave: { saved: boolean } | null = null;
+
+const REMOTE_ENDPOINT_PATH = "/values/remoteEndpoint";
+
+const AUTH_TYPE_BY_SECRET: Record<string, AuthType> = {
+  "/values/authBearerToken": "bearer",
+  "/values/authBasicPassword": "basic",
+  "/values/authApiKeyToken": "api_key",
+};
+
+/** Whether a blanked secret is still sent: only a remote scorer sends auth and headers, and only its chosen auth. */
+function secretInUse(path: string, value: ScorerForm): boolean {
+  const auth = AUTH_TYPE_BY_SECRET[path];
+  if (auth) return value.scorerType === "remote" && value.authType === auth;
+  if (path.startsWith("/values/customHeaders/") || path === REMOTE_ENDPOINT_PATH)
+    return value.scorerType === "remote";
+  return true;
+}
+
+function secretFieldLabel(path: string, data: ScorerDraft): I18nText | null {
+  const header = /^\/values\/customHeaders\/(\d+)\/value$/.exec(path);
+  if (header) {
+    return t("common.editorDraft.headerField", {
+      name: data.values.customHeaders[Number(header[1])]?.key ?? "",
+    });
+  }
+  if (path === "/values/authBasicPassword") return t("common.editorDraft.passwordField");
+  if (path === "/values/authBearerToken" || path === "/values/authApiKeyToken") {
+    return t("common.editorDraft.tokenField");
+  }
+  if (path === REMOTE_ENDPOINT_PATH) return t("common.editorDraft.urlField");
+  return null;
+}
+
+const scorerDraft = useEditorDraft<ScorerDraft>({
+  kind: "eval_scorer",
+  entityLabel: () => t("common.editorDraft.entities.eval_scorer"),
+  entityId: () => (props.mode === "edit" && props.row ? entityId(props.row) : null),
+  newVariant: () => props.scorerType,
+  snapshot: () => ({
+    values: {
+      ...formValues.value,
+      extraMetadataFields: formValues.value.extraMetadataFields.map((field) => ({ ...field })),
+      customHeaders: formValues.value.customHeaders.map((header) => ({ ...header })),
+    },
+  }),
+  // A header name, not a secret, though its key matches the secret pattern.
+  secretExemptKeys: ["authApiKeyHeaderName"],
+  // Any custom header can carry a credential, whatever its name, so no header value is drafted.
+  secretLists: ["/values/customHeaders"],
+  secretUrls: [REMOTE_ENDPOINT_PATH],
+  apply: (data) => {
+    form.reset({ ...initForm(null, props.scorerType), ...data.values });
+    if (data.values.producesScoreConfigId) void prepareSelectedScoreConfigVersion(true);
+  },
+  // Shaped like the snapshot, so the secret pointers blank the endpoint and header values before hashing.
+  base: () =>
+    props.mode === "edit" && props.row
+      ? { values: initForm(props.row, props.scorerType) }
+      : undefined,
+  save: async () => {
+    const run = { saved: false };
+    leaveSave = run;
+    try {
+      await form.handleSubmit();
+    } finally {
+      leaveSave = null;
+    }
+    return run.saved;
+  },
+  describeRedacted: (paths, data) => paths.flatMap((path) => secretFieldLabel(path, data) ?? []),
+  leaveOnRouteUpdate: leavesEvalForm,
+});
+
+async function cancel() {
+  if (await scorerDraft.confirmLeave()) emit("cancel");
 }
 </script>
 

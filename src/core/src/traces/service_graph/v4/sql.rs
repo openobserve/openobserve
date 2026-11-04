@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::{AGENT_INHERIT_DEPTH, LEARN_SAMPLE};
-use crate::traces::otel::pricing::model_canonical_names;
 
 pub const BUCKET_COUNT: usize = 17;
 /// `le` strings in bucket order; the last one is the `+Inf` bucket (= requests).
@@ -678,16 +677,11 @@ pub fn agent_form(cols: &Columns, orphans: u64) -> AgentForm {
     }
 }
 
-/// Canonical display name (§4.6); the fallback strips a vendor prefix and a `-YYYYMMDD` suffix.
+/// Canonical display name (§4.6): strips a vendor prefix, a `-YYYYMMDD` suffix and a `[...]`
+/// suffix.
 pub fn model_display_expr(model_expr: &str) -> String {
-    let arms = model_canonical_names()
-        .map(|(pattern, canonical)| {
-            format!("WHEN regexp_like({model_expr}, '{pattern}') THEN '{canonical}'")
-        })
-        .collect::<Vec<_>>()
-        .join(" ");
     format!(
-        "CASE {arms} ELSE regexp_replace(regexp_replace(regexp_replace(lower({model_expr}), '^[^/]+/', ''), '-[0-9]{{8}}$', ''), '\\[[^\\]]*\\]$', '') END"
+        "regexp_replace(regexp_replace(regexp_replace(lower({model_expr}), '^[^/]+/', ''), '-[0-9]{{8}}$', ''), '\\[[^\\]]*\\]$', '')"
     )
 }
 
@@ -1546,7 +1540,7 @@ mod tests {
 
         let model = "COALESCE(NULLIF(gen_ai_request_model, ''), NULLIF(gen_ai_response_model, ''))";
         let flat = build_q6(&Columns::all(), "t", 1, 2, AgentForm::Flat).unwrap();
-        assert!(flat.starts_with("SELECT NULLIF(gen_ai_agent_name, '') AS agent_from, service_name, CASE WHEN regexp_like("));
+        assert!(flat.starts_with("SELECT NULLIF(gen_ai_agent_name, '') AS agent_from, service_name, regexp_replace(regexp_replace(regexp_replace(lower("));
         assert!(flat.contains(&format!(
             "{model} IS NOT NULL AND {model} NOT LIKE '<%' GROUP BY 1, 2, 3, 4"
         )));
@@ -1585,34 +1579,11 @@ mod tests {
     }
 
     #[test]
-    fn test_model_display_expr_never_emits_a_pattern() {
-        let expr = model_display_expr("m");
-        assert!(expr.starts_with("CASE WHEN regexp_like(m, '"));
-        assert!(expr.ends_with(
-            " ELSE regexp_replace(regexp_replace(regexp_replace(lower(m), '^[^/]+/', ''), '-[0-9]{8}$', ''), '\\[[^\\]]*\\]$', '') END"
-        ));
-        assert!(expr.contains("WHEN regexp_like(m, 'gpt-5\\.2-pro') THEN 'gpt-5.2-pro'"));
-        assert!(expr.contains("WHEN regexp_like(m, '(?i)deepseek-v4-pro') THEN 'deepseek-v4-pro'"));
-        assert!(
-            expr.contains(
-                "WHEN regexp_like(m, '(?i)deepseek-(?:v3|chat)(?:$|-)') THEN 'deepseek-v3'"
-            )
+    fn test_model_display_expr_normalises_without_a_model_table() {
+        assert_eq!(
+            model_display_expr("m"),
+            "regexp_replace(regexp_replace(regexp_replace(lower(m), '^[^/]+/', ''), '-[0-9]{8}$', ''), '\\[[^\\]]*\\]$', '')"
         );
-        let canonical: Vec<&str> = model_canonical_names().map(|(_, c)| c).collect();
-        let values: Vec<&str> = expr
-            .split(" THEN '")
-            .skip(1)
-            .map(|rest| rest.split('\'').next().unwrap())
-            .collect();
-        assert_eq!(values.len(), canonical.len());
-        for v in &values {
-            assert!(canonical.contains(v), "{v}");
-            assert!(
-                !v.contains(['\\', '(', ')', '[', ']', '?', '*', '+', '^', '$', '|']),
-                "{v}"
-            );
-        }
-        assert_eq!(expr.matches("WHEN ").count(), canonical.len());
     }
 
     #[test]

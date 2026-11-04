@@ -5,11 +5,17 @@ const routerOnError = vi.hoisted(() => vi.fn());
 const isStaleChunkError = vi.hoisted(() => vi.fn());
 const toast = vi.hoisted(() => vi.fn());
 const logsInit = vi.hoisted(() => vi.fn());
+const setInitialVersion = vi.hoisted(() => vi.fn());
+const bindAccess = vi.hoisted(() => vi.fn());
+const appMount = vi.hoisted(() => vi.fn());
 
-vi.mock("@/services/config.queries", () => ({ configQuery: () => ({}) }));
+vi.mock("@/services/config.queries", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/config.queries")>()),
+  configQuery: () => ({}),
+}));
 vi.mock("vue", async (importOriginal) => {
   const actual = await importOriginal<typeof import("vue")>();
-  const app = { use: () => app, mount: vi.fn() };
+  const app = { use: () => app, mount: appMount };
   return { ...actual, createApp: () => app };
 });
 vi.mock("@tanstack/vue-query", () => ({ VueQueryPlugin: {} }));
@@ -33,7 +39,7 @@ vi.mock("./composables/contextProviders", () => ({
   createDefaultContextProvider: vi.fn(),
 }));
 vi.mock("./utils/buildVersionChecker", () => ({
-  buildVersionChecker: { setInitialVersion: vi.fn(), isStaleChunkError },
+  buildVersionChecker: { setInitialVersion, isStaleChunkError },
   isChunkLoadError: (e: { message?: string } | undefined) =>
     /dynamically imported module|Unable to preload CSS/.test(e?.message ?? ""),
 }));
@@ -41,6 +47,8 @@ vi.mock("./composables/query/queryClient", () => ({
   queryClient: {
     fetchQuery: () =>
       Promise.resolve({
+        commit_hash: "abc123",
+        // A stale server may still send rum in the bootstrap; the SDK must wait for login anyway.
         rum: {
           enabled: true,
           client_token: "t",
@@ -57,64 +65,37 @@ vi.mock("./composables/query/queryClient", () => ({
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
 vi.mock("@/utils/themeManager", () => ({ bootstrapTheme: vi.fn() }));
-
-const EXT = "chrome-extension://abcdefghijklmnop";
+vi.mock("@/composables/useAccessStore", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/useAccessStore")>()),
+  bindAccess,
+}));
 
 // main.ts boots the whole app on import, which can outlast the default hook timeout on a busy runner.
 beforeAll(async () => {
   await import("./main");
-  await vi.waitFor(() => expect(rumInit).toHaveBeenCalled(), { timeout: 20000 });
+  await vi.waitFor(() => expect(setInitialVersion).toHaveBeenCalledWith("abc123"), {
+    timeout: 20000,
+  });
 }, 60000);
 
-const rumBeforeSend = (): ((event: Record<string, unknown>) => boolean) =>
-  rumInit.mock.calls[0][0].beforeSend;
-
-const errorEvent = (stack: string) => ({
-  type: "error",
-  view: { url: "https://cloud.openobserve.ai/web/logs", referrer: "" },
-  error: { message: "boom", stack },
-});
-
-describe("main.ts RUM version", () => {
-  it("sends the server's build version to both the RUM and logs SDKs", () => {
-    expect(rumInit.mock.calls[0][0].version).toBe("v0.70.0");
-    expect(logsInit.mock.calls[0][0].version).toBe("v0.70.0");
+describe("main.ts access store", () => {
+  it("binds the access store to the app's router and store before the app mounts", async () => {
+    const store = (await import("./stores")).default;
+    expect(bindAccess).toHaveBeenCalledTimes(1);
+    const [router, boundStore] = bindAccess.mock.calls[0];
+    expect(router.onError).toBe(routerOnError);
+    expect(boundStore).toBe(store);
+    await vi.waitFor(() => expect(appMount).toHaveBeenCalled());
+    expect(bindAccess.mock.invocationCallOrder[0]).toBeLessThan(
+      appMount.mock.invocationCallOrder[0],
+    );
   });
 });
 
-describe("main.ts RUM beforeSend", () => {
-  it("drops an error whose every frame is a Chrome extension", async () => {
-    const beforeSend = rumBeforeSend();
-    const stack = `TypeError: boom\n    at inject (${EXT}/content.js:1:1)\n    at ${EXT}/x.js:2:2`;
-    expect(beforeSend(errorEvent(stack))).toBe(false);
-  });
-
-  it("sends an error with at least one app frame", async () => {
-    const beforeSend = rumBeforeSend();
-    const stack = `TypeError: boom\n    at inject (${EXT}/content.js:1:1)\n    at setup (https://cloud.openobserve.ai/web/assets/index.js:3:4)`;
-    expect(beforeSend(errorEvent(stack))).toBe(true);
-  });
-
-  it("still scrubs sign-in tokens from the view URL of an event it sends", async () => {
-    const beforeSend = rumBeforeSend();
-    const event = {
-      type: "view",
-      view: { url: "https://cloud.openobserve.ai/web/cb#id_token=abc", referrer: "" },
-    };
-    expect(beforeSend(event)).toBe(true);
-    expect(event.view.url).toBe("https://cloud.openobserve.ai/web/cb#id_token=redacted");
-  });
-
-  it("drops a JWT from a click's target name", async () => {
-    const beforeSend = rumBeforeSend();
-    const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2ln";
-    const event = {
-      type: "action",
-      view: { url: "https://cloud.openobserve.ai/web/logs", referrer: "" },
-      action: { target: { name: `Copy ${jwt}` } },
-    };
-    expect(beforeSend(event)).toBe(true);
-    expect(event.action.target.name).toBe("Copy ");
+describe("main.ts RUM", () => {
+  it("does not start the RUM or logs SDK from the unauthenticated bootstrap config", () => {
+    expect(rumInit).not.toHaveBeenCalled();
+    expect(logsInit).not.toHaveBeenCalled();
   });
 });
 

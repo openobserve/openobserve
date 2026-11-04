@@ -36,6 +36,14 @@ export function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+// opencode provider ids carry a suffix (anthropic-review); gen_ai.provider.name wants the well-known vendor value.
+export function genAiProviderName(providerId) {
+  const id = String(providerId ?? "").toLowerCase();
+  if (id.includes("anthropic")) return "anthropic";
+  if (id.includes("deepseek")) return "deepseek";
+  return providerId;
+}
+
 export function genAiRequestAttributes(systemInstructions, userMessage) {
   return {
     "gen_ai.system_instructions": JSON.stringify([
@@ -58,13 +66,52 @@ function tokenCount(value) {
   return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : undefined;
 }
 
+// Sums the tokens of several opencode sessions (retried attempts of one call); either side may be missing.
+export function addUsage(a, b) {
+  if (!a) return b || null;
+  if (!b) return a;
+  const sum = (x, y) => (tokenCount(x) ?? 0) + (tokenCount(y) ?? 0);
+  return {
+    tokens: {
+      input: sum(a.tokens?.input, b.tokens?.input),
+      output: sum(a.tokens?.output, b.tokens?.output),
+      reasoning: sum(a.tokens?.reasoning, b.tokens?.reasoning),
+      cache: {
+        read: sum(a.tokens?.cache?.read, b.tokens?.cache?.read),
+        write: sum(a.tokens?.cache?.write, b.tokens?.cache?.write),
+      },
+    },
+  };
+}
+
+export function genAiUsageAttributes(usage) {
+  const nonCachedInputTokens = tokenCount(usage?.tokens?.input);
+  const visibleOutputTokens = tokenCount(usage?.tokens?.output);
+  const cacheReadTokens = tokenCount(usage?.tokens?.cache?.read);
+  const cacheWriteTokens = tokenCount(usage?.tokens?.cache?.write);
+  const reasoningTokens = tokenCount(usage?.tokens?.reasoning);
+  // opencode splits cache and reasoning out; OpenObserve expects input to include cache and output to include reasoning.
+  const inputTokens = nonCachedInputTokens === undefined
+    ? undefined
+    : nonCachedInputTokens + (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0);
+  const outputTokens = visibleOutputTokens === undefined
+    ? undefined
+    : visibleOutputTokens + (reasoningTokens ?? 0);
+
+  return cleanAttributes({
+    "gen_ai.usage.input_tokens": inputTokens,
+    "gen_ai.usage.output_tokens": outputTokens,
+    "gen_ai.usage.total_tokens": inputTokens !== undefined && outputTokens !== undefined
+      ? inputTokens + outputTokens
+      : undefined,
+    "gen_ai.usage.cache_read.input_tokens": cacheReadTokens,
+    "gen_ai.usage.cache_creation.input_tokens": cacheWriteTokens,
+    "ai.usage.reasoning_tokens": reasoningTokens,
+  });
+}
+
 export function genAiResponseAttributes(data, text, requestedModel) {
   const info = data?.info || {};
-  const inputTokens = tokenCount(info.tokens?.input);
-  const outputTokens = tokenCount(info.tokens?.output);
-  const cacheReadTokens = tokenCount(info.tokens?.cache?.read);
-  const cacheWriteTokens = tokenCount(info.tokens?.cache?.write);
-  const reasoningTokens = tokenCount(info.tokens?.reasoning);
   const responseModel = info.modelID || requestedModel;
 
   const attributes = {
@@ -77,15 +124,7 @@ export function genAiResponseAttributes(data, text, requestedModel) {
     "gen_ai.response.id": info.id,
     "gen_ai.response.model": responseModel,
     "gen_ai.response.finish_reasons": info.finish ? [String(info.finish)] : undefined,
-    "gen_ai.usage.input_tokens": inputTokens,
-    "gen_ai.usage.output_tokens": outputTokens,
-    "gen_ai.usage.total_tokens": inputTokens !== undefined && outputTokens !== undefined
-      ? inputTokens + outputTokens
-      : undefined,
-    "gen_ai.usage.cache_read_tokens": cacheReadTokens,
-    "gen_ai.usage.cache_write_tokens": cacheWriteTokens,
-    "gen_ai.usage.cost": Number.isFinite(info.cost) && info.cost >= 0 ? info.cost : undefined,
-    "ai.review.usage.reasoning_tokens": reasoningTokens,
+    ...genAiUsageAttributes(info),
     "ai.review.output.chars": text.length,
     "ai.review.output.sha256": sha256(text),
   };

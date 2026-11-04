@@ -23,8 +23,10 @@ import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
 import { purgeAllQueries } from "@/composables/query/queryClient";
-import { clearAllPanelDrafts } from "@/composables/dashboard/usePanelDraft";
+import { clearPanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
+import { editorDraftSessionEnded, resumeEditorDraftSession } from "@/utils/drafts/editorDraftStore";
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
+import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -52,6 +54,8 @@ const organizationObj = {
   rumToken: {
     rum_token: "",
   },
+  // the RUM token read returned 403: the setup card withholds its snippet and the header its actions
+  rumTokenForbidden: false,
   // Which traces stream contains a given (canonical 32-char) trace id, and the
   // range it ran in when the time index knew — see useCorrelatedTracesStream.
   // knownStreams is the org-level fact ("streams that have ever contained a
@@ -91,7 +95,7 @@ const organizationObj = {
   }>,
 };
 
-export default createStore({
+const store = createStore({
   state: {
     API_ENDPOINT: API_ENDPOINT,
     userInfo: {},
@@ -218,6 +222,9 @@ export default createStore({
     },
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
+    },
+    setRUMTokenForbidden(state, payload) {
+      state.organizationData.rumTokenForbidden = payload;
     },
     setCorrelatedTracesStream(
       state,
@@ -447,14 +454,20 @@ export default createStore({
   },
   actions: {
     login(context, payload) {
+      const current = context.state.userInfo as { email?: string } | null;
+      const sameSession = context.state.loggedIn && current?.email === payload?.userInfo?.email;
       context.commit("login", payload);
+      // A token refresh re-dispatches login, and a sign-out here always reloads, so a login after one in this tab is a refresh too.
+      const refresh = sameSession || editorDraftSessionEnded.value;
+      if (payload?.loginState && !refresh) resumeEditorDraftSession(payload.userInfo?.email);
     },
-    logout(context) {
+    logout(context, payload?: { draftsOf?: string }) {
       context.commit("logout");
       // Nothing from the previous session may survive — including anything the
       // query layer persisted to localStorage/IndexedDB.
       purgeAllQueries();
-      clearAllPanelDrafts();
+      // Only an explicit sign-out names a user to clear; an expired session keeps every draft for the next login.
+      if (payload?.draftsOf !== undefined) clearPanelDraftsFor(payload.draftsOf);
     },
     endpoint(context, payload) {
       context.commit("endpoint", payload);
@@ -485,6 +498,9 @@ export default createStore({
     },
     setOrganizationPasscodeForbidden(context, payload) {
       context.commit("setOrganizationPasscodeForbidden", payload);
+    },
+    setRUMTokenForbidden(context, payload) {
+      context.commit("setRUMTokenForbidden", payload);
     },
     resetOrganizationData(context, payload) {
       context.commit("resetOrganizationData", payload);
@@ -616,3 +632,8 @@ export default createStore({
     incidents,
   },
 });
+
+// Zone-less calendar resolves (query builders, guards) must use the zone the picker shows.
+setPickerTimezoneSource(() => store.state.timezone);
+
+export default store;

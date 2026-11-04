@@ -15,11 +15,14 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
+import * as echarts from "echarts/core";
 import MapsRenderer from "./MapsRenderer.vue";
+import { chartColor } from "@/utils/chartTheme";
 
 // Create mock chart instance
 const mockChart = {
   setOption: vi.fn(),
+  getOption: vi.fn((): any => ({ series: [] })),
   resize: vi.fn(),
   dispose: vi.fn(),
   on: vi.fn(),
@@ -57,6 +60,13 @@ vi.mock("vuex", () => ({
   }),
 }));
 
+const theme = vi.hoisted(() => ({ isDark: null as any }));
+vi.mock("@/composables/useTheme", async () => {
+  const { ref } = await import("vue");
+  theme.isDark = ref(false);
+  return { default: () => ({ isDark: theme.isDark }) };
+});
+
 // Mock window event listeners with callback tracking
 let windowResizeCallback: Function | null = null;
 
@@ -77,6 +87,8 @@ Object.defineProperty(window, "removeEventListener", {
     }
   }),
 });
+
+const registerMapCallsAtImport = vi.mocked(echarts.registerMap).mock.calls.slice();
 
 describe("MapsRenderer", () => {
   let wrapper: VueWrapper<any>;
@@ -178,7 +190,7 @@ describe("MapsRenderer", () => {
       await waitForChartInit(wrapper);
 
       expect(echarts.init).toHaveBeenCalled();
-      expect(echarts.registerMap).toHaveBeenCalledWith("world", expect.any(Object));
+      expect(echarts.registerMap).not.toHaveBeenCalled();
     });
 
     it("should set chart options", async () => {
@@ -441,13 +453,8 @@ describe("MapsRenderer", () => {
       expect(mapData.default.type).toBe("FeatureCollection");
     });
 
-    it("should register map with ECharts", async () => {
-      const echarts = await import("echarts/core");
-
-      wrapper = createWrapper();
-      await waitForChartInit(wrapper);
-
-      expect(echarts.registerMap).toHaveBeenCalledWith("world", expect.any(Object));
+    it("registers the world map once at import, not per chart", () => {
+      expect(registerMapCallsAtImport).toEqual([["world", expect.any(Object)]]);
     });
   });
 
@@ -489,6 +496,97 @@ describe("MapsRenderer", () => {
       }
 
       expect(wrapper.exists()).toBe(true);
+    });
+  });
+
+  describe("Theme", () => {
+    afterEach(() => {
+      theme.isDark.value = false;
+    });
+
+    it("initialises with the current theme and draws the options it was given", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+
+      expect(echarts.init).toHaveBeenCalledWith(expect.any(HTMLElement), "light");
+      const [options] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.series).toEqual(mockMapData.options.series);
+    });
+
+    it("colours the tooltip of the empty default map from the theme", async () => {
+      wrapper = createWrapper({ data: { options: {} } });
+      await waitForChartInit(wrapper);
+
+      const [options] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.series[0].data).toEqual([]);
+      expect(options.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
+    });
+
+    it("re-initialises in the new theme and recolours the tooltip when the theme changes", async () => {
+      wrapper = createWrapper();
+      await waitForChartInit(wrapper);
+      vi.clearAllMocks();
+
+      theme.isDark.value = true;
+      await wrapper.vm.$nextTick();
+
+      expect(mockChart.dispose).toHaveBeenCalledTimes(1);
+      expect(echarts.init).toHaveBeenCalledWith(expect.any(HTMLElement), "dark");
+      const [options] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.series).toEqual(mockMapData.options.series);
+      expect(options.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
+      expect(options.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
+      expect(options.tooltip.formatter).toBe("{b}: {c}");
+    });
+  });
+
+  describe("Pan and zoom across rebuilds", () => {
+    const roamData = (roam: boolean) => ({
+      options: {
+        tooltip: {},
+        series: [{ type: "map", map: "world", roam, data: [{ name: "Canada", value: 1 }] }],
+      },
+    });
+
+    afterEach(() => {
+      theme.isDark.value = false;
+      mockChart.getOption.mockReturnValue({ series: [] });
+    });
+
+    it("keeps the user's zoom and center when new data arrives", async () => {
+      wrapper = createWrapper({ data: roamData(true) });
+      await waitForChartInit(wrapper);
+      mockChart.getOption.mockReturnValue({ series: [{ zoom: 3, center: [10, 20] }] });
+
+      await wrapper.setProps({ data: roamData(true) });
+      await wrapper.vm.$nextTick();
+
+      const [options] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.series[0]).toMatchObject({ zoom: 3, center: [10, 20] });
+    });
+
+    it("keeps the user's zoom and center across a theme switch", async () => {
+      wrapper = createWrapper({ data: roamData(true) });
+      await waitForChartInit(wrapper);
+      mockChart.getOption.mockReturnValue({ series: [{ zoom: 2, center: [1, 2] }] });
+
+      theme.isDark.value = true;
+      await wrapper.vm.$nextTick();
+
+      const [options] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.series[0]).toMatchObject({ zoom: 2, center: [1, 2] });
+    });
+
+    it("does not carry a view over when panning is off", async () => {
+      wrapper = createWrapper({ data: roamData(false) });
+      await waitForChartInit(wrapper);
+      mockChart.getOption.mockReturnValue({ series: [{ zoom: 3, center: [10, 20] }] });
+
+      await wrapper.setProps({ data: roamData(false) });
+      await wrapper.vm.$nextTick();
+
+      const [options] = mockChart.setOption.mock.calls.at(-1)!;
+      expect(options.series[0].zoom).toBeUndefined();
     });
   });
 });

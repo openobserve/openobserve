@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       :frame="false"
       :loading="loading"
+      :loading-reset-key="teamId"
       pagination="client"
       :show-global-filter="false"
       table-id="oncall-team-covers"
@@ -83,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="delete-outline"
           :aria-label="t('oncall.coverRemove')"
           :data-test="`oncall-cover-remove-${row.id}`"
-          @click.stop="toRemove = row"
+          @click.stop="openRemove(row)"
         />
       </template>
     </OTable>
@@ -100,19 +101,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('oncall.coverRemoveTitle')"
       :primary-button-label="t('oncall.coverRemove')"
       :secondary-button-label="t('oncall.cancel')"
+      primary-button-variant="destructive"
       :primary-button-loading="removing"
       data-test="oncall-cover-remove-dialog"
       @update:open="(v: boolean) => !v && (toRemove = null)"
       @click:primary="removeCover"
       @click:secondary="toRemove = null"
     >
-      <OText v-if="toRemove">
-        {{
-          t("oncall.coverRemoveBody", {
-            who: raw(toRemove.user_email),
-            range: raw(windowOf(toRemove)),
-          })
-        }}
+      <OText v-if="shownRemove">
+        <i18n-t keypath="oncall.coverRemoveBody" tag="span">
+          <template #who>
+            <span
+              data-test="oncall-cover-remove-name"
+              class="text-text-heading font-semibold break-all"
+              >{{ shownRemove.user_email }}</span
+            >
+          </template>
+          <template #range>{{ windowOf(shownRemove) }}</template>
+        </i18n-t>
       </OText>
     </ODialog>
   </div>
@@ -183,6 +189,8 @@ const covers = ref<Override[]>([]);
 const loading = ref(false);
 const removing = ref(false);
 const toRemove = ref<Override | null>(null);
+// Set on open and never cleared, so the closing fade keeps the sentence.
+const shownRemove = ref<Override | null>(null);
 
 // Getter form, so the write follows an org switch and a change of team.
 const removeCoverWrite = useMutation(() => deleteOverrideMutation(orgId.value, props.teamId));
@@ -238,6 +246,8 @@ function windowOf(cover: Override): string {
 let latestCoversRead = 0;
 
 async function fetchCovers(force = false) {
+  // A parent window still at 0 is not yet initialised; the endpoint rejects it with a 400.
+  if (props.window && (!props.window.from || !props.window.to)) return;
   loading.value = true;
   const readId = ++latestCoversRead;
   try {
@@ -271,6 +281,11 @@ async function fetchCovers(force = false) {
   } finally {
     if (readId === latestCoversRead) loading.value = false;
   }
+}
+
+function openRemove(cover: Override) {
+  shownRemove.value = cover;
+  toRemove.value = cover;
 }
 
 async function removeCover() {

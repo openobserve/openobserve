@@ -90,6 +90,7 @@
         :query="query"
         :nlp-mode="nlpMode"
         :read-only="readOnly"
+        :text-preview="textPreview"
         :release-wheel-to-page="releaseWheelToPage"
         :show-auto-complete="showAutoComplete"
         :keywords="keywords"
@@ -99,8 +100,9 @@
         :free-text-decorations="freeTextDecorations ?? null"
         :filter-mode="filterMode"
         :values-time-range="valuesTimeRange ?? null"
+        :recent-queries="recentQueries ?? []"
         @update:query="handleQueryUpdate"
-        @user-edit="emit('user-edit')"
+        @user-edit="(isBlank: boolean, wasBlank: boolean) => emit('user-edit', isBlank, wasBlank)"
         @run-query="emit('run-query')"
         @focus="handleEditorFocus"
         @blur="handleEditorBlur"
@@ -119,7 +121,7 @@
         size="icon-toolbar"
         :disabled="props.disableAi"
         @click="onAiToggleClick"
-        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
+        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-1 z-100 h-7! min-h-7! w-7! min-w-7! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img
@@ -178,6 +180,7 @@ interface Props {
   // Query props
   query: string;
   readOnly?: boolean;
+  textPreview?: boolean; // Draw the query as plain text until Monaco has painted
   showAutoComplete?: boolean;
   releaseWheelToPage?: boolean; // default true: let the page scroll when editor has nothing left to scroll
 
@@ -189,6 +192,7 @@ interface Props {
   freeTextDecorations?: { ranges: { start: number; end: number }[]; hover: I18nText } | null;
   filterMode?: boolean; // The query is a bare WHERE fragment (Logs without SQL mode)
   valuesTimeRange?: { startTime: number; endTime: number } | null; // Range field values are looked up in (microseconds)
+  recentQueries?: string[]; // The user's recent queries, offered as clock rows while typing
 
   // NL Mode (optional external control)
   nlpMode?: boolean; // External NLP mode control (undefined = internal control)
@@ -210,6 +214,7 @@ const props = withDefaults(defineProps<Props>(), {
   languages: () => ["sql"],
   defaultLanguage: "sql",
   readOnly: false,
+  textPreview: false,
   showAutoComplete: true,
   releaseWheelToPage: true,
   keywords: () => [],
@@ -226,7 +231,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   "update:query": [query: string, origin?: QueryChangeOrigin];
-  "user-edit": [];
+  "user-edit": [isBlank: boolean, wasBlank: boolean];
   "language-change": [language: Language];
   "ask-ai": [naturalLanguage: string, language: Language];
   "run-query": [];

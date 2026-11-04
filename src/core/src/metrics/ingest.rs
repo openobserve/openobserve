@@ -48,8 +48,8 @@ use crate::{
     common::meta::stream::SchemaRecords,
     ingestion::{
         PartitionMemo, TriggerAlertData, evaluate_trigger, get_stream_partition_keys,
-        get_thread_id, inferred_column_type, refactor_map, schema_records_to_entries,
-        write_entries,
+        get_thread_id, inferred_column_type, newly_enabled_uds_fields, refactor_map,
+        repack_records, schema_records_to_entries, write_entries,
     },
     pipeline::batch_execution::ExecutablePipeline,
 };
@@ -83,6 +83,43 @@ pub(super) struct WriteTimings {
     pub get_writer_micros: u128,
     pub write_micros: u128,
     pub report_stats_micros: u128,
+}
+
+/// Per-request memo of the streams whose file_list key is too long to store.
+#[derive(Default)]
+pub(super) struct StreamKeyChecks(HashMap<String, Option<String>>);
+
+impl StreamKeyChecks {
+    /// Why `stream_name` cannot be stored; counted as an ingest error the first time it is seen.
+    pub(super) fn violation(&mut self, org_id: &str, stream_name: &str) -> Option<&str> {
+        if !self.0.contains_key(stream_name) {
+            let violation =
+                schema::check_stream_key_len(org_id, StreamType::Metrics, stream_name).err();
+            if let Some(e) = &violation {
+                log::warn!("[METRICS] rejecting stream {org_id}/{stream_name}: {e}");
+            }
+            self.0
+                .insert(stream_name.to_string(), violation.map(|e| e.to_string()));
+        }
+        self.0[stream_name].as_deref()
+    }
+
+    /// Removes the records bound for streams that cannot be stored, as (stream, reason, records).
+    pub(super) fn drop_unstorable<R>(
+        &mut self,
+        org_id: &str,
+        records_by_stream: &mut HashMap<String, Vec<R>>,
+    ) -> Vec<(String, String, usize)> {
+        let mut dropped = Vec::new();
+        records_by_stream.retain(|stream_name, records| {
+            let Some(violation) = self.violation(org_id, stream_name) else {
+                return true;
+            };
+            dropped.push((stream_name.clone(), violation.to_string(), records.len()));
+            false
+        });
+        dropped
+    }
 }
 
 /// Runs each stream's pipelines over its buffered records, grouping the output by destination.
@@ -167,48 +204,38 @@ pub(super) async fn run_pipelines<T: Clone>(
     (outputs, failures)
 }
 
-/// The stream's schema once `records` are in it, as the write path keys and partitions by it.
-pub(super) async fn resolve_batch_schema(
+/// The stream's schema once `rows` are in it, as the write path keys and partitions by it.
+pub(super) async fn resolve_batch_schema<T>(
     org_id: &str,
     stream_name: &str,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
-    records: &[&json::Map<String, json::Value>],
+    rows: &mut [T],
+    record: fn(&mut T) -> &mut json::Map<String, json::Value>,
     min_timestamp: i64,
     has_uds: bool,
 ) -> Result<(Arc<Schema>, String)> {
-    check_columns_per_record(org_id, stream_name, records)?;
-    // probed once per field of every record, so it takes foldhash rather than SipHash
-    let schema_fields: hashbrown::HashMap<&str, &DataType> =
-        match stream_schema_map.get(stream_name) {
-            Some(schema) => schema
-                .schema()
-                .fields()
-                .iter()
-                .map(|f| (f.name().as_str(), f.data_type()))
-                .collect(),
-            None => hashbrown::HashMap::default(),
-        };
-    let evolving: Vec<&json::Map<String, json::Value>> = records
-        .iter()
-        .copied()
-        .filter(|record| record_evolves_schema(record, &schema_fields))
-        .collect();
-    drop(schema_fields);
-    // a user-defined schema is applied by check_for_schema itself, so it cannot be skipped
-    if !evolving.is_empty() || has_uds {
-        let checked = if evolving.is_empty() {
-            records.to_vec()
-        } else {
-            evolving
-        };
-        check_for_schema(
+    let records: Vec<_> = rows.iter_mut().map(|row| &*record(row)).collect();
+    check_metrics_schema(
+        org_id,
+        stream_name,
+        stream_schema_map,
+        &records,
+        min_timestamp,
+        has_uds,
+    )
+    .await?;
+    drop(records);
+    // the check that turned the UDS on projected the schema, which would drop unpacked columns
+    if let Some(fields) = newly_enabled_uds_fields(has_uds, stream_schema_map.get(stream_name)) {
+        repack_records(rows.iter_mut().map(record), &fields);
+        let records: Vec<_> = rows.iter_mut().map(|row| &*record(row)).collect();
+        check_metrics_schema(
             org_id,
             stream_name,
-            StreamType::Metrics,
             stream_schema_map,
-            checked,
+            &records,
             min_timestamp,
-            false, // is_derived is false for metrics
+            true,
         )
         .await?;
     }
@@ -437,10 +464,15 @@ pub(super) async fn write_streams(
 }
 
 /// Records a successful request against `endpoint` in the HTTP metrics.
-pub(super) fn observe_request(endpoint: &str, org_id: &str, start: &Instant) {
+pub(super) fn observe_request(
+    endpoint: &str,
+    org_id: &str,
+    start: &Instant,
+    status: http::StatusCode,
+) {
     let labels = [
         endpoint,
-        "200",
+        status.as_str(),
         org_id,
         StreamType::Metrics.as_str(),
         "",
@@ -460,6 +492,54 @@ pub(super) fn spawn_triggers(stream_trigger_map: HashMap<String, Option<TriggerA
     for entry in stream_trigger_map.into_values().flatten() {
         tokio::spawn(evaluate_trigger(entry));
     }
+}
+
+/// Runs the schema check for the records that can still change the stream schema.
+async fn check_metrics_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
+    records: &[&json::Map<String, json::Value>],
+    min_timestamp: i64,
+    has_uds: bool,
+) -> Result<()> {
+    check_columns_per_record(org_id, stream_name, records)?;
+    // probed once per field of every record, so it takes foldhash rather than SipHash
+    let schema_fields: hashbrown::HashMap<&str, &DataType> =
+        match stream_schema_map.get(stream_name) {
+            Some(schema) => schema
+                .schema()
+                .fields()
+                .iter()
+                .map(|f| (f.name().as_str(), f.data_type()))
+                .collect(),
+            None => hashbrown::HashMap::default(),
+        };
+    let evolving: Vec<&json::Map<String, json::Value>> = records
+        .iter()
+        .copied()
+        .filter(|record| record_evolves_schema(record, &schema_fields))
+        .collect();
+    drop(schema_fields);
+    // a user-defined schema is applied by check_for_schema itself, so it cannot be skipped
+    if !evolving.is_empty() || has_uds {
+        let checked = if evolving.is_empty() {
+            records.to_vec()
+        } else {
+            evolving
+        };
+        check_for_schema(
+            org_id,
+            stream_name,
+            StreamType::Metrics,
+            stream_schema_map,
+            checked,
+            min_timestamp,
+            false, // is_derived is false for metrics
+        )
+        .await?;
+    }
+    Ok(())
 }
 
 /// `check_for_schema` applies the column limit to the batch's merged schema, not to one record.
@@ -594,6 +674,35 @@ mod tests {
             fields.push(Field::new(VALUE_LABEL, value_type, true));
         }
         SchemaCache::new(Schema::new(fields))
+    }
+
+    #[test]
+    fn test_stream_key_checks_drop_only_unstorable_streams() {
+        let long_name = "m".repeat(infra::file_list::STREAM_KEY_MAX_LEN);
+        let bounded =
+            infra::file_list::stream_key_violation("org", StreamType::Metrics, &long_name)
+                .is_some();
+        let mut checks = StreamKeyChecks::default();
+        assert!(checks.violation("org", "short").is_none());
+        assert_eq!(checks.violation("org", &long_name).is_some(), bounded);
+
+        let mut records: RecordsByStream<()> = HashMap::new();
+        records.insert("short".to_string(), vec![(record_with(1), ())]);
+        records.insert(
+            long_name.clone(),
+            vec![(record_with(1), ()), (record_with(1), ())],
+        );
+        let dropped = checks.drop_unstorable("org", &mut records);
+        assert!(records.contains_key("short"));
+        assert_eq!(records.contains_key(&long_name), !bounded);
+        if bounded {
+            assert_eq!(dropped.len(), 1);
+            assert_eq!(dropped[0].0, long_name);
+            assert!(dropped[0].1.starts_with("Stream name too long"));
+            assert_eq!(dropped[0].2, 2);
+        } else {
+            assert!(dropped.is_empty());
+        }
     }
 
     #[test]

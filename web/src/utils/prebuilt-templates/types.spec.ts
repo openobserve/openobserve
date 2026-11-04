@@ -114,15 +114,6 @@ describe("Prebuilt Templates Types", () => {
         templateBody: '{"text": "test"}',
         headers: { "Content-Type": "application/json" },
         method: "post",
-        urlValidator: (url: string) => {
-          try {
-            const parsed = new URL(url);
-            const hostname = parsed.hostname.toLowerCase();
-            return hostname === "slack.com" || hostname.endsWith(".slack.com");
-          } catch {
-            return false;
-          }
-        },
         credentialFields: [
           {
             key: "webhookUrl",
@@ -137,7 +128,6 @@ describe("Prebuilt Templates Types", () => {
       expect(config.templateBody).toBeTruthy();
       expect(config.headers).toBeDefined();
       expect(["get", "post", "put"]).toContain(config.method);
-      expect(typeof config.urlValidator).toBe("function");
       expect(Array.isArray(config.credentialFields)).toBe(true);
     });
   });
