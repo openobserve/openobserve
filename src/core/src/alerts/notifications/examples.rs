@@ -202,11 +202,20 @@ pub fn variable_groups() -> Vec<VariableGroup> {
 
 /// The sample of the Examples tab for `kind`; `resolved` gives the recovery of the same episode.
 pub fn example_context(kind: NotificationKind, resolved: bool) -> NotificationContext {
+    example_context_at(kind, resolved, "P2")
+}
+
+/// The sample with on-call and incident carrying `priority`, so a chosen severity reads through.
+pub fn example_context_at(
+    kind: NotificationKind,
+    resolved: bool,
+    priority: &str,
+) -> NotificationContext {
     match kind {
         NotificationKind::Anomaly => anomaly_example(resolved),
-        NotificationKind::Incident => incident_example(resolved),
+        NotificationKind::Incident => incident_example(resolved, priority),
         NotificationKind::Synthetics => synthetics_example(resolved),
-        NotificationKind::OnCall => on_call_example(resolved),
+        NotificationKind::OnCall => on_call_example(resolved, priority),
         NotificationKind::Downtime => downtime_example(resolved),
         _ => {
             let level = if resolved {
@@ -376,7 +385,7 @@ fn synthetics_example(resolved: bool) -> NotificationContext {
     ctx
 }
 
-fn on_call_example(resolved: bool) -> NotificationContext {
+fn on_call_example(resolved: bool, priority: &str) -> NotificationContext {
     let url = "https://o2.acme.com/web/oncall/responses/resp_31?org_identifier=acme";
     let level = if resolved {
         AlertLevel::Ok
@@ -394,8 +403,8 @@ fn on_call_example(resolved: bool) -> NotificationContext {
         )
     };
     // The engine's subject and plain-text page, as `render_subject` and `render_body` build them.
-    ctx.alert_name = "[P2] High error rate on web-logs — checkout".into();
-    ctx.alert_level = "P2".into();
+    ctx.alert_name = format!("[{priority}] High error rate on web-logs — checkout");
+    ctx.alert_level = priority.into();
     ctx.stream_type = String::new();
     ctx.stream_name = String::new();
     ctx.alert_status = if resolved { "acknowledged" } else { "paged" }.into();
@@ -409,13 +418,13 @@ fn on_call_example(resolved: bool) -> NotificationContext {
         format!("Acknowledge: {ack}\n")
     };
     ctx.alert_description = format!(
-        "P2 · High error rate on web-logs\n\n{reason} for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: {url}\n{ack_line}"
+        "{priority} · High error rate on web-logs\n\n{reason} for checkout.\n\nerror rate 12.4% over the 5% threshold on checkout\n\nRunbook: https://wiki.acme.com/runbooks/checkout\n\nDetails: {url}\n{ack_line}"
     );
     ctx.context_attributes = [
         ("oncall_team", "checkout"),
         ("oncall_reason", reason),
         ("oncall_stage", stage),
-        ("oncall_priority", "P2"),
+        ("oncall_priority", priority),
         ("oncall_recipient", "maria@acme.com"),
         ("oncall_response_id", "resp_31"),
         ("oncall_ack_url", ack),
@@ -477,7 +486,7 @@ fn downtime_example(resolved: bool) -> NotificationContext {
     ctx
 }
 
-fn incident_example(resolved: bool) -> NotificationContext {
+fn incident_example(resolved: bool, priority: &str) -> NotificationContext {
     let url = "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme";
     let level = if resolved {
         AlertLevel::Ok
@@ -486,6 +495,8 @@ fn incident_example(resolved: bool) -> NotificationContext {
     };
     let mut ctx = base(NotificationKind::Incident, resolved, level);
     ctx.alert_name = "High error rate".into();
+    // A live incident reads its severity as its level.
+    ctx.alert_level = priority.into();
     ctx.alert_operator = ">".into();
     ctx.alert_threshold = "5".into();
     ctx.alert_agg_value = "12.4".into();
@@ -521,7 +532,7 @@ fn incident_example(resolved: bool) -> NotificationContext {
         ("incident_id", "inc_7f3a"),
         ("incident_title", "High error rate on web-logs"),
         ("incident_event", event),
-        ("incident_severity", "P2"),
+        ("incident_severity", priority),
         ("incident_service", "checkout"),
         ("incident_url", url),
     ]

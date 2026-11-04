@@ -219,6 +219,15 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
     }
 }
 
+/// The on-call and incident priority a chosen severity reads as; P2 is the sample's own.
+fn sample_priority(level: Option<AlertLevel>) -> &'static str {
+    match level {
+        Some(AlertLevel::Critical) => "P1",
+        Some(AlertLevel::Warning) | None => "P2",
+        Some(AlertLevel::Ok | AlertLevel::NoData) => "P3",
+    }
+}
+
 /// Preview a draft `ContentSpec` for one channel, sharing the exact
 /// `resolve_content` + `render` code path the send path uses.
 pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
@@ -236,7 +245,11 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
     let ctx = match req.kind {
         NotificationKind::Alert => synthetic_context(level),
         kind => {
-            let mut ctx = super::examples::example_context(kind, level == Some(AlertLevel::Ok));
+            let mut ctx = super::examples::example_context_at(
+                kind,
+                level == Some(AlertLevel::Ok),
+                sample_priority(level),
+            );
             if let Some(level) = level {
                 ctx.level = Some(level);
                 // On-call's alert_level is a priority and synthetics/downtime leave it blank.
@@ -600,6 +613,31 @@ mod tests {
             };
             let resp = preview(&req).unwrap();
             assert_eq!(resp.preview_model.title.trim(), expected, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn a_critical_page_and_incident_read_p1_in_their_text() {
+        let spec = ContentSpec {
+            title: "{alert_name}|{oncall_priority}{incident_severity}|{alert_level_label}".into(),
+            ..sample_spec()
+        };
+        for (kind, expected) in [
+            (
+                NotificationKind::OnCall,
+                "[P1] High error rate on web-logs — checkout|P1|P1",
+            ),
+            (NotificationKind::Incident, "High error rate|P1|P1"),
+        ] {
+            let req = PreviewRequest {
+                definition: spec.clone(),
+                channel: "slack".into(),
+                severity: Some("critical".into()),
+                sample: None,
+                kind,
+            };
+            let resp = preview(&req).unwrap();
+            assert_eq!(resp.preview_model.title, expected, "{kind:?}");
         }
     }
 }

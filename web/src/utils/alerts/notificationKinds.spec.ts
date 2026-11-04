@@ -23,6 +23,14 @@ import {
   type ResolvableTemplate,
 } from "./notificationKinds";
 
+describe("inferAppliesTo with a length or modifiers", () => {
+  it("reads the variable name before a length or a modifier", () => {
+    expect(inferAppliesTo("{check_target:30}")).toEqual(["synthetics"]);
+    expect(inferAppliesTo("{anomaly_count|humanize}")).toEqual(["anomaly"]);
+    expect(inferAppliesTo("{alert_name} {downtime_name:12|upper}")).toEqual(["downtime"]);
+  });
+});
+
 describe("inferAppliesTo", () => {
   it("returns all kinds ([]) for a body with no kind specific variable", () => {
     expect(inferAppliesTo("{alert_name} fired in {stream_name}")).toEqual([]);

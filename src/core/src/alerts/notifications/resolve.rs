@@ -272,87 +272,45 @@ fn substitute_with(
     ctx: &NotificationContext,
     esc: impl Fn(&str) -> String,
 ) -> (String, Vec<String>) {
-    let unknown = scan_unmatched(input)
-        .into_iter()
-        .filter(|name| !is_known_var(name, ctx))
-        .collect::<Vec<_>>();
-
-    let mut out = input.to_string();
-
-    // Before scalar_vars and kind blanking, so a `{token}` in an inserted alert name stays literal.
-    for (name, value) in extra_scalar_vars(ctx) {
-        scan_and_replace_var(&mut out, name, |len| esc(&truncate(&value, len)));
-    }
-
-    // One template serves every kind, so another kind's variable reads blank and its field hides.
-    for name in super::examples::kind_variables() {
-        if !in_ctx_tier(name, ctx) {
-            scan_and_replace_var(&mut out, name, |_| String::new());
+    // One pass over the authored tokens: an inserted value is never scanned again.
+    let mut unknown = Vec::new();
+    let mut out = String::with_capacity(input.len());
+    let mut rest = input;
+    while let Some(start) = rest.find('{') {
+        out.push_str(&rest[..start]);
+        let at = &rest[start..];
+        let Some((name, len, token_len)) = parse_token(at) else {
+            out.push('{');
+            rest = &at[1..];
+            continue;
+        };
+        match var_value(name, ctx) {
+            Some(value) => out.push_str(&esc(&truncate(&value, len))),
+            None => {
+                out.push_str(UNMATCHED_MARKER);
+                unknown.push(name.to_string());
+            }
         }
+        rest = &at[token_len..];
     }
-
-    for (name, value) in scalar_vars(ctx) {
-        scan_and_replace_var(&mut out, name, |len| esc(&truncate(value, len)));
-    }
-
-    for (key, values) in ctx.row_columns.iter() {
-        let joined = values.join(", ");
-        scan_and_replace_var(&mut out, key, |len| esc(&truncate(&joined, len)));
-    }
-
-    for (key, value) in ctx.context_attributes.iter() {
-        scan_and_replace_var(&mut out, key, |len| esc(&truncate(value, len)));
-    }
-
-    for (key, value) in ctx.metadata.iter() {
-        scan_and_replace_var(&mut out, key, |len| esc(&truncate(value, len)));
-    }
-
-    if let Some(labels) = &ctx.group_labels {
-        for (name, value) in config::meta::alerts::grouping::group_template_vars(labels) {
-            scan_and_replace_var(&mut out, &name, |len| esc(&truncate(&value, len)));
-        }
-    }
-
-    // Only tokens confirmed unknown from the ORIGINAL input are marker-
-    // replaced here — substituted values that happen to look like tokens are
-    // left alone (see doc comment above).
-    let out = replace_unmatched_with_marker(&out, &unknown);
+    out.push_str(rest);
     (out, unknown)
 }
 
-/// Whether `name` resolves in some lookup tier for `ctx` — used to decide,
-/// from the pre-substitution input, which `{name}` tokens are genuinely
-/// unknown rather than merely a substring of the raw template.
-fn is_known_var(name: &str, ctx: &NotificationContext) -> bool {
-    if scalar_vars(ctx).iter().any(|(n, _)| *n == name)
-        || EXTRA_SCALAR_NAMES.contains(&name)
-        || super::examples::is_kind_variable(name)
-    {
-        return true;
-    }
-    if ctx.row_columns.iter().any(|(k, _)| k == name) {
-        return true;
-    }
-    if ctx.context_attributes.iter().any(|(k, _)| k == name) {
-        return true;
-    }
-    if ctx.metadata.iter().any(|(k, _)| k == name) {
-        return true;
-    }
-    if let Some(labels) = &ctx.group_labels {
-        return config::meta::alerts::grouping::group_template_vars(labels)
-            .iter()
-            .any(|(n, _)| n == name);
-    }
-    false
-}
-
-/// Whether `name` is filled by the row, context-attribute or metadata tier of `ctx`.
-fn in_ctx_tier(name: &str, ctx: &NotificationContext) -> bool {
-    ctx.row_columns.iter().any(|(k, _)| k == name)
-        || ctx.context_attributes.iter().any(|(k, _)| k == name)
-        || ctx.metadata.iter().any(|(k, _)| k == name)
+/// `{name}` or `{name:N}` at the start of `at`: the name, the length (0 for whole) and the token
+/// length; the same grammar `scan_unmatched` reads.
+fn parse_token(at: &str) -> Option<(&str, usize, usize)> {
+    let end = at.find('}')?;
+    let inner = &at[1..end];
+    let (name, len) = match inner.split_once(':') {
+        Some((name, n)) => (name, n.parse::<usize>().ok()?),
+        None => (inner, 0),
+    };
+    let is_ident = !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '.');
+    is_ident.then_some((name, len, end + 1))
 }
 
 /// Make a substituted value inert as markdown SOURCE.
@@ -424,21 +382,32 @@ fn every_variable_blank(input: &str, ctx: &NotificationContext) -> bool {
 
 /// The value a `{name}` token takes for `ctx`, in the substitution engine's tier order.
 fn var_value(name: &str, ctx: &NotificationContext) -> Option<String> {
-    if let Some((_, v)) = scalar_vars(ctx).into_iter().find(|(n, _)| *n == name) {
-        return Some(v.to_string());
-    }
     if let Some((_, v)) = extra_scalar_vars(ctx).into_iter().find(|(n, _)| *n == name) {
         return Some(v);
+    }
+    if let Some((_, v)) = scalar_vars(ctx).into_iter().find(|(n, _)| *n == name) {
+        return Some(v.to_string());
     }
     if let Some((_, values)) = ctx.row_columns.iter().find(|(k, _)| k == name) {
         return Some(values.join(", "));
     }
-    ctx.context_attributes
+    if let Some((_, v)) = ctx
+        .context_attributes
         .iter()
         .chain(ctx.metadata.iter())
         .find(|(k, _)| k == name)
-        .map(|(_, v)| v.clone())
-        .or_else(|| super::examples::is_kind_variable(name).then(String::new))
+    {
+        return Some(v.clone());
+    }
+    if let Some(labels) = &ctx.group_labels
+        && let Some((_, v)) = config::meta::alerts::grouping::group_template_vars(labels)
+            .into_iter()
+            .find(|(n, _)| n == name)
+    {
+        return Some(v);
+    }
+    // One template serves every kind, so another kind's variable reads blank and its field hides.
+    super::examples::is_kind_variable(name).then(String::new)
 }
 
 fn scan_unmatched(tpl: &str) -> Vec<String> {
@@ -1170,6 +1139,17 @@ mod tests {
             };
             assert_eq!(status_dot(&ctx), expected, "{kind:?} {event:?} {level:?}");
         }
+    }
+
+    #[test]
+    fn an_extra_value_with_a_kind_token_stays_literal() {
+        let ctx = NotificationContext {
+            cluster_name: "prod-{anomaly_score}".into(),
+            ..fixture_ctx()
+        };
+        let (out, unknown) = substitute_raw("{cluster_name}", &ctx);
+        assert_eq!(out, "prod-{anomaly_score}");
+        assert!(unknown.is_empty());
     }
 
     #[test]

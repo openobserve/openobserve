@@ -59,7 +59,8 @@ const KIND_VARIABLES: [NotificationKind, RegExp][] = [
 /** The kinds a body's `{variable}` tokens point at, in chip order; [] means all kinds. */
 export function inferAppliesTo(body: string): NotificationKind[] {
   const found = new Set<NotificationKind>();
-  for (const match of body.matchAll(/\{([A-Za-z_][\w.]*)\}/g)) {
+  // A token may carry a length (`{name:30}`) or modifiers (`{name|humanize}`), as the server allows.
+  for (const match of body.matchAll(/\{([A-Za-z_][\w.]*)(?::\d+)?(?:\|[^}]*)?\}/g)) {
     const name = match[1];
     for (const [kind, pattern] of KIND_VARIABLES) {
       if (pattern.test(name)) found.add(kind);

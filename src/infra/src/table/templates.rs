@@ -515,15 +515,15 @@ pub async fn record_pending_renames<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Reads and clears the renames a migration recorded.
-pub async fn take_pending_renames<C: ConnectionTrait>(
+/// The renames whose tuples are still to move, oldest first; the list stays until it is replaced.
+pub async fn pending_renames<C: ConnectionTrait>(
     db: &C,
 ) -> Result<Vec<ReservedRename>, sea_orm::DbErr> {
     let Some(row) = pending_row(db).await? else {
         return Ok(Vec::new());
     };
     let field = |v: &serde_json::Value, k: &str| v[k].as_str().unwrap_or_default().to_string();
-    let renames = row
+    Ok(row
         .setting_value
         .as_array()
         .into_iter()
@@ -534,9 +534,18 @@ pub async fn take_pending_renames<C: ConnectionTrait>(
             to: field(v, "to"),
         })
         .filter(|r| !r.from.is_empty() && !r.to.is_empty())
-        .collect();
-    row.delete(db).await?;
-    Ok(renames)
+        .collect())
+}
+
+/// Replaces the pending list with `left`; an empty list removes the row.
+pub async fn set_pending_renames<C: ConnectionTrait>(
+    db: &C,
+    left: &[ReservedRename],
+) -> Result<(), sea_orm::DbErr> {
+    if let Some(row) = pending_row(db).await? {
+        row.delete(db).await?;
+    }
+    record_pending_renames(db, left).await
 }
 
 async fn pending_row<C: ConnectionTrait>(
@@ -1440,8 +1449,8 @@ mod tests {
             alert_template(&db, "alerts", "mine-alert").await.as_deref(),
             Some("user_o2_default")
         );
-        // Boot moves the tuples once, then the list is gone.
-        let pending = take_pending_renames(&db).await.unwrap();
+        // Boot reads the list, then replaces it with what did not move.
+        let pending = pending_renames(&db).await.unwrap();
         assert_eq!(
             pending,
             vec![ReservedRename {
@@ -1450,7 +1459,10 @@ mod tests {
                 to: "user_o2_default".to_string(),
             }]
         );
-        assert!(take_pending_renames(&db).await.unwrap().is_empty());
+        set_pending_renames(&db, &pending[1..]).await.unwrap();
+        assert!(pending_renames(&db).await.unwrap().is_empty());
+        set_pending_renames(&db, &pending).await.unwrap();
+        assert_eq!(pending_renames(&db).await.unwrap(), pending);
         // The seeder's own o2_default is a seed at boot.
         assert!(
             rename_reserved_collisions(&db, &BOOT_SEEDS)

@@ -120,14 +120,7 @@ pub async fn send_to_destination(
             // Unchanged legacy path — byte-identical output.
             let msg = apply_custom_template(&template.body, ctx, is_email);
             let msg = stamp_platform_key(dest_type, ctx, msg);
-            // Alerts never set a fallback, so their subjects are unchanged.
-            let fallback = ctx.render_hints.fallback_subject.as_ref();
-            let title = match &template.template_type {
-                TemplateType::Email { title } if !(title.is_empty() && fallback.is_some()) => {
-                    apply_custom_template(title, ctx, is_email)
-                }
-                _ => fallback.cloned().unwrap_or_else(|| template.name.clone()),
-            };
+            let title = custom_title(template, ctx, is_email);
             let (email_subject, sns_subject) = custom_subjects(subject, title);
             match dest_type {
                 DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
@@ -246,9 +239,39 @@ fn members_to_send(kept: Vec<String>, skipped: &[String]) -> Result<Email, SendE
     Ok(Email { recipients: kept })
 }
 
+/// The subject of a Custom template; alerts never set a fallback, so their subjects are unchanged.
+fn custom_title(template: &Template, ctx: &NotificationContext, is_email: bool) -> String {
+    let fallback = ctx.render_hints.fallback_subject.as_ref();
+    match &template.template_type {
+        TemplateType::Email { title } if !(title.is_empty() && fallback.is_some()) => {
+            // A subject is plain text, so the escaping the email body gets would show as entities.
+            let escape = is_email && !ctx.render_hints.escape_email_attributes;
+            apply_custom_template(title, ctx, escape)
+        }
+        _ => fallback.cloned().unwrap_or_else(|| template.name.clone()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_custom_email_subject_is_plain_text_where_the_body_is_escaped() {
+        let template = Template {
+            name: "check-mail".into(),
+            template_type: TemplateType::Email {
+                title: "{check_name} is down".into(),
+            },
+            ..Default::default()
+        };
+        let mut ctx = NotificationContext {
+            context_attributes: vec![("check_name".into(), "API & worker".into())],
+            ..Default::default()
+        };
+        ctx.render_hints.escape_email_attributes = true;
+        assert_eq!(custom_title(&template, &ctx, true), "API & worker is down");
+    }
 
     #[test]
     fn the_subject_rule_per_template_kind() {

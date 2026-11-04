@@ -402,14 +402,6 @@ pub async fn cached_references(org_id: &str, name: &str) -> (Vec<String>, Vec<St
 pub async fn rename_reserved_collisions()
 -> Result<Vec<table::templates::ReservedRename>, TemplateError> {
     let db = infra::db::get_orm_client_rw().await;
-    // A migration renamed these before any cache or tuple store was up, so only the tuples move.
-    for r in &table::templates::take_pending_renames(db)
-        .await
-        .map_err(infra::errors::Error::from)?
-    {
-        disown_old_name(r).await?;
-        set_ownership(&r.org, "templates", Authz::new(&r.to)).await;
-    }
     let renames = table::templates::rename_reserved_collisions(db, &table::templates::BOOT_SEEDS)
         .await
         .map_err(infra::errors::Error::from)?;
@@ -418,11 +410,29 @@ pub async fn rename_reserved_collisions()
             .await?;
         infra::coordinator::emit_put(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.to))
             .await?;
-        // Ownership tuples are keyed by name, so a rename must move them or the row loses its
-        // owner.
-        disown_old_name(r).await?;
-        set_ownership(&r.org, "templates", Authz::new(&r.to)).await;
     }
+    // Tuples are keyed by name; one that did not move stays queued, so a later boot retries it.
+    table::templates::record_pending_renames(db, &renames)
+        .await
+        .map_err(infra::errors::Error::from)?;
+    let pending = table::templates::pending_renames(db)
+        .await
+        .map_err(infra::errors::Error::from)?;
+    let mut left = Vec::new();
+    for r in pending {
+        if let Err(e) = move_tuples(&r).await {
+            log::warn!(
+                "[TEMPLATES] tuples of '{}' in org {} not moved to '{}' yet: {e}",
+                r.from,
+                r.org,
+                r.to
+            );
+            left.push(r);
+        }
+    }
+    table::templates::set_pending_renames(db, &left)
+        .await
+        .map_err(infra::errors::Error::from)?;
     Ok(renames)
 }
 
@@ -441,6 +451,26 @@ pub async fn retire_default_templates()
         disown_old_name(r).await?;
     }
     Ok(moved)
+}
+
+/// Moves every tuple on the old name, ownership and role grants, to the new one.
+async fn move_tuples(r: &table::templates::ReservedRename) -> Result<(), TemplateError> {
+    let mut orgs = tuple_owners(&r.org, std::slice::from_ref(&r.from))
+        .await?
+        .remove(&r.from)
+        .unwrap_or_default();
+    let unowned = !orgs.contains(&r.org);
+    if unowned {
+        orgs.push(r.org.clone());
+    }
+    db::authz::rename_object(&orgs, "templates", &r.from, &r.to)
+        .await
+        .map_err(|e| TemplateError::InfraError(infra::errors::Error::Message(e.to_string())))?;
+    // A row with no tuple on its old name still needs an owner on the new one.
+    if unowned && db::authz::tracks_ownership() {
+        set_ownership(&r.org, "templates", Authz::new(&r.to)).await;
+    }
+    Ok(())
 }
 
 /// Removes the tuples of the name a row was moved off.
