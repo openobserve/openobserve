@@ -22,7 +22,7 @@
 use config::{
     DEFAULT_ORG,
     meta::{
-        alerts::content_spec::{ChartSpec, ContentField, ContentSpec, RowsSpec},
+        alerts::content_spec::{ChartSpec, ContentField, ContentLink, ContentSpec, RowsSpec},
         destinations::{Template, TemplateKind, TemplateType},
     },
 };
@@ -72,8 +72,13 @@ pub fn compiled_default_content() -> ContentSpec {
             columns: None,
             format: None,
         },
-        // resolve_content appends the View in OpenObserve link to alert_url.
-        links: vec![],
+        // resolve_content appends View in OpenObserve to alert_url; the explore link is anomaly's
+        // own.
+        links: vec![ContentLink {
+            label: "{anomaly_explore_label}".into(),
+            url: "{anomaly_explore_url}".into(),
+            show_when: None,
+        }],
         chart: ChartSpec { enabled: false },
     }
 }
@@ -253,5 +258,58 @@ mod tests {
         assert!(!is_reserved_template_name("user_o2_default_anomaly"));
         assert!(!is_reserved_template_name("o2_defaults"));
         assert!(!is_reserved_template_name("my_template"));
+    }
+
+    #[test]
+    fn only_an_anomaly_with_a_link_renders_the_explore_link() {
+        let explore = |ctx: &crate::alerts::notifications::NotificationContext| {
+            resolve_content(&compiled_default_content(), ctx, "slack")
+                .links
+                .into_iter()
+                .filter(|(label, _)| !label.is_empty())
+                .collect::<Vec<_>>()
+        };
+        // The alert link the renderer appends has an empty label; nothing else may appear.
+        assert!(explore(&synthetic_context(Some(AlertLevel::Critical))).is_empty());
+        for kind in [
+            NotificationKind::Incident,
+            NotificationKind::Synthetics,
+            NotificationKind::Downtime,
+            NotificationKind::OnCall,
+        ] {
+            assert!(
+                explore(&example_context(kind, false)).is_empty(),
+                "{kind:?}"
+            );
+        }
+        let anomaly = example_context(NotificationKind::Anomaly, false);
+        let links = explore(&anomaly);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].0, "View data around the window");
+        assert!(links[0].1.contains("/web/logs?"));
+
+        let mut no_link = anomaly.clone();
+        for (k, v) in no_link.context_attributes.iter_mut() {
+            if k.starts_with("anomaly_explore_") {
+                v.clear();
+            }
+        }
+        assert!(explore(&no_link).is_empty());
+    }
+
+    #[test]
+    fn an_alert_link_with_a_blank_common_variable_is_kept_as_before() {
+        let mut ctx = synthetic_context(Some(AlertLevel::Critical));
+        ctx.alert_description = String::new();
+        let spec = ContentSpec {
+            links: vec![ContentLink {
+                label: "Docs".into(),
+                url: "{alert_description}".into(),
+                show_when: None,
+            }],
+            ..compiled_default_content()
+        };
+        let links = resolve_content(&spec, &ctx, "slack").links;
+        assert!(links.iter().any(|(label, _)| label == "Docs"));
     }
 }

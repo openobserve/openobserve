@@ -25,7 +25,7 @@ use super::{
     context::{NotificationContext, build_row_columns},
 };
 
-pub const ANOMALY_VARIABLES: [&str; 14] = [
+pub const ANOMALY_VARIABLES: [&str; 16] = [
     "anomaly_id",
     "anomaly_name",
     "anomaly_kind",
@@ -37,6 +37,8 @@ pub const ANOMALY_VARIABLES: [&str; 14] = [
     "score",
     "threshold",
     "anomaly_score",
+    "anomaly_explore_url",
+    "anomaly_explore_label",
     "window_start",
     "window_end",
     "anomaly_url",
@@ -376,6 +378,11 @@ fn anomaly_example(resolved: bool) -> NotificationContext {
         ("score", score),
         ("threshold", "0.80"),
         ("anomaly_score", &anomaly_score),
+        (
+            "anomaly_explore_url",
+            "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true",
+        ),
+        ("anomaly_explore_label", "View data around the window"),
         ("window_start", start),
         ("window_end", end),
         ("anomaly_url", link),

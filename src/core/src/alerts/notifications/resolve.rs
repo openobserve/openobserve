@@ -118,8 +118,11 @@ pub fn resolve_content(
         unknown_variables.append(&mut unk);
         let (url, mut unk) = substitute_raw(&link.url, ctx);
         unknown_variables.append(&mut unk);
-        // A card for another kind drops a link whose URL is empty, such as a page with no runbook.
-        if ctx.kind != NotificationKind::Alert && url.trim().is_empty() {
+        // A card for another kind drops a link whose URL is empty, such as a page with no runbook;
+        // an alert keeps a blank link unless its URL names another kind's variable.
+        if url.trim().is_empty()
+            && (ctx.kind != NotificationKind::Alert || uses_kind_variable(&link.url))
+        {
             continue;
         }
         links.push((label, url));
@@ -313,6 +316,13 @@ fn parse_token(at: &str) -> Option<(&str, usize, usize)> {
         None => (inner, 0),
     };
     (!name.is_empty()).then_some((name, len, end + 1))
+}
+
+/// Whether `input` names a variable of some kind's group, such as `{anomaly_explore_url}`.
+fn uses_kind_variable(input: &str) -> bool {
+    scan_unmatched(input)
+        .iter()
+        .any(|name| super::examples::is_kind_variable(name))
 }
 
 /// The grammar `scan_unmatched` reads: what an author meant as a variable.

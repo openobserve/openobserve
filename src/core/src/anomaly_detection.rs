@@ -3350,6 +3350,90 @@ fn anomaly_detail_link(org_id: &str, anomaly_id: &str) -> String {
     )
 }
 
+/// Lets the reader check the anomaly against the raw data around its window.
+#[cfg(feature = "enterprise")]
+fn anomaly_explore_link(
+    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> (String, String) {
+    use config::utils::base64::encode_url;
+    // Keeps the whole link under common URL length limits of browsers and chat clients.
+    const MAX_QUERY_LEN: usize = 4000;
+    let none = || (String::new(), String::new());
+    let Some(target) = actx.explore.as_ref() else {
+        return none();
+    };
+    if actx.window_start_us == 0
+        || actx.window_end_us == 0
+        || actx.window_end_us <= actx.window_start_us
+    {
+        return none();
+    }
+    let cfg = config::get_config();
+    let base = format!(
+        "{}{}",
+        cfg.common.web_url.trim_end_matches('/'),
+        cfg.common.base_uri
+    );
+    let Ok(mut url) = url::Url::parse(&base) else {
+        return none();
+    };
+    let traces = actx.stream_type == "traces";
+    let page = if traces { "/web/traces" } else { "/web/logs" };
+    let path = format!("{}{page}", url.path().trim_end_matches('/'));
+    url.set_path(&path);
+
+    // The traces page takes a filter expression, the logs page a full SQL statement.
+    let query = target.filter.as_deref().filter(|f| !f.is_empty()).map(|f| {
+        if traces {
+            encode_url(f)
+        } else {
+            let stream = format!("\"{}\"", target.stream.replace('"', "\"\""));
+            encode_url(&format!("SELECT * FROM {stream} WHERE {f}"))
+        }
+    });
+    let (query, too_long) = match query {
+        Some(q) if q.len() > MAX_QUERY_LEN => (None, true),
+        q => (q, false),
+    };
+    let from = target.start_us.to_string();
+    let to = actx.window_end_us.to_string();
+    {
+        let mut pairs = url.query_pairs_mut();
+        if traces {
+            pairs
+                .append_pair("stream", &target.stream)
+                .append_pair("from", &from)
+                .append_pair("to", &to)
+                .append_pair("org_identifier", &actx.org_id)
+                .append_pair("tab", "spans")
+                .append_pair("show_histogram", "true");
+            if let Some(q) = &query {
+                pairs.append_pair("query", q);
+            }
+        } else {
+            pairs
+                .append_pair("stream_type", &actx.stream_type)
+                .append_pair("stream", &target.stream)
+                .append_pair("stream_value", &target.stream)
+                .append_pair("from", &from)
+                .append_pair("to", &to)
+                .append_pair("sql_mode", "true");
+            if let Some(q) = &query {
+                pairs.append_pair("query", q);
+            }
+            pairs
+                .append_pair("org_identifier", &actx.org_id)
+                .append_pair("show_histogram", "true");
+        }
+    }
+    let label = if target.filter_dropped || too_long {
+        "View stream around the window (detector filter not applied)"
+    } else {
+        "View data around the window"
+    };
+    (url.to_string(), label.to_string())
+}
+
 /// One honestly-labeled message per alert kind: a score-space deviation, a value-space
 /// drop, an absence, and a recovery are different claims and must not share a phrasing.
 #[cfg(feature = "enterprise")]
@@ -3637,6 +3721,7 @@ fn anomaly_attributes(
         AnomalyAlertKind::PartialDrop => "value_below_expected",
         _ => "",
     };
+    let (explore_url, explore_label) = anomaly_explore_link(actx);
     [
         ("anomaly_id", actx.anomaly_id.clone()),
         ("anomaly_name", actx.config_name.clone()),
@@ -3657,6 +3742,8 @@ fn anomaly_attributes(
         ("window_start", fmt_alert_us(actx.window_start_us)),
         ("window_end", fmt_alert_us(actx.window_end_us)),
         ("anomaly_url", link.to_string()),
+        ("anomaly_explore_url", explore_url),
+        ("anomaly_explore_label", explore_label),
     ]
     .into_iter()
     .map(|(k, v)| (k.to_string(), v))
@@ -7001,6 +7088,7 @@ mod tests {
                 template: None,
                 stream_type: "logs".to_string(),
                 event: Default::default(),
+                explore: None,
             }
         }
 
@@ -7229,6 +7317,196 @@ mod tests {
             let p = anomaly_alert_payload(&c, "m", LINK);
             assert_eq!(p["max_deviation_percent"], 52.4);
             assert_eq!(p["worst_actual_value"], 612.0);
+        }
+
+        fn explore_ctx(
+            stream_type: &str,
+            filter: Option<&str>,
+            filter_dropped: bool,
+        ) -> AnomalyAlertContext {
+            use o2_enterprise::enterprise::anomaly_detection::types::ExploreTarget;
+            let mut c = ctx(AnomalyAlertKind::Value);
+            c.stream_type = stream_type.to_string();
+            c.explore = Some(ExploreTarget {
+                stream: "app_logs".to_string(),
+                filter: filter.map(str::to_string),
+                filter_dropped,
+                start_us: 1_704_063_600_000_000,
+            });
+            c
+        }
+
+        fn pairs(url: &str) -> (url::Url, Vec<(String, String)>) {
+            let u = url::Url::parse(url).expect("explore url parses");
+            let p = u
+                .query_pairs()
+                .map(|(k, v)| (k.into_owned(), v.into_owned()))
+                .collect();
+            (u, p)
+        }
+
+        fn get<'a>(p: &'a [(String, String)], key: &str) -> Option<&'a str> {
+            p.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+        }
+
+        fn decoded_query(p: &[(String, String)]) -> String {
+            config::utils::base64::decode_url(get(p, "query").expect("query pair")).unwrap()
+        }
+
+        const FILTERED: &str = "View data around the window";
+        const UNFILTERED: &str = "View stream around the window (detector filter not applied)";
+
+        #[test]
+        fn the_logs_explore_link_carries_the_window_and_the_filter_as_sql() {
+            let c = explore_ctx("logs", Some("status >= 500"), false);
+            let (url, label) = super::super::anomaly_explore_link(&c);
+            let (u, p) = pairs(&url);
+            assert!(u.path().ends_with("/web/logs"), "{url}");
+            assert_eq!(get(&p, "stream_type"), Some("logs"));
+            assert_eq!(get(&p, "stream"), Some("app_logs"));
+            assert_eq!(get(&p, "stream_value"), Some("app_logs"));
+            assert_eq!(get(&p, "from"), Some("1704063600000000"));
+            assert_eq!(get(&p, "to"), Some("1704070800000000"));
+            assert_eq!(get(&p, "sql_mode"), Some("true"));
+            assert_eq!(get(&p, "org_identifier"), Some("org"));
+            assert_eq!(get(&p, "show_histogram"), Some("true"));
+            assert_eq!(
+                decoded_query(&p),
+                r#"SELECT * FROM "app_logs" WHERE status >= 500"#
+            );
+            assert_eq!(label, FILTERED);
+            let keys: Vec<&str> = p.iter().map(|(k, _)| k.as_str()).collect();
+            assert_eq!(
+                keys,
+                [
+                    "stream_type",
+                    "stream",
+                    "stream_value",
+                    "from",
+                    "to",
+                    "sql_mode",
+                    "query",
+                    "org_identifier",
+                    "show_histogram"
+                ]
+            );
+        }
+
+        #[test]
+        fn a_metrics_detector_links_to_the_logs_page_with_its_stream_type() {
+            let c = explore_ctx("metrics", Some("job = 'api'"), false);
+            let (url, _) = super::super::anomaly_explore_link(&c);
+            let (u, p) = pairs(&url);
+            assert!(u.path().ends_with("/web/logs"), "{url}");
+            assert_eq!(get(&p, "stream_type"), Some("metrics"));
+        }
+
+        #[test]
+        fn the_traces_explore_link_carries_the_filter_expression_only() {
+            let c = explore_ctx("traces", Some("service_name = 'api'"), false);
+            let (url, label) = super::super::anomaly_explore_link(&c);
+            let (u, p) = pairs(&url);
+            assert!(u.path().ends_with("/web/traces"), "{url}");
+            assert_eq!(get(&p, "stream"), Some("app_logs"));
+            assert_eq!(get(&p, "from"), Some("1704063600000000"));
+            assert_eq!(get(&p, "to"), Some("1704070800000000"));
+            assert_eq!(get(&p, "org_identifier"), Some("org"));
+            assert_eq!(get(&p, "tab"), Some("spans"));
+            assert_eq!(get(&p, "show_histogram"), Some("true"));
+            assert_eq!(get(&p, "stream_type"), None);
+            assert_eq!(decoded_query(&p), "service_name = 'api'");
+            assert_eq!(label, FILTERED);
+        }
+
+        #[test]
+        fn a_detector_without_a_filter_links_without_a_query() {
+            let (url, label) =
+                super::super::anomaly_explore_link(&explore_ctx("logs", None, false));
+            let (_, p) = pairs(&url);
+            assert_eq!(get(&p, "query"), None);
+            assert_eq!(get(&p, "sql_mode"), Some("true"));
+            assert_eq!(label, FILTERED);
+        }
+
+        #[test]
+        fn a_dropped_filter_gets_the_unfiltered_label() {
+            let (url, label) = super::super::anomaly_explore_link(&explore_ctx("logs", None, true));
+            let (_, p) = pairs(&url);
+            assert_eq!(get(&p, "query"), None);
+            assert_eq!(label, UNFILTERED);
+        }
+
+        #[test]
+        fn no_window_or_no_target_gives_no_link() {
+            let empty = (String::new(), String::new());
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            c.window_start_us = 0;
+            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            c.window_end_us = 0;
+            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            c.window_end_us = c.window_start_us;
+            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            c.window_end_us = c.window_start_us - 1;
+            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            c.explore = None;
+            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+        }
+
+        #[test]
+        fn an_over_long_filter_is_dropped_and_labeled() {
+            let long = "x".repeat(5000);
+            for stream_type in ["logs", "traces"] {
+                let c = explore_ctx(stream_type, Some(&long), false);
+                let (url, label) = super::super::anomaly_explore_link(&c);
+                let (_, p) = pairs(&url);
+                assert_eq!(get(&p, "query"), None, "{stream_type}");
+                assert_eq!(label, UNFILTERED, "{stream_type}");
+            }
+        }
+
+        #[test]
+        fn odd_stream_and_org_names_round_trip_and_the_stream_is_quoted() {
+            let odd = r#"my "odd" stream & #1 é"#;
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            c.org_id = "a&b".to_string();
+            c.explore.as_mut().unwrap().stream = odd.to_string();
+            let (url, _) = super::super::anomaly_explore_link(&c);
+            let (u, p) = pairs(&url);
+            assert!(u.fragment().is_none(), "{url}");
+            assert_eq!(get(&p, "stream"), Some(odd));
+            assert_eq!(get(&p, "stream_value"), Some(odd));
+            assert_eq!(get(&p, "org_identifier"), Some("a&b"));
+            assert_eq!(
+                decoded_query(&p),
+                r#"SELECT * FROM "my ""odd"" stream & #1 é" WHERE a = 1"#
+            );
+        }
+
+        #[test]
+        fn the_context_exposes_the_explore_link_and_keeps_the_detail_link_as_alert_url() {
+            let c = explore_ctx("logs", Some("a = 1"), false);
+            let n = super::super::anomaly_notification_context(&c);
+            let detail = super::super::anomaly_detail_link(&c.org_id, &c.anomaly_id);
+            assert_eq!(n.alert_url, detail);
+            let (url, label) = super::super::anomaly_explore_link(&c);
+            assert_eq!(attr_of(&n, "anomaly_url"), Some(detail));
+            assert_eq!(attr_of(&n, "anomaly_explore_url"), Some(url));
+            assert_eq!(attr_of(&n, "anomaly_explore_label"), Some(label));
+            let bare = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Value));
+            assert_eq!(attr_of(&bare, "anomaly_explore_url"), Some(String::new()));
+        }
+
+        fn attr_of(
+            n: &crate::alerts::notifications::NotificationContext,
+            k: &str,
+        ) -> Option<String> {
+            n.context_attributes
+                .iter()
+                .find(|(key, _)| key == k)
+                .map(|(_, v)| v.clone())
         }
     }
 
