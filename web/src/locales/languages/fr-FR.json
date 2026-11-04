@@ -850,6 +850,7 @@
     "dateRangeCopied": "Plage de dates copiée",
     "dateRangePasted": "Plage de dates collée",
     "dateRangePasteError": "Impossible d'analyser la plage de dates",
+    "dateRangePasteEmpty": "Le presse-papiers est vide. Copiez d'abord une plage de dates.",
     "dateRangePasteBlocked": "Ce navigateur a bloqué la lecture du presse-papiers. Appuyez sur {shortcut} avec le sélecteur ouvert pour coller.",
     "pastSecond": "Dernière {count} seconde | Dernières {count} secondes",
     "pastMinute": "Dernière {count} minute | Dernières {count} minutes",

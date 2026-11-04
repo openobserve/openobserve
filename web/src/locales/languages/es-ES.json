@@ -850,6 +850,7 @@
     "dateRangeCopied": "Rango de fechas copiado",
     "dateRangePasted": "Rango de fechas pegado",
     "dateRangePasteError": "No se pudo analizar el rango de fechas",
+    "dateRangePasteEmpty": "El portapapeles está vacío. Copia primero un rango de fechas.",
     "dateRangePasteBlocked": "Este navegador ha bloqueado la lectura del portapapeles. Pulsa {shortcut} con el selector abierto para pegar.",
     "pastSecond": "Último {count} segundo | Últimos {count} segundos",
     "pastMinute": "Último {count} minuto | Últimos {count} minutos",

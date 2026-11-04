@@ -850,6 +850,7 @@
     "dateRangeCopied": "Datumbereik gekopieerd",
     "dateRangePasted": "Datumbereik geplakt",
     "dateRangePasteError": "Kon datumbereik niet parseren",
+    "dateRangePasteEmpty": "Klembord is leeg. Kopieer eerst een datumbereik.",
     "dateRangePasteBlocked": "Deze browser heeft het lezen van het klembord geblokkeerd. Druk op {shortcut} terwijl de kiezer open is om te plakken.",
     "pastSecond": "Laatste {count} seconde | Laatste {count} seconden",
     "pastMinute": "Laatste {count} minuut | Laatste {count} minuten",
