@@ -241,6 +241,15 @@ describe("FleetRollouts", () => {
     expect(fleet.rollbackRollout).toHaveBeenCalledWith(org(), "r3");
   });
 
+  it("says a fleet with no stable version stops collecting when it rolls back", async () => {
+    vi.mocked(fleet.rollbackRollout).mockResolvedValue({ data: halted } as any);
+    vi.mocked(fleet.listFleets).mockResolvedValue({ data: { total: 0, items: [] } } as any);
+    wrapper = await mountDrawer("r3");
+    await wrapper.find('[data-test="fleet-rollout-outcome-rollback"]').trigger("click");
+    await settle();
+    expect(confirmMock.mock.calls[0][0].message).toContain("no stable version");
+  });
+
   it("skips exactly the failing members after a confirmation", async () => {
     vi.mocked(fleet.skipRollout).mockResolvedValue({ data: halted } as any);
     wrapper = await mountDrawer("r3");
