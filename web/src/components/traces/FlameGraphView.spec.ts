@@ -1617,6 +1617,259 @@ describe("FlameGraphView span event markers", () => {
   });
 });
 
+describe("FlameGraphView zoom", () => {
+  const span = (span_id: string, startOffsetMs: number, durationMs: number) =>
+    createMockSpan({ span_id, startOffsetMs, durationMs, events: [] });
+
+  beforeEach(() => {
+    config.global.stubs = {
+      ChartRenderer: ChartRendererStub,
+      TraceDetailsSidebar: TraceDetailsSidebarStub,
+    };
+  });
+
+  afterEach(() => {
+    config.global.stubs = {};
+  });
+
+  const mountView = () =>
+    mount(FlameGraphView, {
+      props: {
+        spans: [span("left", 0, 5), span("edge", 5, 10), span("middle", 40, 20)],
+        traceDuration: 100,
+        selectedSpanId: null,
+      },
+    });
+
+  const xRange = (wrapper: any) => {
+    const { min, max } = wrapper.vm.chartOptions.xAxis;
+    return [min, max];
+  };
+
+  // Mirrors ECharts' value-to-pixel mapping for a 480px plot starting at x = 10.
+  const renderAt = (wrapper: any, dataIndex: number) => {
+    const [min, max] = xRange(wrapper);
+    const coordSys = { x: 10, y: 10, width: 480, height: 100 };
+    const item = wrapper.vm.chartOptions.series[0].data[dataIndex];
+    const api = {
+      value: (i: number) => item.value[i],
+      coord: ([xPct]: number[]) => [coordSys.x + ((xPct - min) / (max - min)) * coordSys.width, 0],
+      style: (s: any) => s,
+    };
+    return wrapper.vm.chartOptions.series[0].renderItem({ dataIndex, coordSys }, api);
+  };
+
+  it("shows the zoom controls when there is data", () => {
+    const wrapper = mountView();
+    expect(wrapper.find('[data-test="flame-graph-zoom-controls"]').exists()).toBe(true);
+  });
+
+  it("hides the zoom controls without data", () => {
+    const wrapper = mount(FlameGraphView, {
+      props: { spans: [], traceDuration: 0, selectedSpanId: null },
+    });
+    expect(wrapper.find('[data-test="flame-graph-zoom-controls"]').exists()).toBe(false);
+  });
+
+  it("zoom in narrows the x range around its centre and zoom out widens it", async () => {
+    const wrapper = mountView();
+    expect(xRange(wrapper)).toEqual([0, 100]);
+
+    await wrapper.find('[data-test="flame-graph-zoom-in"]').trigger("click");
+    expect(xRange(wrapper)).toEqual([10, 90]);
+
+    await wrapper.find('[data-test="flame-graph-zoom-out"]').trigger("click");
+    const [min, max] = xRange(wrapper);
+    expect(min).toBeCloseTo(0);
+    expect(max).toBeCloseTo(100);
+  });
+
+  it("stops zooming in at a 1% window", async () => {
+    const wrapper = mountView();
+    for (let i = 0; i < 40; i++) {
+      await wrapper.find('[data-test="flame-graph-zoom-in"]').trigger("click");
+    }
+    const [min, max] = xRange(wrapper);
+    expect(max - min).toBeCloseTo(1);
+  });
+
+  it("fit resets the x range to the whole trace", async () => {
+    const wrapper = mountView();
+    await wrapper.find('[data-test="flame-graph-zoom-in"]').trigger("click");
+    await wrapper.find('[data-test="flame-graph-fit-screen"]').trigger("click");
+    expect(xRange(wrapper)).toEqual([0, 100]);
+  });
+
+  it("labels the ruler with the visible window", async () => {
+    const wrapper = mountView();
+    await wrapper.find('[data-test="flame-graph-zoom-in"]').trigger("click");
+    const labels = wrapper.vm.timelineTicks.map((tick: any) => tick.label);
+    expect(labels[0]).toBe("10.00ms");
+    expect(labels[4]).toBe("90.00ms");
+  });
+
+  it("maps the cursor onto the visible window", async () => {
+    const wrapper = mountView();
+    await wrapper.find('[data-test="flame-graph-zoom-in"]').trigger("click");
+    // offsetX 10 is the plot's left edge, so it reads the window start.
+    wrapper.vm.handleChartMouseMove({
+      clientX: 10,
+      currentTarget: { getBoundingClientRect: () => ({ left: 0, width: 500 }) },
+    });
+    expect(wrapper.vm.cursorTimeLabel).toBe("10.00ms");
+  });
+
+  it("hides the time cursor while the pointer is over the zoom controls", async () => {
+    const wrapper = mountView();
+    const chartWrapper = wrapper.find('[data-test="flame-graph-view-chart-wrapper"]');
+    const controls = wrapper.find('[data-test="flame-graph-zoom-controls"]');
+    const rect = { left: 0, top: 0, width: 500, height: 300, right: 500, bottom: 300 };
+    chartWrapper.element.getBoundingClientRect = () => rect as DOMRect;
+
+    await chartWrapper.trigger("mousemove", { clientX: 100 });
+    expect(wrapper.vm.cursorVisible).toBe(true);
+
+    await controls.trigger("mouseenter");
+    expect(wrapper.vm.cursorVisible).toBe(false);
+    await controls.trigger("mousemove", { clientX: 480 });
+    expect(wrapper.vm.cursorVisible).toBe(false);
+
+    await chartWrapper.trigger("mousemove", { clientX: 100 });
+    expect(wrapper.vm.cursorVisible).toBe(true);
+  });
+
+  it("skips blocks outside the window and cuts blocks at its edge", async () => {
+    const wrapper = mountView();
+    await wrapper.find('[data-test="flame-graph-zoom-in"]').trigger("click");
+
+    expect(renderAt(wrapper, 0)).toBeNull();
+
+    const edge = renderAt(wrapper, 1);
+    expect(edge.shape.x).toBe(10);
+    expect(edge.shape.width).toBeCloseTo((5 / 80) * 480);
+
+    const middle = renderAt(wrapper, 2);
+    expect(middle.shape.x).toBeCloseTo(10 + (30 / 80) * 480);
+    expect(middle.shape.width).toBeCloseTo((20 / 80) * 480);
+  });
+
+  const zoomInTimes = async (wrapper: any, times: number) => {
+    for (let i = 0; i < times; i++) {
+      await wrapper.find('[data-test="flame-graph-zoom-in"]').trigger("click");
+    }
+  };
+
+  // A 500px scroll area leaves a 480px plot between the 10px grid insets.
+  const scrollArea = (wrapper: any) => {
+    const area = wrapper.find('[data-test="flame-graph-view-chart-scroll"]');
+    Object.defineProperty(area.element, "clientWidth", { configurable: true, value: 500 });
+    return area;
+  };
+
+  it("pans the zoomed window when the chart is dragged, and not on a click-sized move", async () => {
+    const wrapper = mountView();
+    await zoomInTimes(wrapper, 1);
+    const area = scrollArea(wrapper);
+
+    await area.trigger("mousedown", { button: 0, clientX: 200 });
+    window.dispatchEvent(new MouseEvent("mousemove", { clientX: 197 }));
+    expect(xRange(wrapper)).toEqual([10, 90]);
+
+    // Dragging left by 48px moves the window right by 48 / 480 of its 80% width.
+    window.dispatchEvent(new MouseEvent("mousemove", { clientX: 152 }));
+    expect(xRange(wrapper)[0]).toBeCloseTo(18);
+    expect(xRange(wrapper)[1]).toBeCloseTo(98);
+
+    window.dispatchEvent(new MouseEvent("mousemove", { clientX: 0 }));
+    expect(xRange(wrapper)).toEqual([20, 100]);
+
+    window.dispatchEvent(new MouseEvent("mouseup"));
+    window.dispatchEvent(new MouseEvent("mousemove", { clientX: 400 }));
+    expect(xRange(wrapper)).toEqual([20, 100]);
+  });
+
+  it("pans on horizontal and shift wheel but leaves a vertical wheel to scroll", async () => {
+    const wrapper = mountView();
+    await zoomInTimes(wrapper, 1);
+    const area = scrollArea(wrapper);
+
+    const vertical = new WheelEvent("wheel", { deltaY: 48, cancelable: true });
+    area.element.dispatchEvent(vertical);
+    expect(vertical.defaultPrevented).toBe(false);
+    expect(xRange(wrapper)).toEqual([10, 90]);
+
+    const horizontal = new WheelEvent("wheel", { deltaX: 48, cancelable: true });
+    area.element.dispatchEvent(horizontal);
+    expect(horizontal.defaultPrevented).toBe(true);
+    expect(xRange(wrapper)[0]).toBeCloseTo(18);
+
+    const shifted = new WheelEvent("wheel", { deltaY: -48, shiftKey: true, cancelable: true });
+    area.element.dispatchEvent(shifted);
+    expect(shifted.defaultPrevented).toBe(true);
+    expect(xRange(wrapper)[0]).toBeCloseTo(10);
+  });
+
+  it("pans to a span selected from outside the chart when it lies outside the window", async () => {
+    const wrapper = mountView();
+    await zoomInTimes(wrapper, 10);
+    const [min, max] = xRange(wrapper);
+    const width = max - min;
+    expect(min).toBeGreaterThan(5);
+
+    await wrapper.setProps({ selectedSpanId: "left" });
+    expect(xRange(wrapper)[0]).toBeCloseTo(0);
+    expect(xRange(wrapper)[1]).toBeCloseTo(width);
+
+    // "middle" (40-60%) is wider than the window, so the window starts at the span.
+    await wrapper.setProps({ selectedSpanId: "middle" });
+    expect(xRange(wrapper)[0]).toBeCloseTo(40);
+
+    // "edge" (5-15%) no longer overlaps; a span already in view does not move the window.
+    await wrapper.setProps({ selectedSpanId: "edge" });
+    const afterEdge = xRange(wrapper);
+    expect(afterEdge[0]).toBeLessThan(15);
+    await wrapper.setProps({ selectedSpanId: "left" });
+    expect(xRange(wrapper)).toEqual(afterEdge);
+  });
+
+  it("resets to the whole trace when the spans change", async () => {
+    const wrapper = mountView();
+    await zoomInTimes(wrapper, 2);
+    await wrapper.setProps({ spans: [span("other", 0, 50)] });
+    expect(xRange(wrapper)).toEqual([0, 100]);
+
+    await zoomInTimes(wrapper, 2);
+    await wrapper.setProps({ traceDuration: 200 });
+    expect(xRange(wrapper)).toEqual([0, 100]);
+  });
+
+  it("keeps the event flag of a narrow block cut at the window's left edge", async () => {
+    const startNs = 1752490492843000000;
+    const wrapper = mount(FlameGraphView, {
+      props: {
+        spans: [
+          createMockSpan({
+            span_id: "cut",
+            start_time: startNs,
+            startOffsetMs: 8,
+            durationMs: 3,
+            events: [{ name: "a", _timestamp: startNs }],
+          }),
+        ],
+        traceDuration: 100,
+        selectedSpanId: null,
+      },
+    });
+    await zoomInTimes(wrapper, 1);
+
+    const result = renderAt(wrapper, 0);
+    expect(result.type).toBe("group");
+    const [block, flag] = result.children;
+    expect(block.shape.x).toBe(10);
+    expect(flag.shape.x).toBe(10);
+  });
+});
+
 describe("FlameGraphView severity colours", () => {
   // renderItem returns raw ECharts shapes, which cannot take Tailwind classes,
   // so this surface resolves token values at draw time via getComputedStyle.

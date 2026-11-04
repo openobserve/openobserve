@@ -1469,10 +1469,14 @@ function generateHistogramData() {
 
 const isAutoRunOff = () => !!store.state.zoConfig?.auto_query_enabled && !searchObj.meta.liveMode;
 
-async function loadPageData() {
+/** `leftOrg`: the org an org switch left; a URL still on that org is the page's own sync, not a shared link. */
+async function loadPageData({ leftOrg = "" } = {}) {
   const generation = pageGeneration;
   pageLoaded = false;
-  const streamFromUrl = typeof router.currentRoute.value.query.stream === "string";
+  const query = router.currentRoute.value.query;
+  // The header switch re-keys the page before the router may have left the old org's URL.
+  const urlFromLeftOrg = !!leftOrg && (query.org_identifier ?? leftOrg) === leftOrg;
+  const streamFromUrl = !urlFromLeftOrg && typeof query.stream === "string";
   // Claimed before any early return, so a restore that finds no stream is not left for a later landing.
   // A newer restore wins over one a left load never acted on.
   const landing = takeRecentLanding("traces") ?? pendingLanding;
@@ -1559,10 +1563,9 @@ function stopInFlightRequests() {
 async function initializePage() {
   const generation = pageGeneration;
   pageLoaded = false;
-  if (
-    searchObj.organizationIdentifier &&
-    searchObj.organizationIdentifier !== store.state.selectedOrganization.identifier
-  ) {
+  const lastOrg = searchObj.organizationIdentifier;
+  const leftOrg = lastOrg && lastOrg !== store.state.selectedOrganization.identifier ? lastOrg : "";
+  if (leftOrg) {
     resetSearchObj();
   }
   restoreUrlQueryParams();
@@ -1574,7 +1577,7 @@ async function initializePage() {
   await loadTracesParser().catch((e) => console.error("Failed to load the traces parser", e));
   if (generation !== pageGeneration) return;
   if (!searchObj.loading) {
-    await loadPageData();
+    await loadPageData({ leftOrg });
   } else {
     searchObj.loadingStream = false;
     pendingUrlPage = null;
@@ -1642,9 +1645,10 @@ onActivated(async () => {
   }
 
   if (searchObj.organizationIdentifier != store.state.selectedOrganization.identifier) {
+    const leftOrg = searchObj.organizationIdentifier;
     resetSearchObj();
     restoreUrlQueryParams();
-    await loadPageData();
+    await loadPageData({ leftOrg });
     if (left()) return;
     reloaded = true;
   }

@@ -244,6 +244,13 @@ describe("useTraces", () => {
       expect(searchObj.meta.lastRunSignature).toBeNull();
     });
 
+    it("clears searchApplied, so a new org does not mount the Rate/Duration panels before a run", () => {
+      const { searchObj, resetSearchObj } = useTraces();
+      searchObj.searchApplied = true;
+      resetSearchObj();
+      expect(searchObj.searchApplied).toBe(false);
+    });
+
     it("clears errorDetail", () => {
       const { searchObj, resetSearchObj } = useTraces();
       searchObj.data.errorDetail = "detail";
