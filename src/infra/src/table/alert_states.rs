@@ -51,6 +51,16 @@ pub struct GroupPlanWrite {
     pub reaped: Vec<ReapedGroup>,
 }
 
+/// What one [`delete_transitions_batch_before_with`] call removed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TransitionBatch {
+    pub deleted: u64,
+    /// Rows the select matched; a concurrent delete can leave `deleted` below this.
+    pub selected: u64,
+    /// Highest id selected, where the next call resumes; `None` when nothing was due.
+    pub last_id: Option<i64>,
+}
+
 /// Convert a stored row into the domain type. An unrecognised `last_outcome`
 /// integer degrades to `None` ("never evaluated") rather than failing the read —
 /// a value we cannot interpret is not worth taking the list endpoint down for.
@@ -1270,15 +1280,45 @@ pub async fn delete_by_alert_with<C: sea_orm::ConnectionTrait + TransactionTrait
     Ok(())
 }
 
-/// Retention for the append-only transition log. Governed by audit needs, set
-/// independently of the `triggers` stream retention.
-pub async fn delete_transitions_before(cutoff: i64) -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
-    alert_state_transitions::Entity::delete_many()
-        .filter(alert_state_transitions::Column::At.lt(cutoff))
-        .exec(client)
+/// Deletes up to `batch` due rows with ids above `after_id`, in one transaction.
+pub async fn delete_transitions_batch_before_with<C>(
+    conn: &C,
+    cutoff_us: i64,
+    after_id: i64,
+    batch: u64,
+) -> Result<TransitionBatch, errors::Error>
+where
+    C: sea_orm::ConnectionTrait + TransactionTrait,
+{
+    let txn = conn.begin().await?;
+    // Keyset on the PK: the only index, (alert_id, at), cannot serve an `at`-only scan.
+    let ids: Vec<i64> = alert_state_transitions::Entity::find()
+        .select_only()
+        .column(alert_state_transitions::Column::Id)
+        .filter(alert_state_transitions::Column::Id.gt(after_id))
+        .filter(alert_state_transitions::Column::At.lt(cutoff_us))
+        .order_by_asc(alert_state_transitions::Column::Id)
+        .limit(batch)
+        .into_tuple()
+        .all(&txn)
         .await?;
-    Ok(())
+    let Some(&last_id) = ids.last() else {
+        txn.commit().await?;
+        return Ok(TransitionBatch::default());
+    };
+    let selected = ids.len() as u64;
+    let deleted = alert_state_transitions::Entity::delete_many()
+        .filter(alert_state_transitions::Column::Id.is_in(ids))
+        .filter(alert_state_transitions::Column::At.lt(cutoff_us))
+        .exec(&txn)
+        .await?
+        .rows_affected;
+    txn.commit().await?;
+    Ok(TransitionBatch {
+        deleted,
+        selected,
+        last_id: Some(last_id),
+    })
 }
 
 #[cfg(test)]
@@ -1286,6 +1326,30 @@ mod tests {
     use sea_orm::PaginatorTrait;
 
     use super::*;
+
+    const CUTOFF: i64 = 1_750_000_000_000_000;
+    const HOUR_US: i64 = 3_600_000_000;
+
+    /// One database a retention test runs against; a Postgres arm drops its schema when done.
+    struct Backend {
+        name: &'static str,
+        conn: sea_orm::DatabaseConnection,
+        pg: Option<(sea_orm::DatabaseConnection, String)>,
+    }
+
+    impl Backend {
+        async fn done(self) {
+            let Backend { conn, pg, .. } = self;
+            let Some((admin, schema)) = pg else {
+                return;
+            };
+            drop_schema(admin, &schema, vec![conn]).await;
+            println!(
+                "postgres arm ran: {}",
+                std::thread::current().name().unwrap_or("?")
+            );
+        }
+    }
 
     fn model(last_outcome: Option<i32>) -> alert_states::Model {
         alert_states::Model {
@@ -2725,5 +2789,217 @@ mod tests {
         update.state.as_mut().unwrap().group_label_set = Some(labels.clone());
         persist_with(&db, &update, None).await.unwrap();
         assert_eq!(row(&db).await.group_label_set, Some(labels));
+    }
+
+    /// Postgres first (when `ZO_META_POSTGRES_DSN` is set) so a failure names it, then SQLite.
+    async fn backends() -> Vec<Backend> {
+        let mut out = Vec::new();
+        if let Some((admin, schema, mut pools)) = postgres_pools(1).await {
+            out.push(Backend {
+                name: "postgres",
+                conn: pools.remove(0),
+                pg: Some((admin, schema)),
+            });
+        }
+        out.push(Backend {
+            name: "sqlite",
+            conn: db().await,
+            pg: None,
+        });
+        out
+    }
+
+    /// One-connection pools on a throwaway Postgres schema holding the transition table.
+    async fn postgres_pools(
+        n: usize,
+    ) -> Option<(
+        sea_orm::DatabaseConnection,
+        String,
+        Vec<sea_orm::DatabaseConnection>,
+    )> {
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let dsn = std::env::var("ZO_META_POSTGRES_DSN").ok()?;
+        // The SQLite lane sets the variable empty rather than unsetting it.
+        if dsn.trim().is_empty() {
+            return None;
+        }
+        let schema = format!("ast_test_{}", config::ider::generate().to_ascii_lowercase());
+        let admin = Database::connect(&dsn).await.unwrap();
+        admin
+            .execute_unprepared(&format!(r#"CREATE SCHEMA "{schema}""#))
+            .await
+            .unwrap();
+        let mut pools = Vec::new();
+        for _ in 0..n {
+            let mut options = sea_orm::ConnectOptions::new(dsn.clone());
+            options
+                .max_connections(1)
+                .min_connections(1)
+                .set_schema_search_path(schema.clone());
+            pools.push(Database::connect(options).await.unwrap());
+        }
+        let backend = pools[0].get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(alert_state_transitions::Entity);
+        pools[0].execute(backend.build(&table)).await.unwrap();
+        Some((admin, schema, pools))
+    }
+
+    async fn drop_schema(
+        admin: sea_orm::DatabaseConnection,
+        schema: &str,
+        pools: Vec<sea_orm::DatabaseConnection>,
+    ) {
+        use sea_orm::ConnectionTrait;
+
+        for pool in pools {
+            pool.close().await.unwrap();
+        }
+        admin
+            .execute_unprepared(&format!(r#"DROP SCHEMA "{schema}" CASCADE"#))
+            .await
+            .unwrap();
+    }
+
+    async fn seed<C: sea_orm::ConnectionTrait>(conn: &C, alert_id: &str, ats: &[i64]) {
+        let rows: Vec<_> = ats
+            .iter()
+            .map(|&at| alert_state_transitions::ActiveModel {
+                alert_id: Set(alert_id.to_string()),
+                group_key: Set(ROLLUP_GROUP_KEY.to_string()),
+                from_outcome: Set(None),
+                to_outcome: Set(RunOutcome::Firing.to_i32()),
+                from_level: Set(None),
+                to_level: Set(None),
+                at: Set(at),
+                value: Set(None),
+                rule_value: Set(None),
+                group_labels: Set(None),
+                ..Default::default()
+            })
+            .collect();
+        for chunk in rows.chunks(500) {
+            alert_state_transitions::Entity::insert_many(chunk.to_vec())
+                .exec(conn)
+                .await
+                .unwrap();
+        }
+    }
+
+    /// `(id, at)` of every transition, by id.
+    async fn rows_by_id<C: sea_orm::ConnectionTrait>(conn: &C) -> Vec<(i64, i64)> {
+        alert_state_transitions::Entity::find()
+            .select_only()
+            .column(alert_state_transitions::Column::Id)
+            .column(alert_state_transitions::Column::At)
+            .order_by_asc(alert_state_transitions::Column::Id)
+            .into_tuple()
+            .all(conn)
+            .await
+            .unwrap()
+    }
+
+    /// Follows the keyset until a call selects nothing, returning each batch's deletions.
+    async fn drain<C>(conn: &C, cutoff: i64) -> Result<Vec<u64>, errors::Error>
+    where
+        C: sea_orm::ConnectionTrait + TransactionTrait,
+    {
+        let mut after = 0;
+        let mut deleted = Vec::new();
+        loop {
+            let batch = delete_transitions_batch_before_with(conn, cutoff, after, 1_000).await?;
+            let Some(last) = batch.last_id else {
+                return Ok(deleted);
+            };
+            deleted.push(batch.deleted);
+            after = last;
+        }
+    }
+
+    #[tokio::test]
+    async fn a_batch_deletes_at_most_the_batch_size_oldest_ids_first() {
+        for b in backends().await {
+            seed(&b.conn, "a-old", &[CUTOFF - HOUR_US; 2_500]).await;
+            seed(&b.conn, "a-new", &[CUTOFF + HOUR_US; 10]).await;
+            let before = rows_by_id(&b.conn).await;
+            let batch = delete_transitions_batch_before_with(&b.conn, CUTOFF, 0, 1_000)
+                .await
+                .unwrap();
+            assert_eq!(
+                batch,
+                TransitionBatch {
+                    deleted: 1_000,
+                    selected: 1_000,
+                    last_id: Some(before[999].0),
+                },
+                "{}",
+                b.name
+            );
+            assert_eq!(rows_by_id(&b.conn).await, before[1_000..], "{}", b.name);
+            b.done().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn the_cutoff_is_exclusive() {
+        for b in backends().await {
+            seed(&b.conn, "a-old", &[CUTOFF - 1, CUTOFF, CUTOFF + 1]).await;
+            let batch = delete_transitions_batch_before_with(&b.conn, CUTOFF, 0, 1_000)
+                .await
+                .unwrap();
+            assert_eq!(batch.deleted, 1, "{}", b.name);
+            let ats: Vec<i64> = rows_by_id(&b.conn).await.iter().map(|r| r.1).collect();
+            assert_eq!(ats, [CUTOFF, CUTOFF + 1], "{}", b.name);
+            b.done().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn following_the_keyset_drains_due_rows_then_deletes_nothing() {
+        for b in backends().await {
+            seed(&b.conn, "a-old", &[CUTOFF - HOUR_US; 2_500]).await;
+            seed(&b.conn, "a-new", &[CUTOFF + HOUR_US; 10]).await;
+            let deleted = drain(&b.conn, CUTOFF).await.unwrap();
+            assert_eq!(deleted, [1_000, 1_000, 500], "{}", b.name);
+            let again = delete_transitions_batch_before_with(&b.conn, CUTOFF, 0, 1_000)
+                .await
+                .unwrap();
+            assert_eq!(again, TransitionBatch::default(), "{}", b.name);
+            let left = rows_by_id(&b.conn).await;
+            assert_eq!(left.len(), 10, "{}", b.name);
+            assert!(left.iter().all(|r| r.1 == CUTOFF + HOUR_US), "{}", b.name);
+            b.done().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn a_replayed_old_row_with_a_newer_id_is_still_deleted() {
+        for b in backends().await {
+            seed(&b.conn, "a-new", &[CUTOFF + HOUR_US; 5]).await;
+            seed(&b.conn, "a-old", &[CUTOFF - 24 * HOUR_US]).await;
+            let deleted = drain(&b.conn, CUTOFF).await.unwrap();
+            assert_eq!(deleted, [1], "{}", b.name);
+            let left = rows_by_id(&b.conn).await;
+            assert_eq!(left.len(), 5, "{}", b.name);
+            assert!(left.iter().all(|r| r.1 == CUTOFF + HOUR_US), "{}", b.name);
+            b.done().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn two_concurrent_sweeps_delete_each_row_once() {
+        let Some((admin, schema, pools)) = postgres_pools(2).await else {
+            return;
+        };
+        seed(&pools[0], "a-old", &[CUTOFF - HOUR_US; 3_000]).await;
+        let (a, b) = tokio::join!(drain(&pools[0], CUTOFF), drain(&pools[1], CUTOFF));
+        let (a, b) = (a.unwrap(), b.unwrap());
+        assert_eq!(a.iter().chain(&b).sum::<u64>(), 3_000, "{a:?} {b:?}");
+        assert!(rows_by_id(&pools[0]).await.is_empty());
+        drop_schema(admin, &schema, pools).await;
+        println!(
+            "postgres arm ran: {}",
+            std::thread::current().name().unwrap_or("?")
+        );
     }
 }

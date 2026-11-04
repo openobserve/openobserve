@@ -35,6 +35,7 @@ mod agent_signals;
 mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
+mod alert_transitions_reaper;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
@@ -1561,6 +1562,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // gated: retention deletes do not replicate, so every region reaps its own
     // copy or it grows without bound.
     alert_eval_ledger_reaper::run();
+    // Not job-cluster gated for the same reason: each region reaps its own transitions.
+    alert_transitions_reaper::run();
     query_history_reaper::run();
     public_dashboards_outbox::run();
     // Reconciliation is what makes the rolling window actually roll: the
