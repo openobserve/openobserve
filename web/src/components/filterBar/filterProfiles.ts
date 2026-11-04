@@ -385,12 +385,12 @@ const rumIssues =
       return [{ nodeId: node.id, message }];
     });
 
-// Rust-only syntax JS cannot compile: inline flag groups and the `(?P<name>` spelling of a named group.
+// Rust-only syntax JS cannot compile; a `(` after an odd run of backslashes is an escaped literal, not a group.
 const jsCompilable = (pattern: string) =>
   pattern
-    .replace(/\(\?[imsxuUR-]+\)/g, "")
-    .replace(/\(\?[imsxuUR-]+:/g, "(?:")
-    .replace(/\(\?P</g, "(?<");
+    .replace(/(?<!\\)((?:\\\\)*)\(\?[imsxuUR-]+\)/g, "$1")
+    .replace(/(?<!\\)((?:\\\\)*)\(\?[imsxuUR-]+:/g, "$1(?:")
+    .replace(/(?<!\\)((?:\\\\)*)\(\?P</g, "$1(?<");
 
 // The profiles API compiles regex with Rust's engine; JS catches the common mistakes before the round trip.
 const profilesIssues = (tree: FilterGroup, { t }: FilterValidationContext): FilterIssue[] =>

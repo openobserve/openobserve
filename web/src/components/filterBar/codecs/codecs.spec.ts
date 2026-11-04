@@ -714,6 +714,16 @@ describe("flat codecs", () => {
     expect(added[3]).toEqual({ name: "a", operator: "!=", value: "b" });
   });
 
+  it("dashboard variable filters drop a variable's quotes, as addLabelsToSQlQuery re-quotes each value", () => {
+    const codec = dashboardVariableCodec();
+    const saved = [{ name: "env", operator: "IN", value: "'prod','$env'" }];
+    expectRoundTrip(codec, saved);
+    const tree = codec.parse(clone(saved), context);
+    expect(leaves(tree)[0].values).toEqual(["prod", "$env"]);
+    const out = codec.serialize(edit(tree, 0, { values: ["prod", "$env", "stage"] }), context);
+    expect(out[0].value).toBe("prod,$env,stage");
+  });
+
   it("anomaly filters stay a flat list while AND-only, and become a V2 group with OR", () => {
     const codec = anomalyCodec();
     const saved = [
@@ -979,6 +989,59 @@ describe("dashboard filter codec, an IN list with a $variable", () => {
     expect(written(["a", "b c"])).toMatchObject({ type: "list", values: ["a", "b c"] });
   });
 
+  describe("a saved IN text holding a variable, edited", () => {
+    const savedLeaf = (value: string) => ({
+      type: "condition",
+      column: { field: "env" },
+      filterType: "condition",
+      operator: "IN",
+      value,
+      logicalOperator: "AND",
+      values: [],
+    });
+    const savedGroup = (value: string) => ({
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [{ ...savedLeaf("a"), operator: "=" }, savedLeaf(value)],
+    });
+    const parsed = (value: string) => codec.parse(clone(savedGroup(value)) as never, context);
+    const sqlAfter = (value: string, change: (tree: FilterGroup) => FilterGroup) => {
+      const out = codec.serialize(change(parsed(value)), context) as any;
+      return buildCondition(out.conditions[1], panel);
+    };
+    const addStage = (tree: FilterGroup) =>
+      edit(tree, 1, { values: [...leaves(tree)[1].values, "stage"] });
+    const toggle = (tree: FilterGroup) => toggleConnector(tree, leaves(tree)[1].id);
+    const cases: [string, string[], string, string][] = [
+      ["'$env'", ["'$env'"], "env IN ('$env','stage')", "env IN ('$env')"],
+      [
+        "'prod','$env'",
+        ["prod", "'$env'"],
+        "env IN ('prod','$env','stage')",
+        "env IN ('prod','$env')",
+      ],
+      ["prod,$env", ["prod", "$env"], "env IN ('prod',$env,'stage')", "env IN ('prod',$env)"],
+    ];
+
+    it.each(cases)("keeps %s byte-identical when untouched", (value) => {
+      expectRoundTrip(codec, savedGroup(value) as never);
+    });
+
+    it.each(cases)("reads %s with a quoted variable kept quoted", (value, chips) => {
+      expect(leaves(parsed(value))[1].values).toEqual(chips);
+    });
+
+    it.each(cases)("writes %s as valid SQL after adding a value", (value, _chips, added) => {
+      expect(sqlAfter(value, addStage)).toBe(added);
+    });
+
+    it.each(cases)("writes %s as valid SQL after toggling AND/OR", (value, _c, _a, toggled) => {
+      const out = codec.serialize(toggle(parsed(value)), context) as any;
+      expect(out.conditions[1].logicalOperator).toBe("OR");
+      expect(buildCondition(out.conditions[1], panel)).toBe(toggled);
+    });
+  });
+
   it("still splits an IN text with no variable as the SQL builder does", () => {
     const leaf = {
       type: "condition",
@@ -1119,6 +1182,14 @@ describe("profiles regex validation", () => {
     expect(issuesFor("(?i)prod")).toEqual([]);
     expect(issuesFor("(?P<name>api)-\\d+")).toEqual([]);
     expect(issuesFor("a(?i:B)c(?-s)")).toEqual([]);
+  });
+
+  it("leaves an escaped paren alone, so it is checked as a literal", () => {
+    expect(issuesFor("(a\\(?i)")).toEqual([]);
+    expect(issuesFor("a\\\\(?i)b")).toEqual([]);
+    expect(issuesFor("\\\\(?P<n>x)")).toEqual([]);
+    expect(issuesFor("(?i)(?s)x")).toEqual([]);
+    expect(issuesFor("a\\\\(?P<n>x")).toEqual(["filterBar.validation.regexInvalid"]);
   });
 
   it("still refuses a pattern no engine compiles", () => {

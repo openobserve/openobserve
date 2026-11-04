@@ -356,6 +356,35 @@ describe("loadWorkflowRun — history run response mapping", () => {
     });
   });
 
+  it("gives a stored run's wired path with no probe key an empty list, as a live Run Step does", async () => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf1",
+      name: "wf",
+      nodes: [
+        { id: "b1", data: { node_type: "branch", cases: [{ handle: "case_0" }] } },
+        { id: "d0", data: { node_type: "destination" } },
+        { id: "d1", data: { node_type: "destination" } },
+      ],
+      edges: [
+        { source: "b1", sourceHandle: "case_0", target: "d0" },
+        { source: "b1", sourceHandle: "else", target: "d1" },
+      ],
+    } as any;
+    mockRun.mockResolvedValue({
+      data: {
+        errors: { data: [] },
+        data: {
+          input_map: { b1: [{ a: 1 }], "b1::path::case_0": [{ a: 1 }] },
+          output_map: { b1: [{ a: 1 }], "b1::path::case_0": [{ a: 1 }] },
+        },
+      },
+    });
+    await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "probe-gap" });
+    const res: any = workflowObj.testRun.result;
+    expect(res.ghostNodeIds).toEqual([]);
+    expect(res.outputs).toEqual({ b1: { case_0: [{ a: 1 }], else: [] } });
+  });
+
   it("leaves a run without probes exactly as stored", async () => {
     const outputMap = { n1: [{ a: 1 }], n2: { "case-0": [{ a: 1 }] } };
     mockRun.mockResolvedValue({

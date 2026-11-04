@@ -1996,8 +1996,7 @@ fn build_extended_expr(
             } else {
                 pattern.to_string()
             };
-            // Not the re_match UDF: it strips escapes like `\b`, so SQL would disagree with
-            // in-memory evaluation.
+            // Not the re_match UDF: it strips escapes like `\b`, unlike in-memory evaluation.
             let negation = if matches!(cond.operator, Operator::ReMatch) {
                 ""
             } else {

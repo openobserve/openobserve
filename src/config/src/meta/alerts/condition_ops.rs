@@ -45,8 +45,7 @@ pub fn regex_is_match(pattern: &str, case_insensitive: bool, text: &str) -> Opti
     )
 }
 
-/// Items of an `in`/`not_in` value as the UI reads them: an array, a JSON array string, or one
-/// scalar.
+/// Items of an `in`/`not_in` value as the UI stores them: array, JSON array string, or scalar.
 pub fn list_values(value: &Value) -> Cow<'_, [Value]> {
     match value {
         Value::Array(items) => Cow::Borrowed(items.as_slice()),

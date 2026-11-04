@@ -1054,15 +1054,20 @@ export const serializeWorkflow = (opts?: { onlyNodeId?: string }) => {
 
 const BRANCH_PROBE_SEP = "::path::";
 
-// The server records a Branch's output only for a handle with an edge, so a lone Run Step would drop every record; each wired handle gets a pass-through condition probe instead.
-const withBranchProbes = (workflow: any, nodeId: string) => {
+// The Branch's declared handles that have an edge in the current graph, in declaration order.
+const wiredBranchHandles = (nodeId: string): string[] => {
   const node = (workflowObj.currentSelectedWorkflow?.nodes || []).find((n: any) => n.id === nodeId);
   const wired = new Set(
     (workflowObj.currentSelectedWorkflow?.edges || [])
       .filter((e: any) => e.source === nodeId)
       .map((e: any) => e.source_handle ?? e.sourceHandle),
   );
-  const handles = branchHandles(node).filter((h) => wired.has(h));
+  return branchHandles(node).filter((h) => wired.has(h));
+};
+
+// The server records a Branch's output only for a handle with an edge, so a lone Run Step would drop every record; each wired handle gets a pass-through condition probe instead.
+const withBranchProbes = (workflow: any, nodeId: string) => {
+  const handles = wiredBranchHandles(nodeId);
   const probeId = (handle: string) => `${nodeId}${BRANCH_PROBE_SEP}${handle}`;
   const probes = handles.map((handle) =>
     serializeNode({
@@ -1105,7 +1110,9 @@ const foldStoredBranchProbes = (maps: {
     handlesOf.get(branchId)!.add(key.slice(at + BRANCH_PROBE_SEP.length));
   }
   let folded = maps;
-  for (const [branchId, handles] of handlesOf) {
+  // A probe that routed nothing may have no key, so the wired handles are added as the live fold does.
+  for (const [branchId, seen] of handlesOf) {
+    const handles = new Set([...wiredBranchHandles(branchId), ...seen]);
     folded = foldBranchProbes(branchId, [...handles], folded);
   }
   return folded;

@@ -106,6 +106,8 @@ const SQL_LIST_ITEM = /\s*(?:'((?:[^']|'')*)'|"([^"]*)"|([^,()]+))/y;
 const PLACEHOLDER =
   /^(\{\{\s*[\w-]+\s*(:\s*[a-zA-Z]+\s*)?\}\}|\$\{\s*[\w-]+\s*(:\s*[a-zA-Z]+\s*)?\}|\$[\w-]+)$/;
 
+const QUOTED_PLACEHOLDER = new RegExp(`^'${PLACEHOLDER.source.slice(1, -1)}'$`);
+
 const splitWith = (text: string, pattern: RegExp, unescape: (quoted: string) => string) => {
   const values: string[] = [];
   let index = 0;
@@ -126,12 +128,23 @@ const splitWith = (text: string, pattern: RegExp, unescape: (quoted: string) => 
 
 const unescapeSql = (quoted: string) => quoted.replace(/''/g, "'");
 
+// A single-select variable is substituted raw, so a saved `'$env'` keeps its quotes to stay a string.
+const keepQuotedPlaceholder = (quoted: string) =>
+  PLACEHOLDER.test(quoted) ? `'${quoted}'` : unescapeSql(quoted);
+
 /** An IN list typed as text (`a, b`, `('a','b')`); with a `$variable` in it, the SQL-quoted form `'a',$env`. */
 export const splitListText = (value: unknown): string[] => {
   const text = typeof value === "string" ? value : value == null ? "" : String(value);
   if (!text.trim()) return [];
   if (hasVariable(text)) return splitWith(text, SQL_LIST_ITEM, unescapeSql);
   return splitWith(text, LIST_ITEM, (quoted) => quoted.trim());
+};
+
+/** As `splitListText`, but a quoted `'$env'` stays one quoted value, as the panel SQL builder needs it. */
+export const splitPanelListText = (value: unknown): string[] => {
+  const text = typeof value === "string" ? value : value == null ? "" : String(value);
+  if (!hasVariable(text)) return splitListText(text);
+  return splitWith(text, SQL_LIST_ITEM, keepQuotedPlaceholder);
 };
 
 /** An IN list's SQL-quoted text, `''`-escaped; the anomaly SQL builder inserts it verbatim. */
@@ -164,7 +177,12 @@ const placeholderOf = (value: string): string | null => {
 export const joinPanelListText = (values: string[]): string => {
   if (!values.some(hasVariable)) return joinListText(values);
   if (values.length === 1 && placeholderOf(values[0])) return values[0];
-  return values.map((value) => placeholderOf(value) ?? `'${value.replace(/'/g, "''")}'`).join(",");
+  return values
+    .map((value) => {
+      if (QUOTED_PLACEHOLDER.test(value)) return value;
+      return placeholderOf(value) ?? `'${value.replace(/'/g, "''")}'`;
+    })
+    .join(",");
 };
 
 function parseLeaf(item: Record<string, unknown>): FilterNode {
@@ -185,7 +203,7 @@ function parseLeaf(item: Record<string, unknown>): FilterNode {
     }
     const arity = OPERATORS[operator].arity;
     if (arity === "none" || item.operator == null) values = [];
-    else if (arity === "many") values = splitListText(item.value);
+    else if (arity === "many") values = splitPanelListText(item.value);
     else values = valueStrings(item.value).filter((v) => v !== "" || item.emptyLiteral);
   }
   const condition: FilterCondition = {
