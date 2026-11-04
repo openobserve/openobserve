@@ -586,6 +586,49 @@ class MetricsIngestion {
     }
 
     /**
+     * Send several request_count points into one fixed series so rate() over it is never empty.
+     */
+    async ingestFixedRequestCountSeries(points = 5, spacingMs = 15000) {
+        const now = Date.now();
+        const dataPoints = [];
+        for (let i = 0; i < points; i++) {
+            dataPoints.push({
+                timeUnixNano: ((now - (points - 1 - i) * spacingMs) * 1000000).toString(),
+                asDouble: 100 + i * 10,
+                attributes: [
+                    { key: "node", value: { stringValue: "server-01" } },
+                    { key: "service", value: { stringValue: "api-gateway" } },
+                    { key: "region", value: { stringValue: "us-east-1" } }
+                ]
+            });
+        }
+        const metricsData = {
+            resourceMetrics: [{
+                resource: {
+                    attributes: [
+                        { key: "service.name", value: { stringValue: "api-gateway" } },
+                        { key: "service.version", value: { stringValue: "1.0.0" } },
+                        { key: "environment", value: { stringValue: "production" } },
+                        { key: "host.name", value: { stringValue: "server-01" } },
+                        { key: "region", value: { stringValue: "us-east-1" } }
+                    ]
+                },
+                scopeMetrics: [{
+                    scope: { name: "opentelemetry-instrumentation", version: "1.0.0" },
+                    metrics: [{ name: "request_count", unit: "count", gauge: { dataPoints } }]
+                }]
+            }]
+        };
+        const result = await this.sendMetrics(metricsData);
+        if (result.success) {
+            testLogger.info('Sent fixed request_count series', { points });
+        } else {
+            testLogger.error('Failed to send fixed request_count series', { error: result.error });
+        }
+        return result;
+    }
+
+    /**
      * Continuous metrics ingestion
      * Uses while loop with await to prevent overlapping executions
      */

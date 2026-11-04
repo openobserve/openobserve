@@ -370,4 +370,36 @@ describe("SelectDashboardDropdown", () => {
       );
     });
   });
+
+  describe("preferredDashboardId", () => {
+    it("preselects the preferred dashboard when the folder has it", async () => {
+      const wrapper = mountComponent({ preferredDashboardId: "dash2" }, store);
+      await flushPromises();
+
+      expect(wrapper.vm.selectedDashboard).toBe("dash2");
+      expect(wrapper.emitted("dashboard-selected")?.at(-1)).toEqual([
+        { label: "Dashboard 2", value: "dash2" },
+      ]);
+    });
+
+    it("falls back to the first dashboard when the preferred one is gone", async () => {
+      const wrapper = mountComponent({ preferredDashboardId: "deleted" }, store);
+      await flushPromises();
+
+      expect(wrapper.vm.selectedDashboard).toBe("dash1");
+    });
+
+    it("emits the preselected dashboard when the folder's list is already cached", async () => {
+      mountComponent({}, store).unmount();
+      await flushPromises();
+
+      const wrapper = mountComponent({ preferredDashboardId: "dash2" }, store);
+      await flushPromises();
+
+      expect(wrapper.vm.selectedDashboard).toBe("dash2");
+      expect(wrapper.emitted("dashboard-selected")?.at(-1)).toEqual([
+        { label: "Dashboard 2", value: "dash2" },
+      ]);
+    });
+  });
 });

@@ -151,7 +151,7 @@ There are two workflows, with different jobs.
   when you click **Merge when ready** or take a draft out of draft. Plus manual
   `workflow_dispatch` from a feature branch.
 - **Branches**: the PR's own head branch. Same-repo PRs only — see [Fork PRs](#fork-prs).
-- **Secrets**: `DEEPSEEK_API_KEY` and the push PAT.
+- **Secrets**: `DEEPSEEK_API_KEY` and the translations GitHub App's private key.
 - **Action**:
   1. Runs the Python translation script (retrying failed strings in-process)
   2. Updates all language JSON files
@@ -195,10 +195,11 @@ These properties of the workflow matter when you are reading a run:
   locales it finished and marks the commit `Translation-Run: partial`, so a later
   re-run picks the rest up instead of being short-circuited by the skip-guard. The
   merge-queue gate is what stops that PR merging in the meantime.
-- **The push re-runs the PR's checks.** The commit is pushed with a user PAT rather
-  than `GITHUB_TOKEN`, because GitHub deliberately does not trigger workflows for
-  `GITHUB_TOKEN` pushes — the new head SHA would carry no status checks and required
-  checks could never pass.
+- **The push re-runs the PR's checks.** The commit is pushed with a GitHub App
+  installation token rather than `GITHUB_TOKEN`. GitHub holds every `pull_request`
+  run triggered by a `GITHUB_TOKEN` push as `action_required`, and starts no
+  `pull_request_target` run at all, so `ci-gate` and the `ready-for-ci`-gated suites
+  would never report on the new head until someone re-toggled the label.
 - **A deleted head branch is never recreated.** If the PR merges mid-run, the job
   checks that the branch still exists on origin before pushing and bails with a
   warning rather than resurrecting it as a stray. Those strings stay pending for the
@@ -206,20 +207,37 @@ These properties of the workflow matter when you are reading a run:
 
 ### Setup Requirements
 
-The workflow needs two repository secrets:
+The workflow needs two secrets and one variable:
 
-| Secret | Value | Why |
-|--------|-------|-----|
-| `DEEPSEEK_API_KEY` | Your DeepSeek API key | Authenticates the translation calls |
-| `TRANSLATIONS_APPROVE_TOKEN` | **Fine-grained** PAT for a real user account, scoped to *this repository only* with `Contents: read and write` | Pushes the translation commit so the PR's checks re-run |
+| Name | Kind | Value | Why |
+|------|------|-------|-----|
+| `DEEPSEEK_API_KEY` | secret | Your DeepSeek API key | Authenticates the translation calls |
+| `TRANSLATIONS_APP_ID` | variable | The translations GitHub App's ID | Identifies the App whose token pushes the commit |
+| `TRANSLATIONS_APP_PRIVATE_KEY` | secret | A private key generated for that App | Mints a one-hour, Contents-only token for the push |
 
-Set them under **Settings → Secrets and variables → Actions → New repository secret**
-(or via `gh secret set …`). The workflow fails fast with a clear error if
-`DEEPSEEK_API_KEY` is missing; if `TRANSLATIONS_APPROVE_TOKEN` is missing it falls
-back to `GITHUB_TOKEN`, which still commits the translations but leaves the PR's
-checks unre-run on the new head SHA.
+Set them under **Settings → Secrets and variables → Actions** (or via `gh secret set …`
+/ `gh variable set …`). The workflow fails fast with a clear error if any is missing;
+there is deliberately no `GITHUB_TOKEN` fallback, because a push made with it leaves
+every check on the new head SHA waiting.
 
-#### Why the PAT must be fine-grained
+#### Creating the translations App
+
+An org owner creates it once, under **Organization settings → Developer settings →
+GitHub Apps → New GitHub App**:
+
+1. Name it (e.g. `openobserve-translations`); untick **Webhook → Active**.
+2. **Repository permissions → Contents: Read and write**. Nothing else.
+3. **Where can this GitHub App be installed? → Only on this account**, then create it.
+4. Note the **App ID** and **Generate a private key**.
+5. **Install App → openobserve → Only select repositories → openobserve**.
+6. Store the ID as the `TRANSLATIONS_APP_ID` variable and the `.pem` contents as the
+   `TRANSLATIONS_APP_PRIVATE_KEY` secret.
+
+A dedicated App rather than a human PAT means the push carries no person's identity,
+does not break when someone leaves or rotates a token, and can do nothing beyond
+writing contents to this one repository.
+
+#### Why the credential must stay narrow
 
 This workflow triggers on `pull_request`, which runs from the PR's **merge ref** — so
 `requirements.txt`, `main.py`, `translator.py` *and this workflow file itself* come
@@ -227,8 +245,8 @@ from the PR, not from `main`. (That is the difference from `pull_request_target`
 which always uses the base branch's workflow definition.) A same-repo PR can therefore
 change anything about what runs in this job. Fork PRs are skipped and
 would not receive secrets in any case, so the blast radius is "anyone with push
-access" — but a classic `repo`-scope PAT belonging to a human account grants far more
-than that, across every repository they can reach. Scope it down.
+access" — but a human PAT grants far more than that, across every repository its
+owner can reach. The App's token is limited to Contents on this repository.
 
 Three things in the workflow narrow the exposure. None of them is a boundary — a PR
 that edits the workflow file can undo all three — but they mean an *accidental*
@@ -237,8 +255,9 @@ much less to reach:
 
 - `actions/checkout` runs with `persist-credentials: false`, so the push token is not
   sitting in `.git/config` while PR-authored Python runs.
-- The token is a **step-level** `env:` on the commit step only — nothing above it,
-  including `pip install` and `python3 main.py`, has it in the environment.
+- The token is minted only after the PR-authored steps finish, and is a
+  **step-level** `env:` on the commit step only — nothing above it, including
+  `pip install` and `python3 main.py`, has it in the environment.
 - `requirements.txt` carries an upper version bound so a major release cannot land
   unreviewed. (Full hash pinning via `pip install --require-hashes` is the stronger
   form and is still worth doing.)
@@ -246,9 +265,9 @@ much less to reach:
 The only real boundary is a `workflow_run` split: this workflow produces the locale
 files as an artifact and holds no secrets that survive it, and a second workflow —
 which `workflow_run` always runs from `main`'s definition, never the PR's — holds the
-push token and does the commit. Until that lands, **the security model here is "every
+App key and does the commit. Until that lands, **the security model here is "every
 account with push access to this repo is trusted with both secrets"**, and the
-fine-grained PAT is what keeps that from meaning "trusted with a human's whole GitHub
+Contents-only App is what keeps that from meaning "trusted with a human's whole GitHub
 account".
 
 ### Fork PRs

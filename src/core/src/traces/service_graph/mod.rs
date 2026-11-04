@@ -47,21 +47,10 @@ pub(crate) async fn run_graph_search(
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql,
-            from: 0,
             size: 100000,
             start_time,
             end_time,
-            quick_mode: false,
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            histogram_interval: 0,
-            streaming_id: None,
-            streaming_output: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            timezone: None,
+            ..Default::default()
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],

@@ -45,6 +45,7 @@ import {
   isShiftRuleValid,
   isSnoozed,
   isDeletedTeam,
+  ladderStopped,
   pagePhrase,
   reachedStepOf,
   pageState,
@@ -516,6 +517,36 @@ describe("isDeletedTeam", () => {
   });
 });
 
+describe("ladderStopped", () => {
+  const progress = (exhausted: boolean, stopped_because: string | null) =>
+    ({ fired: [], next_targets: [], next_at: null, exhausted, stopped_because }) as any;
+
+  it.each([
+    [
+      "an exhausted ladder",
+      progress(true, "the ladder is exhausted — nobody acknowledged"),
+      false,
+      false,
+    ],
+    [
+      "a ladder stopped for another reason",
+      progress(false, "the owning team was deleted"),
+      false,
+      true,
+    ],
+    ["a climbing ladder", progress(false, null), false, false],
+    [
+      "a deleted team, even with an exhausted ladder",
+      progress(true, "the ladder is exhausted — nobody acknowledged"),
+      true,
+      true,
+    ],
+    ["a deleted team with no progress loaded", undefined, true, true],
+  ])("%s", (_name, ladder, teamDeleted, expected) => {
+    expect(ladderStopped(ladder, teamDeleted)).toBe(expected);
+  });
+});
+
 describe("reachedStepOf", () => {
   it("names the 1-based step a recorded rung delay matches, or nothing", () => {
     const steps = [{ after_micros: 900 }, { after_micros: 0 }, { after_micros: 300 }];
@@ -615,6 +646,35 @@ describe("pagePhrase", () => {
         { kind: "paging", step: 2, total: 3, who: [] },
       ],
       ["not paged", {}, { progress: ladder() }, { kind: "notPaged" }],
+      [
+        "the first rung is due but not sent yet (after an unack restarts the ladder)",
+        {},
+        { progress: ladder({ next_at: NOW - SEC }) },
+        { kind: "paging", step: 1, total: 3, who: [] },
+      ],
+      [
+        "the first rung is still to come",
+        {},
+        { progress: ladder({ next_at: NOW + 60 * SEC }) },
+        { kind: "notPaged" },
+      ],
+      [
+        "its team was deleted, with no progress loaded",
+        {},
+        { reachedStep: 2, teamDeleted: true },
+        { kind: "nobodyPaged" },
+      ],
+      [
+        "the ladder stopped (its team was deleted)",
+        {},
+        {
+          progress: ladder({
+            fired: [rung(["ana@o2.ai"]), rung(["bo@o2.ai"]), rung(["cy@o2.ai"])],
+            stopped_because: "the owning team was deleted",
+          }),
+        },
+        { kind: "nobodyPaged" },
+      ],
       [
         "empty ladder on a list without progress, where the record says it ran out",
         { exhausted_at: NOW },

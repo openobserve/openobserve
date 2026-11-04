@@ -51,21 +51,10 @@ pub async fn get_usage(
     let req = SearchRequest {
         query: Query {
             sql,
-            from: 0,
             size: -1,
             start_time,
             end_time,
-            quick_mode: false,
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: RequestEncoding::Empty,
         regions,

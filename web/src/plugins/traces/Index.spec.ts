@@ -3143,6 +3143,52 @@ describe("Index.vue (Main Traces Page)", () => {
       });
     });
 
+    // The header org switch re-keys MainLayout's content, so the page remounts; the router may not have left the old URL yet.
+    describe("remount after a header org switch", () => {
+      afterEach(() => {
+        delete store.state.zoConfig.auto_query_enabled;
+        globalThis.localStorage.removeItem("oo_toggle_auto_run");
+      });
+
+      async function remountWith(query: Record<string, string>, autoRun: boolean, lastOrg: string) {
+        store.state.zoConfig.auto_query_enabled = true;
+        globalThis.localStorage.setItem("oo_toggle_auto_run", String(autoRun));
+        mockSearchObj.meta.liveMode = autoRun;
+        mockSearchObj.organizationIdentifier = lastOrg;
+        routerCurrentRouteSpy.mockReturnValue({
+          value: { query, name: "traces", path: "/traces" },
+        } as any);
+        wrapper = mountIndexStubbed();
+        await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false), { timeout: 10000 });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        await flushPromises();
+      }
+
+      it.each([
+        ["the old org's URL", { stream: "default", org_identifier: "old-org" }],
+        ["the new org's bare URL", { org_identifier: "default" }],
+      ])("does not search with Auto Run off while the router still shows %s", async (_l, query) => {
+        await remountWith(query, false, "old-org");
+        expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+        expect(mockSearchObj.data.stream.selectedStream.value).toBeTruthy();
+      });
+
+      it("still searches with Auto Run on", async () => {
+        await remountWith({ stream: "default", org_identifier: "old-org" }, true, "old-org");
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      });
+
+      it("searches a shared link for the org being switched to with Auto Run off", async () => {
+        await remountWith({ stream: "default", org_identifier: "default" }, false, "old-org");
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      });
+
+      it("searches a shared link for another org opened without an org switch", async () => {
+        await remountWith({ stream: "default", org_identifier: "other-org" }, false, "default");
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      });
+    });
+
     describe("onActivated", () => {
       // Helper: mount Index inside a KeepAlive wrapper so that toggling
       // the `show` ref produces real deactivate/activate lifecycle calls.
@@ -3202,6 +3248,42 @@ describe("Index.vue (Main Traces Page)", () => {
         expect(mockGetStreams).toHaveBeenCalled();
 
         parentWrapper.unmount();
+      });
+
+      it.each([
+        ["does not search", "false", false],
+        ["still searches", "true", true],
+      ])("%s on an org switch when the Auto Run toggle is %s", async (_label, toggle, searches) => {
+        store.state.zoConfig.auto_query_enabled = true;
+        globalThis.localStorage.setItem("oo_toggle_auto_run", toggle);
+        // The page's own URL sync always writes stream=, so the URL looks like a shared link.
+        routerCurrentRouteSpy.mockReturnValue({
+          value: { query: { stream: "default" }, name: "traces", path: "/traces" },
+        } as any);
+        mockSearchObj.organizationIdentifier = "default";
+        const { parentWrapper, show } = mountWithKeepAlive();
+        // The first load must settle, or reactivation re-runs the first-load path instead.
+        await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+        await flushPromises();
+
+        show.value = false;
+        await flushPromises();
+        mockFetchQueryDataWithHttpStream.mockClear();
+        mockSearchObj.organizationIdentifier = "old-org";
+        show.value = true;
+        await flushPromises();
+        if (searches) {
+          await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled());
+        } else {
+          await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          await flushPromises();
+          expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+        }
+        expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+
+        parentWrapper.unmount();
+        delete store.state.zoConfig.auto_query_enabled;
       });
 
       it("should read oo_toggle_auto_run from localStorage and set liveMode on activation", async () => {

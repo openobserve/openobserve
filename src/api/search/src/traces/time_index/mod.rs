@@ -386,22 +386,11 @@ async fn search_index_window(
     let request = Request {
         query: Query {
             sql,
-            from: 0,
             size: 50_000,
             start_time,
             // Timer windows use closed endpoints; search ranges are half-open.
             end_time: end_time.saturating_add(1),
-            quick_mode: false,
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: RequestEncoding::Empty,
         regions: vec![],

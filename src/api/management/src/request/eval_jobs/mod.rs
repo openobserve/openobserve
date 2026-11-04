@@ -54,7 +54,7 @@ use crate::{
     responses(
         (status = 200, body = inline(ListEvalJobsResponseBody)),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "list"})),
     ),
 )]
@@ -106,7 +106,7 @@ pub async fn list_eval_jobs(
         (status = 200, body = inline(EvalJobResponseBody)),
         (status = 400, description = "Bad Request", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "create"})),
     ),
 )]
@@ -167,7 +167,7 @@ pub async fn create_eval_job(
         (status = 200, body = inline(EvalJobResponseBody)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "get"})),
     ),
 )]
@@ -201,7 +201,7 @@ pub async fn get_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> Res
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "update"})),
     ),
 )]
@@ -266,10 +266,10 @@ pub async fn update_eval_job(
         ("job_id" = String, Path, description = "Eval job id"),
     ),
     responses(
-        (status = 200, description = "Deleted", body = String),
+        (status = 200, description = "Deleted", content_type = "application/json", body = inline(MetaHttpResponse)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
         ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "delete"})),
     ),
 )]
@@ -299,8 +299,8 @@ pub async fn delete_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> 
         (status = 400, description = "Invalid state transition", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "activate"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "create"})),
     ),
 )]
 pub async fn activate_eval_job(
@@ -339,8 +339,8 @@ pub async fn activate_eval_job(
         (status = 400, description = "Invalid state transition", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "pause"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "create"})),
     ),
 )]
 pub async fn pause_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> Response {
@@ -372,8 +372,8 @@ pub async fn pause_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> R
         (status = 400, description = "Invalid state transition", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "resume"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "create"})),
     ),
 )]
 pub async fn resume_eval_job(
@@ -411,8 +411,8 @@ pub async fn resume_eval_job(
         (status = 200, body = inline(EvalJobStatusActionResponseBody)),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "archive"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "create"})),
     ),
 )]
 pub async fn archive_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> Response {
@@ -445,8 +445,8 @@ pub async fn archive_eval_job(Path((org_id, job_id)): Path<(String, String)>) ->
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Not Found", body = ()),
     ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "manual_eval"})),
+    extensions(("x-o2-mcp" = json!({"enabled": false})), 
+        ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "create"})),
     ),
 )]
 pub async fn manual_eval_job(

@@ -47,7 +47,7 @@ use ingestion_common::{IngestionResponse, StreamStatus};
 use super::ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream};
 use crate::{
     common::meta::{authz::Authz, stream::SchemaRecords},
-    ingestion::{TriggerAlertData, check_ingestion_allowed},
+    ingestion::check_ingestion_allowed,
     pipeline::batch_execution::ExecutablePipeline,
 };
 
@@ -311,10 +311,10 @@ fn finish_rows(
 async fn buffer_stream_rows(
     org_id: &str,
     stream_name: &str,
-    (rows, first_type): (Vec<Row>, Option<&'static str>),
+    (mut rows, first_type): (Vec<Row>, Option<&'static str>),
     lookups: &mut StreamLookups,
     partitions: &mut HashMap<String, SchemaRecords>,
-) -> Result<Option<TriggerAlertData>> {
+) -> Result<Option<ingest::StreamTriggers>> {
     if !lookups.partitions.contains_key(stream_name) {
         let keys =
             crate::ingestion::get_stream_partition_keys(org_id, &StreamType::Metrics, stream_name)
@@ -340,18 +340,16 @@ async fn buffer_stream_rows(
 
     let has_uds = matches!(lookups.user_defined_schemas.get(stream_name), Some(Some(_)));
     let min_timestamp = rows.iter().map(|(_, ts)| *ts).min().unwrap_or(0);
-    let record_refs: Vec<&json::Map<String, json::Value>> =
-        rows.iter().map(|(record, ..)| record).collect();
     let (schema, schema_key) = ingest::resolve_batch_schema(
         org_id,
         stream_name,
         &mut lookups.schemas,
-        &record_refs,
+        &mut rows,
+        |(record, _)| record,
         min_timestamp,
         has_uds,
     )
     .await?;
-    drop(record_refs);
 
     let alerts = lookups
         .alerts
@@ -513,7 +511,7 @@ pub async fn ingest(
     }
 
     let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
-    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, Option<ingest::StreamTriggers>> = HashMap::new();
     for (stream_name, records) in records_by_stream {
         // redacted before finish_rows, so the series hash covers the stored values
         #[cfg(feature = "vectorscan")]
@@ -554,7 +552,7 @@ pub async fn ingest(
     )
     .await?;
 
-    ingest::observe_request(ENDPOINT, org_id, &start);
+    ingest::observe_request(ENDPOINT, org_id, &start, http::StatusCode::OK);
     ingest::spawn_triggers(stream_trigger_map);
 
     Ok(IngestionResponse::new(

@@ -13,36 +13,39 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { FleetAuditModule } from "@/services/fleet";
+
 /** What an audit action acted on, derived from the action key the server stores. */
 export type AuditKind =
   "fleet" | "collector" | "configuration" | "rollout" | "token" | "settings" | "other";
 
-export const AUDIT_KINDS: AuditKind[] = [
-  "fleet",
-  "collector",
-  "configuration",
-  "rollout",
-  "token",
-  "settings",
-];
+/** The server's `module` filter for each kind, in the order the filter offers them. */
+export const AUDIT_MODULES: Record<Exclude<AuditKind, "other">, FleetAuditModule> = {
+  fleet: "fleets",
+  collector: "collectors",
+  configuration: "configs",
+  rollout: "rollouts",
+  token: "tokens",
+  settings: "settings",
+};
 
 const KIND_OF: Record<string, AuditKind> = {
   createdFleet: "fleet",
   renamedFleet: "fleet",
   deletedFleet: "fleet",
   updatedFleetSettings: "fleet",
+  // The server files it by its path, fleets/{id}/desired, though it starts a rollout.
+  setDesired: "fleet",
   enrolledCollector: "collector",
   movedByToken: "collector",
   removedCollector: "collector",
   renamedCollector: "collector",
   restartedCollector: "collector",
   redeliveredCollector: "collector",
-  assignedFleetConfig: "collector",
   createdConfig: "configuration",
   editedConfig: "configuration",
   publishedVersion: "configuration",
   deletedConfig: "configuration",
-  setDesired: "rollout",
   rolloutHalted: "rollout",
   autoRollback: "rollout",
   resumedRollout: "rollout",

@@ -371,6 +371,62 @@ describe("PanelContainer", () => {
   });
 
   describe("Panel Controls", () => {
+    // OTable is covered by PanelDataView.spec; this file's ResizeObserver mock cannot construct.
+    const dataViewStub = {
+      PanelDataView: { template: '<div data-test="dashboard-panel-data-view"></div>' },
+      ODropdown: { template: "<div><slot /></div>" },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template: '<div v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
+      },
+    };
+    const TOGGLE = '[data-test="dashboard-panel-data-view-toggle"]';
+    const DATA_VIEW = '[data-test="dashboard-panel-data-view"]';
+
+    it("switches a chart panel to its raw rows and back from the panel menu", async () => {
+      wrapper = createWrapper({}, dataViewStub);
+
+      expect(wrapper.find(TOGGLE).text()).toBe("Show raw data");
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(false);
+
+      await wrapper.find(TOGGLE).trigger("click");
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-schema-renderer"]').exists()).toBe(true);
+      expect(wrapper.find(TOGGLE).text()).toBe("Show chart");
+
+      await wrapper.find(TOGGLE).trigger("click");
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(false);
+    });
+
+    it("hides the legends button while the rows are shown", async () => {
+      wrapper = createWrapper({ showLegendsButton: true }, dataViewStub);
+      await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
+      expect(wrapper.find('[data-test="dashboard-show-legends-btn"]').exists()).toBe(true);
+
+      await wrapper.find(TOGGLE).trigger("click");
+      expect(wrapper.find('[data-test="dashboard-show-legends-btn"]').exists()).toBe(false);
+    });
+
+    it("returns to the chart when layout editing starts", async () => {
+      wrapper = createWrapper({ layoutMode: "view" }, dataViewStub);
+      await wrapper.find(TOGGLE).trigger("click");
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(true);
+
+      await wrapper.setProps({ layoutMode: "edit" });
+      expect(wrapper.find(DATA_VIEW).exists()).toBe(false);
+    });
+
+    it.each([
+      ["table panels", { data: { ...defaultProps.data, type: "table" } }],
+      ["kiosk mode", { kiosk: true }],
+      ["view-only panels", { viewOnly: true }],
+      ["simplified panels", { simplifiedPanelView: true }],
+    ])("offers no Data view on %s", (_name, props) => {
+      wrapper = createWrapper(props, dataViewStub);
+      expect(wrapper.find(TOGGLE).exists()).toBe(false);
+    });
+
     it("should show fullscreen button on hover when not view-only", async () => {
       wrapper = createWrapper({ viewOnly: false });
 
@@ -1241,6 +1297,70 @@ describe("PanelContainer", () => {
       await wrapper.vm.onLogPanel();
 
       consoleErrorSpy.mockRestore();
+    });
+
+    it.each([
+      ["logs", "logs"],
+      ["metrics", "metrics"],
+      ["traces", "traces"],
+    ])("go to logs locks while the panel's %s stream type is license-locked", (streamType, key) => {
+      (store.state as any).zoConfig.features = { [key]: "locked" };
+      const panel = {
+        ...mockPanelData,
+        queries: [
+          { ...mockPanelData.queries[0], fields: { stream: "s", stream_type: streamType } },
+        ],
+      };
+      wrapper = createWrapper({ data: panel });
+      expect(wrapper.vm.goToLogsLocked).toBe(true);
+      expect(wrapper.vm.goToLogsLockedReason).toBeTruthy();
+    });
+
+    it("go to logs shows as a disabled, focusable menu item with the reason as description", async () => {
+      (store.state as any).zoConfig.features = { logs: "locked" };
+      wrapper = createWrapper(
+        { data: mockPanelData },
+        {
+          ODropdown: {
+            name: "ODropdown",
+            template: '<div><slot name="trigger" /><slot /></div>',
+          },
+          ODropdownItem: {
+            name: "ODropdownItem",
+            props: {
+              disabled: Boolean,
+              focusableUnavailable: Boolean,
+              iconLeft: String,
+              description: String,
+            },
+            template: "<div><slot /></div>",
+          },
+        },
+      );
+      wrapper.vm.metaData = { queries: [{}] };
+      await flushPromises();
+      const item = wrapper
+        .findAllComponents({ name: "ODropdownItem" })
+        .find((c: any) => c.attributes("data-test") === "dashboard-move-to-logs-module");
+      expect(item?.props("disabled")).toBe(true);
+      expect(item?.props("focusableUnavailable")).toBe(true);
+      expect(item?.props("iconLeft")).toBe("lock");
+      expect(item?.props("description")).toBe(wrapper.vm.goToLogsLockedReason);
+    });
+
+    it("go to logs stays live while another signal is locked or the stream type is free", () => {
+      (store.state as any).zoConfig.features = { traces: "locked" };
+      wrapper = createWrapper({ data: mockPanelData });
+      expect(wrapper.vm.goToLogsLocked).toBe(false);
+      wrapper.unmount();
+      (store.state as any).zoConfig.features = { logs: "locked" };
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queries: [{ ...mockPanelData.queries[0], fields: { stream_type: "enrichment_tables" } }],
+        },
+      });
+      expect(wrapper.vm.goToLogsLocked).toBe(false);
     });
 
     it("should show go to logs option only for SQL queries", () => {
@@ -2873,6 +2993,55 @@ describe("PanelContainer", () => {
       wrapper = createWrapper({ data: { ...mockPanelData, type } }, timeSeriesRenderer);
       await flushPromises();
       expect(wrapper.find(button).exists()).toBe(shown);
+    });
+  });
+
+  describe("Explore actions", () => {
+    const menuStubs = {
+      ODropdown: {
+        name: "ODropdown",
+        template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
+      },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template:
+          '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
+      },
+    };
+    const trigger = '[data-test="panel-explore-actions-btn"]';
+
+    it("shows the explore menu only with viewOnly and exploreActions", () => {
+      wrapper = createWrapper({ viewOnly: true, exploreActions: true }, menuStubs);
+      expect(wrapper.find(trigger).exists()).toBe(true);
+    });
+
+    it.each([
+      [{ viewOnly: false, exploreActions: true }],
+      [{ viewOnly: true, exploreActions: false }],
+      [{ viewOnly: true }],
+    ])("hides the explore menu for %o", (props) => {
+      wrapper = createWrapper(props, menuStubs);
+      expect(wrapper.find(trigger).exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-explore-create-alert"]').exists()).toBe(false);
+    });
+
+    it("never shows next to the panel's own menu", () => {
+      wrapper = createWrapper({ viewOnly: false, exploreActions: true }, menuStubs);
+      expect(wrapper.find('[data-test="dashboard-edit-panel"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-explore-add-to-dashboard"]').exists()).toBe(false);
+    });
+
+    it("emits exploreCreateAlert with the panel schema", async () => {
+      wrapper = createWrapper({ viewOnly: true, exploreActions: true }, menuStubs);
+      await wrapper.find('[data-test="panel-explore-create-alert"]').trigger("click");
+      expect(wrapper.emitted("exploreCreateAlert")).toEqual([[mockPanelData]]);
+    });
+
+    it("emits exploreAddToDashboard with the panel schema", async () => {
+      wrapper = createWrapper({ viewOnly: true, exploreActions: true }, menuStubs);
+      await wrapper.find('[data-test="panel-explore-add-to-dashboard"]').trigger("click");
+      expect(wrapper.emitted("exploreAddToDashboard")).toEqual([[mockPanelData]]);
     });
   });
 });

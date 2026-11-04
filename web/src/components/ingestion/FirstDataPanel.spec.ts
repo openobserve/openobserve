@@ -19,6 +19,7 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createMemoryHistory, createRouter } from "vue-router";
 import i18n from "@/locales";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamKeys } from "@/services/stream.querykeys";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -178,7 +179,9 @@ const mountPanel = async (
   return wrapper;
 };
 const q = (id: string) => wrapper.find(`[data-test="${id}"]`);
-const seedLists = (lists: Partial<Record<"logs" | "metrics" | "traces", unknown[]>>) => {
+const seedLists = (
+  lists: Partial<Record<"logs" | "metrics" | "traces" | "profiles", unknown[]>>,
+) => {
   for (const [type, list] of Object.entries(lists)) {
     queryClient.setQueryData(streamKeys.nameList(ORG, type), list);
   }
@@ -225,7 +228,7 @@ describe("FirstDataPanel — flag off", () => {
 
   it("draws no compact card", async () => {
     window.localStorage.setItem(PICK_KEY, "kubernetes");
-    seedLists({ logs: [], metrics: [], traces: [] });
+    seedLists({ logs: [], metrics: [], traces: [], profiles: [] });
     await mountPanel({ signal: "any", variant: "compact" }, { flag: false, at: "home" });
     expect(wrapper.html()).not.toContain("first-data-panel");
     expect(watchArgs).not.toHaveBeenCalled();
@@ -372,7 +375,12 @@ describe("FirstDataPanel — no pick or a pick of another signal", () => {
 describe("FirstDataPanel — compact card on Dashboards and Home", () => {
   it("shows the pick, the pill, Copy command and Open the guide on an empty org", async () => {
     window.localStorage.setItem(PICK_KEY, "kubernetes");
-    seedLists({ logs: [{ name: "usage", stream_type: "logs" }], metrics: [], traces: [] });
+    seedLists({
+      logs: [{ name: "usage", stream_type: "logs" }],
+      metrics: [],
+      traces: [],
+      profiles: [],
+    });
     await mountPanel({ signal: "any", variant: "compact" }, { at: "dashboards" });
 
     const panel = q("first-data-panel");
@@ -395,7 +403,7 @@ describe("FirstDataPanel — compact card on Dashboards and Home", () => {
 
   it("titles the card with the org name, not its identifier", async () => {
     window.localStorage.setItem(PICK_KEY, "kubernetes");
-    seedLists({ logs: [], metrics: [], traces: [] });
+    seedLists({ logs: [], metrics: [], traces: [], profiles: [] });
     await mountPanel(
       { signal: "any", variant: "compact" },
       { at: "dashboards", orgName: "Acme Production" },
@@ -406,7 +414,7 @@ describe("FirstDataPanel — compact card on Dashboards and Home", () => {
 
   it("names the org from the org list when the selection has no label", async () => {
     window.localStorage.setItem(PICK_KEY, "kubernetes");
-    seedLists({ logs: [], metrics: [], traces: [] });
+    seedLists({ logs: [], metrics: [], traces: [], profiles: [] });
     await mountPanel({ signal: "any", variant: "compact" }, { at: "dashboards" });
     store.state.organizations = [{ identifier: ORG, name: "Acme Production" }];
     await flushPromises();
@@ -415,7 +423,7 @@ describe("FirstDataPanel — compact card on Dashboards and Home", () => {
 
   it("speaks for the Home tab it stands in for, the command line in its own span", async () => {
     window.localStorage.setItem(PICK_KEY, "kubernetes");
-    seedLists({ logs: [], metrics: [], traces: [] });
+    seedLists({ logs: [], metrics: [], traces: [], profiles: [] });
     await mountPanel({ signal: "any", variant: "compact", context: "overview" }, { at: "home" });
     const spans = q("first-data-panel-compact-text").findAll("span");
     expect(spans.map((sp) => sp.text())).toEqual([
@@ -434,14 +442,19 @@ describe("FirstDataPanel — compact card on Dashboards and Home", () => {
     expect(q("first-data-panel").exists()).toBe(false);
     expect(watchArgs).not.toHaveBeenCalled();
 
-    seedLists({ logs: [{ name: "app", stream_type: "logs" }], metrics: [], traces: [] });
+    seedLists({
+      logs: [{ name: "app", stream_type: "logs" }],
+      metrics: [],
+      traces: [],
+      profiles: [],
+    });
     await flushPromises();
     expect(q("first-data-panel").exists()).toBe(false);
   });
 
   it("stays hidden once the org has data", async () => {
     window.localStorage.setItem(PICK_KEY, "kubernetes");
-    seedLists({ logs: [], metrics: [], traces: [] });
+    seedLists({ logs: [], metrics: [], traces: [], profiles: [] });
     await mountPanel({ signal: "any", variant: "compact" }, { at: "home", ingested: true });
     expect(q("first-data-panel").exists()).toBe(false);
   });
@@ -527,14 +540,14 @@ describe("FirstDataPanel — Home layouts", () => {
     expect(layout()).toBe("pending");
     expect(watchArgs).not.toHaveBeenCalled();
 
-    seedLists({ logs: [], metrics: [], traces: [] });
+    seedLists({ logs: [], metrics: [], traces: [], profiles: [] });
     await flushPromises();
     expect(layout()).toBe("status");
   });
 
   it("keeps the card and its watcher while the watcher's list refresh shows the stream it is confirming", async () => {
     window.localStorage.setItem(PICK_KEY, "kubernetes");
-    seedLists({ logs: [], metrics: [], traces: [] });
+    seedLists({ logs: [], metrics: [], traces: [], profiles: [] });
     await mountPanel(homeProps, { at: "home", slot: layoutOf });
     expect(layout()).toBe("card");
 
@@ -548,7 +561,7 @@ describe("FirstDataPanel — Home layouts", () => {
     vi.useFakeTimers();
     try {
       window.localStorage.setItem(PICK_KEY, "kubernetes");
-      seedLists({ logs: [], metrics: [], traces: [] });
+      seedLists({ logs: [], metrics: [], traces: [], profiles: [] });
       await mountPanel(homeProps, { at: "home", slot: layoutOf });
       store.state.organizationData.isDataIngested = true;
       await flushPromises();
@@ -575,7 +588,7 @@ describe("FirstDataPanel — Home layouts", () => {
     vi.useFakeTimers();
     try {
       window.localStorage.setItem(PICK_KEY, "kubernetes");
-      seedLists({ logs: [], metrics: [], traces: [] });
+      seedLists({ logs: [], metrics: [], traces: [], profiles: [] });
       await mountPanel(homeProps, { at: "home", slot: layoutOf });
       store.state.organizationData.isDataIngested = true;
       await flushPromises();
@@ -590,7 +603,12 @@ describe("FirstDataPanel — Home layouts", () => {
 
   it("lets an org with data mount its own view once the lists arrive", async () => {
     await mountPanel(homeProps, { at: "home", slot: layoutOf });
-    seedLists({ logs: [{ name: "app", stream_type: "logs" }], metrics: [], traces: [] });
+    seedLists({
+      logs: [{ name: "app", stream_type: "logs" }],
+      metrics: [],
+      traces: [],
+      profiles: [],
+    });
     await flushPromises();
     expect(layout()).toBe("none");
   });
@@ -602,7 +620,7 @@ describe("FirstDataPanel — Home layouts", () => {
     "keeps the empty state and the pill when a list failed for another reason, with %s",
     async (_label, pickId, expected) => {
       if (pickId) window.localStorage.setItem(PICK_KEY, pickId);
-      for (const type of ["logs", "metrics", "traces"]) await failList(type, 500);
+      for (const type of ["logs", "metrics", "traces", "profiles"]) await failList(type, 500);
       await mountPanel(homeProps, { at: "home", slot: layoutOf });
       expect(layout()).toBe(expected);
       expect(q("first-event-status").exists()).toBe(true);
@@ -618,7 +636,7 @@ describe("FirstDataPanel — Home layouts", () => {
 
   it("hands a no-pick status line laid out for a hero", async () => {
     window.localStorage.setItem(PICK_KEY, "unsure");
-    seedLists({ logs: [], metrics: [], traces: [] });
+    seedLists({ logs: [], metrics: [], traces: [], profiles: [] });
     await mountPanel(homeProps, { at: "home", slot: layoutOf });
     expect(layout()).toBe("status");
     expect(q("first-data-panel").classes()).toContain("justify-center");
@@ -626,7 +644,7 @@ describe("FirstDataPanel — Home layouts", () => {
 
   it("reports card when it draws the compact card above the page", async () => {
     window.localStorage.setItem(PICK_KEY, "kubernetes");
-    seedLists({ logs: [], metrics: [], traces: [] });
+    seedLists({ logs: [], metrics: [], traces: [], profiles: [] });
     await mountPanel(homeProps, { at: "home", slot: layoutOf });
     expect(layout()).toBe("card");
     expect(q("first-data-panel").attributes("data-variant")).toBe("compact");
@@ -662,7 +680,7 @@ describe("FirstDataPanel — the org credential, loaded where the snippet is", (
   it("loads the credential itself on Home and copies the org token, not an empty password", async () => {
     credentialApi.list_org_ingestion_tokens.mockResolvedValue({ data: { data: [tokenRow] } });
     window.localStorage.setItem(PICK_KEY, "kubernetes");
-    seedLists({ logs: [], metrics: [], traces: [] });
+    seedLists({ logs: [], metrics: [], traces: [], profiles: [] });
     await mountPanel(
       { signal: "any", variant: "compact", context: "overview" },
       { at: "home", passcode: "" },
@@ -687,7 +705,7 @@ describe("FirstDataPanel — the org credential, loaded where the snippet is", (
   it("offers no command while the credential is unknown, so nothing empty is copied", async () => {
     credentialApi.get_organization_passcode.mockReturnValue(new Promise(() => {}));
     window.localStorage.setItem(PICK_KEY, "kubernetes");
-    seedLists({ logs: [], metrics: [], traces: [] });
+    seedLists({ logs: [], metrics: [], traces: [], profiles: [] });
     await mountPanel({ signal: "any", variant: "compact" }, { at: "dashboards", passcode: "" });
     expect(q("first-data-panel").exists()).toBe(true);
     expect(q("first-data-panel-copy-btn").exists()).toBe(false);
@@ -724,6 +742,21 @@ describe("FirstDataPanel — first data arrived strip (e5)", () => {
     expect(open.text()).toBe("Open in Logs");
     await open.trigger("click");
     expect(wrapper.emitted("open")).toHaveLength(1);
+  });
+
+  it("disables Open in Logs with a lock while the logs license is locked", async () => {
+    await mountPanel({
+      signal: "any",
+      variant: "compact",
+      arrived: { streamName: "default", streamType: "logs", count: 1, rangeStart: 0, rangeEnd: 1 },
+    });
+    store.state.zoConfig.features = { logs: "locked" };
+    await nextTick();
+    const open = q("first-data-panel-arrived-open-btn");
+    expect(open.attributes("disabled")).toBeDefined();
+    expect(open.findAllComponents(OIcon).map((i) => i.props("name"))).toContain("lock");
+    await open.trigger("click");
+    expect(wrapper.emitted("open")).toBeUndefined();
   });
 
   it("states the records and stream, and closes", async () => {

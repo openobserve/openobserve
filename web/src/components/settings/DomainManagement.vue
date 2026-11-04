@@ -145,14 +145,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Show More Button -->
                 <div class="mt-2 text-center">
-                  <OButton
-                    icon-right="open-in-new"
-                    variant="ghost-primary"
-                    size="sm"
-                    @click="viewAllErrors"
+                  <OTooltip
+                    :content="logsLock.lockedReason.value"
+                    :disabled="!logsLock.locked.value"
                   >
-                    {{ t("common.showMore") }}
-                  </OButton>
+                    <span class="inline-flex">
+                      <OButton
+                        :icon-left="logsLock.locked.value ? 'lock' : undefined"
+                        :icon-right="logsLock.locked.value ? undefined : 'open-in-new'"
+                        variant="ghost-primary"
+                        size="sm"
+                        :disabled="logsLock.locked.value"
+                        data-test="domain-management-view-all-errors"
+                        @click="viewAllErrors"
+                      >
+                        {{ t("common.showMore") }}
+                      </OButton>
+                    </span>
+                  </OTooltip>
                 </div>
               </div>
             </div>
@@ -191,6 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OFormInput
               data-test="domain-management-new-domain-input"
               name="newDomain"
+              :aria-label="t('settings.addDomain')"
               class="domain-input"
               :placeholder="t('settings.domainPlaceholder', { example: raw('example.com') })"
             />
@@ -307,6 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OFormInput
                       :data-test="`domain-management-allow-email-input-${domain.name}`"
                       name="newEmail"
+                      :aria-label="t('settings.emailPlaceholder', { domain: '@' + domain.name })"
                       class="email-input min-w-62.5"
                     />
                     <OButton
@@ -357,6 +369,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OFormInput
                       :data-test="`domain-management-block-email-input-${domain.name}`"
                       name="newEmail"
+                      :aria-label="
+                        t('settings.blockedEmailPlaceholder', { domain: '@' + domain.name })
+                      "
                       class="email-input min-w-62.5"
                     />
                     <OButton
@@ -507,6 +522,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -559,6 +575,7 @@ const pendingRemoveEmail = ref<{
 const shownRemoveEmail = ref({ email: "", blocked: false });
 const store = useStore();
 const router = useRouter();
+const logsLock = useLicenseLock("logs");
 
 // Domain settings live on the meta org, not the selected one.
 const updateMetaOrgSettings = useMutation(() =>

@@ -179,13 +179,25 @@
                 </div>
               </div>
 
-              <div>
+              <div class="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
                 <OFormInput
                   name="model"
                   :label="t('onlineEvals.scorer.modelLabel')"
                   :placeholder="t('onlineEvals.scorer.modelPlaceholder')"
                   size="sm"
                   data-test="scorer-form-model-input"
+                />
+                <OFormInput
+                  name="temperature"
+                  :label="t('onlineEvals.scorer.temperatureLabel')"
+                  :placeholder="t('onlineEvals.scorer.temperaturePlaceholder')"
+                  :help-text="t('onlineEvals.scorer.temperatureHelp')"
+                  type="number"
+                  size="sm"
+                  :min="0"
+                  :max="2"
+                  step="0.1"
+                  data-test="scorer-form-temperature-input"
                 />
               </div>
 
@@ -713,6 +725,8 @@ import { makeScorerFormSchema, type ScorerForm } from "./ScorerFormPage.schema";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import { leavesEvalForm } from "../utils/routeSync";
+import { saveScorerMutation } from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 
 const props = defineProps<{
   orgId: string;
@@ -735,6 +749,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const saveScorer = useMutation(() => saveScorerMutation(props.orgId));
 
 // Co-located Zod schema (factory keeps messages i18n-driven). The form is
 // mounted fresh for each create/edit action, so building it once is safe.
@@ -802,6 +817,7 @@ function buildScorerTestPayload() {
         params: {
           provider_id: formValues.value.providerId,
           ...(formValues.value.model.trim() ? { model: formValues.value.model.trim() } : {}),
+          ...temperatureParam(formValues.value.temperature),
           include_reasoning: formValues.value.includeReasoning,
           ...(cleanedExtraFields.value.length
             ? { extra_metadata_fields: cleanedExtraFields.value }
@@ -1183,6 +1199,12 @@ function readCustomHeaders(rawHeaders: any): CustomHeader[] {
     .map((h) => ({ key: String(h.key || ""), value: String(h.value || "") }));
 }
 
+/** `{ temperature }` when the field holds a number, else nothing (judge default). */
+function temperatureParam(raw: string | number | undefined): { temperature?: number } {
+  const text = String(raw ?? "").trim();
+  return text ? { temperature: Number(text) } : {};
+}
+
 function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
   if (!row) {
     return {
@@ -1194,6 +1216,7 @@ function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
       pinScoreConfigVersion: false,
       providerId: "",
       model: "",
+      temperature: "",
       remoteEndpoint: "",
       template: "Evaluate {{ input }} and {{ output }}.",
       includeReasoning: true,
@@ -1231,6 +1254,7 @@ function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
     ),
     providerId: String(row.params?.provider_id || ""),
     model: String(row.params?.model || ""),
+    temperature: typeof row.params?.temperature === "number" ? String(row.params.temperature) : "",
     remoteEndpoint: String(row.params?.endpoint || ""),
     template: row.template || "",
     includeReasoning: row.params?.include_reasoning !== false,
@@ -1313,6 +1337,7 @@ async function save(value: ScorerForm) {
           params: {
             provider_id: value.providerId,
             ...(value.model.trim() ? { model: value.model.trim() } : {}),
+            ...temperatureParam(value.temperature),
             include_reasoning: value.includeReasoning,
             ...(extraFields.length ? { extra_metadata_fields: extraFields } : {}),
           },
@@ -1324,19 +1349,14 @@ async function save(value: ScorerForm) {
           params: buildRemoteParams(value),
         };
 
-    if (props.mode === "edit" && props.row) {
-      await onlineEvalsService.scorers.update(props.orgId, entityId(props.row), {
+    await saveScorer.mutateAsync({
+      id: props.mode === "edit" && props.row ? entityId(props.row) : undefined,
+      payload: {
         name: value.name.trim(),
         description: value.description?.trim() || null,
         scorer: scorerPayload,
-      });
-    } else {
-      await onlineEvalsService.scorers.create(props.orgId, {
-        name: value.name.trim(),
-        description: value.description?.trim() || null,
-        scorer: scorerPayload,
-      });
-    }
+      },
+    });
     toast({
       variant: "success",
       message: t("onlineEvals.saved", { label: t("onlineEvals.singular.scorers") }),

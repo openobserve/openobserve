@@ -304,11 +304,12 @@ describe("AssociatedStreamFunction", () => {
   });
 
   describe("Stream Data Mapping", () => {
-    it("should filter out enrichment_tables streams", async () => {
+    it("should filter out enrichment_tables and profiles streams", async () => {
       mockGetStreams.mockResolvedValue({
         list: [
           { name: "stream1", stream_type: "logs", stats: null },
           { name: "enrich_table", stream_type: "enrichment_tables", stats: null },
+          { name: "prof1", stream_type: "profiles", stats: null },
         ],
       });
 
@@ -319,8 +320,7 @@ describe("AssociatedStreamFunction", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      expect(vm.logStream.every((s: any) => s.stream_type !== "enrichment_tables")).toBe(true);
-      expect(vm.logStream).toHaveLength(1);
+      expect(vm.logStream.map((s: any) => s.name)).toEqual(["stream1"]);
     });
 
     it("should map stream stats correctly when stats exist", async () => {

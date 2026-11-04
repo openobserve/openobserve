@@ -241,6 +241,15 @@ describe("FleetRollouts", () => {
     expect(fleet.rollbackRollout).toHaveBeenCalledWith(org(), "r3");
   });
 
+  it("says a fleet with no stable version stops collecting when it rolls back", async () => {
+    vi.mocked(fleet.rollbackRollout).mockResolvedValue({ data: halted } as any);
+    vi.mocked(fleet.listFleets).mockResolvedValue({ data: { total: 0, items: [] } } as any);
+    wrapper = await mountDrawer("r3");
+    await wrapper.find('[data-test="fleet-rollout-outcome-rollback"]').trigger("click");
+    await settle();
+    expect(confirmMock.mock.calls[0][0].message).toContain("no stable version");
+  });
+
   it("skips exactly the failing members after a confirmation", async () => {
     vi.mocked(fleet.skipRollout).mockResolvedValue({ data: halted } as any);
     wrapper = await mountDrawer("r3");
@@ -318,6 +327,28 @@ describe("FleetRollouts", () => {
       "No collectors targeted",
     );
     expect(wrapper.find('[data-test="fleet-rollout-phases-r0"]').exists()).toBe(false);
+  });
+
+  it("says a waiting rollout sent nothing and offers only rollback", async () => {
+    const waiting = apiRollout({
+      id: "r8",
+      fleet: F1,
+      status: "waiting",
+      halt: null,
+      total: 0,
+      running: 0,
+      phases: [],
+      members: [],
+    });
+    vi.mocked(fleet.getRollout).mockResolvedValue({ data: waiting } as any);
+    vi.mocked(fleet.rollbackRollout).mockResolvedValue({ data: waiting } as any);
+    wrapper = await mountDrawer("r8");
+    expect(wrapper.find('[data-test="fleet-rollout-outcome-title"]').text()).toBe("Waiting");
+    expect(wrapper.find('[data-test="fleet-rollout-phases-r8"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="fleet-rollout-outcome-resume"]').exists()).toBe(false);
+    await wrapper.find('[data-test="fleet-rollout-outcome-rollback"]').trigger("click");
+    await settle();
+    expect(fleet.rollbackRollout).toHaveBeenCalledWith(org(), "r8");
   });
 
   it("says when a scheduled rollout starts", async () => {

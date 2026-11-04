@@ -5,7 +5,7 @@ name: AI Code Review
 on:
   pull_request_target:
     branches: [main]
-    # unlabeled/converted_to_draft start a run that only cancels the one in progress (see concurrency).
+    # unlabeled and converted_to_draft never review: their run exists only to cancel the one in progress (see concurrency).
     types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review, converted_to_draft]
   workflow_dispatch:
     inputs:
@@ -31,18 +31,20 @@ on:
 
 permissions: {}
 
-# Workflow-level so a run whose job is skipped still cancels the paid one; unrelated label edits get a private group.
+# Workflow-level so an unlabeled or draft run, whose job is always skipped, still cancels the paid one; pushes queue so a paid run finishes; unrelated label edits and off-main dispatches, whose job always skips, get a private group and cancel nothing.
 concurrency:
-  group: ai-review-${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && github.event.label.name != 'ready-for-ci') && github.run_id || github.event.pull_request.number || inputs.pr_number }}
-  cancel-in-progress: true
+  group: ai-review-${{ ((contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && github.event.label.name != 'ready-for-ci') || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')) && github.run_id || github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: ${{ contains(fromJSON('["unlabeled","converted_to_draft"]'), github.event.action) }}
 
 jobs:
   review:
     # Paid CI runs only on non-draft 'ready-for-ci' PRs, and never when vars.AI_REVIEW_ENABLED is 'false' (the kill switch).
+    # A dispatch from any other ref would run that ref's engine next to the review secrets.
     if: >-
-      ${{ vars.AI_REVIEW_ENABLED != 'false' && (github.event_name == 'workflow_dispatch' || (
+      ${{ vars.AI_REVIEW_ENABLED != 'false' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (
         contains(github.event.pull_request.labels.*.name, 'ready-for-ci') &&
         github.event.pull_request.draft == false &&
+        github.event.action != 'unlabeled' &&
         (github.event.action != 'labeled' || github.event.label.name == 'ready-for-ci')
       )) }}
     # Explicit name: without it GitHub serializes the whole matrix object (api_key_env, marker) into the public check name.
@@ -63,14 +65,13 @@ jobs:
         # provider? Give it a distinct `<!-- ai-code-review-<suffix> -->` marker — run-review.mjs
         # matches that shape, so two legs sharing one marker overwrite each other's comment.
         provider:
-          - name: deepseek
-            provider_id: deepseek-review
-            model_id: deepseek-flash
-            model_variant: max
-            api_key_env: DEEPSEEK_API_KEY
+          - name: anthropic
+            provider_id: anthropic-review
+            model_id: claude-sonnet-5-5
+            api_key_env: ANTHROPIC_REVIEW_API_KEY
             marker: "<!-- ai-code-review -->"
     steps:
-      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      # Debounce: lets a burst of pushes land so Resolve PR picks up the newest head.
       - if: github.event_name == 'pull_request_target'
         run: sleep 60
 
@@ -107,6 +108,11 @@ jobs:
           fi
           merge_base="$(gh api "repos/$REPO/compare/$base_sha...$head_sha" --jq '.merge_base_commit.sha' || true)"
           echo "merge_base=$merge_base" >> "$GITHUB_OUTPUT"
+          {
+            echo "author=$(jq -r '.user.login // ""' <<<"$pr_json")"
+            echo "changed_files=$(jq -r '.changed_files // ""' <<<"$pr_json")"
+            echo "commit_count=$(jq -r '.commits // ""' <<<"$pr_json")"
+          } >> "$GITHUB_OUTPUT"
           echo "REVIEW_RUN=true" >> "$GITHUB_ENV"
 
       # If minting fails (app not installed, bad key) the steps below fall back to github.token.
@@ -120,7 +126,7 @@ jobs:
           app-id: ${{ vars.OO_REVIEWER_APP_ID }}
           private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
 
-      # Without it (app not installed on o2-enterprise, or no actions:write) the pairing check is skipped and the PR is reviewed here.
+      # Without it (app not installed on o2-enterprise, or no actions:write) the PR is reviewed here.
       - name: Generate app token for the paired o2-enterprise lookup
         id: ent_token
         if: env.REVIEW_RUN == 'true' && vars.OO_REVIEWER_APP_ID != '' && !inputs.ignore_paired
@@ -147,6 +153,37 @@ jobs:
             .claude/skills/ui-architect
             .claude/skills/eslint-error-handling
 
+      # Bills nothing and posts nothing; a hand-started run, a failed listing or a failed check always reviews.
+      - name: Skip PRs with nothing to review
+        if: env.REVIEW_RUN == 'true' && github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PR_AUTHOR: ${{ steps.pr.outputs.author }}
+          # The listings are checked against these, as both endpoints stop at a cap however far they are paged.
+          EXPECTED_FILES: ${{ steps.pr.outputs.changed_files }}
+          EXPECTED_COMMITS: ${{ steps.pr.outputs.commit_count }}
+        run: |
+          set -uo pipefail
+          list="$RUNNER_TEMP/pr-files.tsv"
+          commits="$RUNNER_TEMP/pr-commits.tsv"
+          # One line per file with its rename source, so code moved under docs/ is not taken for docs and the count can be checked.
+          if ! gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" --jq '.[] | [.filename, (.previous_filename // "")] | @tsv' > "$list"; then
+            echo "::warning::Could not list the PR's files; reviewing."
+            : > "$list"
+          fi
+          # One line per commit: author login, committer login, signature verified; a missing field lists as empty and reviews.
+          if ! gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits?per_page=100" --jq '.[] | [(.author.login // ""), (.committer.login // ""), ((.commit.verification.verified // "") | tostring)] | @tsv' > "$commits"; then
+            echo "::warning::Could not list the PR's commits; reviewing."
+            : > "$commits"
+          fi
+          reason="$(node engine/scripts/ai-review/skip-check.mjs "$list" "$commits")" || reason=""
+          if [ -n "$reason" ]; then
+            echo "::notice::PR #$PR_NUMBER needs no review ($reason); skipped."
+            echo "REVIEW_RUN=false" >> "$GITHUB_ENV"
+          fi
+
       # Paired OSS+ENT changes are reviewed once, by the o2-enterprise workflow, which pulls this PR's diff in.
       - name: Defer to a paired o2-enterprise PR
         if: env.REVIEW_RUN == 'true' && !inputs.ignore_paired
@@ -159,29 +196,34 @@ jobs:
           BRANCH: ${{ steps.pr.outputs.head_ref }}
           MARKER: ${{ matrix.provider.marker }}
           IGNORE_PASS_LIMIT: ${{ inputs.ignore_pass_limit || 'false' }}
+          FORCE_REVIEW: ${{ inputs.force_full || 'false' }}
         run: |
           set -uo pipefail
-          if [ -z "$ENT_TOKEN" ]; then
-            echo "::warning::No app token for o2-enterprise; cannot look for a paired PR, reviewing here."
+          # An old pointer cannot prove the paired PR is still open, so only a successful lookup may skip the review.
+          review_here() {
+            echo "::warning::$1; reviewing here."
             exit 0
+          }
+          if [ -z "$ENT_TOKEN" ]; then
+            review_here "No app token for o2-enterprise, so no paired PR lookup"
           fi
           ent_repo=openobserve/o2-enterprise
           # Any lookup error falls back to reviewing here: a missed pairing costs a duplicate review, a failed step costs the review.
-          if ! ent_json="$(GH_TOKEN="$ENT_TOKEN" gh pr list --repo "$ent_repo" --head "$BRANCH" --state open \
-            --json number,isCrossRepository,isDraft,labels \
-            --jq '[.[] | select(.isCrossRepository == false)][0] // {}')"; then
-            echo "::warning::Could not look up a paired $ent_repo PR; reviewing here."
-            exit 0
+          if ! ent_json="$(GH_TOKEN="$ENT_TOKEN" gh api -X GET "repos/$ent_repo/pulls" -f state=open -f head="${ent_repo%%/*}:$BRANCH" \
+            --jq "[.[] | select(.head.repo.full_name == \"$ent_repo\")][0] // {} | {number, isDraft: .draft, labels}")"; then
+            review_here "Could not look up a paired $ent_repo PR"
           fi
           ent_pr="$(jq -r '.number // ""' <<<"$ent_json")"
           if [ -z "$ent_pr" ]; then
             echo "No open $ent_repo PR on branch '$BRANCH'; reviewing here."
+            echo "REVIEW_PAIR_CLEAR=true" >> "$GITHUB_ENV"
             exit 0
           fi
           ent_ready="$(jq -r '(.isDraft | not) and ([.labels[].name] | index("ready-for-ci") != null)' <<<"$ent_json")"
           if [ "$ent_ready" = "true" ]; then
             bypass=()
             if [ "$IGNORE_PASS_LIMIT" = "true" ]; then bypass=(-f ignore_pass_limit=true); fi
+            if [ "$FORCE_REVIEW" = "true" ]; then bypass+=(-f force_full=true); fi
             if ! GH_TOKEN="$ENT_TOKEN" gh workflow run ai-code-review.yml --repo "$ent_repo" --ref main -f pr_number="$ent_pr" "${bypass[@]}"; then
               echo "::warning::Could not dispatch the $ent_repo review; reviewing here."
               exit 0
@@ -284,15 +326,17 @@ jobs:
           FORCE_FULL: ${{ inputs.force_full || 'false' }}
           REVIEW_PROVIDER_ID: ${{ matrix.provider.provider_id }}
           REVIEW_MODEL_ID: ${{ matrix.provider.model_id }}
-          REVIEW_MODEL_VARIANT: ${{ matrix.provider.model_variant }}
+          # The effort is set here only, so the variable is the single source; each value must be a variant in opencode.ci.jsonc.
+          REVIEW_MODEL_VARIANT: ${{ vars.AI_REVIEW_EFFORT || 'high' }}
+          REVIEW_COORDINATOR_VARIANT: ${{ vars.AI_REVIEW_COORDINATOR_EFFORT || vars.AI_REVIEW_EFFORT || 'high' }}
           REVIEW_API_KEY_ENV: ${{ matrix.provider.api_key_env }}
           REVIEW_MARKER: ${{ matrix.provider.marker }}
-          # opencode.ci.jsonc: every tool (shell, edit, webfetch) allowed with no prompts; "default" is the read-only opencode.jsonc.
+          # opencode.ci.jsonc: file tools plus a read-only shell allowlist, no web or sub-agent tools, no prompts; "default" is the read-only opencode.jsonc.
           REVIEW_OPENCODE_CONFIG: ci-full
           # Empty under the github.token fallback: any workflow a same-repo PR adds can also post as github-actions[bot].
           REVIEW_BOT_LOGIN: ${{ steps.app_token.outputs.token && format('{0}[bot]', steps.app_token.outputs.app-slug) || '' }}
-          # Review-only key held in the ai-review environment (the org-wide key is readable by any same-repo PR workflow).
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # A name no bundled opencode provider reads (they default to ANTHROPIC_API_KEY), so only anthropic-review gets the key.
+          ANTHROPIC_REVIEW_API_KEY: ${{ secrets.USAGE_CREDIT_API_KEY }}
           O2_TRACE_INGEST_URL: ${{ secrets.O2_TRACE_INGEST_URL }}
           O2_TRACE_ORG: ${{ secrets.O2_TRACE_ORG }}
           O2_TRACE_USERNAME: ${{ secrets.O2_TRACE_USERNAME }}
@@ -303,9 +347,17 @@ jobs:
           O2_TRACE_EXPORT_BATCH_SIZE: ${{ vars.O2_TRACE_EXPORT_BATCH_SIZE }}
           # Set the variable to 'true' to also post inline threads; the summary comment always posts.
           REVIEW_INLINE: ${{ vars.AI_REVIEW_INLINE || 'false' }}
-          # Automatic reviews per PR (engine default 2); the manual input lifts the cap for one run.
+          # Optional ceiling on automatic reviews per PR; unset means no cap, so each new commit gets one review. The manual input bypasses it for one run.
           REVIEW_MAX_PASSES: ${{ vars.AI_REVIEW_MAX_PASSES }}
           REVIEW_IGNORE_PASS_LIMIT: ${{ inputs.ignore_pass_limit || 'false' }}
+          # A hand-started run reviews even a diff the last review already read.
+          REVIEW_MANUAL_RUN: ${{ github.event_name == 'workflow_dispatch' }}
+          # Independent reviewer sessions per area (1-3), merged by the coordinator; one cold pass misses findings a second catches.
+          REVIEW_COLD_PASSES: ${{ vars.AI_REVIEW_COLD_PASSES || '2' }}
+          # An unknown value means off, so a typo can never start approving.
+          REVIEW_AUTO_APPROVE: ${{ vars.AI_REVIEW_AUTO_APPROVE || 'shadow' }}
+          # Set only when the lookup proved no paired PR is open, so a failed or skipped lookup can never approve.
+          REVIEW_PAIR_CLEAR: ${{ env.REVIEW_PAIR_CLEAR }}
           REVIEW_ARTIFACT_DIR: ${{ runner.temp }}/ai-review-findings
         run: node engine/scripts/ai-review/run-review.mjs
 

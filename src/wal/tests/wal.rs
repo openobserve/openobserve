@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    sync::mpsc,
     thread::sleep,
     time::{Duration, Instant},
 };
@@ -120,60 +121,53 @@ fn test_metadata() {
 
 #[test]
 fn test_realtime_write_and_read() {
-    let entry_num = 10;
+    let entry_num = 50;
+    let pause_at = entry_num / 2;
     let dir = tempdir().unwrap();
     let dir = dir.path();
     let mut header = wal::FileHeader::new();
     header.insert("key1".into(), "value1".into());
     header.insert("key2".into(), "value2".into());
     let path = build_file_path(dir, "org", "stream", "1".to_string());
-    let (mut writer, _) = Writer::new(path, 0, 8 * 1024, Some(header)).unwrap();
+    let (mut writer, header_len) = Writer::new(path, 0, 8 * 1024, Some(header)).unwrap();
 
-    std::thread::spawn(move || {
+    let (synced_tx, synced_rx) = mpsc::channel();
+    let (drained_tx, drained_rx) = mpsc::channel();
+    let write_thread = std::thread::spawn(move || {
         for i in 0..entry_num {
+            if i == pause_at {
+                drained_rx.recv().unwrap();
+            }
             let data = format!("hello world {i}");
             writer.write(data.as_bytes()).unwrap();
             writer.sync().unwrap();
-            println!(
-                "write data: {data}, pos:{:?}, file_path: {}",
-                writer.current_position(),
-                writer.path().display()
-            );
-            sleep(Duration::from_secs(1));
+            // Not current_position(): its seek flushes the buffer and would mask a broken sync().
+            let position = writer.size().0 + wal::WAL_FILE_HEADER_LEN + header_len;
+            synced_tx.send(position as u64).unwrap();
         }
         writer.close().unwrap();
     });
-
-    sleep(Duration::from_secs(1));
 
     let path = build_file_path(dir, "org", "stream", "1".to_string());
     let mut reader = Reader::from_path(path).unwrap();
     let header = reader.header();
     assert_eq!(header.get("key1"), Some(&"value1".to_string()));
     assert_eq!(header.get("key2"), Some(&"value2".to_string()));
-    println!("begin to read file:{}", reader.path().display());
-    loop {
-        sleep(Duration::from_secs(1));
-        match reader.read_entry() {
-            Ok(entry) => match entry {
-                Some(entry) => {
-                    println!(
-                        "read position: {:?}, data : {:?}",
-                        reader.current_position(),
-                        String::from_utf8(entry)
-                    );
-                }
-                None => {
-                    println!("read option none");
-                    break;
-                }
-            },
-            Err(e) => {
-                println!("read err : {e}");
-                break;
-            }
+
+    for i in 0..entry_num {
+        // A read racing an unfinished flush can see a torn entry, so only read what is synced.
+        let synced_position = synced_rx.recv().unwrap();
+        let entry = reader.read_entry().unwrap().unwrap();
+        assert_eq!(entry, format!("hello world {i}").as_bytes());
+        assert_eq!(reader.current_position().unwrap(), synced_position);
+        if i + 1 == pause_at {
+            assert!(reader.read_entry().unwrap().is_none());
+            drained_tx.send(()).unwrap();
         }
     }
+
+    write_thread.join().unwrap();
+    assert!(reader.read_entry().unwrap().is_none());
 }
 
 #[test]

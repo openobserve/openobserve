@@ -165,21 +165,10 @@ pub async fn get_trace_dag(
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql.to_string(),
-            from: 0,
             size: 10000, // Large enough for most traces
             start_time,
             end_time,
-            quick_mode: false,
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            streaming_output: false,
-            streaming_id: None,
-            histogram_interval: 0,
-            timezone: None,
+            ..Default::default()
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],

@@ -1,0 +1,108 @@
+[
+  {
+    "date": "2026-05-12T09:14:00.512Z",
+    "status": "info",
+    "message": "Checkout screen opened __MARKER__",
+    "service": "e2e-android-app",
+    "logger": {
+      "name": "checkout",
+      "thread_name": "main",
+      "version": "1.0.0"
+    },
+    "_o2": {
+      "device": {
+        "architecture": "arm64-v8a"
+      }
+    },
+    "usr": {
+      "id": "u-1001",
+      "name": "Test User",
+      "email": "test@example.com",
+      "anonymous_id": "anon-7f3c"
+    },
+    "network": {
+      "client": {
+        "connectivity": "wifi",
+        "signal_strength": "-52",
+        "downlink_kbps": "48000",
+        "uplink_kbps": "12000",
+        "sim_carrier": {
+          "id": "310",
+          "name": "ExampleCell"
+        }
+      }
+    },
+    "device": {
+      "type": "mobile",
+      "name": "Pixel 7",
+      "model": "Pixel 7",
+      "brand": "Google",
+      "architecture": "arm64-v8a"
+    },
+    "os": {
+      "name": "Android",
+      "version": "14",
+      "version_major": "14"
+    },
+    "build_version": "42",
+    "build_id": "b-20260512",
+    "o2tags": "env:staging,version:1.0.0,variant:debug,application_id:app-123",
+    "custom_attr": "value"
+  },
+  {
+    "date": "2026-05-12T09:14:01.512Z",
+    "status": "error",
+    "message": "Payment request failed: timeout __MARKER__",
+    "service": "e2e-android-app",
+    "logger": {
+      "name": "checkout",
+      "thread_name": "OkHttp Dispatcher",
+      "version": "1.0.0"
+    },
+    "_o2": {
+      "device": {
+        "architecture": "arm64-v8a"
+      }
+    },
+    "usr": {
+      "id": "u-1001",
+      "name": "Test User",
+      "email": "test@example.com",
+      "anonymous_id": "anon-7f3c"
+    },
+    "network": {
+      "client": {
+        "connectivity": "wifi",
+        "signal_strength": "-52",
+        "downlink_kbps": "48000",
+        "uplink_kbps": "12000",
+        "sim_carrier": {
+          "id": "310",
+          "name": "ExampleCell"
+        }
+      }
+    },
+    "device": {
+      "type": "mobile",
+      "name": "Pixel 7",
+      "model": "Pixel 7",
+      "brand": "Google",
+      "architecture": "arm64-v8a"
+    },
+    "os": {
+      "name": "Android",
+      "version": "14",
+      "version_major": "14"
+    },
+    "build_version": "42",
+    "build_id": "b-20260512",
+    "o2tags": "env:staging,version:1.0.0,variant:debug,application_id:app-123",
+    "error": {
+      "kind": "java.net.SocketTimeoutException",
+      "message": "timeout",
+      "stack": "java.net.SocketTimeoutException: timeout\n\tat okhttp3.internal.http2.Http2Stream.waitForIo(Http2Stream.kt:1)",
+      "source_type": "android"
+    },
+    "custom_attr": "value"
+  }
+]

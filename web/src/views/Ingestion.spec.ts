@@ -23,6 +23,7 @@ import organizationsService from "@/services/organizations";
 import apiKeysService from "@/services/api_keys";
 import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
+import { rumTokensQuery } from "@/services/api_keys.queries";
 import { createMemoryHistory, createRouter } from "vue-router";
 
 // Mock services with default resolved values
@@ -141,6 +142,7 @@ describe("Ingestion", () => {
       data: { data: { token: "default-token", passcode: "default-passcode" } },
     });
     store.state.organizationData.organizationPasscodeForbidden = false;
+    store.state.organizationData.rumTokenForbidden = false;
 
     try {
       wrapper = mount(Ingestion, {
@@ -477,7 +479,7 @@ describe("Ingestion", () => {
             ConfirmDialog: { template: "<div />" },
             OButton: { template: "<button><slot /></button>" },
             OTabs: { template: "<div><slot /></div>" },
-            ORouteTab: { template: "<div><slot /></div>" },
+            ORouteTab: { template: "<div class='route-tab-stub'><slot /></div>" },
             "router-view": { template: "<div />" },
           },
         },
@@ -540,7 +542,7 @@ describe("Ingestion", () => {
             ConfirmDialog: { template: "<div />" },
             OButton: { template: "<button><slot /></button>" },
             OTabs: { template: "<div><slot /></div>" },
-            ORouteTab: { template: "<div><slot /></div>" },
+            ORouteTab: { template: "<div class='route-tab-stub'><slot /></div>" },
             "router-view": { template: "<div />" },
           },
         },
@@ -843,6 +845,30 @@ describe("Ingestion", () => {
       expect(apiKeysService.listRUMTokens).toHaveBeenCalledWith("default");
       expect(dispatchSpy).toHaveBeenCalledWith("setRUMToken", mockResponse.data.data);
     });
+
+    it("drops a token read earlier once a later read is forbidden", async () => {
+      if (!wrapper) {
+        expect.fail("Component failed to mount");
+        return;
+      }
+      const orgData = wrapper.vm.store.state.organizationData;
+
+      apiKeysService.listRUMTokens.mockResolvedValue({ data: { data: { rum_token: "rum-old" } } });
+      queryClient.clear();
+      await wrapper.vm.getRUMToken();
+      expect(orgData.rumToken.rum_token).toBe("rum-old");
+
+      // the success above is still cached: the 403 is reached only if the read bypasses the cache
+      apiKeysService.listRUMTokens.mockRejectedValue({ response: { status: 403 } });
+      await wrapper.vm.getRUMToken();
+      expect(wrapper.vm.rumTokenForbidden).toBe(true);
+      expect(wrapper.vm.store.state.organizationData.rumToken.rum_token).toBe("");
+      expect(queryClient.getQueryData(rumTokensQuery("default").queryKey)).toBeUndefined();
+
+      apiKeysService.listRUMTokens.mockRejectedValue({ response: { status: 500 } });
+      await wrapper.vm.getRUMToken();
+      expect(wrapper.vm.rumTokenForbidden).toBe(false);
+    });
   });
 
   describe("updatePasscode", () => {
@@ -1053,6 +1079,91 @@ describe("Ingestion", () => {
 
       const routerView = wrapper.find(".router-view");
       expect(routerView.exists()).toBe(true);
+    });
+  });
+
+  describe("RUM license lock", () => {
+    const mountLocked = async () => {
+      const w = mount(Ingestion, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+          stubs: {
+            ConfirmDialog: true,
+            OTooltip: { template: "<span><slot /></span>" },
+            OButton: {
+              name: "OButton",
+              template: "<button @click=\"$emit('click')\"><slot /></button>",
+              props: { variant: String, size: String, disabled: Boolean, iconLeft: String },
+              emits: ["click"],
+            },
+            OTabs: { template: "<div><slot /></div>" },
+            ORouteTab: { template: "<div class='route-tab-stub'><slot /></div>" },
+            "router-view": { template: "<div />" },
+          },
+        },
+      });
+      await flushPromises();
+      return w;
+    };
+
+    afterEach(() => {
+      store.state.zoConfig.features = {};
+    });
+
+    it("never requests the RUM token when rum is locked", async () => {
+      store.state.zoConfig.features = { rum: "locked" };
+      queryClient.clear();
+      apiKeysService.listRUMTokens.mockClear();
+
+      const w = await mountLocked();
+      await w.vm.getRUMToken();
+
+      expect(apiKeysService.listRUMTokens).not.toHaveBeenCalled();
+      w.unmount();
+    });
+
+    it("leaves the lock to the page on the RUM token button when rum is locked", async () => {
+      store.state.zoConfig.features = { rum: "locked" };
+      if (!router.hasRoute("frontendMonitoring")) {
+        router.addRoute({
+          name: "frontendMonitoring",
+          path: "/rum-lock-test",
+          component: { template: "<div />" },
+        });
+      }
+      const before = router.currentRoute.value.fullPath;
+      await router.push({ name: "frontendMonitoring" });
+      const w = await mountLocked();
+
+      const btn = w
+        .findAllComponents({ name: "OButton" })
+        .find((b: any) => b.attributes("data-test") === "ingestion-reset-token-btn");
+      expect(btn?.exists()).toBe(true);
+      expect(btn?.props("iconLeft")).not.toBe("lock");
+      w.unmount();
+      await router.push(before);
+    });
+
+    it("keeps the section tabs, search and Manage Tokens live on a locked page", async () => {
+      const w = await mountLocked();
+      const exempt = w.findAll("[data-feature-lock-exempt]");
+      const inExempt = (selector: string) => exempt.some((e: any) => e.find(selector).exists());
+      expect(inExempt('[data-test="recommended-list-search-input"]')).toBe(true);
+      expect(inExempt('[data-test="ingestion-manage-tokens-btn"]')).toBe(true);
+      expect(inExempt(".route-tab-stub")).toBe(true);
+      w.unmount();
+    });
+
+    it("requests the RUM token when rum is enabled", async () => {
+      store.state.zoConfig.features = { rum: "enabled" };
+      queryClient.clear();
+      apiKeysService.listRUMTokens.mockClear();
+
+      const w = await mountLocked();
+
+      expect(apiKeysService.listRUMTokens).toHaveBeenCalled();
+      w.unmount();
     });
   });
 

@@ -65,55 +65,110 @@ const traces = pipeline({
 const byId = <T extends { id: string }>(list: T[]) => new Map(list.map((x) => [x.id, x]));
 
 describe("buildPipelineMap", () => {
-  it("lays out four columns: fleet, receiver, exporter, destination", () => {
+  it("lays out three columns: fleet, receiver, destination", () => {
     const map = buildPipelineMap([logs, traces], layout);
-    const columns = ["fleet", "receiver", "exporter", "destination"].map((c) =>
+    const columns = ["fleet", "receiver", "destination"].map((c) =>
       map.nodes.filter((n) => n.column === c).map((n) => n.id),
     );
-    expect(columns).toEqual([
-      ["f:prod"],
-      ["r:prod|filelog", "r:prod|otlp"],
-      ["e:prod|otlphttp", "e:prod|s3"],
-      ["d:d_o2", "d:d_s3"],
-    ]);
+    expect(columns).toEqual([["f:prod"], ["r:prod|filelog", "r:prod|otlp"], ["d:d_o2", "d:d_s3"]]);
     const xs = columns.map((ids) => byId(map.nodes).get(ids[0])!.x);
     expect(xs).toEqual([...xs].sort((a, b) => a - b));
-    expect(new Set(xs).size).toBe(4);
+    expect(new Set(xs).size).toBe(3);
   });
 
-  it("splits an exporter's rate over the receivers by their share of the pipeline input", () => {
+  it("splits a destination's rate over the receivers by their share of the pipeline input", () => {
     const edges = byId(buildPipelineMap([logs], layout).edges);
-    expect(edges.get("re:prod|filelog|otlphttp|logs")?.rate).toBe(150);
-    expect(edges.get("re:prod|otlp|otlphttp|logs")?.rate).toBe(50);
-    expect(edges.get("re:prod|filelog|s3|logs")?.rate).toBe(300);
+    expect(edges.get("rd:prod|filelog|d_o2|logs")?.rate).toBe(150);
+    expect(edges.get("rd:prod|otlp|d_o2|logs")?.rate).toBe(50);
+    expect(edges.get("rd:prod|filelog|d_s3|logs")?.rate).toBe(300);
   });
 
-  it("keeps one line per signal, so a shared receiver and exporter carry each signal apart", () => {
+  it("merges every exporter sending to one destination, across fleets, into one node", () => {
+    const prod = pipeline({
+      fleet: "prod",
+      name: "logs",
+      receivers: [{ name: "otlp", rate: 100, refused: 0 }],
+      exporters: [
+        exporter("otlphttp/a", "d_o2", 60, { failed: 10, queue: 0.2 }),
+        exporter("otlphttp/b", "d_o2", 40),
+      ],
+    });
+    const edge = pipeline({
+      fleet: "edge",
+      name: "logs",
+      receivers: [{ name: "otlp", rate: 30, refused: 0 }],
+      exporters: [exporter("otlphttp/c", "d_o2", 30, { dropped: 5, queue: 0.9 })],
+    });
+    const map = buildPipelineMap([prod, edge], layout);
+    expect(map.nodes.filter((n) => n.column === "destination").map((n) => n.id)).toEqual([
+      "d:d_o2",
+    ]);
+    expect(byId(map.nodes).get("d:d_o2")).toMatchObject({
+      rate: 130,
+      failed: 10,
+      dropped: 5,
+      queue: 0.9,
+      pipelines: ["prod/logs", "edge/logs"],
+    });
+    const edges = byId(map.edges);
+    expect(edges.get("rd:prod|otlp|d_o2|logs")?.rate).toBe(100);
+    expect(edges.get("rd:edge|otlp|d_o2|logs")?.rate).toBe(30);
+  });
+
+  it("keeps one line per signal, so a shared receiver and destination carry each signal apart", () => {
     const map = buildPipelineMap([logs, traces], layout);
     const edges = byId(map.edges);
     expect(edges.get("fr:prod|otlp|logs")?.rate).toBe(100);
     expect(edges.get("fr:prod|otlp|traces")?.rate).toBe(80);
-    expect(edges.get("ed:prod|otlphttp|d_o2|logs")?.signal).toBe("logs");
-    expect(edges.get("ed:prod|otlphttp|d_o2|traces")?.signal).toBe("traces");
-    expect(byId(map.nodes).get("e:prod|otlphttp")?.rate).toBe(280);
+    expect(edges.get("rd:prod|otlp|d_o2|logs")?.signal).toBe("logs");
+    expect(edges.get("rd:prod|otlp|d_o2|traces")?.signal).toBe("traces");
+    expect(byId(map.nodes).get("d:d_o2")?.rate).toBe(280);
     expect(byId(map.nodes).get("r:prod|otlp")?.rate).toBe(180);
-    expect(byId(map.nodes).get("e:prod|otlphttp")?.pipelines).toEqual(["prod/logs", "prod/traces"]);
+    expect(byId(map.nodes).get("d:d_o2")?.pipelines).toEqual(["prod/logs", "prod/traces"]);
   });
 
-  it("draws a failure branch off the failing exporter with its failed share", () => {
+  it("draws a failure branch off the failing destination with its failed share", () => {
     const map = buildPipelineMap([logs], layout);
     const branch = map.edges.find((e) => e.branch);
     expect(branch).toMatchObject({
-      id: "br:e:prod|otlphttp",
-      source: "e:prod|otlphttp",
-      target: "x:e:prod|otlphttp",
+      id: "br:d:d_o2",
+      source: "d:d_o2",
+      target: "x:d:d_o2",
       branch: { kind: "failed", ratio: 0.2 },
     });
     expect(map.edges.filter((e) => e.branch)).toHaveLength(1);
-    const sink = byId(map.nodes).get("x:e:prod|otlphttp")!;
-    const from = byId(map.nodes).get("e:prod|otlphttp")!;
+    const sink = byId(map.nodes).get("x:d:d_o2")!;
+    const from = byId(map.nodes).get("d:d_o2")!;
     expect(sink.x).toBeGreaterThan(from.x);
     expect(sink.y).toBeGreaterThan(from.y);
+  });
+
+  it("keeps a failure branch and its label inside the canvas, past the last column", () => {
+    const failing = buildPipelineMap([logs], layout).nodes;
+    const healthy = buildPipelineMap([traces], layout).nodes;
+    const x = (nodes: typeof failing, id: string) => byId(nodes).get(id)!.x;
+    expect(x(healthy, "d:d_o2") + layout.nodeWidth).toBe(layout.width - 16);
+    const sink = x(failing, "x:d:d_o2");
+    expect(sink).toBeGreaterThan(x(failing, "d:d_o2") + layout.nodeWidth);
+    expect(sink + 120).toBeLessThanOrEqual(layout.width);
+  });
+
+  it("reports the worst exporter's share, so a busy healthy fleet cannot hide a failing one", () => {
+    const failing = pipeline({
+      fleet: "edge",
+      name: "logs",
+      receivers: [{ name: "otlp", rate: 100, refused: 0 }],
+      exporters: [exporter("otlphttp/a", "d_o2", 50, { failed: 50 })],
+    });
+    const healthy = pipeline({
+      fleet: "prod",
+      name: "logs",
+      receivers: [{ name: "otlp", rate: 100000, refused: 0 }],
+      exporters: [exporter("otlphttp/b", "d_o2", 100000)],
+    });
+    const map = buildPipelineMap([failing, healthy], layout);
+    expect(byId(map.nodes).get("d:d_o2")?.failedRatio).toBe(0.5);
+    expect(map.edges.find((e) => e.branch)?.branch).toEqual({ kind: "failed", ratio: 0.5 });
   });
 
   it("names a drop-only branch as dropped", () => {
@@ -145,8 +200,8 @@ describe("buildPipelineMap", () => {
     });
     const edges = byId(buildPipelineMap([silent], layout).edges);
     expect(edges.get("fr:edge|a|logs")?.rate).toBeNull();
-    expect(edges.get("re:edge|a|otlp|logs")?.rate).toBe(5);
-    expect(edges.get("re:edge|a|debug|logs")?.rate).toBeNull();
+    expect(edges.get("rd:edge|a|d_o2|logs")?.rate).toBe(5);
+    expect(edges.get("rd:edge|a|d_dbg|logs")?.rate).toBeNull();
   });
 });
 

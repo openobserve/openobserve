@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-version="{ row }">
-              <span class="tabular-nums">{{ versionLabel(row.version) }}</span>
+              <span class="tabular-nums">{{ versionLabel(row.writeVersion) }}</span>
             </template>
 
             <template #cell-actions="{ row }">
@@ -536,7 +536,7 @@ const columns = computed(() => [
   {
     id: "version",
     header: t("aiObservability.datasets.detail.columns.version"),
-    accessorKey: "version",
+    accessorKey: "writeVersion",
     hideable: true,
     sortable: false,
     size: 140,

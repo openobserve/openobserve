@@ -454,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OIcon
                                 :name="sdrAccess.allowed ? 'arrow-forward' : 'lock'"
                                 size="xs"
-                                :class="sdrAccess.allowed ? '' : 'text-warning-600'"
+                                :class="sdrAccess.allowed ? '' : 'lock-chip'"
                               />
                             </span>
                           </template>
@@ -1219,8 +1219,9 @@ export default defineComponent({
       approxPartition.value = false;
     });
 
+    // only the logs ingest path writes the original record
     const showStoreOriginalDataToggle = computed(() => {
-      return modelValue.stream_type !== "traces";
+      return modelValue.stream_type === "logs";
     });
     //here we added a watcher to
     //1. if user defined schema is enabled then we need to show the schema fields tab and also need to make sure that it would be the active tab

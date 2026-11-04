@@ -271,6 +271,7 @@ import type {
 import { statusOf, targetScopeOf, valueOf } from "./utils/evalEntity";
 import { relativeTime } from "./utils/evalFormat";
 import { formatDate } from "@/utils/date";
+import type { ForbiddenState } from "@/utils/featureGate";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
@@ -282,7 +283,7 @@ const props = defineProps<{
   rows: EvalJob[];
   search: string;
   loading?: boolean;
-  forbidden?: boolean;
+  forbidden?: ForbiddenState;
   /** A bulk action (e.g. delete-selected) is in flight — shows the table overlay. */
   actionLoading?: boolean;
   /** ID of the job whose activate/pause request is currently in flight. */
@@ -610,7 +611,14 @@ function lastErrorOf(row: EvalJob): EvalJobLastError | undefined {
 
 function healthLabel(row: EvalJob): I18nText {
   const health = healthOf(row);
-  return health ? t(HEALTH_LABELS[health.state]) : raw("—");
+  if (!health) return raw("—");
+  // Health measures a 15-minute window; a job that scored earlier in the
+  // 24-hour lookback says when it last scored instead of a bare "Healthy".
+  // (One whose newest outcome there is an error is degraded, not healthy.)
+  if (health.state === "healthy" && !health.recentRuns && health.lastSuccessAt) {
+    return t("onlineEvals.job.health.lastScored", { time: microsAgo(health.lastSuccessAt) });
+  }
+  return t(HEALTH_LABELS[health.state]);
 }
 
 function healthSummary(row: EvalJob): I18nText {

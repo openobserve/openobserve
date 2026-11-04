@@ -509,7 +509,7 @@ impl ReadCounter {
         (status = 404, description = "Unknown conversation", body = Object),
         (status = 415, description = "The body is not JSON", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "create"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn create(
     Path((org_id, session_id)): Path<(String, String)>,
@@ -591,7 +591,7 @@ pub async fn create(
         (status = 200, description = "Active shares", body = inline(ShareListResponse)),
         (status = 404, description = "Unknown conversation", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "list"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn list_for_chat(
     Path((org_id, session_id)): Path<(String, String)>,
@@ -644,7 +644,7 @@ pub async fn list_for_chat(
         (status = 200, description = "Active shares", body = inline(ShareListResponse)),
         (status = 403, description = "`all=true` from a non-admin", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "list"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn list_mine(
     Path(org_id): Path<String>,
@@ -709,7 +709,7 @@ pub async fn list_mine(
         (status = 404, description = "Unknown share", body = Object),
         (status = 415, description = "The body is not JSON", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn update(
     Path((org_id, share_id)): Path<(String, String)>,
@@ -789,7 +789,7 @@ pub async fn update(
         (status = 200, description = "Revoked", body = Object),
         (status = 404, description = "Unknown share", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "delete"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn revoke(
     Path((org_id, share_id)): Path<(String, String)>,
@@ -851,7 +851,7 @@ pub async fn revoke(
         (status = 429, description = "Too many shared reads in flight; retry", body = Object),
         (status = 503, description = "History temporarily unreadable", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "get"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn get_shared(
     Path((org_id, token)): Path<(String, String)>,
@@ -886,13 +886,14 @@ pub async fn get_shared(
         ("org_id" = String, Path, description = "Organization name"),
         ("token" = String, Path, description = "Share token"),
     ),
+    request_body(content = Object, description = "Send {}: the handler requires a JSON content type and ignores the body", content_type = "application/json"),
     responses(
         (status = 201, description = "The new conversation", body = inline(ForkResponse)),
         (status = 403, description = "Not allowed to start conversations", body = Object),
         (status = 404, description = "Unknown, revoked or expired share", body = Object),
         (status = 415, description = "The body is not JSON", body = Object),
     ),
-    extensions(("x-o2-mcp" = json!({"enabled": false})))
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "create"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn fork(
     Path((org_id, token)): Path<(String, String)>,

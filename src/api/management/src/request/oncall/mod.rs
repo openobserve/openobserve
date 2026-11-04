@@ -49,6 +49,14 @@ const RESPONSES: &str = "oncall_responses";
 #[cfg(feature = "enterprise")]
 const SETTINGS: &str = "settings";
 
+/// Bounds one batch read, as `list_responses` bounds a page at 200 rows.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+const MAX_BATCH_IDS: usize = 200;
+
+/// Ids a batch route works on at once; a team-context id runs three reads, so 48 at most.
+#[cfg(feature = "enterprise")]
+const BATCH_READ_CONCURRENCY: usize = 16;
+
 #[cfg(feature = "enterprise")]
 const HANDOFF_NEEDS_A_TARGET: &str =
     "a handoff needs either `to` (a person) or `to_team_id` (another team)";
@@ -281,6 +289,21 @@ pub struct PromoteRequest {
 pub struct OnCallQuery {
     /// Resolve at this instant (micros), so the UI shows a future week without a second endpoint.
     pub at: Option<i64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct TeamContextQuery {
+    /// Comma-separated team ids.
+    pub team_ids: Option<String>,
+    /// Also answer for the caller's own teams.
+    #[serde(default)]
+    pub include_mine: bool,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct EscalationBatchQuery {
+    /// Comma-separated response record ids.
+    pub response_ids: Option<String>,
 }
 
 /// Points one identity-dimension path at the team that gets woken for it.
@@ -564,9 +587,9 @@ fn internal_error(context: &str, e: &impl std::fmt::Display) -> Response {
 fn to_response(e: anyhow::Error) -> Response {
     use o2_enterprise::enterprise::oncall::service::OncallError;
     let status = match e.downcast_ref::<OncallError>() {
-        Some(OncallError::TeamNotFound(_)) | Some(OncallError::ResponseNotFound(_)) => {
-            StatusCode::NOT_FOUND
-        }
+        Some(OncallError::TeamNotFound(_))
+        | Some(OncallError::MemberNotFound { .. })
+        | Some(OncallError::ResponseNotFound(_)) => StatusCode::NOT_FOUND,
         // Not 404: the record exists, and the honest answer is that working it is not theirs.
         Some(OncallError::NotOnThisTeam { .. }) => StatusCode::FORBIDDEN,
         // A conflict, not a 400: the caller fixes it by changing the org's state, not the request.
@@ -624,9 +647,26 @@ async fn page_problem(
     response_id: &str,
     actor: &str,
 ) -> Result<Option<openobserve_core::alerts::ack::Problem>, Response> {
+    page_problem_for(
+        org_id,
+        response_id,
+        actor,
+        openobserve_core::alerts::ack::Act::Ack,
+    )
+    .await
+}
+
+/// [`page_problem`] for an ack verb, so that a refusal names the verb refused.
+#[cfg(feature = "enterprise")]
+async fn page_problem_for(
+    org_id: &str,
+    response_id: &str,
+    actor: &str,
+    act: openobserve_core::alerts::ack::Act,
+) -> Result<Option<openobserve_core::alerts::ack::Problem>, Response> {
     use openobserve_core::alerts::ack::AckError;
 
-    page_problem_of(org_id, response_id, actor)
+    page_problem_of(org_id, response_id, actor, act)
         .await
         .map_err(|e| match e {
             AckError::NotFound => MetaHttpResponse::not_found("Response not found"),
@@ -640,17 +680,18 @@ async fn page_problem_of(
     org_id: &str,
     response_id: &str,
     actor: &str,
+    act: openobserve_core::alerts::ack::Act,
 ) -> Result<Option<openobserve_core::alerts::ack::Problem>, openobserve_core::alerts::ack::AckError>
 {
-    use openobserve_core::alerts::ack::{self, AckError, Act};
+    use openobserve_core::alerts::ack::{self, AckError};
 
     match ack::problem_of_page(org_id, response_id).await {
-        Ok(problem) => ack::authorize_problem(&problem, actor, Act::Ack)
+        Ok(problem) => ack::authorize_problem(&problem, actor, act)
             .await
             .map(|_| Some(problem)),
         Err(AckError::NotFound) => {
             match infra::table::oncall_responses::get(org_id, response_id).await? {
-                Some(page) => ack::authorize_orphan_page(&page, actor, Act::Ack)
+                Some(page) => ack::authorize_orphan_page(&page, actor, act)
                     .await
                     .map(|_| None)
                     .map_err(AckError::Refused),
@@ -768,6 +809,10 @@ async fn acknowledge_page(
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 409, description = "Conflict", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn create_team(
     Path(org_id): Path<String>,
@@ -807,7 +852,11 @@ pub async fn create_team(
     summary = "List on-call teams",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_teams(
     Path(org_id): Path<String>,
@@ -843,6 +892,10 @@ pub async fn list_teams(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_team(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -879,6 +932,10 @@ pub async fn get_team(
     ),
     request_body(content = UpdateTeamRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn update_team(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -923,6 +980,10 @@ pub async fn update_team(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete_team(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -957,7 +1018,11 @@ pub async fn delete_team(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_members(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -993,7 +1058,11 @@ pub async fn list_members(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     request_body(content = AddMembersRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn add_member(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1040,6 +1109,10 @@ pub async fn add_member(
         ("user_email" = String, Query, description = "Member email"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn remove_member(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1058,10 +1131,14 @@ pub async fn remove_member(
         )
         .await
         {
-            Ok(true) => MetaHttpResponse::ok("Member removed"),
-            Ok(false) => {
-                MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Member not found")
-                    .into_response()
+            Ok(released_pages) => {
+                openobserve_core::alerts::ack::release_leaver_pages(
+                    &org_id,
+                    &released_pages,
+                    &q.user_email,
+                )
+                .await;
+                MetaHttpResponse::ok("Member removed")
             }
             Err(e) => to_response(e),
         }
@@ -1085,7 +1162,11 @@ pub async fn remove_member(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Option<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_schedule(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1122,6 +1203,10 @@ pub async fn get_schedule(
     ),
     request_body(content = SetScheduleRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn set_schedule(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1161,7 +1246,11 @@ pub async fn set_schedule(
     summary = "The catalogue of schedule presets",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_schedule_presets(
     Path(org_id): Path<String>,
@@ -1200,6 +1289,10 @@ pub async fn list_schedule_presets(
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 404, description = "No such team", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn apply_schedule_preset(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1248,7 +1341,11 @@ pub async fn apply_schedule_preset(
         ("team_id" = String, Path, description = "Team ID"),
         ("at" = Option<i64>, Query, description = "Resolve at this instant (microseconds) instead of now"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn who_is_on_call(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1294,6 +1391,10 @@ pub async fn who_is_on_call(
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 404, description = "No such team", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn create_override(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1346,7 +1447,11 @@ pub async fn create_override(
         ("from" = Option<i64>, Query, description = "Window start (microseconds); requires `to`"),
         ("to" = Option<i64>, Query, description = "Window end (microseconds); requires `from`"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_overrides(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1391,6 +1496,10 @@ pub async fn list_overrides(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "No such override", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete_override(
     Path((org_id, team_id, override_id)): Path<(String, String, String)>,
@@ -1434,9 +1543,13 @@ pub async fn delete_override(
         ("rotation_id" = Option<String>, Query, description = "Rotation id or name; defaults to the team's primary"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 400, description = "Window inverted or too long", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_resolved_schedule(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1482,9 +1595,13 @@ pub async fn get_resolved_schedule(
     ),
     request_body(content = PreviewResolvedScheduleRequest, content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 400, description = "Window inverted or too long", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn preview_resolved_schedule(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1530,6 +1647,10 @@ pub async fn preview_resolved_schedule(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_policy(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1566,6 +1687,10 @@ pub async fn get_policy(
     ),
     request_body(content = SetPolicyRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn set_policy(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1688,6 +1813,10 @@ async fn team_channel_response(team: config::meta::oncall::Team) -> Response {
         ("team_id" = String, Path, description = "Team ID"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = TeamChannelResponse)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_team_channel(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1729,6 +1858,10 @@ pub async fn get_team_channel(
         (status = 400, description = "Not one of the team's webhook destinations", content_type = "application/json", body = Object),
         (status = 404, description = "Team not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn set_team_channel(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1799,6 +1932,10 @@ pub struct TeamSlackTestResponse {
         (status = 200, description = "Success", content_type = "application/json", body = TeamSlackTestResponse),
         (status = 404, description = "Team not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn test_team_slack_channel(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1917,7 +2054,7 @@ async fn team_of(record: &config::meta::oncall::Response) -> Option<config::meta
 #[utoipa::path(
     post,
     path = "/{org_id}/oncall/ack",
-    context_path = "/api",
+    context_path = "/api/v2",
     tag = "OnCall",
     operation_id = "AcknowledgeOnCallPage",
     summary = "Acknowledge a page from its emailed link",
@@ -2018,7 +2155,7 @@ pub async fn acknowledge(
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/ack",
-    context_path = "/api",
+    context_path = "/api/v2",
     tag = "OnCall",
     operation_id = "OnCallAckConfirmPage",
     summary = "Confirmation page for an emailed acknowledgement link",
@@ -2088,7 +2225,7 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
 #[utoipa::path(
     post,
     path = "/{org_id}/oncall/ack/voice/{token}",
-    context_path = "/api",
+    context_path = "/api/v2",
     tag = "OnCall",
     operation_id = "AcknowledgeOnCallPageByVoice",
     summary = "Acknowledge a page from a key pressed on its phone call",
@@ -2173,7 +2310,7 @@ async fn act_by_phone(
     use o2_enterprise::enterprise::oncall::{notify::PhoneAction, service};
     use openobserve_core::alerts::ack::{self, AckError};
 
-    let problem = match page_problem_of(&org_id, &response_id, &actor).await {
+    let problem = match page_problem_of(&org_id, &response_id, &actor, ack::Act::Ack).await {
         Ok(problem) => problem,
         Err(e) => return phone_answer_to(e),
     };
@@ -2185,7 +2322,12 @@ async fn act_by_phone(
             PhoneAction::Acknowledge => {
                 service::phone_ack_outcome(&org_id, &response_id, &actor).await
             }
-            PhoneAction::Resolve | PhoneAction::Escalate => {
+            PhoneAction::Resolve => {
+                // A retried press 6 finishes a clear the first press could not.
+                end_ack_by_phone(&org_id, &response_id, problem.as_ref(), &actor).await?;
+                Ok(o2_enterprise::enterprise::oncall::notify::PressOutcome::Closed)
+            }
+            PhoneAction::Escalate => {
                 Ok(o2_enterprise::enterprise::oncall::notify::PressOutcome::Closed)
             }
         };
@@ -2209,9 +2351,44 @@ async fn act_by_phone(
             }
             service::phone_ack_outcome(&org_id, &response_id, &actor).await
         }
-        PhoneAction::Resolve => service::phone_resolve(&org_id, &response_id, &actor).await,
+        PhoneAction::Resolve => {
+            let outcome = service::phone_resolve(&org_id, &response_id, &actor).await?;
+            end_ack_by_phone(&org_id, &response_id, problem.as_ref(), &actor).await?;
+            Ok(outcome)
+        }
         PhoneAction::Escalate => service::phone_escalate(&org_id, &response_id, &actor).await,
     }
+}
+
+/// Press 6 ends the problem's ack once the page is closed; a page whose alert is gone has none.
+#[cfg(feature = "enterprise")]
+async fn end_ack_by_phone(
+    org_id: &str,
+    response_id: &str,
+    problem: Option<&openobserve_core::alerts::ack::Problem>,
+    actor: &str,
+) -> Result<(), anyhow::Error> {
+    use openobserve_core::alerts::ack;
+
+    let Some(p) = problem else {
+        return Ok(());
+    };
+    let Some(page) = infra::table::oncall_responses::get(org_id, response_id).await? else {
+        return Ok(());
+    };
+    let closed_at = page
+        .closed_at
+        .unwrap_or_else(config::utils::time::now_micros);
+    let cover = ack::page_cover(&page.subject, closed_at);
+    ack::resolve(
+        p,
+        actor,
+        config::meta::alerts::ack::AckSource::Oncall,
+        cover,
+    )
+    .await
+    .map(|_| ())
+    .map_err(|e| anyhow::anyhow!("end the ack after a resolve by phone: {e:?}"))
 }
 
 /// TwiML refusal for an inactive or unreadable org, as `inactive_org_response` refuses email acks.
@@ -2243,6 +2420,28 @@ fn parse_subject_type(s: &str) -> Option<config::meta::oncall::SubjectType> {
     SUBJECT_TYPES.into_iter().find(|t| t.as_str() == s)
 }
 
+/// Listed then `extra` ids, de-duplicated in order; only the listed count to the cap. [pure]
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn batch_ids(listed: Option<&str>, extra: Vec<String>) -> Result<Vec<String>, String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut ids: Vec<String> = listed
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(str::to_string)
+        .filter(|id| seen.insert(id.clone()))
+        .collect();
+    if ids.len() > MAX_BATCH_IDS {
+        return Err(format!(
+            "at most {MAX_BATCH_IDS} ids per request, got {}",
+            ids.len()
+        ));
+    }
+    ids.extend(extra.into_iter().filter(|id| seen.insert(id.clone())));
+    Ok(ids)
+}
+
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/responses",
@@ -2263,9 +2462,13 @@ fn parse_subject_type(s: &str) -> Option<config::meta::oncall::SubjectType> {
         ("offset" = Option<u64>, Query, description = "Rows to skip"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
         (status = 400, description = "Unknown filter value", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_responses(
     Path(org_id): Path<String>,
@@ -2353,13 +2556,25 @@ pub async fn list_responses(
     }
 }
 
-/// Two queries for the whole page, never one per row, which is the N+1 this exists to avoid.
+/// Three queries for the whole page, never one per row, which is the N+1 this exists to avoid.
 #[cfg(feature = "enterprise")]
 async fn with_page_details(
     org_id: &str,
     rows: Vec<config::meta::oncall::Response>,
 ) -> Vec<serde_json::Value> {
     let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
+    let incident_ids: Vec<String> = rows
+        .iter()
+        .filter_map(|r| r.incident_id.clone())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let titles = infra::table::alert_incidents::titles(org_id, &incident_ids)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::error!("[oncall] incident title lookup: {e}");
+            Default::default()
+        });
     let runbooks = infra::table::oncall_responses::runbook_urls(org_id, &ids)
         .await
         .unwrap_or_else(|e| {
@@ -2378,27 +2593,39 @@ async fn with_page_details(
             Default::default()
         });
     rows.into_iter()
-        .map(|r| {
-            let mut value = serde_json::json!(r);
-            if let Some(obj) = value.as_object_mut() {
-                if let Some(url) = runbooks.get(&r.id) {
-                    obj.insert("runbook_url".to_string(), url.clone().into());
-                }
-                // The rung's `after_micros`: an index would not survive a reordered ladder.
-                if let Some(rung) = rungs.get(&r.id) {
-                    obj.insert("reached_rung_micros".to_string(), (*rung).into());
-                }
-                // Only when answered: a null is indistinguishable from "answered instantly".
-                if let Some(acked_at) = r.acked_at {
-                    obj.insert(
-                        "time_to_ack_micros".to_string(),
-                        (acked_at - r.opened_at).max(0).into(),
-                    );
-                }
-            }
-            value
-        })
+        .map(|r| page_row(r, &runbooks, &rungs, &titles))
         .collect()
+}
+
+/// One list row with the page-wide lookups, keyed by record or incident id, folded in. [pure]
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn page_row(
+    r: config::meta::oncall::Response,
+    runbooks: &std::collections::HashMap<String, String>,
+    rungs: &std::collections::HashMap<String, i64>,
+    titles: &std::collections::HashMap<String, String>,
+) -> serde_json::Value {
+    let mut value = serde_json::json!(r);
+    if let Some(obj) = value.as_object_mut() {
+        if let Some(url) = runbooks.get(&r.id) {
+            obj.insert("runbook_url".to_string(), url.clone().into());
+        }
+        // The rung's `after_micros`: an index would not survive a reordered ladder.
+        if let Some(rung) = rungs.get(&r.id) {
+            obj.insert("reached_rung_micros".to_string(), (*rung).into());
+        }
+        // Only when answered: a null is indistinguishable from "answered instantly".
+        if let Some(acked_at) = r.acked_at {
+            obj.insert(
+                "time_to_ack_micros".to_string(),
+                (acked_at - r.opened_at).max(0).into(),
+            );
+        }
+        if let Some(title) = r.incident_id.as_ref().and_then(|id| titles.get(id)) {
+            obj.insert("incident_title".to_string(), title.clone().into());
+        }
+    }
+    value
 }
 
 #[utoipa::path(
@@ -2414,6 +2641,10 @@ async fn with_page_details(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_response(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2467,22 +2698,40 @@ pub async fn get_response(
     ),
     request_body(content = ResolveRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn resolve_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
     ValidatedJson(body): ValidatedJson<Option<ResolveRequest>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        use crate::request::alerts::ack::{ack_source, error_response};
+
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
-            return resp;
-        }
+        let problem = match page_problem_for(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            openobserve_core::alerts::ack::Act::Resolve,
+        )
+        .await
+        {
+            Ok(p) => p,
+            Err(resp) => return resp,
+        };
         let body = body.unwrap_or_default();
-        match o2_enterprise::enterprise::oncall::escalation::resolve(
+        let record = match o2_enterprise::enterprise::oncall::escalation::resolve(
             &org_id,
             &response_id,
             &user_email.user_id,
@@ -2491,9 +2740,23 @@ pub async fn resolve_response(
         )
         .await
         {
-            Ok(record) => MetaHttpResponse::json(record),
-            Err(e) => to_response(e),
+            Ok(record) => record,
+            Err(e) => return to_response(e),
+        };
+        // Closed first, so a failed clear is retried by resolving the closed page again.
+        if let Some(p) = problem.as_ref() {
+            let source = ack_source(delegated.as_deref(), &headers);
+            let closed_at = record
+                .closed_at
+                .unwrap_or_else(config::utils::time::now_micros);
+            let cover = openobserve_core::alerts::ack::page_cover(&record.subject, closed_at);
+            if let Err(e) =
+                openobserve_core::alerts::ack::resolve(p, &user_email.user_id, source, cover).await
+            {
+                return error_response(e);
+            }
         }
+        MetaHttpResponse::json(record)
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -2516,6 +2779,10 @@ pub async fn resolve_response(
     ),
     request_body(content = AddNoteRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn add_note(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2561,7 +2828,11 @@ pub async fn add_note(
         ("org_id" = String, Path, description = "Organization name"),
         ("incident_id" = String, Path, description = "Incident ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_responses_for_incident(
     Path((org_id, incident_id)): Path<(String, String)>,
@@ -2597,6 +2868,10 @@ pub async fn list_responses_for_incident(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_escalation_progress(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2619,6 +2894,85 @@ pub async fn get_escalation_progress(
     }
 }
 
+/// One read for a page of open records; the per-id route stays for the screens that show one.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/responses/escalation",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "OnCallEscalationProgressBatch",
+    summary = "Where the escalation ladder has got to, for many records",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_ids" = Option<String>, Query, description = "Comma-separated response record IDs (at most 200)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "More than 200 ids", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn list_escalation_progress(
+    Path(org_id): Path<String>,
+    Query(q): Query<EscalationBatchQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use futures::StreamExt;
+
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let ids = match batch_ids(q.response_ids.as_deref(), Vec::new()) {
+            Ok(ids) => ids,
+            Err(msg) => return MetaHttpResponse::bad_request(msg),
+        };
+        // Owned per read: a borrowing closure in the stream fails axum's `Handler` lifetime bound.
+        let reads: Vec<_> =
+            ids.iter()
+                .map(|id| {
+                    let (org, id) = (org_id.clone(), id.clone());
+                    async move {
+                        o2_enterprise::enterprise::oncall::escalation::progress(&org, &id).await
+                    }
+                })
+                .collect();
+        // `buffered` keeps the input order, so each answer stays beside its id.
+        let reads: Vec<_> = futures::stream::iter(reads)
+            .buffered(BATCH_READ_CONCURRENCY)
+            .collect()
+            .await;
+        let progress: Vec<serde_json::Value> = ids
+            .into_iter()
+            .zip(reads)
+            .filter_map(|(id, read)| match read {
+                Ok(p) => {
+                    let mut value = serde_json::json!(p);
+                    if let Some(obj) = value.as_object_mut() {
+                        obj.insert("response_id".to_string(), id.into());
+                    }
+                    Some(value)
+                }
+                Err(e) => {
+                    tracing::warn!("[oncall] escalation progress for {id}: {e}");
+                    None
+                }
+            })
+            .collect();
+        MetaHttpResponse::json(serde_json::json!({ "progress": progress }))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/responses/{response_id}/prior-causes",
@@ -2631,7 +2985,11 @@ pub async fn get_escalation_progress(
         ("org_id" = String, Path, description = "Organization name"),
         ("response_id" = String, Path, description = "Response record ID"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_prior_causes(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2670,6 +3028,10 @@ pub async fn get_prior_causes(
         ("response_id" = String, Path, description = "Response record ID"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_response_report(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2717,6 +3079,10 @@ pub async fn get_response_report(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 403, description = "Refused, with who is on call and who can act", content_type = "application/json", body = config::meta::alerts::ack::ActRefusal),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn acknowledge_response(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2741,10 +3107,11 @@ pub async fn acknowledge_response(
             Ok(false) => Verb::Acknowledge,
             Err(resp) => return resp,
         };
-        let problem = match page_problem(&org_id, &response_id, &user_email.user_id).await {
-            Ok(p) => p,
-            Err(resp) => return resp,
-        };
+        let problem =
+            match page_problem_for(&org_id, &response_id, &user_email.user_id, verb.into()).await {
+                Ok(p) => p,
+                Err(resp) => return resp,
+            };
         match page_is_closed(&org_id, &response_id).await {
             Ok(true) => return page_with_ack(&org_id, &response_id, unchanged()).await,
             Ok(false) => {}
@@ -2789,6 +3156,10 @@ pub async fn acknowledge_response(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 403, description = "Refused, with who is on call and who can act", content_type = "application/json", body = config::meta::alerts::ack::ActRefusal),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn unacknowledge_response(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2807,7 +3178,14 @@ pub async fn unacknowledge_response(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        let problem = match page_problem(&org_id, &response_id, &user_email.user_id).await {
+        let problem = match page_problem_for(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            openobserve_core::alerts::ack::Act::Unack,
+        )
+        .await
+        {
             Ok(p) => p,
             Err(resp) => return resp,
         };
@@ -2849,6 +3227,10 @@ pub async fn unacknowledge_response(
     ),
     request_body(content = SnoozeRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn snooze_response(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2886,6 +3268,56 @@ pub async fn snooze_response(
 
 #[utoipa::path(
     post,
+    path = "/{org_id}/oncall/responses/{response_id}/unsnooze",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "UnsnoozeOnCallResponse",
+    summary = "End a snooze now, so paging continues from the current step",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn unsnooze_response(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+            return resp;
+        }
+        match o2_enterprise::enterprise::oncall::escalation::unsnooze(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            config::utils::time::now_micros(),
+        )
+        .await
+        {
+            Ok(Some(r)) => MetaHttpResponse::json(r),
+            Ok(None) => MetaHttpResponse::not_found("Response record not found"),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
     path = "/{org_id}/oncall/responses/{response_id}/handoff",
     context_path = "/api",
     tag = "OnCall",
@@ -2898,6 +3330,10 @@ pub async fn snooze_response(
     ),
     request_body(content = HandoffRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn handoff_response(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -2993,6 +3429,10 @@ pub async fn handoff_response(
     ),
     request_body(content = ConfirmRecoveryRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn confirm_recovery(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -3060,6 +3500,10 @@ pub async fn confirm_recovery(
     ),
     request_body(content = EscalateRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn escalate_response(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -3141,6 +3585,10 @@ pub async fn escalate_response(
     ),
     request_body(content = TestPageRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn send_test_page(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -3193,7 +3641,11 @@ pub async fn send_test_page(
         ("response_id" = String, Path, description = "Response record ID"),
         ("limit" = Option<u64>, Query, description = "Max records (default 10)"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_response_history(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -3247,7 +3699,11 @@ pub async fn get_response_history(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = Option<String>, Query, description = "Restrict to one team"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_ownership_rules(
     Path(org_id): Path<String>,
@@ -3292,6 +3748,10 @@ pub async fn list_ownership_rules(
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
         (status = 409, description = "Conflict", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn create_ownership_rule(
     Path(org_id): Path<String>,
@@ -3352,6 +3812,10 @@ pub async fn create_ownership_rule(
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
         (status = 409, description = "Conflict", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn update_ownership_rule(
     Path((org_id, rule_id)): Path<(String, String)>,
@@ -3409,6 +3873,10 @@ pub async fn update_ownership_rule(
         ("rule_id" = String, Path, description = "Rule ID"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete_ownership_rule(
     Path((org_id, rule_id)): Path<(String, String)>,
@@ -3464,6 +3932,10 @@ async fn routing_config_body(config: &config::meta::oncall::RoutingConfig) -> se
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_routing_config(
     Path(org_id): Path<String>,
@@ -3501,6 +3973,10 @@ pub async fn get_routing_config(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn set_routing_config(
     Path(org_id): Path<String>,
@@ -3541,6 +4017,10 @@ pub async fn set_routing_config(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = PreviewRoutingRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn preview_routing(
     Path(org_id): Path<String>,
@@ -3630,6 +4110,10 @@ pub async fn preview_routing(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_team_reachability(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -3673,6 +4157,10 @@ pub async fn get_team_reachability(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_team_config_risks(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -3736,6 +4224,10 @@ pub async fn list_team_config_risks(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_team_overview(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -3782,6 +4274,10 @@ pub async fn get_team_overview(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_team_load(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -3828,6 +4324,10 @@ pub async fn get_team_load(
         (status = 400, description = "Invalid",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_escalation_preview(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -3875,6 +4375,10 @@ pub async fn get_escalation_preview(
         ("offset" = Option<u64>, Query, description = "Rules to skip"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_ownership_rule_stats(
     Path(org_id): Path<String>,
@@ -3941,7 +4445,11 @@ fn with_description(signal: &config::meta::oncall::UnroutedSignal) -> serde_json
         ("landing" = Option<String>, Query, description = "`default_team` for gaps the default team is absorbing, `nobody` for gaps that paged no one; omit for both"),
         ("limit" = Option<u64>, Query, description = "Page size (default 100, max 200)"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_unrouted_signals(
     Path(org_id): Path<String>,
@@ -3995,6 +4503,10 @@ pub async fn list_unrouted_signals(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn dismiss_unrouted_signal(
     Path((org_id, signal_id)): Path<(String, String)>,
@@ -4035,6 +4547,10 @@ pub async fn dismiss_unrouted_signal(
         ("limit" = Option<u64>, Query, description = "Max teams returned (default 100, max 200); `total` is never truncated"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_coverage_gaps(
     Path(org_id): Path<String>,
@@ -4093,6 +4609,10 @@ pub async fn list_coverage_gaps(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_deliveries(
     Path((org_id, response_id)): Path<(String, String)>,
@@ -4161,7 +4681,11 @@ async fn may_touch_unavailability(org_id: &str, caller: &str, subject: &str, ver
         ("from" = Option<i64>, Query, description = "Window start (microseconds); requires `to`"),
         ("to" = Option<i64>, Query, description = "Window end (microseconds); requires `from`"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>))),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_unavailability(
     Path(org_id): Path<String>,
@@ -4222,6 +4746,10 @@ pub async fn list_unavailability(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Invalid", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn create_unavailability(
     Path(org_id): Path<String>,
@@ -4278,6 +4806,10 @@ pub async fn create_unavailability(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "No such absence", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete_unavailability(
     Path((org_id, unavailability_id)): Path<(String, String)>,
@@ -4375,6 +4907,10 @@ fn contact_body(
         ("user_email" = String, Path, description = "The person's email"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_contact(
     Path((org_id, subject_email)): Path<(String, String)>,
@@ -4433,6 +4969,10 @@ pub async fn get_contact(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Not a dialable number", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn set_contact(
     Path((org_id, subject_email)): Path<(String, String)>,
@@ -4522,6 +5062,10 @@ pub async fn set_contact(
         (status = 429, description = "Too many codes; carries retry_after_secs", content_type = "application/json", body = Object),
         (status = 503, description = "The provider could not send now", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn send_contact_code(
     Path((org_id, subject_email)): Path<(String, String)>,
@@ -4567,6 +5111,10 @@ pub async fn send_contact_code(
         (status = 200, description = "Verified; carries phone_verified_at", content_type = "application/json", body = Object),
         (status = 400, description = "Wrong, expired or missing code", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn confirm_contact_code(
     Path((org_id, subject_email)): Path<(String, String)>,
@@ -4609,6 +5157,10 @@ pub async fn confirm_contact_code(
         ("user_email" = String, Path, description = "The person's email"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete_contact(
     Path((org_id, subject_email)): Path<(String, String)>,
@@ -4663,6 +5215,10 @@ pub async fn delete_contact(
         ("offset" = Option<u64>, Query, description = "Rows to skip"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_my_deliveries(
     Path(org_id): Path<String>,
@@ -4728,6 +5284,10 @@ pub async fn list_my_deliveries(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Too many ids", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn mark_deliveries_read(
     Path(org_id): Path<String>,
@@ -4796,6 +5356,10 @@ pub async fn mark_deliveries_read(
         ("at" = Option<i64>, Query, description = "Answer for this instant (microseconds) instead of now"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn list_my_teams(
     Path(org_id): Path<String>,
@@ -4862,6 +5426,114 @@ pub async fn list_my_teams(
     }
 }
 
+// ── Team context for the pages list ───────────────────────────────────────────
+
+/// One read for the pages list, answering each team as its three per-team routes would.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/teams/context",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListOnCallTeamContext",
+    summary = "Policy, who is on call and schedule for many teams",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_ids" = Option<String>, Query, description = "Comma-separated team IDs (at most 200; `include_mine` teams are not counted)"),
+        ("include_mine" = Option<bool>, Query, description = "Also answer for the caller's own teams (default false)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "More than 200 listed teams", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn list_team_context(
+    Path(org_id): Path<String>,
+    Query(q): Query<TeamContextQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use futures::StreamExt;
+
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let mine = if q.include_mine {
+            match infra::table::oncall_teams::list_for_user(&org_id, &user_email.user_id).await {
+                Ok(teams) => teams.into_iter().map(|t| t.id).collect(),
+                Err(e) => {
+                    // The listed teams still answer; without the caller's, the page shows no shift.
+                    tracing::warn!("[oncall] team context: the caller's teams: {e}");
+                    Vec::new()
+                }
+            }
+        } else {
+            Vec::new()
+        };
+        let ids = match batch_ids(q.team_ids.as_deref(), mine) {
+            Ok(ids) => ids,
+            Err(msg) => return MetaHttpResponse::bad_request(msg),
+        };
+        let known: std::collections::HashSet<String> =
+            match infra::table::oncall_teams::list(&org_id).await {
+                Ok(teams) => teams.into_iter().map(|t| t.id).collect(),
+                Err(e) => return internal_error("list_team_context", &e),
+            };
+        // Owned per read: a borrowing closure in the stream fails axum's `Handler` lifetime bound.
+        let reads: Vec<_> = ids
+            .into_iter()
+            .filter(|id| known.contains(id))
+            .map(|id| {
+                let org = org_id.clone();
+                async move { team_context(&org, &id).await }
+            })
+            .collect();
+        let teams: Vec<serde_json::Value> = futures::stream::iter(reads)
+            .buffered(BATCH_READ_CONCURRENCY)
+            .collect()
+            .await;
+        MetaHttpResponse::json(serde_json::json!({ "teams": teams }))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// One team's policy, rotation and schedule; a field whose read fails is left out and logged.
+#[cfg(feature = "enterprise")]
+async fn team_context(org_id: &str, team_id: &str) -> serde_json::Value {
+    use o2_enterprise::enterprise::oncall::service;
+
+    let (policy, on_call, schedule) = futures::join!(
+        service::get_policy_view(org_id, team_id),
+        service::who_is_on_call(org_id, team_id, None),
+        service::get_schedule(org_id, team_id),
+    );
+    let mut out = serde_json::Map::new();
+    out.insert("team_id".to_string(), team_id.into());
+    let fields = [
+        ("policy", policy.map(|p| serde_json::json!(p))),
+        ("on_call", on_call.map(|s| serde_json::json!(s))),
+        ("schedule", schedule.map(|s| serde_json::json!(s))),
+    ];
+    for (field, read) in fields {
+        match read {
+            Ok(value) => {
+                out.insert(field.to_string(), value);
+            }
+            Err(e) => tracing::warn!("[oncall] team context {field} for {team_id}: {e}"),
+        }
+    }
+    serde_json::Value::Object(out)
+}
+
 // ── Cause analytics (U26) ─────────────────────────────────────────────────────
 
 /// Counted in the database: the org with most to learn from this has the most rows.
@@ -4883,6 +5555,10 @@ pub async fn list_my_teams(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Window inverted or too long", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn cause_analytics(
     Path(org_id): Path<String>,
@@ -4945,25 +5621,6 @@ fn analytics_window(from: Option<i64>, to: Option<i64>) -> Result<(i64, i64), St
 // ── Promote a firing to an incident ───────────────────────────────────────────
 
 /// Idempotent by refusal: an attached record is a conflict, so two clicks give one incident.
-#[utoipa::path(
-    post,
-    path = "/{org_id}/oncall/responses/{response_id}/promote",
-    context_path = "/api",
-    tag = "OnCall",
-    operation_id = "PromoteOnCallResponseToIncident",
-    summary = "Promote a response record to an incident",
-    security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("response_id" = String, Path, description = "Response record ID"),
-    ),
-    request_body(content = PromoteRequest, content_type = "application/json"),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 404, description = "No such record", content_type = "application/json", body = Object),
-        (status = 409, description = "Already an incident", content_type = "application/json", body = Object),
-    ),
-)]
 /// Best effort: a thin history beats rolling the incident back over a timeline write.
 #[cfg(feature = "enterprise")]
 async fn carry_page_history_into_incident(
@@ -5061,6 +5718,29 @@ fn promoted_severity(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/responses/{response_id}/promote",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "PromoteOnCallResponseToIncident",
+    summary = "Promote a response record to an incident",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    request_body(content = PromoteRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "No such record", content_type = "application/json", body = Object),
+        (status = 409, description = "Already an incident", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn promote_to_incident(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
@@ -5199,6 +5879,10 @@ pub async fn promote_to_incident(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_telephony(
     Path(org_id): Path<String>,
@@ -5242,6 +5926,10 @@ pub async fn get_telephony(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn get_telephony_status(
     Path(org_id): Path<String>,
@@ -5287,6 +5975,10 @@ pub async fn get_telephony_status(
         (status = 400, description = "Invalid, refused by Twilio, or no master key", content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn put_telephony(
     Path(org_id): Path<String>,
@@ -5339,6 +6031,10 @@ pub async fn put_telephony(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "OnCall", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn delete_telephony(
     Path(org_id): Path<String>,
@@ -6462,6 +7158,77 @@ mod tests {
             digits: Some("4".to_string()),
         });
         assert_not_supported(voice_ack(path, form).await).await;
+    }
+
+    #[test]
+    fn test_batch_ids_trim_dedupe_in_order_and_cap_only_the_listed() {
+        // `None` as the answer means refused.
+        type Case = (Option<String>, Vec<String>, Option<Vec<String>>);
+        let ids = |n: usize| (0..n).map(|i| format!("t{i}")).collect::<Vec<_>>();
+        let cases: Vec<Case> = vec![
+            (None, vec![], Some(vec![])),
+            (Some(" ,, ".into()), vec![], Some(vec![])),
+            (
+                Some(" a, b,,a ".into()),
+                vec![],
+                Some(vec!["a".into(), "b".into()]),
+            ),
+            (
+                Some("a".into()),
+                vec!["b".into(), "a".into()],
+                Some(vec!["a".into(), "b".into()]),
+            ),
+            (Some(ids(200).join(",")), ids(200), Some(ids(200))),
+            (Some(ids(201).join(",")), vec![], None),
+            (
+                Some(ids(150).join(",")),
+                ids(201)[150..].to_vec(),
+                Some(ids(201)),
+            ),
+            (Some(ids(200).join(",")), ids(230), Some(ids(230))),
+            (
+                Some(format!("{},t0", ids(200).join(","))),
+                vec![],
+                Some(ids(200)),
+            ),
+        ];
+        for (listed, extra, want) in cases {
+            let got = batch_ids(listed.as_deref(), extra.clone()).ok();
+            assert_eq!(got, want, "{listed:?} + {extra:?}");
+        }
+    }
+
+    #[test]
+    fn test_page_row_titles_only_rows_whose_incident_is_known() {
+        let record = |id: &str, incident_id: Option<&str>| {
+            serde_json::from_value::<config::meta::oncall::Response>(serde_json::json!({
+                "id": id,
+                "org_id": "acme",
+                "subject": {"subject_type": "alert", "source_id": "a1", "firing": 1},
+                "priority": 2,
+                "state": "triggered",
+                "opened_at": 1,
+                "incident_id": incident_id,
+            }))
+            .unwrap()
+        };
+        let titles =
+            std::collections::HashMap::from([("inc-1".to_string(), "DB down".to_string())]);
+        let cases = [
+            (record("r1", Some("inc-1")), Some("DB down")),
+            (record("r2", Some("inc-gone")), None),
+            (record("r3", None), None),
+        ];
+        for (r, want) in cases {
+            let id = r.id.clone();
+            let row = page_row(r, &Default::default(), &Default::default(), &titles);
+            assert_eq!(
+                row.get("incident_title").and_then(|t| t.as_str()),
+                want,
+                "{id}"
+            );
+            assert_eq!(row["id"], id.as_str());
+        }
     }
 
     /// Disconnecting stops the org's own phone pages, so it needs the same write as connecting.

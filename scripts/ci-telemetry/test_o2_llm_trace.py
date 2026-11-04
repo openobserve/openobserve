@@ -1,5 +1,4 @@
 # Copyright 2026 OpenObserve Inc.
-import datetime
 import hashlib
 import http.server
 import json
@@ -48,10 +47,6 @@ RESOURCE_KEYS = {
     "workflow.trace_id",
 }
 TRACE_ID = "0123456789abcdef0123456789abcdef"
-
-
-def utc(*args):
-    return datetime.datetime(*args, tzinfo=datetime.timezone.utc).timestamp()
 
 
 def attr_map(attributes):
@@ -187,27 +182,6 @@ class EndpointTest(unittest.TestCase):
         self.assertIsNone(t.pr_number({}))
 
 
-class PricingTest(unittest.TestCase):
-    def test_peak_windows(self):
-        self.assertTrue(t.is_peak(utc(2026, 10, 28, 1, 0)))
-        self.assertTrue(t.is_peak(utc(2026, 10, 28, 9, 59)))
-        self.assertFalse(t.is_peak(utc(2026, 10, 28, 4, 0)))
-        self.assertFalse(t.is_peak(utc(2026, 10, 28, 10, 0)))
-        self.assertFalse(t.is_peak(utc(2026, 10, 31, 7, 0)))
-
-    def test_flash_peak_and_off_peak(self):
-        usage = t.usage_from_response(DEEPSEEK_RESPONSE)
-        peak = (800 * 0.006 + 200 * 0.30 + 300 * 1.20) / 1e6
-        self.assertAlmostEqual(t.estimate_cost("deepseek-v4-flash", usage, utc(2026, 10, 28, 7)), peak)
-        self.assertAlmostEqual(t.estimate_cost("deepseek-flash", usage, utc(2026, 10, 28, 12)), peak / 2)
-
-    def test_pro_price_and_unknown_model(self):
-        usage = {"input": 1_000_000, "cache_read": 0, "output": 1_000_000}
-        self.assertAlmostEqual(t.estimate_cost("deepseek-v4-pro", usage, utc(2026, 10, 28, 7)), 5.28)
-        self.assertIsNone(t.estimate_cost("gpt-x", usage, utc(2026, 10, 28, 7)))
-        self.assertIsNone(t.estimate_cost("deepseek-flash", {"input": None, "output": None}, 0))
-
-
 class UsageTest(unittest.TestCase):
     def test_deepseek_usage_uses_dotted_cache_names(self):
         attrs = t.usage_attributes(t.usage_from_response(DEEPSEEK_RESPONSE))
@@ -321,7 +295,7 @@ class TracerTest(unittest.TestCase):
             "ai.llm.usage.reasoning_tokens": "120",
         }.items():
             self.assertEqual(a[key], value, key)
-        self.assertIn("gen_ai.usage.cost", a)
+        self.assertFalse([k for k in a if "cost" in k or "pricing" in k])
         self.assertEqual(json.loads(a["gen_ai.system_instructions"]), [{"type": "text", "content": "be terse"}])
         self.assertEqual(json.loads(a["gen_ai.output.messages"])[0]["parts"][0]["content"], '{"translations": ["Bonjour"]}')
         self.assertEqual(a["ai.llm.output.sha256"], hashlib.sha256(b'{"translations": ["Bonjour"]}').hexdigest())
@@ -344,7 +318,7 @@ class TracerTest(unittest.TestCase):
         self.assertEqual(event["name"], "exception")
         self.assertEqual(attr_map(event["attributes"]), {"exception.type": "RuntimeError", "exception.message": "boom"})
 
-    def test_retries_sum_usage_and_cost(self):
+    def test_retries_sum_usage_without_cost(self):
         tracer = make_tracer()
         messages = [{"role": "user", "content": "x"}]
         with tracer.llm_call("deepseek-flash", messages) as call:
@@ -357,7 +331,11 @@ class TracerTest(unittest.TestCase):
         a = attr_map(next(s for s in recorder.spans() if s["name"] == "gen_ai.chat")["attributes"])
         self.assertEqual(a["gen_ai.usage.input_tokens"], "2000")
         self.assertEqual(a["gen_ai.usage.output_tokens"], "600")
+        self.assertEqual(a["gen_ai.usage.total_tokens"], "2600")
+        self.assertEqual(a["gen_ai.usage.cache_read.input_tokens"], "1600")
+        self.assertEqual(a["ai.llm.usage.reasoning_tokens"], "240")
         self.assertEqual(a["ai.llm.attempts"], "2")
+        self.assertNotIn("gen_ai.usage.cost", a)
         self.assertNotIn("error.type", a)
 
     def test_export_failure_never_raises(self):

@@ -20,9 +20,11 @@ import { getManager } from "@/lib/vue-shortcut-manager";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import config from "@/aws-exports";
 import router from "@/test/unit/helpers/router";
 import { http, HttpResponse } from "msw";
 import tracesMockData from "@/test/unit/mockData/traces";
+import searchService from "@/services/search";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -443,6 +445,21 @@ describe("TraceDetails", () => {
           }),
         );
         routerPushSpy.mockRestore();
+      }
+    });
+
+    it("should disable View Logs with a lock while logs is locked", async () => {
+      expect(wrapper.vm.logsLocked).toBe(false);
+      store.state.zoConfig.features = { logs: "locked" };
+      try {
+        await wrapper.vm.$nextTick();
+        const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
+        expect(wrapper.vm.logsLocked).toBe(true);
+        expect(wrapper.vm.isViewLogsDisabled).toBe(true);
+        expect(viewLogsBtn.attributes("disabled")).toBeDefined();
+        expect(viewLogsBtn.findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+      } finally {
+        delete store.state.zoConfig.features;
       }
     });
   });
@@ -936,6 +953,39 @@ describe("TraceDetails", () => {
       expect(series()).toMatchObject({ left: 55, right: 55 });
     });
 
+    it("zooms both views from the chart's live level and fit recreates the chart", async () => {
+      let liveZoom = 1;
+      fakeChart.getOption = () => ({ series: [{ zoom: liveZoom }] });
+      fakeChart.setOption = vi.fn((opt: any) => {
+        liveZoom = opt.series[0].zoom;
+      });
+      await mountMap();
+
+      for (const view of ["tree", "graph"]) {
+        if (view === "graph") {
+          await graphBtn().trigger("click");
+          await flushPromises();
+        }
+        expect(wrapper.find('[data-test="trace-graph-zoom-controls"]').exists()).toBe(true);
+        liveZoom = 1;
+        await wrapper.find('[data-test="trace-graph-zoom-in"]').trigger("click");
+        expect(liveZoom).toBeCloseTo(1.25);
+        await wrapper.find('[data-test="trace-graph-zoom-out"]').trigger("click");
+        expect(liveZoom).toBeCloseTo(1);
+
+        const keyBefore = wrapper.vm.traceGraphChartKey;
+        await wrapper.find('[data-test="trace-graph-fit-screen"]').trigger("click");
+        expect(wrapper.vm.traceGraphChartKey).toBe(keyBefore + 1);
+      }
+    });
+
+    it("hides the zoom controls when no service matches", async () => {
+      await mountMap();
+      wrapper.vm.traceGraphSearch = "nope";
+      await flushPromises();
+      expect(wrapper.find('[data-test="trace-graph-zoom-controls"]').exists()).toBe(false);
+    });
+
     it("truncates graph labels and hides overlapping ones", async () => {
       await mountMap();
       await graphBtn().trigger("click");
@@ -987,6 +1037,29 @@ describe("TraceDetails", () => {
       await flushPromises();
 
       expect(fakeChart.off).toHaveBeenCalledWith("mouseover", expect.any(Function));
+    });
+
+    it("resolves the hovered node in the searched tree, not the full one", async () => {
+      const tooltipSetupDelay = () => new Promise((resolve) => setTimeout(resolve, 350));
+      const chartDom = document.createElement("div");
+      fakeChart.getDom = () => chartDom;
+      await mountMap();
+      wrapper.vm.setTraceGraphView("tree");
+      await tooltipSetupDelay();
+      const fullCatalog = series().data[0].children.find((n: any) => n.name === "catalog");
+      wrapper.vm.traceGraphSearch = "catalog";
+      await flushPromises();
+      await tooltipSetupDelay();
+
+      const catalog = series().data[0].children[0];
+      expect(catalog.name).toBe("catalog");
+      expect(catalog.treePath).not.toEqual(fullCatalog.treePath);
+      const handlers = fakeChart.on.mock.calls.filter(([event]: any[]) => event === "mouseover");
+      handlers.at(-1)[1]({ data: catalog, event: { offsetX: 10, offsetY: 10 } });
+
+      const tooltip = chartDom.lastElementChild as HTMLElement;
+      expect(tooltip.innerHTML).toContain("catalog");
+      expect(tooltip.innerHTML).not.toContain("checkout");
     });
 
     it("does not attach the tree tooltip when Graph View is chosen during the setup delay", async () => {
@@ -2050,6 +2123,25 @@ describe("TraceDetails", () => {
       expect(replayBtn.exists()).toBe(true);
     });
 
+    it("should render the session replay button disabled with a lock when rum is locked", async () => {
+      store.state.zoConfig.features = { rum: "locked" };
+      try {
+        wrapper.vm.searchObj.data.traceDetails.spanList = [
+          {
+            ...tracesMockData.tracesDetails.traceSpans.hits[0],
+            rum_session_id: "session-123",
+            rum_session_has_replay: true,
+          },
+        ];
+        await wrapper.vm.$nextTick();
+        const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
+        expect(replayBtn.attributes("disabled")).toBeDefined();
+        expect(replayBtn.findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+      } finally {
+        delete store.state.zoConfig.features;
+      }
+    });
+
     it("should not show session replay button when no RUM session exists", async () => {
       wrapper.vm.searchObj.data.traceDetails.spanList =
         tracesMockData.tracesDetails.traceSpans.hits;
@@ -2608,6 +2700,52 @@ describe("TraceDetails", () => {
       expect(localWrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe(validSpanId);
 
       localWrapper.unmount();
+    });
+
+    it("stays on the page without a not-found redirect when the details call is a license denial", async () => {
+      // The unit-test http mock flattens error bodies, so reject with the shape production http rethrows.
+      vi.spyOn(searchService, "get_trace_details").mockRejectedValue({
+        response: { status: 403, data: { code: 40001, error_detail: "traces" } },
+      });
+      const pushSpy = vi.spyOn(router, "push");
+      const localWrapper = mountWithSpanQuery("any-span");
+      await flushPromises();
+      expect(pushSpy).not.toHaveBeenCalledWith(expect.objectContaining({ name: "traces" }));
+      expect(mockShowErrorNotification).not.toHaveBeenCalled();
+      localWrapper.unmount();
+    });
+
+    it("skips the details call while traces is locked and makes it while licensed", async () => {
+      let detailCalls = 0;
+      globalThis.server.use(
+        http.get(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+          () => {
+            detailCalls++;
+            return HttpResponse.json(tracesMockData.tracesDetails.traceSpans);
+          },
+        ),
+      );
+      store.state.zoConfig.features = { traces: "locked" };
+      try {
+        const locked = mountWithSpanQuery("any-span");
+        await flushPromises();
+        expect(detailCalls).toBe(0);
+        const lockedView = locked.find('[data-test="trace-details-license-locked"]');
+        expect(lockedView.exists()).toBe(true);
+        const denied = lockedView.findComponent({ name: "LicenseDeniedState" });
+        expect(denied.props("features")).toEqual(["traces"]);
+        const exempt = lockedView.find("[data-feature-lock-exempt]");
+        expect(exempt.find('[data-test="trace-details-back-btn"]').exists()).toBe(true);
+        locked.unmount();
+      } finally {
+        delete store.state.zoConfig.features;
+      }
+      const licensed = mountWithSpanQuery("any-span");
+      await flushPromises();
+      expect(detailCalls).toBeGreaterThan(0);
+      expect(licensed.find('[data-test="trace-details-license-locked"]').exists()).toBe(false);
+      licensed.unmount();
     });
 
     it("opens Preview when a URL-selected span is an LLM evaluator span", async () => {
@@ -3189,6 +3327,108 @@ describe("TraceDetails", () => {
       await pending;
 
       expect(viewSpanLogs).not.toHaveBeenCalled();
+    });
+
+    it("opens a plain logs search without a warning when correlation is license-locked", async () => {
+      store.state.zoConfig.features = { correlation: "locked" };
+      try {
+        const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+        wrapper.vm.searchObj.data.traceDetails.correlationProps = null;
+        const spanId = tracesMockData.tracesDetails.traceSpans.hits[0].span_id;
+        await wrapper.vm.handleTreeViewCorrelatedLogs({ span_id: spanId });
+        await flushPromises();
+        expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ path: "/logs" }));
+      } finally {
+        delete store.state.zoConfig.features;
+      }
+    });
+  });
+
+  describe("Ask AI: Explain trace and the span relay", () => {
+    const EXPLAIN = '[data-test="trace-explain-trace-btn"]';
+    const sidebarStub = () => ({
+      ...mountOptions.global.stubs["trace-details-sidebar"],
+      props: [...mountOptions.global.stubs["trace-details-sidebar"].props, "showAskAi"],
+      emits: [...mountOptions.global.stubs["trace-details-sidebar"].emits, "sendToAiChat"],
+    });
+    let savedEnterprise: string;
+    let savedAiEnabled: unknown;
+
+    async function mountAskAi(showAskAi: boolean, { enterprise = true, ai = true } = {}) {
+      config.isEnterprise = enterprise ? "true" : "false";
+      store.state.zoConfig.ai_enabled = ai;
+      wrapper.unmount();
+      wrapper = mount(TraceDetails, {
+        ...mountOptions,
+        props: { ...mountOptions.props, showAskAi },
+        global: {
+          ...mountOptions.global,
+          stubs: { ...mountOptions.global.stubs, "trace-details-sidebar": sidebarStub() },
+        },
+      });
+      await flushPromises();
+      wrapper.vm.activeTab = "waterfall";
+      await flushPromises();
+    }
+
+    async function openSidebar() {
+      wrapper.vm.updateSelectedSpan(tracesMockData.tracesDetails.traceSpans.hits[0].span_id);
+      await flushPromises();
+      return wrapper.findComponent('[data-test="trace-details-sidebar"]');
+    }
+
+    beforeEach(() => {
+      savedEnterprise = config.isEnterprise;
+      savedAiEnabled = store.state.zoConfig.ai_enabled;
+    });
+
+    afterEach(() => {
+      config.isEnterprise = savedEnterprise;
+      store.state.zoConfig.ai_enabled = savedAiEnabled;
+    });
+
+    it.each([
+      ["the parent leaves showAskAi off", false, {}],
+      ["the build is not enterprise", true, { enterprise: false }],
+      ["AI is disabled on the server", true, { ai: false }],
+    ])("hides Explain trace and the span button when %s", async (_label, show, gate) => {
+      await mountAskAi(show, gate);
+      expect(wrapper.find(EXPLAIN).exists()).toBe(false);
+      expect((await openSidebar()).props("showAskAi")).toBe(false);
+    });
+
+    it("shows Explain trace beside the Critical path toggle on the Waterfall tab only", async () => {
+      await mountAskAi(true);
+      expect(wrapper.find(EXPLAIN).exists()).toBe(true);
+      wrapper.vm.activeTab = "flame-graph";
+      await flushPromises();
+      expect(wrapper.find(EXPLAIN).exists()).toBe(false);
+    });
+
+    it("emits sendToAiChat with the trace summary when Explain trace is clicked", async () => {
+      await mountAskAi(true);
+      await wrapper.find(EXPLAIN).trigger("click");
+      const [payload] = wrapper.emitted("sendToAiChat")![0] as [Record<string, any>];
+      expect(payload.chipName).toBe(`Trace · ${wrapper.vm.traceTree[0].operationName}`);
+      expect(payload).toMatchObject({ newChat: true, autoSend: false });
+      expect(payload.context).toMatchObject({
+        currentPage: "traces",
+        streamType: "traces",
+        selectedStreams: ["test-stream"],
+        traceId: "test-trace-id",
+      });
+      const summary = payload.context.trace_summary;
+      expect(summary.total_spans).toBe(tracesMockData.tracesDetails.traceSpans.hits.length);
+      expect(summary.critical_path.length).toBeGreaterThan(0);
+    });
+
+    it("turns the span button on and relays its sendToAiChat", async () => {
+      await mountAskAi(true);
+      const sidebar = await openSidebar();
+      expect(sidebar.props("showAskAi")).toBe(true);
+      const payload = { query: "q", chipName: "Span · x", newChat: true, autoSend: false };
+      sidebar.vm.$emit("sendToAiChat", payload);
+      expect(wrapper.emitted("sendToAiChat")![0]).toEqual([payload]);
     });
   });
 });

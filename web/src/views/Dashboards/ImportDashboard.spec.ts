@@ -47,6 +47,7 @@ vi.mock("@/utils/dashboard/panelValidation", () => ({
 vi.mock("@/components/dashboards/SelectFolderDropdown.vue", () => ({
   default: {
     name: "SelectFolderDropdown",
+    props: ["activeFolderId", "disabled"],
     template: '<div data-test="select-folder-dropdown"></div>',
   },
 }));
@@ -383,6 +384,96 @@ describe("ImportDashboard.vue", () => {
       "traces",
       "enrichment_tables",
     ]);
+  });
+
+  it.each(["import_json_file", "import_json_url"])(
+    "locks the folder picker on %s while an import is running",
+    async (tab) => {
+      wrapper = mountComponent();
+      wrapper.vm.activeTab = tab;
+      await nextTick();
+      const picker = () => wrapper.findComponent({ name: "SelectFolderDropdown" });
+      expect(picker().props("disabled")).toBe(false);
+
+      wrapper.vm.isLoading = tab === "import_json_url" ? "url" : "files";
+      await nextTick();
+      expect(picker().props("disabled")).toBe(true);
+
+      wrapper.vm.isLoading = false;
+      await nextTick();
+      expect(picker().props("disabled")).toBe(false);
+    },
+  );
+
+  it("keeps the folder picker locked until a pending create settles", async () => {
+    const dashboardService = (await import("@/services/dashboards")).default;
+    let settle: (v: unknown) => void = () => {};
+    (dashboardService.create as any).mockReturnValue(new Promise((resolve) => (settle = resolve)));
+    wrapper = mountComponent();
+    await nextTick();
+    wrapper.vm.jsonStr = JSON.stringify({ title: "Pending", tabs: [{ tabId: "t1", panels: [] }] });
+
+    const run = wrapper.vm.importFromJsonStr();
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "SelectFolderDropdown" }).props("disabled")).toBe(true);
+
+    settle({ data: {} });
+    await run;
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "SelectFolderDropdown" }).props("disabled")).toBe(false);
+  });
+
+  it("keeps the folder picker locked while uploaded files are importing", async () => {
+    const dashboardService = (await import("@/services/dashboards")).default;
+    let settle: (v: unknown) => void = () => {};
+    (dashboardService.create as any).mockReturnValue(new Promise((resolve) => (settle = resolve)));
+    const content = JSON.stringify({ title: "Pending", tabs: [{ tabId: "t1", panels: [] }] });
+    wrapper = mountComponent();
+    await nextTick();
+    wrapper.vm.form.setFieldValue("jsonFiles", [
+      new File([content], "a.json", { type: "application/json" }),
+    ]);
+    await flushPromises();
+    wrapper.vm.jsonStr = JSON.stringify([JSON.parse(content)]);
+    const picker = () => wrapper.findComponent({ name: "SelectFolderDropdown" });
+
+    void wrapper.vm.importFiles();
+    await flushPromises();
+    expect(picker().props("disabled")).toBe(true);
+
+    settle({ data: {} });
+    await flushPromises();
+    expect(picker().props("disabled")).toBe(false);
+  });
+
+  it("imports every uploaded dashboard into the folder chosen when the import started", async () => {
+    const dashboardService = (await import("@/services/dashboards")).default;
+    const settles: Array<(v: unknown) => void> = [];
+    (dashboardService.create as any).mockImplementation(
+      () => new Promise((resolve) => settles.push(resolve)),
+    );
+    const dash = (title: string) => ({ title, tabs: [{ tabId: "t1", panels: [] }] });
+    wrapper = mountComponent();
+    await nextTick();
+    wrapper.vm.selectedFolder = { label: "A", value: "folder-a" };
+    wrapper.vm.form.setFieldValue("jsonFiles", [
+      new File([JSON.stringify([dash("One"), dash("Two")])], "a.json", {
+        type: "application/json",
+      }),
+    ]);
+    await flushPromises();
+    wrapper.vm.jsonStr = JSON.stringify([[dash("One"), dash("Two")]]);
+
+    void wrapper.vm.importFiles();
+    await flushPromises();
+    wrapper.vm.selectedFolder = { label: "B", value: "folder-b" };
+    settles.shift()?.({ data: {} });
+    await flushPromises();
+    settles.shift()?.({ data: {} });
+    await flushPromises();
+
+    const folders = (dashboardService.create as any).mock.calls.map((c: any[]) => c[2]);
+    expect(folders).toEqual(["folder-a", "folder-a"]);
   });
 
   // Real-OForm validation wiring (playbook §5): the OForm covers only the

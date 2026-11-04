@@ -118,7 +118,8 @@ test.describe("Create Alert from Dashboard Panel testcases", () => {
       // is a span, not an <input>, so read the committed value via the helper.
       const alertNameValue = pm.alertsPage.getAlertNameValueLocator();
       await expect(alertNameValue).toBeVisible({ timeout: 30000 });
-      expect((await alertNameValue.textContent()) ?? "").toContain("Alert_from_");
+      // The temporary auto-name shows first until the prefill resetForm applies the panel name
+      await expect(alertNameValue).toContainText("Alert_from_", { timeout: 30000 });
       testLogger.info("Landed on the alert form pre-filled from the panel");
 
       // Navigate back to the dashboard folder and clean up.

@@ -38,6 +38,12 @@ export function sanitizePrTree(prDir, contextSourceDir) {
   return { removed, contextFiles: copied };
 }
 
+// The same names the walk strips, so a PR touching only these still steers a reviewer and is never docs-only.
+export function isLoaderPath(filePath) {
+  const parts = String(filePath ?? "").toLowerCase().split("/");
+  return LOADER_FILES.has(parts.at(-1)) || parts.some(part => LOADER_DIRS.has(part));
+}
+
 function walk(dir, root, removed) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
