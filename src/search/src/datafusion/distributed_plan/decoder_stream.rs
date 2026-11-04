@@ -23,8 +23,9 @@ use config::{
     utils::{record_batch_ext::RecordBatchExt, size::bytes_to_human_readable},
 };
 use flight::{
-    common::{CustomMessage, FlightMessage, RemoteScanMetrics},
-    decoder::FlightDataDecoder,
+    decoder::{FlightDataDecoder, FlightMessage},
+    message::CustomMessage,
+    remote_scan::RemoteScanMetrics,
 };
 use futures::{Stream, StreamExt, ready};
 use tonic::Streaming;

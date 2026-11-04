@@ -28,7 +28,7 @@ use datafusion::{
     common::{DataFusionError, Result},
     physical_plan::execute_stream_partitioned,
 };
-use flight::common::{MetricsInfo, NodeMessages};
+use flight::node_messages::{MetricsInfo, NodeMessages};
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;

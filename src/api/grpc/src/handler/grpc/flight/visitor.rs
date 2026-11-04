@@ -19,7 +19,7 @@ use datafusion::{
     common::tree_node::{TreeNode, TreeNodeRecursion},
     physical_plan::ExecutionPlan,
 };
-use flight::common::NodeRole;
+use flight::node_messages::NodeRole;
 use search::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
 pub use search::datafusion::plan_metrics::get_peak_memory_from_ctx;
 

@@ -26,7 +26,7 @@ use arrow_flight::{FlightData, error::Result};
 use bytes::Bytes;
 use flatbuffers::FlatBufferBuilder;
 
-use crate::common::CustomMessage;
+use crate::message::CustomMessage;
 
 /// Encodes CustomMessages and RecordBatch chunks into FlightData (coalescing is separate — see
 /// [`ChunkCoalescer`]). Owns the zstd compressor, so it's not `Clone`: use one per thread.
@@ -232,7 +232,7 @@ mod tests {
     use config::meta::search::ScanStats;
 
     use super::*;
-    use crate::common::CustomMessage;
+    use crate::message::CustomMessage;
 
     fn create_test_schema() -> Schema {
         Schema::new(vec![
