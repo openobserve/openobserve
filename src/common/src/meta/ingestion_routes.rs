@@ -29,8 +29,7 @@
 //! changing an ingestion endpoint means editing [`INGESTION_ROUTES`] and nothing
 //! else.
 //!
-//! Rows are matched against the route template axum matched (`MatchedPath`), with the
-//! `/api/` (and base-uri) mount prefix lined up away, so segment 0 is `{org_id}`.
+//! Rows match axum's `MatchedPath` below the mount prefix, so segment 0 is `{org_id}`.
 
 use axum::http::Method;
 
