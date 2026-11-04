@@ -1798,6 +1798,75 @@ pub(crate) async fn alert_for_swept_run(done: &synthetics_runs::RunFinalized) {
     .await;
 }
 
+/// Sends the "Monitoring gap" notice of every gap that passed the 15-minute rule without a run
+/// to send it, for example on an hourly check, and retries a notice whose send failed. The
+/// reaper calls it on each sweep. The notice is marked only after delivery
+/// (`core::synthetics::notify_gap`).
+pub(crate) async fn send_due_gap_notices(now_us: i64) {
+    let Some(notify) = RUN_NOTIFIER.get() else {
+        return;
+    };
+    let conn = get_orm_client_rw().await;
+    let due = match synthetics_checks::list_due_gap_notices(
+        conn,
+        now_us - crate::alerting::GAP_NOTICE_AFTER_US,
+    )
+    .await
+    {
+        Ok(due) => due,
+        Err(e) => {
+            tracing::error!("[synthetics reaper] list_due_gap_notices: {e}");
+            return;
+        }
+    };
+    for (org_id, synthetics_id, since) in due {
+        let Ok(Some(synthetic)) =
+            synthetics_checks::get_cached(conn, &org_id, &synthetics_id).await
+        else {
+            continue;
+        };
+        if synthetic.destinations.is_empty()
+            || crate::alerting::muted_by(
+                &org_id,
+                &synthetic.id,
+                &synthetic.folder_id,
+                &synthetic.tags,
+            )
+            .await
+            .is_some()
+        {
+            continue;
+        }
+        notify(AckResponse {
+            run_complete: true,
+            run_status: None,
+            job_count: 0,
+            org_id,
+            job_id: String::new(),
+            run_id: String::new(),
+            synthetics_id,
+            synthetics_name: synthetic.name,
+            synthetic_type: String::new(),
+            target: synthetic.target,
+            destinations: synthetic.destinations,
+            location: String::new(),
+            pool: String::new(),
+            trigger_type: "scheduled".to_string(),
+            alert: AlertDecision::Silent,
+            status_reason: None,
+            consecutive_failures: 0,
+            failing_locations: Vec::new(),
+            passing_locations: Vec::new(),
+            usage_events: Vec::new(),
+            failing_environments: Vec::new(),
+            suppressed_by: None,
+            coverage: None,
+            gap_notice: Some(crate::alerting::GapNotice::Opened { since }),
+        })
+        .await;
+    }
+}
+
 /// Delay before the one extra run that fills a Not measured gap.
 const GAP_RETRY_DELAY_US: i64 = 60_000_000;
 
@@ -1858,6 +1927,7 @@ pub(crate) async fn publish_check_status(done: &synthetics_runs::RunFinalized) {
                 _streaks.run_ts,
                 _streaks.run_class,
                 _streaks.run_class_at,
+                _streaks.tested_at,
             )
             .await
     {
@@ -1945,7 +2015,7 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         return Ok(stale_lease_response(req.job_id, req.trigger_type, check));
     }
 
-    // A failure waits for one confirm job from a second location before it counts. The confirm
+    // A failure waits for one confirm job from the same location before it counts. The confirm
     // job joins the run before this job is counted, so the run cannot complete without it.
     if status_db == config::meta::synthetics::SyntheticStatus::Failed.to_db() {
         let confirm_failures =

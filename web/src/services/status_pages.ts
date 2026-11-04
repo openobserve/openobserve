@@ -167,9 +167,9 @@ const statusPagesService = {
   listNoticeUpdates: (orgIdentifier: string, noticeId: string) =>
     http().get(`/api/${orgIdentifier}/status_pages/notices/${noticeId}/updates`),
 
-  markFalsePositive: (orgIdentifier: string, noticeId: string, reason: string, snoozeHours = 6) =>
+  // No snooze: the server holds only the failure the incident was marked on.
+  markFalsePositive: (orgIdentifier: string, noticeId: string, reason: string) =>
     http().post(`/api/${orgIdentifier}/status_pages/notices/${noticeId}/mark_false_positive`, {
-      snooze_hours: snoozeHours,
       reason,
     }),
 

@@ -101,6 +101,8 @@ pub async fn run(stop: crate::StopToken) {
             Err(e) => tracing::error!("[synthetics reaper] finalize_stuck_runs: {e}"),
         }
 
+        crate::job_api::send_due_gap_notices(now_us).await;
+
         match synthetics_jobs::prune_stale(db, now_us).await {
             // Warn, not info: `dead_letter_expired` above should have claimed and
             // accounted for every one of these. Anything this deletes is a run

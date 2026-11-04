@@ -959,6 +959,8 @@ pub struct StatusStreaks {
     pub run_class: i32,
     /// `scheduled_ts` of the first run in the current `run_class`, in microseconds.
     pub run_class_at: i64,
+    /// `scheduled_ts` of the newest run that tested the site, in microseconds. 0 = none.
+    pub tested_at: i64,
 }
 
 /// Reads the badge and run streaks of one check. `None` when the check is not in this region.
@@ -974,17 +976,21 @@ pub async fn get_status_streaks<C: ConnectionTrait>(
         .column(Column::StatusRunTs)
         .column(Column::LastRunClass)
         .column(Column::LastRunClassAt)
-        .into_tuple::<(i32, i32, i32, i64, i32, i64)>()
+        .column(Column::LastTestedAt)
+        .into_tuple::<(i32, i32, i32, i64, i32, i64, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
-        |(last_check_status, down_runs, up_runs, run_ts, run_class, run_class_at)| StatusStreaks {
-            last_check_status,
-            down_runs,
-            up_runs,
-            run_ts,
-            run_class,
-            run_class_at,
+        |(last_check_status, down_runs, up_runs, run_ts, run_class, run_class_at, tested_at)| {
+            StatusStreaks {
+                last_check_status,
+                down_runs,
+                up_runs,
+                run_ts,
+                run_class,
+                run_class_at,
+                tested_at,
+            }
         },
     ))
 }
@@ -1003,18 +1009,22 @@ pub async fn lock_status_streaks<C: ConnectionTrait>(
         .column(Column::StatusRunTs)
         .column(Column::LastRunClass)
         .column(Column::LastRunClassAt)
+        .column(Column::LastTestedAt)
         .lock_exclusive()
-        .into_tuple::<(i32, i32, i32, i64, i32, i64)>()
+        .into_tuple::<(i32, i32, i32, i64, i32, i64, i64)>()
         .one(conn)
         .await?;
     Ok(row.map(
-        |(last_check_status, down_runs, up_runs, run_ts, run_class, run_class_at)| StatusStreaks {
-            last_check_status,
-            down_runs,
-            up_runs,
-            run_ts,
-            run_class,
-            run_class_at,
+        |(last_check_status, down_runs, up_runs, run_ts, run_class, run_class_at, tested_at)| {
+            StatusStreaks {
+                last_check_status,
+                down_runs,
+                up_runs,
+                run_ts,
+                run_class,
+                run_class_at,
+                tested_at,
+            }
         },
     ))
 }
@@ -1033,7 +1043,8 @@ pub async fn swap_status_streaks<C: ConnectionTrait>(
         .col_expr(Column::StatusUpRuns, Expr::value(next.up_runs))
         .col_expr(Column::StatusRunTs, Expr::value(next.run_ts))
         .col_expr(Column::LastRunClass, Expr::value(next.run_class))
-        .col_expr(Column::LastRunClassAt, Expr::value(next.run_class_at));
+        .col_expr(Column::LastRunClassAt, Expr::value(next.run_class_at))
+        .col_expr(Column::LastTestedAt, Expr::value(next.tested_at));
     if streaks_differ(expected, next) {
         q = q.col_expr(
             Column::UpdatedAt,
@@ -1070,6 +1081,7 @@ pub async fn apply_replicated_streaks<C: ConnectionTrait>(
         .col_expr(Column::StatusRunTs, Expr::value(next.run_ts))
         .col_expr(Column::LastRunClass, Expr::value(next.run_class))
         .col_expr(Column::LastRunClassAt, Expr::value(next.run_class_at))
+        .col_expr(Column::LastTestedAt, Expr::value(next.tested_at))
         .col_expr(
             Column::UpdatedAt,
             Expr::value(config::utils::time::now_micros()),
@@ -1201,6 +1213,45 @@ pub async fn update_alert_state_if<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(res.rows_affected > 0)
+}
+
+/// Records that the "Monitoring gap" notice of the gap that began at `since` went out. Only a
+/// delivery sets it, so a failed send stays owed. `false` when the gap ended or another sender
+/// marked it first.
+pub async fn mark_gap_notified<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    since: i64,
+    at: i64,
+) -> Result<bool, errors::Error> {
+    let res = Entity::update_many()
+        .col_expr(Column::GapNotifiedAt, Expr::value(at))
+        .filter(Column::Id.eq(id))
+        .filter(Column::GapSince.eq(since))
+        .filter(Column::GapNotifiedAt.eq(0))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Enabled checks whose open gap began at or before `before` and still owes its notice:
+/// `(org_id, id, gap_since)`.
+pub async fn list_due_gap_notices<C: ConnectionTrait>(
+    conn: &C,
+    before: i64,
+) -> Result<Vec<(String, String, i64)>, errors::Error> {
+    Ok(Entity::find()
+        .select_only()
+        .column(Column::OrgId)
+        .column(Column::Id)
+        .column(Column::GapSince)
+        .filter(Column::Enabled.eq(true))
+        .filter(Column::GapSince.gt(0))
+        .filter(Column::GapSince.lte(before))
+        .filter(Column::GapNotifiedAt.eq(0))
+        .into_tuple::<(String, String, i64)>()
+        .all(conn)
+        .await?)
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
@@ -1460,6 +1511,7 @@ pub(crate) mod tests {
             status_run_ts: 0,
             last_run_class: 0,
             last_run_class_at: 0,
+            last_tested_at: 0,
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,

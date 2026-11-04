@@ -312,8 +312,8 @@ pub struct NoticeUpdateRequest {
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct MarkFalsePositiveRequest {
-    /// Hours to snooze the underlying check org-wide (default 6, per mockup
-    /// B1's "snooze 6h").
+    /// Ignored: a false alarm no longer snoozes the check. Kept so older
+    /// clients that send it still decode.
     #[serde(default = "default_snooze_hours")]
     pub snooze_hours: i64,
     /// Why the incident was not real. Stored with who marked it and when.

@@ -524,6 +524,11 @@ pub fn next_streaks(
     } else {
         run_ts
     };
+    let tested_at = if RunClass::from_db(run_class).counts_for_uptime() {
+        run_ts
+    } else {
+        cur.tested_at
+    };
     Some(StatusStreaks {
         last_check_status: run_result,
         down_runs,
@@ -531,6 +536,7 @@ pub fn next_streaks(
         run_ts,
         run_class,
         run_class_at,
+        tested_at,
     })
 }
 
@@ -797,6 +803,7 @@ async fn replay_streaks<C: ConnectionTrait>(
         run_ts: cur.run_ts,
         run_class: cur.run_class,
         run_class_at: cur.run_class_at,
+        tested_at: cur.tested_at,
     })
 }
 
@@ -826,8 +833,8 @@ fn fresh_execution_ids(json: &str) -> String {
 
 /// Adds one confirm job for the failed job `job_id` to its run, so the run waits for it.
 ///
-/// The confirm job runs at once from another location of the same environment, one that passed
-/// or did not fail if there is one, else from the same location. Returns the new job id, or `None`
+/// The confirm job runs at once from the location that failed. A pass there marks a short blip;
+/// a pass elsewhere would hide a one-region outage. Returns the new job id, or `None`
 /// when `job_id` is a confirm job, already has one, or its run already completed.
 pub async fn add_confirm_job<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
@@ -852,15 +859,6 @@ pub async fn add_confirm_job<C: ConnectionTrait + TransactionTrait>(
         txn.commit().await?;
         return Ok(None);
     }
-    let others = || {
-        siblings
-            .iter()
-            .filter(|j| j.env == orig.env && j.location != orig.location && confirm_of(j).is_none())
-    };
-    let source = others()
-        .find(|j| j.status == JOB_PASSED || j.status == JOB_WARNING)
-        .or_else(|| others().find(|j| j.status != JOB_FAILED))
-        .unwrap_or(&orig);
     let bumped = txn
         .execute(Statement::from_sql_and_values(
             txn.get_database_backend(),
@@ -886,9 +884,9 @@ pub async fn add_confirm_job<C: ConnectionTrait + TransactionTrait>(
             synthetics_id: &orig.synthetics_id,
             synthetics_name: &orig.synthetics_name,
             org_id: &orig.org_id,
-            location: &source.location,
+            location: &orig.location,
             env: orig.env.as_deref(),
-            pool: &source.pool,
+            pool: &orig.pool,
             scheduled_ts: now_us,
             valid_until: now_us + (orig.valid_until - orig.scheduled_ts),
             run_id: &orig.run_id,
@@ -1089,6 +1087,7 @@ mod tests {
             status_run_ts: 0,
             last_run_class: 0,
             last_run_class_at: 0,
+            last_tested_at: 0,
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,
@@ -1198,6 +1197,7 @@ mod tests {
                 run_ts: m.status_run_ts,
                 run_class: m.last_run_class,
                 run_class_at: m.last_run_class_at,
+                tested_at: m.last_tested_at,
             },
             m.updated_at,
         )
@@ -1230,6 +1230,22 @@ mod tests {
                 "n={n} f={failed} h={healthy}"
             );
         }
+    }
+
+    #[test]
+    fn tested_at_moves_only_on_a_run_that_tested_the_site() {
+        let up =
+            next_streaks(&StatusStreaks::default(), 1, Verdict::Up, RunClass::Up, 100).unwrap();
+        assert_eq!(up.tested_at, 100);
+        let gap = next_streaks(&up, 0, Verdict::NoVerdict, RunClass::NotMeasured, 200).unwrap();
+        assert_eq!(
+            gap.tested_at, 100,
+            "a Not measured run keeps the last test time"
+        );
+        let bad = next_streaks(&gap, 0, Verdict::NoVerdict, RunClass::Misconfigured, 300).unwrap();
+        assert_eq!(bad.tested_at, 100);
+        let down = next_streaks(&bad, 3, Verdict::Down, RunClass::Down, 400).unwrap();
+        assert_eq!(down.tested_at, 400);
     }
 
     #[test]
@@ -1282,6 +1298,7 @@ mod tests {
                 run_ts: 100,
                 run_class: RunClass::Partial.to_db(),
                 run_class_at: 100,
+                tested_at: 100,
             }
         );
         assert_eq!(done.check_update, Some(row));
@@ -1416,6 +1433,7 @@ mod tests {
                 run_ts: 100,
                 run_class: RunClass::Down.to_db(),
                 run_class_at: 100,
+                tested_at: 100,
             }
         );
         let run = get_run(&db, "r1").await.unwrap().unwrap();
@@ -1456,13 +1474,13 @@ mod tests {
             location: loc.to_string(),
             ..j
         };
-        // One of two fails, its confirm job from the other location fails too: one vote.
+        // One of two fails, its confirm job from the same location fails too: one vote.
         let t = tally(
             3,
             &[
                 at(job("a", JOB_FAILED), "aws-us-east-1"),
                 at(job("b", JOB_PASSED), "aws-us-west-1"),
-                at(confirm("c", "a", JOB_FAILED), "aws-us-west-1"),
+                at(confirm("c", "a", JOB_FAILED), "aws-us-east-1"),
             ],
         );
         assert_eq!(t.class, RunClass::Partial);
@@ -1733,7 +1751,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_failure_gets_one_confirm_job_from_a_passing_location() {
+    async fn a_failure_gets_one_confirm_job_from_the_location_that_failed() {
         let db = db().await;
         run_with_jobs(&db, "r", 100, 2).await;
         ack(&db, "r", 1, 1, 150).await;
@@ -1749,8 +1767,8 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(
-            confirm_row.location, "loc-1",
-            "runs from the location that passed"
+            confirm_row.location, "loc-0",
+            "runs from the location that failed, not the one that passed"
         );
         assert_eq!(confirm_row.status, 0);
         assert_eq!(confirm_row.scheduled_ts, 200, "runs at once");

@@ -57,6 +57,8 @@ pub struct CheckStateRow {
     pub last_run_class: i32,
     /// `scheduled_ts` of the first run in the current `last_run_class`.
     pub last_run_class_at: i64,
+    /// `scheduled_ts` of the newest finalized run that tested the site. 0 = none.
+    pub last_tested_at: i64,
     /// Seconds between scheduled runs; 0 for cron.
     pub interval_secs: i64,
     pub created_at: i64,
@@ -140,70 +142,57 @@ pub async fn get_check_states<C: ConnectionTrait>(
         .column(synthetics_checks::Column::StatusRunTs)
         .column(synthetics_checks::Column::LastRunClass)
         .column(synthetics_checks::Column::LastRunClassAt)
+        .column(synthetics_checks::Column::LastTestedAt)
         .column(synthetics_checks::Column::Frequency)
         .column(synthetics_checks::Column::CreatedAt)
         .filter(synthetics_checks::Column::Id.is_in(check_ids.iter().cloned()));
     if let Some(watermark) = since {
         q = q.filter(synthetics_checks::Column::UpdatedAt.gt(watermark));
     }
-    let rows = q
-        .into_tuple::<(
-            String,
-            String,
-            i32,
-            i32,
-            i32,
-            i64,
-            i64,
-            i64,
-            i32,
-            i64,
-            serde_json::Value,
-            i64,
-        )>()
-        .all(conn)
-        .await?;
+    // Thirteen columns: more than a tuple read takes.
+    #[derive(sea_orm::FromQueryResult)]
+    struct Row {
+        id: String,
+        org_id: String,
+        last_check_status: i32,
+        status_down_runs: i32,
+        status_up_runs: i32,
+        last_triggered_at: i64,
+        updated_at: i64,
+        status_run_ts: i64,
+        last_run_class: i32,
+        last_run_class_at: i64,
+        last_tested_at: i64,
+        frequency: serde_json::Value,
+        created_at: i64,
+    }
+    let rows = q.into_model::<Row>().all(conn).await?;
     let mut max_updated = since.unwrap_or(0);
     let out = rows
         .into_iter()
-        .map(
-            |(
-                id,
-                org_id,
-                last_check_status,
-                down_runs,
-                up_runs,
-                last_triggered_at,
-                updated_at,
-                status_run_ts,
-                last_run_class,
-                last_run_class_at,
-                frequency,
-                created_at,
-            )| {
-                if updated_at > max_updated {
-                    max_updated = updated_at;
-                }
-                let interval_secs = serde_json::from_value::<
-                    config::meta::synthetics::SyntheticFrequency,
-                >(frequency)
-                .map(|f| f.interval_secs())
-                .unwrap_or(0);
-                CheckStateRow {
-                    id,
-                    org_id,
-                    last_check_status,
-                    down_runs,
-                    up_runs,
-                    last_triggered_at,
-                    status_run_ts,
-                    last_run_class,
-                    last_run_class_at,
-                    interval_secs,
-                    created_at,
-                }
-            },
-        )
+        .map(|r| {
+            if r.updated_at > max_updated {
+                max_updated = r.updated_at;
+            }
+            let interval_secs =
+                serde_json::from_value::<config::meta::synthetics::SyntheticFrequency>(r.frequency)
+                    .map(|f| f.interval_secs())
+                    .unwrap_or(0);
+            CheckStateRow {
+                id: r.id,
+                org_id: r.org_id,
+                last_check_status: r.last_check_status,
+                down_runs: r.status_down_runs,
+                up_runs: r.status_up_runs,
+                last_triggered_at: r.last_triggered_at,
+                status_run_ts: r.status_run_ts,
+                last_run_class: r.last_run_class,
+                last_run_class_at: r.last_run_class_at,
+                last_tested_at: r.last_tested_at,
+                interval_secs,
+                created_at: r.created_at,
+            }
+        })
         .collect();
     Ok((out, max_updated))
 }

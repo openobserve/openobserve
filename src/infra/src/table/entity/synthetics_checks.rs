@@ -58,6 +58,8 @@ pub struct Model {
     pub last_run_class: i32,
     /// `scheduled_ts` of the first run in the current `last_run_class`, in microseconds.
     pub last_run_class_at: i64,
+    /// `scheduled_ts` of the newest finalized run that tested the site, in microseconds. 0 = none.
+    pub last_tested_at: i64,
     /// When the current run of Not measured results started, in microseconds. 0 = no gap.
     pub gap_since: i64,
     /// Not measured runs in a row in the current gap.
@@ -109,6 +111,7 @@ mod tests {
             status_run_ts: 0,
             last_run_class: 0,
             last_run_class_at: 0,
+            last_tested_at: 0,
             gap_since: 0,
             gap_runs: 0,
             gap_notified_at: 0,

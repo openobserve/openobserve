@@ -347,6 +347,7 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
             run_ts,
             run_class,
             run_class_at,
+            tested_at,
         } => {
             let streaks = table::synthetics_checks::StatusStreaks {
                 last_check_status: status,
@@ -355,6 +356,7 @@ async fn process_msg(msg: SyntheticsMessage) -> Result<()> {
                 run_ts,
                 run_class,
                 run_class_at,
+                tested_at,
             };
             apply_last_check_status(conn, &org_id, &id, &streaks).await?;
         }
@@ -714,6 +716,7 @@ mod tests {
                 up_runs: 0,
                 run_class: 0,
                 run_class_at: 0,
+                tested_at: 0,
                 ..
             }
         ));
@@ -729,6 +732,7 @@ mod tests {
             run_ts: 200,
             run_class: 3,
             run_class_at: 200,
+            tested_at: 200,
         };
         apply_last_check_status(&db, "org1", "check-1", &newer)
             .await
@@ -742,6 +746,7 @@ mod tests {
             run_ts: 100,
             run_class: 1,
             run_class_at: 100,
+            tested_at: 100,
         };
         apply_last_check_status(&db, "org1", "check-1", &older)
             .await
@@ -821,6 +826,7 @@ mod tests {
             run_ts: 0,
             run_class: 0,
             run_class_at: 0,
+            tested_at: 0,
         })
         .unwrap();
         let msg = Message::new(
@@ -894,6 +900,7 @@ mod tests {
                 status_run_ts BIGINT NOT NULL DEFAULT 0,
                 last_run_class INTEGER NOT NULL DEFAULT 0,
                 last_run_class_at BIGINT NOT NULL DEFAULT 0,
+                last_tested_at BIGINT NOT NULL DEFAULT 0,
                 gap_since BIGINT NOT NULL DEFAULT 0,
                 gap_runs INTEGER NOT NULL DEFAULT 0,
                 gap_notified_at BIGINT NOT NULL DEFAULT 0,

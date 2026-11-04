@@ -18,6 +18,7 @@
 use sea_orm_migration::prelude::*;
 
 const TABLE: &str = "status_page_notices";
+const COLUMNS: [&str; 3] = ["false_alarm_by", "false_alarm_at", "false_alarm_reason"];
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -33,26 +34,26 @@ enum StatusPageNotices {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // add_column_if_not_exists renders IF NOT EXISTS, which MySQL rejects.
-        if manager.has_column(TABLE, "false_alarm_at").await? {
-            return Ok(());
-        }
+        // add_column_if_not_exists renders IF NOT EXISTS, which MySQL rejects, so each column
+        // has its own guard. A run that stopped halfway then adds only the missing columns.
         // SQLite takes one ADD COLUMN per ALTER TABLE.
-        for stmt in add_column_stmts() {
-            manager.alter_table(stmt).await?;
+        for (name, stmt) in COLUMNS.into_iter().zip(add_column_stmts()) {
+            if !manager.has_column(TABLE, name).await? {
+                manager.alter_table(stmt).await?;
+            }
         }
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        if !manager.has_column(TABLE, "false_alarm_at").await? {
-            return Ok(());
-        }
-        for col in [
+        for (name, col) in COLUMNS.into_iter().zip([
             StatusPageNotices::FalseAlarmBy,
             StatusPageNotices::FalseAlarmAt,
             StatusPageNotices::FalseAlarmReason,
-        ] {
+        ]) {
+            if !manager.has_column(TABLE, name).await? {
+                continue;
+            }
             manager
                 .alter_table(
                     Table::alter()
@@ -94,8 +95,32 @@ fn add_column_stmts() -> Vec<TableAlterStatement> {
 #[cfg(test)]
 mod tests {
     use collapse::*;
+    use sea_orm::{ConnectionTrait, Database};
 
     use super::*;
+
+    #[tokio::test]
+    async fn a_run_that_stopped_halfway_adds_the_missing_columns() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute_unprepared(
+            "CREATE TABLE status_page_notices (id TEXT PRIMARY KEY, false_alarm_by VARCHAR(256))",
+        )
+        .await
+        .unwrap();
+        let manager = SchemaManager::new(&db);
+        Migration.up(&manager).await.unwrap();
+        Migration.up(&manager).await.unwrap();
+        for name in COLUMNS {
+            assert!(manager.has_column(TABLE, name).await.unwrap(), "{name}");
+        }
+        db.execute_unprepared("ALTER TABLE status_page_notices DROP COLUMN false_alarm_reason")
+            .await
+            .unwrap();
+        Migration.down(&manager).await.unwrap();
+        for name in COLUMNS {
+            assert!(!manager.has_column(TABLE, name).await.unwrap(), "{name}");
+        }
+    }
 
     #[test]
     fn postgres() {

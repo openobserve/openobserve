@@ -451,6 +451,10 @@ pub enum GapNotice {
 /// in a row or [`GAP_NOTICE_AFTER_US`], and "Monitoring resumed" on the next run that is not Not
 /// measured, only if the gap notice went out. The state lives on the check row, so a restart or
 /// another node continues the same gap.
+///
+/// This never sets `gap_notified_at`: the sender sets it after a delivery succeeds
+/// (`synthetics_checks::mark_gap_notified`), so a failed send is owed again on the next run or
+/// reaper sweep.
 pub fn decide_gap(
     prior: AlertState,
     not_measured: bool,
@@ -475,14 +479,13 @@ pub fn decide_gap(
     } else {
         now_us
     };
-    let mut next = AlertState {
+    let next = AlertState {
         gap_since: since,
         gap_runs: prior.gap_runs.saturating_add(1),
         ..prior
     };
     let due = next.gap_runs >= GAP_NOTICE_RUNS || now_us - since >= GAP_NOTICE_AFTER_US;
     if prior.gap_notified_at == 0 && due {
-        next.gap_notified_at = now_us;
         return (Some(GapNotice::Opened { since }), next);
     }
     (None, next)
@@ -1169,7 +1172,8 @@ mod tests {
     }
 
     /// Runs `classes` (true = Not measured) through the gap state from `state`, one per minute
-    /// from `start`, and returns the notices with the final state.
+    /// from `start`, and returns the notices with the final state. Each gap notice is delivered,
+    /// so the sender marks it as `mark_gap_notified` does.
     fn run_gap(
         mut state: AlertState,
         start: i64,
@@ -1177,11 +1181,26 @@ mod tests {
     ) -> (Vec<GapNotice>, AlertState) {
         let mut notices = Vec::new();
         for (i, not_measured) in classes.iter().enumerate() {
-            let (notice, next) = decide_gap(state, *not_measured, start + i as i64 * MIN);
+            let now = start + i as i64 * MIN;
+            let (notice, mut next) = decide_gap(state, *not_measured, now);
+            if let Some(GapNotice::Opened { .. }) = notice {
+                next.gap_notified_at = now;
+            }
             notices.extend(notice);
             state = next;
         }
         (notices, state)
+    }
+
+    #[test]
+    fn a_gap_notice_that_was_not_delivered_is_owed_again() {
+        let t0 = 10 * MIN;
+        let (_, state) = run_gap(AlertState::default(), t0, &[true, true]);
+        let (first, undelivered) = decide_gap(state, true, t0 + 2 * MIN);
+        assert_eq!(first, Some(GapNotice::Opened { since: t0 }));
+        assert_eq!(undelivered.gap_notified_at, 0, "only a delivery marks it");
+        let (again, _) = decide_gap(undelivered, true, t0 + 3 * MIN);
+        assert_eq!(again, Some(GapNotice::Opened { since: t0 }));
     }
 
     #[test]

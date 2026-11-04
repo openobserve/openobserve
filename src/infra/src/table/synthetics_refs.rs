@@ -295,6 +295,7 @@ mod tests {
                 status_run_ts BIGINT NOT NULL DEFAULT 0,
                 last_run_class INTEGER NOT NULL DEFAULT 0,
                 last_run_class_at BIGINT NOT NULL DEFAULT 0,
+                last_tested_at BIGINT NOT NULL DEFAULT 0,
                 gap_since BIGINT NOT NULL DEFAULT 0,
                 gap_runs INTEGER NOT NULL DEFAULT 0,
                 gap_notified_at BIGINT NOT NULL DEFAULT 0,

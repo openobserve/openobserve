@@ -12,7 +12,8 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//! Adds the class of the newest finalized run to `synthetics`.
+//! Adds the class of the newest finalized run, and when a run last tested the site, to
+//! `synthetics`.
 
 use sea_orm_migration::prelude::*;
 
@@ -69,12 +70,14 @@ enum Synthetics {
     Table,
     LastRunClass,
     LastRunClassAt,
+    LastTestedAt,
 }
 
-fn columns() -> [(&'static str, Synthetics, bool); 2] {
+fn columns() -> [(&'static str, Synthetics, bool); 3] {
     [
         ("last_run_class", Synthetics::LastRunClass, false),
         ("last_run_class_at", Synthetics::LastRunClassAt, true),
+        ("last_tested_at", Synthetics::LastTestedAt, true),
     ]
 }
 
@@ -100,13 +103,14 @@ mod tests {
         let row = db
             .query_one(Statement::from_string(
                 db.get_database_backend(),
-                "SELECT last_run_class, last_run_class_at FROM synthetics",
+                "SELECT last_run_class, last_run_class_at, last_tested_at FROM synthetics",
             ))
             .await
             .unwrap()
             .unwrap();
         assert_eq!(row.try_get::<i32>("", "last_run_class").unwrap(), 0);
         assert_eq!(row.try_get::<i64>("", "last_run_class_at").unwrap(), 0);
+        assert_eq!(row.try_get::<i64>("", "last_tested_at").unwrap(), 0);
         Migration.down(&manager).await.unwrap();
         assert!(!manager.has_column(TABLE, "last_run_class").await.unwrap());
     }
