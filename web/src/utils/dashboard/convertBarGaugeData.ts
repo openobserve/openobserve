@@ -202,7 +202,7 @@ export const barGaugeItems = (gaugeOptions: any, panelSchema: any): BarGaugeItem
           value,
           min: toNumber(gauge.min) ?? 0,
           max: toNumber(gauge.max) ?? 100,
-          color: item.itemStyle?.color as string | undefined,
+          color: item.itemStyle?.color,
           text,
         },
       };
