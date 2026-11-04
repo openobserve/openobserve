@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class IngestionConfigPage {
     constructor(page) {
@@ -488,7 +489,7 @@ export class IngestionConfigPage {
                 const retryCostMs = 1000 * (attempt + 1) + 5000;
                 // A spent budget would push the whole test past its timeout, so the real error is reported instead
                 if (attempt >= maxRetries || retryCostMs > this.networkErrorRetryBudgetMs) throw error;
-                console.warn(`[doc-links] HEAD failed (${error.message}), retry ${attempt + 1}/${maxRetries}: ${href}`);
+                testLogger.warn(`[doc-links] HEAD failed (${error.message}), retry ${attempt + 1}/${maxRetries}: ${href}`);
                 this.networkErrorRetryBudgetMs -= retryCostMs;
                 await this.page.waitForTimeout(1000 * (attempt + 1));
             }
