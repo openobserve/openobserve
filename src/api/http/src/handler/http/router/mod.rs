@@ -1284,12 +1284,9 @@ pub fn service_routes() -> Router {
     let server = cfg.common.instance_name_short.to_string();
 
     // Downtimes, Slack and service streams live in their own tables to keep this function under the line limit.
-    let mut router = public_dashboard_admin_routes(
-        Router::new()
-            .merge(downtime_routes())
-            .merge(slack_routes())
-            .merge(service_streams_routes()),
-    );
+    let mut router =
+        public_dashboard_admin_routes(Router::new().merge(downtime_routes()).merge(slack_routes()));
+    router = router.merge(service_streams_routes());
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
