@@ -2334,6 +2334,24 @@ struct AlertResolution {
     gap_notice: Option<crate::alerting::GapNotice>,
 }
 
+/// The gap follows the stored class where there is one: a run is Not measured only when no
+/// location tested the site. A Misconfigured run did not test it either, so it neither grows nor
+/// closes the gap: "Monitoring resumed" needs a run that tested the site.
+fn gap_step(
+    next: infra::table::synthetics_checks::AlertState,
+    run_class: config::meta::synthetics::RunClass,
+    not_measured: bool,
+    now_us: i64,
+) -> (
+    Option<crate::alerting::GapNotice>,
+    infra::table::synthetics_checks::AlertState,
+) {
+    if run_class == config::meta::synthetics::RunClass::Misconfigured {
+        return (None, next);
+    }
+    crate::alerting::decide_gap(next, not_measured, now_us)
+}
+
 async fn resolve_alert<C: sea_orm::ConnectionTrait>(
     conn: &C,
     outcome: RunOutcome<'_>,
@@ -2402,10 +2420,9 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
         check.cooldown_mins,
         now_us,
     );
-    // The gap follows the stored class where there is one: a run is Not measured only when no
-    // location tested the site.
-    let (gap_notice, next) = crate::alerting::decide_gap(
+    let (gap_notice, next) = gap_step(
         next,
+        done.run_class,
         class == crate::alerting::RunClass::NotMeasured,
         now_us,
     );
@@ -2593,6 +2610,24 @@ mod tests {
     }
 
     // Step billing. Every guard is a pure function, so these need no database.
+    #[test]
+    fn a_misconfigured_run_neither_closes_nor_grows_a_gap() {
+        use config::meta::synthetics::RunClass as C;
+        let open = infra::table::synthetics_checks::AlertState {
+            gap_since: 100,
+            gap_runs: 3,
+            gap_notified_at: 200,
+            ..Default::default()
+        };
+        assert_eq!(gap_step(open, C::Misconfigured, false, 300), (None, open));
+        let (resumed, closed) = gap_step(open, C::Up, false, 300);
+        assert!(matches!(
+            resumed,
+            Some(crate::alerting::GapNotice::Resumed { .. })
+        ));
+        assert_eq!(closed.gap_since, 0);
+    }
+
     #[test]
     fn a_confirm_run_alerts_on_its_merged_vote() {
         use config::meta::synthetics::RunClass as C;

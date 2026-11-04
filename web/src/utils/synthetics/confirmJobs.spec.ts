@@ -72,6 +72,23 @@ describe("splitConfirms", () => {
     expect(confirms).toEqual([{ of: a, confirm }]);
   });
 
+  it("should pair each confirm job with the failure in its own location", () => {
+    const at = (location: string, status: ExecutionSlot["status"], ts: number) => ({
+      ...exec(location, status, ts),
+      scheduledTs: ts < 10 ? 1 : ts,
+    });
+    const east = at("us-east", "fail", 1);
+    const west = at("us-west", "fail", 2);
+    // West's confirm job is scheduled first; it still re-tests west, not east.
+    const westConfirm = at("us-west", "pass", 10);
+    const eastConfirm = at("us-east", "fail", 11);
+    const { confirms } = splitConfirms([east, west, eastConfirm, westConfirm]);
+    expect(confirms).toEqual([
+      { of: west, confirm: westConfirm },
+      { of: east, confirm: eastConfirm },
+    ]);
+  });
+
   it("should find no confirm job in a run that tests each slot once", () => {
     const runs = [exec("a", "fail", 1), exec("b", "pass", 2)];
     expect(splitConfirms(runs)).toEqual({ primary: runs, confirms: [] });

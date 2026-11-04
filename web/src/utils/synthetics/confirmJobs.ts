@@ -36,13 +36,14 @@ export interface ConfirmPair<T> {
 /**
  * Split a run's executions into the scheduled ones and its confirm jobs.
  *
- * A confirm job re-tests a failure from a second location of the same run, or
- * from the same location when the check has one. Its result row carries no
+ * A confirm job re-tests a failure from the location that failed (older runs
+ * used a second location). Its result row carries no
  * marker, but the job API enqueues it with its own, later `scheduled_ts`, while
  * the run's own jobs share the run's. Rows without a scheduled time fall back to
  * the slot rule: a run tests each (location, browser, device, environment) slot
  * once, so a second execution in a slot is a confirm job. Each confirm job pairs
- * with a failed execution of the run, on the same device when there is one.
+ * with a failed execution of the run: in its own location first, then on the
+ * same device, then in the same environment.
  */
 export function splitConfirms<T extends ExecutionSlot>(
   executions: readonly T[],
@@ -67,16 +68,16 @@ export function splitConfirms<T extends ExecutionSlot>(
     const i = failed.findIndex(match);
     return i < 0 ? null : failed.splice(i, 1)[0];
   };
-  // A browser confirm job re-tests every device: pair same-device failures first, then the rest.
+  const sameDevice = (f: T, c: T) =>
+    f.browser === c.browser && f.device === c.device && f.environment === c.environment;
+  // A browser confirm job re-tests every device: pair same-location, same-device failures first.
   const confirms: ConfirmPair<T>[] = extra.map((confirm) => ({
-    of: take(
-      (f) =>
-        f.browser === confirm.browser &&
-        f.device === confirm.device &&
-        f.environment === confirm.environment,
-    ),
+    of: take((f) => f.location === confirm.location && sameDevice(f, confirm)),
     confirm,
   }));
+  for (const pair of confirms) {
+    if (!pair.of) pair.of = take((f) => sameDevice(f, pair.confirm));
+  }
   for (const pair of confirms) {
     if (!pair.of) pair.of = take((f) => f.environment === pair.confirm.environment);
   }
