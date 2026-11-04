@@ -79,8 +79,14 @@ pub(super) fn plan_day(
         .map(|group| (group, MergeMode::Classic))
         .collect();
     if mode.merges_whole_batch() {
+        // a merged day's late files join each other, or the whole day would be sorted again
+        let mode_files: Vec<FileKey> = if outputs > 0 {
+            mode_files.into_iter().filter(|f| !day_output(f)).collect()
+        } else {
+            mode_files
+        };
         // series stay together: one batch in (hash, timestamp) order, split by size on output
-        if !mode_files.is_empty() {
+        if mode_files.len() > 1 {
             batches.push((mode_files, mode.clone()));
         }
     } else {
@@ -319,6 +325,22 @@ mod tests {
         assert_eq!(legacy[0].0.len(), 2);
         assert_eq!(indexed[0].0.len(), 24);
         assert!(matches!(indexed[0].1, MergeMode::MetricsIndexed));
+    }
+
+    /// A merged indexed day is not sorted again for its late files: they join each other.
+    #[test]
+    fn test_plan_day_merged_indexed_day_late_files_join_each_other() {
+        let strategy = MergeStrategy::FileTime;
+        let limits = limits(&strategy);
+        let mut merged = file("metrics", 0, "indexed-v1-merged", 12 * GB);
+        merged.meta.max_ts = hour_micros(24) - 1;
+        let mut files = vec![merged, file("metrics", 5, "indexed-v1-late5", MB)];
+        assert!(plan_day(files.clone(), &MergeMode::MetricsIndexed, &limits).is_empty());
+        files.push(file("metrics", 9, "indexed-v1-late9", MB));
+        let batches = plan_day(files, &MergeMode::MetricsIndexed, &limits);
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0].0.len(), 2);
+        assert!(batches[0].0.iter().all(|f| !day_output(f)));
     }
 
     /// Hour 00's own files, without the outputs of a merged day.
