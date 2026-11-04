@@ -109,7 +109,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("oncall.myDeliveriesUnread", { count: unread }, unread) }}
           </OTag>
 
-          <span v-if="unread || unreadOnly" class="ms-auto flex flex-wrap items-center gap-2">
+          <!-- Hidden, not removed, so the header does not reflow when the first unread arrives. -->
+          <span
+            class="ms-auto flex flex-wrap items-center gap-2"
+            :class="unread || unreadOnly ? '' : 'invisible'"
+            data-test="oncall-my-deliveries-controls"
+          >
             <OCheckbox
               :model-value="unreadOnly"
               :label="t('oncall.myDeliveriesUnreadOnly')"
@@ -117,9 +122,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="(v: CheckboxModelValue) => setUnreadOnly(!!v)"
             />
             <OButton
-              v-if="unread"
               variant="outline"
               size="sm"
+              :class="unread ? '' : 'invisible'"
               :loading="marking"
               data-test="oncall-my-deliveries-read-all"
               @click="markAll"
@@ -214,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ raw(clock(row.latest.at)) }}
             </span>
           </template>
-          <template #cell-actions="{ row }">
+          <template #cell-row-actions="{ row }">
             <div class="flex items-center justify-end">
               <!-- An open tooltip is the top dismissable layer, so it would take the menu's Escape. -->
               <ODropdown
@@ -260,16 +265,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="block"
           icon="notifications-active"
           :title="unreadOnly ? t('oncall.myDeliveriesNoUnread') : t('oncall.myDeliveriesNone')"
-          :action-label="
-            unreadOnly || !canTest
-              ? undefined
-              : testTeamName
-                ? t('oncall.mineTestTeam', { team: raw(testTeamName) })
-                : t('oncall.mineTestTeamPage')
-          "
-          action-icon="campaign"
+          :action-label="emptyAction?.label"
+          :action-icon="emptyAction?.icon"
           data-test="oncall-my-deliveries-empty"
-          @action="emit('test-page')"
+          @action="emptyAction?.run()"
         />
       </section>
     </template>
@@ -307,7 +306,7 @@ import {
 } from "@/services/oncall.queries";
 import type { Channel, MyDeliveries, MyDelivery } from "@/ts/interfaces/oncall";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { formatOnCallInstant, isEscalating } from "@/utils/oncall";
 
@@ -321,11 +320,19 @@ const props = withDefaults(
     canTest?: boolean;
     /** The team that test page goes to, named on the button so it is never ambiguous. */
     testTeamName?: string | null;
+    /** The reader is on no team, so the empty history points them at one instead. */
+    noTeam?: boolean;
   }>(),
-  { teamNames: () => ({}), teamsState: "loaded", canTest: false, testTeamName: null },
+  {
+    teamNames: () => ({}),
+    teamsState: "loaded",
+    canTest: false,
+    testTeamName: null,
+    noTeam: false,
+  },
 );
 
-const emit = defineEmits<{ unread: [count: number]; "test-page": [] }>();
+const emit = defineEmits<{ unread: [count: number]; "test-page": []; "join-team": [] }>();
 
 /// A first visit has a handful of pages, so more skeleton rows would only collapse when they land.
 const HISTORY_SKELETON_ROWS = 3;
@@ -401,6 +408,23 @@ const teamsPending = (...ids: string[]) =>
 
 const countsAsUnread = (row: MyDelivery) => !row.read;
 
+/// An empty history always says what to do next: test a team's page, or find a team to be paged by.
+const emptyAction = computed<{ label: I18nText; icon: IconName; run: () => void } | null>(() => {
+  if (unreadOnly.value) return null;
+  if (props.canTest) {
+    return {
+      label: props.testTeamName
+        ? t("oncall.mineTestTeam", { team: raw(props.testTeamName) })
+        : t("oncall.mineTestTeamPage"),
+      icon: "campaign",
+      run: () => emit("test-page"),
+    };
+  }
+  return props.noTeam
+    ? { label: t("oncall.mineJoinTeam"), icon: "group", run: () => emit("join-team") }
+    : null;
+});
+
 /// The open pages, one row per page with its newest send.
 const openRows = computed<MyDelivery[]>(() => {
   const byPage = new Map<string, MyDelivery>();
@@ -415,8 +439,10 @@ const openRows = computed<MyDelivery[]>(() => {
 const historyRows = computed<HistoryRow[]>(() => {
   const groups = new Map<string, MyDelivery[]>();
   for (const row of rows.value) {
-    // The id carries the firing ("…#2"); without it every firing of one alert is its own row.
-    const key = `${row.subject_type}:${row.subject_id.replace(/#\d+$/, "")}`;
+    // By name: an alert and the incident it opened page under one title, and the reader cannot tell them apart.
+    const key = row.title
+      ? `title:${row.title}`
+      : `${row.subject_type}:${row.subject_id.replace(/#\d+$/, "")}`;
     groups.set(key, [...(groups.get(key) ?? []), row]);
   }
   return [...groups.entries()]
@@ -463,10 +489,8 @@ const openColumns = computed<OTableColumnDef<MyDelivery>[]>(() => [
 ]);
 
 const historyColumns = computed<OTableColumnDef<HistoryRow>[]>(() => [
-  // Only while something is unread: a column of empty dots says nothing.
-  ...(historyRows.value.some((row) => row.unread)
-    ? [{ id: "unread", header: raw(""), size: 32, sortable: false }]
-    : []),
+  // Always present: a column that arrived with the first unread row shifted every other column.
+  { id: "unread", header: raw(""), size: 32, sortable: false },
   {
     id: "page",
     header: t("oncall.myDeliveriesPage"),
@@ -479,14 +503,13 @@ const historyColumns = computed<OTableColumnDef<HistoryRow>[]>(() => [
   { id: "state", header: t("oncall.myDeliveriesStatus"), size: 128, sortable: false },
   { id: "channels", header: t("oncall.myDeliveriesChannels"), size: 104, sortable: false },
   { id: "at", header: t("oncall.myDeliveriesWhen"), size: 176, sortable: false },
+  // Not `isAction`: that pins the column, and its divider reads as a stray border on a table this narrow.
   {
-    id: "actions",
+    id: "row-actions",
     header: t("oncall.actions"),
-    isAction: true,
-    pinned: "right",
     sortable: false,
     size: 64,
-    meta: { align: "center", actionCount: 1 },
+    meta: { align: "center" },
   },
 ]);
 

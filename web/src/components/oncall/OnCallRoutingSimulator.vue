@@ -104,6 +104,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </i18n-t>
           <span v-else :class="responderTone" data-test="oncall-simulator-responder">
             {{ responderNote }}
+            <OTooltip
+              v-if="responderWhy"
+              side="bottom"
+              :content="responderWhy"
+              data-test="oncall-simulator-responder-why"
+            />
           </span>
           <template v-if="nextStep">
             <span>{{ raw(" · ") }}</span>
@@ -537,16 +543,25 @@ const responderNote = computed<I18nText>(() => {
   const step = firstStep.value;
   if (step) {
     if (!step.recipients.length) return t("oncall.simulatorNobodyOnCall");
-    const blocked = step.recipients.find((one) => !one.would_a_page_land);
-    if (!step.recipients.some((one) => one.would_a_page_land)) {
-      return raw(blocked?.why_not) || t("oncall.contactNoChannel");
-    }
+    if (!step.recipients.some((one) => one.would_a_page_land)) return t("oncall.contactNoChannel");
     return t("oncall.simulatorSendsNothing");
   }
   const person = responder.value;
   if (!person) return t("oncall.simulatorNobodyOnCall");
-  if (!person.would_a_page_land) return raw(person.why_not) || t("oncall.contactNoChannel");
+  if (!person.would_a_page_land) return t("oncall.contactNoChannel");
   return t("oncall.simulatorSendsNothing");
+});
+
+/// The server's reason a page cannot land runs to a sentence, so it rides the tooltip and the answer stays one line.
+const responderWhy = computed<I18nText | null>(() => {
+  if (ladderEntry.value && !ladderEntry.value.pages_anyone) return null;
+  const step = firstStep.value;
+  if (step) {
+    if (step.recipients.some((one) => one.would_a_page_land)) return null;
+    return raw(step.recipients.find((one) => !one.would_a_page_land)?.why_not) || null;
+  }
+  const person = responder.value;
+  return person && !person.would_a_page_land ? raw(person.why_not) || null : null;
 });
 
 const responderTone = computed(() => {

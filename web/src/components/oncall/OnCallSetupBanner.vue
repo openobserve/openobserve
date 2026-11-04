@@ -106,9 +106,21 @@ async function read<T>(
   return queryClient.fetchQuery(options as any) as Promise<T>;
 }
 
+/// One answering policy is enough, so teams are asked in turn rather than all at once.
+async function anyPolicy(org: string, teamList: OnCallTeam[], force: boolean) {
+  for (const team of teamList) {
+    const policy = await read<OnCallPolicy | null>(teamPolicyQuery(org, team.id), force).catch(
+      () => null,
+    );
+    if (policy) return true;
+  }
+  return false;
+}
+
 async function load(force = false) {
   const org = orgId.value;
-  if (!org) return;
+  // A dismissed bar never shows, so its facts are not worth a request.
+  if (!org || dismissed.value) return;
   try {
     const [teamList, gaps, rules, pages] = await Promise.all([
       read<OnCallTeam[]>(oncallTeamsQuery(org), force),
@@ -116,15 +128,13 @@ async function load(force = false) {
       read<OwnershipRule[]>(ownershipRulesQuery(org), force),
       read<OnCallResponse[]>(responsesQuery(org, { include_resolved: true, limit: 20 }), force),
     ]);
-    const policies = await Promise.allSettled(
-      teamList.map((team) => read<OnCallPolicy | null>(teamPolicyQuery(org, team.id), force)),
-    );
+    const hasPolicy = await anyPolicy(org, teamList, force);
     teams.value = teamList;
     facts.value = {
       hasTeam: teamList.length > 0,
       hasStaffedRotation: teamList.length > 0 && (gaps?.total ?? 0) < teamList.length,
       // The server creates the default ladder on first read, so a policy that answers is one that pages.
-      hasPolicy: policies.some((p) => p.status === "fulfilled" && !!p.value),
+      hasPolicy,
       // An alert bound straight to a team counts: it is routing without a rule.
       hasRouting: rules.length > 0 || pages.some((page) => !!page.team_id),
     };

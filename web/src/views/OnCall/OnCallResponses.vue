@@ -709,13 +709,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("oncall.resolve") }}
             </ODropdownItem>
             <ODropdownItem
-              icon-left="open-in-new"
-              :data-test="`oncall-row-open-${row.rowKey}`"
-              @select="openResponse(row)"
-            >
-              {{ t("oncall.rowOpenPage") }}
-            </ODropdownItem>
-            <ODropdownItem
               icon-left="timeline"
               :data-test="`oncall-row-show-timeline-${row.rowKey}`"
               @select="toggleTimeline(row)"

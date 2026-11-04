@@ -284,6 +284,7 @@ describe("OnCallRoutingSimulator", () => {
     expect(next).toBe("then Kim after 5m");
   });
 
+  /// The server's reason can run to a sentence; it sits in the tooltip so the answer stays on one line.
   it("says why when nobody on the first step can receive a page", async () => {
     vi.useRealTimers();
     escalationPreview.mockResolvedValue({
@@ -311,7 +312,8 @@ describe("OnCallRoutingSimulator", () => {
     await flushPromises();
     await flushPromises();
     const responder = wrapper.find('[data-test="oncall-simulator-responder"]');
-    expect(responder.text()).toBe("no verified channel");
+    expect(responder.text()).toBe("No channel can carry a page");
+    expect(responder.findComponent(OTooltip).props("content")).toBe("no verified channel");
     expect(responder.classes()).toContain("text-status-error-text");
   });
 
