@@ -3398,4 +3398,68 @@ export class TracesPage {
       const cap = setTimeout(finish, maxMs);
     }), { minExamples, maxMs, intervalMs });
   }
+
+  // ============================================
+  // CREATE ALERT / ADD TO DASHBOARD (RED actions)
+  // Source: web/src/plugins/traces/SearchBar.vue, PanelContainer.vue, metrics/TracesLatencyHeatmap.vue
+  // ============================================
+
+  async openMoreActionsMenu() {
+    await this.page.locator('[data-test="traces-search-bar-more-actions-btn"]').click();
+  }
+
+  async clickAddRedChartsToDashboard() {
+    await this.openMoreActionsMenu();
+    await this.page.locator('[data-test="traces-add-red-to-dashboard-btn"]').click();
+  }
+
+  async createAlertFromChartMenu(title) {
+    const panel = this.metricsPanelLocator(title);
+    if (title === 'Duration') {
+      await panel.hover();
+      await this.page.locator('[data-test="traces-duration-actions-btn"]').click();
+      await this.page.locator('[data-test="traces-duration-create-alert"]').click();
+      return;
+    }
+    // Hovering the chart body opens its tooltip, which then covers this button.
+    const actionsBtn = panel.locator('[data-test="panel-explore-actions-btn"]');
+    await actionsBtn.hover();
+    await actionsBtn.click();
+    await this.page.locator('[data-test="panel-explore-create-alert"]').click();
+  }
+
+  async expectAddToDashboardPanels(count) {
+    const dialog = this.page.locator('[data-test="add-to-dashboard-dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 15000 });
+    await expect(this.page.locator('[data-test="add-to-dashboard-notice"]')).toBeVisible();
+    await expect(this.page.locator('[data-test="add-to-dashboard-panel-title"]')).toHaveCount(count);
+  }
+
+  async selectDashboardInAddDialog(title) {
+    await this.page.locator('[data-test="dashboard-dropdown-dashboard-selection-trigger"]').click();
+    await this.page
+      .locator('[data-test="dashboard-dropdown-dashboard-selection-option"]')
+      .filter({ hasText: title })
+      .first()
+      .click();
+  }
+
+  async confirmAddToDashboard() {
+    await this.page
+      .locator('[data-test="add-to-dashboard-dialog"] [data-test="o-dialog-primary-btn"]')
+      .click();
+  }
+
+  async expectAlertFormPrefilledFromTraces() {
+    await expect(this.page).toHaveURL(/prefill=traces/, { timeout: 30000 });
+    await expect(
+      this.page.locator('[data-test="add-alert-stream-type-select-dropdown"]').first()
+    ).toContainText('traces', { timeout: 30000 });
+    await expect(
+      this.page.locator('[data-test="alert-trigger-threshold-input-field"]').first()
+    ).toHaveValue('1');
+    await expect(
+      this.page.locator('[data-test="alert-trigger-operator-select"]').first()
+    ).toContainText('>=');
+  }
 }

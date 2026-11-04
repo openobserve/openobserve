@@ -12,7 +12,7 @@
   >
     <OForm
       id="add-to-dashboard-form"
-      :schema="addToDashboardSchema"
+      :schema="isMulti ? multiPanelSchema : addToDashboardSchema"
       :default-values="addToDashboardDefaults(defaultPanelTitle)"
       @submit="onSubmit"
     >
@@ -25,12 +25,16 @@
           data-test="add-to-dashboard-notice"
         />
         <!-- select folder or create new folder and select -->
-        <SelectFolderDropdown @folder-selected="updateActiveFolderId" />
+        <SelectFolderDropdown
+          :active-folder-id="rememberedTarget?.folderId ?? null"
+          @folder-selected="updateActiveFolderId"
+        />
 
         <!-- select folder or create new folder and select -->
         <SelectDashboardDropdown
           v-if="activeFolderId"
           :folder-id="activeFolderId"
+          :preferred-dashboard-id="rememberedTarget?.dashboardId"
           @dashboard-selected="updateSelectedDashboard"
         />
 
@@ -39,9 +43,29 @@
           v-if="activeFolderId && selectedDashboard"
           :folder-id="activeFolderId"
           :dashboard-id="selectedDashboard"
+          :preferred-tab-id="
+            rememberedTarget?.dashboardId === selectedDashboard
+              ? rememberedTarget?.tabId
+              : undefined
+          "
           @tab-selected="updateActiveTabId"
         />
+        <div v-if="isMulti" class="flex flex-col gap-1" data-test="add-to-dashboard-panel-titles">
+          <span class="text-compact text-input-label-text leading-tight font-medium">
+            {{ t("metrics.addToDashboardPage.panelsToAdd") }}
+          </span>
+          <ul class="text-text-body flex flex-col gap-0.5 text-sm">
+            <li
+              v-for="(panel, index) in panels"
+              :key="index"
+              data-test="add-to-dashboard-panel-title"
+            >
+              <OTruncatedText>{{ panel.title }}</OTruncatedText>
+            </li>
+          </ul>
+        </div>
         <OFormInput
+          v-else
           name="panelTitle"
           :label="t('dashboard.panelTitle')"
           required
@@ -65,6 +89,8 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { z } from "zod";
 import { useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -74,6 +100,12 @@ import {
   addToDashboardDefaults,
   type AddToDashboardForm,
 } from "./AddToDashboard.schema";
+
+interface DashboardTarget {
+  folderId: string;
+  dashboardId: string;
+  tabId: string;
+}
 
 export default defineComponent({
   name: "AddToDashboard",
@@ -85,6 +117,7 @@ export default defineComponent({
     OForm,
     OFormInput,
     OBanner,
+    OTruncatedText,
   },
   props: {
     open: {
@@ -133,6 +166,36 @@ export default defineComponent({
     const activeTabId: any = ref(null);
     const { t } = useI18nTyped();
     const addToDashboardSchema = makeAddToDashboardSchema(t);
+    // Each panel brings its own title, so the hidden title field must not block submit.
+    const multiPanelSchema = z.object({ panelTitle: z.string() });
+    const isMulti = computed(() => props.panels.length > 0);
+
+    const rememberedTargetKey = () =>
+      `addToDashboard.lastTarget.${store.state.selectedOrganization?.identifier ?? ""}.${
+        store.state.userInfo?.email ?? ""
+      }`;
+    const rememberedTarget = ref<DashboardTarget | null>(null);
+
+    const readRememberedTarget = (): DashboardTarget | null => {
+      try {
+        const parsed = JSON.parse(window.localStorage.getItem(rememberedTargetKey()) ?? "null");
+        return parsed && typeof parsed.folderId === "string" ? parsed : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const writeRememberedTarget = (target: DashboardTarget) => {
+      try {
+        window.localStorage.setItem(rememberedTargetKey(), JSON.stringify(target));
+      } catch {
+        // A full or blocked localStorage only loses the preselection next time.
+      }
+    };
+
+    // Panel indexes already written to savedTarget, so a retry adds only the rest.
+    const savedPanelIndexes = new Set<number>();
+    let savedTarget = "";
 
     const { showErrorNotification, showConfictErrorNotificationWithRefreshBtn } =
       useNotifications();
@@ -146,11 +209,17 @@ export default defineComponent({
       () => props.open,
       async (isOpen) => {
         if (isOpen) {
+          rememberedTarget.value = readRememberedTarget();
           await getFoldersList(store);
+          const folderId = rememberedTarget.value?.folderId;
+          if (store.state.organizationData.folders.some((f: any) => f.folderId === folderId)) {
+            activeFolderId.value = folderId as string;
+          }
         } else {
           activeFolderId.value = "default";
           selectedDashboard.value = null;
           activeTabId.value = null;
+          savedPanelIndexes.clear();
         }
       },
       { immediate: true },
@@ -176,7 +245,12 @@ export default defineComponent({
     ) => {
       let dismiss = function () {};
 
-      const multi = props.panels && props.panels.length > 0;
+      const multi = isMulti.value;
+      const target = `${dashboardId}/${tabId}`;
+      if (target !== savedTarget) {
+        savedPanelIndexes.clear();
+        savedTarget = target;
+      }
       // Counted per write: a later panel failing does not undo the ones already saved.
       let written = 0;
       try {
@@ -193,12 +267,16 @@ export default defineComponent({
           // auto-positions each one (side-by-side, then wrapping), so N calls
           // lay out an N-panel grid. Each needs a fresh panel id; the title comes
           // from the panel data (per-metric), falling back to the form title.
-          for (const panelData of props.panels) {
+          for (const [index, panelData] of props.panels.entries()) {
+            if (savedPanelIndexes.has(index)) continue;
             panelData.id = getPanelId();
             if (!panelData.title) panelData.title = panelTitle;
             await addPanel(store, dashboardId, panelData, folderId, tabId);
+            savedPanelIndexes.add(index);
             written++;
           }
+          // The page is kept alive, so a later Add from the same dialog must write every panel.
+          savedPanelIndexes.clear();
         } else {
           dashboardPanelData.value.data.id = getPanelId();
           // panel name will come from add to dashboard component
@@ -207,12 +285,15 @@ export default defineComponent({
           await addPanel(store, dashboardId, dashboardPanelData.value.data, folderId, tabId);
           written++;
         }
+        writeRememberedTarget({ folderId, dashboardId, tabId });
         toast({
           message: multi
             ? t("metrics.addToDashboardPage.panelsAdded")
             : t("metrics.addToDashboardPage.panelAdded"),
           variant: "success",
         });
+        // A kept-alive caller page would show the dialog still open on return.
+        emit("update:open", false);
         router.push({
           name: "viewDashboard",
           query: { dashboard: dashboardId, folder: folderId, tab: tabId },
@@ -267,6 +348,9 @@ export default defineComponent({
       // built schema MUST be exposed or `:schema` resolves to undefined
       // (which silently disables validation).
       addToDashboardSchema,
+      multiPanelSchema,
+      isMulti,
+      rememberedTarget,
       addToDashboardDefaults,
       selectedDashboard,
       filteredDashboards,

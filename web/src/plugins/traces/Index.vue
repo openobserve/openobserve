@@ -331,14 +331,13 @@ import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
-import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { applyFieldGrouping, buildSemanticIndex, type FieldObj } from "@/utils/fieldCategories";
 import {
   useServiceCorrelation,
   type KeyFieldsConfig,
   type FieldGroupingConfig,
 } from "@/composables/useServiceCorrelation";
-import { parseSpanKindWhereClause } from "@/utils/traces/constants";
+import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
@@ -705,18 +704,7 @@ function buildSearch(reuseLastWindow = false) {
     let whereClause = query.trim();
 
     if (whereClause.trim() != "") {
-      // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
-      const durationParseResult = parseDurationWhereClause(
-        whereClause,
-        tracesParser.value,
-        searchObj.data.stream.selectedStream.value,
-      );
-      if (typeof durationParseResult === "string") {
-        whereClause = durationParseResult;
-      }
-
-      // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
-      whereClause = parseSpanKindWhereClause(
+      whereClause = resolveTracesFilter(
         whereClause,
         tracesParser.value,
         searchObj.data.stream.selectedStream.value,
@@ -868,13 +856,11 @@ const updateFieldValues = (data) => {
 
 // The whole editor value is the where clause; a "|" split is quote-unaware and would cut match_all('a | b').
 function buildEditorFilter() {
-  const streamName = searchObj.data.stream.selectedStream.value;
-  let filter = searchObj.data.editorValue.trim();
-  const filterParseResult = parseDurationWhereClause(filter, tracesParser.value, streamName);
-  if (typeof filterParseResult === "string") {
-    filter = filterParseResult;
-  }
-  return parseSpanKindWhereClause(filter, tracesParser.value, streamName);
+  return resolveTracesFilter(
+    searchObj.data.editorValue,
+    tracesParser.value,
+    searchObj.data.stream.selectedStream.value,
+  );
 }
 
 // Every new search and sort (stream, mode, editor) rebuilds its filter in getQueryData, so the selection is checked there.
