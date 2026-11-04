@@ -44,6 +44,12 @@ export class OnCallMinePage {
       onCallTag: '[data-test="oncall-mine-on-call"]',
       noTeams: '[data-test="oncall-mine-no-teams"]',
       shiftsTable: '[data-test="oncall-mine-shifts-table"]',
+      // Below md the shifts render as stacked rows instead of the table.
+      shiftsList: '[data-test="oncall-mine-shifts-list"]',
+      // Inside the five-row frame: "N more" while rows wait below the fold.
+      shiftsMore: '[data-test="oncall-mine-shifts-more"]',
+      setupBanner: '[data-test="oncall-setup-banner-host"]',
+      setupDismiss: '[data-test="oncall-setup-dismiss"]',
       away: '[data-test="oncall-mine-away"]',
       reach: '[data-test="oncall-mine-reach"]',
 
@@ -64,6 +70,8 @@ export class OnCallMinePage {
   nextPerson(teamId) { return `[data-test="oncall-mine-next-${teamId}"]`; }
   coverButton(teamId) { return `[data-test="oncall-mine-cover-${teamId}"]`; }
   testPageButton(teamId) { return `[data-test="oncall-mine-test-page-${teamId}"]`; }
+  shiftRow(teamId) { return `[data-test="oncall-mine-shift-row-${teamId}"]`; }
+  rowMenu(teamId) { return `[data-test="oncall-mine-row-menu-${teamId}"]`; }
   deliveryUnreadTag(eventId) { return `[data-test="oncall-my-delivery-unread-${eventId}"]`; }
   deliveryToggle(eventId) { return `[data-test="oncall-my-delivery-toggle-${eventId}"]`; }
 

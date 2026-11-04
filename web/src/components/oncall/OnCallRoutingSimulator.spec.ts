@@ -163,6 +163,32 @@ describe("OnCallRoutingSimulator", () => {
     ]);
   });
 
+  /// A start names the conditions it filled in; once the rows say something else it would describe an alert nobody is testing.
+  it("clears the start once the conditions no longer match it", async () => {
+    const wrapper = render();
+    const start = () => select(wrapper, "oncall-simulator-start");
+    start().vm.$emit("update:modelValue", "rule:r1");
+    await wrapper.vm.$nextTick();
+    expect(start().props("modelValue")).toBe("rule:r1");
+
+    wrapper
+      .findComponent({ name: "OnCallConditionRows" })
+      .vm.$emit("update:modelValue", { "k8s-namespace": "payments", service: "cart" });
+    await wrapper.vm.$nextTick();
+    expect(start().props("modelValue")).toBe(null);
+  });
+
+  it("keeps the start while the rows still say what it filled in", async () => {
+    const wrapper = render();
+    select(wrapper, "oncall-simulator-start").vm.$emit("update:modelValue", "rule:r1");
+    await wrapper.vm.$nextTick();
+    wrapper
+      .findComponent({ name: "OnCallConditionRows" })
+      .vm.$emit("update:modelValue", { "k8s-namespace": "payments" });
+    await wrapper.vm.$nextTick();
+    expect(select(wrapper, "oncall-simulator-start").props("modelValue")).toBe("rule:r1");
+  });
+
   it("uses the same condition rows as the rule editor", () => {
     const wrapper = render({ seed: { service: "checkout-*" } });
     expect(wrapper.findComponent({ name: "OnCallConditionRows" }).exists()).toBe(true);

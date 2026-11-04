@@ -213,7 +213,6 @@ const save = async (value: DefaultForm): Promise<void> => {
         <h2 class="text-text-heading m-0 text-lg font-semibold">
           {{ t("slackApp.channels.title") }}
         </h2>
-        <p class="text-text-secondary m-0 text-sm">{{ t("slackApp.channels.description") }}</p>
       </div>
       <OButton
         variant="outline"

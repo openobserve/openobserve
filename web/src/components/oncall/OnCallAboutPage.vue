@@ -102,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("oncall.deletedTeam") }}
           </OTag>
+          <OSkeleton v-else-if="!teamName" class="h-4 w-24" data-test="oncall-about-team-pending" />
           <router-link
             v-else
             class="text-accent"
@@ -130,7 +131,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODescriptionItem>
 
         <ODescriptionItem v-if="incidentId" :label="t('oncall.incident')">
+          <OSkeleton
+            v-if="incidentLoading"
+            class="h-4 w-40"
+            data-test="oncall-about-incident-pending"
+          />
           <router-link
+            v-else
             class="text-accent min-w-0"
             :to="{
               name: 'incidentDetail',
@@ -192,6 +199,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import type { ResolutionCause, SubjectType } from "@/ts/interfaces/oncall";
@@ -214,8 +222,10 @@ const props = withDefaults(
     routingReason?: string | null;
     subjectStream?: string | null;
     incidentId?: string | null;
-    /** The incident's own title; the id stands in until it loads. */
+    /** The incident's own title; the id stands in only when it could not be read. */
     incidentTitle?: string | null;
+    /** The title is still on its way, so the row skeletons instead of flashing the id. */
+    incidentLoading?: boolean;
     cause?: ResolutionCause | null;
     causeNote?: string | null;
   }>(),
@@ -225,6 +235,7 @@ const props = withDefaults(
     subjectStream: null,
     incidentId: null,
     incidentTitle: null,
+    incidentLoading: false,
     cause: null,
     causeNote: null,
   },

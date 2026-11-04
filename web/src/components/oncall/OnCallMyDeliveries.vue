@@ -137,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="key"
           :frame="false"
           :loading="loading"
+          :skeleton-rows="HISTORY_SKELETON_ROWS"
           :pagination="historyRows.length > pageSize ? 'client' : 'none'"
           :page-size="pageSize"
           :current-page="currentPage"
@@ -215,7 +216,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-end">
-              <ODropdown side="bottom" align="end">
+              <!-- An open tooltip is the top dismissable layer, so it would take the menu's Escape. -->
+              <ODropdown
+                side="bottom"
+                align="end"
+                @update:open="(open: boolean) => (openMenuKey = open ? row.key : '')"
+              >
                 <template #trigger>
                   <OButton
                     variant="ghost"
@@ -226,7 +232,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`oncall-my-delivery-more-${row.latest.event_id}`"
                     @click.stop
                   >
-                    <OTooltip side="bottom" :content="t('oncall.moreActions')" />
+                    <OTooltip
+                      v-if="openMenuKey !== row.key"
+                      side="bottom"
+                      :content="t('oncall.moreActions')"
+                    />
                   </OButton>
                 </template>
                 <ODropdownItem
@@ -250,7 +260,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="block"
           icon="notifications-active"
           :title="unreadOnly ? t('oncall.myDeliveriesNoUnread') : t('oncall.myDeliveriesNone')"
-          :description="!unreadOnly && !canTest ? t('oncall.myDeliveriesNoneHint') : undefined"
           :action-label="
             unreadOnly || !canTest
               ? undefined
@@ -258,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? t('oncall.mineTestTeam', { team: raw(testTeamName) })
                 : t('oncall.mineTestTeamPage')
           "
+          action-icon="campaign"
           data-test="oncall-my-deliveries-empty"
           @action="emit('test-page')"
         />
@@ -317,6 +327,9 @@ const props = withDefaults(
 
 const emit = defineEmits<{ unread: [count: number]; "test-page": [] }>();
 
+/// A first visit has a handful of pages, so more skeleton rows would only collapse when they land.
+const HISTORY_SKELETON_ROWS = 3;
+
 const CHANNEL_ICON: Record<Channel, IconName> = {
   email: "mail",
   slack: "chat",
@@ -347,6 +360,7 @@ const rows = ref<MyDelivery[]>([]);
 const unread = ref(0);
 const loading = ref(false);
 const marking = ref(false);
+const openMenuKey = ref("");
 const savedView = useListViewState("oncall-my-deliveries", {
   unreadOnly: false,
   currentPage: 1,

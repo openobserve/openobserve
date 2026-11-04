@@ -41,6 +41,21 @@ vi.mock("@/services/users", () => ({
 
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
+// Read once at mount: a phone gets the stacked list, everything wider the table.
+const viewport = vi.hoisted(() => ({ mobile: false }));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => viewport.mobile),
+      isTablet: computed(() => false),
+      isDesktop: computed(() => !viewport.mobile),
+      mdUp: computed(() => !viewport.mobile),
+      lgUp: computed(() => !viewport.mobile),
+    }),
+  };
+});
+
 const service = vi.mocked(oncallService);
 
 // The page's Refresh calls this through a template ref; the stub has to expose it or that call throws.
@@ -136,6 +151,7 @@ describe("OnCallMine", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     queryClient.clear();
+    viewport.mobile = false;
     service.myOnCall.mockResolvedValue({ data: MINE } as any);
     service.listTeams.mockResolvedValue({ data: [] } as any);
     service.whoIsOnCall.mockRejectedValue({ response: { status: 403 } });
@@ -476,5 +492,55 @@ describe("OnCallMine", () => {
     expect(frame().find('[data-test="o2-table-scroll-container"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-mine-shifts-toggle"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("Show all");
+
+    // The fold is marked inside the frame with how many rows wait below it, and the mark goes once they are reached.
+    expect(wrapper.find('[data-test="oncall-mine-shifts-more"]').text()).toBe("115 more");
+    await scroller.trigger("scroll");
+    expect(wrapper.find('[data-test="oncall-mine-shifts-more"]').exists()).toBe(false);
+  });
+
+  it("marks no fold when every shift fits the frame", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-mine-shifts-more"]').exists()).toBe(false);
+  });
+
+  /// Five columns cannot fit a phone, so each shift is its own row with every action in one menu.
+  it("stacks each shift as its own row on a phone", async () => {
+    viewport.mobile = true;
+    const me = store.state.userInfo.email;
+    const now = Date.now() * 1000;
+    service.whoIsOnCall.mockResolvedValue({
+      data: [{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: me }],
+    } as any);
+    service.resolvedSchedule.mockResolvedValue({
+      data: [
+        { rotation_id: "r1", from: now - 1_000_000, to: now + 3_600_000_000, user_email: me },
+        {
+          rotation_id: "r1",
+          from: now + 3_600_000_000,
+          to: now + 7_200_000_000,
+          user_email: "raj@o2.ai",
+        },
+      ],
+    } as any);
+    const menu = { template: "<div><slot name='trigger' /><slot /></div>" };
+    const wrapper = mount(OnCallMine, {
+      global: {
+        plugins: [i18n, store],
+        stubs: { ...stubs, ODropdown: menu, ODropdownItem: { template: "<div><slot /></div>" } },
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-mine-shifts-frame"]').exists()).toBe(false);
+    const row = wrapper.find('[data-test="oncall-mine-shift-row-team_1"]');
+    expect(row.find('[data-test="oncall-mine-team-team_1"]').text()).toBe("Payments");
+    expect(row.find('[data-test="oncall-mine-duty-team_1"]').text()).toBe("Primary");
+    expect(row.find('[data-test="oncall-mine-shift-team_1"]').text()).toMatch(/left$/);
+    expect(row.find('[data-test="oncall-mine-next-team_1"]').text()).toBe("raj@o2.ai");
+    expect(row.find('[data-test="oncall-mine-row-menu-team_1"]').exists()).toBe(true);
+    expect(row.find('[data-test="oncall-mine-cover-team_1-menu"]').exists()).toBe(true);
+    expect(row.find('[data-test="oncall-mine-test-page-team_1-menu"]').exists()).toBe(true);
   });
 });

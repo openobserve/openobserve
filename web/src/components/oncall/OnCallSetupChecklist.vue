@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- What must exist before an alert can wake somebody, each step answered from live data. -->
 <template>
   <OBanner
-    v-if="compact && !expanded"
+    v-if="compact && !expanded && !dismissed"
     variant="info"
     icon="rocket-launch"
     inline-actions
@@ -51,12 +51,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("oncall.setupProgress", { done: doneCount, total: steps.length }) }}
         </OButton>
+        <OButton
+          v-if="dismissible"
+          variant="ghost"
+          size="icon-xs"
+          icon-left="close"
+          :aria-label="t('oncall.setupHideBanner')"
+          data-test="oncall-setup-dismiss"
+          @click="dismiss"
+        >
+          <OTooltip :content="t('oncall.setupHideBanner')" />
+        </OButton>
       </span>
     </template>
   </OBanner>
 
   <div
-    v-else
+    v-else-if="!compact || !dismissed"
     class="max-lg:px-page-edge mx-auto flex w-full max-w-3xl flex-col gap-4 py-6"
     data-test="oncall-setup-checklist"
   >
@@ -90,12 +101,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
 
         <div class="flex min-w-0 flex-1 flex-col">
-          <OTruncatedText class="text-text-body text-sm font-semibold">
+          <OTruncatedText
+            class="text-text-body text-sm font-semibold max-md:line-clamp-2 max-md:whitespace-normal"
+          >
             {{ step.state === "done" && step.doneLabel ? step.doneLabel : step.title }}
           </OTruncatedText>
           <OTruncatedText
             v-if="step.state !== 'done'"
-            class="text-text-secondary text-xs"
+            class="text-text-secondary text-xs max-md:line-clamp-2 max-md:whitespace-normal"
             :data-test="`oncall-setup-body-${step.key}`"
           >
             {{ step.body }}
@@ -163,7 +176,9 @@ import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useOnCallSetupDismissed } from "@/composables/useOnCallSetupDismissed";
 import { testPageMutation } from "@/services/oncall.queries";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -184,8 +199,16 @@ const props = withDefaults(
     canConfigure?: boolean;
     firstTeamId?: string | null;
     firstTeamName?: string | null;
+    /** The compact bar carries a close button that hides it for this person in this org. */
+    dismissible?: boolean;
   }>(),
-  { compact: false, canConfigure: true, firstTeamId: null, firstTeamName: null },
+  {
+    compact: false,
+    canConfigure: true,
+    firstTeamId: null,
+    firstTeamName: null,
+    dismissible: false,
+  },
 );
 
 const emit = defineEmits<{ (e: "create-team"): void }>();
@@ -195,6 +218,10 @@ const router = useRouter();
 const store = useStore();
 
 const expanded = ref(false);
+
+const setupDismissed = useOnCallSetupDismissed();
+const dismissed = computed(() => props.dismissible && setupDismissed.dismissed.value);
+const dismiss = setupDismissed.dismiss;
 const testConfirmOpen = ref(false);
 const testing = ref(false);
 // The test page leaves no record on the server, so "it landed" is only known for this visit.

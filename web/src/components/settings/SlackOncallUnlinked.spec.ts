@@ -69,9 +69,7 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
     expect(slack.listOncallUnlinked).toHaveBeenCalledWith("acme", "inst-1");
     const section = w.find('[data-test="slack-oncall-unlinked"]');
     expect(section.text()).toContain("On-call people not linked to Slack");
-    expect(section.text()).toContain(
-      "Until they link, their Acknowledge and Resolve presses in Slack wait.",
-    );
+    expect(section.text()).not.toContain("Until they link");
     expect(w.find('[data-test="slack-oncall-unlinked-count"]').text()).toBe("2 people");
     expect(section.text()).toContain("kim@acme.io");
     expect(section.text()).toContain("Payments");
@@ -143,6 +141,73 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
     expect(w.find('[data-test="slack-oncall-unlinked-reminder-amy@acme.io"]').text()).toBe(
       "Not sent",
     );
+  });
+
+  /// Being on call is not an error, so the chip says it in the calm "on call" tone the rest of On-Call uses.
+  it("marks on call now in the success tone, never as an error", async () => {
+    vi.mocked(slack.listOncallUnlinked).mockReturnValue(
+      ok({
+        members: [
+          {
+            email: "zed@acme.io",
+            team_id: "t1",
+            team_name: "Payments",
+            next_shift_at: Date.now() * 1000 - 60_000_000,
+            reminded_at: null,
+          },
+        ],
+      }) as any,
+    );
+    const w = await mountList();
+    const chip = w.find('[data-test="slack-oncall-unlinked-now-zed@acme.io"]');
+    expect(chip.classes().join(" ")).not.toMatch(/error/);
+    expect(
+      w.findComponent('[data-test="slack-oncall-unlinked-now-zed@acme.io"]').props("variant"),
+    ).toBe("success-soft");
+  });
+
+  /// One row of chips per person: the ones that fit, then "+N" naming them all.
+  it("keeps every team on one line with a tooltip naming them all", async () => {
+    vi.mocked(slack.listOncallUnlinked).mockReturnValue(
+      ok({
+        members: ["Payments", "Search", "Infra"].map((team, i) => ({
+          email: "bob@acme.io",
+          team_id: `t${i}`,
+          team_name: team,
+          next_shift_at: null,
+          reminded_at: null,
+        })),
+      }) as any,
+    );
+    const w = await mountList();
+    const chips = w.findComponent({ name: "OnCallFitChips" });
+    expect(chips.exists()).toBe(true);
+    expect(chips.props("tooltip")).toBe("Payments, Search, Infra");
+  });
+
+  /// A long list pages inside the card rather than running the settings page long.
+  it("pages a long list ten people at a time", async () => {
+    vi.mocked(slack.listOncallUnlinked).mockReturnValue(
+      ok({
+        members: Array.from({ length: 12 }, (_, i) => ({
+          email: `p${String(i).padStart(2, "0")}@acme.io`,
+          team_id: "t1",
+          team_name: "Payments",
+          next_shift_at: null,
+          reminded_at: null,
+        })),
+      }) as any,
+    );
+    const w = await mountList();
+    const table = w.findComponent({ name: "OTable" });
+    expect(table.props("pagination")).toBe("client");
+    expect(table.props("pageSize")).toBe(10);
+    expect(w.findAll('[data-test^="slack-oncall-unlinked-person-"]')).toHaveLength(10);
+  });
+
+  it("shows no pager while the list fits one page", async () => {
+    const w = await mountList();
+    expect(w.findComponent({ name: "OTable" }).props("pagination")).toBe("none");
   });
 
   it("Remind by DM is a labelled icon button that sends the DMs again", async () => {

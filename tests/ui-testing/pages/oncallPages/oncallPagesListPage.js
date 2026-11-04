@@ -101,6 +101,8 @@ export class OnCallPagesListPage {
       setupChecklist: '[data-test="oncall-setup-checklist"]',
       setupExpand: '[data-test="oncall-setup-expand"]',
       setupCollapse: '[data-test="oncall-setup-collapse"]',
+      // The compact bar's close; hides it for this user in this org.
+      setupDismiss: '[data-test="oncall-setup-dismiss"]',
       pageSizeSelect: '[data-test="o2-table-page-size-select"]',
       paginationInfo: '[data-test="o2-table-pagination-info"]',
       firstPage: '[data-test="o2-table-first-page-btn"]',

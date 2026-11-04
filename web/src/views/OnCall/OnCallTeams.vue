@@ -34,6 +34,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
 
+    <!-- With no team the empty state below is already the next step, so the bar would only repeat it. -->
+    <OnCallSetupBanner
+      v-if="teams.length && !notAvailable"
+      class="px-page-edge shrink-0 pt-2"
+      @create-team="openCreate"
+    />
+
     <OTable
       ref="oTableRef"
       :error="loadError"
@@ -257,10 +264,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="oncall-teams-not-available"
         />
         <OEmptyState
-          v-else-if="!loading"
+          v-else-if="!loading && search"
           size="hero"
           preset="no-oncall-teams"
-          :filtered="!!search"
+          filtered
+          data-test="oncall-teams-empty"
+          @action="onEmptyAction"
+        />
+        <!-- The title and the card already say what to do; the preset's explainer lines are left out. -->
+        <OEmptyState
+          v-else-if="!loading"
+          size="hero"
+          illustration="users"
+          variant="create"
+          :title="t('emptyState.noOncallTeams.title')"
+          :actions="NO_TEAMS_ACTIONS"
           data-test="oncall-teams-empty"
           @action="onEmptyAction"
         />
@@ -293,6 +311,7 @@ import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -302,6 +321,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OnCallSetupBanner from "@/components/oncall/OnCallSetupBanner.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -678,6 +698,10 @@ function openTeam(team: Pick<OnCallTeam, "id">) {
     query: { org_identifier: orgId.value },
   });
 }
+
+const NO_TEAMS_ACTIONS: EmptyStateAction[] = [
+  { id: "create", icon: "add", titleKey: "emptyState.noOncallTeams.action" },
+];
 
 function onEmptyAction(id?: string) {
   if (id === "clear-filters") {

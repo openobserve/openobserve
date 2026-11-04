@@ -21,6 +21,7 @@ import { flushPromises } from "@vue/test-utils";
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
+import { resetOnCallSetupDismissed } from "@/composables/useOnCallSetupDismissed";
 import store from "@/test/unit/helpers/store";
 
 vi.mock("@/services/oncall", () => ({ default: { testPage: vi.fn() } }));
@@ -220,5 +221,36 @@ describe("OnCallSetupChecklist", () => {
     const wrapper = render({ canConfigure: false });
 
     expect(wrapper.find('[data-test="oncall-setup-cta-team"]').exists()).toBe(false);
+  });
+  describe("hiding the compact bar", () => {
+    beforeEach(() => {
+      resetOnCallSetupDismissed();
+      window.localStorage.clear();
+    });
+
+    it("offers no close button unless the page asks for one", () => {
+      const wrapper = render({ compact: true });
+      expect(wrapper.find('[data-test="oncall-setup-dismiss"]').exists()).toBe(false);
+    });
+
+    it("hides for this person and org once closed", async () => {
+      const wrapper = render({ compact: true, dismissible: true });
+      await wrapper.find('[data-test="oncall-setup-dismiss"]').trigger("click");
+
+      expect(wrapper.find('[data-test="oncall-setup-banner"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+      const keys = Object.keys(window.localStorage);
+      expect(keys.some((key) => key.startsWith("oncall-setup-dismissed:"))).toBe(true);
+    });
+
+    /// Closing the bar never removes the first-run checklist: with no page yet it is the whole screen.
+    it("still shows the full checklist when it is the screen", () => {
+      window.localStorage.setItem(
+        `oncall-setup-dismissed:${store.state.selectedOrganization.identifier}:${String(store.state.userInfo.email).toLowerCase()}`,
+        "1",
+      );
+      const wrapper = render({ dismissible: true });
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(true);
+    });
   });
 });

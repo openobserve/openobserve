@@ -216,6 +216,15 @@ describe("OnCallAboutPage", () => {
     expect(link.text()).not.toContain("inc_9");
   });
 
+  /// While the title is on its way the row waits, so a raw id never flashes in first.
+  it("skeletons the incident and team rows while their names load", () => {
+    const wrapper = render({ incidentId: "inc_9", incidentLoading: true, teamName: "" });
+    expect(wrapper.find('[data-test="oncall-about-incident-pending"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-about-incident-link"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-about-team-pending"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("inc_9");
+  });
+
   /// The id is here to be pasted into a channel, so it keeps its copy control
   /// — the same boxed value + copy icon shape the Incident Details card uses,
   /// so an alert id and an incident id copy the same way.

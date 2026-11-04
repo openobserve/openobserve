@@ -112,10 +112,8 @@ const runLinkAll = async (): Promise<void> => {
         <h2 class="text-text-heading m-0 text-lg font-semibold">
           {{ t("slackApp.linking.title") }}
         </h2>
-        <p class="text-text-secondary m-0 text-sm">
-          {{
-            managed ? t("slackApp.linking.setByInstanceAdmin") : t("slackApp.linking.removedUsers")
-          }}
+        <p v-if="managed" class="text-text-secondary m-0 text-sm">
+          {{ t("slackApp.linking.setByInstanceAdmin") }}
         </p>
       </div>
       <OButton

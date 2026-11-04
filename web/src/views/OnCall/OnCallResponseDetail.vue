@@ -40,6 +40,11 @@
           >
             {{ t("oncall.deletedTeam") }}
           </OTag>
+          <OSkeleton
+            v-else-if="!teamName"
+            class="h-3.5 w-20"
+            data-test="oncall-response-team-pending"
+          />
           <router-link
             v-else
             class="text-accent min-w-0 hover:underline"
@@ -457,62 +462,79 @@
             <OCard variant="glass" data-test="oncall-response-tabs">
               <OCardSection role="body" dense>
                 <OTabPanels v-model="activeDetailTab">
-                  <OTabPanel name="activity" data-test="oncall-response-activity">
-                    <div class="flex justify-end pt-2">
-                      <OButton
-                        variant="ghost"
-                        size="sm"
-                        :icon-left="showAllActivity ? 'visibility-off' : 'visibility'"
-                        data-test="oncall-response-activity-toggle-all"
-                        @click="showAllActivity = !showAllActivity"
+                  <OTabPanel name="activity">
+                    <div data-test="oncall-response-activity">
+                      <div class="flex justify-end pt-2">
+                        <OButton
+                          variant="ghost"
+                          size="sm"
+                          :icon-left="showAllActivity ? 'visibility-off' : 'visibility'"
+                          data-test="oncall-response-activity-toggle-all"
+                          @click="showAllActivity = !showAllActivity"
+                        >
+                          {{
+                            showAllActivity
+                              ? t("oncall.activityHideSystem")
+                              : t("oncall.activityShowSystemCount", { count: systemActivityCount })
+                          }}
+                        </OButton>
+                      </div>
+                      <!-- Held until the policy answers, so "(step 1)" is on each line from the first paint. -->
+                      <div
+                        v-if="!timelineReady"
+                        class="flex flex-col gap-4 py-3"
+                        data-test="oncall-response-activity-pending"
                       >
-                        {{
-                          showAllActivity
-                            ? t("oncall.activityHideSystem")
-                            : t("oncall.activityShowSystemCount", { count: systemActivityCount })
-                        }}
-                      </OButton>
+                        <OSkeleton v-for="n in 4" :key="n" class="h-4 w-3/4" />
+                      </div>
+                      <OnCallActivityTimeline
+                        v-else
+                        :events="events"
+                        v-model:comment-text="noteBody"
+                        v-model:show-all="showAllActivity"
+                        :submitting="addingNote"
+                        :opened-at="response.opened_at"
+                        :step-of="stepOfRung"
+                        :team-name-of="teamNameOf"
+                        pin-composer
+                        @submit="addNote"
+                      />
                     </div>
-                    <OnCallActivityTimeline
-                      :events="events"
-                      v-model:comment-text="noteBody"
-                      v-model:show-all="showAllActivity"
-                      :submitting="addingNote"
-                      :opened-at="response.opened_at"
-                      :step-of="stepOfRung"
-                      :team-name-of="teamNameOf"
-                      pin-composer
-                      @submit="addNote"
-                    />
                   </OTabPanel>
 
                   <!-- The receipt behind the ladder's claims. -->
-                  <OTabPanel name="deliveries" data-test="oncall-response-deliveries">
-                    <OnCallDeliveryLedger
-                      :records="deliveries"
-                      :total="deliveriesTotal"
-                      :loading="deliveriesLoading"
-                    />
+                  <OTabPanel name="deliveries">
+                    <div data-test="oncall-response-deliveries">
+                      <OnCallDeliveryLedger
+                        :records="deliveries"
+                        :total="deliveriesTotal"
+                        :loading="deliveriesLoading"
+                      />
+                    </div>
                   </OTabPanel>
 
                   <!-- The history behind the rail's one-line summary. -->
-                  <OTabPanel name="causes" data-test="oncall-response-causes">
-                    <OnCallPriorCauses
-                      :groups="priorCauses"
-                      :loading="priorCausesLoading"
-                      @open="openResponse"
-                    />
-                    <OnCallFiringHistory
-                      class="mt-4"
-                      :firings="firingHistory"
-                      :loading="priorCausesLoading"
-                      @open="openResponse"
-                    />
+                  <OTabPanel name="causes">
+                    <div data-test="oncall-response-causes">
+                      <OnCallPriorCauses
+                        :groups="priorCauses"
+                        :loading="priorCausesLoading"
+                        @open="openResponse"
+                      />
+                      <OnCallFiringHistory
+                        class="mt-4"
+                        :firings="firingHistory"
+                        :loading="priorCausesLoading"
+                        @open="openResponse"
+                      />
+                    </div>
                   </OTabPanel>
 
                   <!-- The working behind the verdict card's one sentence. -->
-                  <OTabPanel name="report" data-test="oncall-response-report">
-                    <OnCallReportCard :report="report" :loading="reportLoading" />
+                  <OTabPanel name="report">
+                    <div data-test="oncall-response-report">
+                      <OnCallReportCard :report="report" :loading="reportLoading" />
+                    </div>
                   </OTabPanel>
                 </OTabPanels>
               </OCardSection>
@@ -549,6 +571,7 @@
               :subject-stream="subjectStream"
               :incident-id="response.incident_id"
               :incident-title="incidentTitle"
+              :incident-loading="incidentLoading"
               :cause="response.cause"
               :cause-note="response.cause_note"
             />
@@ -775,6 +798,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import OnCallAboutPage from "@/components/oncall/OnCallAboutPage.vue";
@@ -1060,6 +1084,10 @@ const teamOptions = ref<{ label: I18nText; value: string }[]>([]);
 const teamNamesById = ref<Record<string, string>>({});
 /// The incident's own title for the rail link; the id until it answers, or when the read fails.
 const incidentTitle = ref<string | null>(null);
+/// True from the record's arrival until its incident's title answers, so the id never flashes first.
+const incidentLoading = ref(true);
+/// The timeline waits for the policy that numbers its steps, then never goes back to waiting.
+const timelineReady = ref(false);
 
 // Round numbers a half-awake person can pick without doing arithmetic.
 const snoozeOptions = [
@@ -1283,20 +1311,20 @@ async function fetchResponse(force = false) {
         ?.dataUpdatedAt ?? null;
     // Flip before the awaits below so the card skeletons instead of reading an empty roster as "nobody on call".
     onCallPositionsLoading.value = true;
-    for (const step of [
-      fetchTeamName,
-      fetchSubjectAlert,
-      fetchHandoffTargets,
-      fetchPriorCauses,
-      fetchReport,
-      fetchEscalation,
-      fetchDeliveries,
-      fetchTeamContext,
-      fetchIncidentTitle,
-    ]) {
-      await step();
-      if (readId !== latestResponseRead) return;
-    }
+    // The team list first: it says whether the team still exists, and a deleted one has nothing else to read.
+    await fetchTeams();
+    if (readId !== latestResponseRead) return;
+    await Promise.all([
+      fetchTeamName(),
+      fetchSubjectAlert(),
+      fetchHandoffTargets(),
+      fetchPriorCauses(),
+      fetchReport(),
+      fetchEscalation(),
+      fetchDeliveries(),
+      fetchTeamContext(),
+      fetchIncidentTitle(),
+    ]);
   } catch (err: any) {
     if (readId !== latestResponseRead) return;
     if (!response.value) {
@@ -1331,18 +1359,31 @@ async function refreshPage() {
   }
 }
 
-// The record stores a team id; a deleted team still has records pointing at
-// it, so the id is the fallback rather than an error.
-async function fetchTeamName() {
-  const r = response.value;
-  if (!r) return;
-  teamName.value = r.team_id ?? "";
-  if (!r.team_id) return;
+/// The org's teams: whether this page's team still exists, its name, and where it can be handed.
+async function fetchTeams() {
   try {
-    const team = await read<OnCallTeam | null>(oncallTeamQuery(orgId.value, r.team_id), false);
-    if (team?.name) teamName.value = team.name;
+    const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), false);
+    knownTeamIds.value = teams.map((tm) => tm.id);
+    teamNamesById.value = Object.fromEntries(teams.map((tm) => [tm.id, tm.name]));
   } catch {
-    // Keep the id.
+    knownTeamIds.value = null;
+  }
+}
+
+// Never the raw id: the name from the list, else the team's own read, else a dash.
+async function fetchTeamName() {
+  const teamId = response.value?.team_id;
+  if (!teamId || teamDeleted.value) return;
+  const listed = teamNamesById.value[teamId];
+  if (listed) {
+    teamName.value = listed;
+    return;
+  }
+  try {
+    const team = await read<OnCallTeam | null>(oncallTeamQuery(orgId.value, teamId), false);
+    teamName.value = team?.name || "—";
+  } catch {
+    teamName.value = "—";
   }
 }
 
@@ -1508,8 +1549,8 @@ async function handoffRecord() {
 async function fetchHandoffTargets() {
   const r = response.value;
   if (!r) return;
-  // An unrouted page has no members to hand to, but the team list below still offers a team.
-  const teamId = r.team_id;
+  // An unrouted page or a deleted team has no members to hand to, but the team list still offers a team.
+  const teamId = teamDeleted.value ? null : r.team_id;
   try {
     const members = teamId
       ? await read<OnCallTeamMember[]>(teamMembersQuery(orgId.value, teamId), false)
@@ -1528,17 +1569,9 @@ async function fetchHandoffTargets() {
   } catch {
     memberOptions.value = [];
   }
-  try {
-    const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), false);
-    knownTeamIds.value = teams.map((tm) => tm.id);
-    teamNamesById.value = Object.fromEntries(teams.map((tm) => [tm.id, tm.name]));
-    teamOptions.value = teams
-      .filter((tm) => tm.id !== r.team_id)
-      .map((tm) => ({ label: raw(tm.name), value: tm.id }));
-  } catch {
-    knownTeamIds.value = null;
-    teamOptions.value = [];
-  }
+  teamOptions.value = Object.entries(teamNamesById.value)
+    .filter(([id]) => id !== r.team_id)
+    .map(([id, name]) => ({ label: raw(name), value: id }));
 }
 
 /// Only alerts have a rule to fetch, and a page whose alert has since been
@@ -1558,8 +1591,11 @@ async function fetchSubjectAlert() {
 
 async function fetchIncidentTitle() {
   const incidentId = response.value?.incident_id;
-  incidentTitle.value = null;
-  if (!incidentId) return;
+  if (!incidentId) {
+    incidentTitle.value = null;
+    incidentLoading.value = false;
+    return;
+  }
   try {
     const incident = await read<IncidentWithAlerts | null>(
       incidentQuery(orgId.value, incidentId),
@@ -1568,6 +1604,8 @@ async function fetchIncidentTitle() {
     incidentTitle.value = incident?.title ?? null;
   } catch {
     // The rail falls back to the id.
+  } finally {
+    incidentLoading.value = false;
   }
 }
 
@@ -1639,6 +1677,14 @@ async function fetchDeliveries() {
  * record.
  */
 async function fetchTeamContext() {
+  try {
+    await readTeamContext();
+  } finally {
+    timelineReady.value = true;
+  }
+}
+
+async function readTeamContext() {
   const r = response.value;
   if (!r) return;
   const teamId = r.team_id;
@@ -1855,6 +1901,9 @@ watch(
     onCallPositions.value = [];
     deliveries.value = [];
     teamName.value = "";
+    incidentTitle.value = null;
+    incidentLoading.value = true;
+    timelineReady.value = false;
     subjectAlert.value = null;
     priorCauses.value = [];
     firingHistory.value = [];

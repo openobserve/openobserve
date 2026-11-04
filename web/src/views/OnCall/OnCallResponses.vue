@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :has-policy="setup.hasPolicy"
       :has-routing="setup.hasRouting"
       :compact="hasPages"
+      :dismissible="hasPages"
       :can-configure="canConfigure"
       :first-team-id="teams[0]?.id ?? null"
       :first-team-name="teams[0]?.name ?? null"
@@ -547,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            is marked rather than implied. Off by default: it describes the team's
            policy, which is the same for every row of that team. -->
       <template #cell-channels="{ row }">
-        <span class="flex flex-wrap items-center gap-1">
+        <span class="flex flex-nowrap items-center gap-1">
           <OTag
             v-for="channel in channelsFor(row.latest)"
             :key="channel"
@@ -666,7 +667,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
           </template>
-          <ODropdown side="bottom" align="end">
+          <!-- An open tooltip is the top dismissable layer, so it would take the menu's Escape. -->
+          <ODropdown
+            side="bottom"
+            align="end"
+            @update:open="(open: boolean) => (openMenuKey = open ? row.rowKey : '')"
+          >
             <template #trigger>
               <OButton
                 variant="ghost"
@@ -677,7 +683,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`oncall-row-more-${row.rowKey}`"
                 @click.stop
               >
-                <OTooltip side="bottom" :content="t('oncall.moreActions')" />
+                <OTooltip
+                  v-if="openMenuKey !== row.rowKey"
+                  side="bottom"
+                  :content="t('oncall.moreActions')"
+                />
               </OButton>
             </template>
             <ODropdownItem
@@ -1038,6 +1048,7 @@ const sortBy = ref(savedView.sortBy === "state" ? "last_alert_at" : savedView.so
 const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
 const oTableRef = ref<any>(null);
 const busyId = ref("");
+const openMenuKey = ref("");
 const bulkBusy = ref(false);
 const confirmBulkResolve = ref(false);
 const bulkResolveCause = ref<ResolutionCause | "">("");
@@ -1202,7 +1213,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // a woken engineer nothing. Fall back only when there is no title.
     accessorFn: (row: PageRow) => row.latest.title || row.latest.subject.source_id,
     sortable: true,
-    size: 200,
+    size: 176,
     minSize: 160,
     // The widest thing in the row and the one a reader scans by, so it takes
     // the table's leftover width rather than leaving it to the trailing spacer.
@@ -1229,7 +1240,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // scannable down the list instead of discovered by accident.
     id: "incident",
     header: t("oncall.incident"),
-    size: 144,
+    size: 120,
     accessorFn: (row: PageRow) =>
       row.latest.incident_id
         ? (incidentTitleById.value[row.latest.incident_id] ?? row.latest.incident_id)
@@ -1242,7 +1253,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // that is the ordering a responder wants, not alphabetical state.
     id: "escalation",
     header: t("oncall.escalation"),
-    size: 176,
+    size: 144,
     accessorFn: (row: PageRow) =>
       progressById.value[row.latest.id]?.fired.length ?? reachedStepFor(row.latest) ?? 0,
     sortable: true,
@@ -1250,7 +1261,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
   {
     id: "responder",
     header: t("oncall.responder"),
-    size: 148,
+    size: 136,
     accessorFn: (row: PageRow) => row.latest.acked_by ?? "",
     sortable: true,
   },
@@ -1260,7 +1271,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // answered by someone no longer holding the pager.
     id: "on_call_now",
     header: t("oncall.onCallNow"),
-    size: 148,
+    size: 136,
     accessorFn: (row: PageRow) =>
       positionsByTeam.value[row.latest.team_id ?? ""]?.[0]?.user_email ?? "",
     sortable: true,
@@ -1307,7 +1318,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     isAction: true,
     pinned: "right",
     sortable: false,
-    size: 128,
+    size: 112,
     meta: { align: "center", actionCount: 3 },
   },
 ]);
@@ -1436,8 +1447,7 @@ const { nameOf } = useOrgUserNames();
 /// A name when the org has one, else the email's local part: the domain is the same on every row.
 function displayName(email: string): string {
   if (email.toLowerCase() === viewerEmail.value) return youLabel.value;
-  const name = nameOf(email);
-  return name !== email ? name : email.split("@")[0] || email;
+  return nameOf(email);
 }
 
 /// Names can repeat across an org, so the email is always one hover away.

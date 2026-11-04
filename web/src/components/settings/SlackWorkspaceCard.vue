@@ -559,9 +559,6 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
         <h2 class="text-text-heading m-0 text-lg font-semibold">
           {{ t("slackApp.card.connectedOrgs") }}
         </h2>
-        <p class="text-text-secondary m-0 text-sm">
-          {{ t("slackApp.card.connectedOrgsDescription", { team: installation.team_name }) }}
-        </p>
       </div>
       <OTable
         :data="orgRows"
