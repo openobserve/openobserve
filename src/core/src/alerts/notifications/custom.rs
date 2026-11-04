@@ -91,7 +91,19 @@ pub(crate) fn apply_custom_template_plain(
         .replace("{notification_kind}", ctx.kind.as_str())
         .replace("{notification_event}", ctx.event.as_str())
         .replace("{notification_kind_label}", ctx.kind.label())
-        .replace("{notification_event_label}", ctx.event.label())
+        .replace(
+            "{notification_event_label}",
+            ctx.kind.event_label(ctx.event),
+        )
+        .replace("{status_dot}", super::resolve::status_dot(ctx))
+        .replace(
+            "{alert_level_label}",
+            &super::resolve::level_label(&ctx.alert_level),
+        )
+        .replace(
+            "{alert_trigger_time_utc}",
+            &super::resolve::utc_stamp(ctx.alert_trigger_time),
+        )
         .replace("{cluster_name}", &ctx.cluster_name)
         // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
         // incident notifications build custom JSON and workflows carry

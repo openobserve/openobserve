@@ -13753,7 +13753,6 @@
     "previewFidelityEmail": "Le véritable e-mail est en HTML avec une alternative en texte brut. Voir Charge utile pour les deux.",
     "previewFidelityWebhook": "Les destinataires de webhook reçoivent du JSON, pas une carte. Voir Charge utile pour le corps exact.",
     "previewFidelityMachine": "Ce canal est consommé par un logiciel, pas lu par des personnes — la carte est un rendu normalisé. Charge utile montre le corps exact envoyé.",
-    "previewGroupLabel": "Aperçu (non envoyé)",
     "previewChannel": "Canal",
     "previewSeverity": "Gravité",
     "previewSeveritySingle": "Niveau unique (aucun niveau)",

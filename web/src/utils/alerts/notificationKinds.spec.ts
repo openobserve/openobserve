@@ -14,9 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
+import i18n from "@/locales";
 import {
   inferAppliesTo,
   resolveEffectiveTemplate,
+  sentTemplatesText,
   templateFitsTransport,
   type ResolvableTemplate,
 } from "./notificationKinds";
@@ -65,14 +67,12 @@ describe("resolveEffectiveTemplate", () => {
     { name: "mail", kind: "custom", type: "email", applies_to: [] },
     { name: "card", kind: "content", applies_to: [] },
     { name: "prebuilt_slack", kind: "content", isPrebuilt: true, applies_to: [] },
-    { name: "legacy", kind: "content", isDefault: true, applies_to: [] },
   ];
   const resolve = (
     kind: any,
     override: string | null,
     destination: { type?: string; template?: string | null },
-    orgDefault: string | null = null,
-  ) => resolveEffectiveTemplate({ kind, override, destination, templates, orgDefault });
+  ) => resolveEffectiveTemplate({ kind, override, destination, templates });
 
   it("takes the override when it fits the destination", () => {
     expect(resolve("anomaly", "hook_all", { type: "http", template: "card" })).toEqual({
@@ -88,10 +88,10 @@ describe("resolveEffectiveTemplate", () => {
     });
   });
 
-  it("skips a destination template that does not apply to the kind", () => {
-    expect(resolve("anomaly", null, { type: "http", template: "hook_alert" }, "card")).toEqual({
-      name: "card",
-      source: "org_default",
+  it("falls to the built-in default when the destination template does not apply to the kind", () => {
+    expect(resolve("anomaly", null, { type: "http", template: "hook_alert" })).toEqual({
+      name: null,
+      source: "compiled",
     });
   });
 
@@ -106,11 +106,33 @@ describe("resolveEffectiveTemplate", () => {
     });
   });
 
-  it("uses the legacy default template only for alerts with no org default", () => {
-    expect(resolve("alert", null, { type: "http" })).toEqual({
-      name: "legacy",
-      source: "org_default",
-    });
-    expect(resolve("anomaly", null, { type: "http" })).toEqual({ name: null, source: "compiled" });
+  it("never reports an org default, even for a template still flagged as the old default", () => {
+    const legacy = [...templates, { name: "legacy", kind: "content", isDefault: true }];
+    for (const kind of ["alert", "incident", "anomaly"] as const) {
+      expect(
+        resolveEffectiveTemplate({
+          kind,
+          override: null,
+          destination: { type: "http" },
+          templates: legacy,
+        }),
+      ).toEqual({ name: null, source: "compiled" });
+    }
+  });
+});
+
+describe("sentTemplatesText", () => {
+  const t = i18n.global.t as any;
+
+  it("still labels a stored org_default row and passes an unknown source through", () => {
+    expect(
+      sentTemplatesText(
+        [
+          { destination: "slack", template_name: "card", template_source: "org_default" },
+          { destination: "hook", template_name: "", template_source: "something_new" },
+        ],
+        t,
+      ),
+    ).toBe("slack: card (org default), hook: something_new");
   });
 });

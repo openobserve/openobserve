@@ -25,7 +25,7 @@ use super::{
     context::{NotificationContext, build_row_columns},
 };
 
-pub const ANOMALY_VARIABLES: [&str; 13] = [
+pub const ANOMALY_VARIABLES: [&str; 14] = [
     "anomaly_id",
     "anomaly_name",
     "anomaly_kind",
@@ -36,6 +36,7 @@ pub const ANOMALY_VARIABLES: [&str; 13] = [
     "worst_expected",
     "score",
     "threshold",
+    "anomaly_score",
     "window_start",
     "window_end",
     "anomaly_url",
@@ -82,12 +83,13 @@ pub const ONCALL_VARIABLES: [&str; 8] = [
     "runbook_url",
 ];
 
-pub const DOWNTIME_VARIABLES: [&str; 8] = [
+pub const DOWNTIME_VARIABLES: [&str; 9] = [
     "downtime_name",
     "downtime_event",
     "downtime_reason",
     "downtime_starts_at",
     "downtime_ends_at",
+    "downtime_window",
     "downtime_targets",
     "downtime_counts",
     "downtime_url",
@@ -139,6 +141,20 @@ pub fn variables_for(kind: NotificationKind) -> Vec<String> {
         .chain(kind_vars)
         .map(|v| v.to_string())
         .collect()
+}
+
+/// Every kind's own variables; one of them reads blank for another kind rather than unknown.
+pub fn kind_variables() -> impl Iterator<Item = &'static str> {
+    ANOMALY_VARIABLES
+        .into_iter()
+        .chain(INCIDENT_VARIABLES)
+        .chain(SYNTHETICS_VARIABLES)
+        .chain(ONCALL_VARIABLES)
+        .chain(DOWNTIME_VARIABLES)
+}
+
+pub fn is_kind_variable(name: &str) -> bool {
+    kind_variables().any(|v| v == name)
 }
 
 /// One group of the variable guide: `common`, or a kind whose producer renders templates.
@@ -220,6 +236,11 @@ fn base(kind: NotificationKind, resolved: bool, level: AlertLevel) -> Notificati
         alert_level: level_str(level).into(),
         level: Some(level),
         kind,
+        alert_trigger_time: if resolved {
+            1_793_616_000_000_000
+        } else {
+            1_793_613_900_000_000
+        },
         cluster_name: "o2-acme".into(),
         alert_start_time: "N/A".into(),
         alert_end_time: "N/A".into(),
@@ -265,6 +286,8 @@ fn anomaly_example(resolved: bool) -> NotificationContext {
     } else {
         ("3", "342.00", "98.00", "0.91", "14.0", "value")
     };
+    ctx.alert_agg_value = worst.into();
+    let anomaly_score = format!("{score} vs 0.80");
     ctx.context_attributes = [
         ("anomaly_id", "a1b2c3"),
         ("anomaly_name", "error rate on web-logs"),
@@ -279,6 +302,7 @@ fn anomaly_example(resolved: bool) -> NotificationContext {
         ("worst_expected", expected),
         ("score", score),
         ("threshold", "0.80"),
+        ("anomaly_score", &anomaly_score),
         ("window_start", start),
         ("window_end", end),
         ("anomaly_url", link),
@@ -297,7 +321,9 @@ fn synthetics_example(resolved: bool) -> NotificationContext {
     };
     let mut ctx = base(NotificationKind::Synthetics, resolved, level);
     ctx.stream_type = "synthetics".into();
-    ctx.stream_name = "https://shop.acme.com/api/health".into();
+    ctx.stream_name = String::new();
+    ctx.alert_level = String::new();
+    ctx.alert_status = if resolved { "recovered" } else { "failing" }.into();
     ctx.alert_name = "checkout API".into();
     ctx.alert_url = url.into();
     ctx.episode_id = Some("chk_9d".into());
@@ -340,7 +366,7 @@ fn synthetics_example(resolved: bool) -> NotificationContext {
         ("check_run_id", "run_42"),
         ("check_url", url),
         ("check_error", error),
-        ("check_environments", ""),
+        ("check_environments", "production"),
         ("check_checked_at", "2026-11-02 10:05:00 UTC"),
         ("check_title", title),
     ]
@@ -368,6 +394,10 @@ fn on_call_example(resolved: bool) -> NotificationContext {
     };
     // The engine's subject and plain-text page, as `render_subject` and `render_body` build them.
     ctx.alert_name = "[P2] High error rate on web-logs — checkout".into();
+    ctx.alert_level = "P2".into();
+    ctx.stream_type = String::new();
+    ctx.stream_name = String::new();
+    ctx.alert_status = if resolved { "acknowledged" } else { "paged" }.into();
     ctx.alert_url = url.into();
     ctx.episode_id = Some("resp_31".into());
     ctx.event = event_of(resolved);
@@ -406,6 +436,8 @@ fn downtime_example(resolved: bool) -> NotificationContext {
     let mut ctx = base(NotificationKind::Downtime, resolved, level);
     ctx.stream_type = String::new();
     ctx.stream_name = String::new();
+    ctx.alert_level = String::new();
+    ctx.level = None;
     ctx.alert_name = "Nightly database upgrade".into();
     ctx.alert_url = url.into();
     ctx.event = event_of(resolved);
@@ -419,12 +451,22 @@ fn downtime_example(resolved: bool) -> NotificationContext {
     .into();
     ctx.alert_description = "CHG-1042 Postgres 17 upgrade".into();
     let event = if resolved { "ended" } else { "started" };
+    ctx.alert_status = event.into();
+    ctx.alert_trigger_time = if resolved {
+        1_793_664_000_000_000
+    } else {
+        1_793_656_800_000_000
+    };
     ctx.context_attributes = [
         ("downtime_name", "Nightly database upgrade"),
         ("downtime_event", event),
         ("downtime_reason", "CHG-1042 Postgres 17 upgrade"),
         ("downtime_starts_at", "2026-11-02 22:00 UTC"),
         ("downtime_ends_at", "2026-11-03 00:00 UTC"),
+        (
+            "downtime_window",
+            "2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC",
+        ),
         ("downtime_targets", "alerts, synthetics checks"),
         ("downtime_counts", "4 alerts, 2 synthetics checks"),
         ("downtime_url", url),
@@ -443,6 +485,9 @@ fn incident_example(resolved: bool) -> NotificationContext {
     };
     let mut ctx = base(NotificationKind::Incident, resolved, level);
     ctx.alert_name = "High error rate".into();
+    ctx.alert_operator = ">".into();
+    ctx.alert_threshold = "5".into();
+    ctx.alert_agg_value = "12.4".into();
     ctx.alert_url = url.into();
     ctx.incident_id = "inc_7f3a".into();
     ctx.episode_id = Some("inc_7f3a".into());
@@ -505,7 +550,7 @@ fn level_str(level: AlertLevel) -> &'static str {
 mod tests {
     use super::*;
     use crate::alerts::notifications::{
-        default_template::compiled_content_for,
+        default_template::compiled_default_content,
         format::ChannelFormat,
         render::{RenderedMessage, render},
         resolve::resolve_content,
@@ -523,7 +568,7 @@ mod tests {
         format: ChannelFormat,
     ) -> serde_json::Value {
         let ctx = example_context(kind, resolved);
-        let content = resolve_content(&compiled_content_for(kind), &ctx, format.channel_family());
+        let content = resolve_content(&compiled_default_content(), &ctx, format.channel_family());
         match render(format, &content, &ctx).unwrap() {
             RenderedMessage::Http { body } => serde_json::from_str(&body).unwrap(),
             RenderedMessage::Email {
@@ -551,12 +596,12 @@ mod tests {
     fn golden_example_anomaly() {
         let want: serde_json::Value = serde_json::from_str(EXAMPLE_ANOMALY).unwrap();
         assert_eq!(example(NotificationKind::Anomaly), want);
-        let title = &want["slack_firing"]["attachments"][0]["blocks"][0]["text"]["text"];
+        let title = &want["slack_firing"]["blocks"][0]["text"]["text"];
         assert!(
             title
                 .as_str()
                 .unwrap()
-                .contains("Anomaly firing: error rate on web-logs on web-logs")
+                .contains("🔴 error rate on web-logs is firing")
         );
     }
 
@@ -571,15 +616,15 @@ mod tests {
     }
 
     #[test]
-    fn golden_example_synthetics_keeps_the_subject_line_as_its_title() {
+    fn golden_example_synthetics_reads_its_own_state_word() {
         let want: serde_json::Value = serde_json::from_str(EXAMPLE_SYNTHETICS).unwrap();
         assert_eq!(example(NotificationKind::Synthetics), want);
-        let title = &want["slack_firing"]["attachments"][0]["blocks"][0]["text"]["text"];
+        let title = &want["slack_firing"]["blocks"][0]["text"]["text"];
         assert!(
             title
                 .as_str()
                 .unwrap()
-                .contains("[OpenObserve Synthetics] 🔴 checkout API is FAILED")
+                .contains("🔴 checkout API is failing")
         );
     }
 
@@ -589,7 +634,7 @@ mod tests {
         assert_eq!(example(NotificationKind::OnCall), want);
         let firing = want["slack_firing"].to_string();
         assert!(
-            firing.contains("[P2] High error rate on web-logs — checkout"),
+            firing.contains("[P2] High error rate on web-logs — checkout is paged"),
             "{firing}"
         );
         assert!(firing.contains("Acknowledge"));
@@ -619,13 +664,9 @@ mod tests {
     #[test]
     fn anomaly_recovery_hides_empty_fields() {
         let ctx = example_context(NotificationKind::Anomaly, true);
-        let content = resolve_content(
-            &compiled_content_for(NotificationKind::Anomaly),
-            &ctx,
-            "slack",
-        );
+        let content = resolve_content(&compiled_default_content(), &ctx, "slack");
         let labels: Vec<&str> = content.fields.iter().map(|(l, _)| l.as_str()).collect();
-        assert_eq!(labels, ["Window", "Score"]);
+        assert_eq!(labels, ["Level", "Event", "Stream", "Score", "Time"]);
     }
 
     #[test]

@@ -462,7 +462,6 @@ async fn send_incident_notifications_inner(
         cfg.common.web_url
     );
     let subject = format!("[{event}] {title}");
-    let incident_template = incident_override(org_id).await;
 
     let mut success_parts: Vec<String> = Vec::new();
     let mut err_parts: Vec<String> = Vec::new();
@@ -477,12 +476,7 @@ async fn send_incident_notifications_inner(
             &service_name,
             &incident_url,
         );
-        // Ordered level 1: an override that does not fit a transport falls to the alert's template.
-        let explicit: Vec<_> = incident_template
-            .iter()
-            .chain(send.alert_template)
-            .cloned()
-            .collect();
+        let explicit: Vec<_> = send.alert_template.into_iter().cloned().collect();
         for dest_name in &send.dest_names {
             match crate::alerts::notifications::notify::notify(
                 org_id,
@@ -516,23 +510,6 @@ async fn send_incident_notifications_inner(
             "[incidents] Notification partially failed for incident {org_id}/{incident_id} ({event}): {error}"
         );
         Some(error)
-    }
-}
-
-/// The org's `default_templates.incident`, loaded once per batch; a missing row falls through.
-#[cfg(feature = "enterprise")]
-async fn incident_override(org_id: &str) -> Option<config::meta::destinations::Template> {
-    use config::meta::alerts::notification_kind::NotificationKind;
-    let defaults = crate::alerts::notifications::org_default::get_default_templates(org_id).await;
-    let name = defaults.get(NotificationKind::Incident)?;
-    match crate::db::alerts::templates::get(org_id, name).await {
-        Ok(t) => Some(t),
-        Err(e) => {
-            log::warn!(
-                "[incidents] default_templates.incident '{name}' not found for {org_id}: {e}"
-            );
-            None
-        }
     }
 }
 
@@ -3525,7 +3502,7 @@ mod tests {
     #[cfg(feature = "enterprise")]
     fn pagerduty_resolved() -> crate::alerts::notifications::notify::Resolved {
         use crate::alerts::notifications::org_default::{
-            EffectiveTemplate, TemplateSource, compiled_fallback_for,
+            EffectiveTemplate, TemplateSource, compiled_fallback,
         };
         let dest_type = config::meta::destinations::DestinationType::Http(
             config::meta::destinations::Endpoint {
@@ -3539,10 +3516,7 @@ mod tests {
             channel: crate::alerts::notifications::derive_channel_format(&dest_type),
             destination_type: dest_type,
             effective: EffectiveTemplate {
-                template: compiled_fallback_for(
-                    "org",
-                    config::meta::alerts::notification_kind::NotificationKind::Incident,
-                ),
+                template: compiled_fallback("org"),
                 source: TemplateSource::Compiled,
                 skipped: vec![],
             },
@@ -4663,7 +4637,7 @@ mod tests {
         };
         let slack: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert!(slack.get("incident").is_none(), "{body}");
-        assert!(slack["attachments"].is_array(), "{body}");
+        assert!(slack["blocks"].is_array(), "{body}");
         assert!(body.contains("incidents/inc-1"), "{body}");
 
         let custom = apply_custom_template(

@@ -271,15 +271,9 @@ mod tests {
             panic!("expected Http rendered message for a Slack destination");
         };
         let value: serde_json::Value = serde_json::from_str(&body).unwrap();
-        // Slack Block Kit: the title is the first block of the first
-        // severity-striped attachment — a bold mrkdwn LINK section
-        // (`*<url|label>*`) when the context carries an alert URL, which the
-        // synthetic context always does. The `[TEST]` marker must therefore
-        // lead the link LABEL, not the raw string.
+        // The title block is a mrkdwn link `*<url|label>*`, so the marker leads the label.
         let title = value
-            .get("attachments")
-            .and_then(|a| a.get(0))
-            .and_then(|a| a.get("blocks"))
+            .get("blocks")
             .and_then(|b| b.get(0))
             .and_then(|b| b.get("text"))
             .and_then(|t| t.get("text"))
@@ -290,6 +284,28 @@ mod tests {
             label.starts_with(TEST_MARKER),
             "test-send title label must start with `[TEST] `, got: {title}"
         );
+    }
+
+    #[test]
+    fn a_test_send_of_o2_default_reads_the_sample_alert_with_its_dot() {
+        let spec = crate::alerts::notifications::default_template::compiled_default_content();
+        let RenderedMessage::Http { body } = build_test_message(&slack_dest(), &spec).unwrap()
+        else {
+            panic!("expected Http rendered message for a Slack destination");
+        };
+        let value: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let title = value["blocks"][0]["text"]["text"].as_str().unwrap();
+        assert!(
+            title.ends_with("|[TEST] 🔴 Sample CPU alert is firing>*"),
+            "{title}"
+        );
+        let fields = value["blocks"][2]["fields"].to_string();
+        assert!(fields.contains("*Level*\\nCritical"), "{fields}");
+        assert!(
+            fields.contains("*Time*\\n2026-08-01 10:10:00 UTC"),
+            "{fields}"
+        );
+        assert!(!body.contains("()"), "{body}");
     }
 
     #[test]

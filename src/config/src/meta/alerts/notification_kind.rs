@@ -67,15 +67,14 @@ impl NotificationKind {
         Self::ALL.into_iter().find(|k| k.as_str() == s)
     }
 
-    /// The reserved name of the kind's compiled default; alerts keep `o2_default_content`.
-    pub fn compiled_default_name(self) -> &'static str {
-        match self {
-            NotificationKind::Alert => "o2_default_content",
-            NotificationKind::Incident => "o2_default_incident",
-            NotificationKind::Anomaly => "o2_default_anomaly",
-            NotificationKind::Synthetics => "o2_default_synthetics",
-            NotificationKind::Downtime => "o2_default_downtime",
-            NotificationKind::OnCall => "o2_default_on_call",
+    /// The event as a person reads it for this kind: a downtime starts and ends, a page is paged.
+    pub fn event_label(self, event: NotificationEvent) -> &'static str {
+        match (self, event) {
+            (NotificationKind::Downtime, NotificationEvent::Firing) => "Started",
+            (NotificationKind::Downtime, NotificationEvent::Resolved) => "Ended",
+            (NotificationKind::OnCall, NotificationEvent::Firing) => "Paged",
+            (NotificationKind::OnCall, NotificationEvent::Resolved) => "Acknowledged",
+            _ => event.label(),
         }
     }
 
@@ -146,6 +145,23 @@ pub enum PlatformAction {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_downtime_and_a_page_read_their_own_event_words() {
+        use NotificationEvent::*;
+        assert_eq!(NotificationKind::Downtime.event_label(Firing), "Started");
+        assert_eq!(NotificationKind::Downtime.event_label(Resolved), "Ended");
+        assert_eq!(NotificationKind::OnCall.event_label(Firing), "Paged");
+        assert_eq!(
+            NotificationKind::OnCall.event_label(Resolved),
+            "Acknowledged"
+        );
+        assert_eq!(NotificationKind::Alert.event_label(Firing), "Firing");
+        assert_eq!(
+            NotificationKind::Downtime.event_label(Informational),
+            "Informational"
+        );
+    }
 
     #[test]
     fn wire_spelling_round_trips() {

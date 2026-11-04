@@ -12121,7 +12121,7 @@
       "helpApplyToAlert": "Apply to alert",
       "helpApplyToObject": "Use this template",
       "helpTemplateExplainObject": "A template is the message that gets sent: the text plus variables. Picking one here replaces each destination's own template, for this configuration only.",
-      "helpTemplateWhenDescObject": "Leave this empty and each destination uses its own template if it applies to this kind, then the org default, then the built-in message. Set an override to send one message to every destination that fits it.",
+      "helpTemplateWhenDescObject": "Leave this empty and each destination uses its own template if it applies to this kind, then the built-in message. Set an override to send one message to every destination that fits it.",
       "helpCurrentHeadingObject": "What this sends now",
       "helpCurrentOverrideSome": "Destinations that fit use this template:",
       "helpCurrentResolved": "No override set. Each destination uses:",
@@ -13485,10 +13485,6 @@
       "emailOnly": "(email only)",
       "snsOnly": "(SNS only)",
       "stale": "Template {name} no longer exists. Pick another one or clear the field.",
-      "orgDefaultPlaceholder": "Built-in {kind} message",
-      "orgDefaultHelp": "Sent for {kind} messages when the destination has no template that applies.",
-      "orgDefaultIncidentPlaceholder": "Use the alert's or the destination's template",
-      "orgDefaultIncidentHelp": "Overrides the alert's and the destination's template for incident messages.",
       "willUse": "Will use: {template}",
       "willUsePerDestination": "Will use, per destination:",
       "willUseRow": "{destination}: {template}",
@@ -13797,7 +13793,8 @@
     "previewFidelityEmail": "The real email is HTML with a plain-text alternative. See Payload for both.",
     "previewFidelityWebhook": "Webhook receivers get JSON, not a card. See Payload for the exact body.",
     "previewFidelityMachine": "This channel is consumed by software, not read by people — the card is a normalized rendering. Payload shows the exact body that is sent.",
-    "previewGroupLabel": "Preview (not sent anywhere)",
+    "playgroundLabel": "Playground",
+    "playgroundHelp": "Nothing here is sent.",
     "previewChannel": "Channel",
     "previewSeverity": "Severity",
     "previewSeveritySingle": "Single-level (no level)",
@@ -15341,14 +15338,6 @@
       "requestApproved": "{domain} linked",
       "requestRejected": "Request for {domain} rejected",
       "decisionFailed": "Failed to update the request"
-    },
-    "defaultTemplates": {
-      "title": "Default templates",
-      "description": "Used when a destination has no template of its own, or only a prebuilt one. Applies to this region.",
-      "save": "Save",
-      "saved": "Default templates saved",
-      "loadFailed": "Could not load the default templates",
-      "readOnly": "You can view the default templates but not change them."
     }
   },
   "reports": {

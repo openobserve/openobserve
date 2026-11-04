@@ -3587,6 +3587,10 @@ fn anomaly_notification_context(
         stream_type: actx.stream_type.clone(),
         stream_name: actx.stream_name.clone(),
         alert_name: actx.config_name.clone(),
+        alert_agg_value: actx
+            .worst_actual_value
+            .map(|v| format!("{v:.2}"))
+            .unwrap_or_default(),
         alert_level: level_str.to_string(),
         alert_status: if recovery {
             STATUS_RESOLVED
@@ -3649,6 +3653,7 @@ fn anomaly_attributes(
         ("worst_expected", two(actx.worst_expected)),
         ("score", two(actx.score)),
         ("threshold", two(actx.threshold)),
+        ("anomaly_score", score_line(actx.score, actx.threshold)),
         ("window_start", fmt_alert_us(actx.window_start_us)),
         ("window_end", fmt_alert_us(actx.window_end_us)),
         ("anomaly_url", link.to_string()),
@@ -3656,6 +3661,16 @@ fn anomaly_attributes(
     .into_iter()
     .map(|(k, v)| (k.to_string(), v))
     .collect()
+}
+
+/// `0.91 vs 0.80`, or the score alone when the config has no threshold.
+#[cfg(feature = "enterprise")]
+fn score_line(score: Option<f64>, threshold: Option<f64>) -> String {
+    match (score, threshold) {
+        (Some(s), Some(t)) => format!("{s:.2} vs {t:.2}"),
+        (Some(s), None) => format!("{s:.2}"),
+        _ => String::new(),
+    }
 }
 
 /// The alert convention for the standard time fields: server local time with no suffix.
@@ -4934,14 +4949,10 @@ mod tests {
         use config::meta::{
             alerts::notification_kind::NotificationKind::{self, *},
             destinations::{Template, TemplateKind},
-            system_settings::SystemSetting,
         };
         use db::alerts::templates::TemplateError;
 
-        use crate::{
-            alerts::{notifications::org_default, templates as svc},
-            ssrf_test_support::isolated,
-        };
+        use crate::{alerts::templates as svc, ssrf_test_support::isolated};
 
         fn run<F: std::future::Future<Output = ()>>(path: &str, task: impl FnOnce() -> F) {
             let name = path.rsplit("::").next().unwrap_or(path);
@@ -5078,7 +5089,7 @@ mod tests {
                         .unwrap();
                     infra::table::templates::put(content(
                         config::DEFAULT_ORG,
-                        "o2_default_anomaly",
+                        "o2_default",
                         vec![],
                     ))
                     .await
@@ -5095,8 +5106,8 @@ mod tests {
                         "validation error: template 'incident-only' does not apply to anomaly"
                     );
                     assert_eq!(
-                        err("o2_default_anomaly").await,
-                        "validation error: template 'o2_default_anomaly' is reserved"
+                        err("o2_default").await,
+                        "validation error: template 'o2_default' is reserved"
                     );
                     assert_eq!(
                         err("gone").await,
@@ -5116,32 +5127,6 @@ mod tests {
                             .unwrap(),
                         None
                     );
-
-                    let pointer_err = org_default::validate_default_templates(
-                        "acme",
-                        &serde_json::json!({"anomaly": "incident-only"}),
-                    )
-                    .await
-                    .unwrap_err();
-                    assert_eq!(
-                        pointer_err,
-                        "default_templates.anomaly: template 'incident-only' does not apply to anomaly"
-                    );
-                    assert!(
-                        org_default::validate_default_templates(
-                            "acme",
-                            &serde_json::json!({"pages": "ops-card"}),
-                        )
-                        .await
-                        .unwrap_err()
-                        .contains("unknown kind 'pages'")
-                    );
-                    org_default::validate_default_templates(
-                        "acme",
-                        &serde_json::json!({"anomaly": "ops-card", "incident": "incident-only"}),
-                    )
-                    .await
-                    .unwrap();
                 },
             );
         }
@@ -5159,40 +5144,31 @@ mod tests {
                         .await
                         .unwrap();
                     bind_anomaly("acme", "error rate on web-logs", "ops-card").await;
-                    infra::table::system_settings::set(&SystemSetting::new_org(
-                        "acme",
-                        org_default::DEFAULT_TEMPLATES_KEY,
-                        serde_json::json!({"incident": "ops-card"}),
-                    ))
-                    .await
-                    .unwrap();
 
                     let used = svc::used_by("acme", "ops-card").await.unwrap();
                     assert_eq!(used.anomaly, 1);
-                    assert_eq!(used.org_default, vec!["incident".to_string()]);
                     assert_eq!(used.destinations, 0);
 
-                    // Narrowing away incident is refused because the org pointer names it.
+                    // Narrowing away anomaly is refused because an anomaly config names it.
                     let err = svc::save(
                         "ops-card",
                         content("acme", "ops-card", vec![]),
                         None,
-                        Some(vec![Anomaly]),
+                        Some(vec![Incident]),
                         false,
                         false,
                     )
                     .await
                     .unwrap_err();
                     assert!(
-                        matches!(&err, TemplateError::InUseForKind { kind, by } if kind == "incident" && by.contains("org default template of acme")),
+                        matches!(&err, TemplateError::InUseForKind { kind, by } if kind == "anomaly" && by.contains("anomaly config 'error rate on web-logs'")),
                         "{err}"
                     );
 
                     let err = svc::delete("acme", "ops-card", false).await.unwrap_err();
                     assert!(
                         matches!(&err, TemplateError::DeleteWithBinding(by)
-                            if by.contains("anomaly config 'error rate on web-logs'")
-                                && by.contains("org default for incident")),
+                            if by.contains("anomaly config 'error rate on web-logs'")),
                         "{err}"
                     );
                     assert!(
@@ -7030,17 +7006,15 @@ mod tests {
         fn resolved_for(
             dest_type: config::meta::destinations::DestinationType,
         ) -> crate::alerts::notifications::notify::Resolved {
-            use config::meta::alerts::notification_kind::NotificationKind;
-
             use crate::alerts::notifications::org_default::{
-                EffectiveTemplate, TemplateSource, compiled_fallback_for,
+                EffectiveTemplate, TemplateSource, compiled_fallback,
             };
             crate::alerts::notifications::notify::Resolved {
                 destination: Default::default(),
                 channel: crate::alerts::notifications::derive_channel_format(&dest_type),
                 destination_type: dest_type,
                 effective: EffectiveTemplate {
-                    template: compiled_fallback_for("org", NotificationKind::Anomaly),
+                    template: compiled_fallback("org"),
                     source: TemplateSource::Compiled,
                     skipped: vec![],
                 },

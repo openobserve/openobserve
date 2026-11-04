@@ -299,6 +299,18 @@ async fn delete_by_org_returning_with<C: ConnectionTrait>(
 
 /// The prefix of compiled default names; every name under it is reserved.
 pub const RESERVED_PREFIX: &str = "o2_default_";
+/// The one compiled default every kind falls back to; reserved like the prefix.
+pub const DEFAULT_TEMPLATE_NAME: &str = "o2_default";
+/// The compiled rows `o2_default` replaced; their references move to it.
+pub const RETIRED_DEFAULT_NAMES: [&str; 7] = [
+    "o2_default_content",
+    "o2_default_incident",
+    "o2_default_anomaly",
+    "o2_default_synthetics",
+    "o2_default_on_call",
+    "prebuilt_downtime",
+    "prebuilt_downtime_email",
+];
 /// The setting keys whose values can name a template.
 const POINTER_KEYS: [&str; 2] = ["default_alert_template", "default_templates"];
 
@@ -311,7 +323,8 @@ pub struct ReservedRename {
 }
 
 /// The rows the seeder writes in the default org; any other reserved name is a user row.
-const SHIPPED_SEEDS: [&str; 5] = [
+const SHIPPED_SEEDS: [&str; 6] = [
+    DEFAULT_TEMPLATE_NAME,
     "o2_default_content",
     "o2_default_incident",
     "o2_default_anomaly",
@@ -324,18 +337,24 @@ fn is_shipped_seed(org: &str, name: &str, kind: &str) -> bool {
     org == DEFAULT_ORG && SHIPPED_SEEDS.contains(&name) && kind == TemplateKind::Content.to_string()
 }
 
-/// Renames user rows under `o2_default_` to `user_{name}` and moves their references.
+/// A name only the system may use: `o2_default` or anything under `o2_default_`.
+pub fn is_reserved_default_name(name: &str) -> bool {
+    name == DEFAULT_TEMPLATE_NAME || name.starts_with(RESERVED_PREFIX)
+}
+
+/// Renames user rows named `o2_default` or under `o2_default_` to `user_{name}` and moves their
+/// references.
 pub async fn rename_reserved_collisions<C>(db: &C) -> Result<Vec<ReservedRename>, sea_orm::DbErr>
 where
     C: ConnectionTrait + sea_orm::TransactionTrait,
 {
     let txn = db.begin().await?;
     let mut rows: Vec<Model> = Entity::find()
-        .filter(Column::Name.like(format!("{RESERVED_PREFIX}%")))
+        .filter(Column::Name.like(format!("{DEFAULT_TEMPLATE_NAME}%")))
         .all(&txn)
         .await?
         .into_iter()
-        .filter(|m| m.name.starts_with(RESERVED_PREFIX))
+        .filter(|m| is_reserved_default_name(&m.name))
         .filter(|m| !is_shipped_seed(&m.org, &m.name, &m.kind))
         .collect();
     // Other orgs first, so a reference left on the old name afterwards reads the default row.
@@ -444,6 +463,111 @@ fn rename_in_value(value: &mut serde_json::Value, from: &str, to: &str) -> bool 
         }
     }
     changed
+}
+
+/// Folds the retired default rows into `o2_default`, moves every reference to it and drops the
+/// org default pointers; safe to run again.
+pub async fn retire_default_templates<C>(db: &C) -> Result<Vec<ReservedRename>, sea_orm::DbErr>
+where
+    C: ConnectionTrait + sea_orm::TransactionTrait,
+{
+    use sea_orm::sea_query::Expr;
+
+    use super::entity::{destinations, system_settings};
+
+    let txn = db.begin().await?;
+    let mut retired: Vec<Model> = Entity::find()
+        .filter(Column::Org.eq(DEFAULT_ORG))
+        .filter(Column::Name.is_in(RETIRED_DEFAULT_NAMES))
+        .all(&txn)
+        .await?;
+    // The alert default's row becomes o2_default, so a destination bound to it keeps its id.
+    retired.sort_by_key(|m| m.name != "o2_default_content");
+    let mut target = get_org_model(&txn, DEFAULT_ORG, DEFAULT_TEMPLATE_NAME)
+        .await?
+        .map(|m| m.id);
+    let mut moved = Vec::with_capacity(retired.len());
+    for row in retired {
+        if target.is_none() && row.kind == TemplateKind::Content.to_string() {
+            Entity::update_many()
+                .col_expr(Column::Name, Expr::value(DEFAULT_TEMPLATE_NAME))
+                .filter(Column::Id.eq(row.id.clone()))
+                .exec(&txn)
+                .await?;
+            target = Some(row.id.clone());
+        } else {
+            destinations::Entity::update_many()
+                .col_expr(
+                    destinations::Column::TemplateId,
+                    Expr::value(target.clone()),
+                )
+                .filter(destinations::Column::TemplateId.eq(row.id.clone()))
+                .exec(&txn)
+                .await?;
+            Entity::delete_by_id(row.id.clone()).exec(&txn).await?;
+        }
+        moved.push(ReservedRename {
+            org: row.org,
+            from: row.name,
+            to: DEFAULT_TEMPLATE_NAME.to_string(),
+        });
+    }
+    point_names_at_default(&txn).await?;
+    system_settings::Entity::delete_many()
+        .filter(system_settings::Column::Scope.eq("org"))
+        .filter(system_settings::Column::SettingKey.is_in(POINTER_KEYS))
+        .exec(&txn)
+        .await?;
+    txn.commit().await?;
+    Ok(moved)
+}
+
+/// Every override that names a retired default names `o2_default` instead, in every org.
+async fn point_names_at_default<C: ConnectionTrait>(db: &C) -> Result<(), sea_orm::DbErr> {
+    use sea_orm::sea_query::Expr;
+
+    use super::entity::{
+        alert_composites, alerts, anomaly_detection_config, oncall_policies, synthetics_checks,
+    };
+
+    alerts::Entity::update_many()
+        .col_expr(alerts::Column::Template, Expr::value(DEFAULT_TEMPLATE_NAME))
+        .filter(alerts::Column::Template.is_in(RETIRED_DEFAULT_NAMES))
+        .exec(db)
+        .await?;
+    alert_composites::Entity::update_many()
+        .col_expr(
+            alert_composites::Column::Template,
+            Expr::value(DEFAULT_TEMPLATE_NAME),
+        )
+        .filter(alert_composites::Column::Template.is_in(RETIRED_DEFAULT_NAMES))
+        .exec(db)
+        .await?;
+    anomaly_detection_config::Entity::update_many()
+        .col_expr(
+            anomaly_detection_config::Column::Template,
+            Expr::value(DEFAULT_TEMPLATE_NAME),
+        )
+        .filter(anomaly_detection_config::Column::Template.is_in(RETIRED_DEFAULT_NAMES))
+        .exec(db)
+        .await?;
+    synthetics_checks::Entity::update_many()
+        .col_expr(
+            synthetics_checks::Column::Template,
+            Expr::value(DEFAULT_TEMPLATE_NAME),
+        )
+        .filter(synthetics_checks::Column::Template.is_in(RETIRED_DEFAULT_NAMES))
+        .exec(db)
+        .await?;
+    oncall_policies::Entity::update_many()
+        .col_expr(
+            oncall_policies::Column::Template,
+            Expr::value(DEFAULT_TEMPLATE_NAME),
+        )
+        .filter(oncall_policies::Column::Template.is_in(RETIRED_DEFAULT_NAMES))
+        .exec(db)
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]

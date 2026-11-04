@@ -39,6 +39,7 @@ import { announcementKeys } from "./announcements.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 import { dbmHttpError } from "@/utils/dbm/format";
 import {
+  DOWNTIME_TEMPLATE,
   downtimeVariables,
   isEmailDestination,
   renderDowntimeTemplate,
@@ -253,6 +254,21 @@ const templateBody = async (org: string, name: string): Promise<string> =>
     (await template.get_by_name({ org_identifier: org, template_name: name })).data?.body ?? "",
   );
 
+const serverTestSend = async (org: string, dest: TestDestination): Promise<DowntimeTestResult> => {
+  const res = (
+    await destination.testSend({
+      org_identifier: org,
+      destination_name: dest.name,
+      data: { template_name: DOWNTIME_TEMPLATE, kind: "downtime" },
+    })
+  ).data;
+  return {
+    destination: dest.name,
+    ok: !!res?.success,
+    error: res?.success ? undefined : res?.message,
+  };
+};
+
 const sendTestTo = async (
   org: string,
   dest: TestDestination,
@@ -261,7 +277,9 @@ const sendTestTo = async (
   try {
     const own = dest.template ? await templateBody(org, dest.template).catch(() => "") : "";
     const name = templateNameFor(dest, own);
-    const body = name === dest.template ? own : await templateBody(org, name);
+    // o2_default is a content spec, so the server renders it with the downtime sample.
+    if (name === DOWNTIME_TEMPLATE) return await serverTestSend(org, dest);
+    const body = own;
     const escape = isEmailDestination(dest) ? "html" : "json";
     const request = testRequestFor(dest, renderDowntimeTemplate(body, variables, escape));
     if (!request) return { destination: dest.name, ok: false, unsupported: true };

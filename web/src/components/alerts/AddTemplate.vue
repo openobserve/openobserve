@@ -253,6 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :kinds="appliesTo"
               data-test="add-template-preview-panel"
               @variable-groups="(groups) => (variableGroups = groups)"
+              @kind-change="(kind) => (previewKind = kind)"
             />
             <OSeparator class="-ms-2 me-2 mt-2" />
           </template>
@@ -510,10 +511,17 @@ const resetAppliesTo = () => {
   appliesToError.value = null;
 };
 
-// Filled from the preview response; the guide shows common, then each selected kind.
+// Filled from the preview response, which carries every group.
 const variableGroups = ref<VariableGroup[]>([]);
+// The playground's Kind; the panel only offers kinds inside Applies to, so it narrows that list.
+const previewKind = ref<NotificationKind>("alert");
 const shownVariableGroups = computed(() => {
-  const kinds: string[] = appliesTo.value.length ? appliesTo.value : [...NOTIFICATION_KINDS];
+  const kinds: string[] =
+    editorMode.value === "content"
+      ? [previewKind.value]
+      : appliesTo.value.length
+        ? appliesTo.value
+        : [...NOTIFICATION_KINDS];
   return variableGroups.value.filter(
     (g) => g.name === "common" || (kinds.includes(g.name) && g.variables.length > 0),
   );

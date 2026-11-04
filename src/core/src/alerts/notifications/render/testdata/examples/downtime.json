@@ -1,101 +1,105 @@
 {
   "slack_firing": {
-    "attachments": [
+    "blocks": [
       {
-        "color": "#ECB22E",
-        "blocks": [
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*<https://o2.acme.com/web/downtimes?org_identifier=acme|🔵 Nightly database upgrade is started>*"
+        }
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "CHG-1042 Postgres 17 upgrade"
+        }
+      },
+      {
+        "type": "section",
+        "fields": [
           {
-            "type": "section",
-            "text": {
-              "type": "mrkdwn",
-              "text": "*<https://o2.acme.com/web/downtimes?org_identifier=acme|[warning] Nightly database upgrade on >*"
-            }
+            "type": "mrkdwn",
+            "text": "*Event*\nStarted"
           },
           {
-            "type": "section",
-            "text": {
-              "type": "mrkdwn",
-              "text": "*Nightly database upgrade* is firing for stream ****.\n\nCHG-1042 Postgres 17 upgrade"
-            }
+            "type": "mrkdwn",
+            "text": "*Window*\n2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC"
           },
           {
-            "type": "section",
-            "fields": [
-              {
-                "type": "mrkdwn",
-                "text": "*Triggered*\n2026-11-02 22:00 UTC"
-              }
-            ]
+            "type": "mrkdwn",
+            "text": "*Muted*\nalerts, synthetics checks"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Time*\n2026-11-02 22:00:00 UTC"
           }
         ]
       },
       {
-        "color": "#ECB22E",
-        "blocks": [
+        "type": "actions",
+        "elements": [
           {
-            "type": "actions",
-            "elements": [
-              {
-                "type": "button",
-                "text": {
-                  "type": "plain_text",
-                  "text": "View in OpenObserve"
-                },
-                "url": "https://o2.acme.com/web/downtimes?org_identifier=acme",
-                "style": "primary"
-              }
-            ]
+            "type": "button",
+            "text": {
+              "type": "plain_text",
+              "text": "View in OpenObserve"
+            },
+            "url": "https://o2.acme.com/web/downtimes?org_identifier=acme",
+            "style": "primary"
           }
         ]
       }
     ]
   },
   "slack_resolved": {
-    "attachments": [
+    "blocks": [
       {
-        "color": "#2EB67D",
-        "blocks": [
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*<https://o2.acme.com/web/downtimes?org_identifier=acme|🟢 Nightly database upgrade is ended>*"
+        }
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "CHG-1042 Postgres 17 upgrade"
+        }
+      },
+      {
+        "type": "section",
+        "fields": [
           {
-            "type": "section",
-            "text": {
-              "type": "mrkdwn",
-              "text": "*<https://o2.acme.com/web/downtimes?org_identifier=acme|[ok] Nightly database upgrade on >*"
-            }
+            "type": "mrkdwn",
+            "text": "*Event*\nEnded"
           },
           {
-            "type": "section",
-            "text": {
-              "type": "mrkdwn",
-              "text": "*Nightly database upgrade* is resolved for stream ****.\n\nCHG-1042 Postgres 17 upgrade"
-            }
+            "type": "mrkdwn",
+            "text": "*Window*\n2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC"
           },
           {
-            "type": "section",
-            "fields": [
-              {
-                "type": "mrkdwn",
-                "text": "*Triggered*\n2026-11-03 00:00 UTC"
-              }
-            ]
+            "type": "mrkdwn",
+            "text": "*Muted*\nalerts, synthetics checks"
+          },
+          {
+            "type": "mrkdwn",
+            "text": "*Time*\n2026-11-03 00:00:00 UTC"
           }
         ]
       },
       {
-        "color": "#2EB67D",
-        "blocks": [
+        "type": "actions",
+        "elements": [
           {
-            "type": "actions",
-            "elements": [
-              {
-                "type": "button",
-                "text": {
-                  "type": "plain_text",
-                  "text": "View in OpenObserve"
-                },
-                "url": "https://o2.acme.com/web/downtimes?org_identifier=acme",
-                "style": "primary"
-              }
-            ]
+            "type": "button",
+            "text": {
+              "type": "plain_text",
+              "text": "View in OpenObserve"
+            },
+            "url": "https://o2.acme.com/web/downtimes?org_identifier=acme",
+            "style": "primary"
           }
         ]
       }
@@ -103,10 +107,13 @@
   },
   "webhook_firing": {
     "version": 1,
-    "title": "[warning] Nightly database upgrade on ",
-    "body_markdown": "**Nightly database upgrade** is firing for stream ****.\n\nCHG\\-1042 Postgres 17 upgrade",
+    "title": "🔵 Nightly database upgrade is started",
+    "body_markdown": "CHG\\-1042 Postgres 17 upgrade",
     "fields": {
-      "Triggered": "2026-11-02 22:00 UTC"
+      "Event": "Started",
+      "Window": "2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC",
+      "Muted": "alerts, synthetics checks",
+      "Time": "2026-11-02 22:00:00 UTC"
     },
     "rows": [],
     "links": [
@@ -115,7 +122,7 @@
         "url": "https://o2.acme.com/web/downtimes?org_identifier=acme"
       }
     ],
-    "severity": "warning",
+    "severity": null,
     "chart_url": null,
     "context": {
       "org_name": "acme",
@@ -128,8 +135,8 @@
       "alert_threshold": null,
       "alert_count": null,
       "alert_agg_value": null,
-      "alert_level": "warning",
-      "alert_status": "firing",
+      "alert_level": null,
+      "alert_status": "started",
       "episode_id": null,
       "recovery_reason": null,
       "alert_priority": null,
@@ -147,13 +154,16 @@
       "notification_kind": "downtime",
       "notification_event": "firing",
       "notification_kind_label": "Downtime",
-      "notification_event_label": "Firing",
+      "notification_event_label": "Started",
+      "status_dot": "🔵",
+      "alert_level_label": null,
+      "alert_trigger_time_utc": "2026-11-02 22:00:00 UTC",
       "cluster_name": "o2-acme",
       "alert_start_time_millis": "N/A",
       "alert_end_time_millis": "N/A",
-      "alert_trigger_time": "0",
-      "alert_trigger_time_millis": "0",
-      "alert_trigger_time_seconds": "0",
+      "alert_trigger_time": "1793656800000000",
+      "alert_trigger_time_millis": "1793656800000",
+      "alert_trigger_time_seconds": "1793656800",
       "alert_promql_operator": null,
       "alert_promql_value": null,
       "downtime_name": "Nightly database upgrade",
@@ -161,18 +171,19 @@
       "downtime_reason": "CHG-1042 Postgres 17 upgrade",
       "downtime_starts_at": "2026-11-02 22:00 UTC",
       "downtime_ends_at": "2026-11-03 00:00 UTC",
+      "downtime_window": "2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC",
       "downtime_targets": "alerts, synthetics checks",
       "downtime_counts": "4 alerts, 2 synthetics checks",
       "downtime_url": "https://o2.acme.com/web/downtimes?org_identifier=acme"
     }
   },
   "email_firing": {
-    "subject": "[warning] Nightly database upgrade on ",
-    "html": "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"border-collapse:collapse;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#202124;\"><tr><td style=\"padding:16px;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"border-collapse:collapse;\"><tr><td width=\"4\" style=\"width:4px;background-color:#ECB22E;\"></td><td style=\"padding:0 0 0 12px;\"><span style=\"display:inline-block;margin:0 0 8px 0;padding:2px 8px;border-radius:3px;background-color:#ECB22E;color:#FFFFFF;font-size:11px;font-weight:700;letter-spacing:0.03em;\">WARNING</span><br/><h2 style=\"margin:0 0 8px 0;font-size:20px;line-height:1.3;color:#202124;\">[warning] Nightly database upgrade on </h2></td></tr></table><div style=\"margin:16px 0;color:#202124;\"><p><strong>Nightly database upgrade</strong> is firing for stream ****.</p>\n<p>CHG-1042 Postgres 17 upgrade</p></div><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;margin:16px 0;\"><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Triggered</td><td style=\"padding:4px 0;color:#202124;\">2026-11-02 22:00 UTC</td></tr></table><div style=\"margin:16px 0;\"><a href=\"https://o2.acme.com/web/downtimes?org_identifier=acme\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;background-color:#2EB67D;border-radius:4px;color:#FFFFFF;font-weight:600;text-decoration:none;\">View in OpenObserve</a></div><div style=\"margin:24px 0 0 0;padding-top:12px;border-top:1px solid #DADCE0;color:#5F6368;font-size:12px;\">Sent by OpenObserve.</div></td></tr></table>",
-    "text": "[WARNING] [warning] Nightly database upgrade on \n\nNightly database upgrade is firing for stream ****.\n\nCHG-1042 Postgres 17 upgrade\n\nTriggered: 2026-11-02 22:00 UTC\n\nView in OpenObserve: https://o2.acme.com/web/downtimes?org_identifier=acme\n\nSent by OpenObserve."
+    "subject": "🔵 Nightly database upgrade is started",
+    "html": "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"border-collapse:collapse;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#202124;\"><tr><td style=\"padding:16px;\"><h2 style=\"margin:0 0 8px 0;font-size:20px;line-height:1.3;color:#202124;\">🔵 Nightly database upgrade is started</h2><div style=\"margin:16px 0;color:#202124;\"><p>CHG-1042 Postgres 17 upgrade</p></div><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;margin:16px 0;\"><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Event</td><td style=\"padding:4px 0;color:#202124;\">Started</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Window</td><td style=\"padding:4px 0;color:#202124;\">2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Muted</td><td style=\"padding:4px 0;color:#202124;\">alerts, synthetics checks</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Time</td><td style=\"padding:4px 0;color:#202124;\">2026-11-02 22:00:00 UTC</td></tr></table><div style=\"margin:16px 0;\"><a href=\"https://o2.acme.com/web/downtimes?org_identifier=acme\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;background-color:#2EB67D;border-radius:4px;color:#FFFFFF;font-weight:600;text-decoration:none;\">View in OpenObserve</a></div><div style=\"margin:24px 0 0 0;padding-top:12px;border-top:1px solid #DADCE0;color:#5F6368;font-size:12px;\">Sent by OpenObserve.</div></td></tr></table>",
+    "text": "🔵 Nightly database upgrade is started\n\nCHG-1042 Postgres 17 upgrade\n\nEvent: Started\nWindow: 2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC\nMuted: alerts, synthetics checks\nTime: 2026-11-02 22:00:00 UTC\n\nView in OpenObserve: https://o2.acme.com/web/downtimes?org_identifier=acme\n\nSent by OpenObserve."
   },
   "sns_firing": {
-    "subject": "[warning] Nightly database upgrade on ",
-    "message": "[warning] Nightly database upgrade on \n\nNightly database upgrade is firing for stream ****.\n\nCHG-1042 Postgres 17 upgrade\n\nTriggered: 2026-11-02 22:00 UTC\n\nhttps://o2.acme.com/web/downtimes?org_identifier=acme"
+    "subject": "🔵 Nightly database upgrade is started",
+    "message": "🔵 Nightly database upgrade is started\n\nCHG-1042 Postgres 17 upgrade\n\nEvent: Started\nWindow: 2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC\nMuted: alerts, synthetics checks\nTime: 2026-11-02 22:00:00 UTC\n\nhttps://o2.acme.com/web/downtimes?org_identifier=acme"
   }
 }

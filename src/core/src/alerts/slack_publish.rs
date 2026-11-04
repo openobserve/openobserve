@@ -370,8 +370,7 @@ pub async fn send_form_test(
         None => None,
     };
     let effective =
-        crate::alerts::notifications::org_default::resolve_effective_template(org_id, explicit)
-            .await;
+        crate::alerts::notifications::org_default::resolve_effective_template(org_id, explicit);
     let ctx = crate::alerts::notifications::preview::synthetic_context(None);
     let mut wire = render_wire(effective.template(), &ctx)?;
     wire.title = format!(

@@ -923,12 +923,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("system templates initialization failed");
 
-    // Give every org without a default_alert_template pointer one, pointing
-    // at the just-seeded o2_default_content. Best-effort: the compiled-in
-    // fallback (design §4.4) covers any org this misses.
-    if let Err(e) = alerts::notifications::org_default::backfill_org_default_templates().await {
-        log::error!("[TEMPLATES] default_alert_template backfill failed: {e}");
-    }
     #[cfg(feature = "enterprise")]
     if let Err(e) = alerts::alert_calibration::backfill_org_configs().await {
         log::error!("[alert_calibration] default config backfill failed: {e}");

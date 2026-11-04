@@ -277,14 +277,8 @@ fn downtime_context(
 ) -> crate::alerts::notifications::NotificationContext {
     use config::meta::alerts::notification_kind::{self, NotificationKind};
 
-    use crate::alerts::notifications::{
-        NotificationContext, STATUS_FIRING, STATUS_RESOLVED, context::RenderHints,
-    };
+    use crate::alerts::notifications::{NotificationContext, context::RenderHints};
 
-    let ended = matches!(
-        due.event,
-        NotificationEvent::Ended | NotificationEvent::Cancelled
-    );
     let subject = render_title(&vars);
     let url = vars
         .iter()
@@ -294,12 +288,7 @@ fn downtime_context(
     NotificationContext {
         org_name: row.org.clone(),
         alert_name: row.name.clone(),
-        alert_status: if ended {
-            STATUS_RESOLVED
-        } else {
-            STATUS_FIRING
-        }
-        .to_string(),
+        alert_status: state_word(due.event).to_string(),
         alert_start_time: utc(due.window.start),
         alert_end_time: utc(due.window.end),
         alert_start_time_millis: (due.window.start / 1000).to_string(),
@@ -314,7 +303,7 @@ fn downtime_context(
             .map(|(k, v)| (k.to_string(), v))
             .collect(),
         kind: NotificationKind::Downtime,
-        // Matches alert_status; platforms still skip every downtime event (D8).
+        // Platforms still skip every downtime event (D8).
         event: match due.event {
             NotificationEvent::Started => notification_kind::NotificationEvent::Firing,
             NotificationEvent::Ended | NotificationEvent::Cancelled => {
@@ -355,6 +344,10 @@ fn variables(
         ("downtime_reason", row.reason.clone().unwrap_or_default()),
         ("downtime_starts_at", utc(window.start)),
         ("downtime_ends_at", utc(window.end)),
+        (
+            "downtime_window",
+            format!("{} to {}", utc(window.start), utc(window.end)),
+        ),
         ("downtime_targets", targets_phrase(row)),
         ("downtime_counts", counts_phrase(row, counts)),
         (
@@ -363,6 +356,17 @@ fn variables(
         ),
         ("org_name", row.org.clone()),
     ]
+}
+
+/// The window's state as the title reads it: `{name} is started`.
+fn state_word(event: NotificationEvent) -> &'static str {
+    match event {
+        NotificationEvent::Started => "started",
+        NotificationEvent::EndingSoon => "ending soon",
+        NotificationEvent::Ended => "ended",
+        NotificationEvent::Cancelled => "cancelled",
+        NotificationEvent::Extended => "extended",
+    }
 }
 
 fn event_phrase(event: NotificationEvent) -> &'static str {
@@ -423,7 +427,6 @@ mod tests {
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, Schema};
 
     use super::*;
-    use crate::alerts::templates::downtime_templates;
 
     const HOUR: i64 = 3_600_000_000;
 
@@ -596,43 +599,43 @@ mod tests {
     }
 
     #[test]
-    fn the_seeded_pair_renders_through_the_shared_path_escaped_for_its_format() {
-        use crate::alerts::notifications::custom::apply_custom_template;
-
-        let counts = MatchCounts {
-            alerts: 2,
-            synthetics: 1,
-            ..Default::default()
+    fn a_downtime_renders_o2_default_with_its_own_fields() {
+        use crate::alerts::notifications::{
+            ChannelFormat, RenderedMessage, default_template::compiled_default_content, render,
+            resolve_content,
         };
+
         let vars = variables(
             &row(None),
-            NotificationEvent::EndingSoon,
+            NotificationEvent::Started,
             &window(),
-            Some(&counts),
+            None,
             "https://o2.example.com",
         );
-        let ctx = downtime_context(&row(None), &due(NotificationEvent::EndingSoon), 7, vars);
-        let [http, email] = downtime_templates();
-
-        let body = apply_custom_template(&http.body, &ctx, false);
-        let json: serde_json::Value = serde_json::from_str(&body).unwrap();
-        assert_eq!(json["downtime"]["name"], "Nightly \"deploy\" <db>");
-        assert_eq!(json["downtime"]["event"], "ends soon");
-        assert_eq!(json["downtime"]["starts_at"], "1970-01-01 10:00 UTC");
-        assert_eq!(json["downtime"]["ends_at"], "1970-01-01 12:00 UTC");
-        assert_eq!(json["downtime"]["targets"], "alerts, synthetics checks");
-        assert_eq!(json["downtime"]["counts"], "2 alerts, 1 synthetics check");
+        let ctx = downtime_context(&row(None), &due(NotificationEvent::Started), 7, vars);
+        let content = resolve_content(&compiled_default_content(), &ctx, "slack");
+        assert_eq!(content.title, "🔵 Nightly \"deploy\" <db> is started");
+        let labels: Vec<&str> = content.fields.iter().map(|(l, _)| l.as_str()).collect();
+        assert_eq!(labels, ["Event", "Window", "Muted", "Time"]);
+        assert_eq!(content.fields[0].1, "Started");
         assert_eq!(
-            json["downtime"]["url"],
-            "https://o2.example.com/web/downtimes?org_identifier=acme"
+            content.fields[1].1,
+            "1970-01-01 10:00 UTC to 1970-01-01 12:00 UTC"
         );
-        assert_eq!(json["downtime"]["org"], "acme");
-        assert_eq!(json["downtime"]["reason"], "CHG-1");
+        assert_eq!(content.fields[2].1, "alerts, synthetics checks");
 
-        let html = apply_custom_template(&email.body, &ctx, true);
-        assert!(html.contains("Nightly &quot;deploy&quot; &lt;db&gt;"));
-        assert!(!html.contains("{downtime_"));
-        assert!(!html.contains("{org_name}"));
+        let email = resolve_content(&compiled_default_content(), &ctx, "email");
+        let RenderedMessage::Email { subject, html, .. } =
+            render(ChannelFormat::Email, &email, &ctx).unwrap()
+        else {
+            panic!("email renders a message");
+        };
+        assert!(subject.contains("is started"), "{subject}");
+        assert!(
+            html.contains("Nightly &quot;deploy&quot; &lt;db&gt;"),
+            "{html}"
+        );
+        assert!(!html.contains("{downtime_"), "{html}");
     }
 
     #[test]
@@ -646,10 +649,10 @@ mod tests {
         assert_eq!(started.kind.as_str(), "downtime");
         assert_eq!(started.event, Event::Firing);
         assert_eq!(started.episode_id, None);
-        assert_eq!(started.alert_status, "firing");
+        assert_eq!(started.alert_status, "started");
         let ended = downtime_context(&row(None), &due(NotificationEvent::Ended), 6, vars());
         assert_eq!(ended.event, Event::Resolved);
-        assert_eq!(ended.alert_status, "resolved");
+        assert_eq!(ended.alert_status, "ended");
         let body = "{notification_event}";
         assert_eq!(apply_custom_template(body, &started, false), "firing");
         assert_eq!(apply_custom_template(body, &ended, false), "resolved");

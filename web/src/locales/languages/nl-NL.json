@@ -13753,7 +13753,6 @@
     "previewFidelityEmail": "De echte e-mail is HTML met een platte-tekst alternatief. Zie Payload voor beide.",
     "previewFidelityWebhook": "Webhook-ontvangers krijgen JSON, geen kaart. Zie Payload voor de exacte inhoud.",
     "previewFidelityMachine": "Dit kanaal wordt gebruikt door software, niet gelezen door mensen — de kaart is een genormaliseerde weergave. Payload toont de exacte inhoud die wordt verzonden.",
-    "previewGroupLabel": "Voorbeeld (nergens verzonden)",
     "previewChannel": "Kanaal",
     "previewSeverity": "Ernst",
     "previewSeveritySingle": "Enkel niveau (geen niveau)",

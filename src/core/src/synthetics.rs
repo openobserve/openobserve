@@ -155,16 +155,14 @@ pub fn synthetics_notification_context(
         notification_kind::{NotificationEvent, NotificationKind},
     };
 
-    use crate::alerts::notifications::{
-        LegacyPayload, NotificationContext, STATUS_FIRING, STATUS_RESOLVED, context::RenderHints,
-    };
+    use crate::alerts::notifications::{LegacyPayload, NotificationContext, context::RenderHints};
 
-    let (level, level_str) = if n.recovery {
-        (AlertLevel::Ok, "ok")
+    let level = if n.recovery {
+        AlertLevel::Ok
     } else if n.degraded || n.flaky || n.status == "warning" {
-        (AlertLevel::Warning, "warning")
+        AlertLevel::Warning
     } else {
-        (AlertLevel::Critical, "critical")
+        AlertLevel::Critical
     };
     // Plain text: the body escapes substituted values, and the card's Error field carries the
     // error.
@@ -174,15 +172,9 @@ pub fn synthetics_notification_context(
     NotificationContext {
         org_name: n.org_id.clone(),
         stream_type: "synthetics".to_string(),
-        stream_name: n.target.clone(),
+        // A check has no stream or level row of its own; the card's Target and Status carry them.
         alert_name: n.check_name.clone(),
-        alert_level: level_str.to_string(),
-        alert_status: if n.recovery {
-            STATUS_RESOLVED
-        } else {
-            STATUS_FIRING
-        }
-        .to_string(),
+        alert_status: state_word(n).to_string(),
         episode_id: (n.event != NotificationEvent::Informational).then(|| n.check_id.clone()),
         alert_start_time: checked.clone(),
         alert_end_time: checked.clone(),
@@ -203,6 +195,20 @@ pub fn synthetics_notification_context(
             escape_email_attributes: true,
         },
         ..Default::default()
+    }
+}
+
+/// The check's state as the title reads it: `failing`, `degraded`, `flaky` or `recovered`.
+#[cfg(feature = "enterprise")]
+fn state_word(n: &CheckNotification) -> &'static str {
+    if n.recovery {
+        "recovered"
+    } else if n.degraded {
+        "degraded"
+    } else if n.flaky {
+        "flaky"
+    } else {
+        "failing"
     }
 }
 
@@ -785,10 +791,8 @@ mod tests {
     }
 
     fn resolved_for(destination_type: &str) -> crate::alerts::notifications::notify::Resolved {
-        use config::meta::alerts::notification_kind::NotificationKind;
-
         use crate::alerts::notifications::org_default::{
-            EffectiveTemplate, TemplateSource, compiled_fallback_for,
+            EffectiveTemplate, TemplateSource, compiled_fallback,
         };
         let dest_type = config::meta::destinations::DestinationType::Http(
             config::meta::destinations::Endpoint {
@@ -802,7 +806,7 @@ mod tests {
             channel: crate::alerts::notifications::derive_channel_format(&dest_type),
             destination_type: dest_type,
             effective: EffectiveTemplate {
-                template: compiled_fallback_for("default", NotificationKind::Synthetics),
+                template: compiled_fallback("default"),
                 source: TemplateSource::Compiled,
                 skipped: vec![],
             },
@@ -857,7 +861,7 @@ mod tests {
     #[test]
     fn the_check_card_body_has_no_escaped_code_fence() {
         use crate::alerts::notifications::{
-            default_template::compiled_synthetics_content, resolve_content,
+            default_template::compiled_default_content, resolve_content,
         };
         let n = CheckNotification {
             error: Some("connect to https://example.com:443/health?x=1 timed out".into()),
@@ -869,7 +873,7 @@ mod tests {
             "{}",
             ctx.alert_description
         );
-        let content = resolve_content(&compiled_synthetics_content(), &ctx, "slack");
+        let content = resolve_content(&compiled_default_content(), &ctx, "slack");
         assert!(
             !content.body_markdown.contains("\\`"),
             "{}",
@@ -912,11 +916,11 @@ mod tests {
     fn the_location_card_has_no_unknown_marker_on_slack_and_email() {
         use crate::alerts::notifications::{
             ChannelFormat, RenderedMessage, UNMATCHED_MARKER,
-            default_template::compiled_synthetics_content, render, resolve_content,
+            default_template::compiled_default_content, render, resolve_content,
         };
         let ctx = location_down_context("default", &location(), 3, 120);
-        assert_eq!(ctx.alert_status, "firing");
-        let content = resolve_content(&compiled_synthetics_content(), &ctx, "slack");
+        assert_eq!(ctx.alert_status, "failing");
+        let content = resolve_content(&compiled_default_content(), &ctx, "slack");
         let RenderedMessage::Http { body } = render(ChannelFormat::Slack, &content, &ctx).unwrap()
         else {
             panic!("slack renders a body");
@@ -924,7 +928,7 @@ mod tests {
         assert!(!body.contains(UNMATCHED_MARKER), "{body}");
         assert!(body.contains("private_location"), "{body}");
         assert!(!content.body_markdown.contains("\\`"), "{body}");
-        let email = resolve_content(&compiled_synthetics_content(), &ctx, "email");
+        let email = resolve_content(&compiled_default_content(), &ctx, "email");
         let RenderedMessage::Email { html, text, .. } =
             render(ChannelFormat::Email, &email, &ctx).unwrap()
         else {
@@ -1259,9 +1263,7 @@ fn location_down_context(
         notification_kind::{NotificationEvent, NotificationKind},
     };
 
-    use crate::alerts::notifications::{
-        LegacyPayload, NotificationContext, STATUS_FIRING, context::RenderHints,
-    };
+    use crate::alerts::notifications::{LegacyPayload, NotificationContext, context::RenderHints};
 
     let subject = format!(
         "[OpenObserve Synthetics] 🔴 Private location {} is DOWN",
@@ -1277,8 +1279,7 @@ fn location_down_context(
         org_name: org_id.to_string(),
         stream_type: "synthetics".to_string(),
         alert_name: loc.label.clone(),
-        alert_level: "critical".to_string(),
-        alert_status: STATUS_FIRING.to_string(),
+        alert_status: "failing".to_string(),
         alert_url: locations_url(org_id),
         alert_trigger_time: now,
         alert_trigger_time_str: crate::anomaly_detection::fmt_local_us(now),

@@ -13753,7 +13753,6 @@
     "previewFidelityEmail": "L'email reale è in HTML con un'alternativa in testo semplice. Vedi Payload per entrambi.",
     "previewFidelityWebhook": "I ricevitori webhook ricevono JSON, non una card. Vedi Payload per il corpo esatto.",
     "previewFidelityMachine": "Questo canale è utilizzato da software, non letto da persone — la card è una resa normalizzata. Payload mostra il corpo esatto che viene inviato.",
-    "previewGroupLabel": "Anteprima (non inviata da nessuna parte)",
     "previewChannel": "Canale",
     "previewSeverity": "Gravità",
     "previewSeveritySingle": "Livello singolo (nessun livello)",

@@ -27,7 +27,7 @@ vi.mock("@/services/downtimes", () => ({
 }));
 
 vi.mock("@/services/alert_destination", () => ({
-  default: { list: vi.fn(), test: vi.fn() },
+  default: { list: vi.fn(), test: vi.fn(), testSend: vi.fn() },
 }));
 
 vi.mock("@/services/alert_templates", () => ({
@@ -175,7 +175,7 @@ describe("DowntimeDetail notifications tab", () => {
     wrapper.unmount();
   });
 
-  it("names the template each destination sent with", async () => {
+  it("names the template each destination sent with, including a stored org default row", async () => {
     const wrapper = await mountDetail();
     const text = wrapper.get('[data-test="downtime-detail-notifications-table"]').text();
     expect(text).toContain("Template");
@@ -183,18 +183,15 @@ describe("DowntimeDetail notifications tab", () => {
     wrapper.unmount();
   });
 
-  it("sends the started message through the destination test path", async () => {
+  it("sends o2_default through the server render with the downtime sample", async () => {
+    vi.mocked(destination.testSend).mockResolvedValue({ data: { success: true } } as any);
     const wrapper = await mountDetail();
     await wrapper.get('[data-test="downtime-detail-send-test"]').trigger("click");
     await flushPromises();
-    expect(template.get_by_name).toHaveBeenCalledWith({
-      org_identifier: "default",
-      template_name: "prebuilt_downtime",
-    });
-    expect(destination.test).toHaveBeenCalledTimes(1);
-    const [{ data }] = vi.mocked(destination.test).mock.calls[0] as any;
-    expect(data).toMatchObject({ type: "http", url: "https://hooks.example.com" });
-    expect(JSON.parse(data.body)).toEqual({ text: "Nightly deploy: started" });
+    expect(destination.testSend).toHaveBeenCalledTimes(1);
+    const [{ data }] = vi.mocked(destination.testSend).mock.calls[0] as any;
+    expect(data).toEqual({ template_name: "o2_default", kind: "downtime" });
+    expect(destination.test).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 

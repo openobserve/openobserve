@@ -39,12 +39,7 @@ use crate::{
     common::meta::authz::Authz,
 };
 
-pub const DOWNTIME_TEMPLATE: &str = "prebuilt_downtime";
-pub const DOWNTIME_EMAIL_TEMPLATE: &str = "prebuilt_downtime_email";
 pub const DOWNTIME_EMAIL_TITLE: &str = "OpenObserve downtime {downtime_name}: {downtime_event}";
-
-const DOWNTIME_HTTP_BODY: &str = r#"{"text": "Downtime {downtime_name}: {downtime_event}. {downtime_starts_at} to {downtime_ends_at}, muting {downtime_counts}. {downtime_url}", "downtime": {"name": "{downtime_name}", "event": "{downtime_event}", "reason": "{downtime_reason}", "starts_at": "{downtime_starts_at}", "ends_at": "{downtime_ends_at}", "targets": "{downtime_targets}", "counts": "{downtime_counts}", "url": "{downtime_url}", "org": "{org_name}"}}"#;
-const DOWNTIME_EMAIL_BODY: &str = r#"<h3>Downtime {downtime_name}: {downtime_event}</h3><p>Window: {downtime_starts_at} to {downtime_ends_at}</p><p>Covers {downtime_targets}, muting {downtime_counts}.</p><p>Reason: {downtime_reason}</p><p>Organization: {org_name}</p><p><a href="{downtime_url}">Open downtimes in OpenObserve</a></p>"#;
 
 /// Sticky-kind rule (design §6.2): create defaults absent→Custom; update
 /// preserves the existing kind when the client didn't specify one.
@@ -108,7 +103,7 @@ pub async fn save(
             return Err(TemplateError::ReservedName(template.name.clone()));
         }
         // Updates are allowed for root (internal ops / self-hosted admins);
-        // all other callers get a 403. The `o2_default_*` rows mirror code
+        // all other callers get a 403. The `o2_default` row mirrors code
         // and stay read only for root too: the seeder owns them.
         if !is_root || is_compiled_default_name(&template.name) {
             return Err(TemplateError::PrebuiltReadOnly(template.name.clone()));
@@ -167,9 +162,9 @@ pub async fn save(
     Ok(saved)
 }
 
-/// The seeded `o2_default_*` rows: read only for every caller, root included.
+/// The seeded `o2_default` row and its reserved prefix: read only for every caller, root included.
 fn is_compiled_default_name(name: &str) -> bool {
-    name.starts_with(infra::table::templates::RESERVED_PREFIX)
+    infra::table::templates::is_reserved_default_name(name)
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
@@ -265,7 +260,7 @@ fn binding_scope(org_id: &str) -> Option<&str> {
     (org_id != DEFAULT_ORG).then_some(org_id)
 }
 
-/// Level 1 overrides and level 3 org pointers of `kind` that name the template.
+/// Level 1 overrides of `kind` that name the template.
 pub(crate) async fn bindings_for(
     org_id: &str,
     name: &str,
@@ -311,57 +306,7 @@ pub(crate) async fn bindings_for(
         }
         _ => {}
     }
-    for org in pointer_orgs(org_id, name).await? {
-        if org.1.contains(&kind) {
-            by.push(format!("org default template of {}", org.0));
-        }
-    }
     Ok(by)
-}
-
-/// `(org, kinds)` whose org default pointers name the template.
-async fn pointer_orgs(
-    org_id: &str,
-    name: &str,
-) -> Result<Vec<(String, Vec<NotificationKind>)>, TemplateError> {
-    use super::notifications::org_default::{
-        DEFAULT_ALERT_TEMPLATE_KEY, DEFAULT_TEMPLATES_KEY, DefaultTemplates, pointer_from_value,
-    };
-
-    let scope = binding_scope(org_id);
-    let in_scope = |org: &str| scope.is_none_or(|s| s == org);
-    let mut found: Vec<(String, Vec<NotificationKind>)> = Vec::new();
-    let mut add = |org: String, kind: NotificationKind| match found.iter_mut().find(|f| f.0 == org)
-    {
-        Some(entry) if !entry.1.contains(&kind) => entry.1.push(kind),
-        Some(_) => {}
-        None => found.push((org, vec![kind])),
-    };
-    let read =
-        |e: anyhow::Error| TemplateError::InfraError(infra::errors::Error::Message(e.to_string()));
-    for (org, value) in infra::table::system_settings::list_org_values(DEFAULT_TEMPLATES_KEY)
-        .await
-        .map_err(read)?
-    {
-        if !in_scope(&org) {
-            continue;
-        }
-        let pointers = DefaultTemplates::from_value(&value);
-        for kind in NotificationKind::ALL {
-            if pointers.get(kind) == Some(name) {
-                add(org.clone(), kind);
-            }
-        }
-    }
-    for (org, value) in infra::table::system_settings::list_org_values(DEFAULT_ALERT_TEMPLATE_KEY)
-        .await
-        .map_err(read)?
-    {
-        if in_scope(&org) && pointer_from_value(&value).as_deref() == Some(name) {
-            add(org, NotificationKind::Alert);
-        }
-    }
-    Ok(found)
 }
 
 /// Where a template is referenced (Data section 2, GET template).
@@ -372,8 +317,6 @@ pub struct UsedBy {
     pub anomaly: usize,
     pub synthetics: usize,
     pub on_call: usize,
-    /// Kinds whose org default pointer names the template.
-    pub org_default: Vec<String>,
     #[serde(skip)]
     binding_names: Vec<String>,
 }
@@ -381,11 +324,7 @@ pub struct UsedBy {
 impl UsedBy {
     /// The references the cached delete guard does not see, as one message.
     fn bindings_outside_caches(&self) -> Option<String> {
-        let mut by = self.binding_names.clone();
-        if !self.org_default.is_empty() {
-            by.push(format!("org default for {}", self.org_default.join(", ")));
-        }
-        (!by.is_empty()).then(|| by.join(", "))
+        (!self.binding_names.is_empty()).then(|| self.binding_names.join(", "))
     }
 }
 
@@ -415,22 +354,12 @@ pub async fn used_by(org_id: &str, name: &str) -> Result<UsedBy, TemplateError> 
             .into_iter()
             .map(|(_, team)| format!("on-call policy of team '{team}'"))
             .collect();
-    let mut org_default: Vec<String> = Vec::new();
-    for (_, kinds) in pointer_orgs(org_id, name).await? {
-        for kind in kinds {
-            let kind = kind.as_str().to_string();
-            if !org_default.contains(&kind) {
-                org_default.push(kind);
-            }
-        }
-    }
     Ok(UsedBy {
         destinations: destinations.len(),
         alerts: alerts.len(),
         anomaly: anomaly_names.len(),
         synthetics: synthetics_names.len(),
         on_call: on_call_names.len(),
-        org_default,
         binding_names: anomaly_names
             .into_iter()
             .chain(synthetics_names)
@@ -510,33 +439,6 @@ pub fn apply_list_filter(templates: Vec<Template>, filter: ListFilter) -> Vec<Te
 
 pub(crate) const PREBUILT_REVISION_KEY: &str = "prebuilt_templates_revision";
 
-pub fn downtime_templates() -> [Template; 2] {
-    let template = |name: &str, body: &str, template_type| Template {
-        id: None,
-        org_id: DEFAULT_ORG.to_string(),
-        name: name.to_string(),
-        is_default: true,
-        template_type,
-        body: body.to_string(),
-        kind: TemplateKind::Custom,
-        applies_to: Vec::new(),
-    };
-    [
-        template(DOWNTIME_TEMPLATE, DOWNTIME_HTTP_BODY, TemplateType::Http),
-        template(
-            DOWNTIME_EMAIL_TEMPLATE,
-            DOWNTIME_EMAIL_BODY,
-            TemplateType::Email {
-                title: DOWNTIME_EMAIL_TITLE.to_string(),
-            },
-        ),
-    ]
-}
-
-pub fn is_downtime_template_name(name: &str) -> bool {
-    name == DOWNTIME_TEMPLATE || name == DOWNTIME_EMAIL_TEMPLATE
-}
-
 /// Reseed gate (design §6.3): overwrite a stored prebuilt template when the
 /// shipped revision is newer, or when revisions are equal but the stored
 /// body/type drifted — equal-revision drift is the old-binary-revert
@@ -606,10 +508,7 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
     let mut updated_count = 0;
     let mut skipped_count = 0;
 
-    let prebuilt = prebuilt_types
-        .into_iter()
-        .filter_map(get_prebuilt_template)
-        .chain(seeded_downtime_templates());
+    let prebuilt = prebuilt_types.into_iter().filter_map(get_prebuilt_template);
     for mut template in prebuilt {
         // Set org_id to DEFAULT_ORG for global visibility
         template.org_id = DEFAULT_ORG.to_string();
@@ -697,6 +596,16 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
     {
         log::error!("[TEMPLATES] Failed to seed '{DEFAULT_CONTENT_TEMPLATE_NAME}': {e}");
     }
+    // An old node reseeds the retired rows during a rolling upgrade, so every boot folds them
+    // again.
+    match db::alerts::templates::retire_default_templates().await {
+        Ok(moved) => {
+            for r in moved {
+                log::info!("[TEMPLATES] retired template '{}' into '{}'", r.from, r.to);
+            }
+        }
+        Err(e) => log::error!("[TEMPLATES] retiring the old default templates failed: {e}"),
+    }
 
     // Record the newly-applied revision so future startups don't re-overwrite
     // already-converged templates. Only advance forward, never downgrade.
@@ -741,17 +650,6 @@ async fn owners_to_disown(org_id: &str, name: &str) -> Result<Vec<String>, Templ
     let mut owners =
         db::alerts::templates::tuple_owners(org_id, std::slice::from_ref(&name)).await?;
     Ok(owners.remove(&name).unwrap_or_default())
-}
-
-fn seeded_downtime_templates() -> Vec<Template> {
-    #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .downtimes
-        .enabled
-    {
-        return downtime_templates().into();
-    }
-    vec![]
 }
 
 #[cfg(test)]
@@ -809,7 +707,7 @@ mod tests {
             user("a-hook", TemplateKind::Custom, vec![]),
             user("b-card", TemplateKind::Content, vec![Anomaly]),
             user("c-incident", TemplateKind::Content, vec![Incident]),
-            user("o2_default_anomaly", TemplateKind::Content, vec![]),
+            user("o2_default", TemplateKind::Content, vec![]),
             user("prebuilt_slack", TemplateKind::Content, vec![]),
             email,
         ];
@@ -840,9 +738,10 @@ mod tests {
     #[tokio::test]
     async fn creating_any_name_under_the_reserved_prefix_is_refused() {
         for name in [
+            "o2_default",
             "o2_default_anomaly",
-            "o2_default_synthetics",
             "o2_default_x",
+            "prebuilt_downtime",
         ] {
             let template = Template {
                 org_id: "acme".to_string(),
@@ -866,18 +765,16 @@ mod tests {
             body: "{}".to_string(),
             ..Default::default()
         };
-        let err = save("o2_default_alert", template, None, None, false, true)
+        let err = save("o2_default", template, None, None, false, true)
             .await
             .unwrap_err();
         assert!(
-            matches!(err, TemplateError::PrebuiltReadOnly(ref n) if n == "o2_default_alert"),
+            matches!(err, TemplateError::PrebuiltReadOnly(ref n) if n == "o2_default"),
             "{err}"
         );
-        let err = delete(DEFAULT_ORG, "o2_default_alert", true)
-            .await
-            .unwrap_err();
+        let err = delete(DEFAULT_ORG, "o2_default", true).await.unwrap_err();
         assert!(
-            matches!(err, TemplateError::PrebuiltReadOnly(ref n) if n == "o2_default_alert"),
+            matches!(err, TemplateError::PrebuiltReadOnly(ref n) if n == "o2_default"),
             "{err}"
         );
     }
@@ -909,9 +806,12 @@ mod tests {
             format!("t_sd_shared_{suffix}"),
         );
         for (owner, name) in [(&org, &solo), (&org, &shared), (&other, &shared)] {
-            let [mut template, _] = downtime_templates();
-            template.org_id = owner.to_string();
-            template.name = name.to_string();
+            let template = Template {
+                org_id: owner.to_string(),
+                name: name.to_string(),
+                body: "{}".to_string(),
+                ..Default::default()
+            };
             infra::table::templates::put(template).await.unwrap();
         }
         infra::table::organizations::add(
@@ -942,9 +842,11 @@ mod tests {
 
     #[test]
     fn test_new_template_ownership_names_its_org() {
-        let [mut template, _] = downtime_templates();
-        template.org_id = "acme".to_string();
-        template.name = "tpl_acme".to_string();
+        let template = Template {
+            org_id: "acme".to_string(),
+            name: "tpl_acme".to_string(),
+            ..Default::default()
+        };
         let (owner, object) = ownership_of(&template);
         assert_eq!((owner, object.obj_id.as_str()), ("acme", "tpl_acme"));
         #[cfg(feature = "enterprise")]
@@ -956,22 +858,6 @@ mod tests {
                 .collect();
             assert_eq!(shapes, [("org:acme", "owningOrg", "template:tpl_acme")]);
         }
-    }
-
-    #[test]
-    fn test_downtime_templates_are_reserved_and_use_only_downtime_variables() {
-        let [http, email] = downtime_templates();
-        assert_eq!(http.template_type, TemplateType::Http);
-        assert!(matches!(email.template_type, TemplateType::Email { .. }));
-        assert!(serde_json::from_str::<serde_json::Value>(&http.body).is_ok());
-        for t in [&http, &email] {
-            assert!(is_downtime_template_name(&t.name));
-            assert!(
-                super::super::notifications::default_template::is_reserved_template_name(&t.name)
-            );
-            assert!(!t.body.contains("{alert_"));
-        }
-        assert!(!is_downtime_template_name("prebuilt_slack_downtime"));
     }
 
     #[test]

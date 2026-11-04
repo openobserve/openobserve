@@ -80,16 +80,16 @@ export interface ResolvableTemplate {
   kind?: string;
   type?: string;
   isPrebuilt?: boolean;
-  isDefault?: boolean;
   applies_to?: string[];
 }
 
-/** Where the effective template came from, as the server's send log names it. */
-export type TemplateSource = "explicit" | "destination" | "org_default" | "compiled";
+/** Where the effective template came from, as the resolution walk names it. */
+export type TemplateSource = "explicit" | "destination" | "compiled";
 
 const SOURCE_LABEL_KEYS: Record<string, string> = {
   explicit: "alerts.templateOverride.sourceExplicit",
   destination: "alerts.templateOverride.sourceDestination",
+  // Send log rows written before the org default level was removed still carry it.
   org_default: "alerts.templateOverride.sourceOrgDefault",
   compiled: "alerts.templateOverride.sourceCompiled",
   platform_resolve: "alerts.templateOverride.sourcePlatformResolve",
@@ -107,7 +107,7 @@ export interface SentTemplate {
   template_source: string;
 }
 
-/** "slack: card (org default)" per destination; the source alone when nothing rendered. */
+/** "slack: card (destination template)" per destination; the source alone when nothing rendered. */
 export function sentTemplatesText(
   templates: SentTemplate[] | undefined,
   t: ReturnType<typeof useI18nTyped>["t"],
@@ -130,16 +130,12 @@ export function sentTemplatesText(
 export const templateAppliesTo = (tpl: ResolvableTemplate, kind: NotificationKind) =>
   !tpl.applies_to?.length || tpl.applies_to.includes(kind);
 
-/**
- * The server's walk for one destination: the override, then the destination template if it
- * applies, then the org default, then the built-in message (`name` null).
- */
+/** The server's walk for one destination: the override, then the destination template if it applies, then the built-in message (`name` null). */
 export function resolveEffectiveTemplate(input: {
   kind: NotificationKind;
   override: string | null;
   destination: { type?: string; template?: string | null };
   templates: ResolvableTemplate[];
-  orgDefault: string | null;
 }): { name: string | null; source: TemplateSource } {
   const { kind, override, destination, templates } = input;
   const find = (name?: string | null) =>
@@ -155,15 +151,6 @@ export function resolveEffectiveTemplate(input: {
   const own = find(destination.template);
   if (own && (kind === "alert" || (!own.isPrebuilt && templateAppliesTo(own, kind))) && fits(own)) {
     return { name: own.name, source: "destination" };
-  }
-
-  const orgDefault = input.orgDefault !== override ? find(input.orgDefault) : undefined;
-  if (orgDefault && fits(orgDefault)) return { name: orgDefault.name, source: "org_default" };
-
-  // Alerts still honour the template marked as default before the per-kind map existed.
-  if (kind === "alert" && !find(input.orgDefault)) {
-    const legacy = templates.find((t) => t.isDefault && fits(t));
-    if (legacy) return { name: legacy.name, source: "org_default" };
   }
   return { name: null, source: "compiled" };
 }

@@ -34,7 +34,7 @@ use config::{
 };
 use db::system_settings;
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::{alerts::notifications::org_default, auth::UserEmail};
+use openobserve_core::auth::UserEmail;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
@@ -221,12 +221,6 @@ pub async fn set_org_setting(
     }
     if let Some(response) = invalid_value_response(&payload.setting_key, &payload.setting_value) {
         return response;
-    }
-    if payload.setting_key == org_default::DEFAULT_TEMPLATES_KEY
-        && let Err(e) =
-            org_default::validate_default_templates(&org_id, &payload.setting_value).await
-    {
-        return MetaHttpResponse::bad_request(e.as_str());
     }
     let mut setting = SystemSetting::new_org(&org_id, &payload.setting_key, payload.setting_value);
     if let Some(cat) = payload.setting_category.as_deref() {

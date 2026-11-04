@@ -328,6 +328,68 @@ describe("TemplatePreviewPanel", () => {
     expect(previewSpy.mock.calls.at(-1)?.[0].data.kind).toBe("anomaly");
   });
 
+  it("heads the section Playground, says nothing is sent, and keeps Send test in it", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
+    const w = await mountPanel();
+
+    expect(w.find('[data-test="template-preview-panel-playground-heading"]').text()).toBe(
+      "Playground",
+    );
+    expect(w.find('[data-test="template-preview-panel-playground-help"]').text()).toBe(
+      "Nothing here is sent.",
+    );
+    expect(w.find('[data-test="template-preview-panel-test-send-btn"]').exists()).toBe(true);
+  });
+
+  it("opens on Alert when the template applies to every kind and reports each Kind change", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
+    const w = await mountPanel();
+    expect(w.emitted("kind-change")).toEqual([["alert"]]);
+
+    const kindSelect = w
+      .find('[data-test="template-preview-panel-kind-select"]')
+      .findComponent({ name: "OSelect" });
+    expect((kindSelect.props("options") as any[]).length).toBe(6);
+    await kindSelect.vm.$emit("update:modelValue", "downtime");
+    expect(w.emitted("kind-change")?.at(-1)).toEqual(["downtime"]);
+  });
+
+  it("opens on the first kind of Applies to", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
+    const w = mount(TemplatePreviewPanel, {
+      props: { spec: emptyContentSpec(), kinds: ["synthetics", "downtime"] },
+      global: { plugins: [i18n, makeStore()] },
+    });
+    await flushPromises();
+    expect((w.vm as any).previewKind).toBe("synthetics");
+    expect(w.emitted("kind-change")).toEqual([["synthetics"]]);
+  });
+
+  it("names the blank variables of the kind picked in the playground", async () => {
+    vi.spyOn(templateService, "preview").mockImplementation(
+      async (args: any) =>
+        makePreviewResponse({
+          empty_variables: args.data.kind === "anomaly" ? ["alert_threshold"] : [],
+        }) as any,
+    );
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(w.find('[data-test="template-preview-panel-empty-variables-chip"]').exists()).toBe(
+      false,
+    );
+
+    await w
+      .find('[data-test="template-preview-panel-kind-select"]')
+      .findComponent({ name: "OSelect" })
+      .vm.$emit("update:modelValue", "anomaly");
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(w.find('[data-test="template-preview-panel-empty-variables-chip"]').text()).toBe(
+      "Empty for Anomaly: alert_threshold",
+    );
+  });
+
   it("keeps the last good preview and shows a banner when a request fails", async () => {
     const previewSpy = vi
       .spyOn(templateService, "preview")

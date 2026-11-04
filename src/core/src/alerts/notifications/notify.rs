@@ -160,8 +160,7 @@ pub async fn resolve(
         explicit,
         dest_template,
         Some(&destination_type),
-    )
-    .await;
+    );
     let channel = derive_channel_format(&destination_type);
     Ok(Resolved {
         destination,
@@ -360,7 +359,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::alerts::notifications::{LegacyPayload, org_default::compiled_fallback_for};
+    use crate::alerts::notifications::{LegacyPayload, org_default::compiled_fallback};
 
     fn resolved_for(dest_type: DestinationType, source: TemplateSource) -> Resolved {
         let channel = derive_channel_format(&dest_type);
@@ -371,7 +370,7 @@ mod tests {
             },
             destination_type: dest_type,
             effective: EffectiveTemplate {
-                template: compiled_fallback_for("acme", NotificationKind::Anomaly),
+                template: compiled_fallback("acme"),
                 source,
                 skipped: vec![],
             },

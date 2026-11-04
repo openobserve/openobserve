@@ -562,8 +562,7 @@ const filterQuery = ref(viewState.filterQuery);
 const pageSize = ref(viewState.pageSize);
 const sortBy = ref(viewState.sortBy);
 const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
-// Top-right tab filter — mirrors the alerts list pattern. "prebuilt" shows
-// system templates (name starts with `prebuilt_`), "custom" shows the rest.
+// "Prebuilt" trusts the server's isPrebuilt flag, which covers o2_default and the prebuilt_* rows.
 const activeTab = ref<"all" | "prebuilt" | "custom">(viewState.tab);
 watch([filterQuery, activeTab, pageSize, sortBy, sortOrder], () => {
   Object.assign(viewState, {

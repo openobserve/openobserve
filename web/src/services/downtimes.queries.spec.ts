@@ -15,10 +15,18 @@
 
 import { describe, expect, it, vi } from "vitest";
 import downtimes from "./downtimes";
-import type { DowntimeListItem } from "./downtimes";
-import { downtimesListQuery, downtimesLookupQuery } from "./downtimes.queries";
+import type { DowntimeDetail, DowntimeListItem } from "./downtimes";
+import destination from "./alert_destination";
+import template from "./alert_templates";
+import {
+  downtimesListQuery,
+  downtimesLookupQuery,
+  sendDowntimeTestMutation,
+} from "./downtimes.queries";
 
 vi.mock("./downtimes", () => ({ default: { list: vi.fn() } }));
+vi.mock("./alert_destination", () => ({ default: { test: vi.fn(), testSend: vi.fn() } }));
+vi.mock("./alert_templates", () => ({ default: { get_by_name: vi.fn() } }));
 
 const COUNTS = { active: 1, scheduled: 2, recurring: 3, ended: 4, cancelled: 5, ended_early: 6 };
 const items = (n: number) =>
@@ -44,5 +52,42 @@ describe("the downtime list queries", () => {
   it("do not flag a response that holds the whole org", async () => {
     expect((await run(downtimesListQuery, 500, 500)).truncated).toBe(false);
     expect((await run(downtimesListQuery, 3, 3)).truncated).toBe(false);
+  });
+});
+
+describe("the downtime test send", () => {
+  const downtime = {
+    name: "Nightly",
+    schedule: { starts_at: 1, ends_at: 2 },
+    targets: [],
+  } as unknown as DowntimeDetail;
+  const send = (dest: Record<string, unknown>) =>
+    (sendDowntimeTestMutation("acme").mutationFn as (v: unknown) => Promise<any>)({
+      downtime,
+      destinations: [dest],
+      url: "https://o2",
+    });
+
+  it("asks the server to render o2_default for a destination without a downtime template", async () => {
+    vi.mocked(destination.testSend).mockResolvedValue({ data: { success: true } } as never);
+    const [result] = await send({ name: "ops-slack", type: "http", url: "https://hook" });
+    expect(destination.testSend).toHaveBeenCalledWith({
+      org_identifier: "acme",
+      destination_name: "ops-slack",
+      data: { template_name: "o2_default", kind: "downtime" },
+    });
+    expect(destination.test).not.toHaveBeenCalled();
+    expect(result).toEqual({ destination: "ops-slack", ok: true, error: undefined });
+  });
+
+  it("keeps the browser render for the destination's own downtime template", async () => {
+    vi.mocked(template.get_by_name).mockResolvedValue({
+      data: { body: '{"text":"{downtime_name}"}' },
+    } as never);
+    vi.mocked(destination.test).mockResolvedValue({ data: { success: true } } as never);
+    vi.mocked(destination.testSend).mockClear();
+    await send({ name: "hook", type: "http", url: "https://hook", template: "mine" });
+    expect(destination.testSend).not.toHaveBeenCalled();
+    expect(vi.mocked(destination.test).mock.calls[0][0].data.body).toContain("Nightly");
   });
 });

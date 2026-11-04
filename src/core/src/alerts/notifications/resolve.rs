@@ -33,7 +33,9 @@
 //! markdown-parsed and stay raw.
 
 use config::meta::alerts::{
-    content_spec::ContentSpec, level::AlertLevel, notification_kind::NotificationKind,
+    content_spec::ContentSpec,
+    level::AlertLevel,
+    notification_kind::{NotificationEvent, NotificationKind},
 };
 
 use super::{context::NotificationContext, custom::scan_and_replace_var};
@@ -99,7 +101,7 @@ pub fn resolve_content(
         let (value, mut unk) = substitute_raw(&field.value, ctx);
         unknown_variables.append(&mut unk);
         // Only legacy Custom templates keep a blank value; they never reach this function.
-        if value.trim().is_empty() {
+        if value.trim().is_empty() || every_variable_blank(&field.value, ctx) {
             continue;
         }
         fields.push((label, value));
@@ -304,6 +306,11 @@ fn substitute_with(
         }
     }
 
+    // One template serves every kind, so another kind's variable reads blank and its field hides.
+    for name in super::examples::kind_variables() {
+        scan_and_replace_var(&mut out, name, |_| String::new());
+    }
+
     // Only tokens confirmed unknown from the ORIGINAL input are marker-
     // replaced here — substituted values that happen to look like tokens are
     // left alone (see doc comment above).
@@ -315,7 +322,10 @@ fn substitute_with(
 /// from the pre-substitution input, which `{name}` tokens are genuinely
 /// unknown rather than merely a substring of the raw template.
 fn is_known_var(name: &str, ctx: &NotificationContext) -> bool {
-    if scalar_vars(ctx).iter().any(|(n, _)| *n == name) || EXTRA_SCALAR_NAMES.contains(&name) {
+    if scalar_vars(ctx).iter().any(|(n, _)| *n == name)
+        || EXTRA_SCALAR_NAMES.contains(&name)
+        || super::examples::is_kind_variable(name)
+    {
         return true;
     }
     if ctx.row_columns.iter().any(|(k, _)| k == name) {
@@ -393,6 +403,15 @@ pub(crate) fn empty_variables(input: &str, ctx: &NotificationContext) -> Vec<Str
     out
 }
 
+/// True when `input` names variables and each is blank, so `{check_name} ({check_type})` hides.
+fn every_variable_blank(input: &str, ctx: &NotificationContext) -> bool {
+    let names = scan_unmatched(input);
+    !names.is_empty()
+        && names
+            .iter()
+            .all(|n| var_value(n, ctx).is_some_and(|v| v.trim().is_empty()))
+}
+
 /// The value a `{name}` token takes for `ctx`, in the substitution engine's tier order.
 fn var_value(name: &str, ctx: &NotificationContext) -> Option<String> {
     if let Some((_, v)) = scalar_vars(ctx).into_iter().find(|(n, _)| *n == name) {
@@ -409,6 +428,7 @@ fn var_value(name: &str, ctx: &NotificationContext) -> Option<String> {
         .chain(ctx.metadata.iter())
         .find(|(k, _)| k == name)
         .map(|(_, v)| v.clone())
+        .or_else(|| super::examples::is_kind_variable(name).then(String::new))
 }
 
 fn scan_unmatched(tpl: &str) -> Vec<String> {
@@ -497,7 +517,13 @@ pub(crate) fn extra_scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str,
         ("notification_kind", ctx.kind.as_str().to_string()),
         ("notification_event", ctx.event.as_str().to_string()),
         ("notification_kind_label", ctx.kind.label().to_string()),
-        ("notification_event_label", ctx.event.label().to_string()),
+        (
+            "notification_event_label",
+            ctx.kind.event_label(ctx.event).to_string(),
+        ),
+        ("status_dot", status_dot(ctx).to_string()),
+        ("alert_level_label", level_label(&ctx.alert_level)),
+        ("alert_trigger_time_utc", utc_stamp(ctx.alert_trigger_time)),
         ("cluster_name", ctx.cluster_name.clone()),
         (
             "alert_start_time_millis",
@@ -521,11 +547,46 @@ pub(crate) fn extra_scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str,
     ]
 }
 
-pub(crate) const EXTRA_SCALAR_NAMES: [&str; 12] = [
+/// The title's severity marker: red failing, orange degraded, green recovered, blue a notice.
+pub(crate) fn status_dot(ctx: &NotificationContext) -> &'static str {
+    match (ctx.event, ctx.level) {
+        (NotificationEvent::Resolved, _) | (_, Some(AlertLevel::Ok)) => "🟢",
+        (NotificationEvent::Informational, _) => "🔵",
+        // A maintenance window opening is a notice, not a failure.
+        _ if ctx.kind == NotificationKind::Downtime => "🔵",
+        (_, Some(AlertLevel::Warning | AlertLevel::NoData)) => "🟠",
+        _ => "🔴",
+    }
+}
+
+/// `critical` reads `Critical` and `no_data` reads `No data`; a priority such as `P1` is kept.
+pub(crate) fn level_label(level: &str) -> String {
+    let words = level.replace('_', " ");
+    let mut chars = words.chars();
+    chars
+        .next()
+        .map(|first| first.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
+}
+
+/// One UTC stamp for every kind; alert times in `alert_trigger_time_str` keep their own zone.
+pub(crate) fn utc_stamp(micros: i64) -> String {
+    if micros <= 0 {
+        return String::new();
+    }
+    chrono::DateTime::from_timestamp_micros(micros)
+        .map(|at| at.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+        .unwrap_or_default()
+}
+
+pub(crate) const EXTRA_SCALAR_NAMES: [&str; 15] = [
     "notification_kind",
     "notification_event",
     "notification_kind_label",
     "notification_event_label",
+    "status_dot",
+    "alert_level_label",
+    "alert_trigger_time_utc",
     "cluster_name",
     "alert_start_time_millis",
     "alert_end_time_millis",

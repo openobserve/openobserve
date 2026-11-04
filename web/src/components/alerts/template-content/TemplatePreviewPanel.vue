@@ -42,8 +42,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         with nothing beside it once the row wraps at a narrow panel width.
       -->
       <div class="flex flex-col gap-1">
-        <div class="text-text-tertiary text-xs">
-          {{ t("alert_templates.previewGroupLabel") }}
+        <div
+          class="text-text-tertiary text-xs"
+          data-test="template-preview-panel-playground-heading"
+        >
+          {{ t("alert_templates.playgroundLabel") }}
+        </div>
+        <div class="text-text-secondary text-xs" data-test="template-preview-panel-playground-help">
+          {{ t("alert_templates.playgroundHelp") }}
         </div>
         <div class="flex flex-wrap items-end gap-3">
           <OSelect
@@ -387,6 +393,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: "variable-groups", groups: VariableGroup[]): void;
+  (e: "kind-change", kind: NotificationKind): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -455,6 +462,7 @@ const previewKind = ref<NotificationKind>(kindOptions.value[0].value);
 watch(kindOptions, (options) => {
   if (!options.some((o) => o.value === previewKind.value)) previewKind.value = options[0].value;
 });
+watch(previewKind, (kind) => emit("kind-change", kind), { immediate: true });
 
 // Each kind's own severity words, sent as the level the backend sample renders with.
 const severityOptions = computed(() => {

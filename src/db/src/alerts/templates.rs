@@ -411,6 +411,21 @@ pub async fn rename_reserved_collisions()
     Ok(renames)
 }
 
+/// Folds the retired default rows into `o2_default` and tells every node's cache.
+pub async fn retire_default_templates()
+-> Result<Vec<table::templates::ReservedRename>, TemplateError> {
+    let moved = table::templates::retire_default_templates(infra::db::get_orm_client_rw().await)
+        .await
+        .map_err(infra::errors::Error::from)?;
+    for r in &moved {
+        infra::coordinator::emit_delete(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.from))
+            .await?;
+        infra::coordinator::emit_put(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.to))
+            .await?;
+    }
+    Ok(moved)
+}
+
 // A `default` template is shared by every org, so its references are checked across all orgs.
 fn references_from(org_id: &str, cache_key: &str) -> bool {
     org_id == DEFAULT_ORG

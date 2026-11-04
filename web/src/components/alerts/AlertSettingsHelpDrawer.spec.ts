@@ -74,14 +74,14 @@ describe("AlertSettingsHelpDrawer", () => {
       subject: "object",
       currentTemplate: "",
       selectedDestinations: ["hook"],
-      resolvedDestinations: [{ destination: "hook", label: "card (org default)" }],
+      resolvedDestinations: [{ destination: "hook", label: "card (destination template)" }],
     });
     await w.setProps({ open: false });
     await w.setProps({ open: true });
 
     const rows = w.findAll('[data-test="help-resolved-row"]');
     expect(rows.map((r) => r.findAll("span").map((x) => x.text()))).toEqual([
-      ["hook", "card (org default)"],
+      ["hook", "card (destination template)"],
     ]);
   });
 

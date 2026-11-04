@@ -14,11 +14,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- One template select for a notification kind: an object's override, or a row of the org default card. -->
+<!-- One template select for a notification kind: an object's override. -->
 <template>
   <div class="flex min-w-0 flex-col gap-1" :data-test="`template-override-${kind}`">
     <OButton
-      v-if="context === 'object'"
       variant="ghost-primary"
       size="xs"
       class="gap-1 self-start font-medium"
@@ -70,21 +69,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       searchable
       :loading="state === 'loading'"
       :disabled="disabled || state === 'loading' || state === 'forbidden'"
-      :placeholder="
-        context !== 'orgDefault'
-          ? t('alerts.templateOverride.placeholder')
-          : kind === 'incident'
-            ? t('alerts.templateOverride.orgDefaultIncidentPlaceholder')
-            : t('alerts.templateOverride.orgDefaultPlaceholder', { kind: kindLabel })
-      "
+      :placeholder="t('alerts.templateOverride.placeholder')"
       :help-text="
         state === 'forbidden'
           ? t('alerts.templateOverride.forbidden')
-          : context !== 'orgDefault'
-            ? t('alerts.templateOverride.help', { kind: kindLabel })
-            : kind === 'incident'
-              ? t('alerts.templateOverride.orgDefaultIncidentHelp')
-              : t('alerts.templateOverride.orgDefaultHelp', { kind: kindLabel })
+          : t('alerts.templateOverride.help', { kind: kindLabel })
       "
       :error-message="serverError ? raw(serverError) : undefined"
       class="max-w-105"
@@ -138,7 +127,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </div>
     <AlertSettingsHelpDrawer
-      v-if="context === 'object'"
       v-model:open="helpOpen"
       topic="template"
       subject="object"
@@ -163,7 +151,6 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import templateService from "@/services/alert_templates";
-import settingsService from "@/services/settings";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
@@ -193,10 +180,8 @@ const props = withDefaults(
     destinations?: (string | FormDestination)[];
     /** The server's 400 message for this field, shown under the select. */
     serverError?: string | null;
-    /** `object` overrides one configuration; `orgDefault` is a row of the org default card. */
-    context?: "object" | "orgDefault";
   }>(),
-  { disabled: false, destinations: () => [], serverError: null, context: "object" },
+  { disabled: false, destinations: () => [], serverError: null },
 );
 
 const emit = defineEmits<{ (e: "update:modelValue", value: string | null): void }>();
@@ -238,10 +223,9 @@ const selected = computed(() => templates.value.find((tpl) => tpl.name === props
 // A deleted or renamed template would be re-sent under its old name until the server refused it.
 const isStale = computed(() => state.value === "ready" && !!props.modelValue && !selected.value);
 
-// What the effective-template line needs beyond the picker's own list; object context only.
+// What the effective-template line needs beyond the picker's own list.
 const allTemplates = ref<ResolvableTemplate[] | null>(null);
 const orgDestinations = ref<FormDestination[]>([]);
-const orgDefault = ref<string | null>(null);
 
 const formDestinations = computed<FormDestination[]>(() =>
   props.destinations.map((d) => {
@@ -267,20 +251,18 @@ const mismatched = computed(() => {
 const SOURCE_KEYS = {
   explicit: "alerts.templateOverride.sourceExplicit",
   destination: "alerts.templateOverride.sourceDestination",
-  org_default: "alerts.templateOverride.sourceOrgDefault",
   compiled: "alerts.templateOverride.sourceCompiled",
 } as const satisfies Record<TemplateSource, string>;
 
 const willUseByDestination = computed(() => {
   const templatesList = allTemplates.value;
-  if (props.context !== "object" || !templatesList) return [];
+  if (!templatesList) return [];
   return formDestinations.value.map((d) => {
     const { name, source } = resolveEffectiveTemplate({
       kind: props.kind,
       override: props.modelValue,
       destination: d,
       templates: templatesList,
-      orgDefault: orgDefault.value,
     });
     const template = name ?? t("alerts.templateOverride.builtIn", { kind: kindLabel.value });
     return {
@@ -302,12 +284,10 @@ const willUse = computed(() => {
 
 // Each read is optional: a failure (or a 403) leaves the line out rather than guessing.
 const loadResolution = async () => {
-  if (props.context !== "object") return;
   const org = store.state.selectedOrganization.identifier;
-  const [templatesList, destinationList, setting] = await Promise.all([
+  const [templatesList, destinationList] = await Promise.all([
     queryClient.fetchQuery(templatesQuery(org)).catch(() => null),
     queryClient.fetchQuery(destinationsQuery(org, "alert")).catch(() => []),
-    settingsService.getSetting(org, "default_templates").catch(() => null),
   ]);
   allTemplates.value = Array.isArray(templatesList) ? templatesList : null;
   orgDestinations.value = (Array.isArray(destinationList) ? destinationList : []).map((d: any) => ({
@@ -315,9 +295,6 @@ const loadResolution = async () => {
     type: d.type,
     template: d.template ?? null,
   }));
-  const value = setting?.data?.setting_value;
-  const name = value && typeof value === "object" ? value[props.kind] : null;
-  orgDefault.value = typeof name === "string" && name ? name : null;
 };
 
 const load = async () => {

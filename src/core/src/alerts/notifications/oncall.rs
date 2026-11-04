@@ -16,13 +16,16 @@
 //! The on-call sender the enterprise engine reaches through its registered slot.
 
 use config::meta::{
-    alerts::{level::AlertLevel, notification_kind::NotificationKind},
+    alerts::{
+        level::AlertLevel,
+        notification_kind::{NotificationEvent, NotificationKind},
+    },
     oncall::response::SentTemplate,
 };
 use o2_enterprise::enterprise::oncall::sender::{OnCallNotification, OnCallSendError, OnCallStage};
 
 use super::{
-    LegacyPayload, NotificationContext, STATUS_FIRING,
+    LegacyPayload, NotificationContext,
     notify::{NotifyError, notify},
 };
 
@@ -99,8 +102,8 @@ pub fn on_call_context(n: &OnCallNotification) -> NotificationContext {
     NotificationContext {
         org_name: n.org_id.clone(),
         alert_name: title,
-        alert_level: level.map(|l| l.to_string()).unwrap_or_default(),
-        alert_status: STATUS_FIRING.to_string(),
+        alert_level: n.priority.clone(),
+        alert_status: state_word(n).to_string(),
         episode_id: (!n.key.is_empty()).then(|| n.key.clone()),
         alert_url: n.url.clone(),
         alert_trigger_time: now,
@@ -132,6 +135,16 @@ pub fn on_call_context(n: &OnCallNotification) -> NotificationContext {
     }
 }
 
+/// The page's state as the title reads it: `{subject} is paged`.
+fn state_word(n: &OnCallNotification) -> &'static str {
+    match (n.stage, n.event) {
+        (_, NotificationEvent::Resolved) => "acknowledged",
+        (OnCallStage::CoverageGap, _) => "uncovered",
+        (OnCallStage::Verdict, _) => "reviewed",
+        _ => "paged",
+    }
+}
+
 /// A Retryable error is retried by the engine; a platform skip is neither delivered nor failed.
 fn send_result<T>(result: Result<T, NotifyError>) -> Result<T, OnCallSendError> {
     match result {
@@ -145,12 +158,10 @@ fn send_result<T>(result: Result<T, NotifyError>) -> Result<T, OnCallSendError> 
 
 #[cfg(test)]
 mod tests {
-    use config::meta::alerts::notification_kind::NotificationEvent;
-
     use super::*;
     use crate::alerts::notifications::{
         notify::{Route, SkipReason, route},
-        org_default::{EffectiveTemplate, TemplateSource, compiled_fallback_for},
+        org_default::{EffectiveTemplate, TemplateSource, compiled_fallback},
     };
 
     fn page(stage: OnCallStage) -> OnCallNotification {
@@ -191,7 +202,7 @@ mod tests {
             channel: super::super::derive_channel_format(&dest_type),
             destination_type: dest_type,
             effective: EffectiveTemplate {
-                template: compiled_fallback_for("acme", NotificationKind::OnCall),
+                template: compiled_fallback("acme"),
                 source: TemplateSource::Compiled,
                 skipped: vec![],
             },
@@ -205,7 +216,8 @@ mod tests {
         assert_eq!(ctx.event, NotificationEvent::Firing);
         assert_eq!(ctx.episode_id.as_deref(), Some("resp_31"));
         assert_eq!(ctx.level, Some(AlertLevel::Critical));
-        assert_eq!(ctx.alert_status, STATUS_FIRING);
+        assert_eq!(ctx.alert_level, "P1");
+        assert_eq!(ctx.alert_status, "paged");
         assert!(
             ctx.context_attributes
                 .iter()

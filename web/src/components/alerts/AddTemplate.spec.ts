@@ -1092,3 +1092,76 @@ describe("AddTemplate - applies to", () => {
     expect(w.find('[data-test="add-template-variable-group-anomaly"]').exists()).toBe(false);
   });
 });
+
+describe("AddTemplate - playground Kind drives the variables", () => {
+  const groups = [
+    { name: "common", variables: ["alert_name", "status_dot"] },
+    { name: "alert", variables: ["alert_level"] },
+    { name: "anomaly", variables: ["anomaly_score"] },
+    { name: "downtime", variables: ["downtime_window", "downtime_targets"] },
+  ];
+  const panel = (w: any) => w.findComponent({ name: "TemplatePreviewPanel" });
+  const kindSelect = (w: any) =>
+    w.find('[data-test="template-preview-panel-kind-select"]').findComponent({ name: "OSelect" });
+  const shownGroups = (w: any) =>
+    w
+      .findAll('[data-test^="add-template-variable-group-"]')
+      .map((g: any) => g.attributes("data-test").replace("add-template-variable-group-", ""));
+  const chips = (w: any) => w.findComponent({ name: "ContentTemplateForm" }).props("variables");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows common plus the previewed kind in the guide and the chips", async () => {
+    const w = await mountComp();
+    await panel(w).vm.$emit("variable-groups", groups);
+    (w.vm as any).variableGuideOpen = true;
+    await flushPromises();
+    expect(shownGroups(w)).toEqual(["common", "alert"]);
+    expect(chips(w)).toEqual(["alert_name", "status_dot", "alert_level"]);
+
+    await kindSelect(w).vm.$emit("update:modelValue", "downtime");
+    await flushPromises();
+    expect(shownGroups(w)).toEqual(["common", "downtime"]);
+    expect(chips(w)).toEqual(["alert_name", "status_dot", "downtime_window", "downtime_targets"]);
+  });
+
+  it("opens a template limited by Applies to on its first kind and offers only its kinds", async () => {
+    const spec = {
+      title: "Anomaly",
+      title_overrides: {},
+      body: "{anomaly_score}",
+      fields: [],
+      rows: { enabled: false, max: 5, columns: null, format: null },
+      links: [],
+      chart: { enabled: false },
+    };
+    const w = await mountComp({
+      template: {
+        name: "ops-card",
+        body: JSON.stringify(spec),
+        type: "http",
+        title: "",
+        kind: "content",
+        applies_to: ["downtime", "anomaly"],
+      },
+    });
+    await panel(w).vm.$emit("variable-groups", groups);
+    (w.vm as any).variableGuideOpen = true;
+    await flushPromises();
+    expect(kindSelect(w).props("modelValue")).toBe("anomaly");
+    expect((kindSelect(w).props("options") as any[]).map((o) => o.value)).toEqual([
+      "anomaly",
+      "downtime",
+    ]);
+    expect(shownGroups(w)).toEqual(["common", "anomaly"]);
+  });
+
+  it("follows Applies to in the custom editor, which has no playground", async () => {
+    const w = await mountComp();
+    await panel(w).vm.$emit("variable-groups", groups);
+    await selectCustomMode(w);
+    expect(shownGroups(w)).toEqual(["common", "alert", "anomaly", "downtime"]);
+  });
+});

@@ -2826,8 +2826,7 @@ impl AlertExt for Alert {
             let effective = crate::alerts::notifications::org_default::resolve_effective_template(
                 &self.org_id,
                 explicit,
-            )
-            .await;
+            );
             let template = effective.template();
 
             if ctx.is_none() {
@@ -3200,8 +3199,7 @@ pub async fn send_recovery_notification(
         let effective = crate::alerts::notifications::org_default::resolve_effective_template(
             &alert.org_id,
             explicit,
-        )
-        .await;
+        );
         // Logged because a resolve nobody sees land is the hard one to debug — a vendor can answer
         // 202 to one it drops. Body at debug only: it can carry recipient data.
         match send_to_destination(

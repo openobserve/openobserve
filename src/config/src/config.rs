@@ -140,7 +140,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 140: add template to oncall_policies.
 // 141: add templates to downtime_notifications.
 // 142: add templates to oncall_response_events.
-pub const DB_SCHEMA_VERSION: u64 = 142;
+// 143: fold the retired compiled default templates into o2_default.
+pub const DB_SCHEMA_VERSION: u64 = 143;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
