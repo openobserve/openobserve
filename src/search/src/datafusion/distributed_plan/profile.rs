@@ -24,9 +24,8 @@ use datafusion::physical_plan::{
     metrics::{MetricValue, MetricsSet},
 };
 use flight::{
-    message::Metrics,
+    common::{Metrics, NodeProfiles, RemoteScanMetrics},
     profile::{MetricKind, ProfileInputs, ProfileMetric, ProfileNode, RemoteNodeProfile},
-    remote_scan::{NodeProfiles, RemoteScanMetrics},
 };
 
 use super::remote_scan_exec::RemoteScanExec;

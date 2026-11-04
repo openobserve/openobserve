@@ -15,11 +15,7 @@
 
 use std::{collections::HashMap, fmt::Debug, pin::Pin, sync::Arc, task::Poll};
 
-use arrow::{
-    array::{ArrayRef, RecordBatch},
-    buffer::Buffer,
-    ipc::MessageHeader,
-};
+use arrow::{array::ArrayRef, buffer::Buffer, ipc::MessageHeader};
 use arrow_flight::{
     FlightData,
     error::{FlightError, Result},
@@ -30,14 +26,7 @@ use datafusion::parquet::data_type::AsBytes;
 use futures::{Stream, StreamExt, ready};
 use tonic::Streaming;
 
-use crate::{message::CustomMessage, remote_scan::RemoteScanMetrics};
-
-#[derive(Debug)]
-pub enum FlightMessage {
-    Schema(SchemaRef),
-    RecordBatch(RecordBatch),
-    CustomMessage(CustomMessage),
-}
+use crate::common::{CustomMessage, FlightMessage, RemoteScanMetrics};
 
 pub struct FlightDataDecoder {
     response: Streaming<FlightData>,
@@ -209,7 +198,7 @@ mod tests {
     use flatbuffers::FlatBufferBuilder;
 
     use super::*;
-    use crate::message::CustomMessage;
+    use crate::common::CustomMessage;
 
     fn create_test_schema() -> Arc<Schema> {
         Arc::new(Schema::new(vec![

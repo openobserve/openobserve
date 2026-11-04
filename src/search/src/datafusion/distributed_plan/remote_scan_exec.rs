@@ -32,7 +32,7 @@ use datafusion::{
     },
 };
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
-use flight::remote_scan::{RemoteScanMetrics, RemoteScanState};
+use flight::common::{RemoteScanMetrics, RemoteScanState};
 use futures::{StreamExt, TryStreamExt};
 use futures_util::pin_mut;
 use opentelemetry::context::FutureExt as _;

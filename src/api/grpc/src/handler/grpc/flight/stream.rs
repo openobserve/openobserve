@@ -19,7 +19,7 @@ use arrow::ipc::writer::IpcWriteOptions;
 use arrow_flight::{FlightData, error::FlightError};
 use config::metrics;
 use datafusion::execution::SendableRecordBatchStream;
-use flight::{encoder::FlightDataEncoder, node_messages::NodeMessages};
+use flight::{common::NodeMessages, encoder::FlightDataEncoder};
 use futures::{Stream, StreamExt};
 use search_service::work_group::DeferredLock;
 use tokio::{sync::mpsc, task::JoinSet};
@@ -392,7 +392,7 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::search::ScanStats;
     use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
-    use flight::{message::CustomMessage, node_messages::NodeRole};
+    use flight::common::{CustomMessage, NodeRole};
     use futures::TryStreamExt;
 
     use super::*;
