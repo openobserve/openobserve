@@ -329,6 +329,7 @@ import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import {
   isFirstLoginOf,
   markStartPending,
+  recordStart,
   redirectPending,
 } from "@/components/onboarding/onboardingFlow";
 import { orgHasUserData } from "@/composables/useOrgHasUserData";
@@ -781,6 +782,14 @@ export default defineComponent({
       document.documentElement.style.setProperty("--navbar-height", `${2.5 + barHeightRem}rem`);
     };
 
+    // a sign-up that never reaches onboarding still sends its one attribution event, as skipped
+    const recordSkippedStart = () => {
+      if (config.isCloud !== "true") return;
+      const email = store.state.userInfo?.email;
+      markStartPending(email);
+      void recordStart(store.state.selectedOrganization?.identifier, email, undefined, true);
+    };
+
     // A brand-new cloud user goes to the onboarding page once; the flag is cleared so a reload does not repeat it.
     const firstLoginRedirect = async (): Promise<void> => {
       if (!isFirstLoginOf(store.state.userInfo?.email)) return;
@@ -789,7 +798,10 @@ export default defineComponent({
       await fullConfigReady();
       if (!onboardingFlowOn(store.state.zoConfig)) {
         // the sample data welcome ends the first login itself; with neither flow it ends here
-        if (!sampleDataFlowOn(store.state.zoConfig)) localStorage.removeItem("isFirstTimeLogin");
+        if (!sampleDataFlowOn(store.state.zoConfig)) {
+          localStorage.removeItem("isFirstTimeLogin");
+          recordSkippedStart();
+        }
         return;
       }
       // A pending redirect (a marketplace or deep link) keeps the flag, so a later Home visit in the same session still onboards.
@@ -808,7 +820,7 @@ export default defineComponent({
       // The answer belongs to the org queried; after a switch, decide again for the org now selected.
       if (store.state.selectedOrganization?.identifier !== org) return firstLoginRedirect();
       localStorage.removeItem("isFirstTimeLogin");
-      if (hasData) return;
+      if (hasData) return recordSkippedStart();
       markStartPending(store.state.userInfo?.email);
       await router.replace({
         name: "onboarding",

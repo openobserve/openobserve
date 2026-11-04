@@ -28,6 +28,7 @@ import * as cookies from "@/utils/cookies";
 import { shouldPaywallRoute } from "@/utils/auth";
 import config from "@/aws-exports";
 import stream from "@/services/stream";
+import billings from "@/services/billings";
 
 const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
 
@@ -2027,8 +2028,11 @@ describe("MainLayout — first-time cloud login", () => {
       },
     })) as never);
 
+  const startCalls = () => vi.mocked(billings.submit_new_user_info).mock.calls;
+
   beforeEach(() => {
     streams();
+    vi.spyOn(billings, "submit_new_user_info").mockResolvedValue({ status: 200 } as never);
     // the org list holds org1, as the API's does after a real login; without it the layout picks another
     store.state.organizations = [{ id: 1, name: "org1", identifier: "org1" }];
     global.window = realWindow;
@@ -2045,6 +2049,7 @@ describe("MainLayout — first-time cloud login", () => {
     sessionStorage.clear();
     (config as any).isCloud = "false";
     vi.mocked(stream.nameList).mockRestore();
+    vi.mocked(billings.submit_new_user_info).mockRestore();
     delete store.state.zoConfig.onboarding_flow_enabled;
     delete store.state.zoConfig.sample_data_onboarding_enabled;
   });
@@ -2066,6 +2071,7 @@ describe("MainLayout — first-time cloud login", () => {
     const { wrapper, replace } = await mountAtHome();
     expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
     expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(startCalls()).toEqual([["org1", expect.objectContaining({ skipped: true })]]);
     wrapper.unmount();
   });
 
@@ -2106,15 +2112,17 @@ describe("MainLayout — first-time cloud login", () => {
     expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
     // A flag left behind would mute the day-two Slack invite for good.
     expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(startCalls()).toEqual([["org1", expect.objectContaining({ skipped: true })]]);
     wrapper.unmount();
   });
 
   // the store flag is still false at mount: weeks after a deep-link sign-up the org has data
-  it("reads the org's stream lists, and leaves an org with data on Home with nothing sent", async () => {
+  it("reads the org's stream lists, and leaves an org with data on Home with one skipped start sent", async () => {
     streams(["default"]);
     const { wrapper, replace } = await mountAtHome();
     expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
     expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(startCalls()).toEqual([["org1", expect.objectContaining({ skipped: true })]]);
     expect(
       localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`),
     ).toBeNull();
@@ -2228,6 +2236,7 @@ describe("MainLayout — first-time cloud login", () => {
     store.state.zoConfig.sample_data_onboarding_enabled = false;
     const { wrapper } = await mountAtHome();
     expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    expect(startCalls()).toEqual([]);
     wrapper.unmount();
   });
 });
