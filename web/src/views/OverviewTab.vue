@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Locked: no license to unlock Incidents, shown instead of omitted so
          the capability is discoverable from a build that can't enable it. -->
     <section
-      v-else-if="!incidentsAccess.allowed"
+      v-else-if="!incidentsAccess.allowed || incidentsLicenseLocked"
       class="mb-5"
       data-test="overview-incidents-locked"
     >
@@ -140,11 +140,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="border-border-default bg-surface-subtle rounded-default flex cursor-pointer items-center gap-3 border border-[0.0625em] px-4 py-5"
-        @click="openUpgradeDialog"
+        class="border-border-default bg-surface-subtle rounded-default flex items-center gap-3 border border-[0.0625em] px-4 py-5"
+        :class="{ 'cursor-pointer': !incidentsLicenseLocked }"
+        @click="!incidentsLicenseLocked && openUpgradeDialog()"
       >
-        <OIcon name="lock" size="md" class="text-warning-600 shrink-0" />
-        <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
+        <OIcon name="lock" size="md" class="lock-chip shrink-0" />
+        <span class="text-text-secondary text-sm">{{
+          incidentsLicenseLocked ? incidentsLockedReason : incidentsAccess.message
+        }}</span>
       </div>
     </section>
 
@@ -168,12 +171,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</strong>
           </span>
         </div>
-        <button
-          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
-          @click="goToServiceGraph"
-        >
-          {{ t("overview.viewAll") }} {{ "→" }}
-        </button>
+        <OTooltip :content="tracesLock.lockedReason.value" :disabled="!tracesLock.locked.value">
+          <button
+            class="text-text-link aria-disabled:text-text-disabled inline-flex cursor-pointer items-center gap-1 border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100 aria-disabled:cursor-not-allowed aria-disabled:no-underline"
+            :aria-disabled="tracesLock.locked.value || undefined"
+            data-test="overview-services-view-all"
+            @click="goToServiceGraph"
+          >
+            <OIcon
+              v-if="tracesLock.locked.value"
+              name="lock"
+              class="text-icon-locked"
+              size="sm"
+              data-test="overview-services-view-all-lock"
+            />
+            {{ t("overview.viewAll") }}
+            <template v-if="!tracesLock.locked.value">{{ "→" }}</template>
+          </button>
+        </OTooltip>
       </div>
       <div class="relative">
         <!-- Left fade + floating scroll control (only present when scrollable) -->
@@ -221,11 +236,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-text-heading block flex-1 cursor-default text-sm font-medium"
                 >{{ svc.label }}</OTruncatedText
               >
-              <span class="ms-1 inline-flex shrink-0 items-center">
+              <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
+                <span class="ms-1 inline-flex shrink-0 items-center" @click.stop>
+                  <OButton
+                    variant="ghost-muted"
+                    size="icon"
+                    disabled
+                    :aria-label="t('traces.servicesCatalog.viewTraces')"
+                    data-test="overview-service-view-traces"
+                  >
+                    <OIcon
+                      name="lock"
+                      class="text-icon-locked"
+                      size="sm"
+                      data-test="overview-service-view-traces-lock"
+                    />
+                  </OButton>
+                </span>
+              </OTooltip>
+              <span v-else class="ms-1 inline-flex shrink-0 items-center">
                 <OButton
                   variant="ghost-muted"
                   size="icon"
                   :title="t('traces.servicesCatalog.viewTraces')"
+                  data-test="overview-service-view-traces"
                   @click="goToService(svc, $event)"
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
@@ -310,20 +344,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @retry="() => loadAll(true)"
     />
 
-    <!-- Locked: Services shares the Incidents license gate — same bundle, no
-         separate upsell story of its own. -->
-    <section v-else-if="!incidentsAccess.allowed" class="mb-5" data-test="overview-services-locked">
+    <!-- Locked: Services shares the Incidents license gate, and its data comes from traces,
+         so a license without traces locks it too. -->
+    <section
+      v-else-if="!incidentsAccess.allowed || tracesLock.locked.value"
+      class="mb-5"
+      data-test="overview-services-locked"
+    >
       <div class="mb-2 flex items-center justify-between ps-1">
         <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
           {{ t("overview.services") }}
         </div>
       </div>
       <div
-        class="border-border-default bg-surface-subtle rounded-default flex cursor-pointer items-center gap-3 border border-[0.0625em] px-4 py-5"
-        @click="openUpgradeDialog"
+        class="border-border-default bg-surface-subtle rounded-default flex items-center gap-3 border border-[0.0625em] px-4 py-5"
+        :class="{ 'cursor-pointer': !servicesLicenseLocked }"
+        @click="!servicesLicenseLocked && openUpgradeDialog()"
       >
-        <OIcon name="lock" size="md" class="text-warning-600 shrink-0" />
-        <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
+        <OIcon name="lock" size="md" class="lock-chip shrink-0" />
+        <span class="text-text-secondary text-sm">{{
+          incidentsAccess.allowed ? tracesLock.lockedReason.value : incidentsAccess.message
+        }}</span>
       </div>
     </section>
 
@@ -401,6 +442,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.activeAnomalies')"
       @retry="() => loadAll(true)"
     />
+    <section v-else-if="anomalyLocked" class="mb-5" data-test="overview-anomalies-locked">
+      <div class="mb-2 flex items-center justify-between ps-1">
+        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
+          {{ t("overview.activeAnomalies") }}
+        </div>
+      </div>
+      <div
+        class="border-border-default bg-surface-subtle rounded-default flex items-center gap-3 border border-[0.0625em] px-4 py-5"
+      >
+        <OIcon name="lock" size="md" class="lock-chip shrink-0" />
+        <span class="text-text-secondary text-sm">{{ anomalyLock.lockedReason.value }}</span>
+      </div>
+    </section>
 
     <!-- RECENT EVENTS (alert firing feed) -->
     <section v-if="recentEvents.length > 0" class="mb-5" data-test="overview-recent-events-section">
@@ -483,14 +537,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #title>{{ t("overview.notMonitoredTitle") }}</template>
       <template #description>{{ t("overview.notMonitoredDesc") }}</template>
       <template #actions>
-        <EmptyStateActionCard
+        <OTooltip
           v-if="showAlertsCard"
-          icon="notifications"
-          :label="t('overview.notMonitoredAlert')"
-          :sublabel="t('overview.notMonitoredAlertDesc')"
-          data-test="overview-not-monitored-alert-card"
-          @click="goToAddAlert"
-        />
+          :content="alertsLock.lockedReason.value"
+          :disabled="!alertsLocked"
+        >
+          <EmptyStateActionCard
+            :icon="alertsLocked ? 'lock' : 'notifications'"
+            :label="t('overview.notMonitoredAlert')"
+            :sublabel="t('overview.notMonitoredAlertDesc')"
+            :unavailable="alertsLocked"
+            data-test="overview-not-monitored-alert-card"
+            @click="goToAddAlert"
+          />
+        </OTooltip>
         <EmptyStateActionCard
           v-if="showAlertsCard && anomalyEnabled"
           icon="auto-awesome"
@@ -499,14 +559,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="overview-not-monitored-anomaly-card"
           @click="goToAnomalies"
         />
-        <EmptyStateActionCard
+        <OTooltip
           v-if="showLogsCard"
-          icon="search"
-          :label="t('overview.emptyActionLogs')"
-          :sublabel="t('overview.emptyActionLogsDesc')"
-          data-test="overview-not-monitored-logs-card"
-          @click="goToLogs"
-        />
+          :content="logsLock.lockedReason.value"
+          :disabled="!logsLock.locked.value"
+        >
+          <EmptyStateActionCard
+            :icon="logsLock.locked.value ? 'lock' : 'search'"
+            :label="t('overview.emptyActionLogs')"
+            :sublabel="t('overview.emptyActionLogsDesc')"
+            :unavailable="logsLock.locked.value"
+            data-test="overview-not-monitored-logs-card"
+            @click="goToLogs"
+          />
+        </OTooltip>
       </template>
     </OEmptyState>
 
@@ -520,92 +586,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :hide-action="true"
       data-test="overview-all-clear-empty-state"
     >
-      <template #title>{{ t("overview.allClear") }}</template>
+      <template #title>{{
+        uncheckedAreas.length ? t("overview.allClearPartial") : t("overview.allClear")
+      }}</template>
       <template #description>{{
-        flagOn ? t("overview.allClearDescScoped") : t("overview.allClearDesc")
+        uncheckedAreas.length
+          ? t("overview.allClearPartialDesc", { areas: raw(uncheckedAreas.join(", ")) })
+          : flagOn
+            ? t("overview.allClearDescScoped")
+            : t("overview.allClearDesc")
       }}</template>
       <template #actions>
-        <!-- View alerts -->
-        <button
+        <OTooltip
           v-if="showAlertsCard"
-          type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
-          data-test="overview-empty-alerts-card"
-          @click="goToAlertList"
+          :content="alertsLock.lockedReason.value"
+          :disabled="!alertsLocked"
         >
-          <span
-            class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
-          >
-            <OIcon name="notifications" size="md" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
-              t("overview.emptyActionAlerts")
-            }}</OTruncatedText>
-            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
-              t("overview.emptyActionAlertsDesc")
-            }}</span>
-          </span>
-          <OIcon
-            name="chevron-right"
-            size="sm"
-            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
+          <EmptyStateActionCard
+            :icon="alertsLocked ? 'lock' : 'notifications'"
+            :label="t('overview.emptyActionAlerts')"
+            :sublabel="t('overview.emptyActionAlertsDesc')"
+            :unavailable="alertsLocked"
+            data-test="overview-empty-alerts-card"
+            @click="goToAlertList"
           />
-        </button>
-        <!-- Explore logs -->
-        <button
+        </OTooltip>
+        <OTooltip
           v-if="showLogsCard"
-          type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
-          data-test="overview-empty-logs-card"
-          @click="goToLogs"
+          :content="logsLock.lockedReason.value"
+          :disabled="!logsLock.locked.value"
         >
-          <span
-            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
-          >
-            <OIcon name="search" size="md" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
-              t("overview.emptyActionLogs")
-            }}</OTruncatedText>
-            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
-              t("overview.emptyActionLogsDesc")
-            }}</span>
-          </span>
-          <OIcon
-            name="chevron-right"
-            size="sm"
-            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
+          <EmptyStateActionCard
+            :icon="logsLock.locked.value ? 'lock' : 'search'"
+            :label="t('overview.emptyActionLogs')"
+            :sublabel="t('overview.emptyActionLogsDesc')"
+            :unavailable="logsLock.locked.value"
+            data-test="overview-empty-logs-card"
+            @click="goToLogs"
           />
-        </button>
-        <!-- Explore traces -->
-        <button
+        </OTooltip>
+        <OTooltip
           v-if="showTracesCard"
-          type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
-          data-test="overview-empty-traces-card"
-          @click="goToTraces"
+          :content="tracesLock.lockedReason.value"
+          :disabled="!tracesLock.locked.value"
         >
-          <span
-            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
-          >
-            <OIcon name="account-tree" size="md" />
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
-              t("overview.emptyActionTraces")
-            }}</OTruncatedText>
-            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
-              t("overview.emptyActionTracesDesc")
-            }}</span>
-          </span>
-          <OIcon
-            name="chevron-right"
-            size="sm"
-            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
+          <EmptyStateActionCard
+            :icon="tracesLock.locked.value ? 'lock' : 'account-tree'"
+            :label="t('overview.emptyActionTraces')"
+            :sublabel="t('overview.emptyActionTracesDesc')"
+            :unavailable="tracesLock.locked.value"
+            data-test="overview-empty-traces-card"
+            @click="goToTraces"
           />
-        </button>
+        </OTooltip>
       </template>
     </OEmptyState>
 
@@ -644,6 +677,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OverviewSkeleton from "./OverviewSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
@@ -655,6 +689,7 @@ import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePane
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -674,7 +709,33 @@ const isIncidentsEnabled = computed(
 );
 const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_data === true);
 // a deployment with anomaly detection off answers 403 by design, which is no load failure
-const anomalyEnabled = computed(() => store.state.zoConfig?.anomaly_detection_enabled === true);
+const alertsLock = useLicenseLock("alerts");
+const alertsLocked = alertsLock.locked;
+const { locked: incidentsFeatureLocked, lockedReason: incidentsLockedReason } =
+  useLicenseLock("incidents");
+const incidentsLicenseLocked = computed(
+  () => incidentsAccess.value.allowed && incidentsFeatureLocked.value,
+);
+const anomalyLock = useLicenseLock("anomaly_detection");
+const anomalyLocked = anomalyLock.locked;
+const logsLock = useLicenseLock("logs");
+const tracesLock = useLicenseLock("traces");
+// a license lock on traces locks Services too
+const servicesLicenseLocked = computed(
+  () => incidentsLicenseLocked.value || (incidentsAccess.value.allowed && tracesLock.locked.value),
+);
+// areas the license keeps the page from reading, so "all clear" must not claim them
+const uncheckedAreas = computed<string[]>(() => {
+  const areas: string[] = [];
+  if (alertsLocked.value) areas.push(t("overview.areaAlerts"));
+  if (anomalyLocked.value) areas.push(t("overview.areaAnomalies"));
+  if (incidentsLicenseLocked.value) areas.push(t("overview.areaIncidents"));
+  if (servicesLicenseLocked.value) areas.push(t("overview.areaServices"));
+  return areas;
+});
+const anomalyEnabled = computed(
+  () => store.state.zoConfig?.anomaly_detection_enabled === true && !anomalyLocked.value,
+);
 
 // ── Date / time picker ───────────────────────────────────────────────────────
 const LS_TIME_KEY = "o2_overview_time";
@@ -795,15 +856,18 @@ const isForbidden = (err: unknown) => {
   return e?.status === 403 || e?.response?.status === 403;
 };
 const attemptedSections = computed<SectionKey[]>(() => {
-  const keys: SectionKey[] = ["recentEvents"];
+  const keys: SectionKey[] = [];
+  if (!alertsLocked.value) keys.push("recentEvents");
   if (anomalyEnabled.value) keys.push("anomalies");
   if (isIncidentsEnabled.value) keys.push("incidents");
-  if (incidentsAccess.value.allowed) keys.push("services");
+  if (incidentsAccess.value.allowed && !tracesLock.locked.value) keys.push("services");
   return keys;
 });
 const isFailed = (key: SectionKey) =>
   !!sectionFailure[key] && attemptedSections.value.includes(key);
-const allFailed = computed(() => attemptedSections.value.every(isFailed));
+const allFailed = computed(
+  () => attemptedSections.value.length > 0 && attemptedSections.value.every(isFailed),
+);
 
 type PageState =
   "content" | "partial" | "forbidden" | "error" | "not-monitored" | "no-data" | "all-clear";
@@ -961,6 +1025,11 @@ const loadUserStreams = async (force = false) => {
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
 const loadAnomalies = async (force = false) => {
   sectionFailure.anomalies = null;
+  if (anomalyLocked.value) {
+    anomalies.value = [];
+    anomalyConfigCount.value = null;
+    return;
+  }
   try {
     const org = orgId.value;
     const { startTime, endTime } = timeRange.value;
@@ -1066,6 +1135,10 @@ const loadAnomalies = async (force = false) => {
 // Alert trigger history feeds recentEvents only
 const loadHistoryAndSplit = async (force = false) => {
   sectionFailure.recentEvents = null;
+  if (alertsLocked.value) {
+    recentEvents.value = [];
+    return;
+  }
   try {
     // Exact bounds: `alertHistoryQuery` rounds only its key, so the newest minutes still reach the server.
     const historyOptions = alertHistoryQuery(orgId.value, {
@@ -1161,7 +1234,7 @@ const loadIncidents = async (force = false) => {
 };
 
 const loadServiceGraph = async (force = false) => {
-  if (!incidentsAccess.value.allowed) return;
+  if (!incidentsAccess.value.allowed || tracesLock.locked.value) return;
   sectionFailure.services = null;
   try {
     graphStream.value = "all";
@@ -1308,6 +1381,8 @@ const goToService = (svc: any, e?: MouseEvent) => {
   // Fired from the per-card info-icon button — stop it bubbling to the card
   // click (which opens the latency/info side panel).
   e?.stopPropagation();
+  // the service panel's View traces emits here too, outside this file's lock markup
+  if (tracesLock.locked.value) return;
   let filter = sqlEquals("service_name", svc.label ?? svc.id);
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
@@ -1376,14 +1451,17 @@ const goToAnomalies = () => {
 };
 
 const goToLogs = () => {
+  if (logsLock.locked.value) return;
   router.push({ name: "logs", query: { org_identifier: orgId.value } });
 };
 
 const goToTraces = () => {
+  if (tracesLock.locked.value) return;
   router.push({ name: "traces", query: { org_identifier: orgId.value } });
 };
 
 const goToServiceGraph = () => {
+  if (tracesLock.locked.value) return;
   const query: Record<string, string> = {
     org_identifier: orgId.value,
     tab: "service-graph",

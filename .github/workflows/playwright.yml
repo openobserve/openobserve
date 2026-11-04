@@ -14,9 +14,18 @@ on:
   merge_group:
   schedule:
     - cron: '30 20 * * *'  # 2:00 AM IST
+  # Manual run on any branch (the "Use workflow from" ref); no PR, label or path filter applies.
+  workflow_dispatch:
+    inputs:
+      shards:
+        description: "Comma-separated testfolder names from tests/ui-testing/ci-matrix/ci_matrix.json (empty = all shards)"
+        required: false
+        default: ""
+        type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
+  # A manual run gets its own group so it never cancels, or is cancelled by, a PR, queue or nightly run.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || (github.event_name == 'workflow_dispatch' && format('dispatch-{0}', github.run_id)) || github.ref }}
   # Only a new commit cancels: a cancelled same-SHA run leaves a failed required summary that a newer run cannot clear.
   cancel-in-progress: ${{ github.event_name != 'pull_request' || github.event.action == 'synchronize' }}
 
@@ -118,6 +127,12 @@ jobs:
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+      # Rejects an unknown shard name here, before build_binary spends a runner on it.
+      - name: Validate requested shards
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          SHARDS: ${{ inputs.shards }}
+        run: node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json --only-shards "$SHARDS" > /dev/null
       - id: check
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -127,6 +142,8 @@ jobs:
         run: |
           if [ "$EVENT_NAME" = "schedule" ]; then
             echo "has_changes=$([ "$MAIN_CHANGED" = "false" ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
           elif [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' playwright.yml '; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
@@ -315,6 +332,7 @@ jobs:
           HAS_FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'e2e-full') || github.event.pull_request.auto_merge != null }}
           SMOKE_DISABLED: ${{ vars.PW_SMOKE_DISABLED }}
           BASE_REF: ${{ github.base_ref }}
+          SHARDS: ${{ inputs.shards }}
         run: |
           SMOKE_DISABLED=$(echo "$SMOKE_DISABLED" | tr '[:upper:]' '[:lower:]')
           SELECT_ARGS=""
@@ -330,7 +348,7 @@ jobs:
             fi
           fi
           # || true: under bash -e a die() would abort before the log below ever prints.
-          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json $SELECT_ARGS 2> /tmp/pw-select-log.txt) || true
+          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json $SELECT_ARGS --only-shards "$SHARDS" 2> /tmp/pw-select-log.txt) || true
           cat /tmp/pw-select-log.txt >&2
           if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (see build-ci-matrix log above)"; exit 1; fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
@@ -339,7 +357,7 @@ jobs:
           # Durable record of what ran and why, visible from the PR checks page.
           {
             echo "### Playwright shard selection"
-            echo "Mode: $([ -n "$SELECT_ARGS" ] && echo "smoke (changed-path selection)" || echo "full matrix")"
+            echo "Mode: $([ -n "$SELECT_ARGS" ] && echo "smoke (changed-path selection)" || { [ -n "$SHARDS" ] && echo "chosen shards (manual run)"; } || echo "full matrix")"
             echo '```'
             echo "$COUNT"
             cat /tmp/pw-select-log.txt
@@ -780,18 +798,32 @@ jobs:
           if-no-files-found: ignore
           retention-days: 1
 
+      # Playwright retries only a failed test, so a retry in a passing shard is a flaky test whose first failure the server log explains.
+      - name: Detect flaky tests
+        id: flaky
+        if: success()
+        continue-on-error: true
+        run: |
+          flaky=false
+          for z in tests/ui-testing/blob-report/*.zip; do
+            [ -f "$z" ] || continue
+            retries=$(unzip -p "$z" report.jsonl 2>/dev/null | grep -cE '"method":"onTestBegin".*"retry":[1-9]' || true)
+            if [ "${retries:-0}" -gt 0 ]; then flaky=true; echo "$z: $retries retried test attempt(s)"; fi
+          done
+          echo "flaky=$flaky" >> "$GITHUB_OUTPUT"
+
       - name: Show OpenObserve log tail
-        if: failure()
+        if: failure() || steps.flaky.outputs.flaky == 'true'
         run: tail -n 200 o2.log || true
 
       - name: Upload OpenObserve log
-        if: failure()
+        if: failure() || steps.flaky.outputs.flaky == 'true'
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: o2-log-${{ matrix.testfolder }}-attempt-${{ github.run_attempt }}
           path: o2.log
-          retention-days: 1
+          retention-days: 7
           if-no-files-found: ignore
 
   merge_reports:
@@ -1154,6 +1186,8 @@ jobs:
           # 2. Nothing Playwright-relevant changed → nothing ran → allow.
           if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
             echo "✅ No Playwright-relevant changes — suite not required."
+            echo "::notice title=Playwright tests skipped::No Playwright-relevant changes — suite did not run."
+            echo "### ⏭️ Playwright suite skipped — no Playwright-relevant changes in this PR, so no tests ran." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { LlmExperiment } from "@/services/llm-experiments.service";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 export type ExperimentScoreSummary =
   | { name: string; kind: "numeric"; value: number; sampleCount: number }
@@ -35,7 +36,50 @@ export interface ExperimentEvidence {
   completedSlots: number;
   totalSlots: number;
   cost: number | null;
+  /** A task or judge call had no price, so `cost` is a lower bound (or unknown). */
+  costIncomplete: boolean;
   scores: ExperimentScoreSummary[];
+}
+
+/** How a run's cost reads: an unpriced call makes the total a floor, and a
+ *  floor of zero says nothing, so it reads as unknown rather than $0. */
+export type ExperimentCostDisplay =
+  | { kind: "none" }
+  | { kind: "exact"; value: number }
+  | { kind: "atLeast"; value: number }
+  | { kind: "unknown" };
+
+export function experimentCostDisplay(
+  cost: number | null | undefined,
+  incomplete: boolean | null | undefined,
+): ExperimentCostDisplay {
+  if (!incomplete) {
+    return cost === null || cost === undefined ? { kind: "none" } : { kind: "exact", value: cost };
+  }
+  return cost !== null && cost !== undefined && cost > 0
+    ? { kind: "atLeast", value: cost }
+    : { kind: "unknown" };
+}
+
+/** The cost text the experiment list and detail page both show. */
+export function experimentCostText(
+  cost: number | null | undefined,
+  incomplete: boolean | null | undefined,
+  t: TranslateFn,
+): I18nText {
+  const display = experimentCostDisplay(cost, incomplete);
+  switch (display.kind) {
+    case "none":
+      return raw("—");
+    case "exact":
+      return raw(`$${display.value.toFixed(4)}`);
+    case "atLeast":
+      return t("aiObservability.experiments.costAtLeast", {
+        cost: `$${display.value.toFixed(4)}`,
+      });
+    case "unknown":
+      return t("aiObservability.experiments.costUnknown");
+  }
 }
 
 export interface ExperimentDatasetGroup {
@@ -85,6 +129,7 @@ export function experimentEvidence(experiment: LlmExperiment): ExperimentEvidenc
     completedSlots: experiment.executionProgress?.completed ?? 0,
     totalSlots: experiment.executionProgress?.total ?? 0,
     cost: experiment.aggregateSummary?.totalCost ?? null,
+    costIncomplete: experiment.aggregateSummary?.costIncomplete ?? false,
     scores,
   };
 }

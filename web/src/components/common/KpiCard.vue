@@ -30,15 +30,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <component
     :is="as"
-    class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 py-2.5 transition-shadow duration-200 ease-in-out hover:shadow-md max-lg:shrink-0 max-lg:basis-auto max-lg:flex-row-reverse max-lg:items-center max-lg:gap-1.5 max-lg:px-1.5 max-lg:py-1"
+    class="bg-card-glass-bg rounded-default border-border-default flex min-w-0 flex-col gap-1 border px-3.5 py-2.5 transition-shadow duration-200 ease-in-out hover:shadow-md max-lg:shrink-0 max-lg:basis-auto max-lg:gap-0.5 max-lg:px-2 max-lg:py-1.5"
     :data-test="dataTest"
-    :title="label && !lgUp ? String(label) : undefined"
   >
+    <!-- The label stays visible at every width: a compact tile without its
+         label is a bare number nobody can read. -->
     <div class="mb-1 flex items-center justify-between gap-2 max-lg:mb-0">
       <OTruncatedText
         as="div"
         :tooltip="$slots.label ? false : undefined"
-        class="max-lg:hidden"
         :class="labelClass || 'text-2xs text-text-secondary leading-normal font-semibold'"
       >
         <slot name="label">{{ label }}</slot>
@@ -80,9 +80,6 @@ import { raw, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import useBreakpoint from "@/composables/useBreakpoint";
-
-const { lgUp } = useBreakpoint();
 
 withDefaults(
   defineProps<{

@@ -69,7 +69,10 @@ pub struct DatasetResponseBody {
     pub name: String,
     pub description: Option<String>,
     pub tags: Vec<String>,
+    /// Per-row MVCC counter: the value an Experiment pins and a Snapshot reads.
     pub global_version: i64,
+    /// The Dataset version to display: one per write request.
+    pub write_version: i64,
     /// Live (non-deleted) Items, counted once per logical Item rather than once
     /// per stored revision.
     pub item_count: i64,
@@ -115,8 +118,14 @@ impl From<ListDatasetItemsQuery> for ListDatasetItems {
 #[into_params(parameter_in = Query)]
 #[serde(deny_unknown_fields)]
 pub struct DatasetSnapshotRowsQuery {
-    /// Snapshot version to resolve. Defaults to the Dataset's current version.
+    /// Row-level Snapshot/pin key. When both this and `write_version` are
+    /// omitted, reads the Dataset's current row version.
     pub version: Option<i64>,
+    /// Displayed write version W to pin. Resolves to the highest row version
+    /// among rows whose write version is at or below W (labels and row versions
+    /// are separate counters); cannot be combined with `version`. Use the
+    /// returned `snapshotVersion` as the Experiment's `datasetVersion`.
+    pub write_version: Option<i64>,
     /// Zero-based result offset. Defaults to 0.
     pub from: Option<usize>,
     /// Page size from 1 through 100. Defaults to 20.
@@ -128,6 +137,7 @@ impl From<DatasetSnapshotRowsQuery> for ReadSnapshotRows {
         let defaults = ReadSnapshotRows::default();
         Self {
             snapshot_version: value.version,
+            write_version: value.write_version,
             from: value.from.unwrap_or(defaults.from),
             size: value.size.unwrap_or(defaults.size),
         }
@@ -251,6 +261,8 @@ pub struct DatasetItemResponseBody {
     pub input: Value,
     pub expected_output: Option<Value>,
     pub global_version: i64,
+    /// The Dataset version of the write request that stored this row.
+    pub write_version: i64,
     pub is_deleted: bool,
     pub source: DatasetItemSourceResponseBody,
     pub source_ref: Option<String>,
@@ -442,6 +454,7 @@ impl From<Dataset> for DatasetResponseBody {
             description: value.description,
             tags: value.tags,
             global_version: value.global_version,
+            write_version: value.write_version,
             item_count: value.item_count,
             sources: value.sources.into(),
             created_by: value.created_by,
@@ -558,6 +571,7 @@ impl From<DatasetItem> for DatasetItemResponseBody {
             input: value.input,
             expected_output: value.expected_output,
             global_version: value.global_version,
+            write_version: value.write_version,
             is_deleted: value.is_deleted,
             source: value.source.into(),
             source_ref: value.source_ref,

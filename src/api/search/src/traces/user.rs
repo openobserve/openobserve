@@ -176,13 +176,10 @@ pub async fn get_latest_users(
     // Detect schema generation up front so both Phase 1 (user-id column) and
     // Phase 2 (token/cost columns) pick consistent names.
     let stream_type = StreamType::Traces;
-    let has_gen_ai_fields = super::schema_compat::stream_has_gen_ai_fields(
-        org_id.as_str(),
-        stream_name.as_str(),
-        stream_type,
-    )
-    .await;
-    let llm_cols = if has_gen_ai_fields {
+    let layout =
+        super::schema_compat::stream_llm_layout(org_id.as_str(), stream_name.as_str(), stream_type)
+            .await;
+    let llm_cols = if layout.has_gen_ai {
         super::schema_compat::LlmColumns::current()
     } else {
         super::schema_compat::LlmColumns::legacy()
@@ -285,7 +282,7 @@ pub async fn get_latest_users(
         .filter(|tid| !tid.is_empty())
         .collect();
     let trace_ids_sql = sanitized_ids.join("','");
-    req.query.sql = build_user_trace_usage_sql(&stream_name, &trace_ids_sql, has_gen_ai_fields);
+    req.query.sql = build_user_trace_usage_sql(&stream_name, &trace_ids_sql, layout);
     req.query.from = 0;
     req.query.size = all_trace_ids.len() as i64;
 
@@ -508,16 +505,20 @@ fn build_latest_users_page_sql(stream_name: &str, user_id_col: &str, filter: &st
 fn build_user_trace_usage_sql(
     stream_name: &str,
     trace_ids_sql: &str,
-    has_gen_ai_fields: bool,
+    layout: super::schema_compat::StreamLlmLayout,
 ) -> String {
     let stream_ident = quote_identifier(stream_name);
-    if has_gen_ai_fields {
+    if layout.has_gen_ai {
+        let usage =
+            |column: &str| super::schema_compat::usage_sum_expr(column, layout.has_operation_name);
+        let total_tokens_expr = usage("gen_ai_usage_total_tokens");
+        let cost_expr = usage("gen_ai_usage_cost");
         format!(
             "SELECT trace_id, \
             min(start_time) as trace_start_time, \
             max(end_time) as trace_end_time, \
-            sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
-            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details \
+            {total_tokens_expr} as gen_ai_usage_details_total, \
+            {cost_expr} as gen_ai_usage_cost_details \
             FROM {stream_ident} \
             WHERE trace_id IN ('{trace_ids_sql}') \
             GROUP BY trace_id"
@@ -785,15 +786,46 @@ mod tests {
 
     #[test]
     fn user_trace_usage_sql_quotes_the_stream_for_both_schemas() {
-        let current = build_user_trace_usage_sql("a\"b", "abc-1", true);
-        let legacy = build_user_trace_usage_sql("a\"b", "abc-1", false);
+        use super::super::schema_compat::StreamLlmLayout;
+        let current = build_user_trace_usage_sql(
+            "a\"b",
+            "abc-1",
+            StreamLlmLayout {
+                has_gen_ai: true,
+                has_operation_name: false,
+            },
+        );
+        let legacy = build_user_trace_usage_sql("a\"b", "abc-1", StreamLlmLayout::default());
         for sql in [&current, &legacy] {
             assert!(sql.contains("FROM \"a\"\"b\""));
             assert!(sql.contains("WHERE trace_id IN ('abc-1')"));
             assert!(!sql.contains("FROM \"a\"b\""));
         }
         assert!(current.contains("sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"));
+        assert!(current.contains("sum(gen_ai_usage_cost) as gen_ai_usage_cost_details"));
+        assert!(!current.contains("gen_ai_operation_name"));
         assert!(legacy.contains("sum(llm_usage_tokens_total) as gen_ai_usage_details_total"));
         assert!(legacy.contains("sum(llm_usage_cost_total) as gen_ai_usage_cost_details"));
+    }
+
+    #[test]
+    fn user_trace_usage_sql_sums_only_llm_call_spans() {
+        let sql = build_user_trace_usage_sql(
+            "default",
+            "abc-1",
+            super::super::schema_compat::StreamLlmLayout {
+                has_gen_ai: true,
+                has_operation_name: true,
+            },
+        );
+        let llm_call = "(gen_ai_operation_name IS NULL OR gen_ai_operation_name IN \
+                        ('chat', 'text_completion', 'generate_content', 'embeddings'))";
+        assert!(sql.contains(&format!(
+            "sum(CASE WHEN {llm_call} THEN gen_ai_usage_total_tokens ELSE 0 END) \
+             as gen_ai_usage_details_total"
+        )));
+        assert!(sql.contains(&format!(
+            "sum(CASE WHEN {llm_call} THEN gen_ai_usage_cost ELSE 0 END) as gen_ai_usage_cost_details"
+        )));
     }
 }

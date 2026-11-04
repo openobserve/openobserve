@@ -2,7 +2,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { copyToClipboard } from "@/utils/clipboard";
+import { copyPendingText, copyToClipboard } from "@/utils/clipboard";
 import { raw } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -283,5 +283,112 @@ describe("copyToClipboard in-place confirmation", () => {
       await moveControlAfter(1500);
       expect(toast).not.toHaveBeenCalled();
     });
+  });
+});
+
+class FakeClipboardItem {
+  constructor(public items: Record<string, Promise<Blob>>) {}
+}
+
+// The test setup defines navigator.clipboard writable but not configurable.
+const setupClipboard = navigator.clipboard;
+const setClipboard = (clipboard: Partial<Clipboard> | undefined) =>
+  Object.assign(navigator, { clipboard });
+
+describe("clipboard", () => {
+  let execCommand: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    execCommand = vi.fn(() => true);
+    Object.defineProperty(document, "execCommand", { value: execCommand, configurable: true });
+  });
+
+  afterEach(() => {
+    setClipboard(setupClipboard);
+    vi.unstubAllGlobals();
+  });
+
+  it("the DOM fallback textarea is masked from session replay", async () => {
+    setClipboard({ writeText: vi.fn().mockRejectedValue(new Error("denied")) });
+    let privacy: string | null = null;
+    execCommand.mockImplementation(() => {
+      privacy = document.activeElement?.getAttribute("data-o2-privacy") ?? null;
+      return true;
+    });
+
+    await expect(copyToClipboard("o2wh_SECRET", t, { silent: true })).resolves.toBe(true);
+
+    expect(privacy).toBe("mask");
+    expect(document.querySelector("textarea")).toBeNull();
+  });
+
+  it("copyPendingText writes a ClipboardItem before the value resolves", async () => {
+    vi.stubGlobal("ClipboardItem", FakeClipboardItem);
+    const write = vi.fn(async (items: FakeClipboardItem[]) => {
+      await items[0].items["text/plain"];
+    });
+    setClipboard({ write: write as unknown as Clipboard["write"], writeText: vi.fn() });
+    let resolve!: (v: string) => void;
+    const value = new Promise<string>((r) => (resolve = r));
+
+    const copying = copyPendingText(value);
+
+    expect(write).toHaveBeenCalledTimes(1);
+    resolve("o2wh_SECRET");
+    await expect(copying).resolves.toBe(true);
+    const blob = await write.mock.calls[0][0][0].items["text/plain"];
+    expect(blob.type).toBe("text/plain");
+    const text = await new Promise((resolveText) => {
+      const reader = new FileReader();
+      reader.onload = () => resolveText(reader.result);
+      reader.readAsText(blob);
+    });
+    expect(text).toBe("o2wh_SECRET");
+  });
+
+  it("copyPendingText falls back to writeText when ClipboardItem is refused or missing", async () => {
+    vi.stubGlobal("ClipboardItem", FakeClipboardItem);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    setClipboard({ write: vi.fn().mockRejectedValue(new Error("NotAllowed")), writeText });
+    await expect(copyPendingText(Promise.resolve("a"))).resolves.toBe(true);
+    expect(writeText).toHaveBeenCalledWith("a");
+
+    vi.unstubAllGlobals();
+    await expect(copyPendingText(Promise.resolve("b"))).resolves.toBe(true);
+    expect(writeText).toHaveBeenCalledWith("b");
+  });
+
+  it("copyPendingText leaves no unhandled rejection when the item is refused before reading", async () => {
+    vi.stubGlobal(
+      "ClipboardItem",
+      class {
+        constructor() {
+          throw new Error("unsupported");
+        }
+      },
+    );
+    setClipboard({ write: vi.fn(), writeText: vi.fn() });
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      await expect(copyPendingText(Promise.reject(new Error("fetch failed")))).rejects.toThrow(
+        "fetch failed",
+      );
+      await new Promise((r) => setTimeout(r, 0));
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("copyPendingText rethrows the value's failure and returns false when no copy works", async () => {
+    setClipboard({ writeText: vi.fn().mockRejectedValue(new Error("denied")) });
+    await expect(copyPendingText(Promise.reject(new Error("fetch failed")))).rejects.toThrow(
+      "fetch failed",
+    );
+
+    execCommand.mockReturnValue(false);
+    await expect(copyPendingText(Promise.resolve("x"))).resolves.toBe(false);
   });
 });

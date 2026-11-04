@@ -118,6 +118,18 @@ export function useFlowIssues() {
   function rolloutIssues(fleetId: string): PathIssue[] {
     const latest = rollouts.rows.value.find((r) => r.fleetId === fleetId);
     if (!latest) return [];
+    if (latest.status === "waiting") {
+      return [
+        {
+          id: `rollout-${latest.id}`,
+          severity: "warning",
+          title: t("fleet.flowIssues.rolloutWaiting", { to: latest.toVersion }),
+          evidence: progressText(latest),
+          actionLabel: t("fleet.flowIssues.openRollout"),
+          action: { kind: "rollout", rolloutId: latest.id },
+        },
+      ];
+    }
     if (latest.status === "in_progress") {
       return [
         {

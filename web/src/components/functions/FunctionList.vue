@@ -304,11 +304,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li
             v-for="(pipeline, index) in transformedPipelineList"
             :key="pipeline.value"
-            @click="onPipelineSelect(pipeline)"
-            class="hover:bg-muted/50 flex cursor-pointer items-center px-3 py-2"
+            :class="
+              pipelinesLocked
+                ? 'flex items-center gap-1.5 px-3 py-2'
+                : 'hover:bg-muted/50 flex cursor-pointer items-center px-3 py-2'
+            "
             :data-test="`function-list-pipeline-item-${pipeline.value}`"
+            @click="!pipelinesLocked && onPipelineSelect(pipeline)"
           >
             <span class="text-sm">{{ index + 1 }}. {{ pipeline.label }}</span>
+            <OTooltip v-if="pipelinesLocked" :content="pipelinesLockedReason">
+              <span
+                class="inline-flex"
+                :data-test="`function-list-pipeline-lock-${pipeline.value}`"
+              >
+                <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
+              </span>
+            </OTooltip>
           </li>
         </ul>
       </div>
@@ -339,6 +351,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -350,6 +364,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { downloadFile } from "@/utils/dom";
+import { forbiddenState } from "@/utils/featureGate";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import {
   bulkDeleteFunctionsMutation,
@@ -360,6 +375,7 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({
   name: "functionList",
@@ -372,6 +388,8 @@ export default defineComponent({
     ConfirmDialog,
     OButton,
     OBadge,
+    OIcon,
+    OTooltip,
     ODialog,
     ODropdown,
     ODropdownItem,
@@ -389,6 +407,8 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18nTyped();
     const router = useRouter();
+    const { locked: pipelinesLocked, lockedReason: pipelinesLockedReason } =
+      useLicenseLock("pipelines");
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
     const selectedDelete: any = ref(null);
@@ -483,7 +503,7 @@ export default defineComponent({
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = functions.error.value;
-      return e?.status === 403 || e?.response?.status === 403;
+      return forbiddenState(e) || e?.status === 403;
     });
     const fetching = functions.isFetching;
     // Epoch ms of the last successful read — drives the button's "1m ago" label.
@@ -1013,6 +1033,8 @@ export default defineComponent({
       selectedPipeline,
       closeDialog,
       onPipelineSelect,
+      pipelinesLocked,
+      pipelinesLockedReason,
       transformedPipelineList,
       getAssociatedPipelines,
       filterQuery,

@@ -172,37 +172,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            DbmSectionTabs, one level down — OTabs/OTab with a hint tooltip, and
            the Callers tab locked with the same lock+tooltip treatment when the
            vantage that fills it reported nothing. -->
-      <OTabs
-        v-if="hasQuery"
-        :model-value="activeTab"
-        align="left"
-        bordered
-        class="px-page-edge shrink-0"
-        data-test="dbm-detail-tabs"
-        @change="onTabChange"
-      >
-        <OTab
-          v-for="tab in detailTabs"
-          :key="tab.key"
-          :name="tab.key"
-          :disable="tab.disabled"
-          :data-test="`dbm-detail-tab-${tab.key}`"
+      <FeatureLockExempt v-if="hasQuery" class="contents">
+        <OTabs
+          :model-value="activeTab"
+          align="left"
+          bordered
+          class="px-page-edge shrink-0"
+          data-test="dbm-detail-tabs"
+          @change="onTabChange"
         >
-          <span>{{ tab.label }}</span>
-          <!-- The lock is what makes an empty tab read as "nothing measured
-               this" rather than "broken" — the same reason the L2 strip locks
-               its gated tabs instead of hiding them. Decorative for AT; the
-               tooltip carries the sentence. -->
-          <OIcon
-            v-if="tab.disabled"
-            name="lock"
-            size="xs"
-            aria-hidden="true"
-            :data-test="`dbm-detail-tab-lock-${tab.key}`"
-          />
-          <OTooltip side="bottom" :content="tab.hint" />
-        </OTab>
-      </OTabs>
+          <OTab
+            v-for="tab in detailTabs"
+            :key="tab.key"
+            :name="tab.key"
+            :disable="tab.disabled"
+            :data-test="`dbm-detail-tab-${tab.key}`"
+          >
+            <span>{{ tab.label }}</span>
+            <!-- The lock is what makes an empty tab read as "nothing measured
+                 this" rather than "broken" — the same reason the L2 strip locks
+                 its gated tabs instead of hiding them. Decorative for AT; the
+                 tooltip carries the sentence. -->
+            <OIcon
+              v-if="tab.disabled"
+              name="lock"
+              class="lock-chip"
+              size="xs"
+              aria-hidden="true"
+              :data-test="`dbm-detail-tab-lock-${tab.key}`"
+            />
+            <OTooltip side="bottom" :content="tab.hint" />
+          </OTab>
+        </OTabs>
+      </FeatureLockExempt>
 
       <OTabPanels v-if="hasQuery" :model-value="activeTab" data-test="dbm-detail-tab-panels">
         <!-- ── Overview ────────────────────────────────────────────────────
@@ -1053,7 +1055,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="tabular-nums">{{ formatNs(endpoint.p95_ns) }}</span>
               </template>
               <template #cell-actions="{ row: endpoint }">
+                <OTooltip
+                  v-if="tracesLock.locked.value"
+                  side="left"
+                  :content="tracesLock.lockedReason.value"
+                >
+                  <span class="inline-flex">
+                    <OButton
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled
+                      :aria-label="t('dbm.detail.viewTraces')"
+                      :data-test="`dbm-detail-endpoint-traces-${endpoint.rowKey}`"
+                    >
+                      <template #icon-left>
+                        <OIcon
+                          name="lock"
+                          class="text-icon-locked"
+                          size="sm"
+                          :data-test="`dbm-detail-endpoint-traces-lock-${endpoint.rowKey}`"
+                        />
+                      </template>
+                    </OButton>
+                  </span>
+                </OTooltip>
                 <OButton
+                  v-else
                   variant="ghost"
                   size="icon-sm"
                   icon-left="open-in-new"
@@ -1088,7 +1115,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <div v-if="samples.length" class="h-50 w-full px-3">
-              <ChartRenderer :data="scatterData" @click="onSampleClick" />
+              <ChartRenderer
+                :data="scatterData"
+                v-on="tracesLock.locked.value ? {} : { click: onSampleClick }"
+              />
             </div>
 
             <OTable
@@ -1102,7 +1132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :page-size="10"
               table-id="dbm-query-samples"
               data-test="dbm-detail-samples-table"
-              @row-click="openSampleTrace"
+              v-on="tracesLock.locked.value ? {} : { rowClick: openSampleTrace }"
             >
               <template #cell-timestamp="{ row: sample }">
                 <span class="tabular-nums">{{ formatClock(sample.timestamp) }}</span>
@@ -1120,7 +1150,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-else class="text-text-muted">{{ raw("—") }}</span>
               </template>
               <template #cell-actions="{ row: sample }">
+                <OTooltip
+                  v-if="tracesLock.locked.value"
+                  side="left"
+                  :content="tracesLock.lockedReason.value"
+                >
+                  <span class="inline-flex">
+                    <OButton
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled
+                      :aria-label="t('dbm.detail.viewTrace')"
+                      :data-test="`dbm-detail-sample-trace-${sample.rowKey}`"
+                    >
+                      <template #icon-left>
+                        <OIcon
+                          name="lock"
+                          class="text-icon-locked"
+                          size="sm"
+                          :data-test="`dbm-detail-sample-trace-lock-${sample.rowKey}`"
+                        />
+                      </template>
+                    </OButton>
+                  </span>
+                </OTooltip>
                 <OButton
+                  v-else
                   variant="ghost"
                   size="icon-sm"
                   icon-left="open-in-new"
@@ -1197,6 +1252,7 @@ import DbmLockEmptyState, {
   type DbmLockEmptyAction,
 } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -1216,6 +1272,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue, SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import dbMonitoringService, {
   type EndpointRow,
   type ErrorCodeCount,
@@ -1328,6 +1385,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
+const tracesLock = useLicenseLock("traces");
 const { getStreams } = useStreams(t);
 
 // This page is a route root, so MainLayout's `@sendToAiChat` binding is on it
@@ -3045,6 +3103,7 @@ const errorMessage = (err: unknown): string =>
 
 /** The traces route hydrates from `stream`/`filter`/`from`/`to` query params. */
 const openTraces = (filter: string) => {
+  if (tracesLock.locked.value) return;
   router
     .push({
       name: "traces",

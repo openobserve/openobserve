@@ -26,10 +26,11 @@ use crate::traces::otel::attributes::{
 pub struct ModelExtractor;
 
 impl ModelExtractor {
-    /// Extract model name from attributes
+    /// Extract the model name (response model, else request model) for pricing and tokenization.
     pub fn extract(&self, attributes: &HashMap<String, json::Value>) -> Option<String> {
         let model_name_keys = [
             GenAiAttributes::RESPONSE_MODEL,
+            VercelAiSdkAttributes::RESPONSE_MODEL,
             VercelAiSdkAttributes::MODEL_ID,
             GenAiAttributes::REQUEST_MODEL,
             LangfuseAttributes::MODEL,
@@ -44,6 +45,22 @@ impl ModelExtractor {
             }
         }
         None
+    }
+
+    /// Extract only the response model, i.e. the model that actually answered.
+    pub fn extract_response_model(
+        &self,
+        attributes: &HashMap<String, json::Value>,
+    ) -> Option<String> {
+        [
+            GenAiAttributes::RESPONSE_MODEL,
+            VercelAiSdkAttributes::RESPONSE_MODEL,
+            OpenInferenceAttributes::LLM_RESPONSE_MODEL,
+        ]
+        .iter()
+        .find_map(|key| attributes.get(*key))
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
     }
 }
 
@@ -150,5 +167,34 @@ mod tests {
         let extractor = ModelExtractor;
         let attrs = make_attributes(vec![("gen_ai.response.model", json::json!(""))]);
         assert_eq!(extractor.extract(&attrs), Some("".to_string()));
+    }
+
+    #[test]
+    fn test_extract_response_model_ignores_request_keys() {
+        let extractor = ModelExtractor;
+        let attrs = make_attributes(vec![
+            ("gen_ai.request.model", json::json!("gpt-4o")),
+            ("ai.model.id", json::json!("gpt-4o")),
+            ("llm.model_name", json::json!("gpt-4o")),
+            ("langfuse.observation.model.name", json::json!("gpt-4o")),
+        ]);
+        assert!(extractor.extract_response_model(&attrs).is_none());
+    }
+
+    #[test]
+    fn test_extract_response_model_keys() {
+        let extractor = ModelExtractor;
+        for key in [
+            "gen_ai.response.model",
+            "ai.response.model",
+            "llm.response.model",
+        ] {
+            let attrs = make_attributes(vec![(key, json::json!("gpt-4o-2024-08-06"))]);
+            assert_eq!(
+                extractor.extract_response_model(&attrs),
+                Some("gpt-4o-2024-08-06".to_string()),
+                "{key}"
+            );
+        }
     }
 }

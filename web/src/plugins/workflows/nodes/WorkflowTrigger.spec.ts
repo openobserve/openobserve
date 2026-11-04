@@ -44,6 +44,7 @@ import { TRIGGER_META_VARS } from "@/plugins/workflows/alertFields";
 import { buildTestSampleText } from "@/plugins/workflows/testSample";
 import { INCIDENT_EVENT_TYPES } from "@/plugins/workflows/incidentSample";
 import WorkflowTrigger from "./WorkflowTrigger.vue";
+import { httpEditorState, resetHttpEditorState } from "@/plugins/workflows/httpEndpointUi";
 
 function createWrapper() {
   return mount(WorkflowTrigger, {
@@ -213,5 +214,80 @@ describe("WorkflowTrigger", () => {
         trigger_kind: "alert_fired",
       });
     });
+  });
+});
+
+describe("WorkflowTrigger HTTP endpoint", () => {
+  const select = (w: any) => w.findComponent({ name: "OSelect" });
+  const payloadOf = (w: any) => w.findComponent({ name: "QueryEditor" }).props("query") as string;
+  const setKind = (kind: string) => {
+    workflowObj.currentSelectedNodeData = {
+      id: "t1",
+      data: { node_type: "workflow_trigger", trigger_kind: kind },
+    } as any;
+  };
+
+  beforeEach(() => {
+    resetHttpEditorState();
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: true };
+    workflowObj.readOnly = false;
+    setKind("alert_fired");
+  });
+  afterEach(() => {
+    resetHttpEditorState();
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+  });
+
+  it("offers Payload from with the HTTP request sample when the endpoint is on", async () => {
+    httpEditorState.endpointOn = true;
+    const w = createWrapper();
+    expect(select(w).props("label")).toBe(i18n.global.t("workflow.http.payloadFrom"));
+    const labels = select(w)
+      .props("options")
+      .map((o: any) => o.label);
+    expect(labels).toEqual(["Alert Fired", i18n.global.t("workflow.http.payloadHttp")]);
+    const http = select(w).props("options")[1].value;
+    await select(w).vm.$emit("update:modelValue", http);
+    expect(httpEditorState.payloadFrom).toBe("http");
+    expect(payloadOf(w)).toContain('"trigger_source": "http"');
+  });
+
+  it("no Payload from while the endpoint is off", () => {
+    const w = createWrapper();
+    expect(select(w).exists()).toBe(false);
+    expect(payloadOf(w)).not.toContain("trigger_source");
+  });
+
+  it("appends HTTP request to the incident event types", () => {
+    httpEditorState.endpointOn = true;
+    setKind("incident_event");
+    const w = createWrapper();
+    const labels = select(w)
+      .props("options")
+      .map((o: any) => o.label);
+    expect(labels.length).toBeGreaterThan(2);
+    expect(labels[labels.length - 1]).toBe(i18n.global.t("workflow.http.payloadHttp"));
+  });
+
+  it("the link row reads by endpoint state and asks to open the panel", async () => {
+    const off = createWrapper();
+    const link = off.find('[data-test="workflow-trigger-http-link"]');
+    expect(link.text()).toContain(i18n.global.t("workflow.http.triggerLinkOff"));
+    expect(link.text()).toContain(i18n.global.t("workflow.http.triggerLinkOffAction"));
+    await off.find('[data-test="workflow-trigger-http-link-action"]').trigger("click");
+    expect(off.emitted("open-http-endpoint")).toHaveLength(1);
+    httpEditorState.endpointOn = true;
+    const on = createWrapper();
+    expect(on.find('[data-test="workflow-trigger-http-link"]').text()).toContain(
+      i18n.global.t("workflow.http.triggerLinkOnAction"),
+    );
+  });
+
+  it("hides the badge and link row when hooks are off", () => {
+    store.state.zoConfig = { ...store.state.zoConfig, workflow_hooks_enabled: false };
+    httpEditorState.endpointOn = true;
+    const w = createWrapper();
+    expect(w.find('[data-test="workflow-trigger-http-link"]').exists()).toBe(false);
+    expect(select(w).exists()).toBe(false);
   });
 });

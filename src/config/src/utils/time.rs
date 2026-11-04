@@ -311,6 +311,27 @@ pub fn parse_timezone_to_offset_at(timezone: &str, reference_micros: i64) -> Opt
     Some(offset.fix().local_minus_utc() as i64)
 }
 
+/// Microseconds since the epoch of 00:00 UTC on `date` (`YYYY-MM-DD`); `None` unless it is a real
+/// calendar date.
+pub fn start_of_date_micros(date: &str) -> Option<i64> {
+    let bytes = date.as_bytes();
+    let shaped = bytes.len() == 10
+        && bytes.iter().enumerate().all(|(i, b)| {
+            if i == 4 || i == 7 {
+                *b == b'-'
+            } else {
+                b.is_ascii_digit()
+            }
+        });
+    if !shaped {
+        return None;
+    }
+    let midnight = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
+        .ok()?
+        .and_hms_opt(0, 0, 0)?;
+    Some(midnight.and_utc().timestamp_micros())
+}
+
 #[inline(always)]
 pub fn parse_str_to_timestamp_micros_as_option(v: &str) -> Option<i64> {
     v.parse()
@@ -785,5 +806,16 @@ mod tests {
         assert_eq!(validate_time_range(10, 10), ordered);
         assert_eq!(validate_time_range(11, 10), ordered);
         assert_eq!(validate_time_range(1, 2), Ok(()));
+    }
+
+    #[test]
+    fn test_start_of_date_micros() {
+        let s = |date: &str| start_of_date_micros(date).map(|us| us / 1_000_000);
+        assert_eq!(s("2026-01-31"), Some(1_769_817_600));
+        assert_eq!(s("2026-07-01"), Some(1_782_864_000));
+        assert_eq!(s("1969-12-31"), Some(-86_400));
+        for bad in ["2026-02-30", "2026-1-05", "2026/01/05", "", "+2026-01-05"] {
+            assert_eq!(s(bad), None, "{bad}");
+        }
     }
 }

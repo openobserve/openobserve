@@ -22,5 +22,11 @@ declare module "vue-router" {
     accessResource?: string;
     /** Query keys naming the item this route shows; access denials are remembered per item. */
     accessScopeQuery?: string[];
+    /** API exists only with online evaluations on, else the shell renders the disabled state. */
+    requiresOnlineEvals?: boolean;
+    /** License feature key the page needs; a `locked` key renders the page with every control disabled. */
+    licenseFeature?: string;
+    /** The license key comes from `query.stream_type` instead, via `streamTypeFeature`. */
+    licenseFeatureFromStreamType?: boolean;
   }
 }
