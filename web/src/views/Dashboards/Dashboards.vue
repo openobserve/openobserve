@@ -788,7 +788,13 @@ export default defineComponent({
 
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
-    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard(t);
+    const {
+      isHome,
+      setHomeDashboard,
+      clearHomeDashboard,
+      homeDashboard,
+      load: loadHomeDashboard,
+    } = useHomeDashboard(t);
 
     // Per-user favorites — heart toggle on each row + a folder-independent
     // favorites view.
@@ -1576,7 +1582,7 @@ export default defineComponent({
       const org = store.state.selectedOrganization?.identifier;
       // The server rewrites the pin's folder on move; the cached copy would keep routing to the old one.
       if (org && selectedDashboardIdToMove.value?.some((id) => isHome(id))) {
-        await useHomeDashboard(t).load(org, true);
+        await loadHomeDashboard(org, true);
       }
     };
 
