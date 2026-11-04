@@ -205,7 +205,27 @@ impl VercelAiSdkAttributes {
     pub const SETTINGS_MODE: &'static str = "ai.settings.mode";
 
     // AI Usage
+    /// Embedding token count (`ai.embed` / `ai.embedMany`)
     pub const USAGE_TOKENS: &'static str = "ai.usage.tokens";
+    /// ai@4 names
+    pub const USAGE_PROMPT_TOKENS: &'static str = "ai.usage.promptTokens";
+    pub const USAGE_COMPLETION_TOKENS: &'static str = "ai.usage.completionTokens";
+    /// ai@5+ names; `inputTokens` is the provider's input count (ai@6+: total incl. cache)
+    pub const USAGE_INPUT_TOKENS: &'static str = "ai.usage.inputTokens";
+    pub const USAGE_OUTPUT_TOKENS: &'static str = "ai.usage.outputTokens";
+    pub const USAGE_TOTAL_TOKENS: &'static str = "ai.usage.totalTokens";
+    /// ai@5 cache-read count (subset of, or added to, `inputTokens` depending on provider)
+    pub const USAGE_CACHED_INPUT_TOKENS: &'static str = "ai.usage.cachedInputTokens";
+    /// ai@6+ breakdown of `inputTokens` (which includes both)
+    pub const USAGE_INPUT_CACHE_READ_TOKENS: &'static str =
+        "ai.usage.inputTokenDetails.cacheReadTokens";
+    pub const USAGE_INPUT_CACHE_WRITE_TOKENS: &'static str =
+        "ai.usage.inputTokenDetails.cacheWriteTokens";
+
+    // AI Operation (`ai.generateText`, `ai.generateText.doGenerate`, …)
+    pub const OPERATION_ID: &'static str = "ai.operationId";
+    // AI Response model (provider call spans)
+    pub const RESPONSE_MODEL: &'static str = "ai.response.model";
 
     // AI Telemetry Metadata
     pub const TELEMETRY_METADATA_USER_ID: &'static str = "ai.telemetry.metadata.userId";
@@ -221,6 +241,11 @@ impl OpenInferenceAttributes {
     pub const LLM_RESPONSE_MODEL: &'static str = "llm.response.model";
     pub const LLM_TOKEN_COUNT_PROMPT: &'static str = "llm.token_count.prompt";
     pub const LLM_TOKEN_COUNT_COMPLETION: &'static str = "llm.token_count.completion";
+    /// Cache-read / cache-write prompt tokens; included in `llm.token_count.prompt`
+    pub const LLM_TOKEN_COUNT_PROMPT_CACHE_READ: &'static str =
+        "llm.token_count.prompt_details.cache_read";
+    pub const LLM_TOKEN_COUNT_PROMPT_CACHE_WRITE: &'static str =
+        "llm.token_count.prompt_details.cache_write";
     pub const LLM_INVOCATION_PARAMETERS: &'static str = "llm.invocation_parameters";
     // Tool name on a TOOL-kind span (Arize/Phoenix, OpenAI Agents, Google ADK).
     pub const TOOL_NAME: &'static str = "tool.name";
@@ -321,6 +346,11 @@ impl FrameworkAttributes {
     pub const TRACELOOP_ENTITY_INPUT: &'static str = "traceloop.entity.input";
     pub const TRACELOOP_ENTITY_OUTPUT: &'static str = "traceloop.entity.output";
     pub const TRACELOOP_SPAN_KIND: &'static str = "traceloop.span.kind";
+    /// OpenLLMetry association properties, where LangChain puts `RunnableConfig.metadata` ids.
+    pub const TRACELOOP_ASSOCIATION_SESSION_ID: &'static str =
+        "traceloop.association.properties.session_id";
+    pub const TRACELOOP_ASSOCIATION_USER_ID: &'static str =
+        "traceloop.association.properties.user_id";
 
     // SmolAgents
     pub const INPUT_VALUE: &'static str = "input.value";

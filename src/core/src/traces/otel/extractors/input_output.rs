@@ -136,6 +136,15 @@ impl InputOutputExtractor {
             return (Some(input.clone()), output.cloned());
         }
 
+        // Structured OpenInference messages first: they keep roles and tool calls over `*.value`.
+        let (input, output) = self.extract_openinference_nested(attributes);
+        if input.is_some() || output.is_some() {
+            return (
+                input.or_else(|| attributes.get(FrameworkAttributes::INPUT_VALUE).cloned()),
+                output.or_else(|| attributes.get(FrameworkAttributes::OUTPUT_VALUE).cloned()),
+            );
+        }
+
         // SmolAgents
         if let Some(input) = attributes.get(FrameworkAttributes::INPUT_VALUE) {
             let output = attributes.get(FrameworkAttributes::OUTPUT_VALUE);
@@ -152,12 +161,6 @@ impl InputOutputExtractor {
         if let Some(input) = attributes.get(FrameworkAttributes::TOOL_ARGUMENTS) {
             let output = attributes.get(FrameworkAttributes::TOOL_RESPONSE);
             return (Some(input.clone()), output.cloned());
-        }
-
-        // OpenInference nested attributes (llm.input_messages.* and llm.output_messages.*)
-        let (input, output) = self.extract_openinference_nested(attributes);
-        if input.is_some() || output.is_some() {
-            return (input, output);
         }
 
         (None, None)
@@ -260,11 +263,20 @@ impl InputOutputExtractor {
 
         let output = if let Some(text) = attributes.get(VercelAiSdkAttributes::RESPONSE_TEXT) {
             if let Some(tool_calls) = attributes.get(VercelAiSdkAttributes::RESPONSE_TOOL_CALLS) {
-                Some(json::json!({
-                    "role": "assistant",
-                    "content": text,
-                    "tool_calls": tool_calls
-                }))
+                // `ai.response.toolCalls` arrives as a JSON string; embed it structurally.
+                let tool_calls = tool_calls
+                    .as_str()
+                    .and_then(|s| json::from_str::<json::Value>(s).ok())
+                    .unwrap_or_else(|| tool_calls.clone());
+                // A string, since an object would be flattened into `_role`/`_content` columns.
+                Some(json::Value::String(
+                    json::json!({
+                        "role": "assistant",
+                        "content": text,
+                        "tool_calls": tool_calls
+                    })
+                    .to_string(),
+                ))
             } else {
                 Some(text.clone())
             }
@@ -811,6 +823,105 @@ mod tests {
         assert!(input_arr.is_array());
         assert_eq!(input_arr[0]["role"], "user");
         assert_eq!(input_arr[0]["content"], "Test");
+    }
+
+    #[test]
+    fn test_openinference_structured_messages_win_over_input_value() {
+        let extractor = InputOutputExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "input.value".to_string(),
+            json::json!(r#"{"messages":[{"role":"user","content":"Weather?"}]}"#),
+        );
+        attrs.insert("output.value".to_string(), json::json!(r#"{"id":"x"}"#));
+        attrs.insert(
+            "llm.input_messages.0.message.role".to_string(),
+            json::json!("user"),
+        );
+        attrs.insert(
+            "llm.input_messages.0.message.content".to_string(),
+            json::json!("Weather?"),
+        );
+        attrs.insert(
+            "llm.input_messages.1.message.role".to_string(),
+            json::json!("tool"),
+        );
+        attrs.insert(
+            "llm.input_messages.1.message.content".to_string(),
+            json::json!("sunny"),
+        );
+        attrs.insert(
+            "llm.output_messages.0.message.role".to_string(),
+            json::json!("assistant"),
+        );
+        attrs.insert(
+            "llm.output_messages.0.message.tool_calls.0.tool_call.function.name".to_string(),
+            json::json!("get_weather"),
+        );
+
+        let (input, output) = extractor.extract(&[], &attrs, "openinference");
+        let input = input.unwrap();
+        assert_eq!(input[0]["message"]["role"], "user");
+        assert_eq!(input[0]["message"]["content"], "Weather?");
+        assert_eq!(input[1]["message"]["role"], "tool");
+        let output = output.unwrap();
+        assert_eq!(output[0]["message"]["role"], "assistant");
+        assert_eq!(
+            output[0]["message"]["tool_calls"][0]["tool_call"]["function"]["name"],
+            "get_weather"
+        );
+    }
+
+    #[test]
+    fn test_openinference_side_without_structured_messages_keeps_its_value() {
+        let extractor = InputOutputExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("input.value".to_string(), json::json!("raw request"));
+        attrs.insert("output.value".to_string(), json::json!("streamed answer"));
+        attrs.insert(
+            "llm.input_messages.0.message.role".to_string(),
+            json::json!("user"),
+        );
+        attrs.insert(
+            "llm.input_messages.0.message.content".to_string(),
+            json::json!("Weather?"),
+        );
+
+        let (input, output) = extractor.extract(&[], &attrs, "openinference");
+        assert_eq!(input.unwrap()[0]["message"]["content"], "Weather?");
+        assert_eq!(output, Some(json::json!("streamed answer")));
+    }
+
+    #[test]
+    fn test_smolagents_input_value_without_structured_messages() {
+        let extractor = InputOutputExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("input.value".to_string(), json::json!("task"));
+        attrs.insert("output.value".to_string(), json::json!("answer"));
+
+        let (input, output) = extractor.extract(&[], &attrs, "smolagents");
+        assert_eq!(input, Some(json::json!("task")));
+        assert_eq!(output, Some(json::json!("answer")));
+    }
+
+    #[test]
+    fn test_vercel_tool_call_step_output_is_single_string() {
+        let extractor = InputOutputExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("ai.response.text".to_string(), json::json!(""));
+        attrs.insert(
+            "ai.response.toolCalls".to_string(),
+            json::json!(r#"[{"toolCallId":"c1","toolName":"weather","input":"{}"}]"#),
+        );
+
+        let (_, output) = extractor.extract(&[], &attrs, "ai");
+        let output = output.unwrap();
+        let s = output
+            .as_str()
+            .expect("output must be a single JSON string");
+        let parsed: json::Value = json::from_str(s).unwrap();
+        assert_eq!(parsed["role"], "assistant");
+        assert_eq!(parsed["tool_calls"][0]["toolName"], "weather");
     }
 
     #[test]

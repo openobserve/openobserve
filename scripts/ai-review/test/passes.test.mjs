@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { mergeConfidence, unfinishedReviewers } from "../src/confidence.mjs";
 import { reviewerFacts } from "../src/auto-approve.mjs";
@@ -10,6 +11,7 @@ import {
   parseColdPasses,
   passLabel,
   passPlan,
+  reviewComplete,
   runPooled,
 } from "../src/passes.mjs";
 import { buildFallbackReview, partialFindingsBlock, selectFallbackFindings } from "../src/report.mjs";
@@ -136,4 +138,23 @@ test("the fallback never merges two different blockers that share most of their 
     done("correctness", 2, [finding("delete query  ignores the stream filter", { line: "42" })]),
   ]);
   assert.equal(selectFallbackFindings(same).length, 1);
+});
+
+test("only a review whose every pass finished in time and whose coordinator merged may skip an unchanged diff next time", () => {
+  const coordinator = { fallback: false };
+  const skippedPass = { agentKey: "frontend", agentName: "frontend Reviewer", pass: 1, findings: [], error: null, skipped: true };
+  assert.equal(reviewComplete([done("security", 1), done("security", 2), skippedPass], coordinator), true);
+  assert.equal(reviewComplete([done("security", 1), failed("security", 2)], coordinator), false, "a lost cold pass is a partial review");
+  assert.equal(reviewComplete([done("security", 1), failed("security", 2, { timedOut: true })], coordinator), false);
+  assert.equal(reviewComplete([done("security", 1), { ...done("qa", 1), parsed: false }], coordinator), false, "unparseable output is unfinished");
+  assert.equal(reviewComplete([done("security", 1), { ...done("qa", 1), wrappedUp: true }], coordinator), false, "a reviewer cut short at its soft deadline");
+  assert.equal(reviewComplete([done("security", 1)], { fallback: true }), false, "the coordinator fell back");
+  assert.equal(reviewComplete([done("security", 1)], null), false, "the coordinator never ran");
+});
+
+test("run-review writes the diff fingerprint only for a complete review", () => {
+  const source = readFileSync(new URL("../run-review.mjs", import.meta.url), "utf-8");
+  assert.match(source, /const complete = reviewComplete\(passResults, coordinatorResult\);/);
+  assert.match(source, /diffFingerprint: complete && fullyRead && diffPinned && hunksLocatable\(diff, readBaseFile\) \? fingerprint : ""/);
+  assert.equal((source.match(/diffFingerprint:/g) || []).length, 1, "every finishReviewBody call goes through the completeness check");
 });
