@@ -232,6 +232,71 @@ describe("OSelect", () => {
     expect(wrapper.emitted("create")).toBeFalsy();
   });
 
+  describe("Enter on a typed term when creatable", () => {
+    async function typeAndEnter(props: Record<string, unknown>, term: string) {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: { searchable: true, creatable: true, ...props },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+      const input = document.body.querySelector(
+        'input[placeholder="Search..."]',
+      ) as HTMLInputElement;
+      input.value = term;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushPromises();
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flushPromises();
+    }
+
+    const options = [
+      { label: "Existing", value: "ex" },
+      { label: "Locked", value: "locked", disabled: true },
+    ];
+
+    it("selects an exact label match instead of creating it", async () => {
+      await typeAndEnter({ options }, "Existing");
+      expect(wrapper.emitted("create")).toBeFalsy();
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["ex"]);
+    });
+
+    it("matches case-sensitively, so a differently cased term is created", async () => {
+      await typeAndEnter({ options }, "existing");
+      expect(wrapper.emitted("create")?.at(-1)).toEqual(["existing"]);
+      expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+    });
+
+    it("emits create once for a term with no match", async () => {
+      await typeAndEnter({ options }, "brand-new");
+      expect(wrapper.emitted("create")).toEqual([["brand-new"]]);
+    });
+
+    it("neither selects nor creates an exact match on a disabled option", async () => {
+      await typeAndEnter({ options }, "Locked");
+      expect(wrapper.emitted("create")).toBeFalsy();
+      expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+    });
+
+    it("adds an exact match to a multi-select without removing the selection", async () => {
+      await typeAndEnter(
+        {
+          options: [...options, { label: "Other", value: "o" }],
+          multiple: true,
+          modelValue: ["o"],
+        },
+        "Existing",
+      );
+      expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([["o", "ex"]]);
+    });
+
+    it("leaves a multi-select unchanged when the match is already selected", async () => {
+      await typeAndEnter({ options, multiple: true, modelValue: ["ex"] }, "Existing");
+      expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+      expect(wrapper.emitted("create")).toBeFalsy();
+    });
+  });
+
   describe("close on scroll", () => {
     const frames = new Map<number, FrameRequestCallback>();
     let nextFrame = 0;

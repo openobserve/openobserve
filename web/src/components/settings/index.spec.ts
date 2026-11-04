@@ -332,6 +332,13 @@ describe("SettingsIndex", () => {
       expect(labels.indexOf("Integrations")).toBe(labels.indexOf("Destinations") + 1);
     });
 
+    it("gives the Slack section no page subtitle", () => {
+      mockStore.state.zoConfig = { service_streams_enabled: true, slack_enabled: true } as any;
+      const wrapper = createWrapper();
+      const items = (wrapper.vm.sectionGroups as any[]).flatMap((g: any) => g.items);
+      expect(items.find((i: any) => i.key === "slack")?.description).toBeUndefined();
+    });
+
     it("AC-1.4 shows no Slack rail item on Cloud while Slack is disabled", () => {
       mockStore.state.zoConfig = {
         service_streams_enabled: true,

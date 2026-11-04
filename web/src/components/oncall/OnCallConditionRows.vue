@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <span class="min-w-40 flex-1">
         <OSelect
+          :ref="(el) => setValueSelect(row.key, el)"
           :model-value="row.value || null"
           :options="valueOptionsFor(row)"
           :placeholder="t('oncall.ruleEditorPickValue')"
@@ -56,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('oncall.conditionValueAria')"
           :data-test="`${testPrefix}-value-${index}`"
           @update:model-value="(v: unknown) => setValue(row, v === null ? '' : String(v))"
-          @create="(v: string) => setValue(row, v)"
+          @create="(v: string) => createValue(row, v)"
         />
       </span>
       <OButton
@@ -256,6 +257,21 @@ function firesOf(fires: number): I18nText | undefined {
 function setValue(row: ConditionRow, value: string) {
   row.value = value;
   row.touched = true;
+}
+
+const valueSelects = new Map<number, { close: () => void }>();
+
+function setValueSelect(key: number, el: unknown) {
+  if (el && typeof (el as { close?: unknown }).close === "function") {
+    valueSelects.set(key, el as { close: () => void });
+  } else {
+    valueSelects.delete(key);
+  }
+}
+
+function createValue(row: ConditionRow, value: string) {
+  setValue(row, value);
+  valueSelects.get(row.key)?.close();
 }
 
 function setField(row: ConditionRow, value: unknown) {

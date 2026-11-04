@@ -367,7 +367,6 @@ export default defineComponent({
         {
           key: "slack",
           label: t("settings.slackApp"),
-          description: t("settings.slackAppDesc"),
           icon: `img:${slackIcon.value}`,
           to: { name: "slack", query: { org_identifier: org } },
           visible: slackVisible.value,

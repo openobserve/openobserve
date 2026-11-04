@@ -730,10 +730,18 @@ function handleCreateFromInput() {
   const term = searchTerm.value.trim();
   if (!term) return;
 
-  const hasExisting = normalizedOptions.value.some(
+  const matches = normalizedOptions.value.filter(
     (opt) => opt.label === term || String(opt.value) === term,
   );
-  if (hasExisting) return;
+  if (matches.length) {
+    const pick = matches.find((opt) => !opt.header && !opt.disabled && !opt.expandable);
+    if (!pick) return;
+    // Enter on a typed exact match picks it; a multi-select only adds, never toggles it off.
+    if (!props.multiple) handleListboxUpdate(toRekaString(pick.value));
+    else if (!selectedValues.value.includes(pick.value))
+      emit("update:modelValue", [...selectedValues.value, pick.value]);
+    return;
+  }
 
   emit("create", term);
 }
