@@ -2931,4 +2931,53 @@ describe("PanelContainer", () => {
       expect(wrapper.find(button).exists()).toBe(shown);
     });
   });
+
+  describe("Explore actions", () => {
+    const menuStubs = {
+      ODropdown: {
+        name: "ODropdown",
+        template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
+      },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template:
+          '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
+      },
+    };
+    const trigger = '[data-test="panel-explore-actions-btn"]';
+
+    it("shows the explore menu only with viewOnly and exploreActions", () => {
+      wrapper = createWrapper({ viewOnly: true, exploreActions: true }, menuStubs);
+      expect(wrapper.find(trigger).exists()).toBe(true);
+    });
+
+    it.each([
+      [{ viewOnly: false, exploreActions: true }],
+      [{ viewOnly: true, exploreActions: false }],
+      [{ viewOnly: true }],
+    ])("hides the explore menu for %o", (props) => {
+      wrapper = createWrapper(props, menuStubs);
+      expect(wrapper.find(trigger).exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-explore-create-alert"]').exists()).toBe(false);
+    });
+
+    it("never shows next to the panel's own menu", () => {
+      wrapper = createWrapper({ viewOnly: false, exploreActions: true }, menuStubs);
+      expect(wrapper.find('[data-test="dashboard-edit-panel"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-explore-add-to-dashboard"]').exists()).toBe(false);
+    });
+
+    it("emits exploreCreateAlert with the panel schema", async () => {
+      wrapper = createWrapper({ viewOnly: true, exploreActions: true }, menuStubs);
+      await wrapper.find('[data-test="panel-explore-create-alert"]').trigger("click");
+      expect(wrapper.emitted("exploreCreateAlert")).toEqual([[mockPanelData]]);
+    });
+
+    it("emits exploreAddToDashboard with the panel schema", async () => {
+      wrapper = createWrapper({ viewOnly: true, exploreActions: true }, menuStubs);
+      await wrapper.find('[data-test="panel-explore-add-to-dashboard"]').trigger("click");
+      expect(wrapper.emitted("exploreAddToDashboard")).toEqual([[mockPanelData]]);
+    });
+  });
 });

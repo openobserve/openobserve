@@ -220,4 +220,21 @@ describe("SelectTabDropdown", () => {
     expect(wrapper.vm.showAddTabDialog).toBe(false);
     expect(wrapper.vm.selectedTab).toBe("emitted123");
   });
+  it("selects the preferred tab when the dashboard has it", async () => {
+    const wrapper = mountComponent(
+      { folderId: "folder1", dashboardId: "dash1", preferredTabId: "tab2" },
+      store,
+    );
+    await flushPromises();
+    expect(wrapper.vm.selectedTab).toBe("tab2");
+  });
+
+  it("falls back to the first tab when the preferred tab is gone", async () => {
+    const wrapper = mountComponent(
+      { folderId: "folder1", dashboardId: "dash1", preferredTabId: "missing" },
+      store,
+    );
+    await flushPromises();
+    expect(wrapper.vm.selectedTab).toBe("tab1");
+  });
 });
