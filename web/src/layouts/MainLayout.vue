@@ -329,6 +329,7 @@ import {
   redirectPending,
 } from "@/components/onboarding/onboardingFlow";
 import { orgHasUserData } from "@/composables/useOrgHasUserData";
+import { onboardingFlowOn, sampleDataFlowOn } from "@/utils/firstRunFlow";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import SampleDataWelcome from "@/components/sampleData/SampleDataWelcome.vue";
 import SampleDataTour from "@/components/sampleData/SampleDataTour.vue";
@@ -791,6 +792,13 @@ export default defineComponent({
     const firstLoginRedirect = async () => {
       if (!isFirstLoginOf(store.state.userInfo?.email)) return;
       await router.isReady();
+      // the flow switches arrive with the full config
+      await fullConfigReady();
+      if (!onboardingFlowOn(store.state.zoConfig)) {
+        // the sample data welcome ends the first login itself; with neither flow it ends here
+        if (!sampleDataFlowOn(store.state.zoConfig)) localStorage.removeItem("isFirstTimeLogin");
+        return;
+      }
       // A pending redirect (a marketplace or deep link) keeps the flag, so a later Home visit in the same session still onboards.
       const notNow = () =>
         config.isCloud === "true" &&
@@ -855,6 +863,16 @@ export default defineComponent({
       store.state.zoConfig.version == "";
     // Pages read flags like ai_enabled once at setup, so they mount after the full config lands or fails.
     const fullConfigSettled = ref(!needsFullConfig());
+    const fullConfigReady = () =>
+      fullConfigSettled.value
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => {
+            const stop = watch(fullConfigSettled, (settled) => {
+              if (!settled) return;
+              stop();
+              resolve();
+            });
+          });
 
     // Which org the full config was fetched for — the response carries
     // org-scoped fields (e.g. per-user permission flags), so an org switch

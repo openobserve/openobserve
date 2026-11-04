@@ -156,6 +156,7 @@ import billings from "@/services/billings";
 import analytics from "@/services/product_analytics";
 import { markSlackInviteOffered } from "@/utils/slackCommunityInvite";
 import { isFirstLoginOf, redirectPending } from "@/components/onboarding/onboardingFlow";
+import { sampleDataFlowOn } from "@/utils/firstRunFlow";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -294,9 +295,11 @@ const browseAll = () => {
   }
 };
 
+const flowOn = () => sampleDataFlowOn(store.state.zoConfig);
+
 const maybeGreet = async () => {
   const id = org.value;
-  if (store.state.kioskMode) return;
+  if (store.state.kioskMode || !flowOn()) return;
   // a tour left open in another org is hidden here, so only this org's tour holds the welcome back
   if (!id || route.name !== "home" || session.welcomeSeen(id) || session.tour.value?.org === id) {
     return;
@@ -338,6 +341,7 @@ watch(session.status, (now, before) => {
 });
 
 // a load in another org holds the welcome back, so check again once it ends
-watch([org, () => route.name, () => session.status.value === "loading"], maybeGreet);
+// the flow's switch arrives with the full config, after mount
+watch([org, () => route.name, () => session.status.value === "loading", flowOn], maybeGreet);
 onMounted(maybeGreet);
 </script>

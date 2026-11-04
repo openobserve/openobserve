@@ -2088,6 +2088,26 @@ describe("MainLayout — first-time cloud login", () => {
     sessionStorage.clear();
     (config as any).isCloud = "false";
     vi.mocked(stream.nameList).mockRestore();
+    delete store.state.zoConfig.onboarding_flow_enabled;
+    delete store.state.zoConfig.sample_data_onboarding_enabled;
+  });
+
+  it("leaves a first login to the sample data welcome when the deployment runs it", async () => {
+    store.state.zoConfig.sample_data_onboarding_enabled = true;
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(
+      localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`),
+    ).toBeNull();
+    wrapper.unmount();
+  });
+
+  it("with both first-run flows off, sends no one to onboarding and ends the first login", async () => {
+    store.state.zoConfig.onboarding_flow_enabled = false;
+    const { wrapper, replace } = await mountAtHome();
+    expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
   });
 
   it("sends a first-time cloud user to onboarding and marks the start as pending", async () => {

@@ -23,6 +23,7 @@ import { streamNameListQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
 import { isUserDataStream } from "@/utils/internalStreams";
 import type { OnboardingChoiceId } from "@/components/onboarding/onboardingChoices";
+import { onboardingFlowOn } from "@/utils/firstRunFlow";
 
 /**
  * Whether the Logs page shows its intro: only while the org has no logs stream of any kind, so an
@@ -113,8 +114,9 @@ export function useNoDataIntro(org: MaybeRefOrGetter<string>) {
 }
 
 /**
- * Where a "set up" button goes. Onboarding (cloud only) serves an org with no data at all;
- * it sends an org with data back to Home, so every other case keeps the ingestion route.
+ * Where a "set up" button goes. Onboarding (cloud only, when the deployment runs it) serves an org
+ * with no data at all; it sends an org with data back to Home, so every other case keeps the
+ * ingestion route.
  */
 export function useSetupTarget(orgSource?: MaybeRefOrGetter<string>) {
   const store = useStore();
@@ -129,7 +131,7 @@ export function useSetupTarget(orgSource?: MaybeRefOrGetter<string>) {
   let settled = false;
   const onboarding = computed(() => {
     if (!isFetching.value) settled = config.isCloud === "true" && hasUserData.value === false;
-    return settled;
+    return settled && onboardingFlowOn(store.state.zoConfig);
   });
   // A null choice opens onboarding's first step; a row opens that row of the choice.
   const target = (choice: OnboardingChoiceId | "agent" | null, route: string, row?: string) =>

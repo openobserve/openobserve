@@ -91,8 +91,14 @@ describe("SampleDataHeaderChip", () => {
   let wrapper: VueWrapper;
 
   let store: ReturnType<typeof createStore<any>>;
-  const mountChip = () => {
-    store = createStore({ state: { selectedOrganization: { identifier: ORG }, kioskMode: false } });
+  const mountChip = (sampleDataFlow = true) => {
+    store = createStore({
+      state: {
+        selectedOrganization: { identifier: ORG },
+        kioskMode: false,
+        zoConfig: { sample_data_onboarding_enabled: sampleDataFlow },
+      },
+    });
     wrapper = mount(SampleDataHeaderChip, {
       global: {
         plugins: [i18n, store],
@@ -131,6 +137,12 @@ describe("SampleDataHeaderChip", () => {
       expect(loadInDialog).toHaveBeenCalledWith(ORG, undefined);
     });
 
+    it("offers no Try Sample Data when the deployment runs another first-run flow", () => {
+      Object.assign(data, { sample: false, own: false });
+      mountChip(false);
+      expect(tryBtn().exists()).toBe(false);
+    });
+
     it.each([
       ["the org holds its own data", { sample: false, own: true }],
       ["sample data is loading here", { sample: false, own: false, loadingHere: true }],
@@ -143,6 +155,11 @@ describe("SampleDataHeaderChip", () => {
   });
 
   it("offers only the guided tour and Delete Sample Data", () => {
+    expect(items().map((i) => i.text())).toEqual(["Start the guided tour", "Delete Sample Data"]);
+  });
+
+  it("keeps the menu for loaded sample data when the deployment runs another first-run flow", () => {
+    mountChip(false);
     expect(items().map((i) => i.text())).toEqual(["Start the guided tour", "Delete Sample Data"]);
   });
 

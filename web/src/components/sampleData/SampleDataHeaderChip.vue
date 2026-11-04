@@ -89,6 +89,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useSampleDataPresence } from "@/composables/sampleData/useSampleDataPresence";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
+import { sampleDataFlowOn } from "@/utils/firstRunFlow";
 
 // the menu and its confirm dialog are siblings, so the header's class goes to the menu
 defineOptions({ inheritAttrs: false });
@@ -104,6 +105,7 @@ const shown = computed(() => presence.hasSample.value && !store.state.kioskMode)
 // an empty org gets the way in; once it holds data of its own the header stays clear
 const offerTry = computed(
   () =>
+    sampleDataFlowOn(store.state.zoConfig) &&
     presence.ready.value &&
     !presence.hasRealData.value &&
     !store.state.kioskMode &&

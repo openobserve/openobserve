@@ -114,14 +114,14 @@ const session = useSampleDataSession() as unknown as {
   openWelcome: () => void;
 };
 
-const makeStore = () =>
+const makeStore = (zoConfig: Record<string, unknown> = { sample_data_onboarding_enabled: true }) =>
   createStore({
     state: {
       selectedOrganization: { identifier: ORG, label: "Acme Shop" },
       theme: "light",
       kioskMode: false,
       userInfo: { email: EMAIL },
-      zoConfig: {},
+      zoConfig,
     },
     actions: { setIsDataIngested: () => {} },
   });
@@ -152,13 +152,15 @@ describe("SampleDataWelcome finish", () => {
   let wrapper: VueWrapper | undefined;
   let router: Router;
 
-  const mountAtHome = async () => {
+  let store: ReturnType<typeof makeStore>;
+  const mountAtHome = async (zoConfig?: Record<string, unknown>) => {
     router = makeRouter();
     await router.push("/");
     await router.isReady();
+    store = makeStore(zoConfig);
     wrapper = mount(SampleDataWelcome, {
       global: {
-        plugins: [i18n, makeStore(), router],
+        plugins: [i18n, store, router],
         stubs: { SampleDataProgress: true },
       },
     });
@@ -223,6 +225,19 @@ describe("SampleDataWelcome finish", () => {
     await mounting;
     expect(session.welcomeOpen.value).toBe(true);
     expect(session.welcomeDeciding.value).toBe(false);
+  });
+
+  it("stays closed when the deployment runs another first-run flow", async () => {
+    await mountAtHome({});
+    expect(session.welcomeOpen.value).toBe(false);
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe("true");
+  });
+
+  it("opens once the full config turns the sample data flow on", async () => {
+    await mountAtHome({});
+    store.state.zoConfig = { sample_data_onboarding_enabled: true };
+    await flush();
+    expect(session.welcomeOpen.value).toBe(true);
   });
 
   it("opens in a new org while a tour is left open in another org", async () => {

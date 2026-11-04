@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="setUp('infrastructure', 'prometheus')"
       />
 
-      <div class="flex basis-full justify-center">
+      <div v-if="sampleDataFlow" class="flex basis-full justify-center">
         <SampleDataCallout class="max-w-200" />
       </div>
     </template>
@@ -177,6 +177,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import SampleDataCallout from "@/components/sampleData/SampleDataCallout.vue";
+import { sampleDataFlowOn } from "@/utils/firstRunFlow";
 import { getImageURL } from "@/utils/zincutils";
 import { useSetupTarget } from "@/composables/useNoDataIntro";
 import type { OnboardingChoiceId } from "@/components/onboarding/onboardingChoices";
@@ -232,6 +233,8 @@ const tabDescription = computed(() => {
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization?.identifier,
 }));
+
+const sampleDataFlow = computed(() => sampleDataFlowOn(store.state.zoConfig));
 
 // Uses v-html — fully i18n-controlled, no user input.
 const description = computed(() => DOMPurify.sanitize(t("home.noDataState.description")));

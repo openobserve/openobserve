@@ -74,6 +74,28 @@ describe("HomeNoDataState", () => {
     expect(await clickCard(card)).toEqual({ name: route, query: org });
   });
 
+  it("on cloud, keeps the setup page when the deployment runs the sample data flow", async () => {
+    awsConfig.isCloud = "true";
+    store.state.zoConfig = { ...store.state.zoConfig, sample_data_onboarding_enabled: true };
+
+    expect(await clickCard("logs")).toEqual({ name: "curl", query: org });
+    store.state.zoConfig = { ...store.state.zoConfig, sample_data_onboarding_enabled: false };
+  });
+
+  it.each([
+    [true, true],
+    [false, false],
+  ])("with the sample data flow %s, shows the sample data callout: %s", (on, shown) => {
+    store.state.zoConfig = { ...store.state.zoConfig, sample_data_onboarding_enabled: on };
+    const wrapper = mount(HomeNoDataState, {
+      props: { tab: "overview" },
+      global: { plugins: [i18n, store] },
+    });
+    expect(wrapper.find('[data-test="sample-data-callout"]').exists()).toBe(shown);
+    wrapper.unmount();
+    store.state.zoConfig = { ...store.state.zoConfig, sample_data_onboarding_enabled: false };
+  });
+
   it("on cloud, keeps the setup page once the org has data", async () => {
     awsConfig.isCloud = "true";
     orgData.has = true;
