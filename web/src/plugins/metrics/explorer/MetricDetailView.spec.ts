@@ -1781,6 +1781,23 @@ describe("MetricDetailView", () => {
       expect(wrapper.find('[data-test="metrics-detail-data-age"]').exists()).toBe(false);
     });
 
+    it("drops the old chart's failed-refresh sentence when the new view has no query to chart", async () => {
+      wrapper = mountView({ timeRange: { start_time: 1, end_time: 2 } });
+      await flushPromises();
+      runQuery.mockRejectedValue({ response: { status: 500, data: { message: "boom" } } });
+      await wrapper.setProps({ timeRange: { start_time: 2, end_time: 3 } });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-refresh-failed"]').exists()).toBe(true);
+
+      await wrapper.setProps({
+        overview: { queries: [], chartType: "line", unit: null, bucketUnit: null },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="metrics-detail-refresh-failed"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-detail-data-age"]').exists()).toBe(false);
+    });
+
     it("a first load that fails (400) still shows the error state, with nothing to keep", async () => {
       runQuery.mockRejectedValue({ response: { status: 400, data: { message: "bad query" } } });
       wrapper = mountView();

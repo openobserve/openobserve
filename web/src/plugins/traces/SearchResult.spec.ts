@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, h, KeepAlive, reactive, ref } from "vue";
+import { clearAnnouncements } from "@/lib/feedback/RegionStatus/announcer";
 import SearchResult from "@/plugins/traces/SearchResult.vue";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
@@ -693,6 +694,33 @@ describe("SearchResult in a kept-alive page", () => {
 
     expect(scroller.scrollTop).toBe(480);
     raf.mockRestore();
+    parent.unmount();
+  });
+});
+
+describe("SearchResult announcements from a kept-alive page", () => {
+  afterEach(() => {
+    clearAnnouncements();
+    mockSearchObj.loading = false;
+  });
+
+  it("says nothing when leaving the page ends its search", async () => {
+    const show = ref(true);
+    const Parent = defineComponent({
+      setup: () => () =>
+        h(KeepAlive, null, { default: () => (show.value ? h(SearchResult) : h("div")) }),
+    });
+    mockSearchObj.loading = true;
+    const parent = mount(Parent, { global: globalOptions, attachTo: document.body });
+    await flushPromises();
+
+    show.value = false;
+    await flushPromises();
+    mockSearchObj.loading = false;
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(document.querySelector('[data-test="region-announcer"]')?.textContent ?? "").toBe("");
     parent.unmount();
   });
 });

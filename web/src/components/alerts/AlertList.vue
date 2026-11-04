@@ -2083,7 +2083,12 @@ export default defineComponent({
     });
     const markIfLeftFilter = (row: any): boolean => {
       const f = stateFilter.value;
-      if (!f || matchesStateFilter(row, f)) return false;
+      if (!f) return false;
+      if (matchesStateFilter(row, f)) {
+        // A row toggled back into the filter matches again, so its old tag would be false.
+        leftFilterIds.value.delete(String(row.alert_id));
+        return false;
+      }
       leftFilterIds.value.set(String(row.alert_id), alertsFetchSeq);
       return true;
     };
@@ -3798,6 +3803,8 @@ export default defineComponent({
       const id = String(alertId);
       let left = false;
       confirmedWrites.set(id, { enabled, seq: alertsFetchSeq });
+      // A confirmed write supersedes an earlier failed one on the same row, from either path.
+      dropRowActionError(id);
       for (const alert of filteredResults.value as any[]) {
         if (String(alert.alert_id) !== id) continue;
         alert.enabled = enabled;

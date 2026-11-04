@@ -91,6 +91,26 @@ describe("OTable refetch keeps settled rows", () => {
     expect(wrapper.emitted("row-click")).toHaveLength(1);
   });
 
+  it("blocks the actions column of the kept rows once the refetch is slow, and only that column", async () => {
+    vi.useFakeTimers();
+    mountTable(
+      { columns: [...columns, { id: "actions", header: "Actions", isAction: true }] },
+      { "cell-actions": '<button data-test="row-pause">Pause</button>' },
+    );
+    const actionsCell = () =>
+      wrapper.find('[data-test="o2-table-row-0"] [data-test="o2-table-cell-actions"]');
+    const nameCell = () =>
+      wrapper.find('[data-test="o2-table-row-0"] [data-test="o2-table-cell-name"]');
+    expect(actionsCell().attributes("inert")).toBeUndefined();
+    await wrapper.setProps({ loading: true });
+    vi.runAllTimers();
+    await nextTick();
+    expect(actionsCell().attributes("inert")).toBeDefined();
+    expect(nameCell().attributes("inert")).toBeUndefined();
+    await wrapper.setProps({ loading: false });
+    expect(actionsCell().attributes("inert")).toBeUndefined();
+  });
+
   it("never shows the stale cue for a refetch that settles quickly", async () => {
     vi.useFakeTimers();
     mountTable();

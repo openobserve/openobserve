@@ -463,6 +463,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
   <td
     ref="cellEl"
     :data-test="`o2-table-cell-${cell.column.id}`"
+    :inert="stale && isAction ? true : undefined"
     :class="[
       // Base text color for the whole cell so custom `#cell-*` slots (which skip
       // the default text wrapper) still inherit the theme-aware primary color

@@ -576,18 +576,22 @@ export default defineComponent({
     });
 
     const loadingLabel = computed(() => loadingText(t, regionNoun.value));
+    // Leaving the page cancels its search; that end must not be announced over the page now shown.
+    let pageShown = true;
+    onDeactivated(() => (pageShown = false));
+    onActivated(() => (pageShown = true));
     const region = useRegionLoading({
       busy: () => regionBusy.value,
       noun: () => regionNoun.value,
       error: () =>
-        searchObj.meta.refreshFailedAt && searchObj.meta.lastRunAt
+        pageShown && searchObj.meta.refreshFailedAt && searchObj.meta.lastRunAt
           ? formatRefreshFailed(t, {
               failedAt: searchObj.meta.refreshFailedAt,
               dataFrom: searchObj.meta.lastRunAt,
             })
           : null,
       result: () =>
-        searchObj.data.errorMsg?.trim()?.length || props.pending
+        !pageShown || searchObj.data.errorMsg?.trim()?.length || props.pending
           ? null
           : resultText(t, { count: resultTotal.value, noun: regionNoun.value }),
     });

@@ -1453,6 +1453,42 @@ describe("AlertList - row actions keep the view", () => {
     expect(names(wrapper)).not.toContain("Alert 6");
   });
 
+  it("drops the off-filter tag when a second toggle brings the row back into the filter", async () => {
+    const wrapper = await mountOnPageTwo();
+    const tag = () => wrapper.find('[data-test="alert-list-Alert 6-left-filter"]');
+    alertsSvc.toggle_state_by_alert_id.mockResolvedValueOnce({ data: { enabled: false } });
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(tag().exists()).toBe(true);
+
+    alertsSvc.toggle_state_by_alert_id.mockResolvedValueOnce({ data: { enabled: true } });
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+    expect(tag().exists()).toBe(false);
+  });
+
+  it("clears a row's failed pause once a bulk pause of that row succeeds", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    const rowError = () => wrapper.find('[data-test="alert-list-Alert 6-row-error"]');
+    alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({
+      response: { status: 503, data: { message: "Temporarily unavailable" } },
+    });
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    expect(rowError().exists()).toBe(true);
+
+    wrapper.vm.selectedAlertIds = ["alert-6"];
+    await flushPromises();
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6"], unsuccessful: [], err: null },
+    });
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
+    expect(rowError().exists()).toBe(false);
+  });
+
   it("shows a forbidden pause in the row, red and announced, without flipping it or toasting", async () => {
     const wrapper = await mountOnPageTwo(null);
     alertsSvc.toggle_state_by_alert_id.mockRejectedValueOnce({ response: { status: 403 } });

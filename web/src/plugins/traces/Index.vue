@@ -857,6 +857,9 @@ function resultsViewKey() {
     searchObj.data.stream.selectedStream.value,
     searchObj.meta.searchMode,
     String(searchObj.data.editorValue ?? "").trim(),
+    // Rows read in another order are another view, so a failed re-sort never shows them under the new order.
+    searchObj.meta.resultGrid.sortBy,
+    searchObj.meta.resultGrid.sortOrder,
   ].join("\u0000");
 }
 

@@ -132,6 +132,8 @@ let childShowTimer: ReturnType<typeof setTimeout> | null = null;
 // trigger we wait briefly before closing so the pointer can travel onto the
 // bubble; entering the bubble cancels this timer and keeps the tooltip open.
 let childHideTimer: ReturnType<typeof setTimeout> | null = null;
+// The portalled bubble sits outside the trigger, so moving within it is not moving away.
+let pointerInBubble = false;
 const HOVERABLE_GRACE_MS = 120;
 let labelledEl: Element | null = null;
 
@@ -158,6 +160,7 @@ watch(() => props.content, syncTriggerName);
 // bubble cancels a pending close; leaving it closes the tooltip.
 const onContentEnter = () => {
   if (!props.hoverable) return;
+  pointerInBubble = true;
   if (childHideTimer) {
     clearTimeout(childHideTimer);
     childHideTimer = null;
@@ -165,6 +168,7 @@ const onContentEnter = () => {
 };
 const onContentLeave = () => {
   if (!props.hoverable) return;
+  pointerInBubble = false;
   childOpen.value = false;
 };
 
@@ -254,11 +258,12 @@ onMounted(() => {
       };
       // Chrome drops mouseleave when the hovered child is re-rendered, so the first move off the trigger also ends the hover.
       const hideOnMoveAway = (e: MouseEvent) => {
-        if (parentEl.value?.contains(e.target as Node)) return;
+        if (pointerInBubble || parentEl.value?.contains(e.target as Node)) return;
         document.removeEventListener("mousemove", hideOnMoveAway);
         hide();
       };
       const enter = () => {
+        pointerInBubble = false;
         document.addEventListener("mousemove", hideOnMoveAway, { passive: true });
         show();
       };

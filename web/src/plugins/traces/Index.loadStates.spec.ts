@@ -1090,6 +1090,19 @@ describe("Traces page load states", () => {
         expect(searchObj.meta.resultGrid.showPagination).toBe(true);
       });
 
+      it("shows the error, not the old rows under the new order, when a re-sort fails", async () => {
+        await loadRows();
+        searchObj.meta.resultGrid.sortOrder = "asc";
+        wrapper!.vm.getQueryData(false, true);
+        await waitFor(() => expect(callsOfType("main")).toHaveLength(2));
+        lastCall("main")[1].error(null, { content: { message: "sort failed", code: 500 } });
+        await flushPromises();
+
+        expect(searchObj.data.queryResults.hits).toEqual([]);
+        expect(searchObj.data.errorMsg).toContain("sort failed");
+        expect((searchObj.meta as any).refreshFailedAt ?? null).toBeNull();
+      });
+
       it("puts the pager back on the page the kept rows were read with", async () => {
         await loadRows();
         searchObj.data.resultGrid.currentPage = 2;

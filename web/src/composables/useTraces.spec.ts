@@ -949,6 +949,18 @@ describe("useTraces", () => {
       expect(mockRouterPush).not.toHaveBeenCalled();
     });
 
+    it.each([
+      ["a partial zero", { is_partial: true, hits: [{ zo_count: 0 }] }],
+      ["a function error", { function_error: "execution failed", hits: [] }],
+    ])("reports the failure, not none, when the only count is %s", async (_, data) => {
+      mockSearch.mockResolvedValue({ data });
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-i", "trace-i");
+
+      expect(await navigateToCorrelatedLogs(streams("app_logs"))).toMatchObject({ failed: true });
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    });
+
     it("runs at most four count queries at once", async () => {
       let inFlight = 0;
       let peak = 0;
