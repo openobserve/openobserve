@@ -16,6 +16,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
+import * as echarts from "echarts/core";
+import { LineChart } from "echarts/charts";
+import { GridComponent } from "echarts/components";
+import { CanvasRenderer } from "echarts/renderers";
 import {
   applyDevicePixelRatio,
   currentDevicePixelRatio,
@@ -195,5 +199,59 @@ describe("applyDevicePixelRatio", () => {
     expect(brokenLayer.layers["zr_0.0"].dpr).toBe(1);
     expect(brokenLayer.layers["zr_0.0"].resize).not.toHaveBeenCalled();
     expect(brokenLayer.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyDevicePixelRatio on a real ECharts canvas chart", () => {
+  let el: HTMLDivElement;
+  let chart: echarts.ECharts;
+
+  beforeEach(() => {
+    echarts.use([LineChart, GridComponent, CanvasRenderer]);
+    el = document.createElement("div");
+    document.body.appendChild(el);
+    chart = echarts.init(el, null, {
+      renderer: "canvas",
+      devicePixelRatio: 1,
+      width: 400,
+      height: 300,
+    });
+    chart.setOption({
+      animation: false,
+      xAxis: { type: "category", data: ["a", "b", "c"] },
+      yAxis: { type: "value" },
+      series: [{ type: "line", data: [1, 3, 2] }],
+    });
+  });
+
+  afterEach(() => {
+    chart.dispose();
+    el.remove();
+  });
+
+  // The fake painter only models zrender, so an upgrade that renames its internals would pass every other spec here.
+  it("re-rasterizes the canvas at the new ratio and keeps the same instance", () => {
+    expect(applyDevicePixelRatio(chart, 2)).toBe(true);
+
+    const canvases = [...el.querySelectorAll("canvas")];
+    expect(canvases.length).toBeGreaterThan(0);
+    canvases.forEach((canvas) => {
+      expect(canvas.width).toBe(800);
+      expect(canvas.height).toBe(600);
+    });
+    expect(chart.getDevicePixelRatio()).toBe(2);
+    expect(echarts.getInstanceByDom(el)).toBe(chart);
+  });
+
+  it("builds a hover layer created after the change at the new ratio", () => {
+    const before = el.querySelectorAll("canvas").length;
+    applyDevicePixelRatio(chart, 2);
+    (chart.getZr().painter as unknown as { getHoverLayer: () => unknown }).getHoverLayer();
+
+    const canvases = [...el.querySelectorAll("canvas")];
+    expect(canvases.length).toBe(before + 1);
+    canvases.forEach((canvas) => {
+      expect(canvas.width).toBe(800);
+    });
   });
 });
