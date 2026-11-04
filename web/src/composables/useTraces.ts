@@ -688,9 +688,10 @@ const useTraces = () => {
     }
 
     const queryString = Array.from(conditions.values()).join(" and ");
-    const timeRange = correlationProps.timeRange;
-    // The count is trace-wide, so a span's window would miss the trace's logs elsewhere.
-    const countRange = correlationProps.traceTimeRange ?? timeRange;
+    // A trace-wide lookup counts and opens on the trace's window, so Logs shows the logs the count found.
+    const timeRange = traceId
+      ? (correlationProps.traceTimeRange ?? correlationProps.timeRange)
+      : correlationProps.timeRange;
 
     let navStreams = streamList;
     let probeFailure: CorrelatedLogsFailure | null = null;
@@ -708,8 +709,8 @@ const useTraces = () => {
           query: {
             query: {
               sql: `SELECT count(*) AS zo_count FROM ${quoteSqlIdentifierIfNeeded(name)} WHERE ${queryString}`,
-              start_time: countRange.startTime,
-              end_time: countRange.endTime,
+              start_time: timeRange.startTime,
+              end_time: timeRange.endTime,
               from: 0,
               size: 1,
             },

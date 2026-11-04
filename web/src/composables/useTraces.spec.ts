@@ -724,7 +724,7 @@ describe("useTraces", () => {
       mockSearch.mockResolvedValue({ data: { hits: [{ zo_count: 3 }] } });
     });
 
-    it("counts each eligible stream by trace id over the trace's window and opens the ones that hold it on the span's window", async () => {
+    it("counts each eligible stream by trace id over the trace's window and opens the ones that hold it on that same window", async () => {
       mockSearch.mockImplementation(
         (req: any) =>
           countFor("app_logs", 4)(req) ?? Promise.resolve({ data: { hits: [{ zo_count: 0 }] } }),
@@ -750,13 +750,13 @@ describe("useTraces", () => {
       expect(pushedQuery()).toBe("trace_id = 'trace-c'");
       expect(mockRouterPush.mock.calls[0][0].query).toMatchObject({
         stream: "app_logs",
-        from: "1000",
-        to: "2000",
+        from: "500",
+        to: "9000",
       });
       expect(mockShowInfoNotification).not.toHaveBeenCalled();
     });
 
-    it("counts over the span's window when the trace's window is unknown", async () => {
+    it("counts and opens on the span's window when the trace's window is unknown", async () => {
       const { navigateToCorrelatedLogs } = useTraces();
       selectSpan("span-u", "trace-u");
 
@@ -766,6 +766,23 @@ describe("useTraces", () => {
         start_time: 1000,
         end_time: 2000,
       });
+      expect(mockRouterPush.mock.calls[0][0].query).toMatchObject({ from: "1000", to: "2000" });
+    });
+
+    it("opens Logs on a window holding the log the count found, even outside the span's window", async () => {
+      const logTimestamp = 8000;
+      mockSearch.mockImplementation(async (req: any) => {
+        const { start_time, end_time } = req.query.query;
+        const inside = start_time <= logTimestamp && end_time >= logTimestamp;
+        return { data: { hits: [{ zo_count: inside ? 1 : 0 }] } };
+      });
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("child-span", "trace-c");
+
+      expect(await navigateToCorrelatedLogs(streams("app_logs"))).toBe("opened");
+      const opened = mockRouterPush.mock.calls[0][0].query;
+      expect(Number(opened.from)).toBeLessThanOrEqual(logTimestamp);
+      expect(Number(opened.to)).toBeGreaterThanOrEqual(logTimestamp);
     });
 
     it("drops the stream dimension filters once the trace id is known", async () => {

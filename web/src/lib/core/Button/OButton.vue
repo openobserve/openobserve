@@ -494,8 +494,10 @@ const classes = computed<string[]>(() => [
   sizeClasses[props.size],
 ]);
 
+// A menu trigger also opens on the arrow keys, so a busy one must swallow those too.
+const ACTIVATION_KEYS = new Set(["Enter", " ", "ArrowDown", "ArrowUp"]);
 function handleKeydown(event: KeyboardEvent): void {
-  if (inactive.value && (event.key === "Enter" || event.key === " ")) {
+  if (inactive.value && ACTIVATION_KEYS.has(event.key)) {
     event.preventDefault();
     event.stopImmediatePropagation();
   }

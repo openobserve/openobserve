@@ -639,7 +639,9 @@ const historyError = ref<string | null>(null);
 // Epoch ms the rows on screen were fetched, which a failed read reports as the data still shown.
 const shownAt = ref<number | null>(null);
 // A failed read with rows on screen keeps them under the failed-refresh notice instead of the table's error state; `retry` is the view it asked for.
-const refreshFailure = ref<{ failedAt: number; dataFrom: number; retry: HistoryView } | null>(null);
+// Retry re-runs exactly the request that failed, so it keeps that request's filter and range too.
+type FailedRead = HistoryView & { filter: string; range: typeof dateTimeValues.value };
+const refreshFailure = ref<{ failedAt: number; dataFrom: number; retry: FailedRead } | null>(null);
 // The view the rows on screen were read with, so a failed read puts the header and range back on it.
 let shownView: HistoryView | null = null;
 let withdrawFailure: (() => void) | null = null;
@@ -861,6 +863,11 @@ let historyReadSeq = 0;
 const fetchAlertHistory = async (force = false) => {
   const seq = ++historyReadSeq;
   const requested = currentView();
+  const retry: FailedRead = {
+    ...requested,
+    filter: searchQuery.value,
+    range: { ...dateTimeValues.value },
+  };
   historyError.value = null;
   try {
     const org = store.state.selectedOrganization.identifier;
@@ -935,7 +942,7 @@ const fetchAlertHistory = async (force = false) => {
     console.error("Error fetching alert history:", error);
     historyError.value =
       error?.response?.data?.message || error?.message || t("alerts.failedToFetchHistory");
-    if (rows.value.length && shownAt.value) keepRowsAfterFailure(shownAt.value, requested);
+    if (rows.value.length && shownAt.value) keepRowsAfterFailure(shownAt.value, retry);
   }
 };
 
@@ -963,7 +970,7 @@ const clearRefreshFailure = () => {
   if (retryHadFocus) void nextTick(() => refreshButton.value?.$el?.focus());
 };
 
-const keepRowsAfterFailure = (dataFrom: number, retry: HistoryView) => {
+const keepRowsAfterFailure = (dataFrom: number, retry: FailedRead) => {
   if (unmounted || !shownView) return;
   applyView(shownView);
   refreshFailure.value = { failedAt: Date.now(), dataFrom, retry };
@@ -972,7 +979,12 @@ const keepRowsAfterFailure = (dataFrom: number, retry: HistoryView) => {
 };
 
 const retryFailedRead = () => {
-  if (refreshFailure.value) applyView(refreshFailure.value.retry);
+  const retry = refreshFailure.value?.retry;
+  if (retry) {
+    applyView(retry);
+    searchQuery.value = retry.filter;
+    dateTimeValues.value = retry.range;
+  }
   fetchAlertHistory(true);
 };
 

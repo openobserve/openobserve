@@ -112,6 +112,26 @@ describe("AlertHistory sort failure", () => {
     expect(wrapper.vm.detailsDialog).toBe(true);
   });
 
+  it("retries the filter and time range that failed, not ones staged since", async () => {
+    await mountHistory();
+    failSortOnce(500);
+    wrapper.vm.searchQuery = "failed-alert";
+    const failedRange = { ...wrapper.vm.dateTimeValues };
+    wrapper.vm.manualSearch();
+    await flushPromises();
+    expect(wrapper.vm.refreshFailure).not.toBeNull();
+
+    wrapper.vm.searchQuery = "staged-alert";
+    wrapper.vm.dateTimeValues = { ...failedRange, startTime: 1, endTime: 2 };
+    wrapper.vm.retryFailedRead();
+    await flushPromises();
+
+    const retried = vi.mocked(alertsService.getHistory).mock.calls.at(-1)?.[1];
+    expect(retried.alert_id).toBe("failed-alert");
+    expect(retried.start_time).toBe(String(failedRange.startTime));
+    expect(retried.end_time).toBe(String(failedRange.endTime));
+  });
+
   it("draws the failed read with the shared failed pill: full sentence and Retry", async () => {
     await mountHistory();
     failSortOnce();
