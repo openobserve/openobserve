@@ -439,6 +439,22 @@ describe("CommunitySlackInvite", () => {
       expect(dialogOpen()).toBe("false");
       expect(localStorage.getItem(STATE_KEY)).toBe(record);
     });
+
+    it("stays closed after a welcome that opened over it closes, and stays due", async () => {
+      setPendingDay2(25);
+      const record = localStorage.getItem(STATE_KEY);
+
+      wrapper = buildWrapper();
+      await flushPromises();
+      expect(dialogOpen()).toBe("true");
+      session.welcomeOpen.value = true;
+      await flushPromises();
+      session.welcomeOpen.value = false;
+      await flushPromises();
+
+      expect(dialogOpen()).toBe("false");
+      expect(localStorage.getItem(STATE_KEY)).toBe(record);
+    });
   });
 
   // ── Day-2 trigger ────────────────────────────────────────────────────────────

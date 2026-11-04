@@ -45,6 +45,11 @@ const isOpen = ref(false);
 
 const userEmail = store.state.userInfo?.email ?? "anonymous";
 
+// a welcome that opens over the invite wins this visit; closing without a dismissal keeps the invite due
+watch(session.welcomeOpen, (open) => {
+  if (open) isOpen.value = false;
+});
+
 const slackUrl = computed(() => getCommunitySlackUrl(store.state.zoConfig?.custom_slack_url));
 
 const track = (event: string, properties: Record<string, any> = {}) => {
@@ -159,7 +164,7 @@ const joinSlack = () => {
 <template>
   <ODialog
     data-test="community-slack-invite-dialog"
-    :open="isOpen && !session.welcomeOpen.value"
+    :open="isOpen"
     size="sm"
     :show-close="false"
     @update:open="handleOpenChange"
