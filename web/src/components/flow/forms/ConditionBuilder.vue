@@ -63,6 +63,7 @@ interface FieldOption {
   label?: unknown;
   value?: unknown;
   type?: string;
+  header?: boolean;
 }
 
 const props = withDefaults(
@@ -93,7 +94,8 @@ const issues = ref<FilterIssue[]>([]);
 
 const filterFields = computed<FilterField[]>(() =>
   props.fields
-    .filter((field) => field?.value !== undefined && field.value !== "")
+    // Group headings (the HTTP request fields) are picker sections, not fields.
+    .filter((field) => !field?.header && field?.value !== undefined && field.value !== "")
     .map((field) => ({
       name: String(field.value),
       label: String(field.label ?? field.value),

@@ -164,6 +164,21 @@ describe("ConditionBuilder (pipeline + workflow host of the shared FilterBuilder
     ]);
   });
 
+  it("leaves group headings out of the builder's fields", () => {
+    createWrapper({
+      fields: [
+        { label: "Alert", value: "__kind_fields__", type: "", header: true },
+        ...fields,
+        { label: "HTTP request", value: "__http_fields__", type: "", header: true },
+      ],
+    });
+    expect(
+      builder()
+        .props("fields")
+        .map((f: { name: string }) => f.name),
+    ).toEqual(["level", "meta_alert_name"]);
+  });
+
   it("pipeline: an empty rule blocks save and says why", async () => {
     createWrapper();
     await expect(submit()).resolves.toBeNull();
