@@ -11300,7 +11300,8 @@
       "notifyFailed": "Notification failed",
       "schedulerHealth": "Scheduler lag",
       "silent": "Silent",
-      "other": "Another rule"
+      "other": "Another rule",
+      "notWorking": "Alert not working"
     },
     "evidence": {
       "errors": "Errors",
@@ -11326,7 +11327,12 @@
       "incidentLinkedFirings": "Incident-linked firings",
       "deliveryAttemptRecords": "Delivery attempt records",
       "yes": "Yes",
-      "no": "No"
+      "no": "No",
+      "stream": "Stream",
+      "field": "Field",
+      "label": "Label",
+      "lastDataAt": "Last data",
+      "checkedAt": "Checked"
     },
     "actions": {
       "raiseThreshold": "Raise threshold",
@@ -11352,7 +11358,22 @@
       "reviewSettings": "Review settings",
       "reviewThreshold": "Review threshold",
       "reviewGrouping": "Review grouping",
-      "inspectPlatform": "Inspect platform"
+      "inspectPlatform": "Inspect platform",
+      "reviewSource": "Review source"
+    },
+    "advice": {
+      "checkMissingStream": "Check the source the query reads: it does not exist.",
+      "checkMissingField": "Check the field the query filters on: none of its streams has it.",
+      "checkIgnoredLabel": "Check the label the query matches on: PromQL ignores it, so every series is watched.",
+      "checkFilterValues": "Check the query's filter values: no rows matched them in the searched window.",
+      "confirmQuietSource": "Confirm whether this source is expected to be quiet before changing the alert."
+    },
+    "limitation": {
+      "quietSource": "A quiet source can be a batch or cron job that is idle by design.",
+      "scanTruncated": "Wider searches timed out, so the empty answer covers less than the full 7 days."
+    },
+    "qualityReason": {
+      "scanTruncated": "wider searches timed out"
     },
     "severity": {
       "high": "High",
@@ -11385,7 +11406,8 @@
       "noIncidentSignal": "No incidents, so nothing says whether firings were wanted",
       "sentinelByDesign": "Quiet by design",
       "enrichmentTimeout": "Evidence read timed out",
-      "other": "Another reason"
+      "other": "Another reason",
+      "healthySilence": "Ran cleanly and never fired; quiet is not a problem by itself"
     },
     "coverage": {
       "full": "Full coverage",
@@ -11401,7 +11423,11 @@
       "definitionsWithoutFacts": "{count} alert had no trigger rows in the window, which is not counted as a gap. | {count} alerts had no trigger rows in the window, which is not counted as a gap.",
       "transitionsTruncated": "State transitions were truncated.",
       "countersTruncated": "Counters were truncated, so alerts past the cut were not judged.",
-      "errorClustersTruncated": "Error clusters were truncated."
+      "errorClustersTruncated": "Error clusters were truncated.",
+      "definitionChecksUnavailable": "Alert definition checks need AutoObserve, which is off. The other checks ran.",
+      "definitionChecksNotYet": "AutoObserve has not checked alert definitions in the last day, so they were not judged.",
+      "definitionChecksFailed": "Alert definition checks could not be read, so they were not judged.",
+      "definitionChecksTruncated": "Alert definition check results were truncated, so alerts past the cut were not judged."
     },
     "digests": {
       "schedule": "Schedule",
@@ -11473,7 +11499,8 @@
       "worstHours": "Worst hours",
       "proposedActions": "Proposed actions",
       "qualityReasons": "Reason: {reasons} | Reasons: {reasons}",
-      "openAlert": "Open alert"
+      "openAlert": "Open alert",
+      "advice": "What to check"
     },
     "dashboard": {
       "latestRunAgo": "Latest run {time}",

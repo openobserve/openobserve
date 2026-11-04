@@ -15,9 +15,9 @@
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { raw, type I18nKey, type I18nText } from "@/types/i18n";
-import type { InsightAction, ReviewFocus, RuleId } from "./digests";
+import type { DigestRecord, InsightAction, ReviewFocus, RuleId } from "./digests";
 
-export type EvidenceFormat = "count" | "ratio" | "seconds" | "text" | "boolean";
+export type EvidenceFormat = "count" | "ratio" | "seconds" | "text" | "boolean" | "time";
 
 export interface EvidenceField {
   column: `evidence_${string}`;
@@ -57,6 +57,10 @@ export const RULE_IDS: RuleId[] = [
 ];
 
 export const isRuleId = (value: string): value is RuleId => (RULE_IDS as string[]).includes(value);
+
+/** Why a version-2 `failure` record's alert cannot fire, as AutoObserve's definition check found it. */
+export type NotWorkingPattern =
+  "stream_missing" | "field_missing" | "ignored_matcher" | "empty_scope" | "source_inactive";
 
 export const RULE_META: Record<RuleId, RuleMeta> = {
   failure: {
@@ -231,6 +235,98 @@ export const RULE_META: Record<RuleId, RuleMeta> = {
   },
 };
 
+const CHECKED_AT: EvidenceField = {
+  column: "evidence_notworking_checked_at_micros",
+  labelKey: "alertCalibration.evidence.checkedAt",
+  format: "time",
+};
+const NOT_WORKING_ERRORS: EvidenceField[] = [
+  {
+    column: "evidence_notworking_evaluation_errors",
+    labelKey: "alertCalibration.evidence.errors",
+    format: "count",
+  },
+  {
+    column: "evidence_notworking_evaluations",
+    labelKey: "alertCalibration.evidence.evaluations",
+    format: "count",
+  },
+];
+const STREAM: EvidenceField = {
+  column: "evidence_notworking_stream",
+  labelKey: "alertCalibration.evidence.stream",
+  format: "text",
+};
+
+/** The rows each definition-check pattern shows, in the evidence grid the card already has (spec §4). */
+export const PATTERN_EVIDENCE: Record<NotWorkingPattern, EvidenceField[]> = {
+  stream_missing: [STREAM, ...NOT_WORKING_ERRORS, CHECKED_AT],
+  field_missing: [
+    {
+      column: "evidence_notworking_field",
+      labelKey: "alertCalibration.evidence.field",
+      format: "text",
+    },
+    ...NOT_WORKING_ERRORS,
+    CHECKED_AT,
+  ],
+  ignored_matcher: [
+    {
+      column: "evidence_notworking_field",
+      labelKey: "alertCalibration.evidence.label",
+      format: "text",
+    },
+    CHECKED_AT,
+  ],
+  empty_scope: [CHECKED_AT],
+  source_inactive: [
+    STREAM,
+    {
+      column: "evidence_notworking_last_data_at_micros",
+      labelKey: "alertCalibration.evidence.lastDataAt",
+      format: "time",
+    },
+    CHECKED_AT,
+  ],
+};
+
+const isNotWorkingPattern = (value: unknown): value is NotWorkingPattern =>
+  typeof value === "string" && Object.hasOwn(PATTERN_EVIDENCE, value);
+
+/** A version-2 `failure` record with a pattern is AutoObserve's definition finding, shown as far as it was stated. */
+export const evidenceFor = (record: DigestRecord & { rule_id: RuleId }): EvidenceField[] =>
+  record.rule_id === "failure" &&
+  (record.schema_version ?? 1) >= 2 &&
+  isNotWorkingPattern(record.pattern)
+    ? PATTERN_EVIDENCE[record.pattern].filter((field) => record[field.column] != null)
+    : RULE_META[record.rule_id].evidence;
+
+/** Version 2 reports a broken alert under `failure`; historical runs keep their legacy label (M2). */
+export const ruleLabelKey = (rule: RuleId, version: number): I18nKey =>
+  rule === "failure" && version >= 2
+    ? "alertCalibration.rules.notWorking"
+    : RULE_META[rule].labelKey;
+
+/** The advice codes a `failure` finding carries (ENT not_working.rs `advice`), in AutoObserve's words. */
+export const ADVICE_LABEL: Record<string, I18nKey> = {
+  check_missing_stream: "alertCalibration.advice.checkMissingStream",
+  check_missing_field: "alertCalibration.advice.checkMissingField",
+  check_ignored_label: "alertCalibration.advice.checkIgnoredLabel",
+  check_filter_values: "alertCalibration.advice.checkFilterValues",
+  confirm_quiet_source: "alertCalibration.advice.confirmQuietSource",
+};
+
+/** Limitation codes (ENT not_working.rs `LIMIT_*`). */
+export const LIMITATION_LABEL: Record<string, I18nKey> = {
+  quiet_source: "alertCalibration.limitation.quietSource",
+  scan_truncated: "alertCalibration.limitation.scanTruncated",
+};
+
+/** Quality-reason codes (ENT not_working.rs `QUALITY_SCAN_TRUNCATED`). */
+export const QUALITY_REASON_LABEL: Record<string, I18nKey> = {
+  scan_truncated: "alertCalibration.qualityReason.scanTruncated",
+};
+
 export type ProposedAction =
   | "RaiseThreshold"
   | "LengthenEvaluationWindow"
@@ -292,6 +388,7 @@ export const isProposedAction = (name: string): name is ProposedAction => name i
 /** A v2 action's button label, by type and then focus; the design maps them one to one (D:L289-300). */
 export const INSIGHT_ACTION_LABEL: {
   review_alert: Record<ReviewFocus | "unfocused", I18nKey>;
+  review_source: I18nKey;
   review_platform: I18nKey;
 } = {
   review_alert: {
@@ -301,17 +398,23 @@ export const INSIGHT_ACTION_LABEL: {
     threshold: "alertCalibration.insightActions.reviewThreshold",
     grouping: "alertCalibration.insightActions.reviewGrouping",
   },
+  review_source: "alertCalibration.insightActions.reviewSource",
   review_platform: "alertCalibration.insightActions.inspectPlatform",
 };
 
-export const insightActionLabel = (action: InsightAction): I18nKey =>
-  action.type === "review_platform"
-    ? INSIGHT_ACTION_LABEL.review_platform
-    : INSIGHT_ACTION_LABEL.review_alert[action.focus ?? "unfocused"];
+export function insightActionLabel(action: InsightAction): I18nKey {
+  if (action.type === "review_platform") return INSIGHT_ACTION_LABEL.review_platform;
+  if (action.type === "review_source") return INSIGHT_ACTION_LABEL.review_source;
+  return INSIGHT_ACTION_LABEL.review_alert[action.focus ?? "unfocused"];
+}
+
+/** Version 2 writes no silent finding, so an always-empty Silent group would read as a clearance (Q2). */
+export const rulesOfVersion = (version: number): RuleId[] =>
+  RULE_IDS.filter((rule) => rule !== "silent" || version < 2);
 
 /** A cluster-wide rule never runs for an ordinary org, so it is shown only in `_meta`. */
-export const rulesShownFor = (orgId: string): RuleId[] =>
-  RULE_IDS.filter((rule) => !RULE_META[rule].clusterWide || orgId === META_ORG_ID);
+export const rulesShownFor = (orgId: string, version = 1): RuleId[] =>
+  rulesOfVersion(version).filter((rule) => !RULE_META[rule].clusterWide || orgId === META_ORG_ID);
 
 /** Rules whose `min_history` the window cannot cover, so every run declines them for every alert. */
 export const rulesStarvedBy = (windowMinutes: number): RuleId[] =>

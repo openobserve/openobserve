@@ -51,9 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t(QUALITY_LABEL[quality]) }}
           </OBadge>
-          <OBadge variant="default-outline" size="xs" shape="rounded">{{
-            t(meta.labelKey)
-          }}</OBadge>
+          <OBadge
+            variant="default-outline"
+            size="xs"
+            shape="rounded"
+            data-test="alert-calibration-finding-rule"
+            >{{ t(ruleLabelKey(finding.rule_id, schemaVersion(finding))) }}</OBadge
+          >
         </div>
         <OText
           v-if="qualityReasons"
@@ -103,6 +107,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText v-for="(line, index) in limitations" :key="index" variant="meta" as="div">{{
           line
         }}</OText>
+      </div>
+
+      <div v-if="advice" class="flex flex-col gap-0.5" data-test="alert-calibration-finding-advice">
+        <OText variant="label" as="div">{{ t("alertCalibration.detail.advice") }}</OText>
+        <OText variant="meta" as="div">{{ advice }}</OText>
       </div>
 
       <div v-if="lagLists.length" class="grid gap-3 lg:grid-cols-2">
@@ -181,6 +190,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import {
+  adviceOf,
   insightActionsOf,
   limitationsOf,
   parseLagRows,
@@ -189,7 +199,14 @@ import {
   type FindingRecord,
   type LagRow,
 } from "./digests";
-import { ACTION_META, insightActionLabel, isProposedAction, RULE_META } from "./rules";
+import {
+  ACTION_META,
+  evidenceFor,
+  insightActionLabel,
+  isProposedAction,
+  RULE_META,
+  ruleLabelKey,
+} from "./rules";
 import {
   CONFIDENCE_LABEL,
   formatEvidence,
@@ -224,10 +241,11 @@ const quality = computed(() => {
   const value = props.finding.quality;
   return isDegradedQuality(value) ? value : null;
 });
-const limitations = computed(() => limitationsOf(props.finding));
+const limitations = computed(() => limitationsOf(t, props.finding));
+const advice = computed(() => adviceOf(t, props.finding));
 /** Usable evidence has no badge, so its reasons would explain nothing on screen. */
 const qualityReasons = computed(() => {
-  const reasons = quality.value ? qualityReasonsOf(props.finding) : [];
+  const reasons = quality.value ? qualityReasonsOf(t, props.finding) : [];
   if (reasons.length === 0) return null;
   const list = new Intl.ListFormat(locale.value, { type: "conjunction" }).format(reasons);
   return t("alertCalibration.detail.qualityReasons", { reasons: raw(list) }, reasons.length);
@@ -244,7 +262,7 @@ const openAlert = () => {
 };
 
 const evidence = computed(() =>
-  meta.value.evidence.map((field) => ({
+  evidenceFor(props.finding).map((field) => ({
     column: field.column,
     label: t(field.labelKey),
     value: formatEvidence(t, props.finding[field.column], field.format),

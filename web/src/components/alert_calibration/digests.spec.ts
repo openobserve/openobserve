@@ -16,6 +16,8 @@
 import { describe, expect, it } from "vitest";
 import { gt } from "@/types/i18n";
 import {
+  adviceOf,
+  coverageNoteRows,
   coverageNotes,
   coverageVerdict,
   findingsByRule,
@@ -42,7 +44,7 @@ import {
   skipReasonLabel,
   splitMinutes,
 } from "./format";
-import { rulesShownFor } from "./rules";
+import { evidenceFor, ruleLabelKey, rulesShownFor } from "./rules";
 
 const run = (overrides: Partial<RunRow> = {}): RunRow => ({
   window_start: 100,
@@ -151,10 +153,14 @@ describe("a run pulled again", () => {
     ]);
   });
 
-  it("reads a finding's limitations out of the one column ingestion stringified", () => {
-    expect(limitationsOf(record({ limitations: JSON.stringify(["a", "b"]) }))).toEqual(["a", "b"]);
-    expect(limitationsOf(record())).toEqual([]);
-    expect(limitationsOf(record({ limitations: "plain" }))).toEqual(["plain"]);
+  it("names a finding's limitation codes in words and drops any code it does not know", () => {
+    const codes = JSON.stringify(["quiet_source", "made_up", "scan_truncated"]);
+    expect(limitationsOf(gt, record({ limitations: codes }))).toEqual([
+      "A quiet source can be a batch or cron job that is idle by design.",
+      "Wider searches timed out, so the empty answer covers less than the full 7 days.",
+    ]);
+    expect(limitationsOf(gt, record())).toEqual([]);
+    expect(limitationsOf(gt, record({ limitations: "plain" }))).toEqual([]);
   });
 });
 
@@ -171,6 +177,38 @@ describe("a run's verdict", () => {
     expect(
       coverageVerdict(run({ coverage_gap: true, coverage_stream_substrate_empty: true })),
     ).toBe("none");
+  });
+
+  it("a_v2_run_hides_the_silent_group_and_explains_definition_checks", () => {
+    const rows = (overrides: Partial<RunRow>) =>
+      coverageNoteRows(gt, run(overrides)).map((n) => [n.text, n.gap]);
+    expect(rows({ coverage_definition_checks: "unavailable" })).toEqual([
+      ["Alert definition checks need AutoObserve, which is off. The other checks ran.", false],
+    ]);
+    expect(rows({ coverage_definition_checks: "not_yet" })).toEqual([
+      [
+        "AutoObserve has not checked alert definitions in the last day, so they were not judged.",
+        true,
+      ],
+    ]);
+    expect(rows({ coverage_definition_checks: "failed" })).toEqual([
+      ["Alert definition checks could not be read, so they were not judged.", true],
+    ]);
+    expect(
+      rows({ coverage_definition_checks: "checked", coverage_definition_checks_truncated: true }),
+    ).toEqual([
+      [
+        "Alert definition check results were truncated, so alerts past the cut were not judged.",
+        true,
+      ],
+    ]);
+    expect(rows({ coverage_definition_checks: "checked" })).toEqual([]);
+    expect(rows({ coverage_definition_checks: "later" as never })).toEqual([]);
+    expect(rulesShownFor("default", 2)).not.toContain("silent");
+    expect(rulesShownFor("default", 1)).toContain("silent");
+    expect(ruleLabelKey("failure", 2)).toBe("alertCalibration.rules.notWorking");
+    expect(ruleLabelKey("failure", 1)).toBe("alertCalibration.rules.failure");
+    expect(ruleLabelKey("noise", 2)).toBe("alertCalibration.rules.noise");
   });
 
   it("names every coverage column off its default, in words", () => {
@@ -246,6 +284,9 @@ describe("the formatting", () => {
     expect(formatEvidence(gt, true, "boolean")).toBe("Yes");
     expect(formatEvidence(gt, false, "boolean")).toBe("No");
     expect(formatEvidence(gt, undefined, "boolean")).toBe("—");
+    const micros = new Date(2026, 10, 4, 9, 30).getTime() * 1000;
+    expect(formatEvidence(gt, micros, "time")).toBe("Nov 4, 09:30");
+    expect(formatEvidence(gt, undefined, "time")).toBe("—");
   });
 });
 
@@ -254,7 +295,10 @@ describe("a skip's reason", () => {
     expect(skipReasonLabel(gt, "incomplete_or_silence_censored_history")).toBe(
       "History incomplete or paused by a silence, so episode lengths are not real",
     );
-    expect(skipReasonLabel(gt, "healthy_silence")).toBe("Another reason");
+    expect(skipReasonLabel(gt, "healthy_silence")).toBe(
+      "Ran cleanly and never fired; quiet is not a problem by itself",
+    );
+    expect(skipReasonLabel(gt, "a_later_reason")).toBe("Another reason");
   });
 
   it("names a known signal in its detail, and any other detail generically", () => {
@@ -341,16 +385,80 @@ describe("a version-2 finding's typed columns", () => {
     expect(insightActionsOf(v2({}))).toEqual([]);
   });
 
-  it("reads the quality reasons out of their one column, keeping only text", () => {
+  it("names the quality reason codes it knows and drops anything else", () => {
     expect(
-      qualityReasonsOf(
-        v2({ quality_reasons: JSON.stringify(["Counters truncated", 3, "Late rows"]) }),
-      ),
-    ).toEqual(["Counters truncated", "Late rows"]);
-    expect(qualityReasonsOf(v2({ quality_reasons: ["Counters truncated"] }))).toEqual([
-      "Counters truncated",
+      qualityReasonsOf(gt, v2({ quality_reasons: JSON.stringify(["scan_truncated", 3, "x"]) })),
+    ).toEqual(["wider searches timed out"]);
+    expect(qualityReasonsOf(gt, v2({ quality_reasons: ["scan_truncated"] }))).toEqual([
+      "wider searches timed out",
     ]);
-    expect(qualityReasonsOf(v2({ quality_reasons: "plain" }))).toEqual(["plain"]);
-    expect(qualityReasonsOf(v2({}))).toEqual([]);
+    expect(qualityReasonsOf(gt, v2({ quality_reasons: "plain" }))).toEqual([]);
+    expect(qualityReasonsOf(gt, v2({}))).toEqual([]);
+  });
+
+  it("names an advice code and nothing for an unknown one", () => {
+    expect(adviceOf(gt, v2({ advice: "confirm_quiet_source" }))).toBe(
+      "Confirm whether this source is expected to be quiet before changing the alert.",
+    );
+    expect(adviceOf(gt, v2({ advice: "made_up" }))).toBeNull();
+    expect(adviceOf(gt, v2({}))).toBeNull();
+  });
+
+  it("keeps a review_source action only with both of its names", () => {
+    const insight_actions = JSON.stringify([
+      { type: "review_source", stream_type: "logs", stream_name: "batch_logs" },
+      { type: "review_source", stream_type: "logs" },
+      { type: "review_source", stream_type: 1, stream_name: "x" },
+    ]);
+    expect(insightActionsOf(v2({ insight_actions }))).toEqual([
+      { type: "review_source", stream_type: "logs", stream_name: "batch_logs" },
+    ]);
+  });
+
+  it("shows a pattern's evidence for a v2 failure, and the error counts otherwise", () => {
+    const columns = (r: DigestRecord) =>
+      evidenceFor({ ...r, rule_id: "failure" }).map((f) => f.column);
+    const quiet = v2({
+      pattern: "source_inactive",
+      evidence_notworking_stream: "logs/batch_logs",
+      evidence_notworking_last_data_at_micros: 1_761_300_000_000_000,
+      evidence_notworking_checked_at_micros: 1_762_000_000_000_000,
+    });
+    expect(columns(quiet)).toEqual([
+      "evidence_notworking_stream",
+      "evidence_notworking_last_data_at_micros",
+      "evidence_notworking_checked_at_micros",
+    ]);
+    // A row that names no stream shows no empty Stream cell.
+    const missing = v2({
+      pattern: "stream_missing",
+      evidence_notworking_evaluation_errors: 33,
+      evidence_notworking_evaluations: 33,
+      evidence_notworking_checked_at_micros: 1_762_000_000_000_000,
+    });
+    expect(columns(missing)).toEqual([
+      "evidence_notworking_evaluation_errors",
+      "evidence_notworking_evaluations",
+      "evidence_notworking_checked_at_micros",
+    ]);
+    expect(columns(v2({}))).toContain("evidence_failure_error_ratio");
+    expect(columns(v2({ pattern: "future" }))).toContain("evidence_failure_error_ratio");
+    expect(columns(record({ pattern: "stream_missing" }))).toContain(
+      "evidence_failure_error_ratio",
+    );
+  });
+
+  it("carries the run's version and definition checks out of its own records", () => {
+    const { run: identity } = latestEmission([
+      record({
+        schema_version: 2,
+        kind: "run",
+        coverage_definition_checks: "not_yet",
+        coverage_definition_checks_truncated: false,
+      }),
+    ]);
+    expect(identity?.schema_version).toBe(2);
+    expect(identity?.coverage_definition_checks).toBe("not_yet");
+    expect(identity?.coverage_definition_checks_truncated).toBe(false);
   });
 });

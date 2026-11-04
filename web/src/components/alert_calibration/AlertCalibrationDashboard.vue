@@ -89,9 +89,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <section class="flex flex-col gap-2">
         <OStatStrip :items="latestStats" data-test="alert-calibration-dashboard-latest" />
-        <OText v-for="note in coverageNotes(t, latest)" :key="note" variant="meta" as="p">{{
-          note
-        }}</OText>
+        <OText
+          v-for="note in coverageNoteRows(t, latest)"
+          :key="note.text"
+          variant="meta"
+          as="p"
+          :data-test="
+            note.gap ? 'alert-calibration-dashboard-gap-note' : 'alert-calibration-dashboard-note'
+          "
+        >
+          <!-- OText's meta colour wins over a class on it, so the amber sits on the text. -->
+          <span :class="note.gap ? 'text-status-warning-text' : ''">{{ note.text }}</span>
+        </OText>
       </section>
 
       <section class="flex flex-col gap-3" data-test="alert-calibration-dashboard-attention">
@@ -129,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCollapsible :icon="RULE_META[group.rule_id].icon" trigger-class="px-4 py-3">
             <template #trigger>
               <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium">
-                {{ t(RULE_META[group.rule_id].labelKey) }}
+                {{ t(ruleLabelKey(group.rule_id, version)) }}
               </span>
               <OBadge
                 v-if="group.severity"
@@ -148,8 +157,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{
                   t(
                     "alertCalibration.dashboard.alertsFlagged",
-                    { count: group.findings.length },
-                    group.findings.length,
+                    { count: alertCount(group.findings) },
+                    alertCount(group.findings),
                   )
                 }}
               </OBadge>
@@ -166,7 +175,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ul class="divide-border-default flex flex-col divide-y">
                 <li
                   v-for="finding in group.findings"
-                  :key="finding.alert_id ?? finding.alert_name ?? finding.rule_id"
+                  :key="
+                    finding.finding_id ?? finding.alert_id ?? finding.alert_name ?? finding.rule_id
+                  "
                   class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2"
                   :data-test="`alert-calibration-dashboard-alert-${finding.alert_id}`"
                 >
@@ -235,7 +246,7 @@ import AlertCalibrationActions from "./AlertCalibrationActions.vue";
 import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
-  coverageNotes,
+  coverageNoteRows,
   coverageVerdict,
   findingsByRule,
   latestEmission,
@@ -250,7 +261,7 @@ import {
   type RunRow,
 } from "./digests";
 import { COVERAGE_BADGE, SEVERITY_BADGE, SEVERITY_LABEL } from "./format";
-import { RULE_META, rulesShownFor } from "./rules";
+import { RULE_META, ruleLabelKey, rulesShownFor } from "./rules";
 
 const { t } = useI18nTyped();
 useLeaveIfAlertCalibrationOff("alertList");
@@ -272,16 +283,22 @@ const data = useLatestRead(async () => {
     window_start: run.window_start,
     window_end: run.window_end,
   });
-  return { latest: run, findings: latestEmission(hits).findings };
+  const emission = latestEmission(hits);
+  // The runs list selects fixed columns, so the run's own records carry its version and newer coverage.
+  return { latest: emission.run ?? run, findings: emission.findings };
 });
 
 const loading = computed(
   () => configQuery.isPending.value || (data.loading.value && !data.data.value),
 );
 const latest = computed(() => data.data.value?.latest ?? null);
+const version = computed(() => latest.value?.schema_version ?? 1);
 const groups = computed(() =>
-  findingsByRule(rulesShownFor(orgId.value), data.data.value?.findings ?? []),
+  findingsByRule(rulesShownFor(orgId.value, version.value), data.data.value?.findings ?? []),
 );
+/** One alert can hold two findings of a rule, such as its errors and its missing source. */
+const alertCount = (findings: FindingRecord[]) =>
+  new Set(findings.map((f) => f.alert_id ?? f.alert_name)).size;
 
 const latestStats = computed<StatItem[]>(() => {
   const run = latest.value;
