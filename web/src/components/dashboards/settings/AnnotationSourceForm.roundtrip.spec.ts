@@ -116,7 +116,7 @@ describe("annotation source filters: untouched sources save unchanged", () => {
 
   it("builds SQL for every new operator", () => {
     expect(buildAnnotationFiltersSql(FIXTURES["new operators, list as JSON text"])).toBe(
-      "env IN ('prod', 'stage') AND str_match_ignore_case(msg, 'Err') AND re_match(path, '^/api')",
+      "env IN ('prod', 'stage') AND str_match_ignore_case(msg, 'Err') AND regexp_like(path, '^/api')",
     );
     const more = {
       filterType: "group" as const,
@@ -130,7 +130,7 @@ describe("annotation source filters: untouched sources save unchanged", () => {
       ],
     };
     expect(buildAnnotationFiltersSql(more)).toBe(
-      "env NOT IN ('dev') AND path LIKE '/v1%' OR file LIKE '%.js' AND re_not_match(msg, 'debug') AND (a IS NULL OR a = '')",
+      "env NOT IN ('dev') AND path LIKE '/v1%' OR file LIKE '%.js' AND NOT regexp_like(msg, 'debug') AND (a IS NULL OR a = '')",
     );
   });
 
