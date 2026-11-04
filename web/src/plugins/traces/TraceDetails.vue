@@ -447,6 +447,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-critical-path-toggle"
               @update:model-value="setShowCriticalPath"
             />
+            <OButton
+              v-if="activeTab === 'waterfall' && askAiVisible"
+              variant="outline"
+              size="sm"
+              class="h-8! text-xs font-normal!"
+              data-test="trace-explain-trace-btn"
+              @click="explainTrace"
+            >
+              <template #icon-left>
+                <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+              </template>
+              {{ t("traces.askAi.explainTrace") }}
+              <OTooltip side="bottom" :content="t('traces.askAi.explainTraceHint')" />
+            </OButton>
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
@@ -685,6 +699,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
                   :show-annotate-buttons="canAnnotate"
+                  :show-ask-ai="askAiVisible"
+                  @send-to-ai-chat="relayToAiChat"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
@@ -749,6 +765,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
                   :show-annotate-buttons="canAnnotate"
+                  :show-ask-ai="askAiVisible"
+                  @send-to-ai-chat="relayToAiChat"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
@@ -829,6 +847,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
                   :show-annotate-buttons="canAnnotate"
+                  :show-ask-ai="askAiVisible"
+                  @send-to-ai-chat="relayToAiChat"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
@@ -882,12 +902,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <!-- Chart Container -->
-              <div class="min-h-0 flex-1 overflow-hidden p-2.5">
+              <div class="relative min-h-0 flex-1 overflow-hidden p-2.5">
                 <ChartRenderer
                   ref="chartRendererRef"
                   data-test="trace-details-service-map-chart"
                   :data="traceServiceMapChartOptions"
+                  :key="traceGraphChartKey"
                   class="h-full"
+                />
+                <ChartZoomControls
+                  v-if="traceGraphHasChart"
+                  data-test-prefix="trace-graph"
+                  @zoom-in="zoomTraceGraphIn"
+                  @zoom-out="zoomTraceGraphOut"
+                  @fit="fitTraceGraph"
                 />
               </div>
             </div>
@@ -990,6 +1018,8 @@ import TraceDAG from "./TraceDAG.vue";
 import TraceHeader from "./TraceHeader.vue";
 import TraceErrorSpansMenu from "./components/TraceErrorSpansMenu.vue";
 import { errorSpansDeepestFirst } from "./utils/traceErrorSummary";
+import { buildTraceAiPayload, type AiChatHandoff } from "./utils/traceAiPayload";
+import { useAiIcon } from "@/composables/useAiIcon";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
@@ -1016,7 +1046,7 @@ import {
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
-import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
+import { buildPathPatterns, buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
 import type { TreeNode as PatternTreeNode } from "@/composables/useTreeVisualization";
 import type { EnrichedSpan } from "@/ts/interfaces/traces/span.types";
@@ -1074,6 +1104,8 @@ import {
 import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
 import { useServiceCorrelation, type KeyFieldsConfig } from "@/composables/useServiceCorrelation";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
+import ChartZoomControls from "@/components/traces/ChartZoomControls.vue";
+import useChartZoom from "@/composables/traces/useChartZoom";
 
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(() => import("@/components/traces/FlameGraphView.vue"));
@@ -1278,6 +1310,11 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    // Only the routed Traces page has a listener for sendToAiChat; embeds leave this off.
+    showAskAi: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     ShareButton,
@@ -1289,6 +1326,7 @@ export default defineComponent({
     TraceHeader,
     TraceErrorSpansMenu,
     FlameGraphView,
+    ChartZoomControls,
     OToggleGroup,
     OToggleGroupItem,
     OButton,
@@ -1311,7 +1349,7 @@ export default defineComponent({
     AddToDatasetDrawer,
   },
 
-  emits: ["searchQueryUpdated", "close", "spanSelected"],
+  emits: ["searchQueryUpdated", "close", "spanSelected", "sendToAiChat"],
   setup(props, { emit }) {
     const serviceDetectionConfig = ref<ServiceDetectionConfig | null>(null);
     provide(TRACE_SERVICE_DETECTION_KEY, serviceDetectionConfig);
@@ -1342,6 +1380,18 @@ export default defineComponent({
 
     // Chart renderer ref for tooltip integration
     const chartRendererRef = ref<any>(null);
+    // Recreating the chart drops the tree view's hover listeners, so fit re-attaches them.
+    const {
+      chartKey: traceGraphChartKey,
+      zoomIn: zoomTraceGraphIn,
+      zoomOut: zoomTraceGraphOut,
+      fitToScreen: fitTraceGraph,
+    } = useChartZoom(
+      () => chartRendererRef.value?.chart,
+      () => {
+        setupTooltips();
+      },
+    );
     // The tree view's span sidebar; it owns the correlation lookup.
     const treeSidebarRef = ref<any>(null);
 
@@ -1365,6 +1415,7 @@ export default defineComponent({
 
     // Pattern View - new functionality
     const consolidatedPatterns = ref(new Map());
+    const tracePathPatterns = ref(new Map());
     const { isDark: isDarkMode } = useTheme();
 
     // Set up pattern tree composable and visualization engine
@@ -1374,7 +1425,10 @@ export default defineComponent({
       getNodeLabel: getPatternNodeLabel,
       getNodeTooltip: getPatternNodeTooltip,
       getNodeErrorRate: getPatternNodeErrorRate,
-    } = useTracePatternTree(consolidatedPatterns, isDarkMode);
+    } = useTracePatternTree(consolidatedPatterns, isDarkMode, tracePathPatterns);
+    const traceGraphTree = computed(() =>
+      filterTraceTree(patternTreeData.value, traceGraphSearch.value),
+    );
 
     // Computed chart options that switches between pattern and span views
     const traceServiceMapChartOptions = computed(() => {
@@ -1436,7 +1490,7 @@ export default defineComponent({
         errorRate: node.errorRate ?? 0,
         metadata: node.metadata,
       });
-      const treeData = filterTraceTree(patternTreeData.value, traceGraphSearch.value);
+      const treeData = traceGraphTree.value;
       // ECharts' tree series throws on empty data and leaves the chart stuck until reload.
       if (!treeData.length) return { options: {}, notMerge: true };
       const chartOptions = generateEChartsOptions(
@@ -1461,6 +1515,10 @@ export default defineComponent({
         lazyUpdate: true,
       };
     });
+
+    const traceGraphHasChart = computed(
+      () => !!(traceServiceMapChartOptions.value.options as { series?: unknown }).series,
+    );
 
     const spanDimensions = {
       height: 30,
@@ -2091,6 +2149,29 @@ export default defineComponent({
       },
     );
 
+    const { aiIconSrc } = useAiIcon();
+    const askAiVisible = computed(
+      () => props.showAskAi && config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
+    );
+
+    const relayToAiChat = (payload: AiChatHandoff) => emit("sendToAiChat", payload);
+
+    const explainTrace = () => {
+      const trace = searchObj.data.traceDetails.selectedTrace;
+      const criticalPath = computeCriticalPathForRoots(traceTree.value.map(toCriticalPathNode));
+      relayToAiChat(
+        buildTraceAiPayload(t, {
+          spans: effectiveSpanList.value,
+          criticalPathSpanIds: criticalPath.map((section) => section.spanId),
+          rootOperation: String(traceTree.value[0]?.operationName ?? ""),
+          traceId: effectiveTraceId.value,
+          stream: currentTraceStreamName.value,
+          traceStartTime: Number(trace?.trace_start_time) || 0,
+          traceEndTime: Number(trace?.trace_end_time) || 0,
+        }),
+      );
+    };
+
     const setShowCriticalPath = (value: unknown) => {
       showCriticalPath.value = value === true;
       try {
@@ -2151,7 +2232,10 @@ export default defineComponent({
           tooltipCleanup = setupTraceNodeTooltips(
             chart,
             {
-              treeData: patternTreeData.value,
+              // A getter, so a hover resolves its tree path in the tree the chart draws now, even after a search.
+              get treeData() {
+                return traceGraphTree.value;
+              },
               getNodeTooltip: getPatternNodeTooltip,
               getNodeErrorRate: getPatternNodeErrorRate,
             } as TreeVisualizationData,
@@ -2871,6 +2955,7 @@ export default defineComponent({
       });
 
       // Build consolidated patterns for pattern view
+      tracePathPatterns.value = buildPathPatterns(traceTree.value);
       consolidatedPatterns.value = buildPatternConsolidatedTree(traceTree.value);
       // console.log('[DEBUG] consolidatedPatterns size:', consolidatedPatterns.value?.size || 0);
       // console.log('[DEBUG] consolidatedPatterns keys:', Array.from(consolidatedPatterns.value?.keys() || []));
@@ -3396,6 +3481,10 @@ export default defineComponent({
       raw,
       showCriticalPath,
       setShowCriticalPath,
+      aiIconSrc,
+      askAiVisible,
+      relayToAiChat,
+      explainTrace,
       traceGraphView,
       setTraceGraphView,
       traceGraphSearch,
@@ -3435,6 +3524,11 @@ export default defineComponent({
       traceServiceMap,
       traceServiceMapChartOptions,
       chartRendererRef,
+      traceGraphChartKey,
+      traceGraphHasChart,
+      zoomTraceGraphIn,
+      zoomTraceGraphOut,
+      fitTraceGraph,
       treeSidebarRef,
       activeVisual,
       traceVisuals,

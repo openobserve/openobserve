@@ -203,10 +203,9 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
-import useDurationPercentiles, {
-  parseDurationWhereClause,
-} from "@/composables/useDurationPercentiles";
-import { SPAN_KIND_MAP, parseSpanKindWhereClause } from "@/utils/traces/constants";
+import useDurationPercentiles from "@/composables/useDurationPercentiles";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
@@ -422,19 +421,8 @@ export default defineComponent({
     const buildFieldValuesSql = (fieldName: string): string => {
       // The whole editor value is the where clause — never split it on "|", the
       // split is quote-unaware and would truncate match_all('text | error').
-      let whereClause = searchObj.data.editorValue.trim();
-
-      const durationParseResult = parseDurationWhereClause(
-        whereClause,
-        tracesParser.value,
-        searchObj.data.stream.selectedStream.value,
-      );
-      if (typeof durationParseResult === "string") {
-        whereClause = durationParseResult;
-      }
-
-      whereClause = parseSpanKindWhereClause(
-        whereClause,
+      const whereClause = resolveTracesFilter(
+        searchObj.data.editorValue,
         tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );

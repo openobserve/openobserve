@@ -348,6 +348,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         </OButton>
 
+        <!-- Only in viewOnly, so it can never sit beside the panel's own Create alert. -->
+        <ODropdown v-if="viewOnly && exploreActions" side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              :aria-label="t('dashboard.moreActions')"
+              variant="ghost"
+              size="icon"
+              data-test="panel-explore-actions-btn"
+            >
+              <OIcon name="more-vert" size="sm" />
+            </OButton>
+          </template>
+          <ODropdownItem
+            data-test="panel-explore-create-alert"
+            icon-left="shield-alert-outline"
+            @select="$emit('exploreCreateAlert', props.data)"
+          >
+            {{ t("dashboard.panelContainer.exploreCreateAlert") }}
+          </ODropdownItem>
+          <ODropdownItem
+            data-test="panel-explore-add-to-dashboard"
+            icon-left="dashboard"
+            @select="$emit('exploreAddToDashboard', props.data)"
+          >
+            {{ t("dashboard.panelContainer.exploreAddToDashboard") }}
+          </ODropdownItem>
+        </ODropdown>
         <!-- Dropdown menu (shown when simplifiedPanelView is false) -->
         <ODropdown side="bottom" align="end" v-if="!viewOnly && !simplifiedPanelView">
           <template #trigger>
@@ -747,6 +774,8 @@ export default defineComponent({
     "update:runId",
     "contextmenu",
     "sendToAiChat",
+    "exploreCreateAlert",
+    "exploreAddToDashboard",
   ],
   props: [
     "data",
@@ -775,6 +804,7 @@ export default defineComponent({
     "injectedPanelData",
     "layoutMode",
     "kiosk",
+    "exploreActions",
   ],
   components: {
     OTag,
