@@ -249,7 +249,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="error" class="text-status-error-text shrink-0" size="md" />
                   <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
-                      <span class="text-status-error-text text-sm font-bold">
+                      <span
+                        class="text-status-error-text text-sm font-bold"
+                        data-test="synthetics-run-detail-error-type"
+                      >
                         {{ currentRun.errorType }}
                       </span>
                       <OBadge
@@ -672,7 +675,7 @@ import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
 import { timestampToTimezoneDate } from "@/utils/timezone";
-import { locationDisplayLabel } from "@/utils/synthetics/format";
+import { errorHeadline, locationDisplayLabel } from "@/utils/synthetics/format";
 import { syntheticsResultsRoute } from "@/utils/synthetics/routes";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -1224,7 +1227,7 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
     hasReplay: false,
     ...(hasIssue
       ? {
-          errorType: detail.error ? detail.error.split(":")[0] : t("synthetics.results.error"),
+          errorType: detail.error ? errorHeadline(detail.error) : t("synthetics.results.error"),
           errorReason: detail.error || "",
           errorStack: detail.error || "",
           errorSource: detail.errorSource,
@@ -1254,7 +1257,7 @@ function errorToDisplayRun(o: OverrideError): DisplayRun {
     timestamp: fmtTimestamp(o.timestamp),
     url: "",
     hasReplay: false,
-    errorType: o.message ? o.message.split(":")[0] : t("synthetics.results.error"),
+    errorType: o.message ? errorHeadline(o.message) : t("synthetics.results.error"),
     errorReason: o.message || "",
     errorStack: o.message || "",
     errorSource: o.errorSource,
