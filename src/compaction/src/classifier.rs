@@ -29,7 +29,10 @@ use config::{
 };
 use infra::{
     cluster::get_node_from_consistent_hash,
-    schema::{get_settings, get_stream_setting_dynamic_partition, unwrap_stream_created_at},
+    schema::{
+        get_settings, get_stream_setting_dynamic_partition, unwrap_stream_created_at,
+        unwrap_stream_settings,
+    },
 };
 
 /// Hashes to the one compactor that runs the classifier.
@@ -154,7 +157,16 @@ async fn classify_stream(
             _ => return Ok(()),
         }
     }
-    let mut settings = (*settings).clone();
+    // the queries took a while: a change made since must survive this write
+    let schema = infra::schema::get_from_db(org_id, stream_name, stream_type).await?;
+    if schema.fields().is_empty() {
+        return Ok(()); // the stream was deleted meanwhile
+    }
+    // a stream ingest created and nobody edited has no stored settings yet
+    let mut settings = unwrap_stream_settings(&schema).unwrap_or_default();
+    if !get_stream_setting_dynamic_partition(stream_type, Some(&settings)) {
+        return Ok(());
+    }
     if settings.partition_time_level.set_level(target, now) {
         schema::save_stream_settings(org_id, stream_name, stream_type, settings).await?;
         log::info!("[COMPACTOR] classify [{org_id}/{stream_type}/{stream_name}] moves to {target}");

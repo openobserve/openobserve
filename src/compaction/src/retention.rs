@@ -575,7 +575,13 @@ async fn prune_partition_time_level(
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
-    let Some(settings) = infra::schema::get_settings(org_id, stream_name, stream_type).await else {
+    let cached = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    if cached.is_none_or(|settings| settings.partition_time_level.changes.len() < 2) {
+        return Ok(());
+    }
+    // a whole-settings write must start from what is stored, not from a cached copy
+    let schema = infra::schema::get_from_db(org_id, stream_name, stream_type).await?;
+    let Some(mut settings) = infra::schema::unwrap_stream_settings(&schema) else {
         return Ok(());
     };
     let Some(cutoff) = level_prune_cutoff(
@@ -585,7 +591,6 @@ async fn prune_partition_time_level(
     ) else {
         return Ok(());
     };
-    let mut settings = (*settings).clone();
     if settings.partition_time_level.prune(cutoff) {
         schema::save_stream_settings(org_id, stream_name, stream_type, settings).await?;
     }
