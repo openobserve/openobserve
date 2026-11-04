@@ -67,7 +67,7 @@ impl FlightDecoderStream {
                 self.query_context.scan_stats.lock().add(&stats);
             }
             CustomMessage::Metrics(metrics) => {
-                self.query_context.cluster_metrics.lock().extend(metrics);
+                self.query_context.node_profile.record_plan(metrics);
             }
             CustomMessage::PeakMemory(peak_memory) => {
                 self.query_context
@@ -191,6 +191,10 @@ impl Stream for FlightDecoderStream {
 
 impl Drop for FlightDecoderStream {
     fn drop(&mut self) {
+        let scan_stats = self.scan_stats;
+        self.query_context
+            .node_profile
+            .finish(&self.metrics, scan_stats);
         let QueryContext {
             trace_id,
             node,
@@ -206,7 +210,6 @@ impl Drop for FlightDecoderStream {
         } else {
             "follower".to_string()
         };
-        let scan_stats = self.scan_stats;
         let batches = self.metrics.batches_received.value();
         let bytes = self.metrics.bytes_received.value();
         let avg_ms = self.metrics.avg_batch_time_ms();

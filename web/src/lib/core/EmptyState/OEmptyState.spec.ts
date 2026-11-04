@@ -221,6 +221,29 @@ describe("OEmptyState", () => {
       expect(wrapper.find("p").exists()).toBe(true);
     });
 
+    it("renders a text-only p title for slim, with no icon or illustration", () => {
+      wrapper = buildWrapper({ size: "slim" });
+
+      expect(wrapper.find("h2").exists()).toBe(false);
+      expect(wrapper.find("p").exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-icon-stub"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="illustration-stub"]').exists()).toBe(false);
+    });
+
+    it("draws no dot-grid backdrop for slim or inline unless asked for", () => {
+      expect(buildWrapper({ size: "slim" }).find('[aria-hidden="true"].absolute').exists()).toBe(
+        false,
+      );
+      expect(buildWrapper({ size: "inline" }).find('[aria-hidden="true"].absolute').exists()).toBe(
+        false,
+      );
+      expect(
+        buildWrapper({ size: "slim", backdrop: true })
+          .find('[aria-hidden="true"].absolute')
+          .exists(),
+      ).toBe(true);
+    });
+
     it("does not render the illustration when size is inline", () => {
       // Arrange & Act — inline never renders the full illustration
       wrapper = buildWrapper({ size: "inline" });
