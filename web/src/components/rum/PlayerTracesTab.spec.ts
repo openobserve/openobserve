@@ -972,11 +972,11 @@ describe("PlayerTracesTab", () => {
           `first_value(CASE WHEN ${routed} THEN operation_name END ORDER BY CASE WHEN ${routed} THEN 0 ELSE 1 END ASC, _timestamp ASC) AS operation_name`,
         );
         // The status: the earliest server span with one (the entry point), per column.
+        // One span answers for both columns: the earliest with either, newer convention first.
+        const status =
+          "COALESCE(CAST(http_response_status_code AS VARCHAR), CAST(http_status_code AS VARCHAR))";
         expect(sql).toContain(
-          "first_value(http_response_status_code ORDER BY CASE WHEN http_response_status_code IS NOT NULL THEN 0 ELSE 1 END ASC, _timestamp ASC) AS server_status_0",
-        );
-        expect(sql).toContain(
-          "first_value(http_status_code ORDER BY CASE WHEN http_status_code IS NOT NULL THEN 0 ELSE 1 END ASC, _timestamp ASC) AS server_status_1",
+          `first_value(${status} ORDER BY CASE WHEN ${status} IS NOT NULL THEN 0 ELSE 1 END ASC, _timestamp ASC) AS server_status`,
         );
         // Not limited to routed spans: a 401 or an unmatched 404 has no route.
         expect(sql).toMatch(/WHERE .* AND span_kind='2' GROUP BY trace_id$/);
@@ -1057,7 +1057,7 @@ describe("PlayerTracesTab", () => {
             {
               trace_id: "trace-abc123def456",
               operation_name: "GET /api/x",
-              server_status_0: "403",
+              server_status: "403",
             },
           ],
         );
@@ -1067,7 +1067,7 @@ describe("PlayerTracesTab", () => {
         expect(statusItem()).toEqual({ errors: 1 });
       });
 
-      it("takes the worse of the two server status columns' entry statuses", async () => {
+      it("reads the entry span's status whichever column carries it", async () => {
         wrapper.unmount();
         withSchemas(["http_response_status_code", "http_status_code"]);
         setupSuccessfulMocks(
@@ -1077,8 +1077,7 @@ describe("PlayerTracesTab", () => {
             {
               trace_id: "trace-abc123def456",
               operation_name: "GET /api/x",
-              server_status_0: null,
-              server_status_1: 500,
+              server_status: "500",
             },
           ],
         );
@@ -1098,7 +1097,7 @@ describe("PlayerTracesTab", () => {
             {
               trace_id: "trace-abc123def456",
               operation_name: "GET /api/x",
-              server_status_0: "200",
+              server_status: "200",
             },
           ],
         );

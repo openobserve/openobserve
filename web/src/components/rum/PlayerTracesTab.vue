@@ -731,16 +731,16 @@ async function fetchTraceMetadata(
   // entry point, which answered the browser (a 404 an internal service returned to the backend is not the
   // request's status). Unrouted spans count, since a request rejected before routing (a 401, an unmatched 404)
   // has no route. The route name still comes from the earliest routed span: routed spans sort first, and a
-  // trace without one gets a null name. Each column gets its own alias, so a string and an integer never meet.
+  // trace without one gets a null name. One span answers for both status columns (a trace can mix
+  // semantic-convention versions across services); they are cast to text, since one may be an integer.
   const routed = `http_route IS NOT NULL AND operation_name IS NOT NULL AND operation_name != ''`;
-  const statusSql = statusColumns.length
-    ? `SELECT trace_id, first_value(CASE WHEN ${routed} THEN operation_name END ORDER BY CASE WHEN ${routed} THEN 0 ELSE 1 END ASC, ${timestamp} ASC) AS operation_name, ${statusColumns
-        .map((column) => quoteSqlIdentifierIfNeeded(column))
-        .map(
-          (column, i) =>
-            `first_value(${column} ORDER BY CASE WHEN ${column} IS NOT NULL THEN 0 ELSE 1 END ASC, ${timestamp} ASC) AS server_status_${i}`,
-        )
-        .join(", ")} FROM ${stream} WHERE ${filter} AND span_kind='2' GROUP BY trace_id`
+  const status = statusColumns.length
+    ? `COALESCE(${statusColumns
+        .map((column) => `CAST(${quoteSqlIdentifierIfNeeded(column)} AS VARCHAR)`)
+        .join(", ")})`
+    : "";
+  const statusSql = status
+    ? `SELECT trace_id, first_value(CASE WHEN ${routed} THEN operation_name END ORDER BY CASE WHEN ${routed} THEN 0 ELSE 1 END ASC, ${timestamp} ASC) AS operation_name, first_value(${status} ORDER BY CASE WHEN ${status} IS NOT NULL THEN 0 ELSE 1 END ASC, ${timestamp} ASC) AS server_status FROM ${stream} WHERE ${filter} AND span_kind='2' GROUP BY trace_id`
     : null;
   const searchOperations = (sql: string) =>
     searchService.search(
@@ -775,10 +775,7 @@ async function fetchTraceMetadata(
       if (metadata[hit.trace_id] && hit.operation_name) {
         metadata[hit.trace_id].httpOperation = hit.operation_name;
       }
-      const serverStatus = Math.max(
-        0,
-        ...statusColumns.map((_, i) => Number(hit[`server_status_${i}`]) || 0),
-      );
+      const serverStatus = Number(hit.server_status) || 0;
       if (metadata[hit.trace_id] && serverStatus > 0) {
         metadata[hit.trace_id].serverStatus = serverStatus;
       }
