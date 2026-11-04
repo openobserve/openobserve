@@ -113,7 +113,7 @@ pub enum MetricKind {
     Other,
 }
 
-/// What the leader saw of one remote node, plus the plan that node ran.
+/// What the caller saw of one remote node, plus the plan that node ran.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RemoteNodeProfile {
     pub partition: usize,
