@@ -55,6 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             t(meta.labelKey)
           }}</OBadge>
         </div>
+        <OText
+          v-if="qualityReasons"
+          variant="meta"
+          as="div"
+          data-test="alert-calibration-finding-quality-reasons"
+        >
+          {{ qualityReasons }}
+        </OText>
       </div>
       <OButton
         v-if="finding.alert_id"
@@ -146,8 +154,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="label" as="div">{{ t("alertCalibration.detail.proposedActions") }}</OText>
         <div
           v-for="action in actions"
-          :key="action.name"
+          :key="action.key"
           class="flex min-w-0 flex-wrap items-baseline gap-x-2"
+          :data-test="`alert-calibration-finding-action-${action.type}`"
         >
           <span class="text-text-body text-xs font-medium">{{ action.label }}</span>
           <OText v-if="action.description" variant="meta" as="span">{{ action.description }}</OText>
@@ -171,11 +180,20 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
-import { limitationsOf, parseLagRows, type FindingRecord, type LagRow } from "./digests";
-import { ACTION_META, isProposedAction, RULE_META } from "./rules";
+import {
+  insightActionsOf,
+  limitationsOf,
+  parseLagRows,
+  qualityReasonsOf,
+  schemaVersion,
+  type FindingRecord,
+  type LagRow,
+} from "./digests";
+import { ACTION_META, insightActionLabel, isProposedAction, RULE_META } from "./rules";
 import {
   CONFIDENCE_LABEL,
   formatEvidence,
+  isDegradedQuality,
   QUALITY_LABEL,
   SEVERITY_BADGE,
   SEVERITY_LABEL,
@@ -191,7 +209,7 @@ const LAG_COLUMNS: { field: keyof LagRow; labelKey: I18nKey }[] = [
   { field: "evaluations", labelKey: "alertCalibration.evidence.evaluations" },
 ];
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 const router = useRouter();
 const orgId = useOrgId();
 
@@ -204,9 +222,16 @@ const tier = computed(() => {
 });
 const quality = computed(() => {
   const value = props.finding.quality;
-  return value && value in QUALITY_LABEL ? value : null;
+  return isDegradedQuality(value) ? value : null;
 });
 const limitations = computed(() => limitationsOf(props.finding));
+/** Usable evidence has no badge, so its reasons would explain nothing on screen. */
+const qualityReasons = computed(() => {
+  const reasons = quality.value ? qualityReasonsOf(props.finding) : [];
+  if (reasons.length === 0) return null;
+  const list = new Intl.ListFormat(locale.value, { type: "conjunction" }).format(reasons);
+  return t("alertCalibration.detail.qualityReasons", { reasons: raw(list) }, reasons.length);
+});
 
 /** A new tab, so the digest stays where it was while the alert is fixed. */
 const openAlert = () => {
@@ -246,22 +271,41 @@ const lagLists = computed(() =>
     .filter((list) => list.rows.length > 0),
 );
 
+interface ActionRow {
+  key: string;
+  type: string;
+  label: I18nText;
+  description?: I18nText;
+}
+
+/** A v2 record carries typed actions only; its `actions` column is never read. */
+const insightActions = (): ActionRow[] =>
+  insightActionsOf(props.finding).map((action, index) => ({
+    key: `${index}`,
+    type: action.type,
+    label: t(insightActionLabel(action)),
+  }));
+
 /** `actions` is comma-joined; an action this build does not know still shows, by its raw name. */
-const actions = computed<{ name: string; label: I18nText; description?: I18nText }[]>(() =>
+const v1Actions = (): ActionRow[] =>
   (props.finding.actions ?? "")
     .split(",")
     .filter(Boolean)
     .map((name) =>
       isProposedAction(name)
         ? {
-            name,
+            key: name,
+            type: name,
             label: t(ACTION_META[name].labelKey),
             description: t(
               ACTION_META[name].descriptionKey,
               ACTION_META[name].descriptionParams ?? {},
             ),
           }
-        : { name, label: raw(name) },
-    ),
+        : { key: name, type: name, label: raw(name) },
+    );
+
+const actions = computed<ActionRow[]>(() =>
+  schemaVersion(props.finding) >= 2 ? insightActions() : v1Actions(),
 );
 </script>

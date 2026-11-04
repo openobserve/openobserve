@@ -15,7 +15,7 @@
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { raw, type I18nKey, type I18nText } from "@/types/i18n";
-import type { RuleId } from "./digests";
+import type { InsightAction, ReviewFocus, RuleId } from "./digests";
 
 export type EvidenceFormat = "count" | "ratio" | "seconds" | "text" | "boolean";
 
@@ -288,6 +288,26 @@ export const ACTION_META: Record<ProposedAction, ActionMeta> = {
 };
 
 export const isProposedAction = (name: string): name is ProposedAction => name in ACTION_META;
+
+/** A v2 action's button label, by type and then focus; the design maps them one to one (D:L289-300). */
+export const INSIGHT_ACTION_LABEL: {
+  review_alert: Record<ReviewFocus | "unfocused", I18nKey>;
+  review_platform: I18nKey;
+} = {
+  review_alert: {
+    unfocused: "alertCalibration.insightActions.reviewAlert",
+    query: "alertCalibration.insightActions.reviewQuery",
+    settings: "alertCalibration.insightActions.reviewSettings",
+    threshold: "alertCalibration.insightActions.reviewThreshold",
+    grouping: "alertCalibration.insightActions.reviewGrouping",
+  },
+  review_platform: "alertCalibration.insightActions.inspectPlatform",
+};
+
+export const insightActionLabel = (action: InsightAction): I18nKey =>
+  action.type === "review_platform"
+    ? INSIGHT_ACTION_LABEL.review_platform
+    : INSIGHT_ACTION_LABEL.review_alert[action.focus ?? "unfocused"];
 
 /** A cluster-wide rule never runs for an ordinary org, so it is shown only in `_meta`. */
 export const rulesShownFor = (orgId: string): RuleId[] =>

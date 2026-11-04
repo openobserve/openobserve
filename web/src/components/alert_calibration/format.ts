@@ -109,6 +109,9 @@ export const QUALITY_LABEL: Record<Exclude<Quality, "usable">, I18nKey> = {
   unavailable: "alertCalibration.quality.unavailable",
 };
 
+export const isDegradedQuality = (value: string | undefined): value is keyof typeof QUALITY_LABEL =>
+  value !== undefined && value in QUALITY_LABEL;
+
 const SKIP_REASON_LABEL: Record<string, I18nKey> = {
   insufficient_history: "alertCalibration.skipReason.insufficientHistory",
   insufficient_samples: "alertCalibration.skipReason.insufficientSamples",
@@ -116,17 +119,45 @@ const SKIP_REASON_LABEL: Record<string, I18nKey> = {
   alert_disabled: "alertCalibration.skipReason.alertDisabled",
   window_too_short: "alertCalibration.skipReason.windowTooShort",
   unsupported_mode: "alertCalibration.skipReason.unsupportedMode",
-  silence_censored_history: "alertCalibration.skipReason.silenceCensoredHistory",
+  incomplete_or_silence_censored_history:
+    "alertCalibration.skipReason.incompleteOrSilenceCensoredHistory",
   no_incident_signal: "alertCalibration.skipReason.noIncidentSignal",
   sentinel_by_design: "alertCalibration.skipReason.sentinelByDesign",
   enrichment_timeout: "alertCalibration.skipReason.enrichmentTimeout",
 };
 
-/** A reason this build does not know still shows, by its stored name. */
-export const skipReasonLabel = (t: TranslateFn, reason: string): I18nText => {
-  const key = SKIP_REASON_LABEL[reason];
-  return key ? t(key) : raw(reason);
+/** A reason from a newer writer is named generically, never by its stored name. */
+export const skipReasonLabel = (t: TranslateFn, reason: string): I18nText =>
+  t(SKIP_REASON_LABEL[reason] ?? "alertCalibration.skipReason.other");
+
+/** The signals the rules name in an `unmeasurable_signal` skip (ENT alert_calibration_rules `unmeasurable`). */
+const SKIP_SIGNAL_LABEL: Record<string, I18nKey> = {
+  firings: "alertCalibration.evidence.firings",
+  evaluation_errors: "alertCalibration.evidence.errors",
+  delay_in_secs: "alertCalibration.evidence.evaluationDelay",
+  incident_linkage: "alertCalibration.evidence.incidentLinkage",
+  mean_time_to_normal_secs: "alertCalibration.evidence.meanTimeToNormal",
+  incident_linked_firings: "alertCalibration.evidence.incidentLinkedFirings",
+  delivery_attempts: "alertCalibration.evidence.attemptedDeliveries",
+  delivery_attempted: "alertCalibration.evidence.deliveryAttemptRecords",
 };
+
+/** A detail this build cannot name points to Logs, never to its stored JSON; null when there is none. */
+export function skipDetailLabel(t: TranslateFn, detail: string | undefined): I18nText | null {
+  if (!detail) return null;
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(detail);
+  } catch {
+    parsed = null;
+  }
+  const signal =
+    typeof parsed === "object" && parsed !== null && "signal" in parsed ? parsed.signal : null;
+  if (typeof signal === "string" && Object.hasOwn(SKIP_SIGNAL_LABEL, signal)) {
+    return t("alertCalibration.detail.declinedSignal", { signal: t(SKIP_SIGNAL_LABEL[signal]) });
+  }
+  return t("alertCalibration.detail.declinedDetailOther");
+}
 
 export const COVERAGE_BADGE: Record<
   CoverageVerdict,

@@ -32,6 +32,13 @@ export type RecordKind = "run" | "finding" | "skip";
 export type Tier = "A" | "B" | "C";
 export type Quality = "usable" | "partial" | "unavailable";
 export type Audience = "owner" | "operator";
+/** What a `review_alert` action opens the editor on (D:L298). */
+export type ReviewFocus = "settings" | "threshold" | "query" | "grouping";
+/** The typed actions this build renders (D:L287); any other type is dropped, never shown raw. */
+export type InsightAction =
+  { type: "review_alert"; alert_id: string; focus?: ReviewFocus } | { type: "review_platform" };
+
+const REVIEW_FOCI: ReviewFocus[] = ["settings", "threshold", "query", "grouping"];
 
 export interface Coverage {
   coverage_unreadable_definitions: number;
@@ -71,13 +78,18 @@ export interface DigestRecord extends Omit<RunRow, "emitted_at"> {
   severity?: Severity;
   confidence?: Confidence;
   title?: string;
+  /** Version 1 only: action names, comma-joined. */
   actions?: string;
+  /** Version 2: the typed actions as one JSON array, stringified whole by ingestion. */
+  insight_actions?: string | unknown[];
   alert_id?: string;
   alert_name?: string;
   tier?: Tier;
   pattern?: string;
   detector_version?: number;
   quality?: Quality;
+  /** Why the evidence is degraded, as one JSON array; written only when it is. */
+  quality_reasons?: string | unknown[];
   audience?: Audience;
   /** A JSON array, stringified whole by ingestion. */
   limitations?: string;
@@ -91,7 +103,7 @@ export interface DigestRecord extends Omit<RunRow, "emitted_at"> {
 }
 
 export type FindingRecord = DigestRecord &
-  Required<Pick<DigestRecord, "rule_id" | "severity" | "confidence" | "title" | "actions">>;
+  Required<Pick<DigestRecord, "rule_id" | "severity" | "confidence" | "title">>;
 
 export type SkipRecord = DigestRecord &
   Required<Pick<DigestRecord, "rule_id" | "skip_reason">> & { kind: "skip" };
@@ -104,19 +116,46 @@ export const isFinding = (record: DigestRecord): record is FindingRecord =>
 
 export const isSkip = (record: DigestRecord): record is SkipRecord => record.kind === "skip";
 
-/** The limitations a finding lists, from the one column ingestion stringified them into. */
-export function limitationsOf(record: DigestRecord): string[] {
-  const value = record.limitations;
+/** An array column as ingestion stringified it, or already parsed; null for a string that is not JSON. */
+function arrayColumn(value: string | unknown[] | undefined): unknown[] | null {
+  if (Array.isArray(value)) return value;
   if (!value) return [];
-  let parsed: unknown = value;
-  if (typeof value === "string") {
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      return [value];
-    }
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return null;
   }
-  return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string") : [];
+}
+
+/** Text that is not JSON is kept as one line, since it is the rule's own words. */
+function textItems(value: string | unknown[] | undefined): string[] {
+  const items = arrayColumn(value);
+  if (items === null) return typeof value === "string" ? [value] : [];
+  return items.filter((item): item is string => typeof item === "string");
+}
+
+const isReviewFocus = (value: unknown): value is ReviewFocus =>
+  typeof value === "string" && (REVIEW_FOCI as string[]).includes(value);
+
+/** The limitations a finding lists, from the one column ingestion stringified them into. */
+export const limitationsOf = (record: DigestRecord): string[] => textItems(record.limitations);
+
+export const qualityReasonsOf = (record: DigestRecord): string[] =>
+  textItems(record.quality_reasons);
+
+/** Only actions this build can label survive, so a newer writer's type never reaches the screen. */
+export function insightActionsOf(record: DigestRecord): InsightAction[] {
+  return (arrayColumn(record.insight_actions) ?? []).flatMap((item): InsightAction[] => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return [];
+    const action: Record<string, unknown> = { ...item };
+    if (action.type === "review_platform") return [{ type: "review_platform" }];
+    if (action.type !== "review_alert" || typeof action.alert_id !== "string") return [];
+    if (action.focus === undefined) return [{ type: "review_alert", alert_id: action.alert_id }];
+    return isReviewFocus(action.focus)
+      ? [{ type: "review_alert", alert_id: action.alert_id, focus: action.focus }]
+      : [];
+  });
 }
 
 export type CoverageVerdict = "none" | "gap" | "full";
