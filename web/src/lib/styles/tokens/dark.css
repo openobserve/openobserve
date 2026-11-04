@@ -245,6 +245,20 @@
   --color-tabs-hover-bg: var(--color-primary-900);
   --color-tabs-bar-border: var(--color-grey-700);
   --color-nav-label-accent: var(--color-accent);
+  --color-nav-rail-text: var(--color-grey-400);
+  --color-nav-rail-text-strong: var(--color-grey-50);
+  --color-nav-lens-rim: oklch(from var(--color-primary-600) 0.74 min(c, 0.12) h);
+  --color-nav-lens-glass: oklch(from var(--color-primary-600) 0.4 calc(c * 0.55) h / 0.55);
+  --color-nav-lens-tint: oklch(from var(--color-primary-600) 0.33 calc(c * 0.45) h);
+  --color-nav-lens-glow: oklch(from var(--color-primary-600) 0.72 c h / 0.4);
+  --color-nav-lens-sheen: rgb(255 255 255 / 0.32);
+  --color-nav-lens-icon: var(--color-white);
+  --color-nav-lens-hover: rgb(255 255 255 / 0.06);
+  /* eslint-disable local/no-hardcoded-px -- optical shadow geometry, not layout */
+  --shadow-nav-lens:
+    inset 0 0 0 1px var(--color-nav-lens-rim), inset 0 1px 0 var(--color-nav-lens-sheen),
+    inset 0 -6px 10px -6px var(--color-nav-lens-glow), 0 0 18px -6px var(--color-nav-lens-glow);
+  /* eslint-enable local/no-hardcoded-px */
 
   /* Collapsible */
   --color-collapsible-trigger-hover-bg: var(--color-primary-900);

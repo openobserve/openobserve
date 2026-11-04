@@ -365,6 +365,27 @@ import AndroidIcon from "~icons/material-symbols/android";
 import PhoneIphoneIcon from "~icons/material-symbols/phone-iphone-outline";
 import CallIcon from "~icons/material-symbols/call-outline";
 
+// Filled twins of the rail icons, shown on the selected rail tile (see filledIconRegistry).
+import AccountTreeFilled from "~icons/material-symbols/account-tree";
+import AutoAwesomeFilled from "~icons/material-symbols/auto-awesome";
+import DashboardFilled from "~icons/material-symbols/dashboard";
+import DataPlusFilled from "~icons/majesticons/data-plus";
+import DatabaseFilled from "~icons/material-symbols/database";
+import DescriptionFilled from "~icons/material-symbols/description";
+import DevicesFilled from "~icons/material-symbols/devices";
+import DnsFilled from "~icons/material-symbols/dns";
+import HomeFilled from "~icons/mdi/home";
+import ManageAccountsFilled from "~icons/material-symbols/manage-accounts";
+import MemoryFilled from "~icons/material-symbols/memory";
+import NavigationFilled from "~icons/material-symbols/navigation";
+import NotificationsActiveFilled from "~icons/material-symbols/notifications-active";
+import NotificationsPausedFilled from "~icons/material-symbols/notifications-paused";
+import SchemaFilled from "~icons/material-symbols/schema";
+import SettingsFilled from "~icons/material-symbols/settings";
+import ShieldAlertFilled from "~icons/mdi/shield-alert";
+import ShieldFilled from "~icons/material-symbols/shield";
+import WindowFilled from "~icons/material-symbols/window";
+
 // Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
 import McpLogo from "./McpLogo.vue";
 
@@ -742,3 +763,26 @@ export const iconRegistry = {
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;
+
+/** Filled variants for `<OIcon filled>`; a name without one keeps its outlined glyph. */
+export const filledIconRegistry: Partial<Record<IconName, Component>> = {
+  "account-tree": AccountTreeFilled,
+  "auto-awesome": AutoAwesomeFilled,
+  dashboard: DashboardFilled,
+  "data-plus-line": DataPlusFilled,
+  database: DatabaseFilled,
+  description: DescriptionFilled,
+  devices: DevicesFilled,
+  dns: DnsFilled,
+  home: HomeFilled,
+  "manage-accounts": ManageAccountsFilled,
+  memory: MemoryFilled,
+  navigation: NavigationFilled,
+  "notifications-active": NotificationsActiveFilled,
+  "notifications-paused": NotificationsPausedFilled,
+  schema: SchemaFilled,
+  settings: SettingsFilled,
+  "shield-alert-outline": ShieldAlertFilled,
+  shield: ShieldFilled,
+  window: WindowFilled,
+};

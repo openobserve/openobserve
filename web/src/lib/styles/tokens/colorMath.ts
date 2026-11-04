@@ -231,7 +231,7 @@ const oklchToLinearSrgb = (lightness: number, chroma: number, hueDeg: number): n
   return clipped;
 };
 
-const parseOklchArgs = (args: string): Rgba | null => {
+const parseOklchChannels = (args: string): number[] | null => {
   const slashed = splitTopLevel(collapseSpace(args), "/");
   if (slashed.length > 2) return null;
   const tokens = slashed[0].split(/[,\s]+/).filter(Boolean);
@@ -243,9 +243,83 @@ const parseOklchArgs = (args: string): Rgba | null => {
   const hue = parseNumber(tokens[2]);
   const alpha = slashed[1] === undefined ? 1 : parseAlpha(slashed[1].trim());
   if ([lightness, chroma, hue, alpha].some(Number.isNaN)) return null;
+  return [lightness, chroma, hue, alpha];
+};
+
+const oklchToRgba = ([lightness, chroma, hue, alpha]: number[]): Rgba => {
   const linear = oklchToLinearSrgb(clamp(lightness, 0, 1), Math.max(0, chroma), hue);
   const [r, g, b] = linear.map((channel) => clamp(linearToSrgb(clamp(channel, 0, 1)), 0, 1) * FULL);
   return { r, g, b, a: clamp(alpha, 0, 1) };
+};
+
+const parseOklchArgs = (args: string): Rgba | null => {
+  const channels = parseOklchChannels(args);
+  return channels && oklchToRgba(channels);
+};
+
+const rgbaToOklch = (color: Rgba): number[] => {
+  const [lightness, aAxis, bAxis] = linearSrgbToOklab(
+    [color.r, color.g, color.b].map((c) => srgbToLinear(c / FULL)),
+  );
+  const hue = (Math.atan2(bAxis, aAxis) * 180) / Math.PI;
+  return [lightness, Math.hypot(aAxis, bAxis), hue < 0 ? hue + 360 : hue];
+};
+
+/** A relative-colour channel: a number, a percentage of `full`, a channel keyword, or min()/max()/calc() over one binary operation. */
+const evalChannel = (expr: string, env: Record<string, number>, full: number): number => {
+  const text = collapseSpace(expr);
+  if (text in env) return env[text];
+  const call = asFunctionCall(text);
+  if (call) {
+    const args = splitTopLevel(call.args, ",").map((arg) => evalChannel(arg, env, full));
+    if (call.name === "min") return Math.min(...args);
+    if (call.name === "max") return Math.max(...args);
+    if (call.name === "calc" && args.length === 1) return args[0];
+    return Number.NaN;
+  }
+  const binary = /^(.+) ([*/+-]) (.+)$/.exec(text);
+  if (binary) {
+    const left = evalChannel(binary[1], env, full);
+    const right = evalChannel(binary[3], env, full);
+    if (binary[2] === "*") return left * right;
+    if (binary[2] === "/") return left / right;
+    return binary[2] === "+" ? left + right : left - right;
+  }
+  return text.endsWith("%") ? (parseNumber(text) / 100) * full : parseNumber(text);
+};
+
+/** `oklch(from <colour> L C H [/ A])`, the relative form the rail lens tokens use. */
+const relativeOklchChannels = (
+  args: string,
+  scope: Map<string, string>,
+  seen: Set<string>,
+): number[] | null => {
+  const tokens = splitTopLevel(collapseSpace(args), " ").filter(Boolean);
+  if (tokens[0] !== "from") return null;
+  const origin = originChannels(tokens[1], scope, seen);
+  if (!origin) return null;
+  const [l, c, h, originAlpha] = origin;
+  const env = { l, c, h, alpha: originAlpha };
+  const channels = tokens.slice(2);
+  const slash = channels.indexOf("/");
+  const lch = slash === -1 ? channels : channels.slice(0, slash);
+  if (lch.length !== 3 || (slash !== -1 && channels.length !== slash + 2)) return null;
+  // A hue has no percentage form, so NaN rejects one.
+  const [lightness, chroma, hue] = lch.map((token, i) =>
+    evalChannel(token, env, [1, OKLCH_CHROMA_FULL, Number.NaN][i]),
+  );
+  const alpha = slash === -1 ? originAlpha : evalChannel(channels[slash + 1], env, 1);
+  if ([lightness, chroma, hue, alpha].some(Number.isNaN)) return null;
+  return [lightness, chroma, hue, alpha];
+};
+
+const parseRelativeOklch = (
+  args: string,
+  scope: Map<string, string>,
+  seen: Set<string>,
+): Rgba | null => {
+  const channels = relativeOklchChannels(args, scope, seen);
+  return channels && oklchToRgba(channels);
 };
 
 /** One side of a `color-mix()`: a colour and, optionally, its own percentage. */
@@ -324,6 +398,33 @@ const resolveVarArgs = (
   return fallback === null ? null : resolveValue(fallback, scope, seen);
 };
 
+// An oklch() origin keeps its own channels, since a round trip through sRGB would gamut-clip a wide-gamut one.
+function originChannels(
+  value: string,
+  scope: Map<string, string>,
+  seen: Set<string>,
+): number[] | null {
+  const text = collapseSpace(value);
+  const call = asFunctionCall(text);
+  if (call?.name === "var") {
+    const parts = splitTopLevel(call.args, ",");
+    const name = parts[0].trim();
+    const fallback = parts.length > 1 ? parts.slice(1).join(",").trim() : null;
+    if (!name.startsWith("--")) return null;
+    const own = seen.has(name) ? undefined : scope.get(name);
+    const resolved = own === undefined ? null : originChannels(own, scope, new Set(seen).add(name));
+    if (resolved || fallback === null) return resolved;
+    return originChannels(fallback, scope, seen);
+  }
+  if (call?.name === "oklch") {
+    return call.args.trimStart().startsWith("from ")
+      ? relativeOklchChannels(call.args, scope, seen)
+      : parseOklchChannels(call.args);
+  }
+  const color = resolveValue(text, scope, seen);
+  return color && [...rgbaToOklch(color), color.a];
+}
+
 function resolveValue(value: string, scope: Map<string, string>, seen: Set<string>): Rgba | null {
   const text = collapseSpace(value);
   if (!text) return null;
@@ -339,7 +440,9 @@ function resolveValue(value: string, scope: Map<string, string>, seen: Set<strin
     case "rgba":
       return parseRgbArgs(call.args);
     case "oklch":
-      return parseOklchArgs(call.args);
+      return call.args.trimStart().startsWith("from ")
+        ? parseRelativeOklch(call.args, scope, seen)
+        : parseOklchArgs(call.args);
     case "color-mix":
       return parseColorMixArgs(call.args, scope, seen);
     default:

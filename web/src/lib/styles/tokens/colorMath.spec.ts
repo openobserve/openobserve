@@ -236,6 +236,33 @@ describe("resolveColor", () => {
   it("returns null for a token that was never declared", () => {
     expect(resolveColor("--nothing", scopeOf({}))).toBeNull();
   });
+
+  it("applies a relative oklch() to an sRGB origin's channels", () => {
+    const scope = scopeOf({ "--ink": "#ff0000", "--soft": "oklch(from var(--ink) l c h / 0.5)" });
+    const soft = resolveColor("--soft", scope)!;
+    expect(soft.a).toBe(0.5);
+    expect([soft.r, soft.g, soft.b].map(Math.round)).toEqual([255, 0, 0]);
+  });
+
+  it("reads relative oklch() percentages as fractions of each channel's range", () => {
+    const percent = parseColor("oklch(from #ff0000 50% 50% h / 50%)");
+    const fraction = parseColor("oklch(from #ff0000 0.5 0.2 h / 0.5)");
+    expect(percent).not.toBeNull();
+    expect(percent).toEqual(fraction);
+  });
+
+  it("keeps a wide-gamut oklch() origin's channels until the relative transform", () => {
+    const scope = scopeOf({
+      "--ink": "oklch(64.6% 0.222 41.116)",
+      "--glow": "oklch(from var(--ink) 0.5 c h / 0.45)",
+    });
+    const expected = parseColor("oklch(0.5 0.222 41.116 / 0.45)")!;
+    const glow = resolveColor("--glow", scope)!;
+    expect(glow.r).toBeCloseTo(expected.r, 2);
+    expect(glow.g).toBeCloseTo(expected.g, 2);
+    expect(glow.b).toBeCloseTo(expected.b, 2);
+    expect(glow.a).toBeCloseTo(0.45, 5);
+  });
 });
 
 describe("compositing and contrast", () => {
@@ -389,8 +416,8 @@ describe("the real token sheets", () => {
   });
 
   describe.each([
-    ["light", 1086, 1074],
-    ["dark", 1087, 1075],
+    ["light", 1096, 1083],
+    ["dark", 1097, 1084],
   ] as const)("%s theme", (theme, total, resolved) => {
     const scope = THEMES[theme];
     const names = colorTokens(scope);
@@ -408,7 +435,7 @@ describe("the real token sheets", () => {
     it("leaves nothing unresolved except the gradient tokens", () => {
       const offenders = names
         .filter((name) => resolveColor(name, scope) === null)
-        .filter((name) => !(scope.get(name) ?? "").startsWith("linear-gradient"))
+        .filter((name) => !/^(linear|radial)-gradient\(/.test(scope.get(name) ?? ""))
         .map((name) => `${name}: ${scope.get(name)}`);
       expect(offenders).toEqual([]);
     });
