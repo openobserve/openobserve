@@ -273,7 +273,8 @@ export function usePanelDrilldown({
     return {
       __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type) ? params?.name : params?.seriesName,
       __value: value,
-      __axisValue: params?.value?.[0] ?? params?.name,
+      // A gauge dial named "(empty)" stands in for a blank label; drilldowns filter on the blank.
+      __axisValue: params?.value?.[0] ?? params?.data?.rawName ?? params?.name,
     };
   };
 
