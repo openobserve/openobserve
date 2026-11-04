@@ -95,52 +95,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OPageHeader>
 
-    <div
-      class="relative flex min-h-0 flex-1 gap-2 px-2 pt-3 max-lg:flex-col max-lg:overflow-y-auto"
-    >
-      <!-- Read-only canvas (per-node run status overlay). Clicking a node's ✓/✗ badge
+    <OPageLockedBody>
+      <div
+        class="relative flex min-h-0 flex-1 gap-2 px-2 pt-3 max-lg:flex-col max-lg:overflow-y-auto"
+      >
+        <!-- Read-only canvas (per-node run status overlay). Clicking a node's ✓/✗ badge
            opens its NDV (read-only here) with the step's Input · Config · Output — the
            SAME panel the editor uses, so results read identically in both places. -->
-      <div
-        class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden max-lg:h-64 max-lg:flex-none dark:bg-transparent"
-      >
-        <WorkflowCanvas />
-      </div>
+        <div
+          class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden max-lg:h-64 max-lg:flex-none dark:bg-transparent"
+        >
+          <WorkflowCanvas />
+        </div>
 
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        class="absolute top-2 right-2 z-10"
-        data-test="workflow-runs-panel-collapse"
-        :aria-label="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
-        @click="togglePanel"
-      >
-        <OIcon
-          :name="panelCollapsed ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
-          size="sm"
-        />
-        <OTooltip
-          :content="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
-          side="left"
-        />
-      </OButton>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          class="absolute top-2 right-2 z-10"
+          data-test="workflow-runs-panel-collapse"
+          :aria-label="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
+          @click="togglePanel"
+        >
+          <OIcon
+            :name="panelCollapsed ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
+            size="sm"
+          />
+          <OTooltip
+            :content="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
+            side="left"
+          />
+        </OButton>
 
-      <!-- Persistent runs list (master-detail). -->
-      <div
-        v-if="!panelCollapsed"
-        data-test="workflow-runs-panel"
-        class="rounded-surface border-border-default bg-surface-base mb-3 flex min-h-0 w-[50rem] max-w-[60%] shrink-0 flex-col overflow-hidden border max-lg:h-96 max-lg:w-full max-lg:max-w-full"
-      >
-        <WorkflowRunsPanel
-          ref="runsPanelRef"
-          :org-id="orgId"
-          :workflow-id="workflowId"
-          :workflow-name="workflowName"
-          :selected-run-id="selectedRunId"
-          @select-run="onSelectRun"
-        />
+        <!-- Persistent runs list (master-detail). -->
+        <div
+          v-if="!panelCollapsed"
+          data-test="workflow-runs-panel"
+          class="rounded-surface border-border-default bg-surface-base mb-3 flex min-h-0 w-[50rem] max-w-[60%] shrink-0 flex-col overflow-hidden border max-lg:h-96 max-lg:w-full max-lg:max-w-full"
+        >
+          <WorkflowRunsPanel
+            ref="runsPanelRef"
+            :org-id="orgId"
+            :workflow-id="workflowId"
+            :workflow-name="workflowName"
+            :selected-run-id="selectedRunId"
+            @select-run="onSelectRun"
+          />
+        </div>
       </div>
-    </div>
+    </OPageLockedBody>
 
     <!-- Node NDV (read-only here) — opened by a node's ✓/✗ badge to inspect that
          step's Input · Config · Output for the loaded run. -->
@@ -174,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import OPageLockedBody from "@/lib/core/PageLayout/OPageLockedBody.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";

@@ -230,28 +230,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- workspace: docked palette + canvas (+ drawer region for node forms). The
          history drawer portals in here (below the toolbar) so it can sit
          side-by-side with the canvas. -->
-    <div id="workflow-workspace" class="relative flex min-h-0 flex-1">
-      <!-- Docked node palette — same shared component as Pipelines, so the two
+    <OPageLockedBody>
+      <div id="workflow-workspace" class="relative flex min-h-0 flex-1">
+        <!-- Docked node palette — same shared component as Pipelines, so the two
            palettes can never drift apart. Workflows add click-to-append. -->
-      <NodePalette
-        v-if="workflowObj.showNodePalette"
-        :items="paletteItems"
-        test-prefix="workflow-palette"
-        :on-drag-start="paletteDragStart"
-        :on-item-click="paletteClick"
-      />
-      <!-- Canvas drop area — flush gray pane running to the viewport edges,
+        <NodePalette
+          v-if="workflowObj.showNodePalette"
+          :items="paletteItems"
+          test-prefix="workflow-palette"
+          :on-drag-start="paletteDragStart"
+          :on-item-click="paletteClick"
+        />
+        <!-- Canvas drop area — flush gray pane running to the viewport edges,
            matching the pipeline editor's `#pipelineChartContainer` so both look
            identical. `dark:bg-transparent` is part of that match: in dark mode
            the canvas falls through to the page background rather than sitting
            on the lighter `surface-subtle` slab, which is what made the two
            editors read as different shades. -->
-      <div class="bg-surface-subtle relative min-w-0 flex-1 overflow-hidden dark:bg-transparent">
-        <!-- Test results are inspected in the node's NDV (click a node's ✓/✗ badge),
+        <div class="bg-surface-subtle relative min-w-0 flex-1 overflow-hidden dark:bg-transparent">
+          <!-- Test results are inspected in the node's NDV (click a node's ✓/✗ badge),
              so the canvas fills the space — no docked results panel. -->
-        <WorkflowCanvas />
+          <WorkflowCanvas />
+        </div>
       </div>
-    </div>
+    </OPageLockedBody>
 
     <!-- "add next step" picker (opened by the hover-+ on a node) — shared with
          pipelines. -->
@@ -337,6 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import OPageLockedBody from "@/lib/core/PageLayout/OPageLockedBody.vue";
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter, onBeforeRouteLeave, type RouteLocationRaw } from "vue-router";
@@ -391,6 +394,7 @@ import useWorkflowCanvas, {
   clearTestData,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
+import { useFeatureLock } from "@/composables/useFeatureLock";
 import analytics from "@/services/product_analytics";
 
 // Emitted after a successful save so the parent WorkflowsList refreshes its rows.
@@ -629,8 +633,11 @@ const goBack = () => {
 const unsavedDialog = ref(false);
 const pendingRoute = ref<RouteLocationRaw | null>(null);
 
+// A locked page cannot be edited, and its locked Discard button would trap the user.
+const { locked: pageLocked } = useFeatureLock();
+
 onBeforeRouteLeave((to) => {
-  if (!workflowObj.dirtyFlag) return true;
+  if (pageLocked.value || !workflowObj.dirtyFlag) return true;
   pendingRoute.value = to.fullPath;
   unsavedDialog.value = true;
   return false;
@@ -651,7 +658,7 @@ const onKeepEditing = () => {
 
 // Native browser prompt for tab close / reload while there are unsaved edits.
 const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
-  if (!workflowObj.dirtyFlag) return;
+  if (pageLocked.value || !workflowObj.dirtyFlag) return;
   e.preventDefault();
   e.returnValue = "";
 };

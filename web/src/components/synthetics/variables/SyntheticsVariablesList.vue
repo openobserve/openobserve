@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       table-id="synthetics-variables"
       :show-global-filter="false"
       :loading="loading"
+      :forbidden="forbidden"
     >
       <template #toolbar>
         <OTooltip side="bottom" :content="raw(`${scopeLabel} — ${scopeSummary}`)">
@@ -270,6 +271,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import type { ForbiddenState } from "@/utils/featureGate";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -303,6 +305,7 @@ export default defineComponent({
   props: {
     variables: { type: Array as PropType<SyntheticsVariable[]>, default: () => [] },
     loading: { type: Boolean, default: false },
+    forbidden: { type: [Boolean, Array] as PropType<ForbiddenState>, default: false },
     /** Environment NAME, or null for the unscoped tier. */
     environment: { type: String as PropType<string | null>, default: null },
     /** Split destinations. Empty on the global tab means there is nowhere to split to. */

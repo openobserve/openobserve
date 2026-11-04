@@ -370,6 +370,23 @@ describe("AlertTargetsSelect", () => {
     });
   });
 
+  it("shows a disabled Create Workflow button for a license lock and never opens the upgrade dialog", async () => {
+    const wrapper = createWrapper({
+      workflowsEnabled: false,
+      workflowsLocked: true,
+      workflowsLicenseLocked: true,
+      workflowsLockMessage: "Locked: needs Workflows",
+    });
+    const btn = wrapper.find('[data-test="create-workflow-btn"]');
+    expect(btn.exists()).toBe(true);
+    expect(btn.attributes("disabled")).toBeDefined();
+
+    const { isOpen, close } = useEnterpriseUpgradeDialog();
+    close();
+    await btn.trigger("click");
+    expect(isOpen.value).toBe(false);
+  });
+
   // ── Malformed / partially-loaded lists ─────────────────────────────────────
   // REGRESSION: with the backend unreachable, `getFormattedDestinations` maps
   // `destination.name` over rows that have no `name`, producing [undefined].

@@ -29,6 +29,8 @@ import { b64EncodeUnicode } from "@/utils/formatters";
 import searchService from "@/services/search";
 import patternsService from "@/services/patterns";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { useLicenseLock, useLicenseLocks } from "@/composables/useFeatureLock";
+import { streamTypeFeature } from "@/utils/featureGate";
 import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { extractSeverity } from "@/utils/sourceEventSeverity";
@@ -474,6 +476,13 @@ const {
   noMatch: correlationNoMatch,
   error: serviceCorrelationError,
 } = useServiceCorrelation();
+const { locked: correlationLocked } = useLicenseLock("correlation");
+const licenseLocks = useLicenseLocks();
+const logsFeature = computed(() => streamTypeFeature(props.streamType));
+const openInLogsLocked = computed(() => licenseLocks.isLocked(logsFeature.value));
+const openInLogsLockedReason = computed(() =>
+  logsFeature.value ? licenseLocks.lockedReason(logsFeature.value) : raw(""),
+);
 
 // Fresh correlation per event (mirrors the Logs page reset on row change).
 watch(selectedEvent, () => {
@@ -485,7 +494,7 @@ watch(selectedEvent, () => {
 
 // Lazy correlation fetch — replicated from SearchResult.vue's openCorrelationFromLog.
 async function openCorrelationFromLog(logData: any) {
-  if (correlationFetchInProgress.value) return;
+  if (correlationFetchInProgress.value || correlationLocked.value) return;
   try {
     correlationFetchInProgress.value = true;
     correlationLoading.value = true;
@@ -793,7 +802,23 @@ function openInLogs() {
           >
             {{ t("panel.logExplorer.queryMode") }}
           </OButton>
+          <OTooltip v-if="openInLogsLocked" :content="openInLogsLockedReason">
+            <span class="inline-flex">
+              <OButton size="sm" variant="outline" disabled data-test="log-explorer-open-in-logs">
+                <template #icon-left>
+                  <OIcon
+                    name="lock"
+                    class="text-icon-locked"
+                    size="sm"
+                    data-test="log-explorer-open-in-logs-lock"
+                  />
+                </template>
+                {{ t("panel.logExplorer.openInLogs") }}
+              </OButton>
+            </span>
+          </OTooltip>
           <OButton
+            v-else
             size="sm"
             variant="outline"
             icon-left="open-in-new"
@@ -1141,7 +1166,28 @@ function openInLogs() {
                         >{{ p.template }}</OTruncatedText
                       >
                       <!-- Open in Logs -->
+                      <OTooltip v-if="openInLogsLocked" :content="openInLogsLockedReason">
+                        <span class="inline-flex shrink-0">
+                          <OButton
+                            :aria-label="t('panel.logExplorer.openInLogs')"
+                            size="sm"
+                            variant="ghost"
+                            disabled
+                            data-test="log-explorer-pattern-open"
+                          >
+                            <template #icon-left>
+                              <OIcon
+                                name="lock"
+                                class="text-icon-locked"
+                                size="sm"
+                                data-test="log-explorer-pattern-open-lock"
+                              />
+                            </template>
+                          </OButton>
+                        </span>
+                      </OTooltip>
                       <OButton
+                        v-else
                         :aria-label="t('panel.logExplorer.openInLogs')"
                         size="sm"
                         variant="ghost"

@@ -17,6 +17,7 @@
 
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
+import { createStore } from "vuex";
 import type { ExperimentRowDetail } from "@/services/llm-experiments.service";
 import ExperimentRowDetailDrawer from "./ExperimentRowDetailDrawer.vue";
 
@@ -93,16 +94,22 @@ const detail: ExperimentRowDetail = {
   ],
 };
 
-function mountDrawer(rowDetail: ExperimentRowDetail = detail) {
+function mountDrawer(
+  rowDetail: ExperimentRowDetail = detail,
+  features: Record<string, string> = {},
+) {
   return mount(ExperimentRowDetailDrawer, {
     props: { open: true, detail: rowDetail },
     global: {
+      plugins: [createStore({ state: { zoConfig: { features } } })],
       stubs: {
         ODrawer: {
           props: ["open", "title", "subTitle"],
           template: '<section v-if="open"><slot /><slot name="footer" /></section>',
         },
-        OButton: { template: "<button @click=\"$emit('click')\"><slot /></button>" },
+        OButton: {
+          template: '<button @click="$emit(\'click\')"><slot name="icon-left" /><slot /></button>',
+        },
         OTag: { template: "<span><slot /></span>" },
       },
     },
@@ -182,6 +189,31 @@ describe("ExperimentRowDetailDrawer", () => {
     expect(wrapper.emitted("score-trace")?.[0]).toEqual([
       { traceId: "evaluator-trace-1", timestamp: 200 },
     ]);
+  });
+
+  it("locks both trace buttons and emits nothing while the traces license is locked", async () => {
+    const wrapper = mountDrawer(detail, { traces: "locked" });
+
+    for (const id of ["ai-experiment-row-trace", "ai-experiment-row-score-trace-quality:3"]) {
+      const button = wrapper.get(`[data-test="${id}"]`);
+      expect(button.attributes("disabled")).toBeDefined();
+      await button.trigger("click");
+    }
+    expect(wrapper.find('[data-test="ai-experiment-row-trace-lock"]').exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="ai-experiment-row-score-trace-lock-quality:3"]').exists(),
+    ).toBe(true);
+    expect(wrapper.emitted("trace")).toBeUndefined();
+    expect(wrapper.emitted("score-trace")).toBeUndefined();
+  });
+
+  it("keeps both trace buttons live when the license enables traces", () => {
+    const wrapper = mountDrawer(detail, { traces: "enabled" });
+
+    expect(wrapper.find('[data-test$="-lock"]').exists()).toBe(false);
+    expect(
+      wrapper.get('[data-test="ai-experiment-row-trace"]').attributes("disabled"),
+    ).toBeUndefined();
   });
 
   it("renders a structured SDK output and the client-reported scores", () => {

@@ -95,11 +95,11 @@ const mockI18n = createI18n({
   },
 });
 
-function mountComponent() {
+function mountComponent(store = mockStore) {
   return mount(CorrelationSettings, {
     global: {
       plugins: [mockI18n],
-      provide: { store: mockStore },
+      provide: { store },
       stubs: {
         OTabs: {
           template: '<div class="o-tabs"><slot /></div>',
@@ -108,8 +108,13 @@ function mountComponent() {
         },
         OTab: {
           template:
-            '<div class="o-tab" :data-test="`tab-${name}`" :data-name="name"><slot /></div>',
-          props: ["name", "label", "noCaps", "icon"],
+            '<div class="o-tab" :data-test="`tab-${name}`" :data-name="name" :data-suffix="suffixIcon"><slot /></div>',
+          props: ["name", "label", "noCaps", "icon", "suffixIcon"],
+        },
+        LicenseDeniedState: {
+          name: "LicenseDeniedState",
+          props: ["features"],
+          template: '<div class="license-denied" :data-features="features.join(\',\')" />',
         },
       },
     },
@@ -122,6 +127,45 @@ describe("CorrelationSettings", () => {
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
+  });
+
+  describe("license locks", () => {
+    const storeWith = (features: Record<string, string>) =>
+      createStore({ state: { ...mockStore.state, zoConfig: { features } } });
+    const deniedFeatures = () =>
+      wrapper.findAll(".license-denied").map((d) => d.attributes("data-features"));
+
+    it("locks only the services and discovery tabs when correlation is locked", async () => {
+      wrapper = mountComponent(storeWith({ correlation: "locked" }));
+      await flushPromises();
+
+      expect(deniedFeatures()).toEqual(["correlation", "correlation"]);
+      expect(wrapper.find('[data-test="discovered-services"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="service-identity-setup"]').exists()).toBe(false);
+      expect(wrapper.find('[data-name="services"]').attributes("data-suffix")).toBe("lock");
+      expect(wrapper.find('[data-name="discovery"]').attributes("data-suffix")).toBe("lock");
+      expect(wrapper.find('[data-name="field-aliases"]').attributes("data-suffix")).toBeUndefined();
+      expect(serviceStreamsService.getSemanticGroups).toHaveBeenCalled();
+    });
+
+    it("locks field aliases and skips semantic groups when alerts is locked", async () => {
+      wrapper = mountComponent(storeWith({ alerts: "locked" }));
+      await flushPromises();
+
+      expect(deniedFeatures()).toEqual(["alerts"]);
+      expect(wrapper.find('[data-test="semantic-field-groups-config"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="discovered-services"]').exists()).toBe(true);
+      expect(wrapper.find('[data-name="field-aliases"]').attributes("data-suffix")).toBe("lock");
+      expect(serviceStreamsService.getSemanticGroups).not.toHaveBeenCalled();
+    });
+
+    it("renders every tab unlocked when both features are enabled", async () => {
+      wrapper = mountComponent(storeWith({ correlation: "enabled", alerts: "enabled" }));
+      await flushPromises();
+
+      expect(deniedFeatures()).toEqual([]);
+      expect(wrapper.findAll("[data-suffix]")).toHaveLength(0);
+    });
   });
 
   describe("initial render", () => {

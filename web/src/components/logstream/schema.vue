@@ -454,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OIcon
                                 :name="sdrAccess.allowed ? 'arrow-forward' : 'lock'"
                                 size="xs"
-                                :class="sdrAccess.allowed ? '' : 'text-warning-600'"
+                                :class="sdrAccess.allowed ? '' : 'lock-chip'"
                               />
                             </span>
                           </template>

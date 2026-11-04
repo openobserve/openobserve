@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="settings_ent_logo_custom_text_locked"
               >
                 <template v-slot:icon-right>
-                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                  <OIcon name="lock" size="sm" class="lock-chip" />
                 </template>
               </OInput>
             </div>
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="o2-file-input mx-0"
               >
                 <template v-slot:prepend>
-                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                  <OIcon name="lock" size="sm" class="lock-chip" />
                 </template>
               </OFile>
             </div>
@@ -365,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="o2-file-input mx-0"
               >
                 <template v-slot:prepend>
-                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                  <OIcon name="lock" size="sm" class="lock-chip" />
                 </template>
               </OFile>
             </div>
