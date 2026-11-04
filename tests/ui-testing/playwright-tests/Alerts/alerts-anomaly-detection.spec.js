@@ -1025,11 +1025,12 @@ test.describe('Anomaly Detection', () => {
               `SELECT actual_value, is_anomaly, score, threshold_value FROM "_anomalies" ` +
                 `WHERE anomaly_id = '${id}'`,
             );
-            return scoredPoints.length;
+            // A run's rows can become searchable piecemeal, so wait for the spike row itself.
+            return scoredPoints.filter((a) => a.is_anomaly === true && a.actual_value === 120).length;
           },
           {
             timeout: 60000,
-            message: `no _anomalies rows for ${id} after detection (manual run scored ${detected.data.points_scored})`,
+            message: `no flagged spike row in _anomalies for ${id} after detection (manual run scored ${detected.data.points_scored})`,
           },
         )
         .toBeGreaterThan(0);
