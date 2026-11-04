@@ -184,9 +184,10 @@ pub async fn guard_with<C: ConnectionTrait>(
     Ok(res.rows_affected)
 }
 
-/// Writes status, from_version, phases, failure, events and gates of a row the caller fenced.
+/// Writes the strategy, status, from_version, phases, failure, events and gates of a fenced row.
 pub async fn save_state_with<C: ConnectionTrait>(conn: &C, row: &Model) -> Result<(), Error> {
     Entity::update_many()
+        .col_expr(Column::Strategy, Expr::value(row.strategy.clone()))
         .col_expr(Column::Status, Expr::value(row.status.clone()))
         .col_expr(Column::FromVersion, Expr::value(row.from_version))
         .col_expr(Column::Phases, Expr::value(row.phases.clone()))
@@ -505,6 +506,7 @@ mod tests {
             .unwrap();
         assert_eq!(members_with(&db, "r1").await.unwrap()[1].state, "running");
 
+        row.strategy = serde_json::json!({"verify": true}).to_string();
         row.status = "halted".to_string();
         row.from_version = Some(7);
         row.failure =

@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { createTreeVisualizationEngine } from "./treeVisualizationEngine";
+import { CHART_ZOOM_MAX, CHART_ZOOM_MIN } from "@/composables/traces/useChartZoom";
 
 // Mock useStore
 const mockStore = {
@@ -132,16 +133,59 @@ describe("createTreeVisualizationEngine tooltip system", () => {
     const cleanup = setupTraceNodeTooltips(mockChart, mockData, false);
 
     // Simulate mouseover event that hits the test node
-    // The handler receives ECharts params and looks up the node by name
     const mouseMoveHandler = mockChart.on.mock.calls.find((call) => call[0] === "mouseover")[1];
 
     const mockParams = {
-      data: { name: "Test Node" },
+      data: { name: "Test Node", treePath: [0] },
       event: { offsetX: 100, offsetY: 200 },
     };
     mouseMoveHandler(mockParams);
 
     expect(mockData.getNodeTooltip).toHaveBeenCalledWith(testNode);
+
+    cleanup();
+  });
+
+  it("shows each copy of a repeated service its own tooltip", () => {
+    const { generateEChartsOptions, setupTraceNodeTooltips } = createTreeVisualizationEngine();
+
+    const frontendCatalog = { id: "product-catalog", name: "product-catalog", value: 0.31 };
+    const checkoutCatalog = { id: "product-catalog", name: "product-catalog", value: 0.26 };
+    const treeData = [
+      {
+        id: "frontend",
+        name: "frontend",
+        value: 5,
+        children: [
+          frontendCatalog,
+          { id: "checkout", name: "checkout", value: 2, children: [checkoutCatalog] },
+        ],
+      },
+    ];
+    const mockData = {
+      treeData,
+      getNodeLabel: () => "",
+      getNodeTooltip: vi.fn().mockReturnValue("<div></div>"),
+      getNodeErrorRate: () => 0,
+    };
+    const options = generateEChartsOptions(mockData, {
+      layoutType: "horizontal",
+      isDarkMode: false,
+      nodeSize: "fixed",
+    });
+    const root = options.series[0].data[0];
+    const frontendDatum = root.children[0];
+    const checkoutDatum = root.children[1].children[0];
+
+    const cleanup = setupTraceNodeTooltips(mockChart, mockData, false);
+    const onMouseOver = mockChart.on.mock.calls.find((call) => call[0] === "mouseover")[1];
+
+    onMouseOver({ data: checkoutDatum, event: { offsetX: 10, offsetY: 10 } });
+    expect(mockData.getNodeTooltip).toHaveBeenLastCalledWith(checkoutCatalog);
+
+    onMouseOver({ data: frontendDatum, event: { offsetX: 10, offsetY: 10 } });
+    expect(mockData.getNodeTooltip).toHaveBeenLastCalledWith(frontendCatalog);
+    expect(mockData.getNodeTooltip).toHaveBeenCalledTimes(2);
 
     cleanup();
   });
@@ -197,7 +241,7 @@ describe("createTreeVisualizationEngine tooltip system", () => {
     // Simulate mouse near edge that should trigger repositioning
     // mouseover handler receives ECharts params object with event coordinates
     const mockParams = {
-      data: { name: "Test Node" },
+      data: { name: "Test Node", treePath: [0] },
       event: { offsetX: 750, offsetY: 550 },
     };
     mouseMoveHandler(mockParams);
@@ -390,5 +434,21 @@ describe("createTreeVisualizationEngine node detection with ECharts hit detectio
     // Non-existent index should return null
     const nullResult = findNodeByIndex(treeData, 5);
     expect(nullResult).toBeNull();
+  });
+});
+
+describe("createTreeVisualizationEngine generateEChartsOptions", () => {
+  it("bounds wheel zoom with the same limits as the zoom buttons", () => {
+    const { generateEChartsOptions } = createTreeVisualizationEngine();
+    const options = generateEChartsOptions(
+      {
+        treeData: [{ id: "a", name: "a", value: 1 }],
+        getNodeLabel: () => "a",
+        getNodeTooltip: () => "",
+        getNodeErrorRate: () => 0,
+      },
+      { layoutType: "horizontal", isDarkMode: false, nodeSize: "fixed" },
+    );
+    expect(options.series[0].scaleLimit).toEqual({ min: CHART_ZOOM_MIN, max: CHART_ZOOM_MAX });
   });
 });

@@ -3447,13 +3447,7 @@ export class LogsPage {
         // Create lives in the Saved views submenu, which only renders while open.
         const createSavedViewBtn = this.page.locator(this.menuCreateSavedViewBtn);
         if (!(await createSavedViewBtn.isVisible({ timeout: 500 }).catch(() => false))) {
-            const submenuTrigger = this.page.locator(this.menuListSavedViewsBtn);
-            if (!(await submenuTrigger.isVisible().catch(() => false))) {
-                await this.page.locator(this.utilitiesMenuButton).click({ force: true });
-                await submenuTrigger.waitFor({ state: 'visible', timeout: 5000 });
-            }
-            await submenuTrigger.click({ force: true });
-            await createSavedViewBtn.waitFor({ state: 'visible', timeout: 5000 });
+            await this.openSavedViewsSubmenu(this.menuCreateSavedViewBtn);
         }
         await createSavedViewBtn.click();
         await this.page.locator(this.savedViewDialog).waitFor({ state: 'visible', timeout: 10000 });
@@ -9035,10 +9029,27 @@ export class LogsPage {
             await listMenuItem.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
         }
         if (!opened) throw new Error('Could not open saved views menu after 3 attempts');
-        // force: true — ODropdown portal transiently detaches items during initial render
-        await listMenuItem.click({ force: true });
-        await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'visible', timeout: 10000 });
+        await this.openSavedViewsSubmenu(this.savedViewSearchInput);
         testLogger.info('Clicked saved views dropdown arrow');
+    }
+
+    /**
+     * Open the Saved views submenu of the utilities menu and wait for `targetSelector` inside it.
+     * @param {string} targetSelector - element that only renders while the submenu is open
+     */
+    async openSavedViewsSubmenu(targetSelector) {
+        const trigger = this.page.locator(this.menuListSavedViewsBtn);
+        const target = this.page.locator(targetSelector);
+        for (let attempt = 0; attempt < 3; attempt++) {
+            if (!(await trigger.isVisible().catch(() => false))) {
+                await this.page.locator(this.utilitiesMenuButton).click({ force: true });
+                await trigger.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+            }
+            // No force: a click during the menu's open animation lands outside it and dismisses the whole menu.
+            await trigger.click({ timeout: 5000 }).catch(() => {});
+            if (await target.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false)) return;
+        }
+        await target.waitFor({ state: 'visible', timeout: 5000 });
     }
 
     /**

@@ -3738,7 +3738,7 @@ pub async fn enable_alert_bulk(
     tag = "Alerts",
     operation_id = "TriggerAlert",
     summary = "Manually trigger alert",
-    description = "Manually triggers an alert to test its functionality and notification delivery. Useful for testing alert configurations, verifying notification channels, and ensuring alerts work as expected before relying on them for monitoring. For an anomaly detection alert it runs detection now and returns `message`, `claim_lost`, `ineligible`, `anomaly_id`, `anomalies_found`, `points_scored` and `anomalies`; `claim_lost: true` means another detection run for this alert is in progress, and `ineligible: true` means the detector is disabled or untrained (`message` says which), so nothing was scored.",
+    description = "Manually triggers an alert to test its functionality and notification delivery. Useful for testing alert configurations, verifying notification channels, and ensuring alerts work as expected before relying on them for monitoring. When a destination or the on-call page could not be delivered, the response also carries `warning` with the reason. For an anomaly detection alert it runs detection now and returns `message`, `claim_lost`, `ineligible`, `anomaly_id`, `anomalies_found`, `points_scored` and `anomalies`; `claim_lost: true` means another detection run for this alert is in progress, and `ineligible: true` means the detector is disabled or untrained (`message` says which), so nothing was scored.",
     security(
         ("Authorization"= [])
     ),
@@ -3779,7 +3779,14 @@ pub async fn trigger_alert(
     }
     let client = get_orm_client_ro().await;
     match alert::trigger_by_id(client, &org_id, alert_id).await {
-        Ok(triggered) => MetaHttpResponse::ok(triggered.response_message()),
+        Ok(triggered) => match triggered.warning() {
+            Some(warning) => MetaHttpResponse::json(serde_json::json!({
+                "code": 200,
+                "message": triggered.response_message(),
+                "warning": warning,
+            })),
+            None => MetaHttpResponse::ok(triggered.response_message()),
+        },
         Err(AlertError::AlertNotFound) => {
             if let Some(_composite) =
                 openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())
