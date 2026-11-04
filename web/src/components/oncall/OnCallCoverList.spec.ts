@@ -19,7 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import OnCallCoverList from "@/components/oncall/OnCallCoverList.vue";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
-import { ok } from "@/test/unit/helpers/axiosReply";
+import { ok } from "@/test/unit/helpers/mockService";
 import store from "@/test/unit/helpers/store";
 import type { Override } from "@/ts/interfaces/oncall";
 

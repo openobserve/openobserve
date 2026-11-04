@@ -62,6 +62,7 @@ vi.mock("vue-router", () => ({
 import { queryClient } from "@/composables/query/queryClient";
 import { oncallKeys } from "@/services/oncall.querykeys";
 import serviceStreamsService from "@/services/service_streams";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 
 const service = vi.mocked(oncallService);
 const correlation = vi.mocked(serviceStreamsService);
@@ -614,7 +615,7 @@ describe("OnCallRouting", () => {
       ],
     } as never);
     service.createOwnershipRule
-      .mockResolvedValueOnce({ data: {} } as any)
+      .mockResolvedValueOnce(axiosReply({}))
       .mockRejectedValueOnce({ response: { status: 500, data: {} } });
     const wrapper = render();
     await flushPromises();
@@ -768,12 +769,12 @@ describe("OnCallRouting", () => {
   });
 
   it("switches tables from the real toolbar toggle and shows each list's count", async () => {
-    service.unroutedSignals.mockResolvedValue({
-      data: [
+    service.unroutedSignals.mockResolvedValue(
+      axiosReply([
         { id: "s1", dimensions: { service: "api" } },
         { id: "s2", dimensions: { service: "web" } },
-      ],
-    } as any);
+      ]),
+    );
     const { OToggleGroup: _g, OToggleGroupItem: _i, OTag: _t, ...rest } = stubs;
     const wrapper = mount(OnCallRouting, { global: { plugins: [i18n, store], stubs: rest } });
     await flushPromises();

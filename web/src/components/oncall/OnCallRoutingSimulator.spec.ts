@@ -327,10 +327,18 @@ describe("OnCallRoutingSimulator", () => {
   it("disables Send a test page, with the reason, when the priority pages nobody", async () => {
     const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
     const button = () => wrapper.find('[data-test="oncall-simulator-send-test"]');
-    expect(button().attributes("disabled")).toBeUndefined();
+    expect(button().attributes("aria-disabled")).toBeUndefined();
     select(wrapper, "oncall-simulator-priority").vm.$emit("update:modelValue", "P4");
     await wrapper.vm.$nextTick();
-    expect(button().attributes("disabled")).toBeDefined();
+    // Unavailable but still focusable, so a keyboard or screen-reader user reaches the reason.
+    expect(button().attributes("aria-disabled")).toBe("true");
+    expect(button().attributes("disabled")).toBeUndefined();
+    const reasonId = button().attributes("aria-describedby");
+    expect(wrapper.find(`[id="${reasonId}"]`).text()).toBe(
+      "P4 pages nobody, so there is nothing to test",
+    );
+    await button().trigger("click");
+    expect(wrapper.emitted("send-test")).toBeUndefined();
     const tip = wrapper
       .find('[data-test="oncall-simulator-send-test-wrap"]')
       .findComponent({ name: "OTooltip" });

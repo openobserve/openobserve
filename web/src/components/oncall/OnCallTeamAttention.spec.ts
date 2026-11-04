@@ -443,7 +443,7 @@ describe("OnCallTeamAttention", () => {
     expect(wrapper.find('[data-test="oncall-attention-checked"]').exists()).toBe(false);
   });
 
-  /// G14: a finding names a person, so the strip reads their display name and keeps the email on hover.
+  /// A finding names a person, so the strip reads their display name and keeps the email on hover.
   it("names people in a finding by display name, mounting the real name component", async () => {
     queryClient.setQueryData(orgUsersQuery("default").queryKey, [
       { email: "bob@oncall.test", first_name: "Bob", last_name: "OnCall" },

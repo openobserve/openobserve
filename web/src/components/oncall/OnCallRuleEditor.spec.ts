@@ -101,7 +101,7 @@ describe("OnCallRuleEditor", () => {
     whoIsOnCall.mockResolvedValue({ data: [] });
   });
 
-  /// R10: a path nothing claims is judged on the draft's conditions alone, so no conflict is named.
+  /// A path nothing claims is judged on the draft's conditions alone, so no conflict is named.
   it("names only the drafted team when nothing claims the path", async () => {
     const wrapper = render({
       initialDimensions: { "k8s-namespace": "risk" },

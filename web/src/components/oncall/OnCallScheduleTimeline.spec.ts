@@ -24,7 +24,7 @@ import type {
 } from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
 import i18n from "@/locales";
 import usersService from "@/services/users";
-import { ok } from "@/test/unit/helpers/axiosReply";
+import { ok } from "@/test/unit/helpers/mockService";
 import store from "@/test/unit/helpers/store";
 import type { ResolvedSegment, Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
@@ -831,7 +831,7 @@ describe("OnCallScheduleTimeline", () => {
     expect(usersService.orgUsers).toHaveBeenCalledTimes(1);
   });
 
-  // G15: the zone is a small chip, and only for a reader on another clock (specs pin UTC).
+  // The zone is a small chip, and only for a reader on another clock (specs pin UTC).
   it("names the team's zone as a chip only when it differs from the reader's", () => {
     expect(render({ timezone: "UTC" }).find('[data-test="oncall-timeline-zone"]').exists()).toBe(
       false,

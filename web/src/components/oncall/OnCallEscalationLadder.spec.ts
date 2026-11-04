@@ -265,7 +265,6 @@ describe("OnCallEscalationLadder", () => {
     expect(wrapper.find('[data-test="oncall-ladder-priority-p3"]').exists()).toBe(true);
   });
 
-  /// Edit and Send test page sit at the right end of the card header, never inline with its text.
   it("puts Edit and Send test page on the right of the card header", () => {
     const wrapper = render({ canConfigure: true });
     const header = wrapper.find('[data-test="oncall-ladder-header"]');
@@ -314,6 +313,27 @@ describe("OnCallEscalationLadder", () => {
     expect(
       wrapper.find('[data-test="oncall-ladder-send-test"]').attributes("disabled"),
     ).toBeDefined();
+  });
+
+  // A keyboard or screen-reader user must reach why Send test is off, so the real button stays focusable.
+  it("keeps a blocked Send test focusable and describes it by its reason", async () => {
+    const { OButton: _button, OTooltip: _tooltip, ...realButton } = stubs;
+    const wrapper = mount(OnCallEscalationLadder, {
+      props: {
+        priorities,
+        selected: "P2",
+        preview: preview({ priority: "P1" }),
+        canConfigure: true,
+      },
+      global: { plugins: [i18n, store], stubs: realButton },
+    });
+    const send = wrapper.find('[data-test="oncall-ladder-send-test"]');
+    expect(send.attributes("disabled")).toBeUndefined();
+    expect(send.attributes("aria-disabled")).toBe("true");
+    const reason = wrapper.find(`[id="${send.attributes("aria-describedby")}"]`);
+    expect(reason.text()).toBe(String(i18n.global.t("oncall.ladderSendTestBlocked")));
+    await send.trigger("click");
+    expect(wrapper.emitted("send-test")).toBeUndefined();
   });
 
   it("offers Send test only to someone who can configure", async () => {
@@ -726,11 +746,9 @@ describe("OnCallEscalationLadder", () => {
       .findAll('[data-test^="oncall-ladder-rung-time-"]')
       .map((cell) => cell.text());
 
-    // Plain text in one fixed column, so every row's "who" starts on the same line.
     expect(times).toEqual(["At once", "After 5 min"]);
     // The ending fires with the last step, so it says "Then" rather than repeat that step's delay.
     expect(wrapper.find('[data-test="oncall-ladder-ends-time"]').text()).toBe("Then");
-    // The time column has one fixed width on every row, the ending's included.
     for (const cell of wrapper.findAll(
       '[data-test^="oncall-ladder-rung-time-"], [data-test="oncall-ladder-ends-time"]',
     )) {

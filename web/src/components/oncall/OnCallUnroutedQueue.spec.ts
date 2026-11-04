@@ -217,7 +217,7 @@ describe("OnCallUnroutedQueue", () => {
       });
       const empty = wrapper.find('[data-test="oncall-unrouted-empty"]');
       expect(empty.exists()).toBe(true);
-      expect(empty.text()).not.toContain(String(i18n.global.t("oncall.unroutedNone")));
+      expect(empty.text()).toContain(String(i18n.global.t("emptyState.filtered.action")));
 
       const clear = empty
         .findAll("button")

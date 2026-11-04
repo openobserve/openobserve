@@ -17,6 +17,7 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { nextTick, reactive } from "vue";
 import SettingsIndex from "./index.vue";
+import type { SectionHubGroup } from "@/components/common/SectionHub.vue";
 import i18n from "@/locales";
 import { createMemoryHistory, createRouter, createWebHistory } from "vue-router";
 import awsConfig from "@/aws-exports";
@@ -55,7 +56,7 @@ const mockStore = {
     },
     zoConfig: {
       service_streams_enabled: true,
-    },
+    } as Record<string, boolean>,
   },
 };
 
@@ -335,10 +336,10 @@ describe("SettingsIndex", () => {
     });
 
     it("gives the Slack section no page subtitle", () => {
-      mockStore.state.zoConfig = { service_streams_enabled: true, slack_enabled: true } as any;
+      mockStore.state.zoConfig = { service_streams_enabled: true, slack_enabled: true };
       const wrapper = createWrapper();
-      const items = (wrapper.vm.sectionGroups as any[]).flatMap((g: any) => g.items);
-      expect(items.find((i: any) => i.key === "slack")?.description).toBeUndefined();
+      const items = (wrapper.vm.sectionGroups as SectionHubGroup[]).flatMap((g) => g.items);
+      expect(items.find((i) => i.key === "slack")?.description).toBeUndefined();
     });
 
     it("AC-1.4 shows no Slack rail item on Cloud while Slack is disabled", () => {

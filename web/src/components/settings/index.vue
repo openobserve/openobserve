@@ -142,7 +142,6 @@ export default defineComponent({
       "slack",
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
-    // Card-and-table sections use the row width, like Telephony and the destination lists.
     const FULL_WIDTH_SECTIONS = new Set(["password_policy", "slack"]);
     const onlineEvalsRouteOff = useOnlineEvalsRouteOff();
 

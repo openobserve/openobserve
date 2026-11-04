@@ -445,10 +445,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :loading="awaySaving"
             :disabled="!awayValid"
+            :focusable-unavailable="!awayValid"
             data-test="oncall-mine-away-save"
             @click="saveAway"
           >
             {{ t("oncall.mineAwaySave") }}
+            <template v-if="!awayValid" #unavailable-reason>{{
+              t("oncall.mineAwayPickTimes")
+            }}</template>
           </OButton>
           <OTooltip v-if="!awayValid" :content="t('oncall.mineAwayPickTimes')" />
         </div>

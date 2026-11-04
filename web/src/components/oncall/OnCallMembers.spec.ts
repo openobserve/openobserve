@@ -21,7 +21,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
-import { ok, type DeepPartial } from "@/test/unit/helpers/axiosReply";
+import { ok, type DeepPartial } from "@/test/unit/helpers/mockService";
 import store from "@/test/unit/helpers/store";
 import type {
   ChannelReadiness,

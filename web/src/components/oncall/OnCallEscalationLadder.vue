@@ -70,26 +70,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <OnCallChannelIcons v-if="headerChannels.length" :channels="headerChannels" />
         <span class="ms-auto flex items-center gap-2">
-          <!-- The why hangs off a wrapper: a disabled button gets no pointer events, so its own tooltip never opens. -->
           <span
             v-if="canConfigure && !silent"
             class="inline-flex"
             data-test="oncall-ladder-send-test-wrap"
           >
-            <OTooltip
-              v-if="!sendTestReady"
-              side="bottom"
-              :content="t('oncall.ladderSendTestBlocked')"
-            />
             <OButton
               variant="outline"
               size="sm"
-              icon-left="play-arrow"
               :disabled="!sendTestReady"
+              :focusable-unavailable="!sendTestReady"
               data-test="oncall-ladder-send-test"
               @click="emit('send-test')"
             >
-              {{ t("oncall.ladderSendTestPage") }}
+              <!-- First child, so it anchors to the whole button and opens on keyboard focus too. -->
+              <OTooltip
+                v-if="!sendTestReady"
+                side="bottom"
+                :content="t('oncall.ladderSendTestBlocked')"
+              />
+              <OIcon name="play-arrow" size="sm" />{{ t("oncall.ladderSendTestPage") }}
+              <template v-if="!sendTestReady" #unavailable-reason>{{
+                t("oncall.ladderSendTestBlocked")
+              }}</template>
             </OButton>
           </span>
           <OButton

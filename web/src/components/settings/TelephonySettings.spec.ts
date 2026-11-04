@@ -29,6 +29,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import TelephonyAccountDialog from "./TelephonyAccountDialog.vue";
 import TelephonySettings from "./TelephonySettings.vue";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/services/oncall", () => ({
@@ -231,13 +232,13 @@ describe("TelephonySettings", () => {
     it("Check account asks Twilio again and says when it passed", async () => {
       await render(CONNECTED);
       expect(service.getTelephonyStatus).toHaveBeenCalledTimes(1);
-      service.getTelephonyStatus.mockResolvedValue({ data: status("account_rejected") } as any);
+      service.getTelephonyStatus.mockResolvedValue(axiosReply(status("account_rejected")));
       card("check")!.click();
       await flushPromises();
       expect(service.getTelephonyStatus).toHaveBeenCalledTimes(2);
       expect(cardText("status")).toBe("Not working");
       expect(toast).toHaveBeenLastCalledWith(expect.objectContaining({ variant: "warning" }));
-      service.getTelephonyStatus.mockResolvedValue({ data: status("ok") } as any);
+      service.getTelephonyStatus.mockResolvedValue(axiosReply(status("ok")));
       card("check")!.click();
       await flushPromises();
       expect(toast).toHaveBeenLastCalledWith({

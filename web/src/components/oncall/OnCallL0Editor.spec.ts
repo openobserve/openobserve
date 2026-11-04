@@ -217,7 +217,6 @@ describe("OnCallL0Editor", () => {
     expect(p2).toBe(String(i18n.global.t("oncall.l0OptionGate")));
   });
 
-  // Every permission's switch is the row's last control, so all three sit in one right-hand column.
   it("ends each permission row with its switch", () => {
     const wrapper = render();
     for (const key of ["promotion", "downgrade", "suppress"]) {

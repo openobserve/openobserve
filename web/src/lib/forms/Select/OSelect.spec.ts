@@ -2,6 +2,7 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { h } from "vue";
 import OSelect from "./OSelect.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -589,6 +590,22 @@ describe("OSelect", () => {
       const trigger = wrapper.find('button[role="combobox"]');
       expect(trigger.attributes("aria-label")).toBe("Pick a country");
       expect(trigger.attributes("aria-labelledby")).toBeUndefined();
+    });
+
+    it("puts the label's info icon in the Tab order so its tooltip opens on keyboard focus", async () => {
+      wrapper = mount(OSelect, {
+        props: { label: "Country", options },
+        attrs: { "data-test": "country" },
+        slots: { tooltip: () => h(OTooltip, { content: "Where the team works", delay: 10 }) },
+        attachTo: document.body,
+      });
+      const info = wrapper.find('[data-test="country-info"]');
+      expect(info.attributes("tabindex")).toBe("0");
+      expect(info.attributes("aria-label")).toBeTruthy();
+      info.element.dispatchEvent(new FocusEvent("focus"));
+      await new Promise((r) => setTimeout(r, 60));
+      await flushPromises();
+      expect(document.body.textContent).toContain("Where the team works");
     });
 
     it("adds no labelledby without an outside label", () => {

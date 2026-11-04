@@ -615,8 +615,7 @@ describe("OnCallResponseDetail", () => {
     });
   });
 
-  /// The server answers an unack it cannot apply with 200 unchanged and the page still held.
-  /// Engine bookkeeping is folded by default; the toggle names how much it hides and appears only when there is some.
+  // Engine bookkeeping is folded by default; the toggle names how much it hides and appears only when there is some.
   it("folds system activity until asked for", async () => {
     service.getResponse.mockResolvedValue(
       axiosReply({
@@ -1298,6 +1297,25 @@ describe("OnCallResponseDetail", () => {
 
       expect(wrapper.text()).toContain("The ladder is finished");
     });
+
+    it("keeps an exhausted Escalate focusable and describes it by its reason", async () => {
+      service.escalationProgress.mockResolvedValue(
+        axiosReply({ fired: [], next_targets: [], next_at: null, exhausted: true }),
+      );
+      service.getResponse.mockResolvedValue(axiosReply({ response: record(), events: [] }));
+      const wrapper = mount(OnCallResponseDetail, {
+        global: { plugins: [i18n, store], stubs: { ...stubs, OButton: false } },
+      });
+      await flushPromises();
+
+      const escalate = wrapper.find('[data-test="oncall-response-escalate-btn"]');
+      expect(escalate.attributes("disabled")).toBeUndefined();
+      expect(escalate.attributes("aria-disabled")).toBe("true");
+      const reason = wrapper.find(`[id="${escalate.attributes("aria-describedby")}"]`);
+      expect(reason.text()).toBe(String(i18n.global.t("oncall.ladderExhausted")));
+      await escalate.trigger("click");
+      expect(service.escalateNow).not.toHaveBeenCalled();
+    });
   });
 
   /// The tagline: team, which firing this is, and when it opened — read once,
@@ -1317,7 +1335,7 @@ describe("OnCallResponseDetail", () => {
       });
     });
 
-    /// Which firing this is was jargon in the tagline; how often it fired before rides the stat strip instead.
+    /// How often the alert fired before is a stat-strip fact, not tagline copy.
     it("keeps the firing number out of the tagline", async () => {
       const wrapper = await renderWith();
       expect(wrapper.find('[data-test="oncall-response-firing"]').exists()).toBe(false);
@@ -1610,7 +1628,7 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
     alerts.get_by_alert_id.mockResolvedValue(axiosReply({}));
   });
 
-  /// "step 2 of 3 · Paged up to" was ladder jargon; the escalation phrase in the header already says it in words.
+  /// The escalation phrase in the header already says how far the ladder got, so no step counter repeats it.
   it("states no ladder-step tile, even when the step is known", async () => {
     service.getPolicy.mockResolvedValue(
       axiosReply({
@@ -1697,7 +1715,7 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
     });
   });
 
-  /// R13, L2: on the subtitle line the phrase gives way after team and time; in the body it keeps a readable floor; the title keeps its floor.
+  /// On the subtitle line the phrase gives way after team and time; in the body it keeps a readable floor; the title keeps its floor.
   it("keeps the escalation phrase readable and the title floored", async () => {
     for (const lgUp of [true, false]) {
       mockViewport.lgUp = lgUp;
@@ -1933,7 +1951,7 @@ describe("OnCallResponseDetail — responding", () => {
       wrapper.unmount();
     });
 
-    /// L3: once the re-read sees the rung sent, the activity reads the record again.
+    /// Once the re-read sees the rung sent, the activity reads the record again.
     it("re-reads the record when the rung is sent, so the activity agrees", async () => {
       vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
       due();
@@ -2252,7 +2270,6 @@ describe("OnCallResponseDetail — responding", () => {
     });
   });
 
-  /// The tabs sit in the header like the Incident page, so the activity panel below has its own height for the note box.
   it("puts the activity, deliveries and causes tabs in the header", async () => {
     const wrapper = await renderWith();
     const header = wrapper.find('[data-test="stub-header-tabs"]');

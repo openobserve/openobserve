@@ -20,6 +20,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import slack from "@/services/slack";
 import { axiosError, installationView, makeSlackStore, ok } from "@/test/unit/helpers/slack";
 import SlackOncallUnlinked from "./SlackOncallUnlinked.vue";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 
 vi.mock("@/services/slack", () => ({
   default: { listOncallUnlinked: vi.fn(), remindOncallUnlinked: vi.fn() },
@@ -83,8 +84,8 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
 
   it("shows one row per person with every team as a chip, on call now first", async () => {
     const nowUs = Date.now() * 1000;
-    vi.mocked(slack.listOncallUnlinked).mockReturnValue(
-      ok({
+    vi.mocked(slack.listOncallUnlinked).mockResolvedValue(
+      axiosReply({
         members: [
           {
             email: "bob@acme.io",
@@ -115,7 +116,7 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
             reminded_at: null,
           },
         ],
-      }) as any,
+      }),
     );
     const w = await mountList();
     const people = w
@@ -145,8 +146,8 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
 
   /// Being on call is not an error, so the chip says it in the calm "on call" tone the rest of On-Call uses.
   it("marks on call now in the success tone, never as an error", async () => {
-    vi.mocked(slack.listOncallUnlinked).mockReturnValue(
-      ok({
+    vi.mocked(slack.listOncallUnlinked).mockResolvedValue(
+      axiosReply({
         members: [
           {
             email: "zed@acme.io",
@@ -156,7 +157,7 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
             reminded_at: null,
           },
         ],
-      }) as any,
+      }),
     );
     const w = await mountList();
     const chip = w.find('[data-test="slack-oncall-unlinked-now-zed@acme.io"]');
@@ -168,8 +169,8 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
 
   /// One row of chips per person: the ones that fit, then "+N" naming them all.
   it("keeps every team on one line with a tooltip naming them all", async () => {
-    vi.mocked(slack.listOncallUnlinked).mockReturnValue(
-      ok({
+    vi.mocked(slack.listOncallUnlinked).mockResolvedValue(
+      axiosReply({
         members: ["Payments", "Search", "Infra"].map((team, i) => ({
           email: "bob@acme.io",
           team_id: `t${i}`,
@@ -177,7 +178,7 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
           next_shift_at: null,
           reminded_at: null,
         })),
-      }) as any,
+      }),
     );
     const w = await mountList();
     const chips = w.findComponent({ name: "OnCallFitChips" });
@@ -187,8 +188,8 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
 
   /// A long list pages inside the card rather than running the settings page long.
   it("pages a long list ten people at a time", async () => {
-    vi.mocked(slack.listOncallUnlinked).mockReturnValue(
-      ok({
+    vi.mocked(slack.listOncallUnlinked).mockResolvedValue(
+      axiosReply({
         members: Array.from({ length: 12 }, (_, i) => ({
           email: `p${String(i).padStart(2, "0")}@acme.io`,
           team_id: "t1",
@@ -196,7 +197,7 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
           next_shift_at: null,
           reminded_at: null,
         })),
-      }) as any,
+      }),
     );
     const w = await mountList();
     const table = w.findComponent({ name: "OTable" });

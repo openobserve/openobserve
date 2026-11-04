@@ -26,7 +26,7 @@ import oncallService from "@/services/oncall";
 import { oncallKeys } from "@/services/oncall.querykeys";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { userKeys } from "@/services/users.querykeys";
-import { ok } from "@/test/unit/helpers/axiosReply";
+import { ok } from "@/test/unit/helpers/mockService";
 import store from "@/test/unit/helpers/store";
 import type { UpcomingShift } from "@/components/oncall/OnCallCoverForm.vue";
 import type { ResolvedSegment, Rotation, Unavailability } from "@/ts/interfaces/oncall";

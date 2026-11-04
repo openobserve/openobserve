@@ -87,6 +87,17 @@ export function axiosReply(data: unknown): AxiosResponse<never> {
   } as AxiosResponse<never>;
 }
 
+export type DeepPartial<T> = T extends (infer U)[]
+  ? DeepPartial<U>[]
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T;
+
+/** A mocked axios answer typed from the call it stands in for; the fixture holds only the fields under test. */
+export function ok<R extends { data: unknown }>(data: DeepPartial<R["data"]> | null): R {
+  return axiosReply(data) as unknown as R;
+}
+
 /** A reply the test sends later with `answer(data)`, for ordering a slow read against a newer one. */
 export function deferredReply(): {
   promise: Promise<AxiosResponse<never>>;

@@ -24,7 +24,7 @@ import { resetListViewState, useListViewState } from "@/composables/useListViewS
 import oncallService from "@/services/oncall";
 import { userKeys } from "@/services/users.querykeys";
 import { orgUsersQuery } from "@/services/users.queries";
-import { ok } from "@/test/unit/helpers/axiosReply";
+import { ok } from "@/test/unit/helpers/mockService";
 import store from "@/test/unit/helpers/store";
 import OnCallTeams from "@/views/OnCall/OnCallTeams.vue";
 import {
@@ -561,7 +561,7 @@ describe("OnCallTeams", () => {
       expect(wrapper.find('[data-test="oncall-team-delete-team_1"]').text()).toBe("Delete team");
     });
 
-    /// G18: a row holds its actions as icons on desktop; setting the default lives in the Edit drawer.
+    /// A row holds its actions as icons on desktop; setting the default lives in the Edit drawer.
     it("offers no set-default on the row, with no star", async () => {
       const wrapper = await rendered();
       expect(wrapper.find('[data-test="oncall-teams-row-more-actions"]').exists()).toBe(false);
@@ -641,7 +641,7 @@ describe("OnCallTeams", () => {
       expect(badge.text()).toContain("Gets every alert no team owns");
     });
 
-    /// G9: every row keeps the same [Edit][Delete] slots, so the icons line up down the column.
+    /// Every row keeps the same Edit and Delete slots, the default team's included.
     it("gives the default row the same Edit and Delete slots as every other row", async () => {
       service.getRoutingConfig.mockResolvedValue(ok({ default_team_id: "team_2" }));
       service.listTeams.mockResolvedValue(
@@ -676,6 +676,25 @@ describe("OnCallTeams", () => {
       expect(open.attributes("disabled")).toBeUndefined();
       await open.trigger("click");
       expect(wrapper.find('[data-test="confirm"]').text()).toContain("Platform");
+    });
+
+    it("keeps the default team's Delete focusable and describes it by why it is off", async () => {
+      service.getRoutingConfig.mockResolvedValue(ok({ default_team_id: "team_2" }));
+      service.listTeams.mockResolvedValue(
+        ok([team("team_1", "Platform"), team("team_2", "Payments")]),
+      );
+      const wrapper = mount(OnCallTeams, {
+        global: { plugins: [i18n, store], stubs: { ...stubs, OButton: false } },
+      });
+      await flushPromises();
+
+      const blocked = wrapper.find('[data-test="oncall-team-delete-team_2"]');
+      expect(blocked.attributes("disabled")).toBeUndefined();
+      expect(blocked.attributes("aria-disabled")).toBe("true");
+      const reason = wrapper.find(`[id="${blocked.attributes("aria-describedby")}"]`);
+      expect(reason.text()).toBe("Make another team the default first");
+      await blocked.trigger("click");
+      expect(wrapper.find('[data-test="confirm"]').exists()).toBe(false);
     });
 
     it("tells the Edit drawer whether the team is already the default", async () => {

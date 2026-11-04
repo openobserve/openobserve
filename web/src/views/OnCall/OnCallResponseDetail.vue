@@ -266,10 +266,14 @@
             size="sm"
             :loading="escalatingNow"
             :disabled="escalation?.exhausted"
+            :focusable-unavailable="escalation?.exhausted"
             data-test="oncall-response-escalate-btn"
             @click="escalateNow"
           >
             <OIcon name="trending-up" size="sm" />{{ t("oncall.escalate") }}
+            <template v-if="escalation?.exhausted" #unavailable-reason>{{
+              t("oncall.ladderExhausted")
+            }}</template>
           </OButton>
           <OTooltip v-if="escalation?.exhausted" :content="t('oncall.ladderExhausted')" />
         </span>

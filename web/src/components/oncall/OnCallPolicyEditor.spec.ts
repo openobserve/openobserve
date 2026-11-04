@@ -24,6 +24,7 @@ import destinationService from "@/services/alert_destination";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import type { Contact, OnCallPolicy } from "@/ts/interfaces/oncall";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -380,11 +381,11 @@ describe("OnCallPolicyEditor", () => {
     expect(tag.attributes("value")).toBe("p1");
   });
 
-  // G15: a team's own channel list is said by the button that reverts it, not a chip.
+  // A team's own channel list is said by the button that reverts it, not a chip.
   it("labels only an inherited team channel", async () => {
-    service.getTeamChannel.mockResolvedValue({
-      data: { team_id: "team_1", destinations: ["slack-eng"], source: "team" },
-    } as any);
+    service.getTeamChannel.mockResolvedValue(
+      axiosReply({ team_id: "team_1", destinations: ["slack-eng"], source: "team" }),
+    );
     const wrapper = render();
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-team-channel-source"]').exists()).toBe(false);

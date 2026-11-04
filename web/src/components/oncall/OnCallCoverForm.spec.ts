@@ -616,7 +616,7 @@ describe("OnCallCoverForm — taking a cover", () => {
 
     const who = wrapper
       .findAllComponents({ name: "OFormSelect" })
-      .find((one: any) => one.props("name") === "user_email")!;
+      .find((one) => one.props("name") === "user_email")!;
     // `options` reaches OSelect through attribute fall-through; OFormSelect declares only `name`.
     expect(who.vm.$attrs.options).toEqual([
       expect.objectContaining({ label: "Ana", value: "ana@o2.ai", subLabel: "ana@o2.ai" }),

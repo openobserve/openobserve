@@ -30,6 +30,7 @@ import {
   refusalOf,
   samePhone,
 } from "@/utils/oncall";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -374,7 +375,7 @@ describe("OnCallPhoneCard", () => {
   it("a number proved in another org needs no code", async () => {
     const w = await render(contact());
     service.setContact.mockResolvedValue({ data: VERIFIED } as any);
-    service.getContact.mockResolvedValue({ data: VERIFIED } as any);
+    service.getContact.mockResolvedValue(axiosReply(VERIFIED));
 
     await find(w, "input").setValue(PHONE);
     await find(w, "send").trigger("click");
@@ -561,7 +562,7 @@ describe("OnCallPhoneCard", () => {
   });
 
   it("opens the remove confirm from the real icon button", async () => {
-    service.getContact.mockResolvedValue({ data: VERIFIED } as any);
+    service.getContact.mockResolvedValue(axiosReply(VERIFIED));
     const { OButton: _button, OTooltip: _tooltip, ...rest } = stubs;
     const w = mount(OnCallPhoneCard, { global: { plugins: [i18n, store], stubs: rest } });
     await flushPromises();

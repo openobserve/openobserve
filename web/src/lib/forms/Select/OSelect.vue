@@ -1383,15 +1383,16 @@ const fieldWidthClass = computed(() => {
       @click.prevent="handleLabelClick"
     >
       {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
-      <OIcon
+      <!-- The tooltip goes first so it anchors to this focusable wrapper, not the icon's svg, and opens on Tab too. -->
+      <span
         v-if="$slots.tooltip"
-        name="info-outline"
-        size="sm"
-        :label="tooltipIconLabel"
+        tabindex="0"
+        role="img"
+        :aria-label="tooltipIconLabel"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="cursor-help"
-        ><slot name="tooltip"
-      /></OIcon>
+        class="rounded-default focus-visible:ring-focus-ring-accent inline-flex cursor-help focus-visible:ring-2 focus-visible:outline-none"
+        ><slot name="tooltip" /><OIcon name="info-outline" size="sm"
+      /></span>
     </label>
 
     <template v-if="listboxModeEnabled">

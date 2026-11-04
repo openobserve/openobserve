@@ -29,6 +29,7 @@ import {
   makeSlackStore,
   ok,
 } from "@/test/unit/helpers/slack";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
 
@@ -81,7 +82,7 @@ beforeEach(() => {
   vi.mocked(slack.listInstallations).mockReturnValue(
     ok({ installations: [], available: [] }) as any,
   );
-  vi.mocked(slack.listOncallUnlinked).mockReturnValue(ok({ members: [] }) as any);
+  vi.mocked(slack.listOncallUnlinked).mockResolvedValue(axiosReply({ members: [] }));
 });
 
 afterEach(() => {
@@ -129,11 +130,11 @@ describe("Slack settings: enabled", () => {
   });
 
   it("puts the on-call unlinked people in the card's on-call slot, above its other sections", async () => {
-    vi.mocked(slack.listInstallations).mockReturnValue(
-      ok({ installations: [installationView()] }) as any,
+    vi.mocked(slack.listInstallations).mockResolvedValue(
+      axiosReply({ installations: [installationView()] }),
     );
-    vi.mocked(slack.listOncallUnlinked).mockReturnValue(
-      ok({
+    vi.mocked(slack.listOncallUnlinked).mockResolvedValue(
+      axiosReply({
         members: [
           {
             email: "kim@acme.io",
@@ -143,7 +144,7 @@ describe("Slack settings: enabled", () => {
             reminded_at: null,
           },
         ],
-      }) as any,
+      }),
     );
     const w = mountSlack({ slack_enabled: true });
     await flushPromises();

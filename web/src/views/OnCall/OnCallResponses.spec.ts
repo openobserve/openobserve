@@ -948,7 +948,6 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(true);
     });
 
-    /// A ⋯-only row reserves no empty slots, so its menu centres under the Actions header.
     it("centres a resolved row's lone ⋯ with no empty slots beside it", async () => {
       const resolved = await withPages([
         page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
@@ -2614,9 +2613,7 @@ describe("OnCallResponses — filtering by cause", () => {
     await flushPromises();
   }
 
-  /// A cause is written at resolve, so filtering an OPEN list by one can only
-  /// ever empty it. The default "all" tab shows resolved pages, so the filter
-  /// is there until a tab that hides them is picked.
+  // A cause is written at resolve, so filtering an open-only list by one could only ever empty it.
   it("is offered only while the tab includes resolved pages", async () => {
     const wrapper = await open();
     expect(cause(wrapper)).toBeDefined();

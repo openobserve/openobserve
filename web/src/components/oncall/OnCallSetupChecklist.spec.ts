@@ -24,6 +24,7 @@ import oncallService from "@/services/oncall";
 import { resetOnCallPolicyReviewed } from "@/composables/useOnCallPolicyReviewed";
 import { resetOnCallSetupDismissed } from "@/composables/useOnCallSetupDismissed";
 import store from "@/test/unit/helpers/store";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 
 vi.mock("@/services/oncall", () => ({ default: { testPage: vi.fn() } }));
 
@@ -195,14 +196,13 @@ describe("OnCallSetupChecklist", () => {
 
   /// The test page is a real page, so it asks first, and the step is done only once a send landed.
   it("ticks the test step only once a test page actually lands", async () => {
-    const result = (delivered: boolean) => ({
-      data: {
+    const result = (delivered: boolean) =>
+      axiosReply({
         reached_anyone: delivered,
         channels: ["email"],
         attempts: [{ channel: "email", recipient: "a@o2.ai", reason: "", delivered }],
-      },
-    });
-    vi.mocked(oncallService.testPage).mockResolvedValueOnce(result(false) as any);
+      });
+    vi.mocked(oncallService.testPage).mockResolvedValueOnce(result(false));
     const wrapper = render({ hasTeam: true, firstTeamId: "team_1", firstTeamName: "Checkout" });
 
     await wrapper.find('[data-test="oncall-setup-cta-test"]').trigger("click");
@@ -212,7 +212,7 @@ describe("OnCallSetupChecklist", () => {
     await flushPromises();
     expect(states(wrapper).at(-1)).not.toBe("done");
 
-    vi.mocked(oncallService.testPage).mockResolvedValueOnce(result(true) as any);
+    vi.mocked(oncallService.testPage).mockResolvedValueOnce(result(true));
     await wrapper.find('[data-test="oncall-setup-cta-test"]').trigger("click");
     wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
     await flushPromises();
@@ -243,7 +243,7 @@ describe("OnCallSetupChecklist", () => {
       );
     });
 
-    /// G15: the title says enough, and the button names the screen it opens.
+    /// The title says enough, and the button names the screen it opens.
     it("reads Review escalation with no sub-line", () => {
       const wrapper = render(ready);
       expect(wrapper.find('[data-test="oncall-setup-cta-policy"]').text()).toBe(

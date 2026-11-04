@@ -336,6 +336,22 @@ describe("OnCallMine", () => {
     expect(data.end_at).toBeGreaterThan(data.start_at);
   });
 
+  it("keeps Save focusable until both ends are picked, and describes it by what is missing", async () => {
+    const wrapper = mount(OnCallMine, {
+      global: { plugins: [i18n, store], stubs: { ...stubs, OButton: false } },
+    });
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-mine-away"]').trigger("click");
+
+    const save = wrapper.find('[data-test="oncall-mine-away-save"]');
+    expect(save.attributes("disabled")).toBeUndefined();
+    expect(save.attributes("aria-disabled")).toBe("true");
+    const reason = wrapper.find(`[id="${save.attributes("aria-describedby")}"]`);
+    expect(reason.text()).toBe(String(i18n.global.t("oncall.mineAwayPickTimes")));
+    await save.trigger("click");
+    expect(service.createUnavailability).not.toHaveBeenCalled();
+  });
+
   it("centres the shift row's actions under the Actions header", async () => {
     const wrapper = render();
     await flushPromises();

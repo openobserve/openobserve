@@ -23,6 +23,7 @@ import { resetListViewState, useListViewState } from "@/composables/useListViewS
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import type { MyDelivery } from "@/ts/interfaces/oncall";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 
 vi.mock("@/services/oncall", () => ({
   default: { myDeliveries: vi.fn(), markDeliveriesRead: vi.fn(), acknowledgeResponse: vi.fn() },
@@ -108,9 +109,9 @@ const history = (wrapper: ReturnType<typeof render>) =>
 const historyRows = (wrapper: ReturnType<typeof render>) =>
   history(wrapper).findAll('[data-test="row"]');
 const answer = (deliveries: MyDelivery[]) =>
-  service.myDeliveries.mockResolvedValue({
-    data: { total: deliveries.length, unread: 99, deliveries },
-  } as any);
+  service.myDeliveries.mockResolvedValue(
+    axiosReply({ total: deliveries.length, unread: 99, deliveries }),
+  );
 
 describe("OnCallMyDeliveries", () => {
   beforeEach(() => {
@@ -119,8 +120,8 @@ describe("OnCallMyDeliveries", () => {
     resetListViewState();
     window.localStorage.clear();
     answer([]);
-    service.markDeliveriesRead.mockResolvedValue({ data: { updated: 1, unread: 0 } } as any);
-    service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+    service.markDeliveriesRead.mockResolvedValue(axiosReply({ updated: 1, unread: 0 }));
+    service.acknowledgeResponse.mockResolvedValue(axiosReply({}));
   });
 
   /// Only channels that were tried are drawn, each saying whether it landed.
@@ -630,7 +631,7 @@ describe("OnCallMyDeliveries", () => {
 
   /// The first paint is a full page, so the fixed-height card looks the same before and after rows arrive.
   it("skeletons ten history rows while the first read is out", async () => {
-    service.myDeliveries.mockReturnValue(new Promise(() => {}) as any);
+    service.myDeliveries.mockReturnValue(new Promise<never>(() => {}));
     const wrapper = render();
     await flushPromises();
     expect(history(wrapper).findComponent({ name: "OTable" }).attributes("skeleton-rows")).toBe(
@@ -755,7 +756,7 @@ describe("OnCallMyDeliveries", () => {
     });
 
     it("holds the same fixed body while loading", async () => {
-      service.myDeliveries.mockReturnValue(new Promise(() => {}) as any);
+      service.myDeliveries.mockReturnValue(new Promise<never>(() => {}));
       const wrapper = await mountReal();
 
       expect(table(wrapper).classes()).toContain("[&_[data-test=o2-table-scroll-container]]:h-104");

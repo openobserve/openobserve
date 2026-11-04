@@ -28,7 +28,6 @@ const CHIP_BADGE_SIZE: Record<NonNullable<AvatarGroupProps["size"]>, BadgeSize> 
   md: "xs",
   lg: "sm",
 };
-// The overlap stays under the initials' side margin, so a neighbour never clips a letter.
 const OVERLAP: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
   sm: "-ms-0.5",
   md: "-ms-0.5",

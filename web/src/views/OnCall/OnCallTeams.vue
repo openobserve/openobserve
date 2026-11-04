@@ -205,7 +205,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="t('oncall.deleteTeam')"
               :data-test="`oncall-team-delete-${row.id}`"
               @click.stop
-            />
+            >
+              <template #unavailable-reason>{{ t("oncall.deleteDefaultTeamBlocked") }}</template>
+            </OButton>
           </OTooltip>
           <OButton
             v-else

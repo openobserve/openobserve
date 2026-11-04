@@ -189,10 +189,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="notifications-active"
           :loading="sending"
           :disabled="!canConfigure || pagesNobody"
+          :focusable-unavailable="pagesNobody"
           data-test="oncall-simulator-send-test"
           @click="sendTest(preview.team_id)"
         >
           {{ t("oncall.simulatorSendTest") }}
+          <template v-if="pagesNobody" #unavailable-reason>{{
+            t("oncall.simulatorSendTestNobody", { priority: raw(priority) })
+          }}</template>
         </OButton>
         <OTooltip
           v-if="pagesNobody"

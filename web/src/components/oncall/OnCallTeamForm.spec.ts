@@ -24,6 +24,7 @@ import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import usersService from "@/services/users";
 import { formatInZone, memberAt } from "@/utils/oncall";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -615,11 +616,12 @@ describe("OnCallTeamForm", () => {
     const TEAM = { id: "t1", name: "Payments", timezone: "UTC" };
     function renderEdit(props: Record<string, unknown>) {
       return mount(OnCallTeamForm, {
-        props: { open: true, team: TEAM as any, ...props },
+        props: { open: true, team: TEAM, ...props },
         global: { plugins: [i18n, store], stubs },
       });
     }
-    const toggle = (wrapper: any) => wrapper.find('[data-test="oncall-team-form-default"]');
+    const toggle = (wrapper: ReturnType<typeof renderEdit>) =>
+      wrapper.find('[data-test="oncall-team-form-default"]');
 
     it("is absent unless the host offers it", async () => {
       const wrapper = renderEdit({});
@@ -629,7 +631,7 @@ describe("OnCallTeamForm", () => {
 
     /// Off until switched on; Save, not the switch, asks the host to nominate the team.
     it("asks the host to make the team default only when switched on and saved", async () => {
-      oncall.updateTeam.mockResolvedValue({ data: TEAM } as any);
+      oncall.updateTeam.mockResolvedValue(axiosReply(TEAM));
       const wrapper = renderEdit({ offerDefault: true, isDefault: false });
       await flushPromises();
       // No hint while off; the outcome line appears once switched on, before Save.
@@ -647,7 +649,7 @@ describe("OnCallTeamForm", () => {
     });
 
     it("saves without nominating when left off", async () => {
-      oncall.updateTeam.mockResolvedValue({ data: TEAM } as any);
+      oncall.updateTeam.mockResolvedValue(axiosReply(TEAM));
       const wrapper = renderEdit({ offerDefault: true, isDefault: false });
       await flushPromises();
       await submit(wrapper);

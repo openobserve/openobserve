@@ -189,7 +189,6 @@ describe("ORefreshButton", () => {
       expect(wrapper.find("[data-stub-tooltip]").text()).toBe("Not yet refreshed");
     });
 
-    /// A header row of `sm` buttons is 34px, so the header size matches them instead of the 32px toolbar height.
     it("is 32px by default and 34px at the header size", () => {
       expect(inline().find("button").classes()).toContain("h-8!");
       const header = inline({ size: "header" }).find("button");
