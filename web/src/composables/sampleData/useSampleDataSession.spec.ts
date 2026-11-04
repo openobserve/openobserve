@@ -21,12 +21,20 @@ vi.mock("@/utils/sampleData/tour", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/sampleData/tour")>()),
   resolveTourTarget: (...args: unknown[]) => mocks.resolveTarget(...args),
 }));
-vi.mock("@/services/sample_data.queries", () => ({
-  loadSampleDataMutation: (org: string) => ({
-    mutationFn: (vars: unknown) => mocks.load(org, vars),
-  }),
-  removeSampleDataMutation: (org: string) => ({ mutationFn: () => mocks.remove(org) }),
-}));
+// the real options keep their meta, so the mutation cache expires what it would in the app
+vi.mock("@/services/sample_data.queries", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/services/sample_data.queries")>();
+  return {
+    loadSampleDataMutation: (org: string) => ({
+      ...real.loadSampleDataMutation(org),
+      mutationFn: (vars: unknown) => mocks.load(org, vars),
+    }),
+    removeSampleDataMutation: (org: string) => ({
+      ...real.removeSampleDataMutation(org),
+      mutationFn: () => mocks.remove(org),
+    }),
+  };
+});
 
 const loaded = { counts: { logs: 10, spans: 2, metrics: 3 }, hours: 4, failedSteps: [] };
 
@@ -85,6 +93,27 @@ describe("useSampleDataSession remove", () => {
     expect(session.status.value).toBe("idle");
     expect(session.result.value).toBeUndefined();
     expect(session.counts.logs).toBe(0);
+  });
+});
+
+describe("useSampleDataSession load end", () => {
+  it.each([
+    ["loads", () => Promise.resolve(loaded)],
+    ["fails part-way", () => Promise.reject(new Error("ingest failed"))],
+  ])("refetches whether the org has data when its load %s", async (_, finish) => {
+    vi.resetModules();
+    mocks.load.mockReset().mockImplementation(finish);
+    const { queryClient } = await import("@/composables/query/queryClient");
+    const { streamKeys } = await import("@/services/stream.querykeys");
+    const { organizationKeys } = await import("@/services/organizations.querykeys");
+    const own = [streamKeys.nameList("org-a", "logs"), organizationKeys.summary("org-a")];
+    const other = streamKeys.nameList("org-b", "logs");
+    for (const key of [...own, other]) queryClient.setQueryData(key, []);
+
+    await (await import("./useSampleDataSession")).useSampleDataSession().start("org-a");
+
+    for (const key of own) expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(other)?.isInvalidated).toBe(false);
   });
 });
 

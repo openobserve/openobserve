@@ -16,6 +16,7 @@
 import { computed, reactive, ref } from "vue";
 import { MutationObserver } from "@tanstack/vue-query";
 import type { Router } from "vue-router";
+import { orgKey } from "@/composables/query/keys";
 import { queryClient } from "@/composables/query/queryClient";
 import { loadSampleDataMutation, removeSampleDataMutation } from "@/services/sample_data.queries";
 import {
@@ -139,6 +140,8 @@ const start = async (org: string, ingestAllowedUptoHours?: number) => {
     status.value = "loaded";
     return res;
   } catch (e: any) {
+    // the mutation expires the org's queries on success only, and a failed load can leave sample streams behind
+    void queryClient.invalidateQueries({ queryKey: orgKey(org) });
     steps.telemetry = "failed";
     error.value = e?.response?.data?.message ?? e?.message ?? "";
     status.value = "failed";
