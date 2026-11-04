@@ -19,7 +19,7 @@ import alertsService from "@/services/alerts";
 import commonService from "@/services/common";
 import dashboardService from "@/services/dashboards";
 import jsTransformService from "@/services/jstransform";
-import { SAMPLE_DASHBOARD_TITLES, SAMPLE_FOLDER_NAME } from "./catalog";
+import { SAMPLE_DASHBOARD_TITLES, SAMPLE_FOLDER_NAME, SAMPLE_FUNCTIONS } from "./catalog";
 import { loadSampleData, removeSampleData, sampleWindowHours } from "./loader";
 
 const accepted = (rows: unknown[]) => ({
@@ -319,7 +319,21 @@ describe("removeSampleData", () => {
   it("still resolves when the state cannot be deleted", async () => {
     mocks.sampleData.deleteState.mockRejectedValueOnce(new Error("down"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    await expect(removeSampleData("acme")).resolves.toBeUndefined();
+    await expect(removeSampleData("acme")).resolves.toEqual([]);
     warn.mockRestore();
+  });
+
+  it("keeps a sample function that the user's own pipeline uses, and still removes the rest", async () => {
+    vi.mocked(jsTransformService.delete).mockRejectedValueOnce({ response: { status: 409 } });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const kept = await removeSampleData("acme");
+    warn.mockRestore();
+    expect(kept).toEqual([SAMPLE_FUNCTIONS[0]]);
+    expect(jsTransformService.delete).toHaveBeenCalledTimes(SAMPLE_FUNCTIONS.length);
+    for (const call of vi.mocked(jsTransformService.delete).mock.calls) {
+      expect(call).toEqual(["acme", expect.any(String)]);
+    }
+    expect(mocks.streamDelete).toHaveBeenCalled();
+    expect(mocks.sampleData.deleteState).toHaveBeenCalledWith("acme");
   });
 });

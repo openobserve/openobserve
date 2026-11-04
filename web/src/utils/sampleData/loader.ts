@@ -387,8 +387,11 @@ const SAMPLE_STREAM_SET: { name: string; type: string }[] = [
   ...Object.values(SAMPLE_METRICS).map((name) => ({ name, type: "metrics" })),
 ];
 
-/** Deletes everything the loader creates; each asset is found by its sample name, so it works from any browser. */
-export const removeSampleData = async (org: string) => {
+/**
+ * Deletes everything the loader creates; each asset is found by its sample name, so it works from any browser.
+ * Resolves to the sample functions it kept because something of the user's still uses them.
+ */
+export const removeSampleData = async (org: string): Promise<string[]> => {
   await removeAlerts(org);
   await removeAlertDelivery(org);
   await removeDashboards(org);
@@ -398,8 +401,15 @@ export const removeSampleData = async (org: string) => {
       pipelineService.deletePipeline({ pipeline_id: pipelineId, org_id: org }),
     );
   }
+  const kept: string[] = [];
   for (const name of SAMPLE_FUNCTIONS) {
-    await ignoreMissing(() => jsTransformService.delete(org, name, true));
+    try {
+      await ignoreMissing(() => jsTransformService.delete(org, name));
+    } catch (e) {
+      // a user pipeline or stream that uses the function blocks its delete; the rest must still go
+      console.warn(`Sample function "${name}" was kept`, e);
+      kept.push(name);
+    }
   }
   // the sample alerts and pipeline are gone by name; the cascade would also take the user's own
   await Promise.all(
@@ -413,4 +423,5 @@ export const removeSampleData = async (org: string) => {
     // everything else is already deleted; a stale state only points the tour at a window with no data
     console.warn("Sample data window was not deleted", e);
   }
+  return kept;
 };

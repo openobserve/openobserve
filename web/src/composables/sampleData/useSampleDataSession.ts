@@ -155,7 +155,7 @@ const remove = async (org: string) => {
     throw new Error("Sample data is still loading");
   }
   const observer = new MutationObserver(queryClient, removeSampleDataMutation(org));
-  await observer.mutate();
+  const keptFunctions = await observer.mutate();
   // the progress and result belong to the last load's org; a load running elsewhere keeps them
   if (loadingOrg.value === org) {
     resetProgress();
@@ -164,6 +164,7 @@ const remove = async (org: string) => {
   }
   for (const flag of ORG_FLAGS) setOrgFlag(flag, org, false);
   if (tour.value?.org === org) stopTour();
+  return keptFunctions;
 };
 
 const persistTour = () =>
