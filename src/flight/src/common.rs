@@ -141,29 +141,47 @@ pub struct NodeMessages {
 impl NodeMessages {
     /// Sent before the first batch, so the caller sees scan stats and fast failures early.
     pub fn first(&self) -> Vec<CustomMessage> {
-        let mut messages = vec![CustomMessage::ScanStats(self.scan_stats)];
-        if let NodeRole::ClusterLeader(remote) = &self.role {
-            messages.push(CustomMessage::ScanStats(*remote.scan_stats.lock()));
-            messages.extend(remote.partial_err());
-        }
+        let mut messages = vec![CustomMessage::ScanStats(self.reported_scan_stats())];
+        messages.extend(self.partial_err());
         messages
     }
 
     /// Sent after the last batch.
     pub fn last(&self) -> Vec<CustomMessage> {
-        let mut messages = vec![CustomMessage::PeakMemory(
-            self.peak_memory.load(Ordering::Relaxed),
-        )];
-        if let NodeRole::ClusterLeader(remote) = &self.role {
-            messages.push(CustomMessage::PeakMemory(
-                remote.peak_memory.load(Ordering::Relaxed),
-            ));
-            messages.extend(remote.partial_err());
-        }
-        if let Some(info) = &self.profile {
-            messages.push(CustomMessage::Metrics(collect_metrics(info)));
-        }
+        let mut messages = vec![CustomMessage::PeakMemory(self.reported_peak_memory())];
+        messages.extend(self.partial_err());
+        messages.extend(
+            self.profile
+                .as_ref()
+                .map(|info| CustomMessage::Metrics(collect_metrics(info))),
+        );
         messages
+    }
+
+    /// Merged here rather than sent twice: the caller's add gives the same result either way.
+    fn reported_scan_stats(&self) -> ScanStats {
+        let mut stats = self.scan_stats;
+        if let NodeRole::ClusterLeader(remote) = &self.role {
+            stats.add(&remote.scan_stats.lock());
+        }
+        stats
+    }
+
+    fn reported_peak_memory(&self) -> usize {
+        let own = self.peak_memory.load(Ordering::Relaxed);
+        match &self.role {
+            NodeRole::Follower => own,
+            NodeRole::ClusterLeader(remote) => own.max(remote.peak_memory.load(Ordering::Relaxed)),
+        }
+    }
+
+    /// Only a cluster leader has one: a follower's own failure ends its stream instead.
+    fn partial_err(&self) -> Option<CustomMessage> {
+        let NodeRole::ClusterLeader(remote) = &self.role else {
+            return None;
+        };
+        let err = remote.partial_err.lock().clone();
+        (!err.is_empty()).then_some(CustomMessage::PartialErr(err))
     }
 }
 
@@ -185,13 +203,6 @@ pub struct RemoteScanState {
     pub partial_err: Arc<Mutex<String>>,
     /// Filled only for EXPLAIN ANALYZE.
     pub node_profiles: NodeProfiles,
-}
-
-impl RemoteScanState {
-    fn partial_err(&self) -> Option<CustomMessage> {
-        let err = self.partial_err.lock().clone();
-        (!err.is_empty()).then_some(CustomMessage::PartialErr(err))
-    }
 }
 
 pub struct MetricsInfo {
@@ -286,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cluster_leader_also_sends_what_its_remote_scan_collected() {
+    fn test_cluster_leader_merges_what_its_remote_scan_collected() {
         let remote = RemoteScanState {
             scan_stats: Arc::new(Mutex::new(ScanStats {
                 files: 3,
@@ -305,16 +316,16 @@ mod tests {
             }),
             role: NodeRole::ClusterLeader(remote),
         };
-        assert_eq!(
-            describe(messages.first()),
-            ["ScanStats(10)", "ScanStats(3)"]
-        );
+        assert_eq!(describe(messages.first()), ["ScanStats(13)"]);
 
         *partial_err.lock() = "node down".to_string();
         assert_eq!(
+            describe(messages.first()),
+            ["ScanStats(13)", "PartialErr(node down)"]
+        );
+        assert_eq!(
             describe(messages.last()),
             [
-                "PeakMemory(5)",
                 "PeakMemory(7)",
                 "PartialErr(node down)",
                 "Metrics(EmptyExec)"
