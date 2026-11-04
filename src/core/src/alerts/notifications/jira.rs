@@ -221,6 +221,15 @@ pub struct JiraRejected {
     pub message: String,
 }
 
+/// A destination setting Jira can never accept; a 400 so the caller does not retry it.
+fn misconfigured(message: String) -> anyhow::Error {
+    JiraRejected {
+        status: 400,
+        message,
+    }
+    .into()
+}
+
 pub fn is_jira(endpoint: &Endpoint) -> bool {
     endpoint.destination_type.as_deref() == Some(DESTINATION_TYPE)
 }
@@ -230,7 +239,7 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
     let meta = |key: &str| endpoint.metadata.get(key).map_or("", String::as_str);
     let project_key = meta("jira_project_key");
     if project_key.is_empty() {
-        bail!("Jira destination has no project key");
+        return Err(misconfigured("Jira destination has no project key".into()));
     }
     let Some(label) = issue_label(ctx) else {
         bail!("Jira destination has no alert, incident or anomaly id to find its issue by");
@@ -276,7 +285,7 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
     let extra = match meta("jira_fields") {
         "" => Map::new(),
         raw => serde_json::from_str(raw)
-            .map_err(|e| anyhow!("Jira destination has invalid jira_fields: {e}"))?,
+            .map_err(|e| misconfigured(format!("Jira destination has invalid jira_fields: {e}")))?,
     };
     let mut fields = issue_fields(
         extra,
@@ -1854,6 +1863,34 @@ mod tests {
                 assert_eq!(rejected.status, 401);
                 assert_eq!(rejected.message, REJECTED_TOKEN);
                 assert_eq!(err.to_string(), REJECTED_TOKEN);
+            },
+        );
+    }
+
+    #[test]
+    fn a_destination_with_no_project_or_bad_fields_is_refused_as_a_400() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_with_no_project_or_bad_fields_is_refused_as_a_400"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let ctx = anomaly_ctx("value", STATUS_FIRING);
+                let mut no_project = endpoint("http://127.0.0.1:9".into());
+                no_project.metadata.remove("jira_project_key");
+                let err = send(&no_project, &ctx).await.unwrap_err();
+                assert_eq!(err.downcast_ref::<JiraRejected>().unwrap().status, 400);
+                assert_eq!(err.to_string(), "Jira destination has no project key");
+
+                let (base, _) = jira_site(None, "indeterminate").await;
+                let mut bad_fields = endpoint(base);
+                bad_fields
+                    .metadata
+                    .insert("jira_fields".into(), "{not json".into());
+                let err = send(&bad_fields, &ctx).await.unwrap_err();
+                assert_eq!(err.downcast_ref::<JiraRejected>().unwrap().status, 400);
+                assert!(err.to_string().contains("invalid jira_fields"), "{err}");
             },
         );
     }

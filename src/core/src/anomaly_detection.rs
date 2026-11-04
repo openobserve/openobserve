@@ -7017,6 +7017,13 @@ mod tests {
                         .is_retryable()
                 );
             }
+            let misconfigured = mapped(400);
+            assert!(
+                !misconfigured
+                    .downcast_ref::<DestinationRejected>()
+                    .unwrap()
+                    .is_retryable()
+            );
             let network = anomaly_jira_error(anyhow::anyhow!("Connection to x failed"));
             assert!(network.downcast_ref::<DestinationRejected>().is_none());
         }
