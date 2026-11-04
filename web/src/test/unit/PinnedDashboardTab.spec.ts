@@ -182,7 +182,7 @@ describe("PinnedDashboardTab", () => {
     (getDashboard as any).mockRejectedValue({ response: { status: 404 } });
     wrapper = factory();
     await flushPromises();
-    expect(wrapper.emitted("unavailable")?.[0]).toEqual(["abc"]);
+    expect(wrapper.emitted("unavailable")?.[0]).toEqual(["abc", "default"]);
   });
 
   it("emits unavailable when getDashboard returns an empty object (deleted)", async () => {
@@ -190,7 +190,7 @@ describe("PinnedDashboardTab", () => {
     (getDashboard as any).mockResolvedValue({});
     wrapper = factory();
     await flushPromises();
-    expect(wrapper.emitted("unavailable")?.[0]).toEqual(["abc"]);
+    expect(wrapper.emitted("unavailable")?.[0]).toEqual(["abc", "default"]);
   });
 
   it("shows skeleton while loading", async () => {

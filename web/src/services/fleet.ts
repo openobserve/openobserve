@@ -257,14 +257,32 @@ export interface FleetAuditEvent {
   outcome: string;
 }
 
+/** `settings` is the org-level fleet settings. */
+export type FleetAuditModule =
+  "collectors" | "tokens" | "fleets" | "rollouts" | "configs" | "settings";
+
+/** `from`/`to` are epoch ms, `[from, to)`; the server defaults to the 30 days before `to` (now). */
+export type FleetAuditParams = {
+  /** Matches the actor or the target, ignoring case. */
+  q?: string;
+  offset?: number;
+  limit?: number;
+  fleet?: string;
+  module?: FleetAuditModule;
+  from?: number;
+  to?: number;
+};
+
+/** One page of the audit trail, newest first; `total` counts every event the filters match. */
 export interface FleetAuditList {
+  total: number;
   items: FleetAuditEvent[];
   /** The trail is the server's audit stream, which `O2_AUDIT_ENABLED=false` turns off. */
   audit_disabled?: boolean;
 }
 
 export type FleetRolloutStatus =
-  "scheduled" | "in_progress" | "halted" | "completed" | "superseded" | "rolled_back";
+  "scheduled" | "waiting" | "in_progress" | "halted" | "completed" | "superseded" | "rolled_back";
 
 export type FleetRolloutStart = { kind: "now" } | { kind: "at"; at: number };
 
@@ -506,7 +524,8 @@ const api = {
   validateConfig: (orgId: string, body: { yaml: string }) =>
     http().post<{ issues: FleetConfigIssues }>(`/api/${orgId}/fleet/configs/validate`, body),
   deleteConfig: (orgId: string, id: string) => http().delete(configPath(orgId, id)),
-  listAudit: (orgId: string) => http().get<FleetAuditList>(`/api/${orgId}/fleet/audit`),
+  listAudit: (orgId: string, params: FleetAuditParams = {}) =>
+    http().get<FleetAuditList>(`/api/${orgId}/fleet/audit`, { params }),
   listRollouts: (orgId: string, page?: FleetPage) =>
     http().get<{ items: FleetRollout[]; total: number }>(
       paged(`/api/${orgId}/fleet/rollouts`, page),

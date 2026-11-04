@@ -18,6 +18,7 @@ import { useStore } from "vuex";
 import type { TranslateFn } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import type { SearchObject } from "@/composables/useLogs/searchState";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 /**
  * State behind the "View Trace" action — the traces-stream picker and the
@@ -37,6 +38,7 @@ import type { SearchObject } from "@/composables/useLogs/searchState";
 export default function useViewTraceAction(t: TranslateFn, searchObj: SearchObject) {
   const store = useStore();
   const { getStreams } = useStreams(t);
+  const { locked: tracesLocked, lockedReason: tracesLockedReason } = useLicenseLock("traces");
 
   const tracesStreams = ref<string[]>([]);
   const filteredTracesStreamOptions = ref<string[]>([]);
@@ -109,6 +111,8 @@ export default function useViewTraceAction(t: TranslateFn, searchObj: SearchObje
     filteredTracesStreamOptions,
     isTracesStreamsLoading,
     showViewTraceBtn,
+    tracesLocked,
+    tracesLockedReason,
     getTracesStreams,
     setViewTraceBtn,
     filterStreamFn,

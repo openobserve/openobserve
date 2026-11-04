@@ -106,6 +106,7 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
                 use_all_org: true,
                 use_self_context: false,
                 use_self_parent: false,
+                feature: None,
             },
             user.role,
             user.is_external,
@@ -148,6 +149,7 @@ where
                 use_all_org: route.use_all_org,
                 use_self_context: route.use_self_context,
                 use_self_parent: route.use_self_parent,
+                feature: route.feature,
             },
             role,
         )

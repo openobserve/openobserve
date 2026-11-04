@@ -92,7 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onFilterChange"
         data-test="failed-only-toggle"
       >
-        <OTooltip :content="t('alerts.insights.filters.failedOnlyTooltip')"> </OTooltip>
+        <template #tooltip>
+          <OTooltip :content="t('alerts.insights.filters.failedOnlyTooltip')" />
+        </template>
       </OSwitch>
 
       <!-- Silenced Only Toggle -->
@@ -103,7 +105,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onFilterChange"
         data-test="silenced-only-toggle"
       >
-        <OTooltip :content="t('alerts.insights.filters.silencedTooltip')"> </OTooltip>
+        <template #tooltip>
+          <OTooltip :content="t('alerts.insights.filters.silencedTooltip')" />
+        </template>
       </OSwitch>
 
       <!-- Range Filter Chips -->

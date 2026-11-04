@@ -61,7 +61,7 @@ use crate::{
         stream::SchemaRecords,
     },
     ingestion::{
-        TriggerAlertData, check_ingestion_allowed,
+        check_ingestion_allowed,
         grpc::{get_exemplar_val, get_metric_val, get_val},
     },
     pipeline::batch_execution::ExecutablePipeline,
@@ -247,7 +247,7 @@ pub async fn handle_otlp_request(
 
     // realtime alerts
     let mut stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
-    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, Option<ingest::StreamTriggers>> = HashMap::new();
 
     let mut partial_success = ExportMetricsPartialSuccess::default();
 

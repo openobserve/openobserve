@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :has-staffed-rotation="setup.hasStaffedRotation"
       :has-routing="setup.hasRouting"
       :has-destinations="setup.hasDestinations"
-      :compact="hasPages"
+      :compact="!setupOnly"
       :can-configure="canConfigure"
       :first-team-id="teams[0]?.id ?? null"
       @create-team="createTeam"
@@ -103,12 +103,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!unavailable && !setupOnly"
       ref="oTableRef"
       :frame="false"
-      :data="rows"
+      :data="visibleRows"
       :columns="columns"
       row-key="rowKey"
       :loading="loading || !setupLoaded"
       :streaming="backgroundLoading"
       :error="loadError"
+      :forbidden="forbidden"
       pagination="client"
       :page-size="pageSize"
       :current-page="currentPage"
@@ -125,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-responses-table"
       :row-tone="rowTone"
       :row-rail-tone="rowRailTone"
-      :row-section="visibleRowSection"
+      :row-section="rowSection"
       :section-order="SECTION_ORDER"
       selection="multiple"
       v-model:selected-ids="selectedIds"
@@ -374,7 +375,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag variant="default-soft" size="sm" :data-test="`oncall-section-count-${sectionKey}`">
             {{ raw(String(sectionCounts[sectionKey] ?? 0)) }}
           </OTag>
-          <OText v-if="sectionKey !== 'ringing' || unroutedRinging === 0" variant="meta">
+          <OText
+            v-if="sectionKey !== 'ringing' || unroutedRinging + stoppedRinging === 0"
+            variant="meta"
+          >
             {{ t(`oncall.sectionHint_${sectionKey}`) }}
           </OText>
           <template v-else>
@@ -384,9 +388,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OText v-if="routedRinging > 0" variant="meta" aria-hidden="true">
               {{ raw("·") }}
             </OText>
-            <OText variant="meta" data-test="oncall-section-hint-unrouted">
+            <OText
+              v-if="unroutedRinging > 0"
+              variant="meta"
+              data-test="oncall-section-hint-unrouted"
+            >
               {{
                 t("oncall.sectionHint_ringingUnrouted", { count: unroutedRinging }, unroutedRinging)
+              }}
+            </OText>
+            <OText
+              v-if="unroutedRinging > 0 && stoppedRinging > 0"
+              variant="meta"
+              aria-hidden="true"
+            >
+              {{ raw("·") }}
+            </OText>
+            <OText v-if="stoppedRinging > 0" variant="meta" data-test="oncall-section-hint-stopped">
+              {{
+                t("oncall.sectionHint_ringingStopped", { count: stoppedRinging }, stoppedRinging)
               }}
             </OText>
           </template>
@@ -460,7 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop
         >
           <OTruncatedText class="block">{{
-            raw(incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id)
+            raw(row.latest.incident_title ?? row.latest.incident_id)
           }}</OTruncatedText>
         </router-link>
       </template>
@@ -505,6 +525,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :progress-loaded="progressAnswered.has(row.latest.id)"
           :total-rungs="totalRungsFor(row.latest)"
           :reached-step="reachedStepFor(row.latest)"
+          :team-deleted="teamIsDeleted(row.latest.team_id)"
         />
       </template>
 
@@ -795,7 +816,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Grouped rather than four loose items: they are one decision
                    ("quiet it") asked at four lengths. -->
-              <ODropdownGroup v-if="canAcknowledge(row)" :label="t('oncall.snoozeFor')">
+              <ODropdownItem
+                v-if="canAcknowledge(row) && snoozedFirings(row).length"
+                :data-test="`oncall-row-unsnooze-${row.rowKey}`"
+                @select="unsnoozeRow(row)"
+              >
+                <template #icon-left>
+                  <OIcon name="play-circle-filled" size="sm" />
+                </template>
+                {{ t("oncall.unsnooze") }}
+              </ODropdownItem>
+              <ODropdownGroup
+                v-if="canAcknowledge(row) && snoozedFirings(row).length < row.escalating.length"
+                :label="t('oncall.snoozeFor')"
+              >
                 <ODropdownItem
                   v-for="option in snoozeOptions"
                   :key="option.minutes"
@@ -948,11 +982,11 @@ import {
   ownershipRulesQuery,
   pagedResponsesQuery,
   resolveResponseMutation,
-  responseProgressQuery,
   responseQuery,
+  responsesProgressQuery,
   snoozeResponseMutation,
-  teamPolicyQuery,
-  teamScheduleQuery,
+  unsnoozeResponseMutation,
+  teamContextQuery,
   whoIsOnCallQuery,
 } from "@/services/oncall.queries";
 
@@ -965,12 +999,11 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { destinationsQuery } from "@/services/alert_destination.queries";
-import type { IncidentWithAlerts } from "@/services/incidents";
-import { incidentQuery } from "@/services/incidents.queries";
 import type {
   Channel,
   CoverageGaps,
   EscalationProgress,
+  EscalationProgressEntry,
   OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
@@ -978,6 +1011,7 @@ import type {
   OnCallSchedule,
   OnCallPosition,
   OnCallTeam,
+  OnCallTeamContext,
   OwnershipRule,
   ResolutionCause,
 } from "@/ts/interfaces/oncall";
@@ -993,11 +1027,13 @@ import {
   isEscalating,
   isOnCallUnavailable,
   isDeletedTeam,
+  ladderStopped,
   isSnoozed,
   reachedStepOf,
   nextHandover,
   winningRule,
 } from "@/utils/oncall";
+import { licenseDeniedFeatures, type ForbiddenState } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
@@ -1010,16 +1046,8 @@ const { canConfigure } = useOnCallPermissions();
 /// columns and the actions never have to branch on the mode.
 type PageRow = OnCallResponseGroup & { rowKey: string };
 
-/**
- * How many open pages get their escalation ladder loaded.
- *
- * There is no bulk escalation endpoint, so this costs one request per page, on
- * every poll. Twenty-five covers the top of a triage list without turning a
- * 200-row incident into 200 requests every twenty seconds; the rows past it
- * still show their state, and the list says so rather than leaving a blank cell
- * that would read as "nothing has fired".
- */
-const ESCALATION_DETAIL_LIMIT = 25;
+/** The batch routes' cap on ids per request; rows past it on the ladder read are flagged, not left blank. */
+const ESCALATION_DETAIL_LIMIT = 200;
 
 /**
  * The states a reader triages by, in the order they matter.
@@ -1070,6 +1098,7 @@ const lastUpdatedAt = ref<number | null>(null);
 /// for a fetch nothing visible was waiting on.
 const backgroundLoading = ref(false);
 const loadError = ref<string | null>(null);
+const forbidden = ref<ForbiddenState>(false);
 /// §G.8.1: 404 or 403 "Not Supported" from the entry fetch — on-call is not
 /// available on this deployment. A fact about the build, never an error.
 const unavailable = ref(false);
@@ -1153,12 +1182,6 @@ const teamNameById = computed<Record<string, string>>(() =>
 const teamIsDeleted = (teamId: string | null) =>
   isDeletedTeam(teamId, teamsLoaded.value ? teams.value.map((team) => team.id) : null);
 
-// A ksuid asks the reader to look it up somewhere else, same as team_id
-// (`fetchTeamContext` below). There is no bulk "get these incidents" endpoint,
-// so this fills in one id at a time and the chip falls back to the raw id
-// until its title lands.
-const incidentTitleById = ref<Record<string, string>>({});
-
 const teamOptions = computed(() => [
   { label: t("oncall.allTeams"), value: "all" },
   ...teams.value.map((team) => ({ label: raw(team.name), value: team.id })),
@@ -1184,6 +1207,7 @@ const isFiltered = computed(
     teamFilter.value !== "all" ||
     priorityFilter.value !== "all" ||
     mineScope.value ||
+    !!causeFilter.value ||
     activeFilter.value !== "all",
 );
 
@@ -1208,6 +1232,9 @@ const showChecklist = computed(
     ),
 );
 
+/// Team and cause narrow the fetch itself, so an empty answer says nothing about whether the org has pages.
+const serverFiltered = computed(() => teamFilter.value !== "all" || !!causeFilter.value);
+
 /// Whether this org has ever paged anybody — read from what was FETCHED, not
 /// from the filtered rows, so narrowing the table to nothing does not swap the
 /// page's whole shape underneath the reader.
@@ -1220,7 +1247,7 @@ const hasPages = computed(() => responses.value.length > 0);
 /// under it would only offer "no pages yet" as if that were healthy. Once a
 /// single page exists the checklist has to give the screen back — it becomes
 /// one bar over a live list.
-const setupOnly = computed(() => showChecklist.value && !hasPages.value);
+const setupOnly = computed(() => showChecklist.value && !hasPages.value && !serverFiltered.value);
 
 const columns = computed<OTableColumnDef<PageRow>[]>(() => [
   {
@@ -1266,9 +1293,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     header: t("oncall.incident"),
     size: 160,
     accessorFn: (row: PageRow) =>
-      row.latest.incident_id
-        ? (incidentTitleById.value[row.latest.incident_id] ?? row.latest.incident_id)
-        : "",
+      row.latest.incident_id ? (row.latest.incident_title ?? row.latest.incident_id) : "",
     sortable: true,
     hideable: true,
   },
@@ -1425,6 +1450,11 @@ function toRows(records: OnCallResponse[]): PageRow[] {
 /// headings and the header's own "mine" toggle, so the list narrows from the
 /// header controls alone.
 const rows = computed(() => toRows(scopedResponses.value));
+
+/// The visible tab's rows, filtered before the table pages them, so the footer count and pages describe that tab.
+const visibleRows = computed(() =>
+  rows.value.filter((row) => sectionVisibility.value[rowSection(row)]),
+);
 
 const causeOptions = computed(() => [
   { label: t("oncall.causeFilterAny"), value: "" },
@@ -1594,6 +1624,7 @@ function menuActions(row: PageRow): RowAction[] {
 /// One list writes to many rows, so the id rides in the variables, not the setup.
 const ackWrite = useMutation(() => acknowledgeResponseMutation(orgId.value));
 const snoozeWrite = useMutation(() => snoozeResponseMutation(orgId.value));
+const unsnoozeWrite = useMutation(() => unsnoozeResponseMutation(orgId.value));
 const resolveWrite = useMutation(() => resolveResponseMutation(orgId.value));
 const handoffWrite = useMutation(() => handoffResponseMutation(orgId.value));
 const noteWrite = useMutation(() => addResponseNoteMutation(orgId.value));
@@ -1621,6 +1652,28 @@ async function snoozeRow(row: PageRow, minutes: number) {
     await Promise.allSettled(
       row.escalating.map((r) => snoozeWrite.mutateAsync({ responseId: r.id, minutes })),
     );
+    await fetchResponses();
+  } finally {
+    busyId.value = "";
+  }
+}
+
+function snoozedFirings(row: PageRow): OnCallResponse[] {
+  return row.escalating.filter((r) => isSnoozed(r));
+}
+
+/// Ends the snooze on every quiet firing the row stands for, so they all continue now.
+async function unsnoozeRow(row: PageRow) {
+  busyId.value = row.rowKey;
+  try {
+    const results = await Promise.allSettled(
+      snoozedFirings(row).map((r) => unsnoozeWrite.mutateAsync(r.id)),
+    );
+    if (results.some((r) => r.status === "rejected")) {
+      toast({ variant: "error", message: t("oncall.unsnoozeFailed") });
+    } else {
+      toast({ variant: "success", message: t("oncall.unsnoozed") });
+    }
     await fetchResponses();
   } finally {
     busyId.value = "";
@@ -1763,15 +1816,6 @@ function rowSection(row: PageRow): SectionKey {
   return "handled";
 }
 
-/// What `OTable` groups by. Unlike `rowSection`, a section the filters
-/// dropdown unchecked returns null here — `OTable` drops a row entirely when
-/// its section is null, which is how "hide Handled" hides Handled rows
-/// without touching `rows`, `sectionCounts`, or anything counted off it.
-function visibleRowSection(row: PageRow): SectionKey | null {
-  const section = rowSection(row);
-  return sectionVisibility.value[section] ? section : null;
-}
-
 /// Counted over the filtered set, not the page: a heading reading "3" on page
 /// one of five would be describing the pagination rather than the state.
 const sectionCounts = computed<Record<string, number>>(() => {
@@ -1789,7 +1833,20 @@ const unroutedRinging = computed(
         !row.escalating.some((r) => r.team_id && !r.acked_by && !isSnoozed(r)),
     ).length,
 );
-const routedRinging = computed(() => (sectionCounts.value.ringing ?? 0) - unroutedRinging.value);
+const stoppedRinging = computed(
+  () =>
+    rows.value.filter((row) => {
+      if (rowSection(row) !== "ringing") return false;
+      const live = row.escalating.filter((r) => r.team_id && !r.acked_by && !isSnoozed(r));
+      return (
+        live.length > 0 &&
+        live.every((r) => ladderStopped(progressById.value[r.id], teamIsDeleted(r.team_id)))
+      );
+    }).length,
+);
+const routedRinging = computed(
+  () => (sectionCounts.value.ringing ?? 0) - unroutedRinging.value - stoppedRinging.value,
+);
 
 /// Only the run that needs somebody gets colour. Snoozed is deliberately
 /// inert and handled and resolved are both finished, so all three stay in the
@@ -1880,13 +1937,13 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
     // From the payload, cache hit included: the cap describes these rows, not this request.
     truncated.value = walk.truncated;
     loadError.value = null;
+    forbidden.value = false;
     // Only on SUCCESS. Setting this in `finally` would let a transient API
     // error render the first-run checklist, telling a configured org that
     // nothing is set up.
     loaded.value = true;
-    // Fire-and-forget: the list is already usable with ids as the fallback,
-    // so titles fill in behind it rather than holding up the table.
-    void fetchIncidentTitles(!!opts.force);
+    // Fire-and-forget: the rows are already usable while their teams and ladders fill in.
+    void fetchRowContext(!!opts.force);
   } catch (err) {
     if (readId !== latestResponsesRead) return;
     // §G.8.1: the probe said "not here". Leaving `loaded` false keeps the
@@ -1896,36 +1953,16 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
       unavailable.value = true;
       return;
     }
+    // A license denial is not a failed read: the table shows the license copy, with no retry.
+    const denied = licenseDeniedFeatures(err);
+    if (denied) {
+      forbidden.value = denied;
+      return;
+    }
     loadError.value = errorMessage(err) || String(t("oncall.loadResponsesFailed"));
   } finally {
     if (readId === latestResponsesRead) busy.value = false;
   }
-}
-
-/// One request per incident id — there is no bulk "get these incidents"
-/// endpoint (see `fetchTeamContext` for the same constraint on team data).
-/// Already-resolved ids are skipped so a background fetch doesn't re-read
-/// titles the list already has; only the reader's Refresh re-reads them all.
-async function fetchIncidentTitles(force = false) {
-  const ids = [
-    ...new Set(
-      responses.value
-        .map((response) => response.incident_id)
-        .filter((id): id is string => !!id && (force || !(id in incidentTitleById.value))),
-    ),
-  ];
-  if (!ids.length) return;
-  const results = await Promise.allSettled(
-    ids.map((id) => read<IncidentWithAlerts>(incidentQuery(orgId.value, id), force)),
-  );
-  const next = { ...incidentTitleById.value };
-  ids.forEach((id, index) => {
-    const result = results[index];
-    if (result.status === "fulfilled" && result.value?.title) {
-      next[id] = result.value.title;
-    }
-  });
-  incidentTitleById.value = next;
 }
 
 /// Teams, coverage and ownership answer the checklist, not the list. A failure
@@ -1977,73 +2014,63 @@ async function someTeamWouldPage(
   return slots.some((s) => s.status === "fulfilled" && s.value.length > 0);
 }
 
-/// Policy and rotation per team. Both are one request per team — there is no
-/// bulk endpoint for either — but team counts are small and the answers change
-/// far more slowly than the pages do.
-async function fetchTeamContext(force = false) {
-  const ids = teams.value.map((team) => team.id);
-  const [policies, slots, schedules] = await Promise.all([
-    Promise.allSettled(
-      ids.map((id) => read<OnCallPolicy | null>(teamPolicyQuery(orgId.value, id), force)),
-    ),
-    Promise.allSettled(
-      ids.map((id) => read<OnCallPosition[]>(whoIsOnCallQuery(orgId.value, id), force)),
-    ),
-    Promise.allSettled(
-      ids.map((id) => read<OnCallSchedule | null>(teamScheduleQuery(orgId.value, id), force)),
-    ),
-  ]);
+// The newest row-context read: one started for rows a filter has since replaced must not overwrite the maps.
+let latestRowContextRead = 0;
 
-  const nextPolicies: Record<string, OnCallPolicy> = {};
-  const nextSlots: Record<string, OnCallPosition[]> = {};
-  const nextSchedules: Record<string, OnCallSchedule> = {};
-  ids.forEach((id, index) => {
-    const policy = policies[index];
-    if (policy.status === "fulfilled" && policy.value) nextPolicies[id] = policy.value;
-    const slot = slots[index];
-    // A team whose rotation could not be read is left OUT rather than recorded
-    // as empty: an unreadable schedule is not the same fact as a coverage gap,
-    // and the card would otherwise accuse a staffed team of having none.
-    if (slot.status === "fulfilled") nextSlots[id] = slot.value;
-    const schedule = schedules[index];
-    if (schedule.status === "fulfilled" && schedule.value) {
-      nextSchedules[id] = schedule.value;
-    }
-  });
-  policyByTeam.value = nextPolicies;
-  positionsByTeam.value = nextSlots;
-  scheduleByTeam.value = nextSchedules;
-}
-
-/// Ladder position for the oldest open pages. Bounded by
-/// ESCALATION_DETAIL_LIMIT because each one is its own request.
-async function fetchEscalationProgress(force = false) {
+/// Team context for the row teams and the viewer's, and the ladder of the oldest open pages: one request each, sent together.
+async function fetchRowContext(force = false) {
+  const readId = ++latestRowContextRead;
+  const teamIds = [
+    ...new Set(responses.value.map((r) => r.team_id).filter((id): id is string => !!id)),
+  ];
   const open = responses.value
     .filter((r) => isEscalating(r.state))
     .sort((a, b) => a.opened_at - b.opened_at);
-
+  const wanted = open.slice(0, ESCALATION_DETAIL_LIMIT).map((r) => r.id);
+  const teamChunks: string[][] = [];
+  for (let i = 0; i < teamIds.length; i += ESCALATION_DETAIL_LIMIT) {
+    teamChunks.push(teamIds.slice(i, i + ESCALATION_DETAIL_LIMIT));
+  }
+  if (!teamChunks.length) teamChunks.push([]);
+  const [context, progress] = await Promise.allSettled([
+    Promise.allSettled(
+      teamChunks.map((ids, i) =>
+        read<OnCallTeamContext[]>(teamContextQuery(orgId.value, ids, i === 0), force),
+      ),
+    ).then((reads) => reads.flatMap((r) => (r.status === "fulfilled" ? r.value : []))),
+    wanted.length
+      ? read<EscalationProgressEntry[]>(responsesProgressQuery(orgId.value, wanted), force)
+      : Promise.resolve([]),
+  ]);
+  if (readId !== latestRowContextRead) return;
+  applyTeamContext(context.status === "fulfilled" ? context.value : []);
   escalationCapped.value = open.length > ESCALATION_DETAIL_LIMIT;
-  const wanted = open.slice(0, ESCALATION_DETAIL_LIMIT);
+  applyProgress(progress.status === "fulfilled" ? progress.value : []);
+}
 
-  const results = await Promise.allSettled(
-    wanted.map((r) =>
-      read<EscalationProgress | null>(responseProgressQuery(orgId.value, r.id), force),
-    ),
-  );
+/// Replaced wholesale, so a team no longer on screen drops out of the maps.
+function applyTeamContext(context: OnCallTeamContext[]) {
+  const policies: Record<string, OnCallPolicy> = {};
+  const slots: Record<string, OnCallPosition[]> = {};
+  const schedules: Record<string, OnCallSchedule> = {};
+  for (const team of context) {
+    if (team.policy) policies[team.team_id] = team.policy;
+    // An unreadable rotation is left OUT, not empty: it is not the same fact as a coverage gap.
+    if (team.on_call) slots[team.team_id] = team.on_call;
+    if (team.schedule) schedules[team.team_id] = team.schedule;
+  }
+  policyByTeam.value = policies;
+  positionsByTeam.value = slots;
+  scheduleByTeam.value = schedules;
+}
 
+/// Replaced wholesale, so a record that resolved since the last read drops a countdown that will never fire.
+function applyProgress(entries: EscalationProgressEntry[]) {
   const next: Record<string, EscalationProgress> = {};
-  const answered = new Set<string>();
-  wanted.forEach((record, index) => {
-    const result = results[index];
-    // An empty body is no answer, so the row stays unknown rather than reading "Not paged yet".
-    if (result.status !== "fulfilled" || !result.value) return;
-    answered.add(record.id);
-    next[record.id] = result.value;
-  });
-  // Replaced wholesale so a record that resolved since the last poll drops its
-  // stale ladder instead of keeping a countdown that will never fire.
+  for (const { response_id, ...progress } of entries) next[response_id] = progress;
   progressById.value = next;
-  progressAnswered.value = answered;
+  // Only the ids the server answered, so an unread row never reads "Not paged yet".
+  progressAnswered.value = new Set(Object.keys(next));
 }
 
 /// The expanded row's timeline.
@@ -2089,9 +2116,8 @@ async function loadAll(force = false) {
   // The probe answered "not here" — every further call would 404/403 the
   // same way, so stop asking.
   if (unavailable.value) return;
+  // Team and ladder reads were started by fetchResponses.
   await fetchContext(force);
-  await fetchTeamContext(force);
-  await fetchEscalationProgress(force);
   // The open timeline is part of what the reader sees, so a refresh reaches it too.
   const open = expandedResponseId();
   if (open) await fetchExpandedEvents(open, force);
@@ -2132,11 +2158,15 @@ function openResponse(row: PageRow) {
 
 function onEmptyAction(id?: string) {
   if (id === "clear-filters") {
+    const refetch = serverFiltered.value;
     search.value = "";
     teamFilter.value = "all";
     priorityFilter.value = "all";
+    causeFilter.value = "";
     mineOnly.value = false;
     selectFilterTab("all");
+    // The loaded rows are the filtered server answer, so clearing team or cause must ask again.
+    if (refetch) void fetchResponses();
   }
 }
 

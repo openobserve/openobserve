@@ -10,7 +10,7 @@ These rules apply to ALL reviewers. Violating any of these will cause your findi
 4. **No flattery.** Do not include "Great job", "Thanks for", "Nice work", or any non-actionable commentary.
 5. **Severity must be justified, and is graded by who can reach the failure.** Use one of four levels:
    - `p0` (blocker): an outage, data loss or corruption, an exploitable security hole, or a default path broken for all users.
-   - `p1` (blocker): a real bug that normal use or normal config reaches: wrong results, a crash, a failed request, a regression. Also, for test code, **a coverage-integrity failure: a test that passes while verifying nothing real** (a missing, vacuous, or soft assertion; an un-awaited assertion that resolves after the test ends; or a `data-test` selector that matches no component). A green check with no coverage behind it is false confidence, so it blocks.
+   - `p1` (major concern): a real bug that normal use or normal config reaches: wrong results, a crash, a failed request, a regression. Also, for test code, **a coverage-integrity failure: a test that passes while verifying nothing real** (a missing, vacuous, or soft assertion; an un-awaited assertion that resolves after the test ends; or a `data-test` selector that matches no component). A green check with no coverage behind it is false confidence, so it blocks.
    - `p2` (not blocking): a real bug that needs unusual input, rare timing or non-default config; a measurable regression off the hot path; a broken project rule with no runtime effect.
    - `p3` (not blocking): a likely bug with one unverified step (rule 2).
 

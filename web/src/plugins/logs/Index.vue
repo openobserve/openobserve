@@ -672,6 +672,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
+import { featureState, streamTypeFeature } from "@/utils/featureGate";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import useLogs from "@/composables/useLogs";
@@ -926,6 +928,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
+    const signalLocks = useLicenseLocks();
     const {
       searchObj,
       resetSearchObj,
@@ -1583,7 +1586,8 @@ export default defineComponent({
             const persistedType = restoreLogsStreamType(
               store.state.selectedOrganization.identifier,
             );
-            if (persistedType) {
+            // The page lock reads the URL type, so a remembered locked type would run unlocked.
+            if (persistedType && !signalLocks.isLocked(streamTypeFeature(persistedType))) {
               searchObj.data.stream.streamType = persistedType;
             }
           }
@@ -1653,7 +1657,11 @@ export default defineComponent({
 
     // Helper function to check if the environment is enterprise and super cluster is enabled
     function isEnterpriseClusterEnabled() {
-      return config.isEnterprise === "true" && store.state.zoConfig.super_cluster_enabled;
+      return (
+        config.isEnterprise === "true" &&
+        store.state.zoConfig.super_cluster_enabled &&
+        featureState(store.state.zoConfig.features, "super_cluster") !== "locked"
+      );
     }
 
     // Helper function to check if quick mode is enabled
@@ -1748,12 +1756,19 @@ export default defineComponent({
     // loadLogsData() minus getQueryData(): a re-applied query is loaded for the user to run, not run for them.
     async function applyReAppliedQuery() {
       resetRunStateForReapply();
+      const gridAtStart = autoRun.engine.currentGeneration("grid")?.id;
       searchObj.meta.searchApplied = false;
+      // The run-query prompt needs a `hits` array; set before the awaits so an Auto Run search that lands meanwhile keeps its hits.
+      searchObj.data.queryResults.hits = [];
       await getStreamList(true, { fromUrl: true });
       await getFunctions();
       await extractFields();
       refreshData();
-      searchObj.loading = false;
+      const latest = autoRun.engine.currentGeneration("grid");
+      // A search started during the load owns the loading state; its completion or cancel clears it.
+      if (!latest || latest.id === gridAtStart || latest.settled || latest.cancelled) {
+        searchObj.loading = false;
+      }
     }
 
     // Helper function for handling the stream explorer
@@ -3946,7 +3961,9 @@ export default defineComponent({
     };
 
     const permalinkResolveContext = (): ResolveContext => {
-      const superCluster = !!store.state.zoConfig?.super_cluster_enabled;
+      const superCluster =
+        !!store.state.zoConfig?.super_cluster_enabled &&
+        featureState(store.state.zoConfig?.features, "super_cluster") !== "locked";
       return {
         regions: superCluster ? [...(searchObj.meta.regions ?? [])] : [],
         clusters: superCluster ? [...(searchObj.meta.clusters ?? [])] : [],

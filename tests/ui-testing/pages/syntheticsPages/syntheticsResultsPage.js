@@ -83,8 +83,8 @@ export class SyntheticsResultsPage {
     await this.page.goto(
       `/web/synthetics/${checkId}/results/run/${runId}/${executionId}?org_identifier=${orgId}`,
     );
-    await expect(this.page.locator(this.locators.statusBadge)).toBeVisible({ timeout: 30000 });
-    // The badge shows a default before the run query resolves; the skeleton is the real readiness signal.
+    // The badge renders only once the run query resolves, so it gets the query's full budget.
+    await expect(this.page.locator(this.locators.statusBadge)).toBeVisible({ timeout: 60000 });
     await expect(this.page.locator(this.locators.infoSkeleton)).toHaveCount(0, { timeout: 60000 });
     testLogger.navigation('Synthetics run detail', { checkId, runId, executionId });
   }

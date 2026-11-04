@@ -142,6 +142,26 @@ pub async fn set_desired_with<C: ConnectionTrait>(
     Ok(())
 }
 
+/// Leaves the fleet with no desired version, keeping stable and its settings.
+pub async fn clear_desired_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    fleet_id: &str,
+    actor: &str,
+    now_us: i64,
+) -> Result<(), Error> {
+    Entity::update_many()
+        .col_expr(Column::ConfigId, Expr::value(Option::<String>::None))
+        .col_expr(Column::ConfigVersion, Expr::value(Option::<i64>::None))
+        .col_expr(Column::UpdatedAt, Expr::value(now_us))
+        .col_expr(Column::UpdatedBy, Expr::value(actor))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::FleetId.eq(fleet_id))
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
 /// Replaces the fleet's setting overrides, keeping its versions; creates the row when absent.
 pub async fn set_settings_with<C: ConnectionTrait>(
     conn: &C,
@@ -220,6 +240,37 @@ mod tests {
 
     use super::*;
     use crate::table::migration::create_fleet_collectors_for_test;
+
+    #[tokio::test]
+    async fn clearing_desired_keeps_stable_and_settings() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        create_fleet_collectors_for_test(&db).await.unwrap();
+        set_settings_with(&db, "o1", "f1", Some("{}".to_string()), "u", 1)
+            .await
+            .unwrap();
+        set_desired_with(&db, "o1", "f1", ("edge", 2), "u", 2)
+            .await
+            .unwrap();
+        set_stable_with(&db, "o1", "f1", ("edge", 1)).await.unwrap();
+        set_desired_with(&db, "o1", "f2", ("edge", 2), "u", 2)
+            .await
+            .unwrap();
+
+        clear_desired_with(&db, "o1", "f1", "system", 3)
+            .await
+            .unwrap();
+
+        let row = get_with(&db, "o1", "f1").await.unwrap().unwrap();
+        assert_eq!((row.config_id, row.config_version), (None, None));
+        assert_eq!(
+            (row.stable_config_id.as_deref(), row.stable_config_version),
+            (Some("edge"), Some(1))
+        );
+        assert_eq!(row.settings.as_deref(), Some("{}"));
+        assert_eq!((row.updated_at, row.updated_by.as_str()), (3, "system"));
+        let other = get_with(&db, "o1", "f2").await.unwrap().unwrap();
+        assert_eq!(other.config_version, Some(2), "only this fleet");
+    }
 
     #[tokio::test]
     async fn settings_and_desired_never_overwrite_each_other() {

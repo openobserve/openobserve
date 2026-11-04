@@ -25,8 +25,13 @@ export function reviewerFinished(r) {
   return !r.skipped && !r.error && r.parsed === true;
 }
 
+// A reviewer interrupted at its soft deadline answered in haste, so its output counts as findings but not as a finished review.
+export function reviewerCompleted(r) {
+  return reviewerFinished(r) && !r.wrappedUp;
+}
+
 export function unfinishedReviewers(ranResults) {
-  return ranResults.filter(r => !reviewerFinished(r)).map(r => r.agentName);
+  return ranResults.filter(r => !reviewerCompleted(r)).map(r => r.agentName);
 }
 
 function plural(count, noun) {
@@ -50,12 +55,14 @@ export function mergeConfidence({
   if (ranCount === 0) return { level: "low", reasons: ["no reviewer ran"] };
   if (ranCount > 0 && failedReviewers.length >= ranCount) return { level: "low", reasons: ["no reviewer finished"] };
 
-  const blockers = (counts.p0 ?? 0) + (counts.p1 ?? 0);
+  const blockers = counts.p0 ?? 0;
+  const major = counts.p1 ?? 0;
   const core = failedReviewers.filter(name => CORE_REVIEWER_RE.test(shortName(name)));
   const other = failedReviewers.filter(name => !core.includes(name));
   const unfinished = name => `${shortName(name)} reviewer did not finish`;
   const low = [
-    ...(blockers > 0 ? [`${plural(blockers, "blocker")} (P0/P1)`] : []),
+    ...(blockers > 0 ? [`${plural(blockers, "blocker")} (P0)`] : []),
+    ...(major > 0 ? [`${plural(major, "major concern")} (P1)`] : []),
     ...(findingsKnown ? [] : ["findings could not be counted"]),
     ...core.map(unfinished),
   ];
@@ -76,6 +83,10 @@ export function mergeConfidenceLine({ level, reasons }) {
 
 export function staleConfidenceLine(shortHead) {
   return `**Merge confidence: ${CONFIDENCE_LABEL.low}** — \`${shortHead}\` has not been reviewed`;
+}
+
+export function notRunConfidenceLine(shortHead) {
+  return `**Merge confidence: ${CONFIDENCE_LABEL.low}** — the review did not run because of a CI configuration error; \`${shortHead}\` has not been reviewed`;
 }
 
 export function reviewingConfidenceLine(shortHead) {

@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OToggleGroupItem value="now" size="sm">{{
             t("fleet.rollouts.startNow")
           }}</OToggleGroupItem>
-          <OToggleGroupItem value="at" size="sm" :disabled="emptyFleet">{{
+          <OToggleGroupItem value="at" size="sm">{{
             t("fleet.rollouts.startAt")
           }}</OToggleGroupItem>
         </OFormToggleGroup>
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("fleet.rollouts.collapsed") }}</OText
           >
           <OText variant="meta" data-test="fleet-new-rollout-dialog-timeout">{{
-            t("fleet.rollouts.phaseTimeoutNote", { minutes: phaseTimeoutMin })
+            phaseTimeoutNote
           }}</OText>
         </div>
       </div>
@@ -287,19 +287,17 @@ const fleetOptions = computed(() =>
   readableFleets.value.map((f) => ({ label: raw(f.name), value: f.id })),
 );
 const fleetRow = computed(() => readableFleets.value.find((f) => f.id === chosenFleet.value));
-const emptyFleet = computed(() => fleetRow.value?.collectors === 0);
 
-// The server refuses a schedule for a fleet with no members.
-watch(emptyFleet, (empty) => {
-  if (empty && start.value === "at") form.setFieldValue("start", "now");
-});
-
-const phaseTimeoutMin = computed(() => {
+const phaseTimeoutNote = computed(() => {
   const secs =
     fleetRow.value?.settings.phase_timeout_secs ??
     orgSettings.settings.value?.fleet_defaults?.phase_timeout_secs ??
     DEFAULT_PHASE_TIMEOUT_SECS;
-  return Math.round(secs / 60);
+  const minutes = Math.floor(secs / 60);
+  const seconds = secs % 60;
+  return seconds
+    ? t("fleet.rollouts.phaseTimeoutNoteSeconds", { minutes, seconds })
+    : t("fleet.rollouts.phaseTimeoutNote", { minutes });
 });
 
 const published = computed(() => configs.rows.value.filter((c) => c.version > 0));
@@ -401,7 +399,13 @@ const preview = usePlanPreview(
 
 const planLine = computed(() => {
   const p = preview.preview.value;
-  if (emptyFleet.value) return t("fleet.rollouts.emptyFleet");
+  const stable = fleetRow.value?.stable;
+  // The stable version needs no proof, so the server sets it at once instead of waiting.
+  const toStable =
+    stable?.config === values.value.config && stable?.version === values.value.version;
+  if (toStable && (fleetRow.value?.collectors === 0 || p?.phases.length === 0))
+    return t("fleet.rollouts.planStable");
+  if (fleetRow.value?.collectors === 0) return t("fleet.rollouts.emptyFleet");
   if (!p) return preview.error.value ? t("fleet.rollouts.planUnavailable") : raw("—");
   return planText(p.phases);
 });

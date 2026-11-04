@@ -33,7 +33,9 @@ use config::{
 use regex::{Captures, Regex};
 use serde_json::Value;
 
-use super::variables::{SELECT_ALL_VALUE, escape, js_string, normalize_syntax, placeholder_regex};
+use super::variables::{
+    DateSpec, SELECT_ALL_VALUE, escape, js_string, normalize_syntax, placeholder_regex,
+};
 
 /// The picker's page size when the variable sets none.
 const DEFAULT_VALUES_SIZE: i64 = 10;
@@ -183,6 +185,14 @@ impl<'a> Defaults<'a> {
 
     /// Visible variable name → key, global then tab then panel, as the instance's picker sees them.
     fn visible(&self, idx: usize) -> BTreeMap<String, String> {
+        self.visible_instances(idx)
+            .into_iter()
+            .map(|(name, o)| (name, o.key.clone()))
+            .collect()
+    }
+
+    /// The instance behind each visible name.
+    fn visible_instances(&self, idx: usize) -> BTreeMap<String, &Instance<'a>> {
         let me = &self.instances[idx];
         self.instances
             .iter()
@@ -192,7 +202,7 @@ impl<'a> Defaults<'a> {
                 (Some(tab), None) => me.tab.as_ref() == Some(tab),
                 (_, Some(panel)) => me.panel.as_ref() == Some(panel),
             })
-            .map(|o| (o.var.name.clone(), o.key.clone()))
+            .map(|o| (o.var.name.clone(), o))
             .collect()
     }
 
@@ -200,10 +210,14 @@ impl<'a> Defaults<'a> {
     fn values_query(&self, idx: usize) -> ValuesQuery {
         let var = self.instances[idx].var;
         let qd = var.query_data.clone().unwrap_or_default();
-        let scope: BTreeMap<String, Value> = self
-            .visible(idx)
-            .into_iter()
-            .filter_map(|(name, key)| self.values.get(&key).map(|v| (name, v.clone())))
+        let visible = self.visible_instances(idx);
+        let scope: BTreeMap<String, Value> = visible
+            .iter()
+            .filter_map(|(name, o)| self.values.get(&o.key).map(|v| (name.clone(), v.clone())))
+            .collect();
+        let dates: BTreeMap<String, DateSpec> = visible
+            .iter()
+            .filter_map(|(name, o)| Some((name.clone(), DateSpec::of(o.var)?)))
             .collect();
         let stream = resolve_name(&qd.stream, &scope);
         let field = resolve_name(&qd.field, &scope);
@@ -221,7 +235,7 @@ impl<'a> Defaults<'a> {
         let filter = if conditions.is_empty() {
             String::new()
         } else {
-            format!(" WHERE {}", substitute_context(&conditions, &scope))
+            format!(" WHERE {}", substitute_context(&conditions, &scope, &dates))
         };
         let sql = format!(
             "SELECT {} AS zo_sql_key FROM {}{filter} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {size}",
@@ -435,8 +449,13 @@ fn split_quoted(input: &str) -> Vec<String> {
         .collect()
 }
 
-/// `buildQueryContext`'s replacement: lists quoted per item unless the placeholder is quoted.
-fn substitute_context(text: &str, scope: &BTreeMap<String, Value>) -> String {
+/// `buildQueryContext`'s replacement: lists quoted per item unless the placeholder is quoted, and a
+/// date in its format.
+fn substitute_context(
+    text: &str,
+    scope: &BTreeMap<String, Value>,
+    dates: &BTreeMap<String, DateSpec>,
+) -> String {
     let text = normalize_syntax(text);
     let mut names: Vec<&str> = scope.keys().map(String::as_str).collect();
     names.sort_by_key(|n| std::cmp::Reverse(n.len()));
@@ -451,6 +470,14 @@ fn substitute_context(text: &str, scope: &BTreeMap<String, Value>) -> String {
             .or_else(|| c.get(5))
             .map_or("", |m| m.as_str());
         let quoted = text[..whole.start()].ends_with('\'') && text[whole.end()..].starts_with('\'');
+        let format = c.get(2).or_else(|| c.get(4)).map(|m| m.as_str());
+        let date = scope
+            .get(name)
+            .zip(dates.get(name))
+            .and_then(|(v, spec)| spec.format(v, format));
+        if let Some(date) = date {
+            return escape(&date);
+        }
         match scope.get(name) {
             Some(Value::Array(items)) => {
                 let items: Vec<String> = items.iter().map(|v| escape(&js_string(v))).collect();
@@ -749,21 +776,69 @@ mod tests {
 
     #[test]
     fn context_substitution_matches_the_live_picker() {
+        let none = BTreeMap::new();
         let scope = BTreeMap::from([
             ("x".to_string(), json!("O'B")),
             ("y".to_string(), json!(["p", "q'r"])),
             ("z".to_string(), Value::Null),
         ]);
         assert_eq!(
-            substitute_context(r#""a" = '$x' AND "b" IN ('$y') AND "c" != 'z'"#, &scope),
+            substitute_context(
+                r#""a" = '$x' AND "b" IN ('$y') AND "c" != 'z'"#,
+                &scope,
+                &none
+            ),
             r#""a" = 'O''B' AND "b" IN ('p', 'q''r') AND "c" != 'z'"#
         );
         assert_eq!(
             substitute_context(
                 "a = '$y' AND b IN ($y) AND c = '${x}' AND d = '{{z}}' AND e = $x",
-                &scope
+                &scope,
+                &none
             ),
             "a = 'p', 'q''r' AND b IN ('p', 'q''r') AND c = 'O''B' AND d = '{{z}}' AND e = O''B"
+        );
+    }
+
+    #[test]
+    fn a_date_variable_reaches_a_values_query_in_its_format() {
+        let dash = dashboard(json!([
+            { "type": "date", "name": "day", "dateFormat": "epochus" },
+            { "type": "query_values", "name": "pod",
+              "query_data": { "stream": "logs", "field": "pod", "filter": [
+                { "name": "_timestamp", "operator": ">=", "value": "$day" },
+                { "name": "d", "operator": "=", "value": "${day:dmy}" } ] } }
+        ]));
+        let frozen = BTreeMap::from([("day".to_string(), json!("2026-07-01"))]);
+        let mut d = Defaults::new(&dash, frozen);
+        let pod = d.next_query().expect("pod");
+        assert_eq!(
+            pod.query.sql,
+            r#"SELECT "pod" AS zo_sql_key FROM "logs" WHERE "_timestamp" >= '1782864000000000' AND "d" = '01/07/2026' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT 10"#
+        );
+    }
+
+    #[test]
+    fn context_substitution_prints_a_date_in_its_format() {
+        let spec = |format: &str| {
+            DateSpec::of(&VariableList {
+                type_field: "date".to_string(),
+                date_format: Some(format.to_string()),
+                ..Default::default()
+            })
+            .unwrap()
+        };
+        let scope = BTreeMap::from([
+            ("d".to_string(), json!("2026-07-01")),
+            ("e".to_string(), json!("")),
+        ]);
+        let dates = BTreeMap::from([
+            ("d".to_string(), spec("epochus")),
+            ("e".to_string(), spec("dmy")),
+        ]);
+        assert_eq!(
+            substitute_context("a >= $d AND b = '${d:iso}' AND c = '$e'", &scope, &dates),
+            "a >= 1782864000000000 AND b = '2026-07-01' AND c = ''"
         );
     }
 

@@ -85,6 +85,8 @@ export interface DbmBreakdown {
   levels: DbmBreakdownNode[];
   /** No row named a schema, so the schema tier was dropped as empty. */
   collapsed: boolean;
+  /** Services of the rows that named no schema at all; a row spanning several schemas is in none. */
+  unnamed: DbmBreakdownNode[];
   /** Time the fingerprint rows account for, nanoseconds. */
   attributedNs: number;
   /** The database row's own exact total, nanoseconds — `null` when unknown. */
@@ -112,6 +114,10 @@ export const rowNamespace = (row: QueryStatsRow): string | null => {
   const list = (row.namespaces ?? []).filter(Boolean);
   return list.length === 1 ? list[0] : null;
 };
+
+/** Whether a row named no schema at all, as distinct from naming several. */
+export const namesNoSchema = (row: QueryStatsRow): boolean =>
+  !row.db_namespace && !(row.namespaces ?? []).some(Boolean);
 
 /**
  * The service that issued a row.
@@ -245,6 +251,13 @@ export const buildDatabaseBreakdown = (
           return node;
         });
 
+  const schemaless = rows.filter(namesNoSchema);
+  const unnamed = serviceNodes(
+    schemaless,
+    schemaless.reduce((acc, row) => acc + num(row.total_time_ns), 0),
+    "service::",
+  );
+
   // Only a gap big enough to change how a share reads is worth a sentence; the
   // two grains are computed by different code paths and drift by rounding.
   const missing =
@@ -253,5 +266,5 @@ export const buildDatabaseBreakdown = (
       : null;
   const shortfall = missing !== null && missing >= SHORTFALL_FLOOR ? missing : null;
 
-  return { levels, collapsed, attributedNs, databaseTotalNs, shortfall };
+  return { levels, collapsed, unnamed, attributedNs, databaseTotalNs, shortfall };
 };

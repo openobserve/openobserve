@@ -102,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <SelectFolderDropdown
                           @folder-selected="selectedFolder = $event"
                           :activeFolderId="selectedFolder.value"
+                          :disabled="!!isLoading"
                         />
                       </div>
                     </div>
@@ -140,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <SelectFolderDropdown
                           @folder-selected="selectedFolder = $event"
                           :activeFolderId="selectedFolder.value"
+                          :disabled="!!isLoading"
                         />
                       </div>
                     </div>
@@ -541,6 +543,7 @@ export default defineComponent({
       }
 
       createdInAction = 0;
+      const importFolder = selectedFolder.value;
       const data = jsonStr.value.map((parsedContent, fileIndex) => {
         return new Promise((resolve, reject) => {
           (async () => {
@@ -575,7 +578,7 @@ export default defineComponent({
                     continue;
                   }
 
-                  const res = await importDashboardFromJSON(convertedSchema, selectedFolder.value);
+                  const res = await importDashboardFromJSON(convertedSchema, importFolder);
                   results.push({ index: i + 1, result: res });
                 } catch (e) {
                   results.push({ index: i + 1, error: e });
@@ -613,7 +616,7 @@ export default defineComponent({
         const successfulImports = results.filter((r) => r.status === "fulfilled").length;
 
         if (results.length === successfulImports) {
-          await resetAndRefresh(ImportType.FILES, selectedFolder.value);
+          await resetAndRefresh(ImportType.FILES, importFolder);
         }
 
         if (successfulImports) {
@@ -666,6 +669,7 @@ export default defineComponent({
     const importFromUrl = async () => {
       isLoading.value = ImportType.URL;
       createdInAction = 0;
+      const importFolder = selectedFolder.value;
       try {
         const urlData = url.value.trim();
 
@@ -691,7 +695,7 @@ export default defineComponent({
               return Promise.reject({ index, error: new Error(errorMessage) });
             }
 
-            return importDashboardFromJSON(converted, selectedFolder.value);
+            return importDashboardFromJSON(converted, importFolder);
           } catch (e) {
             return Promise.reject({ index, error: e });
           }
@@ -706,7 +710,7 @@ export default defineComponent({
         }
 
         if (successCount > 0) {
-          await resetAndRefresh(ImportType.URL, selectedFolder.value);
+          await resetAndRefresh(ImportType.URL, importFolder);
           showPositiveNotification(
             t("dashboard.importDashboardPage.dashboardsImportedSuccessfully", { n: successCount }),
           );
@@ -733,6 +737,7 @@ export default defineComponent({
     const importFromJsonStr = async () => {
       isLoading.value = ImportType.JSON_STRING;
       createdInAction = 0;
+      const importFolder = selectedFolder.value;
       try {
         // get the dashboard
 
@@ -749,8 +754,8 @@ export default defineComponent({
           return;
         }
 
-        await importDashboardFromJSON(convertedSchema, selectedFolder.value).then((_res) => {
-          resetAndRefresh(ImportType.JSON_STRING, selectedFolder.value);
+        await importDashboardFromJSON(convertedSchema, importFolder).then((_res) => {
+          resetAndRefresh(ImportType.JSON_STRING, importFolder);
           filesImportResults.value = [];
           jsonStr.value = "";
 

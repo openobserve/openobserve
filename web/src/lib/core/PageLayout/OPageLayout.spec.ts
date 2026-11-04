@@ -14,9 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi } from "vitest";
+import { defineComponent, h, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import OPageLayout from "./OPageLayout.vue";
+import { provideFeatureLock } from "@/composables/useFeatureLock";
 
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn(), back: vi.fn() }) }));
 
@@ -38,5 +40,20 @@ describe("OPageLayout entrance", () => {
     expect(wrapper.find("header, [data-test*='header']").classes()).not.toContain(
       "motion-safe:slide-in-from-bottom-1",
     );
+  });
+
+  it("shows the license message without the slide while the page is locked", () => {
+    const wrapper = mount(
+      defineComponent({
+        setup() {
+          provideFeatureLock(ref("workflows"));
+          return () => h(OPageLayout, { title: "Page" }, { default: () => h("div") });
+        },
+      }),
+      { global: { plugins: [i18n] } },
+    );
+
+    expect(wrapper.find('[data-test="page-layout-license-locked"]').exists()).toBe(true);
+    expect(wrapper.html()).not.toContain("slide-in-from-bottom-1");
   });
 });
