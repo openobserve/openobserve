@@ -45,8 +45,10 @@ vi.mock("vuex", () => ({
   useStore: vi.fn(() => ({ state: { selectedOrganization: { identifier: "test-org" } } })),
 }));
 
+const mockPush = vi.hoisted(() => vi.fn());
+
 vi.mock("vue-router", () => ({
-  useRouter: vi.fn(() => ({ push: vi.fn() })),
+  useRouter: vi.fn(() => ({ push: mockPush })),
   useRoute: vi.fn(() => ({ params: { id: "q1" }, query: {} })),
 }));
 
@@ -84,9 +86,11 @@ function item(overrides: Record<string, unknown>) {
   };
 }
 
-async function mountPage() {
+// The lock composable loads before this file's vuex mock, so it reads the real injected store.
+async function mountPage(features: Record<string, string> = {}) {
   const wrapper = mount(QueueWorkbenchPage, {
     global: {
+      provide: { store: { state: { zoConfig: { features } } } },
       stubs: {
         OTabs: { template: `<div><slot /></div>` },
         OTab: { template: `<div class="o-tab"><slot /></div>` },
@@ -165,6 +169,46 @@ describe("QueueWorkbenchPage item navigator", () => {
 
     expect(wrapper.find('[data-test="ai-queue-workbench-nav-preview-0"]').text()).toBe(
       "Why is the chart flat?",
+    );
+  });
+});
+
+describe("QueueWorkbenchPage open trace", () => {
+  const withDetail = () => {
+    const current = item({ id: "a", refId: "trace-a" });
+    mockListItems.mockResolvedValue([current]);
+    mockGetItemDetail.mockResolvedValue({
+      item: current,
+      sourceStream: "traces",
+      content: { input: null, output: null, trace: [] },
+      machineScores: [],
+      reviews: [],
+    });
+  };
+
+  beforeEach(() => mockPush.mockReset());
+
+  it("is a disabled lock that opens nothing while the traces license is locked", async () => {
+    withDetail();
+    const wrapper = await mountPage({ traces: "locked" });
+
+    // OTooltip is stubbed bare here, so the live button vanishing is what proves the locked branch rendered.
+    expect(wrapper.find('[data-test="ai-queue-workbench-open-trace"]').exists()).toBe(false);
+    (wrapper.vm as any).$.setupState.openTrace();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("opens the trace when the license enables traces", async () => {
+    withDetail();
+    const wrapper = await mountPage({ traces: "enabled" });
+
+    expect(wrapper.find('[data-test="ai-queue-workbench-open-trace"]').exists()).toBe(true);
+    (wrapper.vm as any).$.setupState.openTrace();
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "traceDetails",
+        query: expect.objectContaining({ trace_id: "trace-a" }),
+      }),
     );
   });
 });

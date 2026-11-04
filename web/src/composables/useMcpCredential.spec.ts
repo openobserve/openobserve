@@ -106,6 +106,52 @@ describe("useMcpCredential", () => {
     });
   });
 
+  describe("with mcp license-locked", () => {
+    it("mints nothing and calls no service-account or role API", async () => {
+      const { generate, credential } = useOrg("org-mcp-locked", { features: { mcp: "locked" } });
+
+      expect(await generate()).toBeNull();
+      expect(service_accounts.create).not.toHaveBeenCalled();
+      expect(createRole).not.toHaveBeenCalled();
+      expect(updateRole).not.toHaveBeenCalled();
+      expect(credential.value).toBeNull();
+    });
+
+    it("mints as usual when mcp is enabled", async () => {
+      const { generate } = useOrg("org-mcp-enabled", { features: { mcp: "enabled" } });
+
+      expect(await generate()).toMatchObject({ token: "tok_123" });
+      expect(service_accounts.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("with rbac enforced but not licensed", () => {
+    it.each(["locked", "hidden"])(
+      "keeps the token and calls no gated role API under a %s license",
+      async (state) => {
+        const { generate, error } = useOrg(`org-license-${state}`, { features: { rbac: state } });
+
+        const cred = await generate();
+
+        expect(service_accounts.create).toHaveBeenCalledTimes(1);
+        expect(createRole).not.toHaveBeenCalled();
+        expect(getAllRolePermissions).not.toHaveBeenCalled();
+        expect(updateRole).not.toHaveBeenCalled();
+        expect(cred).toMatchObject({ role: null, scope: "unscoped", token: "tok_123" });
+        expect(error.value).toBe("");
+      },
+    );
+
+    it("joins the role when the license grants rbac", async () => {
+      const { generate } = useOrg("org-license-enabled", { features: { rbac: "enabled" } });
+
+      const cred = await generate();
+
+      expect(updateRole).toHaveBeenCalledTimes(1);
+      expect(cred).toMatchObject({ role: "mcp_readonly", scope: "readonly" });
+    });
+  });
+
   describe("with rbac", () => {
     it("grants a fresh role the read-only set plus MCP write, and joins the account", async () => {
       const { generate } = useOrg("org-fresh");

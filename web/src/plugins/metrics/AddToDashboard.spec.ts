@@ -157,6 +157,8 @@ const createWrapper = (props: Record<string, any> = {}) => {
       ...props,
     },
     global: {
+      // The setup file loads useFeatureLock before this spec's vuex mock, so it injects the store by key.
+      provide: { store: mockStore },
       stubs: {
         ODialog: ODialogStub,
         OForm: {
@@ -1290,5 +1292,29 @@ describe("AddToDashboard — remembers the last dashboard", () => {
     mockStore.state.userInfo = { email: "user@example.com" };
 
     expect(wrapper.vm.activeFolderId).toBe("default");
+  });
+});
+
+describe("AddToDashboard — license lock", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    delete (mockStore.state as any).zoConfig;
+    vi.clearAllMocks();
+  });
+
+  it("keeps the dialog closed and lists no folders while dashboards is locked", async () => {
+    (mockStore.state as any).zoConfig = { features: { dashboards: "locked" } };
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "ODialog" }).props("open")).toBe(false);
+    expect(mockGetFoldersList).not.toHaveBeenCalled();
+  });
+
+  it("opens and lists folders while dashboards is enabled", async () => {
+    (mockStore.state as any).zoConfig = { features: { dashboards: "enabled" } };
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "ODialog" }).props("open")).toBe(true);
+    expect(mockGetFoldersList).toHaveBeenCalledWith(mockStore);
   });
 });

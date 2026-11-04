@@ -37,6 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSpinner size="md" data-test="edit-role-summary-loading" />
         </div>
 
+        <div v-else-if="licenseDenied" class="flex flex-1 items-center justify-center p-6">
+          <LicenseDeniedState
+            :features="licenseDenied"
+            data-test="edit-role-summary-license-denied"
+          />
+        </div>
+
         <div v-else-if="!modules.length" class="flex flex-1 items-center justify-center p-6">
           <OEmptyState
             size="hero"
@@ -128,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <OButton
-        v-if="!presetsOpen"
+        v-if="!locked && !presetsOpen"
         variant="outline"
         size="icon-sm"
         class="absolute end-3 top-3 z-10"
@@ -141,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
 
       <RolePresetsPanel
-        v-else
+        v-else-if="!locked"
         class="border-border-default w-85 shrink-0 border-s @max-[38rem]/role-overview:max-h-[55%] @max-[38rem]/role-overview:w-auto @max-[38rem]/role-overview:border-s-0 @max-[38rem]/role-overview:border-t"
         :presets="presets"
         :preview-preset="previewPreset"
@@ -174,6 +181,8 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import RolePresetsPanel from "@/components/iam/roles/RolePresetsPanel.vue";
 import { groupTone } from "@/components/iam/roles/roleGroupTone";
 import type { PresetInfo, PresetPreview } from "@/composables/iam/useRolePresets";
+import { useFeatureLock } from "@/composables/useFeatureLock";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 
 export type SummaryAction = { action: string; label: I18nText };
 
@@ -202,6 +211,8 @@ defineProps<{
   moduleLabel: (key: string) => I18nText;
   entityLabel: (resource: string, entity: string) => I18nText;
   summaryActions: (actions: string[]) => SummaryAction[];
+  /** Missing license features when the role's permissions load was license-denied. */
+  licenseDenied?: readonly string[] | null;
 }>();
 
 const emit = defineEmits<{
@@ -211,6 +222,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+// The preset cards are a library button the page lock does not reach.
+const { locked } = useFeatureLock();
 
 const grouped = (count: number) => raw(count.toLocaleString());
 
