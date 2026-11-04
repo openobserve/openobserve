@@ -23,6 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="person"
     scroll
   >
+    <template #title-trail>
+      <BetaBadge class="shrink-0" />
+    </template>
     <template #actions>
       <!-- Personal and org-wide, so it heads the page rather than sitting under one team. -->
       <!-- Away only takes someone off a team's rotation, so a reader on no team has nothing to mark. -->
@@ -464,6 +467,7 @@ import OnCallReachRow from "@/components/oncall/OnCallReachRow.vue";
 import OnCallSetupBanner from "@/components/oncall/OnCallSetupBanner.vue";
 import OnCallSlackCard from "@/components/oncall/OnCallSlackCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

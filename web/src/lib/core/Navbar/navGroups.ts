@@ -237,6 +237,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "onCallResponses",
         categoryKey: "menu.onCall",
         gate: "oncall",
+        beta: true,
       },
       {
         titleKey: "oncall.teams",
@@ -244,6 +245,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "onCallTeams",
         categoryKey: "menu.onCall",
         gate: "oncall",
+        beta: true,
       },
       {
         titleKey: "oncall.routingNav",
@@ -251,6 +253,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "onCallRouting",
         categoryKey: "menu.onCall",
         gate: "oncall",
+        beta: true,
       },
       // Same icon as the page's own header, so the menu and the page read as one place.
       {
@@ -259,6 +262,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "onCallMine",
         categoryKey: "menu.onCall",
         gate: "oncall",
+        beta: true,
       },
       // Where external alerts (Grafana, Alertmanager, etc.) feed Incidents.
       // Gated on incidentList, not alertList: this only makes sense where

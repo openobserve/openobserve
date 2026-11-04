@@ -158,6 +158,17 @@ describe("OnCallMine", () => {
     service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
   });
 
+  /// Mounts the real page layout so the tag is proven to reach the rendered header.
+  it("tags the page title as Beta", async () => {
+    const wrapper = mount(OnCallMine, {
+      global: { plugins: [i18n, store], stubs: { ...stubs, OPageLayout: false } },
+    });
+    await flushPromises();
+    const badge = wrapper.find('[data-test="beta-badge"]');
+    expect(badge.exists()).toBe(true);
+    expect(badge.text()).toBe(String(i18n.global.t("common.beta")));
+  });
+
   it("serves a revisit from cache", async () => {
     const first = render();
     await flushPromises();

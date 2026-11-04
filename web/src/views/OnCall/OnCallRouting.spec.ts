@@ -259,6 +259,17 @@ describe("OnCallRouting", () => {
     correlation.getDimensionAnalytics.mockResolvedValue({ data: { dimensions: [] } } as any);
   });
 
+  /// Mounts the real page layout so the tag is proven to reach the rendered header.
+  it("tags the page title as Beta", async () => {
+    const wrapper = mount(OnCallRouting, {
+      global: { plugins: [i18n, store], stubs: { ...stubs, OPageLayout: false } },
+    });
+    await flushPromises();
+    const badge = wrapper.find('[data-test="beta-badge"]');
+    expect(badge.exists()).toBe(true);
+    expect(badge.text()).toBe(String(i18n.global.t("common.beta")));
+  });
+
   /// The whole point of the org screen: no team_id, so shadowing is computed
   /// across every team's rules, not one team's slice.
   it("asks for the org-wide rules, not one team's", async () => {
