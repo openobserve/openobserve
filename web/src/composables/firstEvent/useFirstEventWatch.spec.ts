@@ -1565,3 +1565,27 @@ describe("useFirstEventWatch — diagnosis", () => {
     });
   });
 });
+
+describe("useFirstEventWatch — sample streams are not the user's data", () => {
+  it("keeps waiting when only a sample stream appears", async () => {
+    countHits.mockReturnValue([{ zo_count: 5, zo_min: NOW * 1000 }]);
+    const w = watchOf("logs");
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    rows.logs = [{ name: "o2_demo_app_logs", stats: { doc_num: 5 } }];
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(w.state.value).toBe("waiting");
+    expect(countCalls().some((r) => r.query.query.sql.includes("o2_demo_"))).toBe(false);
+  });
+
+  it("does not match a sample stream by keyword", async () => {
+    countHits.mockReturnValue([{ zo_count: 5, zo_min: NOW * 1000 }]);
+    const w = watchOf("logs", { targetStream: "nginx", match: "keyword" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    rows.logs = [{ name: "o2_demo_nginx_access", stats: { doc_num: 5, doc_time_max: 9 } }];
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(w.state.value).toBe("waiting");
+    expect(countCalls().some((r) => r.query.query.sql.includes("o2_demo_"))).toBe(false);
+  });
+});
