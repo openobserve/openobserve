@@ -11,6 +11,15 @@ import {
   isNumericYField,
 } from "@/utils/dashboard/heatmapYAxis";
 
+// Builder y functions that stay per-row, so a raw-value chart can filter on them in WHERE.
+const ROW_SCALAR_FUNCTIONS = new Set<string | null>([null, "cast", "try_cast"]);
+
+interface BuilderYField {
+  type?: string;
+  functionName?: string | null;
+  isDerived?: boolean;
+}
+
 export function buildSQLQueryFromInput(fields: any, defaultStream: any): string {
   // Handle undefined or null fields
   if (!fields) {
@@ -408,7 +417,8 @@ export function buildSQLChartQuery(config: {
 
   // WHERE clause
   const whereClause = buildWhereClause(queryData.fields.filter.conditions, dashboardPanelData);
-  query += yBucket?.where ? andWhere(whereClause, yBucket.where) : whereClause;
+  const extraWhere = yBucket?.where || rawValuePresentSql(queryData, chartType, streamAlias);
+  query += extraWhere ? andWhere(whereClause, extraWhere) : whereClause;
 
   // GROUP BY clause - chart-type-specific logic
   // Only include fields that have valid expressions (are in validFieldAliases)
@@ -559,6 +569,29 @@ function heatmapYBucketPlan(
     select: heatmapYBucketSql(expr, bucketing.bucket),
     where: heatmapYRangeSql(expr, bucketing.range),
   };
+}
+
+/** A raw-value chart keeps only rows with a y value, so its row cap is not spent on rows it cannot plot. */
+function rawValuePresentSql(
+  queryData: { fields: { y: BuilderYField[] } },
+  chartType: string,
+  streamAlias: string,
+): string {
+  if (!isRawValueChart(chartType)) return "";
+  const fields = queryData.fields.y.filter((field) => !field?.isDerived);
+  // An aggregate cannot go in WHERE, and skipping one y field would drop the rows only it has.
+  if (
+    fields.some(
+      (field) => field?.type === "raw" || !ROW_SCALAR_FUNCTIONS.has(field?.functionName ?? null),
+    )
+  ) {
+    return "";
+  }
+  const present = fields
+    .map((field) => buildSQLQueryFromInput(field, streamAlias))
+    .filter(Boolean)
+    .map((expr: string) => `${/^[\w."]+$/.test(expr) ? expr : `(${expr})`} IS NOT NULL`);
+  return present.length > 1 ? `(${present.join(" OR ")})` : (present[0] ?? "");
 }
 
 /** `whereClause` (" WHERE ..." or "") with `condition` ANDed on, keeping the user's OR groups intact. */

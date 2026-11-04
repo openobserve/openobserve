@@ -66,7 +66,11 @@ export type ButtonVariant =
   | "tint-blue"
   | "tint-orange"
   // Table-cell content that is itself the action: no chrome, full cell width, stacked lines.
-  | "cell";
+  | "cell"
+  // Borderless list row whose whole content is the action.
+  | "row"
+  // Outlined prompt whose message is the action, e.g. a locked section.
+  | "locked-body";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =

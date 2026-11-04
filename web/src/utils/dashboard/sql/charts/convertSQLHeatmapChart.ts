@@ -18,7 +18,7 @@ import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { formatDate, isTimeSeries } from "../../dateTimeUtils";
 import { getDataValue } from "../../aliasUtils";
 import { getFieldLabel } from "../../fieldLabel";
-import { chartColor } from "@/utils/chartTheme";
+import { chartAxisTextColor, chartColor } from "@/utils/chartTheme";
 import { type SQLContext } from "../shared/types";
 import {
   HEATMAP_MAX_CELLS,
@@ -244,6 +244,7 @@ export function applyHeatmapChart(ctx: SQLContext): void {
       type: "category",
       data: xAxisZerothPositionUniqueValue.map(categoryLabel),
       splitArea: HEATMAP_SPLIT_AREA,
+      axisLabel: { color: chartAxisTextColor() },
     },
   ]),
     [
@@ -253,6 +254,7 @@ export function applyHeatmapChart(ctx: SQLContext): void {
           yBucketing ? heatmapYBucketLabel(value, yBucketing.bucket) : categoryLabel(value),
         ),
         splitArea: HEATMAP_SPLIT_AREA,
+        axisLabel: { color: chartAxisTextColor() },
       }),
     ]);
   options.legend.show = false;

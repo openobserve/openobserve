@@ -178,6 +178,16 @@ pub(crate) fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn write_error_response(e: infra::errors::Error) -> Response {
+    match e {
+        infra::errors::Error::DbError(infra::errors::DbError::UniqueViolation) => {
+            MetaHttpResponse::conflict("an incident integration with this name already exists")
+        }
+        e => MetaHttpResponse::internal_error(e),
+    }
+}
+
 #[cfg(feature = "enterprise")]
 fn gate_enabled() -> Option<Response> {
     use o2_enterprise::enterprise::common::config::get_config as o2_config;
@@ -274,6 +284,7 @@ async fn can_write_integrations(org_id: &str, user_id: &str) -> bool {
     request_body(content = CreateIntegrationPayload, description = "Request body", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 409, description = "Name already exists in the org", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
@@ -309,7 +320,7 @@ pub async fn create_integration(
 
     match infra::table::incident_integrations::add(&record).await {
         Ok(()) => MetaHttpResponse::json(IntegrationResponse::from_record(&org_id, record)),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => write_error_response(e),
     }
 }
 
@@ -371,6 +382,7 @@ pub async fn set_integration_enabled(
     request_body(content = UpdateIntegrationPayload, description = "Request body", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 409, description = "Name already exists in the org", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
@@ -400,7 +412,7 @@ pub async fn update_integration(
     .await
     {
         Ok(()) => MetaHttpResponse::ok("updated"),
-        Err(e) => MetaHttpResponse::internal_error(e),
+        Err(e) => write_error_response(e),
     }
 }
 
@@ -572,6 +584,7 @@ pub async fn list_integrations(_path: Path<String>) -> Response {
     request_body(content = CreateIntegrationPayload, description = "Request body", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 409, description = "Name already exists in the org", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
@@ -655,6 +668,7 @@ pub async fn rotate_integration_token(_path: Path<(String, String)>) -> Response
     request_body(content = UpdateIntegrationPayload, description = "Request body", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 409, description = "Name already exists in the org", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
@@ -922,5 +936,20 @@ mod tests {
         };
         let response = SenderResponse::from(record);
         assert_eq!(response.display_name, "grafana");
+    }
+
+    #[test]
+    fn a_taken_name_is_a_conflict_and_other_write_errors_stay_internal() {
+        use axum::http::StatusCode;
+        use infra::errors::{DbError, Error};
+
+        assert_eq!(
+            write_error_response(Error::DbError(DbError::UniqueViolation)).status(),
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            write_error_response(Error::DbError(DbError::SeaORMError("boom".to_string()))).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 }
