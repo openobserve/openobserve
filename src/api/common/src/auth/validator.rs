@@ -63,6 +63,8 @@ pub struct RequestData {
     pub uri: Uri,
     pub method: Method,
     pub headers: HeaderMap,
+    /// The route template axum matched (`MatchedPath`); ingestion is classified by it.
+    pub route: Option<String>,
 }
 
 /// Error type for auth validation
@@ -214,6 +216,7 @@ pub async fn validator(
             user_id,
             password.trim(),
             path,
+            req_data.route.as_deref(),
             &req_data.method,
             from_session,
         )
@@ -222,7 +225,8 @@ pub async fn validator(
         Ok(res) => {
             if res.is_valid {
                 // Check and create organization if needed
-                check_and_create_org(user_id, &req_data.method, path).await?;
+                check_and_create_org(user_id, &req_data.method, path, req_data.route.as_deref())
+                    .await?;
 
                 #[cfg(feature = "enterprise")]
                 let path = path.to_owned();
@@ -388,9 +392,10 @@ async fn fleet_token_response(
     path_org: Option<&str>,
     method: &Method,
     path: &str,
+    route: Option<&str>,
 ) -> TokenValidationResponse {
     let fleet_enabled = openobserve_core::fleet::enabled();
-    fleet_token_response_with(fleet_enabled, user_id, token, path_org, method, path).await
+    fleet_token_response_with(fleet_enabled, user_id, token, path_org, method, path, route).await
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -400,6 +405,7 @@ async fn fleet_token_response(
     _path_org: Option<&str>,
     _method: &Method,
     _path: &str,
+    _route: Option<&str>,
 ) -> TokenValidationResponse {
     TokenValidationResponse::default()
 }
@@ -412,10 +418,11 @@ async fn fleet_token_response_with(
     path_org: Option<&str>,
     method: &Method,
     path: &str,
+    route: Option<&str>,
 ) -> TokenValidationResponse {
     use o2_enterprise::enterprise::fleet::enrollment::ENROLLMENT;
 
-    let ingestion_write = ingestion_routes::is_ingestion_write(method, path);
+    let ingestion_write = ingestion_routes::is_ingestion_write(method, path, route);
     match ENROLLMENT
         .accept(fleet_enabled, ingestion_write, token, path_org)
         .await
@@ -437,6 +444,7 @@ pub async fn validate_credentials(
     user_id: &str,
     user_password: &str,
     path: &str,
+    route: Option<&str>,
     method: &Method,
     from_session: bool,
 ) -> Result<TokenValidationResponse, AuthError> {
@@ -498,6 +506,7 @@ pub async fn validate_credentials(
             path_columns.first().copied(),
             method,
             path,
+            route,
         )
         .await);
     }
@@ -516,7 +525,7 @@ pub async fn validate_credentials(
     if ingestion_routes::is_opamp(path) {
         return Ok(TokenValidationResponse::default());
     }
-    let is_ingestion_path = ingestion_routes::is_ingestion_allowed(method, path);
+    let is_ingestion_path = ingestion_routes::is_ingestion_allowed(method, path, route);
 
     // Check org-level ingestion tokens before user lookup.
     // Org tokens are prefixed with "o2oi_" for fast identification —
@@ -940,7 +949,12 @@ pub async fn validate_credentials_ext(
 /// - The org does not exist in the meta table
 /// - The user is a root user
 /// - This is a ingestion POST endpoint
-async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Result<(), AuthError> {
+async fn check_and_create_org(
+    user_id: &str,
+    method: &Method,
+    path: &str,
+    route: Option<&str>,
+) -> Result<(), AuthError> {
     let cfg = get_config();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.first()
@@ -972,7 +986,7 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
         if !cfg.common.create_org_through_ingestion {
             Err(AuthError::NotFound("Organization not found".to_string()))
         } else if is_root_user(user_id)
-            && ingestion_routes::is_ingestion_write(method, path)
+            && ingestion_routes::is_ingestion_write(method, path, route)
             && openobserve_core::organization::check_and_create_org(org_id)
                 .await
                 .inspect_err(|error| {
@@ -1132,7 +1146,15 @@ pub async fn validator_aws(req_data: &RequestData) -> Result<AuthValidationResul
                     return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
                 };
 
-                match validate_credentials(&user_id, &password, path, &req_data.method, false).await
+                match validate_credentials(
+                    &user_id,
+                    &password,
+                    path,
+                    req_data.route.as_deref(),
+                    &req_data.method,
+                    false,
+                )
+                .await
                 {
                     Ok(res) => {
                         if res.is_valid {
@@ -1177,7 +1199,16 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
                 return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
             };
 
-            match validate_credentials(&user_id, &password, path, &req_data.method, false).await {
+            match validate_credentials(
+                &user_id,
+                &password,
+                path,
+                req_data.route.as_deref(),
+                &req_data.method,
+                false,
+            )
+            .await
+            {
                 Ok(res) => {
                     if res.is_valid {
                         Ok(AuthValidationResult {
@@ -1525,6 +1556,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // This holds structurally — `Splunk` matches no branch in
         // oo_validator_internal and falls through to Unauthorized.
         let req_data = RequestData {
+            route: None,
             uri: "/orgb/_bulk".parse::<Uri>().unwrap(),
             method: Method::POST,
             headers: HeaderMap::new(),
@@ -1550,6 +1582,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
     async fn auth_ext_token_without_its_prefix_is_rejected() {
         let now = Utc::now().timestamp();
         let req_data = RequestData {
+            route: None,
             uri: "/default/streams".parse::<Uri>().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
@@ -1579,6 +1612,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         let mut headers = HeaderMap::new();
         headers.insert("X-Amz-Firehose-Access-Key", encoded.parse().unwrap());
         let aws = RequestData {
+            route: None,
             uri: "/default/mystream/_kinesis_firehose"
                 .parse::<Uri>()
                 .unwrap(),
@@ -1594,6 +1628,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             .append_pair("API-Key", &encoded)
             .finish();
         let gcp = RequestData {
+            route: None,
             uri: format!("/default/mystream/_sub?{query}")
                 .parse::<Uri>()
                 .unwrap(),
@@ -1611,6 +1646,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // A GUID is not an `o2oi_` token and is not a user password, so Basic
         // with it must fail too.
         let req_data = RequestData {
+            route: None,
             uri: "/orgb/_bulk".parse::<Uri>().unwrap(),
             method: Method::POST,
             headers: HeaderMap::new(),
@@ -1847,10 +1883,17 @@ CN5lTowpVXP2OIiiNTGa75Fj
             "default/metrics/latest",
         ] {
             assert!(
-                !validate_credentials("collector@example.com", token, path, &Method::GET, false,)
-                    .await
-                    .unwrap()
-                    .is_valid,
+                !validate_credentials(
+                    "collector@example.com",
+                    token,
+                    path,
+                    None,
+                    &Method::GET,
+                    false,
+                )
+                .await
+                .unwrap()
+                .is_valid,
                 "org ingestion token must not read GET /{path}"
             );
         }
@@ -1859,25 +1902,50 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // template/data-stream/ingest-pipeline POST-create stubs (whose `{name}`
         // is the last segment, so the old last-segment rule would have missed
         // them — the route table matches them by shape). ---
-        for path in [
-            "default/traces",                      // OTLP/native traces write
-            "default/_bulk",                       // ES bulk
-            "default/mystream/_json",              // JSON ingest
-            "default/_hec",                        // Splunk HEC
-            "default/loki/api/v1/push",            // Loki push
-            "default/v1/logs",                     // OTLP logs
-            "default/prometheus/api/v1/write",     // Prometheus remote-write
-            "default/mystream/_kinesis_firehose",  // AWS Firehose
-            "default/mystream/_sub",               // GCP Pub/Sub push
-            "default/_index_template/filebeat-7",  // ES template create
-            "default/_data_stream/filebeat-7",     // ES data-stream create
-            "default/_ingest/pipeline/filebeat-7", // ES ingest-pipeline create
+        for (path, route) in [
+            ("default/traces", "/api/{org_id}/traces"),
+            ("default/_bulk", "/api/{org_id}/_bulk"),
+            (
+                "default/mystream/_json",
+                "/api/{org_id}/{stream_name}/_json",
+            ),
+            ("default/_hec", "/api/{org_id}/_hec"),
+            ("default/loki/api/v1/push", "/api/{org_id}/loki/api/v1/push"),
+            ("default/v1/logs", "/api/{org_id}/v1/logs"),
+            (
+                "default/prometheus/api/v1/write",
+                "/api/{org_id}/prometheus/api/v1/write",
+            ),
+            (
+                "default/mystream/_kinesis_firehose",
+                "/aws/{org_id}/{stream_name}/_kinesis_firehose",
+            ),
+            ("default/mystream/_sub", "/gcp/{org_id}/{stream_name}/_sub"),
+            (
+                "default/_index_template/filebeat-7",
+                "/api/{org_id}/_index_template/{name}",
+            ),
+            (
+                "default/_data_stream/filebeat-7",
+                "/api/{org_id}/_data_stream/{name}",
+            ),
+            (
+                "default/_ingest/pipeline/filebeat-7",
+                "/api/{org_id}/_ingest/pipeline/{name}",
+            ),
         ] {
             assert!(
-                validate_credentials("collector@example.com", token, path, &Method::POST, false,)
-                    .await
-                    .unwrap()
-                    .is_valid,
+                validate_credentials(
+                    "collector@example.com",
+                    token,
+                    path,
+                    Some(route),
+                    &Method::POST,
+                    false,
+                )
+                .await
+                .unwrap()
+                .is_valid,
                 "org ingestion token must be accepted on POST /{path}"
             );
         }
@@ -1889,6 +1957,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 "collector@example.com",
                 token,
                 "default",
+                None,
                 &Method::POST,
                 false,
             )
@@ -1901,21 +1970,44 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // --- Reads: only the static Elasticsearch handshake/setup stubs (and
         // the bare ES root ping) are reachable so ES ingestion clients connect
         // and load templates. These return no user data. ---
-        for (path, method) in [
-            ("default/", Method::GET),  // ES root version ping `GET /{org}/`
-            ("default/", Method::HEAD), // ES root ping via HEAD
-            ("default/_license", Method::GET),
-            ("default/_xpack", Method::GET),
-            ("default/_ilm/policy/filebeat-7", Method::GET),
-            ("default/_index_template/filebeat-7", Method::GET),
-            ("default/_data_stream/filebeat-7", Method::HEAD),
-            ("default/_ingest/pipeline/filebeat-7", Method::GET),
+        for (path, route, method) in [
+            ("default/", "/api/{org_id}/", Method::GET),
+            ("default/", "/api/{org_id}/", Method::HEAD),
+            ("default/_license", "/api/{org_id}/_license", Method::GET),
+            ("default/_xpack", "/api/{org_id}/_xpack", Method::GET),
+            (
+                "default/_ilm/policy/filebeat-7",
+                "/api/{org_id}/_ilm/policy/{name}",
+                Method::GET,
+            ),
+            (
+                "default/_index_template/filebeat-7",
+                "/api/{org_id}/_index_template/{name}",
+                Method::GET,
+            ),
+            (
+                "default/_data_stream/filebeat-7",
+                "/api/{org_id}/_data_stream/{name}",
+                Method::HEAD,
+            ),
+            (
+                "default/_ingest/pipeline/filebeat-7",
+                "/api/{org_id}/_ingest/pipeline/{name}",
+                Method::GET,
+            ),
         ] {
             assert!(
-                validate_credentials("collector@example.com", token, path, &method, false,)
-                    .await
-                    .unwrap()
-                    .is_valid,
+                validate_credentials(
+                    "collector@example.com",
+                    token,
+                    path,
+                    Some(route),
+                    &method,
+                    false,
+                )
+                .await
+                .unwrap()
+                .is_valid,
                 "org ingestion token must be accepted on {method} /{path}"
             );
         }
@@ -1928,6 +2020,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 "collector@example.com",
                 token,
                 "default",
+                None,
                 &Method::GET,
                 false,
             )
@@ -1944,6 +2037,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 "collector@example.com",
                 token,
                 "default/dashboards",
+                Some("/api/{org_id}/dashboards"),
                 &Method::POST,
                 false,
             )
@@ -1961,6 +2055,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                     "collector@example.com",
                     token,
                     "default/traces",
+                    Some("/api/{org_id}/traces"),
                     &method,
                     false,
                 )
@@ -1978,6 +2073,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                     "collector@example.com",
                     token,
                     "default/v1/opamp",
+                    Some("/api/{org_id}/v1/opamp"),
                     &method,
                     false,
                 )
@@ -1985,6 +2081,34 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 .unwrap()
                 .is_valid,
                 "org ingestion token must not be accepted on {method} /default/v1/opamp"
+            );
+        }
+
+        // A management write whose last segment is an ingestion literal is not ingestion.
+        for (path, route) in [
+            ("default/kv/_json", "/api/{org_id}/kv/{key}"),
+            (
+                "default/streams/_sub",
+                "/api/{org_id}/streams/{stream_name}",
+            ),
+            (
+                "default/enrichment_tables/_sub",
+                "/api/{org_id}/enrichment_tables/{table_name}",
+            ),
+        ] {
+            assert!(
+                !validate_credentials(
+                    "collector@example.com",
+                    token,
+                    path,
+                    Some(route),
+                    &Method::POST,
+                    false,
+                )
+                .await
+                .unwrap()
+                .is_valid,
+                "org ingestion token must not be accepted on POST {route} as /{path}"
             );
         }
 
@@ -2011,21 +2135,29 @@ CN5lTowpVXP2OIiiNTGa75Fj
         let hash = hash_token;
         ENROLLMENT.cache_token(hash(live), cached("live", false));
         ENROLLMENT.cache_token(hash(revoked), cached("revoked", true));
-        let check = |enabled: bool, token: &'static str, method: Method, path: &'static str| async move {
+        let check = |enabled: bool,
+                     token: &'static str,
+                     method: Method,
+                     path: &'static str,
+                     route: &'static str| async move {
             let org = path.split('/').next();
-            fleet_token_response_with(enabled, "agent", token, org, &method, path)
+            fleet_token_response_with(enabled, "agent", token, org, &method, path, Some(route))
                 .await
                 .is_valid
         };
 
-        for (method, path) in [
-            (Method::GET, "default/v1/opamp"),
-            (Method::POST, "default/v1/opamp"),
-            (Method::POST, "default/v1/logs"),
-            (Method::POST, "default/v1/metrics"),
+        for (method, path, route) in [
+            (Method::GET, "default/v1/opamp", "/api/{org_id}/v1/opamp"),
+            (Method::POST, "default/v1/opamp", "/api/{org_id}/v1/opamp"),
+            (Method::POST, "default/v1/logs", "/api/{org_id}/v1/logs"),
+            (
+                Method::POST,
+                "default/v1/metrics",
+                "/api/{org_id}/v1/metrics",
+            ),
         ] {
             assert!(
-                check(true, live, method.clone(), path).await,
+                check(true, live, method.clone(), path, route).await,
                 "{method} /{path}"
             );
         }
@@ -2036,6 +2168,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             Some("default"),
             &Method::POST,
             "default/v1/opamp",
+            Some("/api/{org_id}/v1/opamp"),
         )
         .await;
         assert_eq!(
@@ -2048,18 +2181,24 @@ CN5lTowpVXP2OIiiNTGa75Fj
         );
         assert_eq!(valid.given_name, "fleet-live");
 
-        for (method, path) in [
-            (Method::POST, "other/v1/opamp"),
-            (Method::GET, "default/mystream/traces/latest"),
-            (Method::GET, "default/"),
+        let opamp = "/api/{org_id}/v1/opamp";
+        for (method, path, route) in [
+            (Method::POST, "other/v1/opamp", opamp),
+            (
+                Method::GET,
+                "default/mystream/traces/latest",
+                "/api/{org_id}/{stream_name}/traces/latest",
+            ),
+            (Method::GET, "default/", "/api/{org_id}/"),
+            (Method::POST, "default/kv/_json", "/api/{org_id}/kv/{key}"),
         ] {
             assert!(
-                !check(true, live, method.clone(), path).await,
+                !check(true, live, method.clone(), path, route).await,
                 "{method} /{path}"
             );
         }
-        assert!(!check(true, revoked, Method::POST, "default/v1/opamp").await);
-        assert!(!check(false, live, Method::POST, "default/v1/opamp").await);
+        assert!(!check(true, revoked, Method::POST, "default/v1/opamp", opamp).await);
+        assert!(!check(false, live, Method::POST, "default/v1/opamp", opamp).await);
     }
 
     #[tokio::test]
@@ -2093,6 +2232,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // token must still be rejected: bypass_check must not double as
         // from_session and skip the allow_static_token policy.
         let req_data = RequestData {
+            route: None,
             uri: "/default/config".parse().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
@@ -2108,7 +2248,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         // The same credentials through an assume_service_account session
         // (from_session=true) are accepted.
         assert!(
-            validate_credentials(sa_email, token, "default/config", &Method::GET, true)
+            validate_credentials(sa_email, token, "default/config", None, &Method::GET, true)
                 .await
                 .unwrap()
                 .is_valid,
@@ -2143,6 +2283,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
 
         let credentials = base64::encode(&format!("{sa_email}:{token}"));
         let req_data = RequestData {
+            route: None,
             uri: "/default/users".parse().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
@@ -2245,31 +2386,31 @@ CN5lTowpVXP2OIiiNTGa75Fj
         .await;
 
         assert!(
-            validate_credentials(init_user, pwd, "default/_bulk", &Method::POST, false)
+            validate_credentials(init_user, pwd, "default/_bulk", None, &Method::POST, false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials("", pwd, "default/_bulk", &Method::POST, false)
+            !validate_credentials("", pwd, "default/_bulk", None, &Method::POST, false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials("", pwd, "/", &Method::GET, false)
+            !validate_credentials("", pwd, "/", None, &Method::GET, false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials(user_id, pwd, "/", &Method::GET, false)
+            !validate_credentials(user_id, pwd, "/", None, &Method::GET, false)
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials(user_id, "x", "default/user", &Method::GET, false)
+            !validate_credentials(user_id, "x", "default/user", None, &Method::GET, false)
                 .await
                 .unwrap()
                 .is_valid
@@ -2277,7 +2418,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
         for method in [Method::GET, Method::POST] {
             assert!(
-                !validate_credentials(init_user, pwd, "default/v1/opamp", &method, false)
+                !validate_credentials(init_user, pwd, "default/v1/opamp", None, &method, false)
                     .await
                     .unwrap()
                     .is_valid,
@@ -2285,12 +2426,12 @@ CN5lTowpVXP2OIiiNTGa75Fj
             );
         }
         let stored_ext = get_hash(pwd, &config::get_ext_auth_salt());
-        for (path, method) in [
-            ("default/_bulk", Method::POST),
-            ("default/streams", Method::GET),
+        for (path, route, method) in [
+            ("default/_bulk", "/api/{org_id}/_bulk", Method::POST),
+            ("default/streams", "/api/{org_id}/streams", Method::GET),
         ] {
             assert!(
-                !validate_credentials(init_user, &stored_ext, path, &method, false)
+                !validate_credentials(init_user, &stored_ext, path, Some(route), &method, false)
                     .await
                     .unwrap()
                     .is_valid,
@@ -2311,6 +2452,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 init_user,
                 &static_token,
                 "default/v1/logs",
+                Some("/api/{org_id}/v1/logs"),
                 &Method::POST,
                 false
             )
@@ -2323,6 +2465,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 init_user,
                 &static_token,
                 "default/v1/opamp",
+                Some("/api/{org_id}/v1/opamp"),
                 &Method::POST,
                 false
             )
@@ -2422,6 +2565,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
 
     fn post_request(uri: &str, headers: HeaderMap) -> RequestData {
         RequestData {
+            route: None,
             uri: uri.parse().unwrap(),
             method: Method::POST,
             headers,
@@ -2548,9 +2692,16 @@ CN5lTowpVXP2OIiiNTGa75Fj
 
         for guess in ["anything", " "] {
             assert!(
-                !validate_credentials(sso_user, guess, "default/streams", &Method::GET, false)
-                    .await
-                    .is_ok_and(|r| r.is_valid)
+                !validate_credentials(
+                    sso_user,
+                    guess,
+                    "default/streams",
+                    None,
+                    &Method::GET,
+                    false
+                )
+                .await
+                .is_ok_and(|r| r.is_valid)
             );
             assert!(
                 !validate_user(sso_user, guess)
@@ -2560,6 +2711,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         }
         let credentials = base64::encode(&format!("{sso_user}:anything"));
         let req_data = RequestData {
+            route: None,
             uri: "/default/streams".parse().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),
@@ -2580,10 +2732,17 @@ CN5lTowpVXP2OIiiNTGa75Fj
             .await;
 
         assert!(
-            validate_credentials(plain_user, pwd, "default/streams", &Method::GET, false)
-                .await
-                .unwrap()
-                .is_valid,
+            validate_credentials(
+                plain_user,
+                pwd,
+                "default/streams",
+                None,
+                &Method::GET,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid,
             "the seeded user must still sign in with its real password"
         );
         let mut accepted = vec![];
@@ -2593,7 +2752,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 ("default/_search", Method::POST),
                 ("default/users", Method::GET),
             ] {
-                let res = validate_credentials(email, "", path, &method, false).await;
+                let res = validate_credentials(email, "", path, None, &method, false).await;
                 if res.is_ok_and(|r| r.is_valid) {
                     accepted.push(format!("validate_credentials {email} {method} /{path}"));
                 }
@@ -2602,6 +2761,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         for email in [sre_agent, plain_user] {
             let credentials = base64::encode(&format!("{email}:"));
             let req_data = RequestData {
+                route: None,
                 uri: "/default/streams".parse().unwrap(),
                 method: Method::GET,
                 headers: HeaderMap::new(),
@@ -2680,7 +2840,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
             ("default/user", Method::GET),
         ] {
             assert!(
-                !validate_credentials(user, pwd, path, &method, false)
+                !validate_credentials(user, pwd, path, None, &method, false)
                     .await
                     .unwrap()
                     .is_valid,
@@ -2760,19 +2920,33 @@ CN5lTowpVXP2OIiiNTGa75Fj
             "root must never acquire lockout state"
         );
         assert!(
-            validate_credentials(root_user, root_pwd, "default/_bulk", &Method::POST, false)
-                .await
-                .unwrap()
-                .is_valid,
+            validate_credentials(
+                root_user,
+                root_pwd,
+                "default/_bulk",
+                None,
+                &Method::POST,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid,
             "root is never locked out"
         );
 
         // Without this the final assertion would also hold for a user who was never created.
         assert!(
-            validate_credentials(locked_user, pwd, "default/_bulk", &Method::POST, false)
-                .await
-                .unwrap()
-                .is_valid,
+            validate_credentials(
+                locked_user,
+                pwd,
+                "default/_bulk",
+                None,
+                &Method::POST,
+                false
+            )
+            .await
+            .unwrap()
+            .is_valid,
             "the fixture's user must authenticate before being locked out"
         );
         assert_eq!(
@@ -2838,7 +3012,9 @@ CN5lTowpVXP2OIiiNTGa75Fj
     /// mismatch. Panics if the credentials are accepted.
     #[cfg(feature = "enterprise")]
     async fn refuse(user: &str, password: &str) -> Option<i64> {
-        match validate_credentials(user, password, "default/_bulk", &Method::POST, false).await {
+        match validate_credentials(user, password, "default/_bulk", None, &Method::POST, false)
+            .await
+        {
             Ok(response) => {
                 assert!(!response.is_valid, "{user} was expected to be refused");
                 None
@@ -3033,6 +3209,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
     #[tokio::test]
     async fn an_o2dt_bearer_token_goes_to_the_delegated_validator() {
         let req_data = RequestData {
+            route: None,
             uri: "/api/default/streams".parse::<Uri>().unwrap(),
             method: Method::GET,
             headers: HeaderMap::new(),

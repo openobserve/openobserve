@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use axum::{
     Router,
-    extract::{DefaultBodyLimit, FromRequestParts, Path, RawPathParams, Request},
+    extract::{DefaultBodyLimit, FromRequestParts, MatchedPath, Path, RawPathParams, Request},
     http::{Method, StatusCode, Uri, header, request::Parts},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
@@ -326,6 +326,14 @@ fn license_denial(_required: &[Feature]) -> Option<Response> {
     None
 }
 
+/// The route template axum matched, which a caller cannot shape the way it shapes the path.
+pub(crate) fn matched_route(request: &Request) -> Option<String> {
+    request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|route| route.as_str().to_owned())
+}
+
 /// Authentication middleware for API routes.
 ///
 /// Pair it with `password_policy_middleware` layered inside it on every router that uses it: this
@@ -337,6 +345,7 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     // Extract auth info from request (synchronous now, no await)
@@ -409,6 +418,7 @@ pub async fn aws_auth_middleware(mut request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     match validator_aws(&req_data).await {
@@ -431,6 +441,7 @@ pub async fn gcp_auth_middleware(mut request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     match validator_gcp(&req_data).await {
@@ -453,6 +464,7 @@ pub async fn rum_auth_middleware(mut request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     match validator_rum(&req_data).await {
@@ -475,6 +487,7 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
         uri: request.uri().clone(),
         method: request.method().clone(),
         headers: request.headers().clone(),
+        route: matched_route(&request),
     };
 
     let (mut parts, body) = request.into_parts();
@@ -715,7 +728,11 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     if get_o2_config().common.audit_enabled
         && !(after_org.ends_with("_stream")
             || path.ends_with("ai/chat_stream")
-            || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
+            || common::meta::ingestion_routes::is_ingestion_write(
+                &http_method,
+                ingestion_path,
+                matched_route(&request).as_deref(),
+            ))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
         let org_id = if audit_org == "organizations" {

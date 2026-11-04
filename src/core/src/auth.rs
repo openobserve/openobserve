@@ -397,7 +397,11 @@ where
         // ingestion-route table (method + exact path shape) rather than
         // substring-matching an ingestion word, so only real writes take the
         // stream-level bypass.
-        if common::meta::ingestion_routes::is_ingestion_write(&parts.method, path) {
+        let route = parts
+            .extensions
+            .get::<axum::extract::MatchedPath>()
+            .map(|route| route.as_str());
+        if common::meta::ingestion_routes::is_ingestion_write(&parts.method, path, route) {
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()
             {
