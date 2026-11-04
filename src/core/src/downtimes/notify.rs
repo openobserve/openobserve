@@ -277,9 +277,10 @@ fn downtime_context(
 ) -> crate::alerts::notifications::NotificationContext {
     use config::meta::alerts::notification_kind::{self, NotificationKind};
 
-    use crate::alerts::notifications::{NotificationContext, context::RenderHints};
+    use crate::alerts::notifications::{LegacyPayload, NotificationContext, context::RenderHints};
 
     let subject = render_title(&vars);
+    let legacy = legacy_body(&vars);
     let url = vars
         .iter()
         .find(|(name, _)| *name == "downtime_url")
@@ -314,12 +315,46 @@ fn downtime_context(
             }
         },
         cluster_name: config::get_cluster_name(),
+        legacy_payload: Some(LegacyPayload::new(move || legacy.clone())),
         render_hints: RenderHints {
             fallback_subject: Some(subject),
             escape_email_attributes: true,
         },
         ..Default::default()
     }
+}
+
+/// The body a generic webhook got from the retired `prebuilt_downtime`, so its readers keep
+/// working.
+fn legacy_body(vars: &[(&'static str, String)]) -> serde_json::Value {
+    let var = |name: &str| {
+        vars.iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, v)| v.clone())
+            .unwrap_or_default()
+    };
+    serde_json::json!({
+        "text": format!(
+            "Downtime {}: {}. {} to {}, muting {}. {}",
+            var("downtime_name"),
+            var("downtime_event"),
+            var("downtime_starts_at"),
+            var("downtime_ends_at"),
+            var("downtime_counts"),
+            var("downtime_url"),
+        ),
+        "downtime": {
+            "name": var("downtime_name"),
+            "event": var("downtime_event"),
+            "reason": var("downtime_reason"),
+            "starts_at": var("downtime_starts_at"),
+            "ends_at": var("downtime_ends_at"),
+            "targets": var("downtime_targets"),
+            "counts": var("downtime_counts"),
+            "url": var("downtime_url"),
+            "org": var("org_name"),
+        },
+    })
 }
 
 /// Today's subject, for a destination whose template has no title of its own.
@@ -596,6 +631,61 @@ mod tests {
 
     fn due(event: NotificationEvent) -> DueEvent {
         DueEvent::of_window(event, window())
+    }
+
+    fn resolved_for(destination_type: &str) -> crate::alerts::notifications::notify::Resolved {
+        use crate::alerts::notifications::org_default::{
+            EffectiveTemplate, TemplateSource, compiled_fallback,
+        };
+        let dest_type = config::meta::destinations::DestinationType::Http(
+            config::meta::destinations::Endpoint {
+                destination_type: Some(destination_type.to_string()).filter(|t| !t.is_empty()),
+                url: "https://hooks.example/x".into(),
+                ..Default::default()
+            },
+        );
+        crate::alerts::notifications::notify::Resolved {
+            destination: Default::default(),
+            channel: crate::alerts::notifications::derive_channel_format(&dest_type),
+            destination_type: dest_type,
+            effective: EffectiveTemplate {
+                template: compiled_fallback("acme"),
+                source: TemplateSource::Compiled,
+                skipped: vec![],
+            },
+        }
+    }
+
+    #[test]
+    fn a_generic_webhook_keeps_the_retired_downtime_body() {
+        use crate::alerts::notifications::notify::{Route, route};
+
+        let counts = MatchCounts {
+            alerts: 2,
+            synthetics: 1,
+            ..Default::default()
+        };
+        let vars = variables(
+            &row(None),
+            NotificationEvent::EndingSoon,
+            &window(),
+            Some(&counts),
+            "https://o2.example.com",
+        );
+        let ctx = downtime_context(&row(None), &due(NotificationEvent::EndingSoon), 7, vars);
+        let Route::Legacy(json) = route(&resolved_for(""), &ctx).unwrap() else {
+            panic!("a generic webhook gets the legacy body");
+        };
+        assert_eq!(json["downtime"]["name"], "Nightly \"deploy\" <db>");
+        assert_eq!(json["downtime"]["event"], "ends soon");
+        assert_eq!(json["downtime"]["starts_at"], "1970-01-01 10:00 UTC");
+        assert_eq!(json["downtime"]["counts"], "2 alerts, 1 synthetics check");
+        assert_eq!(json["downtime"]["org"], "acme");
+        assert_eq!(
+            json["text"],
+            "Downtime Nightly \"deploy\" <db>: ends soon. 1970-01-01 10:00 UTC to 1970-01-01 12:00 UTC, muting 2 alerts, 1 synthetics check. https://o2.example.com/web/downtimes?org_identifier=acme"
+        );
+        assert_eq!(route(&resolved_for("slack"), &ctx).unwrap(), Route::Render);
     }
 
     #[test]

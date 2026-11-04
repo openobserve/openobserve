@@ -234,7 +234,10 @@ fn legacy_body(resolved: &Resolved, ctx: &NotificationContext) -> Option<serde_j
     };
     if !matches!(
         ctx.kind,
-        NotificationKind::Anomaly | NotificationKind::Synthetics | NotificationKind::OnCall
+        NotificationKind::Anomaly
+            | NotificationKind::Synthetics
+            | NotificationKind::OnCall
+            | NotificationKind::Downtime
     ) || resolved.channel != ChannelFormat::Webhook
     {
         return None;
