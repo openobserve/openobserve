@@ -16,7 +16,7 @@
 //! AutoObserve engine routes: coverage, suggestions, and the marks the alert gate reads.
 
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashMap},
     future::Future,
     str::FromStr,
 };
@@ -26,11 +26,7 @@ use axum::{
     extract::{Path, Query, RawQuery, rejection::QueryRejection},
     response::Response,
 };
-use config::{
-    meta::{alerts::alert::ListAlertsParams, autoobserve::marks::ENTITY_TYPE_ALERT},
-    utils::time::now_micros,
-};
-use futures::{StreamExt, stream};
+use config::{meta::autoobserve::marks::ENTITY_TYPE_ALERT, utils::time::now_micros};
 use infra::db::get_orm_client_ro;
 use o2_enterprise::enterprise::autoobserve::{
     api::{
@@ -41,23 +37,21 @@ use o2_enterprise::enterprise::autoobserve::{
     marks::MarkSource,
     names::{dims, kinds},
 };
-use o2_openfga::{authorizer::authz::list_objects, meta::mapping::OFGA_MODELS};
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::{
-    alerts::alert, auth::check_permissions, background_access::rbac_enforced, users,
-};
+use openobserve_core::{alerts::alert, auth::check_permissions, background_access::rbac_enforced};
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::{IntoParams, ToSchema};
 
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::auth::UserEmail};
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    request::alert_grants::{AlertAuthority, AlertGrants, LiveAuthority, org_wide_allows},
+    service::auth::UserEmail,
+};
 
 /// Only whether a DELETE carries a body matters, so reading stops here.
 const MAX_DELETE_BODY: usize = 64 * 1024;
 const DISABLED_MESSAGE: &str = "AutoObserve is disabled (O2_AUTOOBSERVE_ENABLED=false)";
-/// Past this many alerts, one list filtered to their ids is cheaper than reading each.
-const ALERT_READS_ONE_BY_ONE: usize = 64;
-const ALERT_READ_CONCURRENCY: usize = 16;
 
 #[derive(Debug, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -154,107 +148,6 @@ impl<'a> Subject<'a> {
             .then(|| subject.key_dims.get(dims::ENTITY_ID).map(String::as_str))
             .flatten();
         Self { resource, alert_id }
-    }
-}
-
-/// A role's alert grants short of org-wide, as list-objects ids: folders, and single alerts.
-#[derive(Debug, Default)]
-struct AlertGrants {
-    every_folder: bool,
-    folders: HashSet<String>,
-    alerts: HashSet<String>,
-}
-
-impl AlertGrants {
-    fn from_objects(org_id: &str, folders: Vec<String>, alerts: Vec<String>) -> Self {
-        let ids = |objects: Vec<String>| -> HashSet<String> {
-            objects
-                .into_iter()
-                .filter_map(|o| o.split_once(':').map(|(_, id)| id.to_string()))
-                .collect()
-        };
-        let (folders, alerts) = (ids(folders), ids(alerts));
-        let all = format!("_all_{org_id}");
-        Self {
-            every_folder: folders.contains(&all) || alerts.contains(&all),
-            folders,
-            alerts,
-        }
-    }
-
-    /// Nothing short of org-wide, so no alert's folder can make one readable.
-    fn is_empty(&self) -> bool {
-        !self.every_folder && self.folders.is_empty() && self.alerts.is_empty()
-    }
-
-    /// The per-alert check's paths: a folder grant, or a grant on `{id}` or `{folder}/{id}`.
-    fn allows(&self, alert_id: &str, folder_id: &str) -> bool {
-        self.every_folder
-            || self.folders.contains(folder_id)
-            || self.alerts.contains(alert_id)
-            || self.alerts.contains(&format!("{folder_id}/{alert_id}"))
-    }
-}
-
-/// The permission and alert reads a subject filter makes; tests count them.
-trait AlertAuthority {
-    async fn org_wide(&self, resource: &'static str) -> bool;
-    async fn grants(&self) -> AlertGrants;
-    /// Each existing alert's folder id; a missing alert is absent.
-    async fn folders_of(&self, alert_ids: Vec<String>) -> HashMap<String, String>;
-}
-
-struct LiveAuthority<'a> {
-    org_id: &'a str,
-    user_id: &'a str,
-}
-
-impl LiveAuthority<'_> {
-    /// A failed listing grants nothing, as a failed per-alert check denies.
-    async fn listed(&self, permission: &str, resource: &str, role: &str) -> Vec<String> {
-        let object_type = OFGA_MODELS.get(resource).map_or(resource, |m| m.key);
-        list_objects(self.user_id, permission, object_type, self.org_id, role)
-            .await
-            .unwrap_or_else(|e| {
-                log::warn!("autoobserve: listing {object_type} grants failed: {e}");
-                Vec::new()
-            })
-    }
-}
-
-impl AlertAuthority for LiveAuthority<'_> {
-    async fn org_wide(&self, resource: &'static str) -> bool {
-        org_wide_allows(self.org_id, self.user_id, resource, "GET").await
-    }
-
-    async fn grants(&self) -> AlertGrants {
-        let Some(user) = users::get_user(Some(self.org_id), self.user_id).await else {
-            return AlertGrants::default();
-        };
-        let role = user.role.to_string();
-        let (folders, alerts) = tokio::join!(
-            self.listed("GET", "alert_folders", &role),
-            self.listed("GET_INDIVIDUAL_FROM_ROLE", "alerts", &role),
-        );
-        AlertGrants::from_objects(self.org_id, folders, alerts)
-    }
-
-    async fn folders_of(&self, alert_ids: Vec<String>) -> HashMap<String, String> {
-        if alert_ids.len() > ALERT_READS_ONE_BY_ONE {
-            return org_alert_folders(self.org_id, &alert_ids).await;
-        }
-        stream::iter(alert_ids)
-            .map(|id| async move {
-                let ksuid = Ksuid::from_str(&id).ok()?;
-                let (folder, _) = alert::get_by_id(get_orm_client_ro().await, self.org_id, ksuid)
-                    .await
-                    .ok()?;
-                Some((id, folder.folder_id))
-            })
-            .buffer_unordered(ALERT_READ_CONCURRENCY)
-            .filter_map(|found| async move { found })
-            .collect()
-            .await
     }
 }
 
@@ -723,24 +616,6 @@ async fn readable_mask<A: AlertAuthority>(auth: &A, subjects: &[Subject<'_>]) ->
         .collect()
 }
 
-async fn org_alert_folders(org_id: &str, alert_ids: &[String]) -> HashMap<String, String> {
-    match alert::list_with_folders_db(folder_params(org_id, alert_ids)).await {
-        Ok(listed) => listed
-            .into_iter()
-            .filter_map(|(folder, a)| Some((a.id?.to_string(), folder.folder_id)))
-            .collect(),
-        Err(e) => {
-            log::warn!("autoobserve: listing {org_id}'s alerts failed: {e}");
-            HashMap::new()
-        }
-    }
-}
-
-/// Filtered to the ids in SQL, so the read follows the page, never the org's alert count.
-fn folder_params(org_id: &str, alert_ids: &[String]) -> ListAlertsParams {
-    ListAlertsParams::new(org_id).with_tag_alert_ids(alert_ids.to_vec())
-}
-
 /// A mark whose alert is gone has no per-alert grant left, so it needs alerts PUT org-wide.
 async fn may_change_mark(org_id: &str, user_id: &str, entity_type: &str, entity_id: &str) -> bool {
     #[cfg(test)]
@@ -780,16 +655,9 @@ async fn alert_allows(org_id: &str, user_id: &str, alert_id: &str, method: &str)
     )
 }
 
-async fn org_wide_allows(org_id: &str, user_id: &str, resource: &str, method: &str) -> bool {
-    check_permissions(
-        org_id, org_id, user_id, resource, method, None, true, false, false,
-    )
-    .await
-}
-
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::Ordering;
 
     use axum::{
         Router,
@@ -800,6 +668,7 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
+    use crate::request::alert_grants::tests::CountingAuthority;
 
     thread_local! {
         /// The deployment switch as this test's thread sees it; None reads the config.
@@ -994,45 +863,6 @@ mod tests {
         assert!(is_json(&refused));
     }
 
-    /// Answers like a folder-scoped role and counts every call a subject filter makes.
-    #[derive(Default)]
-    struct CountingAuthority {
-        org_wide: HashMap<&'static str, bool>,
-        folders: HashMap<String, String>,
-        grants: Vec<String>,
-        org_wide_calls: AtomicUsize,
-        grant_calls: AtomicUsize,
-        folder_reads: AtomicUsize,
-        alerts_read: AtomicUsize,
-    }
-
-    impl AlertAuthority for CountingAuthority {
-        async fn org_wide(&self, resource: &'static str) -> bool {
-            self.org_wide_calls.fetch_add(1, Ordering::SeqCst);
-            self.org_wide.get(resource).copied().unwrap_or(false)
-        }
-
-        async fn grants(&self) -> AlertGrants {
-            self.grant_calls.fetch_add(1, Ordering::SeqCst);
-            let (folders, alerts): (Vec<String>, Vec<String>) = self
-                .grants
-                .iter()
-                .cloned()
-                .partition(|g| g.starts_with("afolder:"));
-            AlertGrants::from_objects("o", folders, alerts)
-        }
-
-        async fn folders_of(&self, alert_ids: Vec<String>) -> HashMap<String, String> {
-            self.folder_reads.fetch_add(1, Ordering::SeqCst);
-            self.alerts_read
-                .fetch_add(alert_ids.len(), Ordering::SeqCst);
-            alert_ids
-                .into_iter()
-                .filter_map(|id| self.folders.get(&id).map(|f| (id, f.clone())))
-                .collect()
-        }
-    }
-
     fn alert_subject(id: &str) -> Subject<'_> {
         Subject {
             resource: "alerts",
@@ -1102,17 +932,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_large_folder_lookup_lists_only_the_asked_alerts() {
-        let ids: Vec<String> = (0..65).map(|n| format!("a{n}")).collect();
-        let params = folder_params("o", &ids);
-        assert_eq!(params.tag_alert_ids, Some(ids));
-        assert_eq!(
-            (params.org_id.as_str(), params.page_size_and_idx),
-            ("o", None)
-        );
-    }
-
     #[tokio::test]
     async fn an_org_wide_reader_lists_no_grants_and_reads_no_alerts() {
         let auth = CountingAuthority {
@@ -1125,24 +944,6 @@ mod tests {
         assert_eq!(auth.grant_calls.load(Ordering::SeqCst), 0);
         assert_eq!(auth.folder_reads.load(Ordering::SeqCst), 0);
         assert!(readable_mask(&auth, &[]).await.is_empty());
-    }
-
-    #[test]
-    fn grants_match_the_per_alert_checks_paths() {
-        let grants = AlertGrants::from_objects(
-            "o",
-            vec!["afolder:ops".into()],
-            vec!["alert:a1".into(), "alert:pay/a2".into()],
-        );
-        assert!(grants.allows("a0", "ops"), "folder grant");
-        assert!(grants.allows("a1", "pay"), "alert grant");
-        assert!(grants.allows("a2", "pay"), "alert-in-folder grant");
-        assert!(!grants.allows("a2", "ops2"), "a2's grant names its folder");
-        assert!(!grants.allows("a3", "pay"));
-        let every = AlertGrants::from_objects("o", vec!["afolder:_all_o".into()], vec![]);
-        assert!(every.allows("a9", "any"));
-        let other_org = AlertGrants::from_objects("o", vec!["afolder:_all_p".into()], vec![]);
-        assert!(!other_org.allows("a9", "any"));
     }
 
     /// Calibration v1's convention: a switched-off deployment answers 404 before any other check.

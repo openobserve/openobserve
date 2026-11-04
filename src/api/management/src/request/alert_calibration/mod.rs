@@ -17,6 +17,7 @@
 
 pub mod config;
 pub mod digests;
+mod visibility;
 
 use axum::response::{IntoResponse, Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;

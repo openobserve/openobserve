@@ -122,11 +122,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alertCalibration.digests.noneFound") }}
             </OBadge>
             <OBadge
+              v-else-if="row.finding_count === null"
+              variant="warning-soft"
+              size="sm"
+              shape="rounded"
+            >
+              {{ visibilityCopy(t, row).pending.badge }}
+            </OBadge>
+            <OBadge
               v-else
               variant="error-soft"
               size="sm"
               shape="rounded"
-              :count="row.finding_count"
+              :count="row.finding_count ?? undefined"
             >
               {{ t("alertCalibration.digests.findings") }}
             </OBadge>
@@ -221,6 +229,7 @@ import AlertCalibrationActions from "./AlertCalibrationActions.vue";
 import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
+  countOrDash,
   coverageNotes,
   coverageVerdict,
   isClean,
@@ -230,6 +239,7 @@ import {
   runKey,
   RUNS_LOOKBACK_DAYS,
   SEARCH_SIZE,
+  visibilityCopy,
   type RunRow,
 } from "./digests";
 import { COVERAGE_BADGE, formatMinutes, splitMinutes } from "./format";
@@ -292,10 +302,10 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "latest",
       label: t("alertCalibration.digests.latestFindings"),
-      value: run ? run.finding_count : raw("—"),
+      value: run ? countOrDash(run.finding_count) : raw("—"),
       sub: run ? t(COVERAGE_BADGE[coverageVerdict(run)].labelKey) : undefined,
       icon: "fact-check",
-      tone: run && run.finding_count > 0 ? "warning" : "neutral",
+      tone: (run?.finding_count ?? 0) > 0 ? "warning" : "neutral",
     },
     {
       key: "window",
