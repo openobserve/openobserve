@@ -282,12 +282,27 @@ fn substitute_with(
     while let Some(start) = rest.find('{') {
         out.push_str(&rest[..start]);
         let at = &rest[start..];
-        let Some((name, len, token_len)) = parse_token(at) else {
+        let Some((inner, token_len)) = parse_token(at) else {
             out.push('{');
             rest = &at[1..];
             continue;
         };
-        match var_value(name, ctx) {
+        // A key may hold a colon, such as a column `http:status`, so the whole text is a key first.
+        let (name, value, len) = match var_value(inner, ctx) {
+            Some(value) => (inner, Some(value), 0),
+            None => match inner.split_once(':') {
+                Some((name, n)) => match n.parse::<usize>() {
+                    Ok(len) if !name.is_empty() => (name, var_value(name, ctx), len),
+                    _ => {
+                        out.push('{');
+                        rest = &at[1..];
+                        continue;
+                    }
+                },
+                None => (inner, None, 0),
+            },
+        };
+        match value {
             Some(value) => out.push_str(&esc(&truncate(&value, len))),
             // Only a name that looks like a variable is marked; other braced text stays as typed.
             None if is_ident(name) => {
@@ -302,20 +317,12 @@ fn substitute_with(
     (out, unknown)
 }
 
-/// `{name}` or `{name:N}` at the start of `at`: the name, the length (0 for whole) and the token
-/// length. Any name without braces counts, since a row column or label such as `http-status` is a
-/// key too.
-fn parse_token(at: &str) -> Option<(&str, usize, usize)> {
+/// `{text}` at the start of `at`: the text inside and the token length. Any text without braces
+/// counts, since a row column or label such as `http-status` is a key too.
+fn parse_token(at: &str) -> Option<(&str, usize)> {
     let end = at.find('}')?;
     let inner = &at[1..end];
-    if inner.contains('{') {
-        return None;
-    }
-    let (name, len) = match inner.split_once(':') {
-        Some((name, n)) => (name, n.parse::<usize>().ok()?),
-        None => (inner, 0),
-    };
-    (!name.is_empty()).then_some((name, len, end + 1))
+    (!inner.is_empty() && !inner.contains('{')).then_some((inner, end + 1))
 }
 
 /// Whether `input` names a variable of some kind's group, such as `{anomaly_explore_url}`.
@@ -683,6 +690,22 @@ mod tests {
         let (out, unknown) = substitute_raw("x {no_such_var} y", &fixture_ctx());
         assert_eq!(out, "x – y");
         assert_eq!(unknown, vec!["no_such_var"]);
+    }
+
+    #[test]
+    fn a_key_with_a_colon_fills_before_the_length_split() {
+        let mut ctx = fixture_ctx();
+        ctx.row_columns
+            .push(("http:status".into(), vec!["503".into()]));
+        ctx.row_columns
+            .push(("metric".into(), vec!["latency".into()]));
+        ctx.row_columns
+            .push(("metric:2".into(), vec!["p99".into()]));
+        ctx.row_columns.push(("load".into(), vec!["93.5".into()]));
+        assert_eq!(substitute_raw("{http:status}", &ctx).0, "503");
+        assert_eq!(substitute_raw("{metric:2}", &ctx).0, "p99");
+        // No `load:2` key, so the length applies.
+        assert_eq!(substitute_raw("{load:2}", &ctx).0, "93");
     }
 
     #[test]

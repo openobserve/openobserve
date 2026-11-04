@@ -454,16 +454,17 @@ pub async fn rename_reserved_collisions()
         table::templates::rename_reserved_collisions(db, &table::templates::BOOT_SEEDS, true)
             .await
             .map_err(infra::errors::Error::from)?;
+    // Tuples are keyed by name; one that did not move stays queued, so a later boot retries it.
+    // Queued before the emits, because the rows are already renamed and a failed emit returns.
+    table::templates::record_pending_renames(db, &renames)
+        .await
+        .map_err(infra::errors::Error::from)?;
     for r in &renames {
         infra::coordinator::emit_delete(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.from))
             .await?;
         infra::coordinator::emit_put(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.to))
             .await?;
     }
-    // Tuples are keyed by name; one that did not move stays queued, so a later boot retries it.
-    table::templates::record_pending_renames(db, &renames)
-        .await
-        .map_err(infra::errors::Error::from)?;
     let pending = table::templates::pending_renames(db)
         .await
         .map_err(infra::errors::Error::from)?;
@@ -491,13 +492,16 @@ pub async fn retire_default_templates()
     let moved = table::templates::retire_default_templates(infra::db::get_orm_client_rw().await)
         .await
         .map_err(infra::errors::Error::from)?;
+    // System rows: the seeder writes no tuple for prebuilt_default, so none is set here. The old
+    // tuples go first, because the rows are already folded and a failed emit returns.
+    for r in &moved {
+        disown_old_name(r).await?;
+    }
     for r in &moved {
         infra::coordinator::emit_delete(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.from))
             .await?;
         infra::coordinator::emit_put(&format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", r.org, r.to))
             .await?;
-        // System rows: the seeder writes no tuple for prebuilt_default, so none is set here.
-        disown_old_name(r).await?;
     }
     Ok(moved)
 }
