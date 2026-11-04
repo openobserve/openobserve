@@ -318,14 +318,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
 
     // generate the dump file
     let dumped_ids = dump_delete_pairs(&files);
-    let dump_file = match generate_dump(
-        &job.org_id,
-        job.stream_type,
-        &job.stream_name,
-        (start_time, end_time),
-        files,
-    )
-    .await
+    let dump_file = match generate_dump(&job.org_id, job.stream_type, &job.stream_name, files).await
     {
         Ok(v) => v,
         Err(e) => {
@@ -430,7 +423,7 @@ pub async fn delete_by_time_range(
         .map(|(date, files)| (date, files.collect::<Vec<_>>()))
         .collect::<Vec<_>>();
     for (date, files) in groupd_files_to_keep {
-        match generate_dump(org_id, stream_type, stream_name, range, files).await {
+        match generate_dump(org_id, stream_type, stream_name, files).await {
             Ok(Some(v)) => new_dump_files.push(v),
             Ok(None) => continue,
             Err(e) => {
@@ -559,7 +552,6 @@ async fn generate_dump(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    range: (i64, i64),
     files: Vec<FileRecord>,
 ) -> Result<Option<FileKey>, errors::Error> {
     // if there are no files to dump, no point in making a dump file
@@ -568,6 +560,9 @@ async fn generate_dump(
     }
 
     let records = files.len();
+    // from the rows: a delete rewrites what it keeps, which lies outside the range it deleted
+    let min_ts = files.iter().map(|f| f.min_ts).min().unwrap_or_default();
+    let max_ts = files.iter().map(|f| f.max_ts).max().unwrap_or_default();
 
     let mut buf = Vec::new();
     let mut writer = get_writer(FILE_LIST_SCHEMA.clone(), &mut buf)?;
@@ -586,7 +581,7 @@ async fn generate_dump(
     }
     writer.close().await?;
 
-    let ts = Utc.timestamp_nanos(range.0 * 1000);
+    let ts = Utc.timestamp_nanos(min_ts * 1000);
 
     let file_name = format!(
         "{:04}/{:02}/{:02}/{:02}/{}.parquet",
@@ -605,8 +600,8 @@ async fn generate_dump(
     );
 
     let meta = FileMeta {
-        min_ts: range.0,
-        max_ts: range.1 - 1, // because the end_time is the start of next hour
+        min_ts,
+        max_ts,
         records: records as i64,
         original_size: buf.len() as i64,
         compressed_size: buf.len() as i64,
@@ -1868,6 +1863,29 @@ mod tests {
     }
 
     const DAY: i64 = 1_790_640_000_000_000; // 2026-09-29T00:00:00Z
+
+    #[tokio::test]
+    async fn test_generate_dump_meta_covers_the_rows_it_holds() {
+        use config::utils::time::hour_micros;
+        let row = |hour, min_ts, max_ts| FileRecord {
+            min_ts,
+            max_ts,
+            ..delete_pairs_record(hour, "2026/09/29/00")
+        };
+        let rows = vec![
+            row(1, DAY + 5, DAY + hour_micros(1) - 5),
+            row(2, DAY + hour_micros(23) + 5, DAY + hour_micros(24) - 5),
+        ];
+        let name = format!("dump_meta_{}", config::ider::generate());
+        let dump = generate_dump("dump_meta", StreamType::Logs, &name, rows)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (dump.meta.min_ts, dump.meta.max_ts),
+            (DAY + 5, DAY + hour_micros(24) - 5)
+        );
+    }
 
     #[test]
     fn test_is_day_sealed_needs_the_generator_past_the_day() {
