@@ -914,6 +914,7 @@ async function getQueryData(
       searchObj.data.queryResults?.hits?.length
         ? searchObj.data.queryResults
         : null;
+    const keptPayload = keptResults ? searchObj.data.queryPayload : null;
     searchObj.searchApplied = true;
     searchObj.loading = true;
 
@@ -1132,6 +1133,8 @@ async function getQueryData(
 
           if (keptResults) {
             searchObj.data.queryResults = keptResults;
+            // Next pages the window these rows came from, not the one that failed.
+            searchObj.data.queryPayload = keptPayload;
             searchObj.data.resultGrid.currentPage = keptPage;
             shownPage = keptPage;
             searchObj.meta.refreshFailedAt = Date.now();

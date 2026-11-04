@@ -90,7 +90,7 @@ const holdsLogs = (count: PromiseSettledResult<any> | undefined): boolean => {
   const n = Number(data.hits?.[0]?.zo_count);
   return Number.isFinite(n) && n > 0;
 };
-// A 4xx means the stream cannot hold the trace (no trace_id field); a 5xx, throttle, timeout, lost connection, partial scan or function error means it was never fully checked.
+// A 4xx means the stream cannot hold the trace (no trace_id field); a denial, 5xx, throttle, timeout, lost connection, partial scan or function error means it was never fully checked.
 const probeServerError = (
   count: PromiseSettledResult<any> | undefined,
   timedOut: boolean,
@@ -102,7 +102,13 @@ const probeServerError = (
   if (count?.status !== "rejected") return null;
   const reason = count.reason as { status?: number; response?: { status?: number } } | null;
   const status = reason?.response?.status ?? reason?.status;
-  if (status === 408 || status === 429 || (typeof status === "number" && status >= 500))
+  if (
+    status === 401 ||
+    status === 403 ||
+    status === 408 ||
+    status === 429 ||
+    (typeof status === "number" && status >= 500)
+  )
     return reason;
   if (typeof status === "number") return null;
   return timedOut ? { code: "ETIMEDOUT" } : (reason ?? {});

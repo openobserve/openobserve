@@ -1138,6 +1138,25 @@ describe("Traces page load states", () => {
         expect(searchObj.data.resultGrid.currentPage).toBe(0);
       });
 
+      it("pages the window of the kept rows after a refresh with a new window fails", async () => {
+        await loadRows();
+        const shownQuery = { ...searchObj.data.queryPayload.query };
+        searchObj.data.datetime.type = "absolute";
+        searchObj.data.datetime.startTime = shownQuery.start_time + 86_400_000_000;
+        searchObj.data.datetime.endTime = shownQuery.end_time + 86_400_000_000;
+        wrapper!.vm.getQueryData();
+        lastCall("main")[1].error(null, { content: { message: "boom", code: 500 } });
+        await flushPromises();
+        expect(searchObj.data.queryResults.hits).toHaveLength(2);
+
+        searchObj.data.resultGrid.currentPage = 1;
+        wrapper!.vm.getQueryData(true);
+        const payload = lastCall("main")[0].queryReq;
+        const query = payload.query ?? payload;
+        expect(query.start_time).toBe(shownQuery.start_time);
+        expect(query.end_time).toBe(shownQuery.end_time);
+      });
+
       it("clears the failed mark when a later run lands", async () => {
         await loadRows();
         wrapper!.vm.getQueryData();

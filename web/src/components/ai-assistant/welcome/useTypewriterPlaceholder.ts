@@ -121,8 +121,31 @@ export function useTypewriterPlaceholder(
 
   const onVisibilityChange = () => (document.hidden ? clearTimer() : resume());
 
+  function watchInputs() {
+    watch(
+      () => getPrompts().join("\n"),
+      () => {
+        if (resting) showRest();
+        else resume();
+      },
+    );
+    if (!options.enabled) return;
+    watch(options.enabled, (val) => {
+      if (val) {
+        resume();
+        return;
+      }
+      clearTimer();
+      typed = 0;
+      erasing = false;
+      placeholder.value = "";
+    });
+  }
+
   onMounted(() => {
     mounted = true;
+    // Callers' getters may read state declared after this call, so nothing reads them during setup.
+    watchInputs();
     const el = instance?.proxy?.$el;
     if (el instanceof Element && typeof IntersectionObserver !== "undefined") {
       observer = new IntersectionObserver((entries) => {
@@ -153,27 +176,6 @@ export function useTypewriterPlaceholder(
     observer = null;
     document.removeEventListener("visibilitychange", onVisibilityChange);
   });
-
-  watch(
-    () => getPrompts().join("\n"),
-    () => {
-      if (resting) showRest();
-      else resume();
-    },
-  );
-
-  if (options.enabled) {
-    watch(options.enabled, (val) => {
-      if (val) {
-        resume();
-        return;
-      }
-      clearTimer();
-      typed = 0;
-      erasing = false;
-      placeholder.value = "";
-    });
-  }
 
   return { placeholder };
 }

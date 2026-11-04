@@ -15,7 +15,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { KeepAlive, defineComponent, h, nextTick, ref, watch, type Ref } from "vue";
+import { KeepAlive, computed, defineComponent, h, nextTick, ref, watch, type Ref } from "vue";
 import { useTypewriterPlaceholder } from "./useTypewriterPlaceholder";
 
 const SPEED = { typeSpeedMs: 10, eraseSpeedMs: 5, holdMs: 20, initialDelayMs: 0 };
@@ -127,6 +127,26 @@ describe("useTypewriterPlaceholder", () => {
     scrollOut(true);
     await vi.runAllTimersAsync();
     expect(seen.at(-1)).toBe("abcd");
+    wrapper.unmount();
+  });
+
+  it("reads its prompts only after the caller's setup has finished", async () => {
+    const LateState = defineComponent({
+      setup() {
+        const prompts = computed(() => [later.value]);
+        const enabled = computed(() => later.value !== "");
+        const { placeholder } = useTypewriterPlaceholder(prompts, { ...SPEED, enabled });
+        const later = ref("ab");
+        return () => h("div", { onClick: () => (later.value = "cd") }, placeholder.value);
+      },
+    });
+    const wrapper = mount(LateState);
+    await vi.runAllTimersAsync();
+    expect(wrapper.text()).toBe("ab");
+
+    await wrapper.trigger("click");
+    await vi.runAllTimersAsync();
+    expect(wrapper.text()).toBe("cd");
     wrapper.unmount();
   });
 

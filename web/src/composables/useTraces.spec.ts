@@ -831,6 +831,30 @@ describe("useTraces", () => {
       expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs");
     });
 
+    it("reports a denied probe as a failure, not as a stream without logs", async () => {
+      const denied = { response: { status: 403, data: { message: "Forbidden" } } };
+      mockSearch.mockRejectedValue(denied);
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-denied", "trace-denied");
+
+      expect(await navigateToCorrelatedLogs(streams("private_logs"))).toEqual({
+        failed: true,
+        error: denied,
+      });
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    });
+
+    it("opens the stream that holds the trace even when another probe is denied", async () => {
+      mockSearch.mockImplementation(
+        (req: any) => countFor("app_logs", 2)(req) ?? Promise.reject({ response: { status: 403 } }),
+      );
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-d2", "trace-d2");
+
+      expect(await navigateToCorrelatedLogs(streams("private_logs", "app_logs"))).toBe("opened");
+      expect(mockRouterPush.mock.calls[0][0].query.stream).toBe("app_logs");
+    });
+
     it("reports none when every probe answers 4xx", async () => {
       mockSearch.mockImplementation(() => badRequest());
       const { navigateToCorrelatedLogs } = useTraces();

@@ -124,19 +124,25 @@ vi.mock("@/composables/useSqlEditorDiagnostics", () => ({
   },
 }));
 
-vi.mock("@/components/logs/useQueryPlaceholder", () => ({
-  useQueryPlaceholder: (...args: any[]) => {
-    // Same rationale (and same TDZ deferral) as above.
-    Promise.resolve().then(() => {
-      for (const arg of args) {
-        void (arg && typeof arg === "object" && "value" in arg ? arg.value : arg);
-      }
-    });
-    return {
-      placeholder: ref("Filter errors…"),
-    };
-  },
-}));
+const placeholderMode = vi.hoisted(() => ({ real: false }));
+
+vi.mock("@/components/logs/useQueryPlaceholder", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/logs/useQueryPlaceholder")>();
+  return {
+    useQueryPlaceholder: (...args: Parameters<typeof actual.useQueryPlaceholder>) => {
+      if (placeholderMode.real) return actual.useQueryPlaceholder(...args);
+      // Same rationale (and same TDZ deferral) as above.
+      Promise.resolve().then(() => {
+        for (const arg of args) {
+          void (arg && typeof arg === "object" && "value" in arg ? arg.value : arg);
+        }
+      });
+      return {
+        placeholder: ref("Filter errors…"),
+      };
+    },
+  };
+});
 
 vi.mock("@/plugins/traces/SyntaxGuide.vue", () => ({
   default: { template: '<div data-test="syntax-guide-stub" />' },
@@ -445,6 +451,21 @@ describe("AppErrors", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Rendering
   // ─────────────────────────────────────────────────────────────────────────
+  describe("with the real query placeholder", () => {
+    beforeEach(() => {
+      placeholderMode.real = true;
+    });
+
+    afterEach(() => {
+      placeholderMode.real = false;
+    });
+
+    it("mounts without reading the page state before it exists", async () => {
+      ({ wrapper } = await mountAppErrors());
+      expect(wrapper.find('[data-test="errors-kpi-cards-stub"]').exists()).toBe(true);
+    });
+  });
+
   describe("rendering", () => {
     it("renders the table when composable returns issues", async () => {
       mockIssues.value = [ISSUE_1, ISSUE_2];
