@@ -465,6 +465,7 @@ async fn can_list(
         use_all_org: route.use_all_org,
         use_self_context: route.use_self_context,
         use_self_parent: route.use_self_parent,
+        feature: route.feature,
     };
     crate::authz::check_permissions(user_id, auth_info, role.clone(), true).await
 }
