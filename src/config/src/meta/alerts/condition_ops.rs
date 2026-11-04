@@ -26,7 +26,6 @@ use crate::utils::json::Value;
 
 pub const MAX_REGEX_PATTERN_LEN: usize = 1024;
 pub const MAX_IN_LIST_VALUES: usize = 1000;
-pub const EXTENDED_OPERATORS_ENV: &str = "ZO_ALERT_EXTENDED_CONDITION_OPERATORS";
 const REGEX_CACHE_CAPACITY: usize = 1024;
 const REGEX_SIZE_LIMIT: usize = 256 * 1024;
 
@@ -35,25 +34,6 @@ static REGEX_CACHE: LazyLock<[RegexCache; 2]> =
     LazyLock::new(|| [RwLock::new(HashMap::new()), RwLock::new(HashMap::new())]);
 
 type RegexCache = RwLock<HashMap<String, Option<Regex>>>;
-
-/// A condition feature servers older than this release cannot read faithfully.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GatedFeature {
-    Operator(Operator),
-    /// `case_insensitive: true`; older servers drop it, so the rule turns case-sensitive.
-    CaseInsensitive,
-}
-
-impl GatedFeature {
-    fn describe(&self) -> String {
-        match self {
-            GatedFeature::Operator(op) => format!("Condition operator '{}'", canonical_name(op)),
-            GatedFeature::CaseInsensitive => {
-                "Condition option 'case_insensitive' (contains ignore case)".to_string()
-            }
-        }
-    }
-}
 
 /// Whether `text` matches `pattern`, compiled once per pattern; `None` when it does not compile.
 pub fn regex_is_match(pattern: &str, case_insensitive: bool, text: &str) -> Option<bool> {
@@ -168,52 +148,6 @@ pub fn eq_ci(a: &str, b: &str) -> bool {
         .eq(b.chars().flat_map(char::to_lowercase))
 }
 
-/// Gated features used anywhere in a serialized condition tree, each listed once.
-pub fn gated_features_in(condition: &Value) -> Vec<GatedFeature> {
-    let mut found = Vec::new();
-    collect_gated_features(condition, &mut found);
-    found
-}
-
-/// Gated features in any serializable condition structure, each listed once.
-pub fn gated_features_of<T: serde::Serialize>(conditions: &T) -> Vec<GatedFeature> {
-    serde_json::to_value(conditions)
-        .map(|value| gated_features_in(&value))
-        .unwrap_or_default()
-}
-
-/// [`check_gated_features`] under the `ZO_ALERT_EXTENDED_CONDITION_OPERATORS` setting.
-pub fn check_gated_features_enabled(
-    used: &[GatedFeature],
-    stored: &[GatedFeature],
-) -> Result<(), String> {
-    check_gated_features(
-        crate::get_config()
-            .common
-            .alert_extended_condition_operators,
-        used,
-        stored,
-    )
-}
-
-/// When disabled, refuses gated features the stored version of the entity did not use already.
-pub fn check_gated_features(
-    enabled: bool,
-    used: &[GatedFeature],
-    stored: &[GatedFeature],
-) -> Result<(), String> {
-    if enabled {
-        return Ok(());
-    }
-    match used.iter().find(|feature| !stored.contains(feature)) {
-        None => Ok(()),
-        Some(feature) => Err(format!(
-            "{} is not enabled on this server; set {EXTENDED_OPERATORS_ENV}=true to allow it",
-            feature.describe()
-        )),
-    }
-}
-
 fn compile_regex(pattern: &str, case_insensitive: bool) -> Result<Regex, regex::Error> {
     RegexBuilder::new(pattern)
         .case_insensitive(case_insensitive)
@@ -239,45 +173,6 @@ fn cached_is_match(
     }
     cache.insert(pattern.to_string(), compiled);
     result
-}
-
-// Recurses into every value, as condition trees nest under different keys per format.
-fn collect_gated_features(value: &Value, found: &mut Vec<GatedFeature>) {
-    match value {
-        Value::Array(items) => items
-            .iter()
-            .for_each(|item| collect_gated_features(item, found)),
-        Value::Object(map) => {
-            let mut push = |feature| {
-                if !found.contains(&feature) {
-                    found.push(feature);
-                }
-            };
-            let operator = map.get("operator").and_then(Value::as_str);
-            if let Some(op) = operator.and_then(extended_operator) {
-                push(GatedFeature::Operator(op));
-            }
-            if operator.is_some() && map.get("case_insensitive") == Some(&Value::Bool(true)) {
-                push(GatedFeature::CaseInsensitive);
-            }
-            map.values()
-                .for_each(|item| collect_gated_features(item, found));
-        }
-        _ => {}
-    }
-}
-
-fn extended_operator(name: &str) -> Option<Operator> {
-    serde_json::from_value::<Operator>(Value::String(name.to_string()))
-        .ok()
-        .filter(Operator::is_extended)
-}
-
-fn canonical_name(operator: &Operator) -> String {
-    serde_json::to_value(operator)
-        .ok()
-        .and_then(|value| value.as_str().map(str::to_string))
-        .unwrap_or_else(|| operator.to_string())
 }
 
 /// `None` when the field type cannot be compared with list items (null, array, object).
@@ -348,9 +243,6 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-
-    const IN: GatedFeature = GatedFeature::Operator(Operator::In);
-    const CI: GatedFeature = GatedFeature::CaseInsensitive;
 
     fn eval(op: Operator, field: Value, cond: Value, ic: bool) -> bool {
         evaluate_extended(&op, &field, &cond, ic).expect("extended operator")
@@ -614,81 +506,5 @@ mod tests {
         let err = validate_condition_value("c", &Operator::ReMatch, &json!(over), false)
             .expect_err("over the limit");
         assert!(err.contains("characters"));
-    }
-
-    fn v2_tree(operators: &[&str]) -> Value {
-        let leaves: Vec<Value> = operators
-            .iter()
-            .map(|op| {
-                json!({"filterType": "condition", "column": "c", "operator": op,
-                             "value": "a", "logicalOperator": "AND"})
-            })
-            .collect();
-        json!({"version": 2, "conditions": {"filterType": "group", "logicalOperator": "AND",
-               "conditions": [{"filterType": "group", "logicalOperator": "OR",
-                               "conditions": leaves}]}})
-    }
-
-    #[test]
-    fn test_extended_operators_are_found_in_nested_groups_once() {
-        let found = gated_features_in(&v2_tree(&["=", "in", "IN", "regex", "contains"]));
-        assert_eq!(found, vec![IN, GatedFeature::Operator(Operator::ReMatch)]);
-        assert!(gated_features_in(&v2_tree(&["=", "not_contains"])).is_empty());
-    }
-
-    #[test]
-    fn test_case_insensitive_leaves_are_gated_once() {
-        let mut tree = v2_tree(&["contains", "contains", "="]);
-        let leaves = tree["conditions"]["conditions"][0]["conditions"]
-            .as_array_mut()
-            .unwrap();
-        leaves[0]["case_insensitive"] = json!(true);
-        leaves[1]["case_insensitive"] = json!(true);
-        leaves[2]["case_insensitive"] = json!(false);
-        assert_eq!(gated_features_in(&tree), vec![CI]);
-        let annotation = json!([{"column": "c", "operator": "contains", "value": "a",
-                                 "case_insensitive": true, "logicalOperator": "AND"}]);
-        assert_eq!(gated_features_in(&annotation), vec![CI]);
-        assert!(gated_features_in(&json!({"case_insensitive": true})).is_empty());
-    }
-
-    #[test]
-    fn test_a_new_extended_operator_is_refused_while_disabled() {
-        let err = check_gated_features(false, &[IN], &[]).unwrap_err();
-        assert!(err.contains("'in'"), "{err}");
-        assert!(err.contains(EXTENDED_OPERATORS_ENV), "{err}");
-        assert!(check_gated_features(true, &[IN], &[]).is_ok());
-        assert!(check_gated_features(false, &[], &[]).is_ok());
-    }
-
-    #[test]
-    fn test_a_stored_extended_operator_stays_saveable_while_disabled() {
-        assert!(check_gated_features(false, &[IN], &[IN]).is_ok());
-        let err = check_gated_features(
-            false,
-            &[IN, GatedFeature::Operator(Operator::ReNotMatch)],
-            &[IN],
-        )
-        .unwrap_err();
-        assert!(err.contains("'re_not_match'"), "{err}");
-    }
-
-    #[test]
-    fn test_case_insensitive_is_gated_like_an_extended_operator() {
-        let err = check_gated_features(false, &[CI], &[]).unwrap_err();
-        assert!(err.contains("case_insensitive"), "{err}");
-        assert!(err.contains(EXTENDED_OPERATORS_ENV), "{err}");
-        assert!(check_gated_features(false, &[CI], &[CI]).is_ok());
-        assert!(check_gated_features(false, &[CI], &[IN]).is_err());
-        assert!(check_gated_features(true, &[CI], &[]).is_ok());
-    }
-
-    #[test]
-    fn test_the_extended_operators_are_off_by_default() {
-        assert!(
-            !crate::get_config()
-                .common
-                .alert_extended_condition_operators
-        );
     }
 }

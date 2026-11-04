@@ -18,18 +18,14 @@ use ::db::{
     functions as db_functions, scheduler,
 };
 use common::meta::authz::Authz;
-use config::{
-    get_config,
-    meta::{
-        alerts::condition_ops::{check_gated_features, gated_features_of},
-        pipeline::{
-            Pipeline, PipelineKind,
-            components::{DerivedStream, NodeData, PipelineSource},
-        },
-        search::SearchEventType,
-        stream::{ListStreamParams, StreamParams},
-        triggers::{Trigger, TriggerModule},
+use config::meta::{
+    pipeline::{
+        Pipeline, PipelineKind,
+        components::{DerivedStream, NodeData, PipelineSource},
     },
+    search::SearchEventType,
+    stream::{ListStreamParams, StreamParams},
+    triggers::{Trigger, TriggerModule},
 };
 
 use self::{db as pipeline, db::PipelineError};
@@ -129,22 +125,6 @@ fn qualified_org<'a>(stream: &'a StreamParams, org: &'a str) -> &'a str {
     }
 }
 
-/// Refuses gated condition features new to this save unless `enabled`; ones `stored` used stay.
-fn check_condition_operators(
-    stored: Option<&Pipeline>,
-    pipeline: &Pipeline,
-    enabled: bool,
-) -> Result<(), PipelineError> {
-    check_gated_features(
-        enabled,
-        &gated_features_of(&pipeline.nodes),
-        &stored
-            .map(|stored| gated_features_of(&stored.nodes))
-            .unwrap_or_default(),
-    )
-    .map_err(PipelineError::InvalidPipeline)
-}
-
 #[tracing::instrument(skip(pipeline))]
 pub async fn save_pipeline(pipeline: Pipeline) -> Result<(), PipelineError> {
     save_pipeline_checked(pipeline, None).await
@@ -221,17 +201,11 @@ pub async fn save_user_pipeline_checked(
     mut pipeline: Pipeline,
     check: Option<&dyn WriteCheck<Pipeline>>,
 ) -> Result<(), PipelineError> {
-    let existing_pipeline = pipeline::get_by_id(&pipeline.id).await.ok();
-    if let Some(existing_pipeline) = &existing_pipeline
+    if let Ok(existing_pipeline) = pipeline::get_by_id(&pipeline.id).await
         && (existing_pipeline.org != pipeline.org || !existing_pipeline.is_user())
     {
         return Err(PipelineError::NotFound(pipeline.id));
     }
-    check_condition_operators(
-        existing_pipeline.as_ref(),
-        &pipeline,
-        get_config().common.alert_extended_condition_operators,
-    )?;
 
     pipeline.kind = PipelineKind::User;
     save_pipeline_checked(pipeline, check).await
@@ -339,12 +313,7 @@ pub async fn update_user_pipeline_checked(
     mut pipeline: Pipeline,
     check: Option<&dyn WriteCheck<Pipeline>>,
 ) -> Result<(), PipelineError> {
-    let existing_pipeline = get_user_pipeline(org_id, &pipeline.id).await?;
-    check_condition_operators(
-        Some(&existing_pipeline),
-        &pipeline,
-        get_config().common.alert_extended_condition_operators,
-    )?;
+    get_user_pipeline(org_id, &pipeline.id).await?;
     pipeline.kind = PipelineKind::User;
     update_pipeline_checked(pipeline, check).await
 }
@@ -805,74 +774,5 @@ mod tests {
             };
             assert_eq!(node_org, "a", "{}", node.id);
         }
-    }
-
-    fn condition_pipeline(id: &str, operator: &str) -> Pipeline {
-        let mut pipeline: Pipeline = serde_json::from_value(serde_json::json!({
-            "pipeline_id": id, "name": id, "edges": [],
-            "nodes": [{"id": "c", "io_type": "default", "position": {"x": 0.0, "y": 0.0},
-                "data": {"node_type": "condition", "version": 2, "conditions": {
-                    "filterType": "group", "logicalOperator": "AND", "conditions": [
-                        {"filterType": "condition", "column": "level", "operator": operator,
-                         "value": ["error"], "logicalOperator": "AND"}]}}}]
-        }))
-        .unwrap();
-        pipeline.org = "extended_ops_org".to_string();
-        pipeline
-    }
-
-    #[tokio::test]
-    async fn a_new_pipeline_with_an_in_condition_is_refused_while_the_flag_is_off() {
-        let saved = super::save_user_pipeline_checked(
-            condition_pipeline("extended_ops_new", "in"),
-            Some(&Unreached),
-        )
-        .await;
-        assert!(
-            matches!(&saved, Err(super::PipelineError::InvalidPipeline(m))
-                if m.contains("'in'") && m.contains("ZO_ALERT_EXTENDED_CONDITION_OPERATORS")),
-            "{saved:?}"
-        );
-    }
-
-    #[test]
-    fn a_stored_in_condition_stays_saveable_while_the_flag_is_off() {
-        let stored = condition_pipeline("p", "in");
-        let check = super::check_condition_operators;
-        assert!(check(Some(&stored), &condition_pipeline("p", "IN"), false).is_ok());
-        assert!(check(Some(&stored), &condition_pipeline("p", "re_match"), false).is_err());
-        assert!(check(Some(&condition_pipeline("p", "=")), &stored, false).is_err());
-        assert!(check(None, &stored, true).is_ok());
-    }
-
-    fn case_insensitive_pipeline(id: &str) -> Pipeline {
-        let mut value = serde_json::to_value(condition_pipeline(id, "contains")).unwrap();
-        value["nodes"][0]["data"]["conditions"]["conditions"][0]["case_insensitive"] =
-            serde_json::json!(true);
-        serde_json::from_value(value).unwrap()
-    }
-
-    #[tokio::test]
-    async fn a_new_pipeline_with_a_case_insensitive_condition_is_refused_while_the_flag_is_off() {
-        let saved = super::save_user_pipeline_checked(
-            case_insensitive_pipeline("case_insensitive_new"),
-            Some(&Unreached),
-        )
-        .await;
-        assert!(
-            matches!(&saved, Err(super::PipelineError::InvalidPipeline(m))
-                if m.contains("case_insensitive") && m.contains("ZO_ALERT_EXTENDED_CONDITION_OPERATORS")),
-            "{saved:?}"
-        );
-    }
-
-    #[test]
-    fn a_stored_case_insensitive_condition_stays_saveable_while_the_flag_is_off() {
-        let stored = case_insensitive_pipeline("p");
-        let check = super::check_condition_operators;
-        assert!(check(Some(&stored), &case_insensitive_pipeline("p"), false).is_ok());
-        let plain = condition_pipeline("p", "contains");
-        assert!(check(Some(&plain), &stored, false).is_err());
-        assert!(check(None, &stored, true).is_ok());
     }
 }

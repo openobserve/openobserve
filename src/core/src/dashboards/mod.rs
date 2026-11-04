@@ -18,10 +18,7 @@ use config::{
     meta::{
         alerts::{
             Operator,
-            condition_ops::{
-                MAX_REGEX_PATTERN_LEN, check_gated_features, gated_features_of,
-                validate_condition_value,
-            },
+            condition_ops::{MAX_REGEX_PATTERN_LEN, validate_condition_value},
         },
         dashboards::{Dashboard, ListDashboardsParams, v8},
         folder::{DEFAULT_FOLDER, Folder, FolderType},
@@ -823,13 +820,6 @@ async fn put(
     if let Some(existing_dash) = &old_version {
         check_update_hash(existing_dash, hash)?;
     };
-    checked_annotation_operators(
-        old_version.as_ref(),
-        &dashboard,
-        config::get_config()
-            .common
-            .alert_extended_condition_operators,
-    )?;
 
     match update_distinct_variables(org_id, old_version, &dashboard).await {
         Ok(_) => {}
@@ -1255,31 +1245,6 @@ pub fn checked_annotation_sources(dashboard: &mut Dashboard) -> Result<(), Dashb
         }
     }
     Ok(())
-}
-
-/// Refuses gated filter features new to this save unless `enabled`; ones `stored` used stay.
-pub fn checked_annotation_operators(
-    stored: Option<&Dashboard>,
-    dashboard: &Dashboard,
-    enabled: bool,
-) -> Result<(), DashboardError> {
-    let operators = |dashboard: &Dashboard| {
-        let filters: Vec<_> = dashboard
-            .v8
-            .as_ref()
-            .and_then(|d| d.annotation_sources.as_ref())
-            .into_iter()
-            .flatten()
-            .map(|source| &source.filters)
-            .collect();
-        gated_features_of(&filters)
-    };
-    check_gated_features(
-        enabled,
-        &operators(dashboard),
-        &stored.map(operators).unwrap_or_default(),
-    )
-    .map_err(DashboardError::InvalidAnnotationSource)
 }
 
 /// A 6-digit hex color, `#` included, matching the only shape `ColorSwatchPicker`'s palette writes.
@@ -1929,52 +1894,6 @@ mod tests {
             conditions: vec![leaf],
         }];
         dashboard_from_sources(vec![source])
-    }
-
-    fn dashboard_with_operator(operator: &str) -> Dashboard {
-        let mut source = valid_source("s1");
-        let mut leaf = single_condition_leaf("col");
-        if let v8::AnnotationConditionItem::Condition(ref mut c) = leaf {
-            c.operator = operator.to_string();
-        }
-        source.filters.conditions = vec![leaf];
-        dashboard_from_sources(vec![source])
-    }
-
-    #[test]
-    fn checked_annotation_operators_keeps_stored_ones_while_the_flag_is_off() {
-        let with_in = dashboard_with_operator("in");
-        let plain = dashboard_with_operator("=");
-        assert!(checked_annotation_operators(None, &plain, false).is_ok());
-        assert!(matches!(
-            checked_annotation_operators(None, &with_in, false),
-            Err(DashboardError::InvalidAnnotationSource(m)) if m.contains("'in'")
-        ));
-        assert!(checked_annotation_operators(Some(&plain), &with_in, false).is_err());
-        assert!(checked_annotation_operators(Some(&with_in), &with_in, false).is_ok());
-        assert!(checked_annotation_operators(None, &with_in, true).is_ok());
-    }
-
-    #[test]
-    fn checked_annotation_operators_gates_case_insensitive_leaves_while_the_flag_is_off() {
-        let with_ci = {
-            let mut source = valid_source("s1");
-            let mut leaf = single_condition_leaf("col");
-            if let v8::AnnotationConditionItem::Condition(ref mut c) = leaf {
-                c.operator = "contains".to_string();
-                c.case_insensitive = Some(true);
-            }
-            source.filters.conditions = vec![leaf];
-            dashboard_from_sources(vec![source])
-        };
-        let plain = dashboard_with_operator("contains");
-        assert!(matches!(
-            checked_annotation_operators(None, &with_ci, false),
-            Err(DashboardError::InvalidAnnotationSource(m)) if m.contains("case_insensitive")
-        ));
-        assert!(checked_annotation_operators(Some(&plain), &with_ci, false).is_err());
-        assert!(checked_annotation_operators(Some(&with_ci), &with_ci, false).is_ok());
-        assert!(checked_annotation_operators(None, &with_ci, true).is_ok());
     }
 
     #[test]

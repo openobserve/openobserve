@@ -536,51 +536,6 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
   },
 };
 
-/** Engine operators older servers cannot read faithfully; offered only when the server allows them. */
-export const EXTENDED_ENGINE_OPERATORS: readonly FilterOperatorId[] = [
-  "in",
-  "not_in",
-  "starts_with",
-  "ends_with",
-  "regex",
-  "not_regex",
-  "contains_ci",
-];
-
-/** Dashboard panel operators older UIs drop on load, which then blocks the panel save. */
-export const EXTENDED_DASHBOARD_OPERATORS: readonly FilterOperatorId[] = [
-  "is_empty",
-  "is_not_empty",
-];
-
-const GATED_OPERATORS: Partial<Record<FilterProfileName, readonly FilterOperatorId[]>> = {
-  alert: EXTENDED_ENGINE_OPERATORS,
-  pipeline: EXTENDED_ENGINE_OPERATORS,
-  workflow: EXTENDED_ENGINE_OPERATORS,
-  eval: EXTENDED_ENGINE_OPERATORS,
-  annotation: EXTENDED_ENGINE_OPERATORS,
-  "dashboard-panel": EXTENDED_DASHBOARD_OPERATORS,
-};
-
-/** A profile as this server allows it: gated operators are dropped unless `extendedOperators`. */
-export const serverProfile = (
-  name: FilterProfileName,
-  extendedOperators: boolean,
-): FilterProfile => {
-  const profile = FILTER_PROFILES[name];
-  const gated = GATED_OPERATORS[name];
-  if (extendedOperators || !gated) return profile;
-  const allowed = (ids: FilterOperatorId[]) => ids.filter((id) => !gated.includes(id));
-  return {
-    ...profile,
-    operators: {
-      string: allowed(profile.operators.string),
-      number: allowed(profile.operators.number),
-      boolean: allowed(profile.operators.boolean),
-    },
-  };
-};
-
 /** How many values an operator takes under this config. */
 export const arityFor = (
   config: Pick<FilterEditorConfig, "arity">,

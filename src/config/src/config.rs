@@ -2684,13 +2684,6 @@ pub struct Common {
         help = "Show experimental features in the UI. Hidden by default"
     )]
     pub experimental: bool,
-    /// Off until every version a rollback could land on skips rows it cannot read.
-    #[env_config(
-        name = "ZO_ALERT_EXTENDED_CONDITION_OPERATORS",
-        default = false,
-        help = "Allow saving alert, pipeline, workflow, eval job and annotation conditions with the operators in, not_in, starts_with, ends_with, re_match and re_not_match. Off by default: versions without the skip-unreadable-rows fix fail to list or start on such a row, so enable only once no rollback target predates that fix. Conditions that already use these operators keep evaluating and stay editable either way."
-    )]
-    pub alert_extended_condition_operators: bool,
 }
 
 impl Common {

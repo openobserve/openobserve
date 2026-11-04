@@ -16,7 +16,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
-import { createStore } from "vuex";
 import FilterBuilder from "./FilterBuilder.vue";
 import type { FilterProfileName } from "./filterProfiles";
 import type { FilterField } from "@/utils/query/filterBar";
@@ -56,7 +55,6 @@ function mountBuilder(
   profile: FilterProfileName,
   modelValue: unknown,
   props: Record<string, unknown> = {},
-  zoConfig: Record<string, unknown> = {},
 ) {
   const state = { value: modelValue as any, valid: [] as boolean[] };
   wrapper = mount(FilterBuilder, {
@@ -74,7 +72,6 @@ function mountBuilder(
       "onUpdate:valid": (valid: boolean) => state.valid.push(valid),
       ...props,
     },
-    global: { plugins: [createStore({ state: { zoConfig } })] },
   });
   return state;
 }
@@ -150,15 +147,11 @@ describe("FilterBuilder", () => {
     });
   });
 
-  describe("server switch for the extended engine operators", () => {
+  describe("extended engine operators", () => {
     const EXTENDED = ["in", "not_in", "starts_with", "ends_with", "regex", "not_regex"];
 
-    async function operatorRows(
-      profile: FilterProfileName,
-      extended: boolean,
-      saved: unknown = null,
-    ) {
-      mountBuilder(profile, saved, {}, { extended_condition_operators: extended });
+    async function operatorRows(profile: FilterProfileName, saved: unknown = null) {
+      mountBuilder(profile, saved);
       await find("input").trigger("click");
       await flushPromises();
       await type("level");
@@ -166,42 +159,25 @@ describe("FilterBuilder", () => {
       return rowKeys();
     }
 
-    it.each(["alert", "pipeline", "workflow", "eval", "annotation"] as FilterProfileName[])(
-      "%s hides them and contains ignore case while the server keeps them off",
-      async (profile) => {
-        const rows = await operatorRows(profile, false);
-        expect(rows.filter((id) => EXTENDED.includes(id))).toEqual([]);
-        expect(rows).not.toContain("contains_ci");
-        expect(rows).toContain("contains");
-        expect(rows).toContain("eq");
-      },
-    );
-
-    it.each(["alert", "pipeline", "workflow", "eval", "annotation"] as FilterProfileName[])(
-      "%s offers them once the server allows them",
-      async (profile) => {
-        const rows = await operatorRows(profile, true);
-        expect(rows).toEqual(expect.arrayContaining([...EXTENDED, "contains_ci"]));
-      },
-    );
-
-    it.each(["logs", "dashboard-panel"] as FilterProfileName[])(
-      "%s keeps the extended engine operators off the switch",
-      async (profile) => {
-        expect(await operatorRows(profile, false)).toEqual(
-          expect.arrayContaining([...EXTENDED, "contains_ci"]),
-        );
-      },
-    );
-
-    it("dashboard-panel hides Is Empty and Is Not Empty while the server keeps them off", async () => {
-      const rows = await operatorRows("dashboard-panel", false);
-      expect(rows).not.toContain("is_empty");
-      expect(rows).not.toContain("is_not_empty");
-      expect(rows).toContain("is_null");
+    it.each([
+      "alert",
+      "pipeline",
+      "workflow",
+      "eval",
+      "annotation",
+      "logs",
+      "dashboard-panel",
+    ] as FilterProfileName[])("%s offers them and contains ignore case", async (profile) => {
+      const rows = await operatorRows(profile);
+      expect(rows).toEqual(expect.arrayContaining([...EXTENDED, "contains_ci"]));
     });
 
-    it("dashboard-panel still shows and writes back a saved Is Empty while the server keeps it off", async () => {
+    it("dashboard-panel offers Is Empty and Is Not Empty", async () => {
+      const rows = await operatorRows("dashboard-panel");
+      expect(rows).toEqual(expect.arrayContaining(["is_empty", "is_not_empty"]));
+    });
+
+    it("dashboard-panel shows and writes back a saved Is Empty", async () => {
       const empty = {
         type: "condition",
         column: { field: "level", streamAlias: null },
@@ -217,12 +193,7 @@ describe("FilterBuilder", () => {
         logicalOperator: "AND",
         conditions: [empty, { ...other, value: "api", logicalOperator: "OR" }],
       };
-      const state = mountBuilder(
-        "dashboard-panel",
-        saved,
-        {},
-        { extended_condition_operators: false },
-      );
+      const state = mountBuilder("dashboard-panel", saved);
       await flushPromises();
       expect(wrapper!.text()).toContain("Is Empty");
       await click("connector-1");
@@ -230,14 +201,9 @@ describe("FilterBuilder", () => {
       expect(state.value.conditions[0]).toEqual(empty);
     });
 
-    it("dashboard-panel offers Is Empty and Is Not Empty once the server allows them", async () => {
-      const rows = await operatorRows("dashboard-panel", true);
-      expect(rows).toEqual(expect.arrayContaining(["is_empty", "is_not_empty"]));
-    });
-
-    it("still shows a saved IN condition while the server keeps them off", async () => {
+    it("shows a saved IN condition", async () => {
       const saved = v2(leaf("level", ["error", "warn"], "AND", "in"));
-      const state = mountBuilder("alert", saved, {}, { extended_condition_operators: false });
+      const state = mountBuilder("alert", saved);
       await flushPromises();
       expect(find("row-0").text()).toContain("IN");
       expect(find("row-0").text()).toContain("error");
@@ -245,12 +211,12 @@ describe("FilterBuilder", () => {
     });
   });
 
-  describe("a saved contains ignore case while the server keeps it off", () => {
+  describe("a saved contains ignore case", () => {
     const ci = { ...leaf("level", "err", "AND", "contains"), case_insensitive: true };
     const saved = v2(ci, leaf("service", "api", "OR"));
 
-    it("still shows the chip and writes it back unchanged when another line changes", async () => {
-      const state = mountBuilder("alert", saved, {}, { extended_condition_operators: false });
+    it("shows the chip and writes it back unchanged when another line changes", async () => {
+      const state = mountBuilder("alert", saved);
       await flushPromises();
       expect(find("row-0").text()).toContain("err");
       await click("connector-1");

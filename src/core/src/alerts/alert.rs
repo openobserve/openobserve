@@ -796,11 +796,6 @@ async fn prepare_alert(
             .validate_operator_values()
             .map_err(AlertError::InvalidCondition)?;
     }
-    check_condition_operators(
-        old_alert.as_ref(),
-        alert,
-        get_config().common.alert_extended_condition_operators,
-    )?;
     alert
         .trigger_condition
         .validate_threshold_operator()
@@ -1211,27 +1206,6 @@ fn same_schedule(a: &Alert, b: &Alert) -> bool {
         && x.cron == y.cron
         && x.silence == y.silence
         && x.tolerance_in_secs == y.tolerance_in_secs
-}
-
-/// Refuses gated condition features new to this save unless `enabled`; ones `stored` used stay.
-fn check_condition_operators(
-    stored: Option<&Alert>,
-    alert: &Alert,
-    enabled: bool,
-) -> Result<(), AlertError> {
-    let operators = |a: &Alert| {
-        a.query_condition
-            .conditions
-            .as_ref()
-            .map(config::meta::alerts::condition_ops::gated_features_of)
-            .unwrap_or_default()
-    };
-    config::meta::alerts::condition_ops::check_gated_features(
-        enabled,
-        &operators(alert),
-        &stored.map(operators).unwrap_or_default(),
-    )
-    .map_err(AlertError::InvalidCondition)
 }
 
 #[cfg(test)]
@@ -9089,31 +9063,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn prepare_alert_refuses_a_new_in_condition_while_the_flag_is_off() {
+    async fn prepare_alert_accepts_an_in_condition() {
         let err = prepare_schedule(|a| {
             a.trigger_condition.frequency = 60;
             with_condition_operator(a, "in");
         })
         .await;
-        assert!(
-            matches!(&err, AlertError::InvalidCondition(m)
-                if m.contains("'in'") && m.contains("ZO_ALERT_EXTENDED_CONDITION_OPERATORS")),
-            "{err:?}"
-        );
-    }
-
-    #[test]
-    fn an_extended_operator_already_stored_stays_saveable_while_the_flag_is_off() {
-        let (mut stored, mut edited) = (Alert::default(), Alert::default());
-        with_condition_operator(&mut stored, "in");
-        with_condition_operator(&mut edited, "in");
-        assert!(check_condition_operators(Some(&stored), &edited, false).is_ok());
-
-        with_condition_operator(&mut stored, "=");
-        assert!(check_condition_operators(Some(&stored), &edited, false).is_err());
-        assert!(check_condition_operators(None, &edited, false).is_err());
-        assert!(check_condition_operators(None, &edited, true).is_ok());
-        assert!(check_condition_operators(Some(&stored), &edited, true).is_ok());
+        assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
     }
 
     fn with_case_insensitive_contains(alert: &mut Alert) {
@@ -9127,30 +9083,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn prepare_alert_refuses_a_new_case_insensitive_condition_while_the_flag_is_off() {
+    async fn prepare_alert_accepts_a_case_insensitive_condition() {
         let err = prepare_schedule(|a| {
             a.trigger_condition.frequency = 60;
             with_case_insensitive_contains(a);
         })
         .await;
-        assert!(
-            matches!(&err, AlertError::InvalidCondition(m)
-                if m.contains("case_insensitive") && m.contains("ZO_ALERT_EXTENDED_CONDITION_OPERATORS")),
-            "{err:?}"
-        );
-    }
-
-    #[test]
-    fn a_case_insensitive_condition_already_stored_stays_saveable_while_the_flag_is_off() {
-        let (mut stored, mut edited) = (Alert::default(), Alert::default());
-        with_case_insensitive_contains(&mut stored);
-        with_case_insensitive_contains(&mut edited);
-        assert!(check_condition_operators(Some(&stored), &edited, false).is_ok());
-
-        with_condition_operator(&mut stored, "contains");
-        assert!(check_condition_operators(Some(&stored), &edited, false).is_err());
-        assert!(check_condition_operators(None, &edited, false).is_err());
-        assert!(check_condition_operators(None, &edited, true).is_ok());
+        assert!(!matches!(err, AlertError::InvalidCondition(_)), "{err:?}");
     }
 
     #[tokio::test]

@@ -19,13 +19,7 @@ import { OPERATORS, type FilterCondition, type FilterGroup } from "@/utils/query
 import type { TranslateFn } from "@/types/i18n";
 import { encodeProfileRouteFilters, parseProfileFilters } from "@/services/profiles";
 import { DASHBOARD_SPELLINGS } from "./codecs";
-import {
-  EXTENDED_DASHBOARD_OPERATORS,
-  EXTENDED_ENGINE_OPERATORS,
-  FILTER_PROFILES,
-  serverProfile,
-  type FilterProfileName,
-} from "./filterProfiles";
+import { FILTER_PROFILES, type FilterProfileName } from "./filterProfiles";
 import { filterIssues } from "./filterValidation";
 import { operatorName } from "./useFilterBarEditor";
 
@@ -296,34 +290,30 @@ describe("operator names", () => {
   });
 });
 
-describe("serverProfile", () => {
+describe("extended operators", () => {
   const ENGINE: FilterProfileName[] = ["alert", "pipeline", "workflow", "eval", "annotation"];
-  const offered = (name: FilterProfileName, extended: boolean) =>
-    Object.values(serverProfile(name, extended).operators).flat();
+  const offered = (name: FilterProfileName) =>
+    Object.values(FILTER_PROFILES[name].operators).flat();
 
-  it.each(ENGINE)("drops the extended operators from %s unless the server allows them", (name) => {
-    expect(offered(name, false).filter((id) => EXTENDED_ENGINE_OPERATORS.includes(id))).toEqual([]);
-    expect(offered(name, false)).not.toContain("contains_ci");
-    expect(offered(name, false)).toEqual(expect.arrayContaining(["contains", "not_contains"]));
-    expect(offered(name, true)).toContain("contains_ci");
-    expect(serverProfile(name, true)).toBe(FILTER_PROFILES[name]);
-    expect(serverProfile(name, false).codec).toBe(FILTER_PROFILES[name].codec);
-  });
-
-  it("drops Is Empty and Is Not Empty from dashboard panel filters unless the server allows them", () => {
-    const off = serverProfile("dashboard-panel", false).operators.string;
-    expect(off.filter((id) => EXTENDED_DASHBOARD_OPERATORS.includes(id))).toEqual([]);
-    expect(off).toEqual(expect.arrayContaining(["is_null", "is_not_null", "in", "contains_ci"]));
-    expect(serverProfile("dashboard-panel", true)).toBe(FILTER_PROFILES["dashboard-panel"]);
-    expect(serverProfile("dashboard-panel", false).codec).toBe(
-      FILTER_PROFILES["dashboard-panel"].codec,
+  it.each(ENGINE)("%s offers the extended engine operators", (name) => {
+    expect(offered(name)).toEqual(
+      expect.arrayContaining([
+        "in",
+        "not_in",
+        "starts_with",
+        "ends_with",
+        "regex",
+        "not_regex",
+        "contains_ci",
+        "contains",
+        "not_contains",
+      ]),
     );
   });
 
-  it.each(["logs", "traces", "metrics", "rum-funnel", "profiles"] as const)(
-    "leaves %s as it is",
-    (name) => {
-      expect(serverProfile(name, false)).toBe(FILTER_PROFILES[name]);
-    },
-  );
+  it("dashboard panel filters offer Is Empty and Is Not Empty", () => {
+    expect(FILTER_PROFILES["dashboard-panel"].operators.string).toEqual(
+      expect.arrayContaining(["is_empty", "is_not_empty", "is_null", "in", "contains_ci"]),
+    );
+  });
 });
