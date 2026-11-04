@@ -129,12 +129,12 @@ describe("OTableBodyRow selection marking", () => {
         "focus-visible:outline-focus-ring-accent",
       ]),
     );
-    expect(classes.some((c) => c.startsWith("transition"))).toBe(false);
+    expect(classes.filter((c) => /(^|:)transition/.test(c))).toEqual([]);
   });
 
   it("switches the hover background instantly so a fast pointer leaves no trail of fading rows", () => {
     const classes = mountSelectable({});
-    expect(classes.some((c) => c.startsWith("transition") || c.includes("duration"))).toBe(false);
+    expect(classes.filter((c) => /(^|:)(transition|duration-)/.test(c))).toEqual([]);
     expect(classes.some((c) => c.startsWith("focus-visible:outline"))).toBe(false);
   });
 });
