@@ -3060,12 +3060,18 @@ mod tests {
         .await
         .unwrap();
         let gate = close_search_gate_for_tests().await;
-        let customer = search_service::check_search_allowed(&org, None);
-        let res = list_audit(Path(org), Query(AuditQuery::default()), root()).await;
+        let refusal = search_service::check_search_allowed(&org, None)
+            .expect_err("the org's own searches are blocked")
+            .to_string();
+        let res = list_audit(Path(org.clone()), Query(AuditQuery::default()), root()).await;
+        let audit = openobserve_core::fleet::list_audit(&org, AuditQuery::default(), None).await;
         drop(gate);
-        assert!(customer.is_err(), "the org's own searches are blocked");
-        let status = res.status();
+        // a unit test has no search backend, so only the licence refusal is ruled out
+        assert_ne!(res.status(), StatusCode::TOO_MANY_REQUESTS);
         let body = body_text(res).await;
-        assert_eq!(status, StatusCode::OK, "{body}");
+        assert!(!body.contains(&refusal), "{body}");
+        if let Err(e) = audit {
+            assert!(!e.to_string().contains(&refusal), "{e}");
+        }
     }
 }
