@@ -1278,18 +1278,11 @@ describe("LibraryInstallDialog", () => {
       } as typeof original.zoConfig;
       const wrapper = await mountDialog({
         seed: null,
-        entries: [seedEntry(), anomalyEntry()],
         preselect: [seedEntry(), anomalyEntry()],
       });
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      await click(wrapper, "alert-library-install-next");
-      expect(
-        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
-      ).toBe("1");
+      await advanceToInstall(wrapper);
+      expect(wrapper.find('[data-test="alert-library-install-run"]').text()).toContain("1");
 
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
-      await click(wrapper, "alert-library-install-next");
       await click(wrapper, "alert-library-install-run");
       expect(mocks.createAnomaly).not.toHaveBeenCalled();
       expect(mocks.createAlert).toHaveBeenCalledTimes(1);

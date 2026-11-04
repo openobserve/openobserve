@@ -65,7 +65,6 @@ import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import IncidentList from "./IncidentList.vue";
 import incidentsService from "@/services/incidents";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import downtimesService from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
 import { oncallKeys } from "@/services/oncall.querykeys";

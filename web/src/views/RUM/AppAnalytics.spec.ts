@@ -191,7 +191,7 @@ describe("AppAnalytics shell", () => {
   it("sits the sub-tabs in a lock-exempt container, so they stay live on a license-locked page", async () => {
     await mountAt("/product-analytics/funnels?period=7d");
     const tabs = wrapper!.findAll('[data-test^="rum-analytics-subtab-"][role="tab"]');
-    expect(tabs.length).toBe(5);
+    expect(tabs.length).toBe(6);
     for (const tab of tabs) {
       expect(tab.element.closest("[data-feature-lock-exempt]")).not.toBeNull();
     }
