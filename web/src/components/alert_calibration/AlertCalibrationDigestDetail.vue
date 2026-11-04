@@ -37,7 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-calibration-digest-page"
   >
     <template #actions>
-      <OTooltip v-if="run && logsLock.locked.value" :content="logsLock.lockedReason.value">
+      <OTooltip
+        v-if="run && !isScoped(run) && logsLock.locked.value"
+        :content="logsLock.lockedReason.value"
+      >
         <span class="inline-flex">
           <OButton
             variant="outline"
@@ -58,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </OTooltip>
       <OButton
-        v-else-if="run"
+        v-else-if="run && !isScoped(run)"
         variant="outline"
         size="sm"
         icon-left="open-in-new"
@@ -109,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-for="note in notes" :key="note" class="block">{{ note }}</span>
       </OText>
 
-      <div v-if="run.finding_count > 0" class="flex flex-col gap-3">
+      <div v-if="hasFindings" class="flex flex-col gap-3">
         <div class="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
           <div class="flex min-w-0 flex-col gap-0.5">
             <OText variant="card-title" as="h2">{{
@@ -144,15 +147,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-calibration-digest-findings-capped"
         >
           <!-- OText's meta colour wins over a class on it, so the amber sits on the text. -->
-          <span class="text-status-warning-text">{{
-            t("alertCalibration.detail.showingCapped", {
-              shown: findings.length,
-              total: run.finding_count,
-              count: SEARCH_SIZE,
-            })
-          }}</span>
+          <span class="text-status-warning-text">{{ cappedNotice }}</span>
         </OText>
-        <OText v-else-if="findings.length !== run.finding_count" variant="meta" as="div">
+        <OText
+          v-else-if="run.finding_count !== null && findings.length !== run.finding_count"
+          variant="meta"
+          as="div"
+        >
           {{ t("alertCalibration.detail.perSubjectNote") }}
         </OText>
         <div class="flex flex-col gap-3">
@@ -164,14 +165,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <OBanner
+        v-else-if="run.finding_count === null"
+        variant="warning"
+        data-test="alert-calibration-digest-counts-pending"
+      >
+        {{ visibilityCopy(t, run).pending.banner }}
+      </OBanner>
+
       <OEmptyState
-        v-else-if="isClean(run)"
+        v-else-if="isQuiet(run)"
         size="block"
-        illustration="check"
+        :illustration="isScoped(run) ? 'radar' : 'check'"
         :title="t('alertCalibration.detail.nothingTitle')"
-        :description="
-          t('alertCalibration.detail.nothingDescription', { count: run.alerts_in_scope })
-        "
+        :description="visibilityCopy(t, run).nothingDescription"
         hide-action
         data-test="alert-calibration-digest-clean"
       />
@@ -273,13 +280,17 @@ import analytics from "@/services/product_analytics";
 import AlertCalibrationFindingCard from "./AlertCalibrationFindingCard.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
+  countOrDash,
   coverageNotes,
   coverageVerdict,
   DIGEST_STREAM,
-  isClean,
+  isQuiet,
+  isScoped,
   latestEmission,
+  recordHits,
   runRecordsSql,
   SEARCH_SIZE,
+  visibilityCopy,
   type DigestRecord,
   type RuleId,
 } from "./digests";
@@ -312,7 +323,7 @@ const records = useLatestRead(async () => {
     window_start: windowStart.value,
     window_end: windowEnd.value,
   });
-  return { hits: hits.length, ...latestEmission(hits) };
+  return { hits: recordHits(hits), ...latestEmission(hits) };
 });
 
 const run = computed(() => records.data.value?.run ?? null);
@@ -328,6 +339,17 @@ const omittedRoutine = computed(() => run.value?.omitted_routine_skip_count ?? 0
 const ruleLabel = (rule: string): I18nText =>
   t(isRuleId(rule) ? ruleLabelKey(rule, version.value) : "alertCalibration.rules.other");
 const hitCount = computed(() => records.data.value?.hits ?? 0);
+/** Returned findings show even when their emission's count did not come back with them. */
+const hasFindings = computed(
+  () => findings.value.length > 0 || (run.value?.finding_count ?? 0) > 0,
+);
+const cappedNotice = computed<I18nText>(() => {
+  const total = run.value?.finding_count;
+  const shown = findings.value.length;
+  return total == null
+    ? t("alertCalibration.visibility.showingCappedUnread", { shown, count: SEARCH_SIZE })
+    : t("alertCalibration.detail.showingCapped", { shown, total, count: SEARCH_SIZE });
+});
 /** A version-1 run writes no skip records, so it has no written count to fall short of. */
 const writtenSkips = computed(() => run.value?.written_skip_count ?? skips.value.length);
 const skipsCapped = computed(
@@ -381,26 +403,29 @@ const stats = computed<StatItem[]>(() => {
   const r = run.value;
   if (!r) return [];
   const verdict = COVERAGE_BADGE[coverageVerdict(r)];
+  const scope = visibilityCopy(t, r).alertsInScope;
   const windowMinutes = Math.round((r.window_end - r.window_start) / 60_000_000);
   return [
     {
       key: "findings",
       label: t("alertCalibration.detail.statFindings"),
-      value: r.finding_count,
+      value: countOrDash(r.finding_count),
       sub: t(verdict.labelKey),
       icon: "fact-check",
-      tone: r.finding_count > 0 ? "warning" : "neutral",
+      tone: hasFindings.value ? "warning" : "neutral",
     },
     {
       key: "scope",
       label: t("alertCalibration.detail.statAlertsInScope"),
-      value: r.alerts_in_scope,
+      value: scope.value,
+      sub: scope.sub,
+      subIcon: scope.subIcon,
       icon: "notifications",
     },
     {
       key: "declined",
       label: t("alertCalibration.detail.statDeclined"),
-      value: r.skip_count,
+      value: countOrDash(r.skip_count),
       sub: t("alertCalibration.detail.statDeclinedSub"),
       subTooltip: t("alertCalibration.detail.statDeclinedTooltip"),
       icon: "block",
@@ -419,10 +444,9 @@ const noneFoundReason = computed<I18nText>(() => {
   if (!r) return raw("");
   const reasons: I18nText[] = [];
   if (r.coverage_gap) reasons.push(t("alertCalibration.detail.noneFoundGap"));
-  if (r.skip_count > 0) {
-    reasons.push(
-      t("alertCalibration.detail.noneFoundDeclined", { count: r.skip_count }, r.skip_count),
-    );
+  const declined = r.skip_count ?? 0;
+  if (declined > 0) {
+    reasons.push(t("alertCalibration.detail.noneFoundDeclined", { count: declined }, declined));
   }
   reasons.push(t("alertCalibration.detail.noneFoundNotClearance"));
   return raw(reasons.join(" "));

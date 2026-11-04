@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { ADVICE_LABEL, LIMITATION_LABEL, QUALITY_REASON_LABEL } from "./rules";
 
 export const DIGEST_STREAM = "_o2_alert_calibration_digests";
@@ -45,14 +46,15 @@ export type DefinitionChecks = "checked" | "unavailable" | "not_yet" | "failed";
 
 const REVIEW_FOCI: ReviewFocus[] = ["settings", "threshold", "query", "grouping"];
 
+/** The counts are null for a scoped reader, since they count definitions it may not see. */
 export interface Coverage {
-  coverage_unreadable_definitions: number;
-  coverage_facts_without_definition: number;
-  coverage_definitions_without_facts: number;
+  coverage_unreadable_definitions: number | null;
+  coverage_facts_without_definition: number | null;
+  coverage_definitions_without_facts: number | null;
   coverage_transitions_truncated: boolean;
   coverage_counters_truncated: boolean;
   coverage_error_clusters_truncated: boolean;
-  coverage_error_clusters_unattributed: number;
+  coverage_error_clusters_unattributed: number | null;
   coverage_stream_substrate_empty: boolean;
   /** Written only when the org has alerts, and only from version 2. */
   coverage_definition_checks?: DefinitionChecks;
@@ -64,15 +66,19 @@ export interface RunRow extends Coverage {
   window_start: number;
   window_end: number;
   emitted_at: number;
-  finding_count: number;
-  skip_count: number;
+  /** Null on a scoped record whose emission's visible counts the read did not get. */
+  finding_count: number | null;
+  skip_count: number | null;
   /** Version 2 splits `skip_count` into the skips written as records and the routine ones only counted. */
-  written_skip_count?: number;
-  omitted_routine_skip_count?: number;
-  alerts_in_scope: number;
+  written_skip_count?: number | null;
+  omitted_routine_skip_count?: number | null;
+  /** Null for a scoped reader: the org's count is not one it may see. */
+  alerts_in_scope: number | null;
   coverage_gap: boolean;
-  /** Only an emission's own records carry it; the runs list does not select it. */
+  /** The org-wide runs list does not select it; an emission's records and every scoped row carry it. */
   schema_version?: number;
+  /** Set when the reader lacks org-wide alert read, so every count covers only its alerts. */
+  visibility?: "scoped";
 }
 
 /** One record of the digest stream; a run that found nothing writes one record with every finding column unset. */
@@ -242,6 +248,7 @@ export function runIdentity(record: DigestRecord): RunRow {
     coverage_definition_checks: record.coverage_definition_checks,
     coverage_definition_checks_truncated: record.coverage_definition_checks_truncated,
     schema_version: record.schema_version,
+    visibility: record.visibility,
   };
 }
 
@@ -261,6 +268,10 @@ export function latestEmission(records: DigestRecord[]): {
     skips: emission.filter(isSkip).sort(skipOrder),
   };
 }
+
+/** The rows the record search returned, without the run rows the server adds for a scoped reader. */
+export const recordHits = (records: DigestRecord[]): number =>
+  records.filter((r) => !(r.kind === "run" && isScoped(r))).length;
 
 const skipOrder = (a: SkipRecord, b: SkipRecord) =>
   a.rule_id.localeCompare(b.rule_id) || (a.alert_name ?? "").localeCompare(b.alert_name ?? "");
@@ -298,9 +309,53 @@ export const titleAfterName = (f: FindingRecord): string =>
 export const latestRun = (rows: RunRow[]): RunRow | null =>
   rows.reduce<RunRow | null>((a, b) => (!a || b.window_end > a.window_end ? b : a), null);
 
-/** Clean needs full coverage and nothing declined as well as zero findings: a zero alone may mean nothing was judged. */
-export const isClean = (row: RunRow) =>
+export const isScoped = (row: Pick<RunRow, "visibility">) => row.visibility === "scoped";
+
+/** A count the read did not get is a dash, never a zero that would read as nothing found. */
+export const countOrDash = (count: number | null | undefined): number | I18nText =>
+  count ?? raw("—");
+
+/** No finding, no gap and nothing declined, over the alerts the reader can see. */
+export const isQuiet = (row: RunRow) =>
   row.finding_count === 0 && !row.coverage_gap && row.skip_count === 0;
+
+/** Clean needs full coverage and nothing declined as well as zero findings: a zero alone may mean nothing was judged. */
+export const isClean = (row: RunRow) => isQuiet(row) && !isScoped(row);
+
+export interface VisibilityCopy {
+  allClear: I18nText;
+  nothingDescription: I18nText;
+  alertsInScope: { value: number | I18nText; sub?: I18nText; subIcon?: IconName };
+  pending: { banner: I18nText; badge: I18nText };
+}
+
+/** A scoped zero says nothing about the alerts the reader cannot access, so its copy never claims the org. */
+export function visibilityCopy(t: TranslateFn, row: RunRow): VisibilityCopy {
+  const pending = {
+    banner: t("alertCalibration.visibility.countsPending"),
+    badge: t("alertCalibration.visibility.countsPendingBadge"),
+  };
+  if (!isScoped(row)) {
+    return {
+      allClear: t("alertCalibration.dashboard.allClear"),
+      nothingDescription: t("alertCalibration.detail.nothingDescription", {
+        count: row.alerts_in_scope ?? 0,
+      }),
+      alertsInScope: { value: row.alerts_in_scope ?? raw("—") },
+      pending,
+    };
+  }
+  return {
+    allClear: t("alertCalibration.visibility.allClear"),
+    nothingDescription: t("alertCalibration.visibility.nothingDescription"),
+    alertsInScope: {
+      value: raw("—"),
+      sub: t("alertCalibration.visibility.orgTotalHidden"),
+      subIcon: "info-outline",
+    },
+    pending,
+  };
+}
 
 /** A missing or malformed column lists nothing, and a row without a usable key is dropped. */
 export function parseLagRows(value: unknown, keyField: "org_id" | "hour_start_micros"): LagRow[] {

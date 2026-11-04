@@ -24,13 +24,16 @@ import {
   insightActionsOf,
   titleAfterName,
   isClean,
+  isScoped,
   latestEmission,
   latestPerWindow,
   latestRun,
   limitationsOf,
+  recordHits,
   parseLagRows,
   qualityReasonsOf,
   schemaVersion,
+  visibilityCopy,
   type DigestRecord,
   type FindingRecord,
   type RuleId,
@@ -460,5 +463,55 @@ describe("a version-2 finding's typed columns", () => {
     expect(identity?.schema_version).toBe(2);
     expect(identity?.coverage_definition_checks).toBe("not_yet");
     expect(identity?.coverage_definition_checks_truncated).toBe(false);
+  });
+});
+
+describe("a scoped run", () => {
+  const scoped = run({ visibility: "scoped", alerts_in_scope: null });
+
+  it("a scoped row is never clean and shows no org totals", () => {
+    expect(isScoped(scoped)).toBe(true);
+    expect(isClean(scoped)).toBe(false);
+    expect(visibilityCopy(gt, scoped)).toEqual({
+      allClear: "No findings on the alerts you can access in the latest run.",
+      nothingDescription:
+        "Alert calibration found nothing on the alerts you can access in this run.",
+      alertsInScope: {
+        value: "—",
+        sub: "Shown only with access to every alert",
+        subIcon: "info-outline",
+      },
+      pending: {
+        banner: "Counts on the alerts you can access are not ready yet. Refresh shortly.",
+        badge: "Pending",
+      },
+    });
+
+    expect(isClean(run())).toBe(true);
+    expect(visibilityCopy(gt, run())).toEqual({
+      allClear: "The latest run found nothing to fix.",
+      nothingDescription:
+        "No coverage gap and nothing declined: across 4 alerts in scope, alert calibration found nothing.",
+      alertsInScope: { value: 4 },
+      pending: {
+        banner: "Counts on the alerts you can access are not ready yet. Refresh shortly.",
+        badge: "Pending",
+      },
+    });
+
+    const { emitted_at, ...columns } = scoped;
+    const runRow = { ...columns, _timestamp: emitted_at, kind: "run" } as DigestRecord;
+    const finding = record({
+      visibility: "scoped",
+      kind: "finding",
+      rule_id: "noise",
+      severity: "Low",
+      confidence: "High",
+      title: "cpu fired often",
+      alert_id: "a0",
+    });
+    expect(recordHits([runRow, finding])).toBe(1);
+    expect(latestEmission([runRow, finding]).run?.visibility).toBe("scoped");
+    expect(recordHits([record({ kind: "run" }), record({ kind: "run" })])).toBe(2);
   });
 });

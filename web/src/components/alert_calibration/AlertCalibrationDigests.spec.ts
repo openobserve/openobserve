@@ -19,6 +19,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import { queryClient } from "@/composables/query/queryClient";
 import alertCalibration from "@/services/alert_calibration";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import AlertCalibrationDigests from "./AlertCalibrationDigests.vue";
 import type { RunRow } from "./digests";
 import analytics from "@/services/product_analytics";
@@ -192,5 +193,41 @@ describe("AlertCalibrationDigests", () => {
     const page = await mountPage();
     expect(page.router.currentRoute.value.name).toBe("alertList");
     page.unmount();
+  });
+
+  it("a scoped run hides View in Logs and the org count: its list row is never Clean", async () => {
+    const clean = { ...run(NOW - 2 * DAY_MICROS, NOW - 300, 0), skip_count: 0 };
+    const scoped: RunRow = {
+      ...clean,
+      window_end: NOW - DAY_MICROS,
+      emitted_at: NOW - 100,
+      alerts_in_scope: null,
+      visibility: "scoped",
+    };
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([scoped, clean]);
+    const wrapper = await mountPage();
+    const rows = wrapper.findAll("tbody tr");
+    expect(rows[0].text()).toContain("None found");
+    expect(rows[0].text()).not.toContain("Clean");
+    expect(rows[1].text()).toContain("Clean");
+    wrapper.unmount();
+  });
+
+  it("a scoped run whose counts are not ready yet is pending in amber, never None found", async () => {
+    const pending: RunRow = {
+      ...run(NOW - DAY_MICROS, NOW - 100, 0),
+      finding_count: null,
+      skip_count: null,
+      alerts_in_scope: null,
+      visibility: "scoped",
+    };
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([pending]);
+    const wrapper = await mountPage();
+    const row = wrapper.findAll("tbody tr")[0];
+    expect(row.text()).toContain("Pending");
+    expect(row.text()).not.toContain("None found");
+    const badge = wrapper.findAllComponents(OBadge).find((b) => b.text() === "Pending");
+    expect(badge?.props("variant")).toBe("warning-soft");
+    wrapper.unmount();
   });
 });

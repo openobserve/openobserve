@@ -25,7 +25,7 @@ use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::{
     ider,
     meta::{
-        search::{Query as SearchQuery, Request as SearchRequest},
+        search::{Query as SearchQuery, Request as SearchRequest, Response as SearchResponse},
         stream::StreamType,
     },
     utils::{
@@ -35,6 +35,7 @@ use config::{
 };
 use infra::errors::{Error as InfraError, ErrorCodes};
 use o2_enterprise::enterprise::alert_calibration_service;
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::alerts::{
     alert_calibration::sink::DIGEST_STREAM,
     scheduler::{LastRun, last_run},
@@ -43,9 +44,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
 
-use super::{deployment_disabled, error_response};
+use super::{
+    deployment_disabled, error_response,
+    visibility::{
+        PROBE_CAP, SumColumns, on_settled_columns, probe, scoped_records, scoped_runs,
+        visible_search,
+    },
+};
+use crate::{
+    request::alert_grants::{AlertVisibility, live_visibility},
+    service::auth::UserEmail,
+};
 
-const RUN_COLUMNS: &str = "window_start, window_end, finding_count, skip_count, alerts_in_scope, \
+pub(super) const RUN_COLUMNS: &str = "window_start, window_end, finding_count, skip_count, alerts_in_scope, \
      coverage_gap, coverage_unreadable_definitions, coverage_facts_without_definition, \
      coverage_definitions_without_facts, coverage_transitions_truncated, \
      coverage_counters_truncated, coverage_error_clusters_truncated, \
@@ -73,15 +84,15 @@ pub struct AlertRuns {
 /// One run, which is identified by its window, and the filters on its records.
 #[derive(Deserialize, IntoParams)]
 pub struct RunWindow {
-    window_start: i64,
-    window_end: i64,
-    size: Option<i64>,
+    pub(super) window_start: i64,
+    pub(super) window_end: i64,
+    pub(super) size: Option<i64>,
     /// `run`, `finding` or `skip`, each matched on a column version 1 also wrote.
-    kind: Option<String>,
-    rule_id: Option<String>,
+    pub(super) kind: Option<String>,
+    pub(super) rule_id: Option<String>,
     /// `A`, `B` or `C`; a version-1 record has no tier.
-    tier: Option<String>,
-    pattern: Option<String>,
+    pub(super) tier: Option<String>,
+    pub(super) pattern: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -92,7 +103,7 @@ pub struct CalibrationStatus {
 
 /// Which digest columns a read names, which decides what a search error can mean.
 #[derive(Clone, Copy)]
-enum Columns {
+pub(super) enum Columns {
     /// Stamped on every record, so a missing one is a bug once the stream exists.
     Run,
     /// Written only by findings, so they stay absent until some run flags something.
@@ -100,7 +111,7 @@ enum Columns {
 }
 
 impl Columns {
-    fn not_written_yet(self, code: &ErrorCodes) -> bool {
+    pub(super) fn not_written_yet(self, code: &ErrorCodes) -> bool {
         match code {
             ErrorCodes::SearchStreamNotFound(_) => true,
             ErrorCodes::SearchFieldNotFound(_) => matches!(self, Self::Finding),
@@ -110,18 +121,22 @@ impl Columns {
 }
 
 /// Which of the columns that tell a run marker from a finding or skip a read's schema holds.
-#[derive(Clone, Copy)]
-struct MarkerColumns {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct MarkerColumns {
     rule_id: bool,
-    kind: bool,
+    pub(super) kind: bool,
 }
 
 impl MarkerColumns {
-    fn of(schema: &Schema) -> Self {
+    pub(super) fn of(schema: &Schema) -> Self {
         Self {
             rule_id: schema.field_with_name("rule_id").is_ok(),
             kind: schema.field_with_name("kind").is_ok(),
         }
+    }
+
+    pub(super) fn both(self) -> bool {
+        self.rule_id && self.kind
     }
 }
 
@@ -132,7 +147,7 @@ impl MarkerColumns {
     tag = "Alert Calibration",
     operation_id = "ListAlertCalibrationRuns",
     summary = "List alert calibration runs",
-    description = "One row per digest emission in the range, newest first. A run pulled again emits a second time, so readers keep the newest emission of each window.",
+    description = "One row per digest emission in the range, newest first. A run pulled again emits a second time, so readers keep the newest emission of each window. A caller without org-wide alert read sees only the alerts its folder and alert grants cover, with counts over those alerts and org totals null.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), DigestRange),
     responses(
@@ -147,20 +162,41 @@ impl MarkerColumns {
         ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
-pub async fn list_runs(Path(org_id): Path<String>, Query(range): Query<DigestRange>) -> Response {
-    let sql = format!(
-        "SELECT DISTINCT {RUN_COLUMNS}, _timestamp AS emitted_at FROM \"{DIGEST_STREAM}\" \
-         ORDER BY emitted_at DESC"
-    );
-    read(
-        &org_id,
-        sql,
-        range.start_time,
-        range.end_time,
-        range.size,
-        Columns::Run,
-    )
-    .await
+pub async fn list_runs(
+    Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
+    Query(range): Query<DigestRange>,
+) -> Response {
+    let (org_id, user_id) = (org_id.as_str(), user.user_id.as_str());
+    let (start_time, end_time, size) = (range.start_time, range.end_time, range.size);
+    if let Err(refused) = admissible(start_time, end_time) {
+        return refused;
+    }
+    // Read ahead of the probe, so a column the probe found missing shows as grown after the read.
+    let planned = digest_columns(org_id).await;
+    let resolve = || visibility_of(org_id, user_id, None, start_time, end_time);
+    let visibility = match resolve().await {
+        Ok(visibility) => visibility,
+        Err(refused) => return refused,
+    };
+    if visibility == AlertVisibility::Org {
+        let hits = search_hits(org_id, list_runs_sql(), start_time, end_time, size).await;
+        return respond(org_id, hits, Columns::Run);
+    }
+    let planned = match planned {
+        Ok(planned) => planned,
+        Err(failed) => return failed,
+    };
+    let search = |sql| search_page(org_id, sql, start_time, end_time, size);
+    let read = |visibility: AlertVisibility, written| async move {
+        rows(
+            org_id,
+            scoped_runs(&visibility, written, search).await,
+            Columns::Run,
+        )
+    };
+    let columns = || digest_columns(org_id);
+    settled(on_settled_columns(planned, visibility, columns, resolve, read).await)
 }
 
 #[utoipa::path(
@@ -170,7 +206,7 @@ pub async fn list_runs(Path(org_id): Path<String>, Query(range): Query<DigestRan
     tag = "Alert Calibration",
     operation_id = "ListAlertCalibrationRunsForAlert",
     summary = "List the runs that flagged an alert",
-    description = "The windows of the runs in the range with a finding on an alert whose name matches, case-insensitively.",
+    description = "The windows of the runs in the range with a finding on an alert whose name matches, case-insensitively. A caller without org-wide alert read sees only the alerts its folder and alert grants cover, with counts over those alerts and org totals null.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), AlertRuns),
     responses(
@@ -187,23 +223,12 @@ pub async fn list_runs(Path(org_id): Path<String>, Query(range): Query<DigestRan
 )]
 pub async fn list_runs_for_alert(
     Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
     Query(query): Query<AlertRuns>,
 ) -> Response {
-    // A skip record names its rule and alert too, so a finding is told by its severity.
-    let sql = format!(
-        "SELECT DISTINCT window_start, window_end FROM \"{DIGEST_STREAM}\" \
-         WHERE severity IS NOT NULL AND str_match_ignore_case(alert_name, {})",
-        quote_sql_string(&query.alert_name)
-    );
-    read(
-        &org_id,
-        sql,
-        query.start_time,
-        query.end_time,
-        query.size,
-        Columns::Finding,
-    )
-    .await
+    let sql = |clause: Option<&str>| runs_for_alert_sql(&query.alert_name, clause);
+    let range = (query.start_time, query.end_time, query.size);
+    read(&org_id, &user.user_id, sql, range, Columns::Finding).await
 }
 
 #[utoipa::path(
@@ -213,7 +238,7 @@ pub async fn list_runs_for_alert(
     tag = "Alert Calibration",
     operation_id = "GetAlertCalibrationRunRecords",
     summary = "Get the records of one alert calibration run",
-    description = "Every record the run with this window wrote, newest emission first. `kind`, `rule_id`, `tier` and `pattern` narrow the records; a filter on a column no record has written yet returns nothing.",
+    description = "Every record the run with this window wrote, newest emission first. `kind`, `rule_id`, `tier` and `pattern` narrow the records; a filter on a column no record has written yet returns nothing. A caller without org-wide alert read sees only the alerts its folder and alert grants cover, with counts over those alerts and org totals null. Such a caller also gets one run row per emission, ahead of its records, and that is all a `kind=run` read returns it.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), RunWindow),
     responses(
@@ -228,18 +253,18 @@ pub async fn list_runs_for_alert(
         ("x-o2-ratelimit" = json!({"module": "Alert Calibration", "operation": "list"}))
     )
 )]
-pub async fn get_run_records(Path(org_id): Path<String>, Query(run): Query<RunWindow>) -> Response {
+pub async fn get_run_records(
+    Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
+    Query(run): Query<RunWindow>,
+) -> Response {
     if let Some(disabled) = deployment_disabled() {
         return disabled;
     }
-    let schema = match infra::schema::get(&org_id, DIGEST_STREAM, StreamType::Logs).await {
+    let (org_id, user_id) = (org_id.as_str(), user.user_id.as_str());
+    let schema = match digest_schema(org_id).await {
         Ok(schema) => schema,
-        Err(e) => {
-            log::error!(
-                "[alert_calibration] could not read the digest schema for org={org_id}: {e}"
-            );
-            return MetaHttpResponse::internal_error(e);
-        }
+        Err(failed) => return failed,
     };
     let (sql, recheck, columns) = match record_queries(&run, &schema) {
         Ok(queries) => queries,
@@ -250,9 +275,31 @@ pub async fn get_run_records(Path(org_id): Path<String>, Query(run): Query<RunWi
     if let Err(msg) = validate_time_range(start_time, end_time) {
         return MetaHttpResponse::bad_request(msg);
     }
-    let search = |sql| search_hits(&org_id, sql, start_time, end_time, run.size);
-    let hits = records_rechecked(sql, recheck, search).await;
-    respond(&org_id, hits, columns)
+    let window = Some((run.window_start, run.window_end));
+    let resolve = || visibility_of(org_id, user_id, window, start_time, end_time);
+    let visibility = match resolve().await {
+        Ok(visibility) => visibility,
+        Err(failed) => return failed,
+    };
+    if visibility == AlertVisibility::Org {
+        let search = |sql| search_hits(org_id, sql, start_time, end_time, run.size);
+        let hits = records_rechecked(sql, recheck, search).await;
+        return respond(org_id, hits, columns);
+    }
+    let run = &run;
+    let search = |sql| search_page(org_id, sql, start_time, end_time, run.size);
+    let read = |visibility: AlertVisibility, written: SumColumns| async move {
+        let filters =
+            record_filters(run, written.markers()).map_err(MetaHttpResponse::bad_request)?;
+        let hits = scoped_records(run, &visibility, written, filters, search).await;
+        rows(org_id, hits, Columns::Run)
+    };
+    let columns = || digest_columns(org_id);
+    let planned = match checked_columns(org_id, &schema).await {
+        Ok(planned) => planned,
+        Err(failed) => return failed,
+    };
+    settled(on_settled_columns(planned, visibility, columns, resolve, read).await)
 }
 
 #[utoipa::path(
@@ -262,7 +309,7 @@ pub async fn get_run_records(Path(org_id): Path<String>, Query(run): Query<RunWi
     tag = "Alert Calibration",
     operation_id = "CountAlertCalibrationFindingsByRule",
     summary = "Count alert calibration findings by rule",
-    description = "Per rule, how many distinct alerts and runs in the range it flagged.",
+    description = "Per rule, how many distinct alerts and runs in the range it flagged. A caller without org-wide alert read sees only the alerts its folder and alert grants cover, with counts over those alerts and org totals null.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), DigestRange),
     responses(
@@ -279,20 +326,15 @@ pub async fn get_run_records(Path(org_id): Path<String>, Query(run): Query<RunWi
 )]
 pub async fn count_findings_by_rule(
     Path(org_id): Path<String>,
+    Headers(user): Headers<UserEmail>,
     Query(range): Query<DigestRange>,
 ) -> Response {
-    // A skip record names its rule too, so a finding is told by its severity.
-    let sql = format!(
-        "SELECT rule_id, COUNT(DISTINCT alert_id) AS alerts_flagged, \
-         COUNT(DISTINCT window_end) AS runs_flagging FROM \"{DIGEST_STREAM}\" \
-         WHERE severity IS NOT NULL GROUP BY rule_id"
-    );
+    let range = (range.start_time, range.end_time, range.size);
     read(
         &org_id,
-        sql,
-        range.start_time,
-        range.end_time,
-        range.size,
+        &user.user_id,
+        findings_by_rule_sql,
+        range,
         Columns::Finding,
     )
     .await
@@ -371,83 +413,35 @@ pub async fn run_alert_calibration(Path(org_id): Path<String>) -> Response {
     }
 }
 
-async fn read(
-    org_id: &str,
-    sql: String,
-    start_time: i64,
-    end_time: i64,
-    size: Option<i64>,
-    columns: Columns,
-) -> Response {
-    if let Some(disabled) = deployment_disabled() {
-        return disabled;
-    }
-    if let Err(msg) = validate_time_range(start_time, end_time) {
-        return MetaHttpResponse::bad_request(msg);
-    }
-    let hits = search_hits(org_id, sql, start_time, end_time, size).await;
-    respond(org_id, hits, columns)
+pub(super) fn list_runs_sql() -> String {
+    format!(
+        "SELECT DISTINCT {RUN_COLUMNS}, _timestamp AS emitted_at FROM \"{DIGEST_STREAM}\" \
+         ORDER BY emitted_at DESC"
+    )
 }
 
-/// Searched as the server, so reading digests needs this module's permission and not the stream's.
-async fn search_hits(
-    org_id: &str,
-    sql: String,
-    start_time: i64,
-    end_time: i64,
-    size: Option<i64>,
-) -> Result<Vec<Value>, InfraError> {
-    let request = SearchRequest {
-        query: SearchQuery {
-            sql,
-            start_time,
-            end_time,
-            from: 0,
-            size: size.unwrap_or(DEFAULT_SIZE).clamp(1, MAX_SIZE),
-            ..Default::default()
-        },
-        use_cache: false,
-        ..Default::default()
-    };
-    let trace_id = ider::generate();
-    search_service::search(&trace_id, org_id, StreamType::Logs, None, &request)
-        .await
-        .map(|response| response.hits)
+/// A skip record names its rule and alert too, so a finding is told by its severity.
+pub(super) fn runs_for_alert_sql(alert_name: &str, clause: Option<&str>) -> String {
+    format!(
+        "SELECT DISTINCT window_start, window_end FROM \"{DIGEST_STREAM}\" \
+         WHERE severity IS NOT NULL AND str_match_ignore_case(alert_name, {}){}",
+        quote_sql_string(alert_name),
+        and_clause(clause)
+    )
 }
 
-fn respond(org_id: &str, hits: Result<Vec<Value>, InfraError>, columns: Columns) -> Response {
-    match hits {
-        Ok(hits) => MetaHttpResponse::json(hits),
-        Err(InfraError::ErrorCode(code)) if columns.not_written_yet(&code) => {
-            MetaHttpResponse::json(Vec::<Value>::new())
-        }
-        Err(e) => {
-            log::error!("[alert_calibration] digest read failed for org={org_id}: {e}");
-            MetaHttpResponse::internal_error(e)
-        }
-    }
-}
-
-/// The planner reads the schema again, so a run read seen without kind re-checks its rows.
-async fn records_rechecked<S, F>(
-    sql: String,
-    recheck: Option<String>,
-    search: S,
-) -> Result<Vec<Value>, InfraError>
-where
-    S: Fn(String) -> F,
-    F: Future<Output = Result<Vec<Value>, InfraError>>,
-{
-    let hits = search(sql).await?;
-    match recheck {
-        // A non-marker row shows kind is planned; the predicated read keeps the page full.
-        Some(sql) if hits.iter().any(not_a_marker) => search(sql).await,
-        _ => Ok(hits),
-    }
+/// A skip record names its rule too, so a finding is told by its severity.
+pub(super) fn findings_by_rule_sql(clause: Option<&str>) -> String {
+    format!(
+        "SELECT rule_id, COUNT(DISTINCT alert_id) AS alerts_flagged, \
+         COUNT(DISTINCT window_end) AS runs_flagging FROM \"{DIGEST_STREAM}\" \
+         WHERE severity IS NOT NULL{} GROUP BY rule_id",
+        and_clause(clause)
+    )
 }
 
 /// A record read's SQL, the SQL to redo a run read with once kind is planned, and its columns.
-fn record_queries(
+pub(super) fn record_queries(
     run: &RunWindow,
     schema: &Schema,
 ) -> Result<(String, Option<String>, Columns), String> {
@@ -471,16 +465,7 @@ fn record_queries(
     Ok((records_sql(run, &filters), recheck, columns))
 }
 
-/// A row naming a rule, or a kind other than run, is a finding or a skip.
-fn not_a_marker(hit: &Value) -> bool {
-    let rule = hit.get("rule_id").is_some_and(|rule| !rule.is_null());
-    let kind = hit
-        .get("kind")
-        .is_some_and(|kind| !kind.is_null() && kind != "run");
-    rule || kind
-}
-
-fn records_sql(run: &RunWindow, filters: &[String]) -> String {
+pub(super) fn records_sql(run: &RunWindow, filters: &[String]) -> String {
     let mut sql = format!(
         "SELECT * FROM \"{DIGEST_STREAM}\" WHERE window_start = {} AND window_end = {}",
         run.window_start, run.window_end
@@ -494,7 +479,10 @@ fn records_sql(run: &RunWindow, filters: &[String]) -> String {
 }
 
 /// The extra WHERE clauses of a filtered record read.
-fn record_filters(run: &RunWindow, written: MarkerColumns) -> Result<Vec<String>, String> {
+pub(super) fn record_filters(
+    run: &RunWindow,
+    written: MarkerColumns,
+) -> Result<Vec<String>, String> {
     let mut filters = Vec::new();
     if let Some(kind) = &run.kind {
         // Version 1 has no `kind`: a finding has a severity, a run marker counts no finding.
@@ -520,6 +508,195 @@ fn record_filters(run: &RunWindow, written: MarkerColumns) -> Result<Vec<String>
     Ok(filters)
 }
 
+/// The switch, then the range, then the caller's visibility, so a refused read searches nothing.
+async fn admit(
+    org_id: &str,
+    user_id: &str,
+    start_time: i64,
+    end_time: i64,
+) -> Result<AlertVisibility, Response> {
+    admissible(start_time, end_time)?;
+    visibility_of(org_id, user_id, None, start_time, end_time).await
+}
+
+fn admissible(start_time: i64, end_time: i64) -> Result<(), Response> {
+    if let Some(disabled) = deployment_disabled() {
+        return Err(disabled);
+    }
+    validate_time_range(start_time, end_time).map_err(MetaHttpResponse::bad_request)
+}
+
+/// The probe reads the range the read itself searches, so it names every alert the read could.
+async fn visibility_of(
+    org_id: &str,
+    user_id: &str,
+    window: Option<(i64, i64)>,
+    start_time: i64,
+    end_time: i64,
+) -> Result<AlertVisibility, Response> {
+    let search = |sql| search_response(org_id, sql, start_time, end_time, PROBE_CAP as i64);
+    live_visibility(org_id, user_id, || probe(window, search))
+        .await
+        .map_err(|e| {
+            log::error!(
+                "[alert_calibration] could not resolve alert visibility for org={org_id}: {e}"
+            );
+            MetaHttpResponse::internal_error(e)
+        })
+}
+
+async fn digest_columns(org_id: &str) -> Result<SumColumns, Response> {
+    checked_columns(org_id, &digest_schema(org_id).await?).await
+}
+
+/// The planner reads this node's cached schema, so a column only stored yet is not counted.
+async fn checked_columns(org_id: &str, cached: &Schema) -> Result<SumColumns, Response> {
+    let cached = SumColumns::of(cached);
+    if cached.holds_every_column() {
+        return Ok(cached);
+    }
+    let stored = infra::schema::get_from_db(org_id, DIGEST_STREAM, StreamType::Logs)
+        .await
+        .map_err(|e| {
+            log::error!(
+                "[alert_calibration] could not read the stored digest schema for org={org_id}: {e}"
+            );
+            MetaHttpResponse::internal_error(e)
+        })?;
+    Ok(cached.against(SumColumns::of(&stored)))
+}
+
+async fn digest_schema(org_id: &str) -> Result<Schema, Response> {
+    infra::schema::get(org_id, DIGEST_STREAM, StreamType::Logs)
+        .await
+        .map_err(|e| {
+            log::error!(
+                "[alert_calibration] could not read the digest schema for org={org_id}: {e}"
+            );
+            MetaHttpResponse::internal_error(e)
+        })
+}
+
+async fn read<Q>(
+    org_id: &str,
+    user_id: &str,
+    sql: Q,
+    (start_time, end_time, size): (i64, i64, Option<i64>),
+    columns: Columns,
+) -> Response
+where
+    Q: FnOnce(Option<&str>) -> String,
+{
+    let visibility = match admit(org_id, user_id, start_time, end_time).await {
+        Ok(visibility) => visibility,
+        Err(refused) => return refused,
+    };
+    let search = |sql| search_page(org_id, sql, start_time, end_time, size);
+    let hits = visible_search(sql, &visibility, search).await;
+    respond(org_id, hits, columns)
+}
+
+/// Searched as the server, so reading digests needs this module's permission and not the stream's.
+async fn search_hits(
+    org_id: &str,
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+    size: Option<i64>,
+) -> Result<Vec<Value>, InfraError> {
+    search_page(org_id, sql, start_time, end_time, size)
+        .await
+        .map(|response| response.hits)
+}
+
+/// The whole response, so a scoped read can refuse a partial one.
+async fn search_page(
+    org_id: &str,
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+    size: Option<i64>,
+) -> Result<SearchResponse, InfraError> {
+    let size = size.unwrap_or(DEFAULT_SIZE).clamp(1, MAX_SIZE);
+    search_response(org_id, sql, start_time, end_time, size).await
+}
+
+async fn search_response(
+    org_id: &str,
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+    size: i64,
+) -> Result<SearchResponse, InfraError> {
+    let request = SearchRequest {
+        query: SearchQuery {
+            sql,
+            start_time,
+            end_time,
+            from: 0,
+            size,
+            ..Default::default()
+        },
+        use_cache: false,
+        ..Default::default()
+    };
+    let trace_id = ider::generate();
+    search_service::search(&trace_id, org_id, StreamType::Logs, None, &request).await
+}
+
+fn respond(org_id: &str, hits: Result<Vec<Value>, InfraError>, columns: Columns) -> Response {
+    settled(rows(org_id, hits, columns))
+}
+
+fn settled(hits: Result<Vec<Value>, Response>) -> Response {
+    match hits {
+        Ok(hits) => MetaHttpResponse::json(hits),
+        Err(failed) => failed,
+    }
+}
+
+fn rows(
+    org_id: &str,
+    hits: Result<Vec<Value>, InfraError>,
+    columns: Columns,
+) -> Result<Vec<Value>, Response> {
+    match hits {
+        Ok(hits) => Ok(hits),
+        Err(InfraError::ErrorCode(code)) if columns.not_written_yet(&code) => Ok(Vec::new()),
+        Err(e) => {
+            log::error!("[alert_calibration] digest read failed for org={org_id}: {e}");
+            Err(MetaHttpResponse::internal_error(e))
+        }
+    }
+}
+
+/// The planner reads the schema again, so a run read seen without kind re-checks its rows.
+async fn records_rechecked<S, F>(
+    sql: String,
+    recheck: Option<String>,
+    search: S,
+) -> Result<Vec<Value>, InfraError>
+where
+    S: Fn(String) -> F,
+    F: Future<Output = Result<Vec<Value>, InfraError>>,
+{
+    let hits = search(sql).await?;
+    match recheck {
+        // A non-marker row shows kind is planned; the predicated read keeps the page full.
+        Some(sql) if hits.iter().any(not_a_marker) => search(sql).await,
+        _ => Ok(hits),
+    }
+}
+
+/// A row naming a rule, or a kind other than run, is a finding or a skip.
+fn not_a_marker(hit: &Value) -> bool {
+    let rule = hit.get("rule_id").is_some_and(|rule| !rule.is_null());
+    let kind = hit
+        .get("kind")
+        .is_some_and(|kind| !kind.is_null() && kind != "run");
+    rule || kind
+}
+
 /// A run marker counts no finding, and names no rule and a run kind wherever those columns exist.
 fn run_filters(written: MarkerColumns) -> Vec<String> {
     // Every record stamps its run's finding_count, so a projected finding still has it.
@@ -531,6 +708,10 @@ fn run_filters(written: MarkerColumns) -> Vec<String> {
         filters.push("(kind IS NULL OR kind = 'run')".to_string());
     }
     filters
+}
+
+fn and_clause(clause: Option<&str>) -> String {
+    clause.map(|c| format!(" AND {c}")).unwrap_or_default()
 }
 
 #[cfg(test)]

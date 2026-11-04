@@ -19,6 +19,10 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import { queryClient } from "@/composables/query/queryClient";
 import alertCalibration from "@/services/alert_calibration";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import AlertCalibrationDashboard from "./AlertCalibrationDashboard.vue";
 import type { DigestRecord, RunRow } from "./digests";
 import analytics from "@/services/product_analytics";
@@ -332,6 +336,251 @@ describe("AlertCalibrationDashboard", () => {
       .trigger("click");
     await flushPromises();
     expect(wrapper.router.currentRoute.value.name).toBe("alertCalibrationSettings");
+    wrapper.unmount();
+  });
+
+  it("a scoped latest run reads as the caller's alerts, not the org", async () => {
+    const latest: RunRow = {
+      ...run,
+      finding_count: 0,
+      skip_count: 0,
+      alerts_in_scope: null,
+      visibility: "scoped",
+    };
+    const { emitted_at, ...columns } = latest;
+    const runRow = { ...columns, _timestamp: emitted_at, kind: "run" } as DigestRecord;
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === "" ? ([latest] as never) : ([runRow] as never),
+    );
+    const selected = store.state.selectedOrganization;
+    store.state.selectedOrganization = { ...selected, identifier: "_meta" };
+    try {
+      const wrapper = await mountPage();
+      const banner = wrapper.findComponent(OBanner);
+      expect(banner.text()).toBe("No findings on the alerts you can access in the latest run.");
+      expect(banner.props("variant")).toBe("info");
+      const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
+      expect(items[0]).toMatchObject({ value: 0, tone: "neutral" });
+      expect(items[1]).toMatchObject({
+        value: "—",
+        sub: "Shown only with access to every alert",
+        subIcon: "info-outline",
+      });
+      expect(
+        wrapper.find('[data-test="alert-calibration-dashboard-rule-scheduler_health"]').exists(),
+      ).toBe(false);
+      wrapper.unmount();
+    } finally {
+      store.state.selectedOrganization = selected;
+    }
+
+    const clean: RunRow = { ...run, finding_count: 0, skip_count: 0 };
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === "" ? ([clean] as never) : ([] as never),
+    );
+    const root = await mountPage();
+    const banner = root.findComponent(OBanner);
+    expect(banner.text()).toBe("The latest run found nothing to fix.");
+    expect(banner.props("variant")).toBe("success");
+    const items = root.findComponent(OStatStrip).props("items") as StatItem[];
+    expect(items[0]).toMatchObject({ value: 0, tone: "success" });
+    expect(items[1]).toMatchObject({ value: 4 });
+    expect(items[1].sub).toBeUndefined();
+    root.unmount();
+  });
+
+  it("a scoped latest run whose counts are not ready yet says so in amber", async () => {
+    const latest: RunRow = {
+      ...run,
+      finding_count: null,
+      skip_count: null,
+      alerts_in_scope: null,
+      visibility: "scoped",
+    };
+    const { emitted_at, ...columns } = latest;
+    const runRow = { ...columns, _timestamp: emitted_at, kind: "run" } as DigestRecord;
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === "" ? ([latest] as never) : ([runRow] as never),
+    );
+    const wrapper = await mountPage();
+    const banner = wrapper.findComponent(OBanner);
+    expect(banner.text()).toBe(
+      "Counts on the alerts you can access are not ready yet. Refresh shortly.",
+    );
+    expect(banner.props("variant")).toBe("warning");
+    const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
+    expect(items[0]).toMatchObject({ value: "—", tone: "neutral" });
+    wrapper.unmount();
+  });
+
+  it("a pending run's rule groups show an amber Pending, never a zero or a no-alert claim", async () => {
+    const latest: RunRow = {
+      ...run,
+      finding_count: null,
+      skip_count: null,
+      alerts_in_scope: null,
+      visibility: "scoped",
+    };
+    const { emitted_at, ...columns } = latest;
+    const runRow = { ...columns, _timestamp: emitted_at, kind: "run" } as DigestRecord;
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === "" ? ([latest] as never) : ([runRow] as never),
+    );
+    const wrapper = await mountPage();
+    const rules = wrapper.findAll('[data-test^="alert-calibration-dashboard-rule-"]');
+    expect(rules.length).toBeGreaterThan(0);
+    const pending = wrapper.findAllComponents(OBadge).filter((b) => b.text() === "Pending");
+    expect(pending).toHaveLength(rules.length);
+    for (const badge of pending) expect(badge.props("variant")).toBe("warning-soft");
+    for (const rule of rules) {
+      expect(rule.text()).not.toMatch(/\d+ alerts?/);
+      expect(rule.text()).toContain("Pending");
+      await rule.find("button").trigger("click");
+      await flushPromises();
+      expect(rule.text()).not.toContain("No alert flagged");
+      expect(rule.text()).toContain("not ready yet");
+    }
+    wrapper.unmount();
+  });
+
+  it("a pending run still counts the findings that came back, and only the empty rules pend", async () => {
+    const latest: RunRow = {
+      ...run,
+      finding_count: null,
+      skip_count: null,
+      alerts_in_scope: null,
+      visibility: "scoped",
+    };
+    const unread = { ...findings[0], finding_count: null, skip_count: null } as DigestRecord;
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === "" ? ([latest] as never) : ([unread] as never),
+    );
+    const wrapper = await mountPage();
+    const failure = wrapper.find('[data-test="alert-calibration-dashboard-rule-failure"]');
+    expect(failure.text()).toContain("1 alert");
+    expect(failure.text()).not.toContain("Pending");
+    const noise = wrapper.find('[data-test="alert-calibration-dashboard-rule-noise"]');
+    expect(noise.text()).toContain("Pending");
+    expect(noise.text()).not.toMatch(/\d+ alerts?/);
+    wrapper.unmount();
+  });
+
+  it("records whose counts are not ready pend the board, though the run list had counts", async () => {
+    for (const finding_count of [1, 0]) {
+      const latest: RunRow = {
+        ...run,
+        finding_count,
+        skip_count: 0,
+        alerts_in_scope: null,
+        visibility: "scoped",
+      };
+      const { emitted_at, ...columns } = latest;
+      const runRow = {
+        ...columns,
+        _timestamp: emitted_at,
+        kind: "run",
+        finding_count: null,
+        skip_count: null,
+        written_skip_count: null,
+      } as DigestRecord;
+      vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+        read === "" ? ([latest] as never) : ([runRow] as never),
+      );
+      const wrapper = await mountPage();
+      const banners = wrapper.findAllComponents(OBanner);
+      expect(banners.map((b) => b.text())).toEqual([
+        "Counts on the alerts you can access are not ready yet. Refresh shortly.",
+      ]);
+      expect(banners[0].props("variant")).toBe("warning");
+      const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
+      expect(items[0]).toMatchObject({ value: "—", tone: "neutral" });
+      const rules = wrapper.findAll('[data-test^="alert-calibration-dashboard-rule-"]');
+      expect(rules.length).toBeGreaterThan(0);
+      for (const rule of rules) {
+        expect(rule.text()).not.toMatch(/\d+ alerts?/);
+        expect(rule.text()).toContain("Pending");
+        await rule.find("button").trigger("click");
+        await flushPromises();
+        expect(rule.text()).not.toContain("No alert flagged");
+      }
+      wrapper.unmount();
+    }
+  });
+
+  it("a scoped version-2 run shows version-2 rules and its definition-check note", async () => {
+    // The scoped list row and run row as the server sends them for a version-2 run (P3I-D1).
+    const versioned = {
+      schema_version: 2,
+      coverage_definition_checks: "unavailable" as const,
+      coverage_definition_checks_truncated: false,
+    };
+    const latest: RunRow = {
+      ...run,
+      ...versioned,
+      finding_count: 1,
+      skip_count: 0,
+      alerts_in_scope: null,
+      visibility: "scoped",
+    };
+    const { emitted_at, ...columns } = latest;
+    const runRow = { ...columns, _timestamp: emitted_at, kind: "run" } as DigestRecord;
+    const visible = {
+      ...findings[0],
+      ...versioned,
+      kind: "finding",
+      finding_count: 1,
+      alerts_in_scope: null,
+      visibility: "scoped",
+    } as DigestRecord;
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === "" ? ([latest] as never) : ([runRow, visible] as never),
+    );
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="alert-calibration-dashboard-rule-silent"]').exists()).toBe(
+      false,
+    );
+    const failure = wrapper.find('[data-test="alert-calibration-dashboard-rule-failure"]');
+    expect(failure.text()).toContain("Alert not working");
+    expect(failure.text()).toContain("1 alert");
+    const notes = wrapper.findAll('[data-test="alert-calibration-dashboard-note"]');
+    expect(notes.map((n) => n.text())).toEqual([
+      "Alert definition checks need AutoObserve, which is off. The other checks ran.",
+    ]);
+    const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
+    expect(items[1]).toMatchObject({ value: "—" });
+    wrapper.unmount();
+  });
+
+  it("a list row whose count is not ready pends the board, though the records had counts", async () => {
+    const latest: RunRow = {
+      ...run,
+      finding_count: null,
+      skip_count: null,
+      alerts_in_scope: null,
+      visibility: "scoped",
+    };
+    const { emitted_at, ...columns } = latest;
+    const runRow = {
+      ...columns,
+      _timestamp: emitted_at,
+      kind: "run",
+      finding_count: 0,
+      skip_count: 0,
+      written_skip_count: 0,
+    } as DigestRecord;
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === "" ? ([latest] as never) : ([runRow] as never),
+    );
+    const wrapper = await mountPage();
+    const banners = wrapper.findAllComponents(OBanner);
+    expect(banners.map((b) => b.text())).toEqual([
+      "Counts on the alerts you can access are not ready yet. Refresh shortly.",
+    ]);
+    const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
+    expect(items[0]).toMatchObject({ value: "—", tone: "neutral" });
+    const rules = wrapper.findAll('[data-test^="alert-calibration-dashboard-rule-"]');
+    expect(rules.length).toBeGreaterThan(0);
+    for (const rule of rules) expect(rule.text()).toContain("Pending");
     wrapper.unmount();
   });
 });

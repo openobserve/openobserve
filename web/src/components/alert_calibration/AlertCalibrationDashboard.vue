@@ -125,8 +125,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OText>
         </div>
 
-        <OBanner v-if="latest.finding_count === 0" variant="success" icon="check-circle">
-          {{ t("alertCalibration.dashboard.allClear") }}
+        <OBanner
+          v-if="countsPending"
+          variant="warning"
+          data-test="alert-calibration-dashboard-counts-pending"
+        >
+          {{ visibilityCopy(t, latest).pending.banner }}
+        </OBanner>
+        <OBanner
+          v-else-if="latest.finding_count === 0"
+          :variant="isScoped(latest) ? 'info' : 'success'"
+          :icon="isScoped(latest) ? 'info' : 'check-circle'"
+        >
+          {{ visibilityCopy(t, latest).allClear }}
         </OBanner>
 
         <OCard
@@ -149,7 +160,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t(SEVERITY_LABEL[group.severity]) }}
               </OBadge>
               <OBadge
-                v-if="!RULE_META[group.rule_id].clusterWide"
+                v-if="group.pending"
+                variant="warning-soft"
+                size="xs"
+                shape="rounded"
+                data-test="alert-calibration-dashboard-group-pending"
+              >
+                {{ visibilityCopy(t, latest).pending.badge }}
+              </OBadge>
+              <OBadge
+                v-else-if="!RULE_META[group.rule_id].clusterWide"
                 :variant="group.findings.length ? 'default-soft' : 'default-outline'"
                 size="xs"
                 shape="rounded"
@@ -164,7 +184,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OBadge>
             </template>
 
-            <OText v-if="!group.findings.length" variant="meta" as="p" class="px-4 pb-3">
+            <OText v-if="group.pending" variant="meta" as="p" class="px-4 pb-3">
+              {{ visibilityCopy(t, latest).pending.banner }}
+            </OText>
+            <OText v-else-if="!group.findings.length" variant="meta" as="p" class="px-4 pb-3">
               {{
                 RULE_META[group.rule_id].clusterWide
                   ? t("alertCalibration.dashboard.nothingCongested")
@@ -247,15 +270,18 @@ import AlertCalibrationActions from "./AlertCalibrationActions.vue";
 import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
+  countOrDash,
   coverageNoteRows,
   coverageVerdict,
   findingsByRule,
+  isScoped,
   latestEmission,
   latestPerWindow,
   latestRun,
   lookbackRange,
   RUNS_LOOKBACK_DAYS,
   titleAfterName,
+  visibilityCopy,
   type DigestRecord,
   type FindingRecord,
   type RuleId,
@@ -279,14 +305,26 @@ const formatAgo = (micros: number) =>
 const data = useLatestRead(async () => {
   const rows = latestPerWindow(await search<RunRow>("", lookbackRange(Date.now() * 1000)));
   const run = latestRun(rows);
-  if (!run) return { latest: null, findings: [] as FindingRecord[] };
+  if (!run) {
+    return {
+      latest: null,
+      findings: [] as FindingRecord[],
+      listPending: false,
+      recordsPending: false,
+    };
+  }
   const hits = await search<DigestRecord>("/records", {
     window_start: run.window_start,
     window_end: run.window_end,
   });
   const emission = latestEmission(hits);
   // The runs list selects fixed columns, so the run's own records carry its version and newer coverage.
-  return { latest: emission.run ?? run, findings: emission.findings };
+  return {
+    latest: emission.run ?? run,
+    findings: emission.findings,
+    listPending: run.finding_count === null,
+    recordsPending: emission.run?.finding_count === null,
+  };
 });
 
 const loading = computed(
@@ -294,9 +332,22 @@ const loading = computed(
 );
 const latest = computed(() => data.data.value?.latest ?? null);
 const version = computed(() => latest.value?.schema_version ?? 1);
-const groups = computed(() =>
-  findingsByRule(rulesShownFor(orgId.value, version.value), data.data.value?.findings ?? []),
+/** The list and the records read can reach nodes of different cache freshness, so either one's unknown count makes the board unknown. */
+const countsPending = computed(
+  () => !!data.data.value?.listPending || !!data.data.value?.recordsPending,
 );
+/** A scoped reader never gets the cluster rows, so a cluster rule would claim a clear it cannot see. */
+const groups = computed(() => {
+  const scoped = !!latest.value && isScoped(latest.value);
+  const rules = rulesShownFor(orgId.value, version.value).filter(
+    (rule) => !(scoped && RULE_META[rule].clusterWide),
+  );
+  // An empty rule on a run whose counts are unknown has not been shown clear, only not yet read.
+  return findingsByRule(rules, data.data.value?.findings ?? []).map((group) => ({
+    ...group,
+    pending: countsPending.value && !group.findings.length,
+  }));
+});
 /** One alert can hold two findings of a rule, such as its errors and its missing source. */
 const alertCount = (findings: FindingRecord[]) =>
   new Set(findings.map((f) => f.alert_id ?? f.alert_name)).size;
@@ -305,18 +356,27 @@ const latestStats = computed<StatItem[]>(() => {
   const run = latest.value;
   if (!run) return [];
   const verdict = COVERAGE_BADGE[coverageVerdict(run)];
+  const scope = visibilityCopy(t, run).alertsInScope;
   return [
     {
       key: "findings",
       label: t("alertCalibration.dashboard.findings"),
-      value: run.finding_count,
+      value: countsPending.value ? raw("—") : countOrDash(run.finding_count),
       icon: "fact-check",
-      tone: run.finding_count > 0 ? "warning" : "success",
+      tone: countsPending.value
+        ? "neutral"
+        : (run.finding_count ?? 0) > 0
+          ? "warning"
+          : isScoped(run)
+            ? "neutral"
+            : "success",
     },
     {
       key: "scope",
       label: t("alertCalibration.dashboard.alertsInScope"),
-      value: run.alerts_in_scope,
+      value: scope.value,
+      sub: scope.sub,
+      subIcon: scope.subIcon,
       icon: "notifications",
     },
     {

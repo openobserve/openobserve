@@ -11694,6 +11694,14 @@
       "findingsDesc": "Findings are written to the {stream} stream of this organization and kept for that stream's retention. Alert calibration sends no notifications.",
       "frequencyRange": "Choose a cadence between 1 hour and 30 days.",
       "windowRange": "Choose a window between 1 minute and 90 days."
+    },
+    "visibility": {
+      "allClear": "No findings on the alerts you can access in the latest run.",
+      "nothingDescription": "Alert calibration found nothing on the alerts you can access in this run.",
+      "orgTotalHidden": "Shown only with access to every alert",
+      "showingCappedUnread": "Showing {shown} findings: the search stopped at {count} records.",
+      "countsPending": "Counts on the alerts you can access are not ready yet. Refresh shortly.",
+      "countsPendingBadge": "Pending"
     }
   },
   "alerts": {

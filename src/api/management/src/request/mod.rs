@@ -17,6 +17,8 @@
 pub mod ai;
 #[cfg(feature = "enterprise")]
 pub mod alert_calibration;
+#[cfg(feature = "enterprise")]
+pub(crate) mod alert_grants;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod annotation_queues;
