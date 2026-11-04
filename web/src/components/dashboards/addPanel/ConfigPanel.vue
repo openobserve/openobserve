@@ -792,7 +792,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :min="1"
               :label="t('dashboard.distributionBucketCount')"
               :placeholder="defaultPlaceholder(t, DISTRIBUTION_DEFAULT_BUCKETS)"
-              :disabled="dashboardPanelData.data.config.distribution_bucket_size != null"
+              :disabled="distributionBucketSizeSet"
               :error="!!distributionBucketCountError"
               :error-message="distributionBucketCountError"
               data-test="dashboard-config-distribution_bucket_count"
@@ -5109,11 +5109,14 @@ export default defineComponent({
 
     const decimalsTouched = ref(false);
 
-    // A set bucket size disables the count field, and an error there could not be fixed in place.
+    const distributionBucketSizeSet = computed(() =>
+      ["", null, undefined].every(
+        (unset) => dashboardPanelData.data.config.distribution_bucket_size !== unset,
+      ),
+    );
+
     const distributionBucketCountError = computed(() =>
-      dashboardPanelData.data.config.distribution_bucket_size != null
-        ? raw("")
-        : panelConfigRangeError(t, dashboardPanelData.data, "distribution_bucket_count"),
+      panelConfigRangeError(t, dashboardPanelData.data, "distribution_bucket_count"),
     );
 
     const distributionBucketSizeError = computed(() =>
@@ -5178,6 +5181,7 @@ export default defineComponent({
       shouldShowNoDataText,
       toMinInterval,
       isHeatmapColorRangeInvalid,
+      distributionBucketSizeSet,
       distributionBucketCountError,
       distributionBucketSizeError,
       axisLabelModeModel,

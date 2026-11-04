@@ -1309,6 +1309,10 @@ export const panelConfigRangeError = (t: TranslateFn, panel: any, key: string): 
   if (!entry) return raw("");
   const [, label, types, min, max, exclusive] = entry;
   if (!types.includes(panel?.type) || !isSetValue(panel?.config?.[key])) return raw("");
+  // A set bucket size replaces the bucket count, and the count field is disabled meanwhile.
+  if (key === "distribution_bucket_count" && isSetValue(panel.config.distribution_bucket_size)) {
+    return raw("");
+  }
   const value = asFiniteNumber(panel.config[key]);
   const tooLow = value === null || (exclusive ? value <= min : value < min);
   if (!tooLow && (value as number) <= max) return raw("");
