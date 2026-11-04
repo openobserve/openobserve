@@ -20,6 +20,7 @@ import { convertPromQLData } from "./convertPromQLData";
 import { applyCartesianOptions, tooltipPointValue } from "./cartesianOptions";
 import { toSeriesOverrideEntry } from "./seriesOverrides";
 import { calculateWidthText } from "./chartDimensionUtils";
+import { chartAxisTextColor } from "@/utils/chartTheme";
 import * as echarts from "echarts";
 
 // The custom-chart runner imports the ECharts bundle as a URL, which only resolves in a browser build.
@@ -424,6 +425,47 @@ describe("y_axis_label", () => {
     const prom = await viaPanel(promPanel("line", { y_axis_label: "Rate" }), promData());
     expect(prom.yAxis.name).toBe("Rate");
     expect(prom.yAxis.nameGap).toBeGreaterThan(0);
+  });
+
+  it("paints SQL and PromQL axis names in the body text colour", async () => {
+    const sql = await viaPanel(
+      sqlPanel("line", { y_axis_label: "Requests" }, { x: [timeX], y: [yField()] }),
+      [TIMES.map((t, i) => ({ x_axis_1: t, y_axis_1: i }))],
+    );
+    const prom = await viaPanel(promPanel("line", { y_axis_label: "Rate" }), promData());
+    const xAxis = sql.xAxis[0];
+    expect(xAxis.nameTextStyle.color).toBe(chartAxisTextColor());
+    expect(sql.yAxis.nameTextStyle.color).toBe(chartAxisTextColor());
+    expect(prom.xAxis.nameTextStyle.color).toBe(chartAxisTextColor());
+    expect(prom.yAxis.nameTextStyle.color).toBe(chartAxisTextColor());
+  });
+
+  it("paints SQL and PromQL x and y tick labels in the body text colour", async () => {
+    const color = chartAxisTextColor();
+    expect(color).toBe("#404040");
+    const charts = [
+      await viaPanel(sqlPanel("line", {}, { x: [timeX], y: [yField()] }), [
+        TIMES.map((t, i) => ({ x_axis_1: t, y_axis_1: i })),
+      ]),
+      await viaPanel(sqlPanel("bar", {}, { x: [endpointX], y: [yField()] }), [plainCategoryRows()]),
+      await viaPanel(sqlPanel("h-bar", {}, { x: [endpointX], y: [yField()] }), [
+        plainCategoryRows(),
+      ]),
+      await viaPanel(
+        sqlPanel("stacked", {}, { x: [endpointX], y: [yField()], breakdown: [breakdown] }),
+        [categoryRows()],
+      ),
+      await viaPanel(promPanel("line"), promData()),
+      await viaPanel(promPanel("bar"), promData()),
+      await viaPanel(promPanel("h-bar"), promData()),
+    ];
+    for (const options of charts) {
+      const axes = [options.xAxis, options.yAxis]
+        .flat()
+        .filter((axis: any) => axis?.show !== false);
+      expect(axes.length).toBeGreaterThanOrEqual(2);
+      for (const axis of axes) expect(axis.axisLabel.color).toBe(color);
+    }
   });
 
   it("keeps the name on the canvas with a log scale, spaced by the drawn ticks", async () => {

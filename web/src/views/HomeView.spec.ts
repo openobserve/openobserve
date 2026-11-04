@@ -196,6 +196,13 @@ describe("HomeView", () => {
       expect(has("first-data-panel")).toBe(false);
     });
 
+    it("should run the Overview panel edge to edge by cancelling the body inset", () => {
+      wrapper = mountHome();
+      expect(wrapper.get('[data-test="home-overview-panel"]').classes()).toEqual(
+        expect.arrayContaining(["-mx-2.5", "-mb-2.5", "flex-1"]),
+      );
+    });
+
     it("should render Usage as at BASE with no first-data panel around it", () => {
       openTab("usage");
       wrapper = mountHome();

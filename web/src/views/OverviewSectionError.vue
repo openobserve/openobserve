@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <section class="mb-5" :data-test="`overview-${testSection}-load-error`">
-    <div class="mb-2 flex items-center ps-1">
-      <div class="text-text-heading text-sm font-medium tracking-[0.01em]">{{ title }}</div>
+  <section :data-test="`overview-${testSection}-load-error`">
+    <div class="mb-2 flex min-h-8 items-center ps-1">
+      <OText variant="card-title">{{ title }}</OText>
     </div>
     <div
-      class="border-border-default rounded-default bg-surface-base overflow-hidden border border-[0.0625em]"
+      class="border-border-default rounded-surface bg-surface-panel overflow-hidden border border-[0.0625em]"
     >
       <OEmptyState size="inline" preset="load-error">
         <template #actions>
@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 const props = defineProps<{
