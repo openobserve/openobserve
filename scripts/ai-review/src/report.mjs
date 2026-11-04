@@ -28,7 +28,7 @@ const BLOCKQUOTE_LINE_RE = /^[ \t]*>.*$/gm;
 const SEVERITY_GLYPH = { p0: "🔴", p1: "🟠", p2: "🟡", p3: "🔵" };
 const SEVERITY_SECTION = {
   p0: "#### 🔴 P0 · Blockers",
-  p1: "#### 🟠 P1 · Blockers",
+  p1: "#### 🟠 P1 · Major concerns",
   p2: "#### 🟡 P2 · Should fix",
   p3: "#### 🔵 P3 · Worth a look",
 };
@@ -280,7 +280,8 @@ ${failedLine}
   const bySeverity = groupBySeverity(shown);
   const sections = severitySections(bySeverity);
   const blocked = bySeverity.p0.length + bySeverity.p1.length > 0;
-  const callout = blocked ? "> [!CAUTION]\n> ### ⛔ Blockers found" : "> [!NOTE]\n> ### 💬 Approved with comments";
+  const heading = bySeverity.p0.length > 0 ? "⛔ Blockers found" : "⚠️ Major concerns found";
+  const callout = blocked ? `> [!CAUTION]\n> ### ${heading}` : "> [!NOTE]\n> ### 💬 Approved with comments";
   const rawCount = agentResults.flatMap(r => r.findings).length;
   const dedupNote = fallbackDedupNote(rawCount, dedupeFindings(agentResults).length, shown.length);
 
