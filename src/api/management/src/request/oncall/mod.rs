@@ -591,9 +591,9 @@ fn internal_error(context: &str, e: &impl std::fmt::Display) -> Response {
 fn to_response(e: anyhow::Error) -> Response {
     use o2_enterprise::enterprise::oncall::service::OncallError;
     let status = match e.downcast_ref::<OncallError>() {
-        Some(OncallError::TeamNotFound(_)) | Some(OncallError::ResponseNotFound(_)) => {
-            StatusCode::NOT_FOUND
-        }
+        Some(OncallError::TeamNotFound(_))
+        | Some(OncallError::MemberNotFound { .. })
+        | Some(OncallError::ResponseNotFound(_)) => StatusCode::NOT_FOUND,
         // Not 404: the record exists, and the honest answer is that working it is not theirs.
         Some(OncallError::NotOnThisTeam { .. }) => StatusCode::FORBIDDEN,
         // A conflict, not a 400: the caller fixes it by changing the org's state, not the request.
@@ -651,9 +651,26 @@ async fn page_problem(
     response_id: &str,
     actor: &str,
 ) -> Result<Option<openobserve_core::alerts::ack::Problem>, Response> {
+    page_problem_for(
+        org_id,
+        response_id,
+        actor,
+        openobserve_core::alerts::ack::Act::Ack,
+    )
+    .await
+}
+
+/// [`page_problem`] for an ack verb, so that a refusal names the verb refused.
+#[cfg(feature = "enterprise")]
+async fn page_problem_for(
+    org_id: &str,
+    response_id: &str,
+    actor: &str,
+    act: openobserve_core::alerts::ack::Act,
+) -> Result<Option<openobserve_core::alerts::ack::Problem>, Response> {
     use openobserve_core::alerts::ack::AckError;
 
-    page_problem_of(org_id, response_id, actor)
+    page_problem_of(org_id, response_id, actor, act)
         .await
         .map_err(|e| match e {
             AckError::NotFound => MetaHttpResponse::not_found("Response not found"),
@@ -667,17 +684,18 @@ async fn page_problem_of(
     org_id: &str,
     response_id: &str,
     actor: &str,
+    act: openobserve_core::alerts::ack::Act,
 ) -> Result<Option<openobserve_core::alerts::ack::Problem>, openobserve_core::alerts::ack::AckError>
 {
-    use openobserve_core::alerts::ack::{self, AckError, Act};
+    use openobserve_core::alerts::ack::{self, AckError};
 
     match ack::problem_of_page(org_id, response_id).await {
-        Ok(problem) => ack::authorize_problem(&problem, actor, Act::Ack)
+        Ok(problem) => ack::authorize_problem(&problem, actor, act)
             .await
             .map(|_| Some(problem)),
         Err(AckError::NotFound) => {
             match infra::table::oncall_responses::get(org_id, response_id).await? {
-                Some(page) => ack::authorize_orphan_page(&page, actor, Act::Ack)
+                Some(page) => ack::authorize_orphan_page(&page, actor, act)
                     .await
                     .map(|_| None)
                     .map_err(AckError::Refused),
@@ -1117,10 +1135,14 @@ pub async fn remove_member(
         )
         .await
         {
-            Ok(true) => MetaHttpResponse::ok("Member removed"),
-            Ok(false) => {
-                MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Member not found")
-                    .into_response()
+            Ok(released_pages) => {
+                openobserve_core::alerts::ack::release_leaver_pages(
+                    &org_id,
+                    &released_pages,
+                    &q.user_email,
+                )
+                .await;
+                MetaHttpResponse::ok("Member removed")
             }
             Err(e) => to_response(e),
         }
@@ -2318,7 +2340,7 @@ async fn act_by_phone(
     use o2_enterprise::enterprise::oncall::{notify::PhoneAction, service};
     use openobserve_core::alerts::ack::{self, AckError};
 
-    let problem = match page_problem_of(&org_id, &response_id, &actor).await {
+    let problem = match page_problem_of(&org_id, &response_id, &actor, ack::Act::Ack).await {
         Ok(problem) => problem,
         Err(e) => return phone_answer_to(e),
     };
@@ -2727,7 +2749,14 @@ pub async fn resolve_response(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        let problem = match page_problem(&org_id, &response_id, &user_email.user_id).await {
+        let problem = match page_problem_for(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            openobserve_core::alerts::ack::Act::Resolve,
+        )
+        .await
+        {
             Ok(p) => p,
             Err(resp) => return resp,
         };
@@ -3108,10 +3137,11 @@ pub async fn acknowledge_response(
             Ok(false) => Verb::Acknowledge,
             Err(resp) => return resp,
         };
-        let problem = match page_problem(&org_id, &response_id, &user_email.user_id).await {
-            Ok(p) => p,
-            Err(resp) => return resp,
-        };
+        let problem =
+            match page_problem_for(&org_id, &response_id, &user_email.user_id, verb.into()).await {
+                Ok(p) => p,
+                Err(resp) => return resp,
+            };
         match page_is_closed(&org_id, &response_id).await {
             Ok(true) => return page_with_ack(&org_id, &response_id, unchanged()).await,
             Ok(false) => {}
@@ -3178,7 +3208,14 @@ pub async fn unacknowledge_response(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        let problem = match page_problem(&org_id, &response_id, &user_email.user_id).await {
+        let problem = match page_problem_for(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            openobserve_core::alerts::ack::Act::Unack,
+        )
+        .await
+        {
             Ok(p) => p,
             Err(resp) => return resp,
         };
