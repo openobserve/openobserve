@@ -420,6 +420,40 @@ test.describe('On-call routing rules', {
    * See o2-enterprise#2601 for the sibling case of a plan expectation the screen
    * never drew.
    */
+  test('an edited rule never loses a condition whose value was emptied', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const service = uniqueName(`${workerPrefix(testInfo)}_svc`);
+    const team = await createTeam(page, { name: uniqueName(`${workerPrefix(testInfo)}_edit`) });
+    const rule = await createOwnershipRule(page, {
+      teamId: team.id,
+      dimensions: { namespace: `${service}_ns`, service },
+    });
+    // A second rule guarantees `region` is offered as a field whatever discovery has seen.
+    await createOwnershipRule(page, { teamId: team.id, dimensions: { region: `${service}_eu` } });
+
+    await pm.oncallRoutingPage.goto(ORG);
+    await pm.oncallRoutingPage.expectAvailable();
+    await pm.oncallRoutingPage.selectTab('rules');
+    await pm.oncallRoutingPage.openRuleEditorFor(rule.id);
+    await expect(pm.oncallRoutingPage.getSaveRuleButton()).toBeEnabled();
+
+    // Rows are sorted by field, so row 0 is namespace.
+    await pm.oncallRoutingPage.changeConditionField(0, 'region');
+    await pm.oncallRoutingPage.expectConditionNeedsValue(0);
+
+    await pm.oncallRoutingPage.removeCondition(0);
+    await expect(pm.oncallRoutingPage.getSaveRuleButton()).toBeEnabled();
+    await pm.oncallRoutingPage.cancelRule();
+
+    const stored = (await listOwnershipRules(page, team.id))
+      .find((one) => (one.id ?? one.rule_id) === rule.id);
+    expect(stored.dimensions, 'cancelling leaves the rule as it was').toEqual({
+      namespace: `${service}_ns`,
+      service,
+    });
+  });
+
   test('§11.4 the shadowing verdict is never hidden behind a row expansion', {
     tag: ['@P2'],
   }, async ({ page }, testInfo) => {

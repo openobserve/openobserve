@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="(v: unknown) => setField(row, v)"
       />
       <OSelect
+        v-if="prefix"
         :model-value="row.op"
         :options="operatorOptions"
         :searchable="false"
@@ -44,6 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`${testPrefix}-op-${index}`"
         @update:model-value="(v: unknown) => (row.op = v === 'prefix' ? 'prefix' : 'is')"
       />
+      <OText v-else variant="body" :data-test="`${testPrefix}-op-${index}`">
+        {{ t("oncall.ruleEditorOpIs") }}
+      </OText>
       <span class="min-w-40 flex-1">
         <OSelect
           :ref="(el) => setValueSelect(row.key, el)"
@@ -69,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="removeRow(index)"
       />
       <OText
-        v-if="row.touched && row.name && !row.value.trim()"
+        v-if="needsValue(row) && (row.touched || hasComplete)"
         variant="meta"
         class="basis-full"
         :data-test="`${testPrefix}-pick-value-${index}`"
@@ -114,7 +118,7 @@ interface ConditionRow {
   name: string;
   op: Operator;
   value: string;
-  /** Set once a value was picked, so an untouched row never repeats its own placeholder. */
+  /** Set once the user edits the row, so an untouched row never repeats its own placeholder. */
   touched: boolean;
 }
 
@@ -130,6 +134,8 @@ const props = withDefaults(
     services?: DiscoveredService[];
     /** Existing rules: the fields they pin are offered even when discovery has not seen them. */
     rules?: { dimensions: Record<string, string> }[];
+    /** Offer `starts with`; off where the rows describe one concrete alert. */
+    prefix?: boolean;
     testPrefix?: string;
   }>(),
   {
@@ -139,6 +145,7 @@ const props = withDefaults(
     signals: () => [],
     services: () => [],
     rules: () => [],
+    prefix: true,
     testPrefix: "oncall-rule-editor",
   },
 );
@@ -146,18 +153,19 @@ const props = withDefaults(
 const emit = defineEmits<{
   /** Complete rows only, with `starts with` written as the engine's trailing `*`. */
   (e: "update:modelValue", dimensions: Record<string, string>): void;
+  /** True while a row names a field but has no value, so a host can refuse to save it. */
+  (e: "update:incomplete", incomplete: boolean): void;
 }>();
 
 const { t } = useI18nTyped();
 
 let nextKey = 0;
 
-/// What this org emits or already routes on; the whole vocabulary only when none of that is known.
+/// What discovery saw, or the whole vocabulary when it saw nothing; fields signals and rules carry are always added.
 const fieldIds = computed<string[]>(() => {
-  const known = routingFieldIds(props.catalogue.present, props.signals, props.rules).filter(
-    isRoutable,
-  );
-  return known.length ? known : props.aliases.map((alias) => alias.id).filter(isRoutable);
+  const discovered = props.catalogue.present.filter(isRoutable);
+  const base = discovered.length ? discovered : props.aliases.map((alias) => alias.id);
+  return routingFieldIds(base, props.signals, props.rules).filter(isRoutable);
 });
 
 /// Engine bookkeeping (`_timestamp`, the service graph's own columns) is never an alert's identity.
@@ -175,12 +183,12 @@ function rowsFrom(dimensions: Record<string, string>): ConditionRow[] {
     .sort()
     .map((name) => {
       const value = String(dimensions[name]);
-      const prefix = value.endsWith("*");
+      const starred = value.endsWith("*");
       return {
         key: nextKey++,
         name,
-        op: prefix ? "prefix" : "is",
-        value: prefix ? value.slice(0, -1) : value,
+        op: starred && props.prefix ? "prefix" : "is",
+        value: starred ? value.slice(0, -1) : value,
         touched: false,
       };
     });
@@ -201,7 +209,11 @@ function emptyRow(taken: ConditionRow[]): ConditionRow {
 const seeded = rowsFrom(props.modelValue);
 const rows = ref<ConditionRow[]>(seeded.length ? seeded : [emptyRow([])]);
 
-/// A half-filled row is ignored, never emitted and never blocking.
+function needsValue(row: ConditionRow): boolean {
+  return !!row.name && !row.value.trim();
+}
+
+/// A half-filled row is never emitted; the host blocks on `incomplete` instead, so a condition cannot vanish silently.
 const complete = computed<Record<string, string>>(() =>
   Object.fromEntries(
     rows.value
@@ -213,10 +225,16 @@ const complete = computed<Record<string, string>>(() =>
   ),
 );
 
+const hasComplete = computed(() => Object.keys(complete.value).length > 0);
+
+const incomplete = computed(() => rows.value.some(needsValue));
+
 watch(complete, (dimensions) => emit("update:modelValue", dimensions), {
   deep: true,
   immediate: true,
 });
+
+watch(incomplete, (value) => emit("update:incomplete", value), { immediate: true });
 
 function labelOf(id: string): I18nText {
   return raw(fieldLabel(id, props.aliases));
@@ -231,7 +249,7 @@ function fieldOptionsFor(row: ConditionRow) {
 
 const operatorOptions = computed(() => [
   { label: t("oncall.ruleEditorOpIs"), value: "is" },
-  { label: t("oncall.ruleEditorOpStartsWith"), value: "prefix" },
+  ...(props.prefix ? [{ label: t("oncall.ruleEditorOpStartsWith"), value: "prefix" }] : []),
 ]);
 
 /// Known values, busiest unowned first, then by how many services carry them.
@@ -292,6 +310,7 @@ function setField(row: ConditionRow, value: unknown) {
   if (name === row.name) return;
   row.name = name;
   row.value = "";
+  row.touched = true;
 }
 
 function addRow() {

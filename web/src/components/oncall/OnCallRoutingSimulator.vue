@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :signals="signals"
         :services="services"
         :rules="rules"
+        :prefix="false"
         test-prefix="oncall-simulator"
       />
     </div>
@@ -273,6 +274,7 @@ import {
   claimableDimensions,
   dimensionsOfPath,
   fieldLabel,
+  literalDimensions,
   ownershipPath,
   readableConditions,
 } from "@/utils/oncall";
@@ -343,8 +345,9 @@ const priorityOptions = PRIORITIES.map((value) => ({ label: raw(value), value })
 let seededPath: string | null = null;
 
 function seedWith(next: Record<string, string>) {
-  dimensions.value = { ...next };
-  seededPath = ownershipPath(next);
+  const literal = literalDimensions(next);
+  dimensions.value = literal;
+  seededPath = ownershipPath(literal);
   seedKey.value += 1;
 }
 

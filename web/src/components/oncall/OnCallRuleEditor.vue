@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :signals="signals"
           :services="services"
           :rules="rules"
+          @update:incomplete="(v: boolean) => (conditionsIncomplete = v)"
         />
       </div>
 
@@ -376,8 +377,11 @@ watch(
   { deep: true },
 );
 
+const conditionsIncomplete = ref(false);
+
 const saveProblem = computed<I18nText | "">(() => {
   if (!conditionCount.value) return t("oncall.ruleNeedsCondition");
+  if (conditionsIncomplete.value) return t("oncall.ruleEditorPickValue");
   if (!team.value) return t("oncall.ruleNeedsTeam");
   return "";
 });

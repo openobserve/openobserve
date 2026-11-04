@@ -2005,6 +2005,16 @@ export function readableConditions(
     .join(` ${words.and} `);
 }
 
+/** One concrete alert a rule's conditions describe: a `starts with` value is read as the prefix itself. */
+export function literalDimensions(dimensions: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(dimensions ?? {}).map(([name, value]) => [
+      name,
+      value.endsWith("*") ? value.slice(0, -1) : value,
+    ]),
+  );
+}
+
 /** Every field a rule could pin here: what the org emits, what the unowned signals carry and what rules already use. */
 export function routingFieldIds(
   present: string[],

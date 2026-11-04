@@ -125,3 +125,92 @@ describe("OnCallConditionRows vocabulary", () => {
     expect(optionsOf(w, `${PREFIX}-value-0`)).toEqual(["checkout"]);
   });
 });
+
+describe("OnCallConditionRows field catalogue", () => {
+  const ALIASES = [
+    { id: "service", display: "Service" },
+    { id: "host", display: "Host" },
+    { id: "k8s-namespace", display: "K8s Namespace" },
+  ];
+  function fieldsOf(props: Record<string, unknown>) {
+    const w = mount(OnCallConditionRows, {
+      props: { testPrefix: PREFIX, aliases: ALIASES, ...props },
+      global: { plugins: [i18n] },
+    });
+    const select = w
+      .findAllComponents(OSelect)
+      .find((c) => c.attributes("data-test") === `${PREFIX}-field-0`)!;
+    return (select.props("options") as { value: string }[]).map((option) => option.value);
+  }
+
+  it("offers the full vocabulary when discovery saw nothing, even once a rule exists", () => {
+    expect(fieldsOf({ rules: [{ dimensions: { service: "payments" } }] })).toEqual([
+      "service",
+      "host",
+      "k8s-namespace",
+    ]);
+  });
+
+  it("adds the fields rules and unrouted signals carry on top of the full vocabulary", () => {
+    expect(
+      fieldsOf({
+        rules: [{ dimensions: { region: "eu" } }],
+        signals: [{ id: "s", path: "", occurrences: 1, dimensions: { environment: "prod" } }],
+      }),
+    ).toEqual(["service", "host", "k8s-namespace", "environment", "region"]);
+  });
+
+  it("narrows to what discovery saw, plus the rules' fields, once discovery has something", () => {
+    expect(
+      fieldsOf({
+        catalogue: { present: ["service"], values: {} },
+        rules: [{ dimensions: { region: "eu" } }],
+      }),
+    ).toEqual(["service", "region"]);
+  });
+});
+
+describe("OnCallConditionRows half-filled rows", () => {
+  function mountRows(props: Record<string, unknown>) {
+    return mount(OnCallConditionRows, {
+      props: { testPrefix: PREFIX, ...props },
+      global: { plugins: [i18n] },
+    });
+  }
+  const selectOf = (w: ReturnType<typeof mountRows>, test: string) =>
+    w.findAllComponents(OSelect).find((c) => c.attributes("data-test") === test)!;
+  const incomplete = (w: ReturnType<typeof mountRows>) =>
+    w.emitted("update:incomplete")?.at(-1)?.[0];
+
+  it("reports a row whose field changed as incomplete and drops it from the conditions", async () => {
+    const w = mountRows({ modelValue: { namespace: "prod", service: "payments" } });
+    expect(incomplete(w)).toBe(false);
+    selectOf(w, `${PREFIX}-field-0`).vm.$emit("update:modelValue", "host");
+    await flushPromises();
+    expect(incomplete(w)).toBe(true);
+    expect(w.emitted("update:modelValue")?.at(-1)?.[0]).toEqual({ service: "payments" });
+    expect(w.find(`[data-test="${PREFIX}-pick-value-0"]`).exists()).toBe(true);
+  });
+
+  it("does not count a fully empty row as incomplete", async () => {
+    const w = mountRows({ modelValue: { service: "payments" } });
+    await w.find(`[data-test="${PREFIX}-add-condition"]`).trigger("click");
+    await flushPromises();
+    expect(selectOf(w, `${PREFIX}-field-1`).props("modelValue")).toBe("");
+    expect(incomplete(w)).toBe(false);
+  });
+});
+
+describe("OnCallConditionRows without starts with", () => {
+  it("offers only is and reads a seeded prefix as the literal value", () => {
+    const w = mount(OnCallConditionRows, {
+      props: { testPrefix: PREFIX, prefix: false, modelValue: { service: "pay*" } },
+      global: { plugins: [i18n] },
+    });
+    expect(
+      w.findAllComponents(OSelect).some((c) => c.attributes("data-test") === `${PREFIX}-op-0`),
+    ).toBe(false);
+    expect(w.find(`[data-test="${PREFIX}-op-0"]`).text()).toBe("is");
+    expect(w.emitted("update:modelValue")?.at(-1)?.[0]).toEqual({ service: "pay" });
+  });
+});

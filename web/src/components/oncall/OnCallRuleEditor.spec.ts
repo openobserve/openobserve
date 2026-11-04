@@ -155,24 +155,59 @@ describe("OnCallRuleEditor", () => {
     ]);
   });
 
-  it("ignores an incomplete row, and says so only once its value was cleared", async () => {
+  it("blocks Save on a row with a field but no value, and drops a fully empty row", async () => {
     const wrapper = render();
     select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "risk-api");
     await wrapper.find('[data-test="oncall-rule-editor-add-condition"]').trigger("click");
-    select(wrapper, "oncall-rule-editor-field-1").vm.$emit("update:modelValue", "k8s-namespace");
     await flushPromises();
-    expect(wrapper.find('[data-test="oncall-rule-editor-pick-value-1"]').exists()).toBe(false);
-    select(wrapper, "oncall-rule-editor-value-1").vm.$emit("update:modelValue", "risk");
-    select(wrapper, "oncall-rule-editor-value-1").vm.$emit("update:modelValue", null);
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+
+    select(wrapper, "oncall-rule-editor-field-1").vm.$emit("update:modelValue", "k8s-namespace");
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-rule-editor-pick-value-1"]').text()).toBe(
       "Pick a value",
     );
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    expect(wrapper.find('[data-test="oncall-rule-editor-save-problem"]').text()).toBe(
+      "Pick a value",
+    );
+    dialog(wrapper).vm.$emit("click:primary");
+    expect(wrapper.emitted("save")).toBeUndefined();
+
+    await wrapper.find('[data-test="oncall-rule-editor-remove-1"]').trigger("click");
+    await flushPromises();
     expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
     dialog(wrapper).vm.$emit("click:primary");
     expect(wrapper.emitted("save")?.[0]).toEqual([
       { dimensions: { service: "risk-api" }, team_id: "team_1" },
     ]);
+  });
+
+  it("never saves an edited two-condition rule with one value cleared or one field changed", async () => {
+    const rule = {
+      rule_id: "r1",
+      team_id: "team_1",
+      path: "k8s-namespace=prod/service=payments",
+      dimensions: { "k8s-namespace": "prod", service: "payments" },
+    } as unknown as OwnershipRuleStats;
+    const wrapper = render({ rule });
+    select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", null);
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-pick-value-0"]').exists()).toBe(true);
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+
+    select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "prod");
+    await flushPromises();
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+
+    select(wrapper, "oncall-rule-editor-field-0").vm.$emit("update:modelValue", "environment");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-pick-value-0"]').text()).toBe(
+      "Pick a value",
+    );
+    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    dialog(wrapper).vm.$emit("click:primary");
+    expect(wrapper.emitted("save")).toBeUndefined();
   });
 
   it("does not offer a field twice", async () => {
