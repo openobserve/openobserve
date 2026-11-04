@@ -27222,6 +27222,8 @@
     "reachWordNotVerified": "ยังไม่ยืนยัน",
     "reachWordEmailWontArrive": "อีเมลจะไม่ไปถึง",
     "phoneRemove": "นำออก",
+    "phoneChangeAction": "เปลี่ยนโทรศัพท์",
+    "phoneRemoveAction": "นำโทรศัพท์ออก",
     "phoneRemoveTitle": "นำโทรศัพท์ของคุณออกหรือไม่",
     "phoneRemoveMessage": "การแจ้งเตือนเรียกเวรจะส่งถึงคุณทางอีเมลเท่านั้น",
     "phoneFormatHint": "เริ่มต้นด้วย + และรหัสประเทศของคุณ เช่น +91 98765 43210",

@@ -262,6 +262,15 @@ describe("OnCallMine", () => {
     expect(frame().classes()).toContain("h-55.5");
   });
 
+  /// The tables below keep a fixed height, so the page scrolls at every width instead of squeezing them.
+  it("scrolls the page body rather than sharing the viewport between the tables", async () => {
+    const wrapper = render();
+    await flushPromises();
+    const body = wrapper.find('[data-test="oncall-mine-body"]');
+    expect(body.classes()).toContain("overflow-y-auto");
+    expect(body.classes()).not.toContain("max-xl:overflow-y-auto");
+  });
+
   /// The cover form opens on the reader's own seat, from now until their shift ends.
   it("opens the cover form on the reader's own shift", async () => {
     const me = store.state.userInfo.email;

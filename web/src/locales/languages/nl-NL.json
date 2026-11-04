@@ -27224,6 +27224,8 @@
     "reachWordNotVerified": "Niet geverifieerd",
     "reachWordEmailWontArrive": "E-mail komt niet aan",
     "phoneRemove": "Verwijderen",
+    "phoneChangeAction": "Telefoon wijzigen",
+    "phoneRemoveAction": "Telefoon verwijderen",
     "phoneRemoveTitle": "Je telefoon verwijderen?",
     "phoneRemoveMessage": "Meldingen bereiken je dan alleen per e-mail.",
     "phoneFormatHint": "Begin met + en je landcode, bijv. +91 98765 43210",

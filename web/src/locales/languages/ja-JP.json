@@ -27224,6 +27224,8 @@
     "reachWordNotVerified": "未確認",
     "reachWordEmailWontArrive": "メールが届きません",
     "phoneRemove": "削除",
+    "phoneChangeAction": "電話番号を変更",
+    "phoneRemoveAction": "電話番号を削除",
     "phoneRemoveTitle": "電話番号を削除しますか？",
     "phoneRemoveMessage": "呼び出しはメールのみで届きます。",
     "phoneFormatHint": "+ と国番号から入力してください（例: +91 98765 43210）",

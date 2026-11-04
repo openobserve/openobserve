@@ -27224,6 +27224,8 @@
     "reachWordNotVerified": "인증 안 됨",
     "reachWordEmailWontArrive": "이메일이 도착하지 않음",
     "phoneRemove": "삭제",
+    "phoneChangeAction": "전화번호 변경",
+    "phoneRemoveAction": "전화번호 삭제",
     "phoneRemoveTitle": "전화번호를 삭제할까요?",
     "phoneRemoveMessage": "호출은 이메일로만 전달됩니다.",
     "phoneFormatHint": "+와 국가 번호로 시작하세요(예: +91 98765 43210)",

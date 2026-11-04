@@ -27224,6 +27224,8 @@
     "reachWordNotVerified": "Nicht verifiziert",
     "reachWordEmailWontArrive": "E-Mail kommt nicht an",
     "phoneRemove": "Entfernen",
+    "phoneChangeAction": "Telefon ändern",
+    "phoneRemoveAction": "Telefon entfernen",
     "phoneRemoveTitle": "Ihr Telefon entfernen?",
     "phoneRemoveMessage": "Alarmierungen erreichen Sie dann nur per E-Mail.",
     "phoneFormatHint": "Beginnen Sie mit + und Ihrer Ländervorwahl, z. B. +91 98765 43210",

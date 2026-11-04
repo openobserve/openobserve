@@ -27224,6 +27224,8 @@
     "reachWordNotVerified": "غير مُتحقق منه",
     "reachWordEmailWontArrive": "لن يصل البريد الإلكتروني",
     "phoneRemove": "إزالة",
+    "phoneChangeAction": "تغيير الهاتف",
+    "phoneRemoveAction": "إزالة الهاتف",
     "phoneRemoveTitle": "إزالة هاتفك؟",
     "phoneRemoveMessage": "ستصلك التنبيهات عبر البريد الإلكتروني فقط.",
     "phoneFormatHint": "ابدأ بـ + ورمز بلدك، مثل +91 98765 43210",

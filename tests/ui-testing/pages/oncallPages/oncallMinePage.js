@@ -52,6 +52,9 @@ export class OnCallMinePage {
       setupDismiss: '[data-test="oncall-setup-dismiss"]',
       away: '[data-test="oncall-mine-away"]',
       reach: '[data-test="oncall-mine-reach"]',
+      // Icon-only row buttons; the name is the aria-label, there is no row menu.
+      phoneChange: '[data-test="oncall-phone-change"]',
+      phoneRemove: '[data-test="oncall-phone-remove"]',
 
       deliveries: '[data-test="oncall-my-deliveries"]',
       deliveriesTable: '[data-test="oncall-my-deliveries-table"]',
@@ -131,7 +134,7 @@ export class OnCallMinePage {
     ).toHaveCount(0, { timeout: 30000 });
   }
 
-  /** Mark one row read or unread again through the screen. */
+  /** Mark one row read or unread again with the row's own button; there is no row menu. */
   async toggleDeliveryRead(eventId) {
     await this.expectDeliveryRowVisible(eventId);
     await this.page.locator(this.deliveryToggle(eventId)).first().click();

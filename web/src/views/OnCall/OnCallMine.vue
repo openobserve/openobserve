@@ -55,11 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-mine-unavailable"
     />
 
-    <!-- Below xl the two top cards stack and leave no room to share, so the body scrolls instead. -->
+    <!-- The tables keep a fixed ten-row height, so the page scrolls instead of squeezing them. -->
     <OContent
       v-else
       y
-      class="flex min-h-0 flex-1 flex-col gap-5 max-xl:overflow-y-auto"
+      class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto"
       data-test="oncall-mine-body"
     >
       <OnCallSetupBanner ref="setupRef" class="shrink-0" />

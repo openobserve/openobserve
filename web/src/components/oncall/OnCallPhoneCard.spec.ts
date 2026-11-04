@@ -56,7 +56,7 @@ const stubs = {
   OBanner: { name: "OBanner", props: ["variant"], template: "<div><slot /></div>" },
   OButton: {
     name: "OButton",
-    props: ["disabled", "loading", "variant"],
+    props: ["disabled", "loading", "variant", "iconLeft"],
     emits: ["click"],
     template: `<button :disabled="disabled" @click="$emit('click', $event)"><slot /></button>`,
   },
@@ -67,12 +67,6 @@ const stubs = {
     template: `<input :value="modelValue" :disabled="disabled" @input="$emit('update:modelValue', $event.target.value)" @blur="$emit('blur', $event)" />`,
   },
   OTooltip: { name: "OTooltip", props: ["content"], template: "<span>{{ content }}</span>" },
-  ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
-  ODropdownItem: {
-    name: "ODropdownItem",
-    emits: ["select"],
-    template: "<button @click=\"$emit('select')\"><slot /></button>",
-  },
   ConfirmDialog: {
     name: "ConfirmDialog",
     props: ["modelValue", "title", "message", "okLabel", "okVariant"],
@@ -468,6 +462,19 @@ describe("OnCallPhoneCard", () => {
     expect(w.text()).not.toContain("Press 4");
   });
 
+  /// Change and Remove are icon buttons on the row, named by their tooltips; no menu holds a single item.
+  it("verified: offers Change and Remove as icon buttons with tooltips", async () => {
+    const w = await render(VERIFIED);
+    const change = w.findComponent('[data-test="oncall-phone-change"]');
+    const remove = w.findComponent('[data-test="oncall-phone-remove"]');
+    expect(change.props("iconLeft")).toBe("edit");
+    expect(change.props("variant")).toBe("ghost");
+    expect(change.text()).toBe("Change phone");
+    expect(remove.props("iconLeft")).toBe("delete");
+    expect(remove.props("variant")).toBe("ghost-destructive");
+    expect(remove.text()).toBe("Remove phone");
+  });
+
   it("verified: Change reopens the number box", async () => {
     const w = await render(VERIFIED);
     await find(w, "change").trigger("click");
@@ -514,7 +521,7 @@ describe("OnCallPhoneCard", () => {
       );
       w.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
       await flushPromises();
-      expect(w.findComponent('[data-test="oncall-phone-more"]').props("loading")).toBe(true);
+      expect(w.findComponent('[data-test="oncall-phone-remove"]').props("loading")).toBe(true);
 
       service.getContact.mockResolvedValue({ data: contact() } as any);
       finish({ data: contact() });
@@ -547,6 +554,19 @@ describe("OnCallPhoneCard", () => {
       data: { phone: "" },
     });
     expect(find(w, "input").exists()).toBe(true);
+  });
+
+  it("opens the remove confirm from the real icon button", async () => {
+    service.getContact.mockResolvedValue({ data: VERIFIED } as any);
+    const { OButton: _button, OTooltip: _tooltip, ...rest } = stubs;
+    const w = mount(OnCallPhoneCard, { global: { plugins: [i18n, store], stubs: rest } });
+    await flushPromises();
+
+    const remove = find(w, "remove");
+    expect(remove.attributes("aria-label")).toBe("Remove phone");
+    expect(find(w, "change").attributes("aria-label")).toBe("Change phone");
+    await remove.trigger("click");
+    expect(w.find('[data-test="confirm"]').exists()).toBe(true);
   });
 
   // S10: the server's format rule is said before Send, not after the round trip.

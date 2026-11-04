@@ -27224,6 +27224,8 @@
     "reachWordNotVerified": "Не подтверждён",
     "reachWordEmailWontArrive": "Письмо не дойдёт",
     "phoneRemove": "Удалить",
+    "phoneChangeAction": "Изменить телефон",
+    "phoneRemoveAction": "Удалить телефон",
     "phoneRemoveTitle": "Удалить ваш телефон?",
     "phoneRemoveMessage": "Вызовы будут приходить вам только по email.",
     "phoneFormatHint": "Начните с + и кода страны, например +91 98765 43210",

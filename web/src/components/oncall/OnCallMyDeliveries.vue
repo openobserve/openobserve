@@ -16,10 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- What has been sent to the reader: the open pages that still need them, then the history grouped by alert. -->
 <template>
-  <div
-    class="flex min-h-0 flex-col gap-5 max-xl:flex-none xl:flex-1"
-    data-test="oncall-my-deliveries"
-  >
+  <div class="flex shrink-0 flex-col gap-5" data-test="oncall-my-deliveries">
     <OEmptyState
       v-if="loadError !== null"
       size="inline"
@@ -34,17 +31,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <section
         v-if="openRows.length"
-        class="rounded-surface bg-surface-base border-border-default table-last-row-flush flex min-w-0 flex-col overflow-hidden border xl:max-h-1/2 xl:min-h-0"
+        class="rounded-surface bg-surface-base border-border-default table-last-row-flush flex min-w-0 flex-col overflow-hidden border"
         data-test="oncall-my-needs-you"
       >
         <div class="flex min-h-12 shrink-0 items-center px-4 py-2">
           <OText variant="card-title" as="h2">{{ t("oncall.myNeedsYouTitle") }}</OText>
         </div>
-        <!-- Basis auto, not 0: the card is sized by its rows up to its cap, so a zero basis would collapse it. -->
         <!-- Keyed on the mode: OTable fixes its pagination row model when it is created, so a flip needs a fresh table. -->
         <OTable
           :key="openPaged ? 'paged' : 'flat'"
-          class="xl:min-h-0 xl:flex-auto"
+          :class="FIXED_BODY"
+          :fill-height="false"
           :data="openRows"
           :columns="openColumns"
           row-key="response_id"
@@ -52,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           :pagination="openPaged ? 'client' : 'none'"
           :page-size="openPageSize"
+          :page-size-options="PAGE_SIZES"
           :current-page="openPage"
           table-id="oncall-my-needs-you"
           data-test="oncall-my-needs-you-table"
@@ -106,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </section>
 
       <section
-        class="rounded-surface bg-surface-base border-border-default table-last-row-flush flex min-w-0 flex-col overflow-hidden border xl:min-h-0 xl:flex-1"
+        class="rounded-surface bg-surface-base border-border-default table-last-row-flush flex min-w-0 flex-col overflow-hidden border"
         data-test="oncall-my-history"
       >
         <div class="flex min-h-12 shrink-0 flex-wrap items-center gap-2 px-4 py-2">
@@ -149,7 +147,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="historyRows.length || loading"
           ref="oTableRef"
           :key="historyPaged ? 'paged' : 'flat'"
-          class="xl:min-h-0 xl:flex-1"
+          :class="FIXED_BODY"
+          :fill-height="false"
           :data="historyRows"
           :columns="historyColumns"
           row-key="key"
@@ -158,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :skeleton-rows="HISTORY_SKELETON_ROWS"
           :pagination="historyPaged ? 'client' : 'none'"
           :page-size="pageSize"
+          :page-size-options="PAGE_SIZES"
           :current-page="currentPage"
           :show-global-filter="false"
           table-id="oncall-my-deliveries"
@@ -234,55 +234,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-row-actions="{ row }">
             <div class="flex items-center justify-center">
-              <!-- An open tooltip is the top dismissable layer, so it would take the menu's Escape. -->
-              <ODropdown
-                side="bottom"
-                align="end"
-                @update:open="(open: boolean) => (openMenuKey = open ? row.key : '')"
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                :icon-left="row.unread ? 'check-circle' : 'mark-email-unread'"
+                :loading="marking"
+                :aria-label="
+                  row.unread ? t('oncall.myDeliveriesMarkRead') : t('oncall.myDeliveriesMarkUnread')
+                "
+                :data-test="`oncall-my-delivery-toggle-${row.latest.event_id}`"
+                @click.stop="toggleRead(row)"
               >
-                <template #trigger>
-                  <OButton
-                    variant="ghost"
-                    size="icon-sm"
-                    icon-left="more-vert"
-                    :loading="marking"
-                    :aria-label="t('oncall.moreActions')"
-                    :data-test="`oncall-my-delivery-more-${row.latest.event_id}`"
-                    @click.stop
-                  >
-                    <OTooltip
-                      v-if="openMenuKey !== row.key"
-                      side="bottom"
-                      :content="t('oncall.moreActions')"
-                    />
-                  </OButton>
-                </template>
-                <ODropdownItem
-                  :icon-left="row.unread ? 'check-circle' : 'mail'"
-                  :data-test="`oncall-my-delivery-toggle-${row.latest.event_id}`"
-                  @select="toggleRead(row)"
-                >
-                  {{
+                <OTooltip
+                  side="bottom"
+                  :content="
                     row.unread
-                      ? t("oncall.myDeliveriesMarkRead")
-                      : t("oncall.myDeliveriesMarkUnread")
-                  }}
-                </ODropdownItem>
-              </ODropdown>
+                      ? t('oncall.myDeliveriesMarkRead')
+                      : t('oncall.myDeliveriesMarkUnread')
+                  "
+                />
+              </OButton>
             </div>
           </template>
         </OTable>
 
-        <OEmptyState
-          v-else
-          size="block"
-          icon="notifications-active"
-          :title="unreadOnly ? t('oncall.myDeliveriesNoUnread') : t('oncall.myDeliveriesNone')"
-          :action-label="emptyAction?.label"
-          :action-icon="emptyAction?.icon"
-          data-test="oncall-my-deliveries-empty"
-          @action="emptyAction?.run()"
-        />
+        <div v-else :class="FIXED_EMPTY" data-test="oncall-my-deliveries-empty-frame">
+          <OEmptyState
+            size="block"
+            icon="notifications-active"
+            :title="unreadOnly ? t('oncall.myDeliveriesNoUnread') : t('oncall.myDeliveriesNone')"
+            :action-label="emptyAction?.label"
+            :action-icon="emptyAction?.icon"
+            data-test="oncall-my-deliveries-empty"
+            @action="emptyAction?.run()"
+          />
+        </div>
       </section>
     </template>
   </div>
@@ -298,8 +284,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -347,10 +331,14 @@ const props = withDefaults(
 
 const emit = defineEmits<{ unread: [count: number]; "test-page": []; "join-team": [] }>();
 
-/// A first visit has a handful of pages, so more skeleton rows would only collapse when they land.
-const HISTORY_SKELETON_ROWS = 3;
-/// OTable's smallest page-size option.
-const SMALLEST_PAGE = 20;
+/// The default page; the body is sized to exactly this many rows, and a larger page scrolls inside it.
+const PAGE_ROWS = 10;
+const PAGE_SIZES = [10, 20, 50, 100];
+/// Same as a full page, so the first paint is the loaded height.
+const HISTORY_SKELETON_ROWS = PAGE_ROWS;
+/// Header plus PAGE_ROWS dense rows; the scroller is sized rather than the table so the pager sits below it.
+const FIXED_BODY = "[&_[data-test=o2-table-scroll-container]]:h-104";
+const FIXED_EMPTY = "flex h-104 items-center justify-center";
 
 const CHANNEL_ICON: Record<Channel, IconName> = {
   email: "mail",
@@ -382,12 +370,11 @@ const rows = ref<MyDelivery[]>([]);
 const unread = ref(0);
 const loading = ref(false);
 const marking = ref(false);
-const openMenuKey = ref("");
 const savedView = useListViewState("oncall-my-deliveries", {
   unreadOnly: false,
   currentPage: 1,
-  pageSize: 20,
-  openPageSize: 20,
+  pageSize: PAGE_ROWS,
+  openPageSize: PAGE_ROWS,
 });
 const unreadOnly = ref(savedView.unreadOnly);
 const currentPage = ref(savedView.currentPage);
@@ -485,7 +472,7 @@ const historyRows = computed<HistoryRow[]>(() => {
 });
 
 /// The pager shows once a second page exists, and stays while a larger size is chosen so it can be undone.
-const paged = (rows: number, size: number) => rows > Math.min(size, SMALLEST_PAGE);
+const paged = (rows: number, size: number) => rows > PAGE_ROWS || size !== PAGE_ROWS;
 const openPaged = computed(() => paged(openRows.value.length, openPageSize.value));
 const historyPaged = computed(() => paged(historyRows.value.length, pageSize.value));
 

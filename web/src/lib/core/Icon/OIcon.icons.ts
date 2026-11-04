@@ -161,6 +161,7 @@ import Label from "~icons/material-symbols/label-outline";
 import Layers from "~icons/material-symbols/layers-outline";
 import Public from "~icons/material-symbols/public";
 import Mail from "~icons/material-symbols/mail-outline";
+import MarkEmailUnread from "~icons/material-symbols/mark-email-unread-outline";
 import ManageSearch from "~icons/material-symbols/manage-search";
 import Merge from "~icons/material-symbols/merge";
 import MoreHoriz from "~icons/material-symbols/more-horiz";
@@ -555,6 +556,7 @@ export const iconRegistry = {
   layers: Layers,
   public: Public,
   mail: Mail,
+  "mark-email-unread": MarkEmailUnread,
   "manage-search": ManageSearch,
   merge: Merge,
   "more-horiz": MoreHoriz,

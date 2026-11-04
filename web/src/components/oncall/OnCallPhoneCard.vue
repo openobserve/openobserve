@@ -93,34 +93,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <OButton
           v-if="state === 'verified' || state === 'codeSent'"
-          variant="outline"
-          size="xs"
+          variant="ghost"
+          size="icon-sm"
+          icon-left="edit"
+          :aria-label="t('oncall.phoneChangeAction')"
           data-test="oncall-phone-change"
           @click="startChange"
         >
-          <OIcon name="edit" size="sm" />{{ t("oncall.phoneChange") }}
+          <OTooltip :content="t('oncall.phoneChangeAction')" />
         </OButton>
         <!-- A saved number can always be taken off, verified or not, provider or not; while editing, Cancel is the way back. -->
-        <ODropdown v-if="contact.phone && !editing" side="bottom" align="end">
-          <template #trigger>
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              icon-left="more-vert"
-              :loading="removing"
-              :aria-label="t('oncall.moreActions')"
-              data-test="oncall-phone-more"
-            />
-          </template>
-          <ODropdownItem
-            icon-left="delete"
-            variant="destructive"
-            data-test="oncall-phone-remove"
-            @select="removeOpen = true"
-          >
-            {{ t("oncall.phoneRemove") }}
-          </ODropdownItem>
-        </ODropdown>
+        <OButton
+          v-if="contact.phone && !editing"
+          variant="ghost-destructive"
+          size="icon-sm"
+          icon-left="delete"
+          :loading="removing"
+          :aria-label="t('oncall.phoneRemoveAction')"
+          data-test="oncall-phone-remove"
+          @click="removeOpen = true"
+        >
+          <OTooltip :content="t('oncall.phoneRemoveAction')" />
+        </OButton>
       </template>
     </OnCallReachRow>
 
@@ -238,8 +232,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   confirmCodeMutation,

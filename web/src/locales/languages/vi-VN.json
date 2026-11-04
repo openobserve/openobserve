@@ -27224,6 +27224,8 @@
     "reachWordNotVerified": "Chưa xác minh",
     "reachWordEmailWontArrive": "Email sẽ không đến",
     "phoneRemove": "Xóa",
+    "phoneChangeAction": "Đổi số điện thoại",
+    "phoneRemoveAction": "Xóa số điện thoại",
     "phoneRemoveTitle": "Xóa điện thoại của bạn?",
     "phoneRemoveMessage": "Cảnh báo sẽ chỉ đến bạn qua email.",
     "phoneFormatHint": "Bắt đầu bằng + và mã quốc gia, ví dụ +91 98765 43210",

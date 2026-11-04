@@ -27224,6 +27224,8 @@
     "reachWordNotVerified": "Doğrulanmadı",
     "reachWordEmailWontArrive": "E-posta ulaşmayacak",
     "phoneRemove": "Kaldır",
+    "phoneChangeAction": "Telefonu değiştir",
+    "phoneRemoveAction": "Telefonu kaldır",
     "phoneRemoveTitle": "Telefonunuz kaldırılsın mı?",
     "phoneRemoveMessage": "Çağrılar size yalnızca e-postayla ulaşır.",
     "phoneFormatHint": "+ ve ülke kodunuzla başlayın, örn. +91 98765 43210",

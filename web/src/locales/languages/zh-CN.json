@@ -27224,6 +27224,8 @@
     "reachWordNotVerified": "未验证",
     "reachWordEmailWontArrive": "邮件无法送达",
     "phoneRemove": "移除",
+    "phoneChangeAction": "更改电话",
+    "phoneRemoveAction": "移除电话",
     "phoneRemoveTitle": "移除你的电话？",
     "phoneRemoveMessage": "呼叫将只通过邮件送达你。",
     "phoneFormatHint": "请以 + 和国家代码开头，例如 +91 98765 43210",

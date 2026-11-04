@@ -27219,6 +27219,8 @@
     "reachWordNotVerified": "未驗證",
     "reachWordEmailWontArrive": "郵件無法送達",
     "phoneRemove": "移除",
+    "phoneChangeAction": "變更電話",
+    "phoneRemoveAction": "移除電話",
     "phoneRemoveTitle": "移除你的電話？",
     "phoneRemoveMessage": "呼叫將只透過郵件送達你。",
     "phoneFormatHint": "請以 + 和國碼開頭，例如 +91 98765 43210",

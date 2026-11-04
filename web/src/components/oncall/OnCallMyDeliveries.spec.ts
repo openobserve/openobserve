@@ -63,13 +63,6 @@ const stubs = {
     emits: ["click"],
     template: `<button @click="$emit('click', $event)"><slot /></button>`,
   },
-  ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
-  ODropdownItem: {
-    name: "ODropdownItem",
-    props: ["iconLeft"],
-    emits: ["select"],
-    template: `<button @click="$emit('select')"><slot /></button>`,
-  },
   OCheckbox: {
     name: "OCheckbox",
     props: ["modelValue", "label"],
@@ -326,17 +319,17 @@ describe("OnCallMyDeliveries", () => {
     expect(service.myDeliveries.mock.calls.at(-1)![0]).toMatchObject({ unread_only: true });
   });
 
-  /// A read, resolved page still offers "Mark unread" from its row menu, and nothing to filter.
-  it("keeps the row menu on a read resolved page", async () => {
+  /// A read, resolved page still offers "Mark unread" on its row, and nothing to filter.
+  it("keeps the mark-unread button on a read resolved page", async () => {
     answer([delivery({ read: true, response_state: "resolved" })]);
     const wrapper = render();
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-my-deliveries-controls"]').classes()).toContain(
       "invisible",
     );
-    expect(wrapper.find('[data-test="oncall-my-delivery-more-ev_88"]').exists()).toBe(true);
     const toggle = wrapper.findComponent('[data-test="oncall-my-delivery-toggle-ev_88"]');
-    expect(toggle.props("iconLeft")).toBe("mail");
+    expect(toggle.props("iconLeft")).toBe("mark-email-unread");
+    expect(toggle.findComponent({ name: "OTooltip" }).props("content")).toBe("Mark unread");
     await toggle.trigger("click");
     await flushPromises();
     expect(service.markDeliveriesRead).toHaveBeenCalledWith(
@@ -433,7 +426,7 @@ describe("OnCallMyDeliveries", () => {
       );
     });
 
-    it("reads every send of an unread alert from its row menu", async () => {
+    it("reads every send of an unread alert from its row button", async () => {
       answer([
         delivery({ event_id: "ev_1", read: false, at: AT + 1 }),
         delivery({ event_id: "ev_2", read: false, channel: "sms" }),
@@ -443,6 +436,7 @@ describe("OnCallMyDeliveries", () => {
 
       const toggle = wrapper.findComponent('[data-test="oncall-my-delivery-toggle-ev_1"]');
       expect(toggle.props("iconLeft")).toBe("check-circle");
+      expect(toggle.findComponent({ name: "OTooltip" }).props("content")).toBe("Mark read");
       await toggle.trigger("click");
       await flushPromises();
 
@@ -582,13 +576,21 @@ describe("OnCallMyDeliveries", () => {
     expect(wrapper.text()).not.toContain("Pages show here once");
   });
 
-  /// The first paint is the shape a first visit usually lands on, so the card does not collapse when rows arrive.
-  it("skeletons three history rows while the first read is out", async () => {
+  /// The first paint is a full page, so the fixed-height card looks the same before and after rows arrive.
+  it("skeletons ten history rows while the first read is out", async () => {
     service.myDeliveries.mockReturnValue(new Promise(() => {}) as any);
     const wrapper = render();
     await flushPromises();
     expect(history(wrapper).findComponent({ name: "OTable" }).attributes("skeleton-rows")).toBe(
-      "3",
+      "10",
+    );
+  });
+
+  it("keeps the empty history at the table's fixed height", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-my-deliveries-empty-frame"]').classes()).toContain(
+      "h-104",
     );
   });
 
@@ -601,7 +603,7 @@ describe("OnCallMyDeliveries", () => {
       wrapper.findComponent('[data-test="oncall-my-needs-you-table"]');
 
     it("hides the pager while every open page fits", async () => {
-      answer(open(20));
+      answer(open(10));
       const wrapper = render();
       await flushPromises();
 
@@ -609,16 +611,16 @@ describe("OnCallMyDeliveries", () => {
     });
 
     it("pages the open pages once they outgrow one page", async () => {
-      answer(open(21));
+      answer(open(11));
       const wrapper = render();
       await flushPromises();
 
       expect(needsYou(wrapper).attributes("pagination")).toBe("client");
-      expect(needsYou(wrapper).props("pageSize")).toBe(20);
+      expect(needsYou(wrapper).props("pageSize")).toBe(10);
     });
 
     it("keeps the chosen page size for the next visit", async () => {
-      answer(open(21));
+      answer(open(11));
       const wrapper = render();
       await flushPromises();
       needsYou(wrapper).vm.$emit("update:pageSize", 50);
@@ -638,10 +640,10 @@ describe("OnCallMyDeliveries", () => {
 
       const card = wrapper.find('[data-test="oncall-my-needs-you"]');
       expect(card.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(true);
-      expect(card.find('[data-test="o2-table-pagination-info"]').text()).toMatch(/1\D+20\D+25/);
+      expect(card.find('[data-test="o2-table-pagination-info"]').text()).toMatch(/1\D+10\D+25/);
       await card.find('[data-test="o2-table-next-page-btn"]').trigger("click");
       await flushPromises();
-      expect(card.find('[data-test="o2-table-pagination-info"]').text()).toMatch(/21\D+25\D+25/);
+      expect(card.find('[data-test="o2-table-pagination-info"]').text()).toMatch(/11\D+20\D+25/);
     });
   });
 
@@ -662,16 +664,72 @@ describe("OnCallMyDeliveries", () => {
     const rendered = (wrapper: ReturnType<typeof render>) =>
       card(wrapper).findAll('[data-test^="o2-table-row-"]:not([data-test$="drag-handle"])');
 
-    /// The pager arrives with the rows, so the table must not keep the row model it was created with.
-    it("renders one page of rows that matches the footer", async () => {
-      Object.assign(useListViewState("oncall-my-deliveries", {}), { pageSize: 10 });
-      answer(sent(25));
+    const mountReal = async () => {
       const wrapper = mount(OnCallMyDeliveries, {
         global: { plugins: [i18n, store], stubs: realTable },
       });
       await flushPromises();
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      // OTable holds its skeleton for a short minimum after loading ends.
+      await new Promise((resolve) => setTimeout(resolve, 60));
       await flushPromises();
+      return wrapper;
+    };
+    const table = (wrapper: ReturnType<typeof render>) =>
+      card(wrapper).find('[data-test="oncall-my-deliveries-table"]');
+    const pager = (wrapper: ReturnType<typeof render>) =>
+      card(wrapper).find('[data-test="o2-table-pagination-bottom"]');
+
+    /// The scroller, not the table, carries the height, so the pager sits under the ten-row body.
+    it("keeps a fixed ten-row body with only two rows and no pager", async () => {
+      answer(sent(2));
+      const wrapper = await mountReal();
+
+      expect(rendered(wrapper)).toHaveLength(2);
+      expect(table(wrapper).classes()).toContain("[&_[data-test=o2-table-scroll-container]]:h-104");
+      expect(table(wrapper).classes()).toContain("h-auto");
+      expect(pager(wrapper).exists()).toBe(false);
+    });
+
+    /// One action is a button on the row, never a menu holding a single item.
+    it("marks a row unread from its own button in the real table", async () => {
+      answer(sent(2));
+      const wrapper = await mountReal();
+
+      await card(wrapper).find('[data-test="oncall-my-delivery-toggle-ev_0"]').trigger("click");
+      await flushPromises();
+      expect(service.markDeliveriesRead).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { event_ids: ["ev_0"], read: false } }),
+      );
+    });
+
+    it("holds the same fixed body while loading", async () => {
+      service.myDeliveries.mockReturnValue(new Promise(() => {}) as any);
+      const wrapper = await mountReal();
+
+      expect(table(wrapper).classes()).toContain("[&_[data-test=o2-table-scroll-container]]:h-104");
+      const skeleton = card(wrapper).find('[data-test="o2-table-skeleton-body"]');
+      expect(skeleton.findAll("tr")).toHaveLength(10);
+    });
+
+    /// A larger page scrolls inside the fixed body, and the pager stays so the size can be put back.
+    it("scrolls a page of 100 inside the fixed body with the pager below", async () => {
+      Object.assign(useListViewState("oncall-my-deliveries", {}), { pageSize: 100 });
+      answer(sent(41));
+      const wrapper = await mountReal();
+
+      expect(rendered(wrapper)).toHaveLength(41);
+      expect(table(wrapper).classes()).toContain("[&_[data-test=o2-table-scroll-container]]:h-104");
+      expect(pager(wrapper).exists()).toBe(true);
+      expect(card(wrapper).find('[data-test="o2-table-pagination-info"]').text()).toMatch(
+        /1\D+41\D+41/,
+      );
+      expect(card(wrapper).find('[data-test="o2-table-page-size-select"]').exists()).toBe(true);
+    });
+
+    /// The pager arrives with the rows, so the table must not keep the row model it was created with.
+    it("renders ten rows and a pager for 25 rows", async () => {
+      answer(sent(25));
+      const wrapper = await mountReal();
 
       expect(rendered(wrapper)).toHaveLength(10);
       const info = () => card(wrapper).find('[data-test="o2-table-pagination-info"]').text();

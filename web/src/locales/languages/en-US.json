@@ -27394,6 +27394,8 @@
     "reachWordNotVerified": "Not verified",
     "reachWordEmailWontArrive": "Email won't arrive",
     "phoneRemove": "Remove",
+    "phoneChangeAction": "Change phone",
+    "phoneRemoveAction": "Remove phone",
     "phoneRemoveTitle": "Remove your phone?",
     "phoneRemoveMessage": "Pages will reach you by email only.",
     "phoneFormatHint": "Start with + and your country code, e.g. +91 98765 43210",
