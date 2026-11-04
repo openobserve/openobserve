@@ -9,8 +9,9 @@ test.describe("Metrics Aggregation and Grouping Tests", () => {
   test.beforeAll(async () => {
     await ensureMetricsIngested();
     // The random seed puts ~1 point per series, and rate() needs 2+ points in one series.
-    await metricsIngestion.ingestFixedRequestCountSeries();
-    await metricsIngestion.waitForMetricQueryable('sum by (service) (rate(request_count[5m]))');
+    const seeded = await metricsIngestion.ingestFixedRequestCountSeries();
+    expect(seeded.success, `fixed request_count seed failed: ${seeded.error}`).toBe(true);
+    expect(await metricsIngestion.waitForMetricQueryable('sum by (service) (rate(request_count[5m]))'), 'rate(request_count[5m]) never became queryable').toBe(true);
   });
 
   /** Create fresh PageManager per test — avoids data races in parallel workers. */
