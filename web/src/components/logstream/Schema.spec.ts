@@ -2234,6 +2234,26 @@ describe("Schema Component Tests", () => {
         expect.objectContaining({ dynamic_merge: true }),
       );
     });
+
+    it("should show the server default while the stream has no value of its own", async () => {
+      const stream = await mockGetStream();
+      wrapper.vm.store.state.zoConfig.compact_dynamic_merge_stream_types = ["logs"];
+      wrapper.vm.setSchema({ ...stream, settings: { ...stream.settings } });
+      expect(wrapper.vm.dynamicMergeIsDefault).toBe(true);
+      expect(wrapper.vm.dynamicMerge).toBe(true);
+
+      wrapper.vm.setSchema({
+        ...stream,
+        settings: { ...stream.settings, dynamic_merge: false },
+      });
+      expect(wrapper.vm.dynamicMergeIsDefault).toBe(false);
+      expect(wrapper.vm.dynamicMerge).toBe(false);
+
+      wrapper.vm.store.state.zoConfig.compact_dynamic_merge_stream_types = [];
+      wrapper.vm.setSchema({ ...stream, settings: { ...stream.settings } });
+      expect(wrapper.vm.dynamicMergeIsDefault).toBe(true);
+      expect(wrapper.vm.dynamicMerge).toBe(false);
+    });
   });
 
   // ==========================================

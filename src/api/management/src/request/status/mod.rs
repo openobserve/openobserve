@@ -161,6 +161,7 @@ struct ConfigResponse<'a> {
     timestamp_column: String,
     data_retention_days: i64,
     extended_data_retention_days: i64,
+    compact_dynamic_merge_stream_types: Vec<String>,
     restricted_routes_on_empty_data: bool,
     sso_enabled: bool,
     native_login_enabled: bool,
@@ -671,6 +672,13 @@ pub async fn zo_config(
         .collect();
     #[cfg(not(feature = "enterprise"))]
     let feature_names: HashMap<String, String> = HashMap::new();
+    // the UI shows a stream without a value of its own the way the server treats it
+    let mut compact_dynamic_merge_stream_types: Vec<String> =
+        config::COMPACT_DYNAMIC_MERGE_STREAM_TYPES
+            .iter()
+            .map(|stream_type| stream_type.to_string())
+            .collect();
+    compact_dynamic_merge_stream_types.sort();
 
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -693,6 +701,7 @@ pub async fn zo_config(
         timestamp_column: TIMESTAMP_COL_NAME.to_string(),
         data_retention_days: cfg.compact.data_retention_days,
         extended_data_retention_days: cfg.compact.extended_data_retention_days,
+        compact_dynamic_merge_stream_types,
         restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
         sso_enabled,
         native_login_enabled,

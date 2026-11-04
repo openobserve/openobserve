@@ -1260,6 +1260,13 @@ export default defineComponent({
       return type === "logs" || type === "metrics" || type === "traces";
     });
 
+    // what the server applies while the stream has no value of its own
+    const dynamicMergeServerDefault = computed(() =>
+      (store.state.zoConfig.compact_dynamic_merge_stream_types ?? []).includes(
+        modelValue.stream_type,
+      ),
+    );
+
     const onDynamicMergeChange = () => {
       dynamicMergeChanged.value = true;
       dynamicMergeIsDefault.value = false;
@@ -1478,7 +1485,9 @@ export default defineComponent({
       enableDistinctFields.value = streamResponse.settings.enable_distinct_fields || false;
       approxPartition.value = streamResponse.settings.approx_partition || false;
       dynamicMergeIsDefault.value = typeof streamResponse.settings.dynamic_merge !== "boolean";
-      dynamicMerge.value = streamResponse.settings.dynamic_merge === true;
+      dynamicMerge.value = dynamicMergeIsDefault.value
+        ? dynamicMergeServerDefault.value
+        : streamResponse.settings.dynamic_merge;
       dynamicMergeChanged.value = false;
 
       if (!streamResponse.schema) {

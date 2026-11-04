@@ -135,6 +135,7 @@ const store = createStore({
       show_stream_stats_doc_num: true,
       data_retention_days: true,
       extended_data_retention_days: 45,
+      compact_dynamic_merge_stream_types: [],
       user_defined_schemas_enabled: true,
       super_cluster_enabled: false,
       query_on_stream_selection: false,
