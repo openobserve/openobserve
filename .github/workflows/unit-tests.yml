@@ -67,7 +67,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_backend_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
     steps:
@@ -91,6 +91,10 @@ jobs:
 
       - name: Install Protoc
         run: bash ./.github/protoc.sh
+
+      # The EKS runner image has no libclang, which bindgen needs to build custom-labels.
+      - name: Install libclang
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
 
       - name: Simulate building frontend code
         run: mkdir -p web/dist && touch web/dist/index.html
@@ -272,7 +276,7 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4]
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
 
@@ -333,7 +337,8 @@ jobs:
     needs: [check_changes, ui_unit_test_shards]
     if: always() && needs.check_changes.outputs.has_ui_changes == 'true'
     timeout-minutes: 20
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
 
@@ -379,7 +384,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_ui_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
 

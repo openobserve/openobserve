@@ -18,8 +18,8 @@ const REVIEW_AGENTS = [
 ];
 const skip = process.env.OPENCODE_BIN ? false : "set OPENCODE_BIN to the pinned opencode binary";
 
-// The first request that offers tools gets one scripted tool call; every later request gets the final answer.
-function stubProvider(toolCall) {
+// By default the first request that offers tools gets one scripted tool call and every later request the final answer; `script` overrides that per request.
+function stubProvider(toolCall, { script } = {}) {
   const requests = [];
   const event = (type, data) => `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`;
   const server = http.createServer((req, res) => {
@@ -34,9 +34,15 @@ function stubProvider(toolCall) {
         usage: { input_tokens: 1000, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
       } }));
       const hasToolResult = (parsed.messages || []).some(m => Array.isArray(m.content) && m.content.some(b => b.type === "tool_result"));
-      if (parsed.tools?.length && !hasToolResult) {
-        res.write(event("content_block_start", { index: 0, content_block: { type: "tool_use", id: "toolu_1", name: toolCall.name, input: {} } }));
-        res.write(event("content_block_delta", { index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify(toolCall.args) } }));
+      const step = script ? script(parsed, requests.length) : { tool: parsed.tools?.length && !hasToolResult ? toolCall : null };
+      if (step.hangMs) {
+        const timer = setTimeout(() => res.end(), step.hangMs);
+        res.on("close", () => clearTimeout(timer));
+        return;
+      }
+      if (step.tool) {
+        res.write(event("content_block_start", { index: 0, content_block: { type: "tool_use", id: `toolu_${requests.length}`, name: step.tool.name, input: {} } }));
+        res.write(event("content_block_delta", { index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify(step.tool.args) } }));
         res.write(event("content_block_stop", { index: 0 }));
         res.write(event("message_delta", { delta: { stop_reason: "tool_use" }, usage: { output_tokens: 100 } }));
       } else {
@@ -102,9 +108,10 @@ async function withServer(prDir, configPath, run, { readOnly = true } = {}) {
   }
 }
 
-function stubConfig(file, stub, configDir) {
+function stubConfig(file, stub, configDir, edit = () => {}) {
   const config = JSON.parse(stripJsonc(readFileSync(join(ENGINE_DIR, file), "utf-8")));
   config.providers["anthropic-review"].settings = { baseURL: stub.url };
+  edit(config);
   const configPath = join(configDir, "opencode.json");
   writeFileSync(configPath, JSON.stringify(config));
   return configPath;
@@ -189,12 +196,17 @@ test("without sanitize, the env flags still keep project config, tools and agent
   assert.deepEqual(toolNames, ["glob", "grep", "read", "skill"]);
 });
 
-test("ci-full: every tool is offered and runs without a prompt, and the shell sees no GitHub token", { skip, timeout: 120_000 }, async t => {
+const allowShell = (...commands) => config => {
+  config.agents["ai-review-correctness"].permissions.push(...commands.map(resource => ({ action: "shell", resource, effect: "allow" })));
+};
+
+test("ci-full: file tools and the shell are offered without a prompt, and the shell sees no GitHub token", { skip, timeout: 120_000 }, async t => {
   const pr = plantedPr();
   const stub = await stubProvider({ name: "shell", args: { command: "echo ran-$((6*7)); env", description: "probe" } });
   const configDir = mkdtempSync(join(tmpdir(), "ai-review-config-"));
   cleanup(t, stub, pr, configDir);
-  const configPath = stubConfig(OPENCODE_CONFIGS["ci-full"].file, stub, configDir);
+  // The allowlist refuses echo and env, so this probe of the shell's environment adds them for the test alone.
+  const configPath = stubConfig(OPENCODE_CONFIGS["ci-full"].file, stub, configDir, allowShell("echo *", "env *"));
   sanitizePrTree(pr.root, ENGINE_DIR);
 
   await withServer(pr.root, configPath, async client => {
@@ -206,8 +218,128 @@ test("ci-full: every tool is offered and runs without a prompt, and the shell se
   }, { readOnly: false });
 
   const toolNames = (stub.requests[0].body.tools || []).map(tool => tool.name);
-  for (const name of ["read", "glob", "grep", "edit", "write", "shell", "webfetch"]) assert.ok(toolNames.includes(name), name);
+  for (const name of ["read", "glob", "grep", "edit", "write", "shell"]) assert.ok(toolNames.includes(name), name);
+  for (const name of ["webfetch", "websearch", "subagent", "question", "execute"]) assert.equal(toolNames.includes(name), false, `${name} is offered`);
   const content = toolResultOf(stub.requests.at(-1));
   assert.match(content, /ran-42/);
   assert.doesNotMatch(content, /ghs_must_not_leak/);
+});
+
+test("the real self-check passes the shipped ci-full config and refuses it with execute or the whole shell re-allowed", { skip, timeout: 120_000 }, async t => {
+  for (const [extra, problem] of [[null, null], [{ action: "execute", resource: "*", effect: "allow" }, /ai-review-qa: execute allowed/], [{ action: "shell", resource: "*", effect: "allow" }, /ai-review-qa: shell allows every command/]]) {
+    const pr = plantedPr();
+    const stub = await stubProvider(null);
+    const configDir = mkdtempSync(join(tmpdir(), "ai-review-config-"));
+    cleanup(t, stub, pr, configDir);
+    const configPath = stubConfig(OPENCODE_CONFIGS["ci-full"].file, stub, configDir, config => { if (extra) config.agents["ai-review-qa"].permissions.push(extra); });
+    sanitizePrTree(pr.root, ENGINE_DIR);
+    await withServer(pr.root, configPath, async client => {
+      const check = selfCheck(client, REVIEW_AGENTS, { readOnly: false });
+      if (problem) await assert.rejects(check, problem);
+      else assert.equal((await check).agents, REVIEW_AGENTS.length);
+    }, { readOnly: false });
+  }
+});
+
+test("ci-full offers skill only because opencode appends a narrower rule, and refuses every skill", { skip, timeout: 120_000 }, async t => {
+  const pr = plantedPr();
+  const stub = await stubProvider({ name: "skill", args: { id: "browser" } });
+  const configDir = mkdtempSync(join(tmpdir(), "ai-review-config-"));
+  cleanup(t, stub, pr, configDir);
+  const configPath = stubConfig(OPENCODE_CONFIGS["ci-full"].file, stub, configDir);
+  sanitizePrTree(pr.root, ENGINE_DIR);
+  await withServer(pr.root, configPath, async client => {
+    const result = await client.prompt({ ...PROMPT, title: "skill" });
+    assert.equal(result.rejectedPermissions, 0);
+  }, { readOnly: false });
+  assert.match(toolResultOf(stub.requests.at(-1)), /Permission denied: skill/);
+});
+
+test("ci-full shell runs an allowlisted command and refuses a build outright, without asking", { skip, timeout: 120_000 }, async t => {
+  // A RegExp is the output an allowed command must print; null means opencode must refuse it.
+  const ONE = /(?<!\d)1(?!\d)/;
+  const cases = [
+    ["cat src/main.rs | wc -l", ONE], ["grep -c main src/main.rs", ONE], ["find src -name '*.rs' | wc -l", ONE], ["tail -n 1 src/main.rs | wc -l", ONE],
+    ["ls src && wc -l src/main.rs", ONE], ["find src -name '*-executor*' | wc -l", /(?<!\d)0(?!\d)/], ["cargo build", null], ["ls && touch built.txt", null],
+    ["find . -name main.rs -exec touch built.txt ;", null], ["find src -fprint built.txt", null], ["git grep -nOsh main", null],
+    ["cat $(touch built.txt)", null], ["cat `touch built.txt`", null], ["cat src/main.rs > built.txt", null], ["cat /proc/self/environ", null],
+  ];
+  for (const [command, output] of cases) {
+    const pr = plantedPr();
+    const stub = await stubProvider({ name: "shell", args: { command, description: "probe" } });
+    const configDir = mkdtempSync(join(tmpdir(), "ai-review-config-"));
+    cleanup(t, stub, pr, configDir);
+    const configPath = stubConfig(OPENCODE_CONFIGS["ci-full"].file, stub, configDir);
+    sanitizePrTree(pr.root, ENGINE_DIR);
+    await withServer(pr.root, configPath, async client => {
+      const result = await client.prompt({ ...PROMPT, title: "shell" });
+      assert.equal(result.rejectedPermissions, 0, "a denied command must not reach a prompt that ci-full would approve");
+    }, { readOnly: false });
+    const content = toolResultOf(stub.requests.at(-1));
+    assert.match(content, output ?? /Permission denied: shell/, command);
+    assert.equal(existsSync(join(pr.root, "built.txt")), false, command);
+  }
+});
+
+// Why neither config sets `steps`: if opencode ever stops ending the capped turn on an assistant message, this fails and the cap can come back.
+test("opencode 2.2.0's step cap ends the capped turn on an assistant prefill, which the model rejects with thinking on", { skip, timeout: 120_000 }, async t => {
+  const pr = plantedPr();
+  // Asks for another tool call on every turn that allows one, so only the cap can end the loop.
+  const stub = await stubProvider(null, { script: parsed => ({ tool: parsed.tool_choice?.type === "none" ? null : { name: "glob", args: { pattern: "*.rs" } } }) });
+  const configDir = mkdtempSync(join(tmpdir(), "ai-review-config-"));
+  cleanup(t, stub, pr, configDir);
+  const configPath = stubConfig(OPENCODE_CONFIGS["ci-full"].file, stub, configDir, config => { config.agents["ai-review-correctness"].steps = 3; });
+  sanitizePrTree(pr.root, ENGINE_DIR);
+  await withServer(pr.root, configPath, client => client.prompt({ ...PROMPT, title: "steps" }), { readOnly: false });
+  assert.equal(stub.requests.length, 3);
+  const capped = stub.requests.at(-1).body;
+  assert.deepEqual(capped.tool_choice, { type: "none" });
+  assert.equal(capped.messages.at(-1).role, "assistant");
+  assert.match(JSON.stringify(capped.messages.at(-1).content), /MAXIMUM STEPS REACHED/);
+  for (const request of stub.requests.slice(0, -1)) assert.equal(request.body.messages.at(-1).role, "user");
+});
+
+test("each effort variant reaches the provider as its own effort level", { skip, timeout: 120_000 }, async t => {
+  for (const variant of ["low", "medium", "xhigh", "max"]) {
+    const pr = plantedPr();
+    const stub = await stubProvider({ name: "glob", args: { pattern: "*.rs" } });
+    const configDir = mkdtempSync(join(tmpdir(), "ai-review-config-"));
+    cleanup(t, stub, pr, configDir);
+    const configPath = stubConfig(OPENCODE_CONFIGS["ci-full"].file, stub, configDir);
+    sanitizePrTree(pr.root, ENGINE_DIR);
+    await withServer(pr.root, configPath, client => client.prompt({ ...PROMPT, variant, title: variant }), { readOnly: false });
+    for (const request of stub.requests) {
+      assert.deepEqual(request.body.output_config, { effort: variant });
+      assert.equal(request.body.thinking?.type, "adaptive");
+      for (const field of ["temperature", "top_p", "top_k", "tool_choice"]) assert.equal(request.body[field], undefined, field);
+    }
+  }
+});
+
+test("a session still running at its soft deadline is interrupted and answers the wrap-up prompt from the same context", { skip, timeout: 120_000 }, async t => {
+  const pr = plantedPr();
+  const wrapText = "WRAP-UP-NOW-5d1e";
+  // A tool step, then a model turn that never returns; only the wrap-up prompt gets an answer.
+  const stub = await stubProvider(null, {
+    script: (parsed, n) => {
+      if (parsed.messages?.some(m => JSON.stringify(m.content).includes(wrapText))) return { tool: null };
+      return n === 1 ? { tool: { name: "glob", args: { pattern: "*.rs" } } } : { hangMs: 60_000 };
+    },
+  });
+  const configDir = mkdtempSync(join(tmpdir(), "ai-review-config-"));
+  cleanup(t, stub, pr, configDir);
+  const configPath = stubConfig(OPENCODE_CONFIGS["ci-full"].file, stub, configDir);
+  sanitizePrTree(pr.root, ENGINE_DIR);
+  await withServer(pr.root, configPath, async client => {
+    const result = await client.prompt({ ...PROMPT, title: "wrap-up", timeoutMs: 20_000, wrapUp: { ms: 10_000, text: wrapText } });
+    assert.equal(result.wrappedUp, true);
+    assert.equal(result.text, "<no-issues/>");
+  }, { readOnly: false });
+  const last = stub.requests.at(-1);
+  assert.match(last.raw, new RegExp(wrapText));
+  assert.ok(last.body.messages.some(m => Array.isArray(m.content) && m.content.some(b => b.type === "tool_result")), "the wrap-up lost the steps the agent had already run");
+  for (const request of stub.requests) {
+    for (const field of ["temperature", "top_p", "top_k", "tool_choice"]) assert.equal(request.body[field], undefined, field);
+    assert.equal(request.body.messages.at(-1).role, "user", "the wrap-up must not end on an assistant prefill");
+  }
 });

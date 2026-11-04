@@ -323,6 +323,18 @@ describe("useVariablesManager", () => {
   });
 
   describe("Variable Loading", () => {
+    it("should treat date variables like textbox (no query, loaded immediately)", async () => {
+      const manager = useVariablesManager(gt);
+      const config: VariableConfig[] = [
+        { name: "from_date", type: "date", scope: "global", value: "2026-01-01" },
+      ];
+
+      await manager.initialize(config, {});
+
+      expect(manager.variablesData.global[0].isVariablePartialLoaded).toBe(true);
+      expect(manager.variablesData.global[0].isVariableLoadingPending).toBe(true);
+    });
+
     it("should load independent global variables in parallel", async () => {
       const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [

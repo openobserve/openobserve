@@ -1,4 +1,5 @@
 import { removeRepeatedly } from "./comments.mjs";
+import { reviewerCompleted } from "./confidence.mjs";
 import { LOADER_DIRS, LOADER_FILES } from "./sanitize.mjs";
 
 export const MAX_APPROVE_LINES = 100;
@@ -62,6 +63,7 @@ const SUBMODULE_MODE = "160000";
 const KNOWN_HEADER_RE = /^(?:index |--- |\+\+\+ |similarity index |dissimilarity index |rename |copy |old mode |new mode |new file mode |deleted file mode |Binary files |GIT binary patch|\\ |$)/;
 const HUNK_RE = /^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@/;
 const APPROVED_LINE = "**Auto-approved** — small change, all gates passed.";
+const UNCHANGED_DIFF_APPROVAL_LINE = "**Needs human review** — an approval does not carry over to a new commit, even one with the same reviewed diff";
 const APPROVAL_BODY = "Auto-approved by the review gate: small change, all gates passed. CI must still pass before merge.";
 const DISMISSAL_MESSAGE = "New commits arrived; an automatic approval does not carry over.";
 
@@ -234,7 +236,7 @@ function reviewerReasons(reviewers) {
 
 // Parsed reviewer output is the only proof a reviewer looked; a clean exit with empty text is not.
 export function reviewerFacts(results) {
-  return results.map(r => ({ key: r.agentKey, ran: !r.skipped, finished: !r.skipped && !r.error && r.parsed === true, fullDiff: r.fullDiff === true }));
+  return results.map(r => ({ key: r.agentKey, ran: !r.skipped, finished: reviewerCompleted(r), fullDiff: r.fullDiff === true }));
 }
 
 function pairingReasons({ paired, pairClear }) {
@@ -385,4 +387,9 @@ export function createAutoApproveGate({ mode, api, botLogin, headSha, warn = () 
 export function autoApproveLine(result) {
   if (result?.mode !== "approve") return "";
   return result.approved ? APPROVED_LINE : `**Needs human review** — ${result.reasons.join("; ")}`;
+}
+
+// The unchanged-diff skip still dismisses the approval: the fingerprint ignores lockfiles and other noise the approval gate checks.
+export function withoutCarriedApproval(body) {
+  return String(body ?? "").split(APPROVED_LINE).join(UNCHANGED_DIFF_APPROVAL_LINE);
 }
