@@ -18,7 +18,7 @@ import { gt } from "@/types/i18n";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { buildAgentTraceFilter } from "../llmAgentFilter";
-import { compactSql } from "../config/llmInsightsPanels";
+import { compactSql, llmCallUsageSum } from "../config/llmInsightsPanels";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { useStore } from "vuex";
 
@@ -222,7 +222,12 @@ export function useLLMInsights() {
    * so the frontend never needs to know the interval.
    *
    * Summing is exact for the additive aggregates (SUM(tokens), SUM(cost),
-   * COUNT(requests)). `trace_count` / `error_count` use `approx_distinct`,
+   * COUNT(requests)). Tokens and cost sum over LLM-call spans only
+   * (`llmCallUsageSum`) so agent spans repeating their children's usage
+   * don't double-count. The agent filter matches spans, and many SDKs tag
+   * only the agent span with the agent's identity, so an agent-scoped bucket
+   * with no matching LLM-call usage falls back to summing the spans it did
+   * match. `trace_count` / `error_count` use `approx_distinct`,
    * so a trace with spans in two buckets is counted in both — the sums
    * can run slightly high, which is an accepted tradeoff for serving the
    * whole strip from one query. The error-rate CARD divides the summed
@@ -240,14 +245,18 @@ export function useLLMInsights() {
     const size = 10_000;
 
     const agentFilter = buildAgentTraceFilter(agent, streamName);
+    const usageSum = (column: string) =>
+      agentFilter
+        ? `COALESCE(NULLIF(${llmCallUsageSum(column)}, 0), SUM(${column}), 0)`
+        : `COALESCE(${llmCallUsageSum(column)}, 0)`;
     const mainSql = compactSql(`
       SELECT
         histogram(_timestamp) as ts,
         COUNT(*) FILTER (WHERE gen_ai_operation_name IS NOT NULL) as request_count,
         approx_distinct(trace_id) as trace_count,
         approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR') as error_count,
-        COALESCE(SUM(gen_ai_usage_total_tokens), 0) as total_tokens,
-        COALESCE(SUM(gen_ai_usage_cost), 0) as total_cost,
+        ${usageSum("gen_ai_usage_total_tokens")} as total_tokens,
+        ${usageSum("gen_ai_usage_cost")} as total_cost,
         COALESCE(approx_percentile_cont(duration, 0.95) FILTER (WHERE gen_ai_operation_name IS NOT NULL), 0) as p95_duration
       FROM "${streamName}"
       ${agentFilter ? `WHERE ${agentFilter}` : ""}

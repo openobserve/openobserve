@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :tabs-below="tabsBelow"
           :title-overflow="titleOverflow"
           :overflow-first="overflowFirst"
+          :title-min-width="titleMinWidth"
         >
           <template v-if="!!slots.title" #title><slot name="title" /></template>
           <template v-if="!!slots['title-prefix']" #title-prefix
@@ -245,6 +246,8 @@ const props = withDefaults(
     titleOverflow?: "truncate" | "visible";
     /** Forwarded to OPageHeader: desktop renders #actions-overflow before #actions. */
     overflowFirst?: boolean;
+    /** Forwarded to OPageHeader: the title keeps a 10rem floor at every width. */
+    titleMinWidth?: boolean;
     // Body
     bleed?: boolean;
     padY?: boolean;
@@ -264,6 +267,7 @@ const props = withDefaults(
   {
     tabsBelow: false,
     overflowFirst: false,
+    titleMinWidth: false,
     bleed: false,
     padY: false,
     scroll: false,

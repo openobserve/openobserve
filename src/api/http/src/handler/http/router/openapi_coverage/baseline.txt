@@ -203,7 +203,6 @@ all ratelimit POST /api/{org_id}/functions/test
 all mcp GET /api/{org_id}/gen_ai/agents
 all ratelimit GET /api/{org_id}/gen_ai/agents
 all summary GET /api/{org_id}/gen_ai/agents
-all tag GET /api/{org_id}/gen_ai/agents
 all mcp GET /api/{org_id}/groups
 all ratelimit GET /api/{org_id}/groups
 all mcp POST /api/{org_id}/groups
@@ -280,15 +279,12 @@ all summary PUT /api/{org_id}/service_streams/config/identity
 all mcp GET /api/{org_id}/settings/gen_ai/agent_mapping
 all ratelimit GET /api/{org_id}/settings/gen_ai/agent_mapping
 all summary GET /api/{org_id}/settings/gen_ai/agent_mapping
-all tag GET /api/{org_id}/settings/gen_ai/agent_mapping
 all mcp PUT /api/{org_id}/settings/gen_ai/agent_mapping
 all ratelimit PUT /api/{org_id}/settings/gen_ai/agent_mapping
 all summary PUT /api/{org_id}/settings/gen_ai/agent_mapping
-all tag PUT /api/{org_id}/settings/gen_ai/agent_mapping
 all mcp DELETE /api/{org_id}/settings/gen_ai/agent_registry
 all ratelimit DELETE /api/{org_id}/settings/gen_ai/agent_registry
 all summary DELETE /api/{org_id}/settings/gen_ai/agent_registry
-all tag DELETE /api/{org_id}/settings/gen_ai/agent_registry
 all security POST /api/{org_id}/short
 all security GET /api/{org_id}/short/{short_id}
 all response POST /api/{org_id}/slack/link-requests/{request_id}/resend

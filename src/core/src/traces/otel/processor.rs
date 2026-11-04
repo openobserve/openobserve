@@ -18,12 +18,14 @@
 //! Processes OpenTelemetry resource spans and enriches them with OpenObserve-specific
 //! attributes following gen-ai semantic conventions.
 
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap, fmt::Write as _};
 
 use config::{
     meta::{
         gen_ai::GenAiAgentMappingConfig,
-        model_pricing::{ModelPricingDefinition, PricingContext},
+        model_pricing::{
+            COST_STATUS_COLUMN, CostStatus, MatchKind, ModelPricingDefinition, PricingContext,
+        },
     },
     utils::{json, time::parse_timestamp_micro_from_value},
 };
@@ -43,11 +45,25 @@ use super::{
 };
 use crate::common::meta::traces::Event;
 
+/// OTLP span fields the processor needs besides the attributes.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SpanContext<'a> {
+    /// Span name; the Vercel AI SDK names spans by operation id.
+    pub name: &'a str,
+    /// `start_time_unix_nano`; zero means unknown.
+    pub start_nanos: u64,
+    /// The span status is ERROR.
+    pub is_error: bool,
+}
+
 /// Results of extracting span enrichment data from raw attributes.
 /// Captures all information needed before I/O attribute cleanup.
 struct SpanExtractions {
     op_name: &'static str,
+    /// Response model, else request model: pricing, tokenization, stored response model.
     model_name: Option<String>,
+    /// Model named by response attributes only.
+    response_model: Option<String>,
     provider_name: Option<String>,
     input: Option<json::Value>,
     output: Option<json::Value>,
@@ -67,6 +83,8 @@ struct SpanExtractions {
     tool_call_result: Option<json::Value>,
     agent: AgentIdentity,
     evaluation: Evaluation,
+    /// Failed call with no usage or cost, so it gets no estimated tokens, cost or request model.
+    failed_without_usage: bool,
 }
 
 pub struct OtelIngestionProcessor {
@@ -136,12 +154,17 @@ impl OtelIngestionProcessor {
             resource_attributes,
             scope_name,
             events,
-            org_pricing_entries,
-            span_start_nanos,
+            Some(org_pricing_entries),
+            SpanContext {
+                start_nanos: span_start_nanos,
+                ..Default::default()
+            },
             &GenAiAgentMappingConfig::default(),
         );
     }
 
+    /// Enriches an LLM span. `org_pricing_entries` is `None` when model pricing is disabled
+    /// (`ZO_MODEL_PRICING_ENABLED=false`): no cost is computed and no cost status is written.
     #[allow(clippy::too_many_arguments)]
     pub fn process_span_with_pricing_and_agent_mapping(
         &self,
@@ -149,8 +172,8 @@ impl OtelIngestionProcessor {
         resource_attributes: &HashMap<String, json::Value>,
         scope_name: Option<&str>,
         events: &[Event],
-        org_pricing_entries: &[CachedModelPricing],
-        span_start_nanos: u64,
+        org_pricing_entries: Option<&[CachedModelPricing]>,
+        span: SpanContext<'_>,
         agent_mapping_config: &GenAiAgentMappingConfig,
     ) {
         // Phase 1: Extract all raw data from span attributes.
@@ -159,6 +182,7 @@ impl OtelIngestionProcessor {
             resource_attributes,
             scope_name,
             events,
+            span,
             agent_mapping_config,
         );
 
@@ -167,16 +191,16 @@ impl OtelIngestionProcessor {
             .retain(|key, _| !self.input_output_extractor.is_input_output_attribute(key));
 
         // Phase 2: Compute derived values — token counts, cost estimates, defaults.
-        let (usage, cost) = self.compute_usage_and_cost(
+        let (usage, cost, cost_status) = self.compute_usage_and_cost(
             &extracted,
             span_attributes,
             resource_attributes,
             org_pricing_entries,
-            span_start_nanos,
+            span.start_nanos,
         );
 
         // Phase 3: Write enriched attributes back to the span.
-        self.emit_enriched_attributes(span_attributes, &extracted, &usage, &cost);
+        self.emit_enriched_attributes(span_attributes, &extracted, &usage, &cost, cost_status);
     }
 
     // ── Phase 1: Extract raw data ──────────────────────────────────────────
@@ -187,15 +211,17 @@ impl OtelIngestionProcessor {
         resource_attributes: &HashMap<String, json::Value>,
         scope_name: Option<&str>,
         events: &[Event],
+        span: SpanContext<'_>,
         agent_mapping_config: &GenAiAgentMappingConfig,
     ) -> SpanExtractions {
-        let scope_info = scope_name.map(|name| ScopeInfo {
-            name: Some(name.to_string()),
-        });
+        let scope_info = ScopeInfo {
+            name: scope_name,
+            span_name: (!span.name.is_empty()).then_some(span.name),
+        };
         let scope_name_default = scope_name.unwrap_or("");
 
         let op_name =
-            map_to_gen_ai_operation_name(span_attributes, resource_attributes, scope_info.as_ref());
+            map_to_gen_ai_operation_name(span_attributes, resource_attributes, Some(&scope_info));
         let model_name = self.model_extractor.extract(span_attributes);
         let provider_name = self.provider_extractor.extract(span_attributes);
         let (input, output) =
@@ -232,10 +258,16 @@ impl OtelIngestionProcessor {
             agent_mapping_config,
         );
         let evaluation = self.evaluation_extractor.extract(span_attributes);
+        let failed_without_usage =
+            span.is_error && usage_details.usage.is_empty() && cost.is_empty();
+        let response_model = failed_without_usage
+            .then(|| self.model_extractor.extract_response_model(span_attributes))
+            .flatten();
 
         SpanExtractions {
             op_name,
             model_name,
+            response_model,
             provider_name,
             input,
             output,
@@ -255,24 +287,36 @@ impl OtelIngestionProcessor {
             tool_call_result,
             agent,
             evaluation,
+            failed_without_usage,
         }
     }
 
     // ── Phase 2: Compute usage, cost, and defaults ─────────────────────────
 
+    /// Returns token usage, cost components and, for a model not priced exactly at a non-zero
+    /// cost, its [`CostStatus`]. An unpriced span gets no cost entries, not a zero total.
+    /// `org_pricing_entries` is `None` when model pricing is disabled: nothing is priced and
+    /// no span is marked.
     fn compute_usage_and_cost(
         &self,
         extracted: &SpanExtractions,
         span_attributes: &HashMap<String, json::Value>,
         resource_attributes: &HashMap<String, json::Value>,
-        org_pricing_entries: &[CachedModelPricing],
+        org_pricing_entries: Option<&[CachedModelPricing]>,
         span_start_nanos: u64,
-    ) -> (HashMap<String, i64>, HashMap<String, f64>) {
+    ) -> (
+        HashMap<String, i64>,
+        HashMap<String, f64>,
+        Option<CostStatus>,
+    ) {
         let mut usage = extracted.usage.clone();
         let mut cost = extracted.cost.clone();
         let mut input_includes_cache = extracted.input_includes_cache;
+        let mut cost_status = None;
+        let mut zero_priced = false;
 
-        if is_generation_or_embedding(extracted.op_name) {
+        // Estimating tokens for a failed call with no usage would invent a cost.
+        if is_generation_or_embedding(extracted.op_name) && !extracted.failed_without_usage {
             // Zero means the payload carried no start time; treat it as unknown rather
             // than as 1970-01-01, which would land every such span in a time-of-day tier.
             let span_ts_micros = (span_start_nanos != 0)
@@ -282,15 +326,17 @@ impl OtelIngestionProcessor {
             if let Some(v) = &extracted.input
                 && !usage.contains_key("input")
             {
-                let prompt = v.to_string();
+                let prompt = message_text(v);
                 let prompt_tokens = pricing::calculate_token_count(tokenizer_key, &prompt);
                 usage.insert("input".to_string(), prompt_tokens);
                 input_includes_cache = true;
             }
-            if let Some(v) = &extracted.output
+            // An embedding's output is a vector, not generated tokens.
+            if extracted.op_name != "embeddings"
+                && let Some(v) = &extracted.output
                 && !usage.contains_key("output")
             {
-                let output_text = v.to_string();
+                let output_text = message_text(v);
                 let output_tokens = pricing::calculate_token_count(tokenizer_key, &output_text);
                 usage.insert("output".to_string(), output_tokens);
             }
@@ -305,42 +351,69 @@ impl OtelIngestionProcessor {
             let (billable_usage, tier_usage) = build_pricing_usage(&usage, input_includes_cache);
 
             // Resolve only for spans without a client-reported cost; the lookup runs regexes.
+            // A span with tokens but no model name has nothing to price: it is unpriced, not
+            // free. One without tokens stays unmarked. With pricing disabled nothing is priced
+            // or marked: the span keeps only a reported cost.
             if cost.is_empty()
-                && let Some(resolved) = extracted.model_name.as_ref().and_then(|mn| {
-                    crate::db::model_pricing::find_pricing_sync_at(
-                        org_pricing_entries,
-                        mn,
-                        span_ts_micros,
-                    )
-                })
+                && org_pricing_entries.is_some()
+                && extracted.model_name.is_none()
+                && usage.values().any(|&v| v > 0)
             {
-                let pricing_def = &resolved.definition;
-                let ctx = pricing_context(
-                    pricing_def,
-                    span_attributes,
-                    resource_attributes,
-                    &extracted.model_params,
+                cost_status = Some(CostStatus::Unpriced);
+            } else if cost.is_empty()
+                && let Some(org_pricing_entries) = org_pricing_entries
+                && let Some(model_name) = extracted.model_name.as_deref()
+            {
+                let resolved = crate::db::model_pricing::find_pricing_sync_at(
+                    org_pricing_entries,
+                    model_name,
+                    span_ts_micros,
                 );
-                let result =
-                    crate::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
+                let mut priced = false;
+                if let Some(resolved) = resolved {
+                    let pricing_def = &resolved.definition;
+                    let ctx = pricing_context(
                         pricing_def,
-                        &billable_usage,
-                        &tier_usage,
-                        span_ts_micros,
-                        &ctx,
+                        span_attributes,
+                        resource_attributes,
+                        &extracted.model_params,
                     );
-                if !result.cost.is_empty() {
-                    log::debug!(
-                        "[model_pricing] model='{}' pattern='{}' match={:?} tier='{}' total_cost={:.8}",
-                        extracted.model_name.as_deref().unwrap_or(""),
-                        pricing_def.match_pattern,
-                        resolved.match_kind,
-                        result.tier_name,
-                        result.cost.get("total").copied().unwrap_or(0.0),
-                    );
-                    cost = result.cost;
-                    add_cache_derived_costs(&mut cost, &tier_usage, &result.prices);
-                    cost.values_mut().for_each(|v| *v = round_cost(*v));
+                    let result =
+                        crate::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
+                            pricing_def,
+                            &billable_usage,
+                            &tier_usage,
+                            span_ts_micros,
+                            &ctx,
+                        );
+                    // A selected tier prices the span even when its cost is zero (no tokens,
+                    // or a free model); only "no definition / no tier" is unpriced.
+                    priced = result.tier_index.is_some();
+                    if priced && resolved.match_kind == MatchKind::Approximate {
+                        cost_status = Some(CostStatus::Approximate);
+                    }
+                    // Free means the exact match's selected tier prices every unit at $0, not
+                    // that this span happened to cost $0 (a priced model's zero-token span).
+                    zero_priced = priced
+                        && resolved.match_kind == MatchKind::Exact
+                        && !result.prices.is_empty()
+                        && result.prices.values().all(|&price| price == 0.0);
+                    if !result.cost.is_empty() {
+                        log::debug!(
+                            "[model_pricing] model='{}' pattern='{}' match={:?} tier='{}' total_cost={:.8}",
+                            model_name,
+                            pricing_def.match_pattern,
+                            resolved.match_kind,
+                            result.tier_name,
+                            result.cost.get("total").copied().unwrap_or(0.0),
+                        );
+                        cost = result.cost;
+                        add_cache_derived_costs(&mut cost, &tier_usage, &result.prices);
+                        cost.values_mut().for_each(|v| *v = round_cost(*v));
+                    }
+                }
+                if !priced && usage.values().any(|&tokens| tokens > 0) {
+                    cost_status = Some(CostStatus::Unpriced);
                 }
             }
         }
@@ -363,13 +436,20 @@ impl OtelIngestionProcessor {
             usage.insert("total".to_string(), input + cache_input + output);
         }
 
-        // Ensure cost total (sum all components, not just input+output).
-        if !cost.contains_key("total") {
+        // Ensure cost total (sum all components, not just input+output). An unpriced span keeps
+        // no cost at all so readers can tell "no price" from "free".
+        if cost_status != Some(CostStatus::Unpriced) && !cost.contains_key("total") {
             let total = actual_cost_total(&cost);
             cost.insert("total".to_string(), total);
         }
+        // An exact all-zero price (a free or muted model) is still a price; mark it so readers
+        // do not take the zero for a legacy unpriced span. A priced model's zero-token span
+        // stays unmarked.
+        if zero_priced && cost.get("total").copied() == Some(0.0) {
+            cost_status = Some(CostStatus::Free);
+        }
 
-        (usage, cost)
+        (usage, cost, cost_status)
     }
 
     // ── Phase 3: Emit enriched attributes ──────────────────────────────────
@@ -380,13 +460,20 @@ impl OtelIngestionProcessor {
         extracted: &SpanExtractions,
         usage: &HashMap<String, i64>,
         cost: &HashMap<String, f64>,
+        cost_status: Option<CostStatus>,
     ) {
         span_attributes.insert(
             GenAiAttributes::OPERATION_NAME.to_string(),
             json::json!(extracted.op_name),
         );
 
-        if let Some(ref model) = extracted.model_name {
+        // A failed call keeps only a response-named model; the request model proves nothing.
+        let response_model = if extracted.failed_without_usage {
+            extracted.response_model.as_ref()
+        } else {
+            extracted.model_name.as_ref()
+        };
+        if let Some(model) = response_model {
             span_attributes.insert(
                 GenAiAttributes::RESPONSE_MODEL.to_string(),
                 json::json!(model),
@@ -512,6 +599,20 @@ impl OtelIngestionProcessor {
         if let Some(&v) = cost.get("total") {
             insert_if_absent(span_attributes, GenAiAttributes::USAGE_COST, json::json!(v));
         }
+        // Only ingest sets the marker; a client-sent value in either spelling (both flatten to
+        // the same column) would fake one or collide with the ingest value.
+        span_attributes.remove(GenAiExtensions::USAGE_COST_STATUS);
+        span_attributes.remove(COST_STATUS_COLUMN);
+        if let Some(status) = cost_status {
+            if status == CostStatus::Unpriced {
+                // A client-sent zero is not a price; leave the cost null.
+                span_attributes.remove(GenAiAttributes::USAGE_COST);
+            }
+            span_attributes.insert(
+                GenAiExtensions::USAGE_COST_STATUS.to_string(),
+                json::json!(status.as_str()),
+            );
+        }
 
         if let Some(uid) = &extracted.user_id {
             span_attributes.insert(OtelAttributes::USER_ID.to_string(), json::json!(uid));
@@ -524,20 +625,27 @@ impl OtelIngestionProcessor {
             );
         }
 
-        if let Some(pname) = &extracted.prompt_name {
-            span_attributes.insert(GenAiAttributes::PROMPT_NAME.to_string(), json::json!(pname));
-        }
-        if let Some(version) = extracted.prompt_version {
-            span_attributes.insert(
-                GenAiAttributes::PROMPT_VERSION.to_string(),
-                json::json!(version),
-            );
-        }
-        if let Some(label) = &extracted.prompt_label {
-            span_attributes.insert(
-                GenAiAttributes::PROMPT_LABEL.to_string(),
-                json::json!(label),
-            );
+        // The raw prompt reference survives extraction; replace it with the normalised value,
+        // or drop it when the extractor rejected it (a non-string name, a version that is not a
+        // positive integer), so `gen_ai_prompt_version` stays an Int64 column.
+        for (key, value) in [
+            (
+                GenAiAttributes::PROMPT_NAME,
+                extracted.prompt_name.as_deref().map(|v| json::json!(v)),
+            ),
+            (
+                GenAiAttributes::PROMPT_VERSION,
+                extracted.prompt_version.map(|v| json::json!(v)),
+            ),
+            (
+                GenAiAttributes::PROMPT_LABEL,
+                extracted.prompt_label.as_deref().map(|v| json::json!(v)),
+            ),
+        ] {
+            match value {
+                Some(value) => span_attributes.insert(key.to_string(), value),
+                None => span_attributes.remove(key),
+            };
         }
 
         // TTFT: convert microseconds → Float64 seconds.
@@ -786,6 +894,94 @@ fn cache_input_tokens(usage: &HashMap<String, i64>) -> i64 {
     cache_read.saturating_add(cache_creation)
 }
 
+/// Text a tokenizer should count: message `content`/`text` parts and tool-call arguments only.
+fn message_text(value: &json::Value) -> Cow<'_, str> {
+    let parsed;
+    let structured = match value {
+        json::Value::String(s) => match json::from_str::<json::Value>(s) {
+            Ok(v @ (json::Value::Array(_) | json::Value::Object(_))) => {
+                parsed = v;
+                &parsed
+            }
+            _ => return Cow::Borrowed(s),
+        },
+        other => other,
+    };
+    let mut out = String::new();
+    collect_message_text(structured, &mut out);
+    if out.is_empty() {
+        collect_string_leaves(structured, &mut out);
+    }
+    Cow::Owned(out)
+}
+
+fn collect_message_text(value: &json::Value, out: &mut String) {
+    match value {
+        json::Value::String(s) => push_text(out, s),
+        json::Value::Array(items) => items
+            .iter()
+            .for_each(|item| collect_message_text(item, out)),
+        json::Value::Object(map) => {
+            for key in [
+                "content",
+                "text",
+                "parts",
+                "messages",
+                "tool_calls",
+                "toolCalls",
+                // OpenInference `message.content`, `contents.N.message_content.text`, tool calls.
+                "message",
+                "contents",
+                "message_content",
+                "tool_call",
+            ] {
+                if let Some(v) = map.get(key) {
+                    collect_message_text(v, out);
+                }
+            }
+            // Tool call: OpenAI `{function: {arguments}}`, `{arguments}`, or Vercel `{args}`.
+            if let Some(function) = map.get("function") {
+                collect_message_text(function, out);
+            }
+            for key in ["arguments", "args", "input"] {
+                match map.get(key) {
+                    Some(json::Value::String(s)) => push_text(out, s),
+                    Some(v @ (json::Value::Object(_) | json::Value::Array(_))) => {
+                        if !out.is_empty() {
+                            out.push('\n');
+                        }
+                        // Writing into a String cannot fail.
+                        let _ = write!(out, "{v}");
+                    }
+                    _ => {}
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_string_leaves(value: &json::Value, out: &mut String) {
+    match value {
+        json::Value::String(s) => push_text(out, s),
+        json::Value::Array(items) => items
+            .iter()
+            .for_each(|item| collect_string_leaves(item, out)),
+        json::Value::Object(map) => map.values().for_each(|v| collect_string_leaves(v, out)),
+        _ => {}
+    }
+}
+
+fn push_text(out: &mut String, text: &str) {
+    if text.is_empty() {
+        return;
+    }
+    if !out.is_empty() {
+        out.push('\n');
+    }
+    out.push_str(text);
+}
+
 fn insert_if_absent(
     span_attributes: &mut HashMap<String, json::Value>,
     key: &str,
@@ -1011,8 +1207,8 @@ mod tests {
             &HashMap::new(),
             None,
             &[],
-            &[],
-            0,
+            Some(&[]),
+            SpanContext::default(),
             &config,
         );
 
@@ -1231,6 +1427,51 @@ mod tests {
             Some(&json::json!("production"))
         );
         assert!(!span_attrs.contains_key("gen_ai_prompt_variable_customer"));
+    }
+
+    #[test]
+    fn process_span_replaces_or_drops_raw_prompt_reference() {
+        let processor = OtelIngestionProcessor::new();
+        // Rejected by the extractor: a non-numeric version and a non-string name.
+        let mut rejected = HashMap::from([
+            (GenAiAttributes::PROMPT_NAME.to_string(), json::json!(42)),
+            (
+                GenAiAttributes::PROMPT_VERSION.to_string(),
+                json::json!("latest"),
+            ),
+            (
+                GenAiAttributes::PROMPT_LABEL.to_string(),
+                json::json!("production"),
+            ),
+        ]);
+        processor.process_span(&mut rejected, &HashMap::new(), None, &[]);
+        assert!(!rejected.contains_key(GenAiAttributes::PROMPT_VERSION));
+        assert!(!rejected.contains_key(GenAiAttributes::PROMPT_NAME));
+        assert_eq!(
+            rejected.get(GenAiAttributes::PROMPT_LABEL),
+            Some(&json::json!("production"))
+        );
+
+        // A numeric string version is stored as the integer it names.
+        let mut accepted = HashMap::from([
+            (
+                GenAiAttributes::PROMPT_NAME.to_string(),
+                json::json!("support-answer"),
+            ),
+            (
+                GenAiAttributes::PROMPT_VERSION.to_string(),
+                json::json!("3"),
+            ),
+        ]);
+        processor.process_span(&mut accepted, &HashMap::new(), None, &[]);
+        assert_eq!(
+            accepted.get(GenAiAttributes::PROMPT_VERSION),
+            Some(&json::json!(3))
+        );
+        assert_eq!(
+            accepted.get(GenAiAttributes::PROMPT_NAME),
+            Some(&json::json!("support-answer"))
+        );
     }
 
     #[test]
@@ -1508,39 +1749,93 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_process_span_no_cost_calculation_for_unknown_model() {
-        let processor = OtelIngestionProcessor::new();
-
+    fn chat_span(model: &str) -> HashMap<String, json::Value> {
         let mut span_attrs = HashMap::new();
         span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
-        span_attrs.insert(
-            "gen_ai.request.model".to_string(),
-            json::json!("unknown-model-xyz-2024"),
-        );
-        span_attrs.insert(
-            "gen_ai.input.messages".to_string(),
-            json::json!("[{\"role\":\"user\"}]"),
-        );
-        span_attrs.insert(
-            "gen_ai.output.messages".to_string(),
-            json::json!("[{\"role\":\"assistant\"}]"),
-        );
+        span_attrs.insert("gen_ai.request.model".to_string(), json::json!(model));
         span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(1000));
         span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(500));
+        span_attrs
+    }
 
-        let resource_attrs = HashMap::new();
-        let events = vec![];
+    fn cost_status(span_attrs: &HashMap<String, json::Value>) -> Option<&str> {
+        span_attrs
+            .get(GenAiExtensions::USAGE_COST_STATUS)
+            .and_then(|v| v.as_str())
+    }
 
-        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+    #[test]
+    fn test_unpriced_model_keeps_tokens_and_has_no_cost() {
+        let processor = OtelIngestionProcessor::new();
+        let mut span_attrs = chat_span("unknown-model-xyz-2024");
+        // A client-sent zero is not a price either.
+        span_attrs.insert("gen_ai.usage.cost".to_string(), json::json!(0));
 
-        // No pricing definition matched for unknown model — total cost should be zero.
+        processor.process_span(&mut span_attrs, &HashMap::new(), None, &[]);
+
+        assert_eq!(cost_status(&span_attrs), Some("unpriced"));
+        assert!(!span_attrs.contains_key(GenAiAttributes::USAGE_COST));
+        assert!(!span_attrs.contains_key(GenAiExtensions::USAGE_COST_INPUT));
+        assert!(!span_attrs.contains_key(GenAiExtensions::USAGE_COST_OUTPUT));
         assert_eq!(
-            span_attrs
+            span_attrs.get(GenAiAttributes::USAGE_TOTAL_TOKENS),
+            Some(&json::json!(1500))
+        );
+    }
+
+    #[test]
+    fn test_approximate_match_keeps_cost_and_is_marked() {
+        let processor = OtelIngestionProcessor::new();
+        // `(?i)claude-sonnet-4-6` covers only the start of the dated name.
+        let mut span_attrs = chat_span("claude-sonnet-4-6-20260101");
+
+        processor.process_span(&mut span_attrs, &HashMap::new(), None, &[]);
+
+        assert_eq!(cost_status(&span_attrs), Some("approximate"));
+        let total = span_attrs
+            .get(GenAiAttributes::USAGE_COST)
+            .and_then(|v| v.as_f64())
+            .unwrap();
+        assert!((total - (1000.0 * 3e-06 + 500.0 * 1.5e-05)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_exact_match_and_client_cost_write_no_marker() {
+        let processor = OtelIngestionProcessor::new();
+        let mut exact = chat_span("gpt-4o");
+        exact.insert(
+            "gen_ai.usage.cost_status".to_string(),
+            json::json!("unpriced"),
+        );
+        processor.process_span(&mut exact, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&exact), None);
+        assert!(exact.contains_key(GenAiAttributes::USAGE_COST));
+
+        let mut client_cost = chat_span("unknown-model-xyz-2024");
+        client_cost.insert("gen_ai.usage.cost".to_string(), json::json!(0.25));
+        processor.process_span(&mut client_cost, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&client_cost), None);
+        assert_eq!(
+            client_cost
                 .get(GenAiAttributes::USAGE_COST)
                 .and_then(|v| v.as_f64()),
-            Some(0.0)
+            Some(0.25)
         );
+
+        // The flattened spelling lands in the same column and must not survive either.
+        let mut flattened = chat_span("gpt-4o");
+        flattened.insert(COST_STATUS_COLUMN.to_string(), json::json!("unpriced"));
+        processor.process_span(&mut flattened, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&flattened), None);
+        assert!(!flattened.contains_key(COST_STATUS_COLUMN));
+        assert!(flattened.contains_key(GenAiAttributes::USAGE_COST));
+
+        // An ingest-set marker replaces a client-sent flattened one instead of colliding.
+        let mut unpriced = chat_span("unknown-model-xyz-2024");
+        unpriced.insert(COST_STATUS_COLUMN.to_string(), json::json!("approximate"));
+        processor.process_span(&mut unpriced, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&unpriced), Some("unpriced"));
+        assert!(!unpriced.contains_key(COST_STATUS_COLUMN));
     }
 
     #[test]
@@ -1592,6 +1887,152 @@ mod tests {
                 .and_then(|v| v.as_f64()),
             Some(noisy)
         );
+    }
+
+    #[test]
+    fn test_no_model_with_tokens_is_unpriced_without_tokens_unmarked() {
+        let processor = OtelIngestionProcessor::new();
+        let mut with_tokens = chat_span("x");
+        with_tokens.remove("gen_ai.request.model");
+        processor.process_span(&mut with_tokens, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&with_tokens), Some("unpriced"));
+        assert!(!with_tokens.contains_key(GenAiAttributes::USAGE_COST));
+        assert_eq!(
+            with_tokens.get(GenAiAttributes::USAGE_TOTAL_TOKENS),
+            Some(&json::json!(1500))
+        );
+
+        let mut no_tokens = HashMap::new();
+        no_tokens.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        processor.process_span(&mut no_tokens, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&no_tokens), None);
+        no_tokens.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("unknown-zero-usage"),
+        );
+        processor.process_span(&mut no_tokens, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&no_tokens), None);
+
+        // A client-reported cost still wins over the missing model.
+        let mut client_cost = chat_span("x");
+        client_cost.remove("gen_ai.request.model");
+        client_cost.insert("gen_ai.usage.cost".to_string(), json::json!(0.25));
+        processor.process_span(&mut client_cost, &HashMap::new(), None, &[]);
+        assert_eq!(cost_status(&client_cost), None);
+    }
+
+    fn zero_price_entry(model: &str) -> CachedModelPricing {
+        use config::meta::model_pricing::PricingTierDefinition;
+
+        let pattern = format!("^{model}$");
+        CachedModelPricing {
+            definition: ModelPricingDefinition {
+                name: format!("{model} (muted)"),
+                match_pattern: pattern.clone(),
+                enabled: true,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: HashMap::from([
+                        ("input".to_string(), 0.0),
+                        ("output".to_string(), 0.0),
+                    ]),
+                    utc_windows: Vec::new(),
+                    rules: Vec::new(),
+                    priority: 0,
+                }],
+                ..Default::default()
+            },
+            compiled_regex: regex::Regex::new(&pattern).unwrap(),
+        }
+    }
+
+    #[test]
+    fn test_exact_zero_price_with_tokens_is_marked_free() {
+        let processor = OtelIngestionProcessor::new();
+        let entries = vec![zero_price_entry("acme-internal-llm")];
+
+        let mut muted = chat_span("acme-internal-llm");
+        processor.process_span_with_pricing(&mut muted, &HashMap::new(), None, &[], &entries, 0);
+        assert_eq!(cost_status(&muted), Some("free"));
+        assert_eq!(
+            muted
+                .get(GenAiAttributes::USAGE_COST)
+                .and_then(|v| v.as_f64()),
+            Some(0.0)
+        );
+
+        // An exactly matched zero price is free even when no tokens were used.
+        let mut no_tokens = HashMap::new();
+        no_tokens.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        no_tokens.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("acme-internal-llm"),
+        );
+        processor.process_span_with_pricing(
+            &mut no_tokens,
+            &HashMap::new(),
+            None,
+            &[],
+            &entries,
+            0,
+        );
+        assert_eq!(cost_status(&no_tokens), Some("free"));
+    }
+
+    #[test]
+    fn test_zero_token_span_of_priced_model_is_not_free() {
+        let processor = OtelIngestionProcessor::new();
+        let mut entry = zero_price_entry("acme-paid-llm");
+        entry.definition.tiers[0].prices = HashMap::from([
+            ("input".to_string(), 0.000001),
+            ("output".to_string(), 0.000002),
+        ]);
+        let entries = vec![entry];
+
+        let mut no_tokens = HashMap::new();
+        no_tokens.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        no_tokens.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("acme-paid-llm"),
+        );
+        processor.process_span_with_pricing(
+            &mut no_tokens,
+            &HashMap::new(),
+            None,
+            &[],
+            &entries,
+            0,
+        );
+        assert_eq!(cost_status(&no_tokens), None);
+    }
+
+    #[test]
+    fn test_pricing_disabled_writes_no_marker() {
+        let processor = OtelIngestionProcessor::new();
+        for model in [Some("unknown-model-xyz-2024"), Some("gpt-4o"), None] {
+            let mut span_attrs = chat_span(model.unwrap_or("x"));
+            if model.is_none() {
+                span_attrs.remove("gen_ai.request.model");
+            }
+            processor.process_span_with_pricing_and_agent_mapping(
+                &mut span_attrs,
+                &HashMap::new(),
+                None,
+                &[],
+                None,
+                SpanContext::default(),
+                &GenAiAgentMappingConfig::default(),
+            );
+            assert_eq!(cost_status(&span_attrs), None, "{model:?}");
+            assert!(!span_attrs.contains_key(COST_STATUS_COLUMN), "{model:?}");
+            // Tokens are still counted; nothing is priced.
+            assert_eq!(
+                span_attrs.get(GenAiAttributes::USAGE_TOTAL_TOKENS),
+                Some(&json::json!(1500))
+            );
+            assert!(!span_attrs.contains_key(GenAiExtensions::USAGE_COST_INPUT));
+        }
     }
 
     #[test]
@@ -2284,5 +2725,515 @@ mod tests {
             service_tier_input_cost(&[], &[("service_cloud.region", "eu-west-1")]),
             0.003
         ));
+    }
+
+    fn attrs(pairs: &[(&str, json::Value)]) -> HashMap<String, json::Value> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect()
+    }
+
+    fn process_ctx(
+        span_attrs: &mut HashMap<String, json::Value>,
+        scope_name: Option<&str>,
+        span: SpanContext<'_>,
+        pricing: &[CachedModelPricing],
+    ) {
+        OtelIngestionProcessor::new().process_span_with_pricing_and_agent_mapping(
+            span_attrs,
+            &HashMap::new(),
+            scope_name,
+            &[],
+            Some(pricing),
+            span,
+            &GenAiAgentMappingConfig::default(),
+        );
+    }
+
+    fn get_i64(span_attrs: &HashMap<String, json::Value>, key: &str) -> Option<i64> {
+        span_attrs.get(key).and_then(|v| v.as_i64())
+    }
+
+    fn get_f64(span_attrs: &HashMap<String, json::Value>, key: &str) -> Option<f64> {
+        span_attrs.get(key).and_then(|v| v.as_f64())
+    }
+
+    fn get_str<'a>(span_attrs: &'a HashMap<String, json::Value>, key: &str) -> Option<&'a str> {
+        span_attrs.get(key).and_then(|v| v.as_str())
+    }
+
+    #[test]
+    fn test_vercel_ai5_generate_text_trace_prices_only_provider_call() {
+        // ai@5 `generateText`: the wrapper span carries its single `doGenerate` child's usage.
+        let mut wrapper = attrs(&[
+            ("ai.operationId", json::json!("ai.generateText")),
+            ("operation.name", json::json!("ai.generateText")),
+            ("ai.model.id", json::json!("gpt-4o")),
+            ("ai.model.provider", json::json!("openai.chat")),
+            ("ai.prompt", json::json!(r#"{"prompt":"Say hello"}"#)),
+            ("ai.response.text", json::json!("Hello!")),
+            ("ai.usage.inputTokens", json::json!(30)),
+            ("ai.usage.outputTokens", json::json!(12)),
+            ("ai.usage.totalTokens", json::json!(42)),
+        ]);
+        let mut call = attrs(&[
+            ("ai.operationId", json::json!("ai.generateText.doGenerate")),
+            ("ai.model.id", json::json!("gpt-4o")),
+            ("ai.model.provider", json::json!("openai.chat")),
+            (
+                "ai.prompt.messages",
+                json::json!(r#"[{"role":"user","content":[{"type":"text","text":"Say hello"}]}]"#),
+            ),
+            ("ai.response.text", json::json!("Hello!")),
+            ("ai.response.model", json::json!("gpt-4o-2024-08-06")),
+            ("gen_ai.system", json::json!("openai.chat")),
+            ("gen_ai.request.model", json::json!("gpt-4o")),
+            ("gen_ai.response.model", json::json!("gpt-4o-2024-08-06")),
+            ("gen_ai.usage.input_tokens", json::json!(30)),
+            ("gen_ai.usage.output_tokens", json::json!(12)),
+            ("ai.usage.inputTokens", json::json!(30)),
+            ("ai.usage.outputTokens", json::json!(12)),
+            ("ai.usage.totalTokens", json::json!(42)),
+        ]);
+        let pricing = built_in_pricing();
+        process_ctx(
+            &mut wrapper,
+            Some("ai"),
+            SpanContext {
+                name: "ai.generateText",
+                ..Default::default()
+            },
+            pricing,
+        );
+        process_ctx(
+            &mut call,
+            Some("ai"),
+            SpanContext {
+                name: "ai.generateText.doGenerate",
+                ..Default::default()
+            },
+            pricing,
+        );
+
+        // Wrapper: an aggregate, keeps the real usage, is not priced.
+        assert_eq!(
+            get_str(&wrapper, GenAiAttributes::OPERATION_NAME),
+            Some("invoke_workflow")
+        );
+        assert_eq!(
+            get_i64(&wrapper, GenAiAttributes::USAGE_INPUT_TOKENS),
+            Some(30)
+        );
+        assert_eq!(
+            get_i64(&wrapper, GenAiAttributes::USAGE_OUTPUT_TOKENS),
+            Some(12)
+        );
+        assert_eq!(get_f64(&wrapper, GenAiAttributes::USAGE_COST), Some(0.0));
+        assert!(!wrapper.contains_key(GenAiExtensions::USAGE_COST_INPUT));
+
+        // Provider call: priced from the provider usage (gpt-4o $2.50/$10.00 per 1M).
+        assert_eq!(
+            get_str(&call, GenAiAttributes::OPERATION_NAME),
+            Some("chat")
+        );
+        assert_eq!(
+            get_i64(&call, GenAiAttributes::USAGE_INPUT_TOKENS),
+            Some(30)
+        );
+        assert_eq!(
+            get_i64(&call, GenAiAttributes::USAGE_OUTPUT_TOKENS),
+            Some(12)
+        );
+        let cost = get_f64(&call, GenAiAttributes::USAGE_COST).unwrap();
+        assert!(
+            (cost - (30.0 * 2.5e-6 + 12.0 * 1e-5)).abs() < 1e-12,
+            "{cost}"
+        );
+    }
+
+    #[test]
+    fn test_vercel_wrapper_identified_by_span_name_alone() {
+        let mut wrapper = attrs(&[
+            ("ai.model.id", json::json!("gpt-4o")),
+            ("ai.prompt", json::json!(r#"{"prompt":"Say hello"}"#)),
+            ("ai.response.text", json::json!("Hello!")),
+        ]);
+        process_ctx(
+            &mut wrapper,
+            Some("ai"),
+            SpanContext {
+                name: "ai.streamText",
+                ..Default::default()
+            },
+            built_in_pricing(),
+        );
+        assert_eq!(
+            get_str(&wrapper, GenAiAttributes::OPERATION_NAME),
+            Some("invoke_workflow")
+        );
+        // No estimation on an aggregate span.
+        assert_eq!(
+            get_i64(&wrapper, GenAiAttributes::USAGE_INPUT_TOKENS),
+            Some(0)
+        );
+        assert_eq!(
+            get_i64(&wrapper, GenAiAttributes::USAGE_OUTPUT_TOKENS),
+            Some(0)
+        );
+        assert_eq!(get_f64(&wrapper, GenAiAttributes::USAGE_COST), Some(0.0));
+    }
+
+    /// Anthropic-like per-1M prices: input $3, output $15, cache read $0.30, cache write $3.75.
+    fn cache_pricing() -> Vec<CachedModelPricing> {
+        use config::meta::model_pricing::PricingTierDefinition;
+        vec![CachedModelPricing {
+            definition: ModelPricingDefinition {
+                name: "Claude Cache".to_string(),
+                match_pattern: "(?i)^claude-cache".to_string(),
+                enabled: true,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    condition: None,
+                    prices: HashMap::from([
+                        ("input".to_string(), 3e-6),
+                        ("output".to_string(), 1.5e-5),
+                        ("cache_read_input_tokens".to_string(), 3e-7),
+                        ("cache_creation_input_tokens".to_string(), 3.75e-6),
+                    ]),
+                    utc_windows: Vec::new(),
+                    rules: Vec::new(),
+                    priority: 0,
+                }],
+                ..Default::default()
+            },
+            compiled_regex: regex::Regex::new("(?i)^claude-cache").unwrap(),
+        }]
+    }
+
+    fn cached_cost(mut span_attrs: HashMap<String, json::Value>, scope: Option<&str>) -> f64 {
+        let span_name = span_attrs
+            .get("ai.operationId")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        process_ctx(
+            &mut span_attrs,
+            scope,
+            SpanContext {
+                name: &span_name,
+                ..Default::default()
+            },
+            &cache_pricing(),
+        );
+        assert_eq!(
+            get_i64(&span_attrs, GenAiAttributes::USAGE_CACHE_READ_INPUT_TOKENS),
+            Some(700)
+        );
+        let cache_read_cost =
+            get_f64(&span_attrs, GenAiExtensions::USAGE_COST_CACHE_READ_INPUT).unwrap();
+        assert!((cache_read_cost - 700.0 * 3e-7).abs() < 1e-12);
+        get_f64(&span_attrs, GenAiAttributes::USAGE_COST).unwrap()
+    }
+
+    // 200 uncached input + 100 output + 700 cache read (+ 100 cache write).
+    const READ_ONLY_COST: f64 = 200.0 * 3e-6 + 100.0 * 1.5e-5 + 700.0 * 3e-7;
+    const READ_WRITE_COST: f64 = READ_ONLY_COST + 100.0 * 3.75e-6;
+
+    #[test]
+    fn test_openinference_cache_tokens_priced_at_cache_rates() {
+        // OpenInference's prompt count includes the cache details.
+        let cost = cached_cost(
+            attrs(&[
+                ("openinference.span.kind", json::json!("LLM")),
+                ("llm.model_name", json::json!("claude-cache")),
+                ("llm.token_count.prompt", json::json!(1000)),
+                ("llm.token_count.completion", json::json!(100)),
+                (
+                    "llm.token_count.prompt_details.cache_read",
+                    json::json!(700),
+                ),
+                (
+                    "llm.token_count.prompt_details.cache_write",
+                    json::json!(100),
+                ),
+            ]),
+            None,
+        );
+        assert!((cost - READ_WRITE_COST).abs() < 1e-12, "{cost}");
+    }
+
+    #[test]
+    fn test_vercel_input_token_details_priced_at_cache_rates() {
+        // ai@6+: inputTokens is the total including cache read and write.
+        let cost = cached_cost(
+            attrs(&[
+                ("ai.operationId", json::json!("ai.generateText.doGenerate")),
+                ("ai.model.id", json::json!("claude-cache")),
+                ("ai.model.provider", json::json!("anthropic.messages")),
+                ("ai.usage.inputTokens", json::json!(1000)),
+                ("ai.usage.outputTokens", json::json!(100)),
+                (
+                    "ai.usage.inputTokenDetails.cacheReadTokens",
+                    json::json!(700),
+                ),
+                (
+                    "ai.usage.inputTokenDetails.cacheWriteTokens",
+                    json::json!(100),
+                ),
+            ]),
+            Some("ai"),
+        );
+        assert!((cost - READ_WRITE_COST).abs() < 1e-12, "{cost}");
+    }
+
+    #[test]
+    fn test_vercel_cached_input_tokens_priced_per_provider_semantics() {
+        // ai@5: Anthropic's inputTokens excludes cache reads, OpenAI's includes them.
+        for (provider, input_tokens) in [("anthropic.messages", 200), ("openai.chat", 900)] {
+            let cost = cached_cost(
+                attrs(&[
+                    ("ai.operationId", json::json!("ai.streamText.doStream")),
+                    ("ai.model.id", json::json!("claude-cache")),
+                    ("ai.model.provider", json::json!(provider)),
+                    ("ai.usage.inputTokens", json::json!(input_tokens)),
+                    ("ai.usage.outputTokens", json::json!(100)),
+                    ("ai.usage.cachedInputTokens", json::json!(700)),
+                ]),
+                Some("ai"),
+            );
+            assert!((cost - READ_ONLY_COST).abs() < 1e-12, "{provider}: {cost}");
+        }
+    }
+
+    #[test]
+    fn test_langfuse_nested_cached_tokens_priced_at_cache_rates() {
+        // langfuse.openai: OpenAI usage, prompt_tokens includes the nested cached_tokens.
+        let usage = json::json!({
+            "prompt_tokens": 900,
+            "completion_tokens": 100,
+            "total_tokens": 1000,
+            "prompt_tokens_details": {"cached_tokens": 700}
+        });
+        let cost = cached_cost(
+            attrs(&[
+                ("langfuse.observation.type", json::json!("generation")),
+                (
+                    "langfuse.observation.model.name",
+                    json::json!("claude-cache"),
+                ),
+                (
+                    LangfuseAttributes::USAGE_DETAILS,
+                    json::Value::String(usage.to_string()),
+                ),
+            ]),
+            None,
+        );
+        assert!((cost - READ_ONLY_COST).abs() < 1e-12, "{cost}");
+    }
+
+    #[test]
+    fn test_failed_call_without_usage_gets_no_tokens_cost_or_response_model() {
+        let mut span_attrs = attrs(&[
+            ("gen_ai.operation.name", json::json!("chat")),
+            ("gen_ai.request.model", json::json!("gpt-4o")),
+            (
+                "gen_ai.input.messages",
+                json::json!(r#"[{"role":"user","content":"What is the capital of France?"}]"#),
+            ),
+        ]);
+        process_ctx(
+            &mut span_attrs,
+            None,
+            SpanContext {
+                is_error: true,
+                ..Default::default()
+            },
+            built_in_pricing(),
+        );
+        assert_eq!(
+            get_i64(&span_attrs, GenAiAttributes::USAGE_INPUT_TOKENS),
+            Some(0)
+        );
+        assert_eq!(
+            get_i64(&span_attrs, GenAiAttributes::USAGE_OUTPUT_TOKENS),
+            Some(0)
+        );
+        assert_eq!(
+            get_i64(&span_attrs, GenAiAttributes::USAGE_TOTAL_TOKENS),
+            Some(0)
+        );
+        assert_eq!(get_f64(&span_attrs, GenAiAttributes::USAGE_COST), Some(0.0));
+        assert!(!span_attrs.contains_key(GenAiExtensions::USAGE_COST_INPUT));
+        assert!(!span_attrs.contains_key(GenAiAttributes::RESPONSE_MODEL));
+        assert_eq!(
+            get_str(&span_attrs, GenAiAttributes::REQUEST_MODEL),
+            Some("gpt-4o")
+        );
+    }
+
+    #[test]
+    fn test_failed_call_with_usage_is_still_priced() {
+        let mut span_attrs = attrs(&[
+            ("gen_ai.operation.name", json::json!("chat")),
+            ("gen_ai.request.model", json::json!("gpt-4o")),
+            ("gen_ai.usage.input_tokens", json::json!(1000)),
+            ("gen_ai.usage.output_tokens", json::json!(500)),
+        ]);
+        process_ctx(
+            &mut span_attrs,
+            None,
+            SpanContext {
+                is_error: true,
+                ..Default::default()
+            },
+            built_in_pricing(),
+        );
+        assert_eq!(
+            get_f64(&span_attrs, GenAiAttributes::USAGE_COST),
+            Some(0.0075)
+        );
+        assert_eq!(
+            get_str(&span_attrs, GenAiAttributes::RESPONSE_MODEL),
+            Some("gpt-4o")
+        );
+    }
+
+    #[test]
+    fn test_successful_call_without_response_model_priced_from_request_model() {
+        let mut span_attrs = attrs(&[
+            ("gen_ai.operation.name", json::json!("chat")),
+            ("gen_ai.request.model", json::json!("gpt-4o")),
+            ("gen_ai.usage.input_tokens", json::json!(1000)),
+            ("gen_ai.usage.output_tokens", json::json!(500)),
+        ]);
+        process_ctx(
+            &mut span_attrs,
+            None,
+            SpanContext::default(),
+            built_in_pricing(),
+        );
+        assert_eq!(
+            get_f64(&span_attrs, GenAiAttributes::USAGE_COST),
+            Some(0.0075)
+        );
+        assert_eq!(
+            get_str(&span_attrs, GenAiAttributes::RESPONSE_MODEL),
+            Some("gpt-4o")
+        );
+    }
+
+    #[test]
+    fn test_embedding_without_usage_estimates_no_output_tokens() {
+        let mut span_attrs = attrs(&[
+            ("gen_ai.operation.name", json::json!("embeddings")),
+            (
+                "gen_ai.request.model",
+                json::json!("text-embedding-3-small"),
+            ),
+            ("gen_ai.input.messages", json::json!("hello world")),
+            (
+                "gen_ai.output.messages",
+                json::json!("[0.0123,-0.0456,0.0789,0.0101,-0.0112,0.0131]"),
+            ),
+        ]);
+        process_ctx(
+            &mut span_attrs,
+            None,
+            SpanContext::default(),
+            built_in_pricing(),
+        );
+        assert_eq!(
+            get_i64(&span_attrs, GenAiAttributes::USAGE_INPUT_TOKENS),
+            Some(pricing::calculate_token_count(
+                "text-embedding-3-small",
+                "hello world"
+            ))
+        );
+        assert_eq!(
+            get_i64(&span_attrs, GenAiAttributes::USAGE_OUTPUT_TOKENS),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn test_chat_estimate_counts_message_text_only() {
+        let question = "What is the capital of France?";
+        let answer = "The capital of France is Paris.";
+        let mut span_attrs = attrs(&[
+            ("gen_ai.operation.name", json::json!("chat")),
+            ("gen_ai.request.model", json::json!("gpt-4o")),
+            (
+                "gen_ai.input.messages",
+                json::json!(format!(
+                    r#"[{{"role":"user","content":[{{"type":"text","text":"{question}"}}]}}]"#
+                )),
+            ),
+            (
+                "gen_ai.output.messages",
+                json::json!(format!(
+                    r#"[{{"role":"assistant","content":"{answer}","id":"msg_0123456789"}}]"#
+                )),
+            ),
+        ]);
+        process_ctx(
+            &mut span_attrs,
+            None,
+            SpanContext::default(),
+            built_in_pricing(),
+        );
+        assert_eq!(
+            get_i64(&span_attrs, GenAiAttributes::USAGE_INPUT_TOKENS),
+            Some(pricing::calculate_token_count("gpt-4o", question))
+        );
+        assert_eq!(
+            get_i64(&span_attrs, GenAiAttributes::USAGE_OUTPUT_TOKENS),
+            Some(pricing::calculate_token_count("gpt-4o", answer))
+        );
+    }
+
+    #[test]
+    fn test_openinference_estimate_counts_message_text_only() {
+        let question = "What is the capital of France?";
+        let arguments = r#"{"city":"Paris"}"#;
+        let mut span_attrs = attrs(&[
+            ("openinference.span.kind", json::json!("LLM")),
+            ("llm.model_name", json::json!("gpt-4o")),
+            ("llm.input_messages.0.message.role", json::json!("user")),
+            (
+                "llm.input_messages.0.message.content",
+                json::json!(question),
+            ),
+            (
+                "llm.output_messages.0.message.role",
+                json::json!("assistant"),
+            ),
+            (
+                "llm.output_messages.0.message.tool_calls.0.tool_call.id",
+                json::json!("call_0123456789"),
+            ),
+            (
+                "llm.output_messages.0.message.tool_calls.0.tool_call.function.name",
+                json::json!("get_weather"),
+            ),
+            (
+                "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments",
+                json::json!(arguments),
+            ),
+        ]);
+        process_ctx(
+            &mut span_attrs,
+            None,
+            SpanContext::default(),
+            built_in_pricing(),
+        );
+        assert_eq!(
+            get_i64(&span_attrs, GenAiAttributes::USAGE_INPUT_TOKENS),
+            Some(pricing::calculate_token_count("gpt-4o", question))
+        );
+        assert_eq!(
+            get_i64(&span_attrs, GenAiAttributes::USAGE_OUTPUT_TOKENS),
+            Some(pricing::calculate_token_count("gpt-4o", arguments))
+        );
     }
 }

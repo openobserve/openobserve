@@ -6,6 +6,7 @@ import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
+const { ingestTraces } = require('../../playwright-tests/utils/trace-ingestion.js');
 
 // Rate and Errors come from web/src/plugins/traces/metrics/metrics.json; Duration is the latency heatmap.
 const TRACES_METRICS_PANELS = ['Rate', 'Errors', 'Duration'];
@@ -13,8 +14,50 @@ const CHART_ZOOM_START_RATIO = 0.35;
 const CHART_ZOOM_END_RATIO = 0.75;
 const CHART_DRAG_STEPS = 20;
 const QUERY_CLEAR_ATTEMPTS = 10;
+const DURATION_UNIT_US = { us: 1, ms: 1000, s: 1000000 };
+
+export function decodedSqlOf(request) {
+  if (request.method() !== 'POST' || !/_search/.test(request.url())) return null;
+  const body = request.postDataJSON?.() ?? null;
+  const query = body?.query ?? {};
+  if (typeof query.sql !== 'string') return null;
+  const base64 = body.encoding === 'base64' || query.encoding === 'base64';
+  return {
+    sql: base64 ? Buffer.from(query.sql, 'base64').toString('utf8') : query.sql,
+    start: query.start_time,
+    end: query.end_time,
+  };
+}
+
+// The comparison sends its own counts and LIMIT 4000 samples; nothing else does.
+export const isComparison = (q) => /^SELECT count\(\*\) AS n\b/.test(q.sql) || /LIMIT 4000$/.test(q.sql);
+export const isCount = (q) => /^SELECT count\(\*\) AS n\b/.test(q.sql);
+// The table search: spans mode posts a base64 `SELECT *` SQL.
+export const isTableSearch = (q) => /^SELECT \* FROM/.test(q.sql);
+
+// The band's bounds in µs as the SQL writes them; a missing side is absent.
+export function bandSql(editorBand) {
+  const toUs = (m) => (m ? Number(m[1]) * DURATION_UNIT_US[m[2]] : null);
+  const lo = toUs(editorBand.match(/duration >= '(\d+)(us|ms|s)'/));
+  const hi = toUs(editorBand.match(/duration < '(\d+)(us|ms|s)'/));
+  return [lo ? `duration >= ${lo}` : '', hi !== null ? `duration < ${hi}` : ''].filter(Boolean).join(' AND ');
+}
 
 export class TracesPage {
+  // Static so a beforeAll, which has no page fixture, can seed through its own context.
+  static async seedTraces(browser, ageMs = 0) {
+    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
+    const page = await context.newPage();
+    try {
+      for (const scenario of [{ count: 6, forceScenario: 'error' }, { count: 10, forceScenario: 'success' }]) {
+        const seeded = await ingestTraces(page, scenario.count, { forceScenario: scenario.forceScenario, ageMs });
+        expect(seeded.failed, `Seeding ${scenario.forceScenario} traces must succeed`).toBe(0);
+      }
+    } finally {
+      await context.close();
+    }
+  }
+
   constructor(page) {
     this.page = page;
 
@@ -3354,5 +3397,69 @@ export class TracesPage {
       }, intervalMs);
       const cap = setTimeout(finish, maxMs);
     }), { minExamples, maxMs, intervalMs });
+  }
+
+  // ============================================
+  // CREATE ALERT / ADD TO DASHBOARD (RED actions)
+  // Source: web/src/plugins/traces/SearchBar.vue, PanelContainer.vue, metrics/TracesLatencyHeatmap.vue
+  // ============================================
+
+  async openMoreActionsMenu() {
+    await this.page.locator('[data-test="traces-search-bar-more-actions-btn"]').click();
+  }
+
+  async clickAddRedChartsToDashboard() {
+    await this.openMoreActionsMenu();
+    await this.page.locator('[data-test="traces-add-red-to-dashboard-btn"]').click();
+  }
+
+  async createAlertFromChartMenu(title) {
+    const panel = this.metricsPanelLocator(title);
+    if (title === 'Duration') {
+      await panel.hover();
+      await this.page.locator('[data-test="traces-duration-actions-btn"]').click();
+      await this.page.locator('[data-test="traces-duration-create-alert"]').click();
+      return;
+    }
+    // Hovering the chart body opens its tooltip, which then covers this button.
+    const actionsBtn = panel.locator('[data-test="panel-explore-actions-btn"]');
+    await actionsBtn.hover();
+    await actionsBtn.click();
+    await this.page.locator('[data-test="panel-explore-create-alert"]').click();
+  }
+
+  async expectAddToDashboardPanels(count) {
+    const dialog = this.page.locator('[data-test="add-to-dashboard-dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 15000 });
+    await expect(this.page.locator('[data-test="add-to-dashboard-notice"]')).toBeVisible();
+    await expect(this.page.locator('[data-test="add-to-dashboard-panel-title"]')).toHaveCount(count);
+  }
+
+  async selectDashboardInAddDialog(title) {
+    await this.page.locator('[data-test="dashboard-dropdown-dashboard-selection-trigger"]').click();
+    await this.page
+      .locator('[data-test="dashboard-dropdown-dashboard-selection-option"]')
+      .filter({ hasText: title })
+      .first()
+      .click();
+  }
+
+  async confirmAddToDashboard() {
+    await this.page
+      .locator('[data-test="add-to-dashboard-dialog"] [data-test="o-dialog-primary-btn"]')
+      .click();
+  }
+
+  async expectAlertFormPrefilledFromTraces() {
+    await expect(this.page).toHaveURL(/prefill=traces/, { timeout: 30000 });
+    await expect(
+      this.page.locator('[data-test="add-alert-stream-type-select-dropdown"]').first()
+    ).toContainText('traces', { timeout: 30000 });
+    await expect(
+      this.page.locator('[data-test="alert-trigger-threshold-input-field"]').first()
+    ).toHaveValue('1');
+    await expect(
+      this.page.locator('[data-test="alert-trigger-operator-select"]').first()
+    ).toContainText('>=');
   }
 }

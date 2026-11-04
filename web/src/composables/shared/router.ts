@@ -633,6 +633,7 @@ const useRoutes = () => {
       path: "traces/trace-details",
       name: "traceDetails",
       component: TraceDetails,
+      props: { showAskAi: true },
       meta: {
         titleKey: "routeTitles.traceDetails",
       },

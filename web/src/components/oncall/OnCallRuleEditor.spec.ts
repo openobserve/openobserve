@@ -101,6 +101,18 @@ describe("OnCallRuleEditor", () => {
     whoIsOnCall.mockResolvedValue({ data: [] });
   });
 
+  /// R10: a path nothing claims is judged on the draft's conditions alone, so no conflict is named.
+  it("names only the drafted team when nothing claims the path", async () => {
+    const wrapper = render({
+      initialDimensions: { "k8s-namespace": "risk" },
+      conflict: { decision: null, team_id: null },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').text()).toBe(
+      "Future alerts like this go to Search",
+    );
+  });
+
   it("opens a new rule on one live row, field preset to service, and no Add button", () => {
     const wrapper = render();
     expect(wrapper.findAll('[data-test^="oncall-rule-editor-row-"]')).toHaveLength(1);

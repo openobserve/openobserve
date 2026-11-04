@@ -628,6 +628,28 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
     .await;
 }
 
+/// Whether the operator switched incident correlation on and the license grants it.
+#[cfg(feature = "enterprise")]
+pub fn incidents_enabled() -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .incidents
+        .enabled
+        && o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::Incidents,
+        ])
+}
+
+/// Whether O2's agent may answer an analysis: operator switch, agent target and assistant license.
+#[cfg(feature = "enterprise")]
+pub fn rca_agent_available() -> bool {
+    let cfg = o2_enterprise::enterprise::common::config::get_config();
+    cfg.ai.enabled
+        && cfg.ai.has_agent_target()
+        && o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::AiAssistant,
+        ])
+}
+
 /// Correlate an alert to an incident, and send a notification if appropriate.
 ///
 /// This is the main entry point for incident correlation in the alert execution flow.
@@ -2424,7 +2446,7 @@ pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
 
     let cfg = get_config();
-    let will_run = cfg.incidents.enabled && cfg.incidents.rca_enabled && cfg.ai.has_agent_target();
+    let will_run = incidents_enabled() && cfg.incidents.rca_enabled && rca_agent_available();
     if !will_run {
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
     }
@@ -2792,7 +2814,7 @@ pub async fn trigger_rca_for_incident(
 
     let config = get_o2_config();
 
-    if !config.incidents.enabled || !config.incidents.rca_enabled {
+    if !incidents_enabled() || !config.incidents.rca_enabled {
         log::debug!("[INCIDENTS::RCA] RCA not enabled, ending run {run_id}");
         end_failed(ERROR_RCA_DISABLED, RCA_DISABLED_REASON, None).await;
         return Ok(());
@@ -3183,15 +3205,21 @@ pub async fn update_status_as(
         return through_the_one_ack(org_id, incident_id, status, user_id).await;
     }
     // Read before the resolve clears it, so resolving a muted incident still notifies nobody.
+    let before = infra::table::alert_incidents::get(org_id, incident_id).await?;
     let muted_before = reads_mute_before(
         status,
         o2_enterprise::enterprise::common::config::get_config()
             .downtimes
             .enabled,
-    ) && infra::table::alert_incidents::get(org_id, incident_id)
-        .await?
+    ) && before
+        .as_ref()
         .is_some_and(|m| m.muted_by_downtime_id.is_some());
-    let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
+    // A re-sent Resolve re-runs the idempotent repairs but keeps the first row and event.
+    let again = status == "resolved" && before.as_ref().is_some_and(|m| m.status == "resolved");
+    let updated = match before {
+        Some(m) if again => m,
+        _ => infra::table::alert_incidents::update_status(org_id, incident_id, status).await?,
+    };
 
     let muted = status_change_is_muted(
         quiet || muted_before,
@@ -3216,7 +3244,7 @@ pub async fn update_status_as(
         "open" => Some(IncidentEvent::reopened(user_id, "Manually reopened")),
         _ => None,
     };
-    if let Some(evt) = event
+    if let Some(evt) = event.filter(|_| !again)
         && let Err(e) = append_event_unless_muted(org_id, incident_id, evt, muted).await
     {
         log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");

@@ -593,6 +593,7 @@
       "tracesTriageLoop.spec.js",
       "traceGenAiParts.spec.js",
       "tracesCharts.spec.js",
+      "tracesRedActions.spec.js",
       "traceSessionReplay.spec.js",
       "traces-jk-navigation.spec.js",
       "service-graph-side-panel.spec.js"

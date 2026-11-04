@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import VariablesValueSelector from "./VariablesValueSelector.vue";
+import ODate from "@/lib/forms/Date/ODate.vue";
 
 // Mock external dependencies
 vi.mock("vue-i18n", () => ({
@@ -2880,6 +2881,74 @@ describe("VariablesValueSelector", () => {
     });
   });
 
+  describe("Date variables in a filter", () => {
+    afterEach(async () => {
+      const { addLabelsToSQlQuery } = await import("@/utils/query/sqlUtils");
+      vi.mocked(addLabelsToSQlQuery).mockImplementation((query: string) => Promise.resolve(query));
+    });
+
+    it("passes a date variable in its effective format, like a scalar value", async () => {
+      const { addLabelsToSQlQuery } = await import("@/utils/query/sqlUtils");
+      vi.mocked(addLabelsToSQlQuery).mockImplementation(
+        async (query: string, labels: any[]) =>
+          `${query} WHERE ${labels.map((l: any) => `${l.name} = '${l.value}'`).join(" AND ")}`,
+      );
+
+      wrapper = createWrapper({
+        variablesConfig: {
+          list: [
+            { name: "d", type: "date", label: "d", value: "2026-03-08", dateFormat: "dmy" },
+            { name: "blank", type: "date", label: "blank", value: "" },
+            {
+              name: "spans",
+              type: "query_values",
+              label: "spans",
+              multiSelect: false,
+              query_data: {
+                field: "span_id",
+                stream: "default",
+                stream_type: "logs",
+                max_record_size: 10,
+                filter: [
+                  { name: "a", operator: "=", value: "$d" },
+                  { name: "b", operator: "=", value: "${d:epochus}" },
+                  { name: "c", operator: "=", value: "'$d'" },
+                  { name: "e", operator: "=", value: "$blank" },
+                ],
+              },
+            },
+          ],
+        },
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const byName = (name: string) => vm.variablesData.values.find((v: any) => v.name === name);
+      ["d", "blank"].forEach((name) => {
+        byName(name).isVariablePartialLoaded = true;
+      });
+
+      let capturedSql = "";
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          capturedSql = atob(payload.queryReq.sql);
+          handlers.complete(payload, { type: "end" });
+        },
+      );
+
+      const spans = byName("spans");
+      spans.isLoading = false;
+      spans.isVariablePartialLoaded = true;
+      spans.isVariableLoadingPending = false;
+      await vm.loadVariableOptions(spans);
+
+      expect(capturedSql).toContain(
+        "WHERE a = '08/03/2026' AND b = '1772928000000000' AND c = ''08/03/2026'' AND e = ''",
+      );
+    });
+  });
+
   describe("textbox debounce follows Auto Run", () => {
     it("uses 1s normally and 300ms while the manager is in live mode", async () => {
       const { useVariablesManager, LIVE_COMMIT_DEBOUNCE_MS } =
@@ -3018,6 +3087,77 @@ describe("VariablesValueSelector", () => {
       endStream();
       await nextTick();
       expect(state.isVariablePartialLoaded).toBe(false);
+    });
+  });
+
+  describe("Date variable", () => {
+    const dateConfig = {
+      list: [
+        { name: "from_date", type: "date", label: "From", value: "2026-01-01" },
+        { name: "to_date", type: "date", label: "To", value: "" },
+      ],
+    };
+
+    it("should render ODate and fall back to the default value", async () => {
+      wrapper = createWrapper({
+        variablesConfig: dateConfig,
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(vm.variablesData.values.find((v: any) => v.name === "from_date").value).toBe(
+        "2026-01-01",
+      );
+      expect(wrapper.findAllComponents(ODate)).toHaveLength(2);
+      // label inside the border, like the textbox and select variables next to it
+      expect(wrapper.findAllComponents(ODate)[0].props("labelPosition")).toBe("inside");
+      expect(wrapper.find('[data-test="variable-selector-from_date"]').exists()).toBe(true);
+    });
+
+    it("should prefer the initial value over the default", async () => {
+      wrapper = createWrapper({
+        variablesConfig: dateConfig,
+        initialVariableValues: { value: { from_date: "2026-02-02" } },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(vm.variablesData.values.find((v: any) => v.name === "from_date").value).toBe(
+        "2026-02-02",
+      );
+    });
+
+    it("should update the variable value when the date changes", async () => {
+      wrapper = createWrapper({
+        variablesConfig: dateConfig,
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+
+      wrapper.findAllComponents(ODate)[1].vm.$emit("update:modelValue", "2026-03-03");
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      expect(vm.variablesData.values.find((v: any) => v.name === "to_date").value).toBe(
+        "2026-03-03",
+      );
+    });
+
+    it("should load without running a query", async () => {
+      wrapper = createWrapper({
+        variablesConfig: dateConfig,
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const vm = wrapper.vm as any;
+      expect(vm.variablesData.values.every((v: any) => v.isVariableLoadingPending !== true)).toBe(
+        true,
+      );
+      expect(vm.variablesData.isVariablesLoading).toBe(false);
+      expect(mockStreamingComposable.fetchQueryDataWithHttpStream).not.toHaveBeenCalled();
     });
   });
 });

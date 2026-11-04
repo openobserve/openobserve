@@ -16,6 +16,13 @@
 /// Sentinel column whose presence indicates the new `gen_ai_*` schema.
 pub const GEN_AI_SENTINEL_COLUMN: &str = "gen_ai_usage_input_tokens";
 
+/// Stored column holding a span's Gen-AI operation (`chat`, `invoke_agent`, ...).
+pub const GEN_AI_OPERATION_NAME_COLUMN: &str = "gen_ai_operation_name";
+
+/// Operations that are LLM calls: the spans ingest prices and trace/session totals sum.
+pub const GENERATION_GEN_AI_OPERATIONS: &[&str] =
+    &["chat", "text_completion", "generate_content", "embeddings"];
+
 /// Required fields for the new (gen_ai_*) schema. If any are missing, the
 /// query is rejected with a clear error.
 pub const REQUIRED_GEN_AI_FIELDS: &[&str] = &[

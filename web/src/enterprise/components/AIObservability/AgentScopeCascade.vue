@@ -51,7 +51,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onEnvChange"
       />
     </div>
-    <div class="w-48 flex-shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink">
+    <!-- The agent shows by name; its registered id(s) on hover. -->
+    <div
+      class="w-48 flex-shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink"
+      :title="selectedAgentIdHint"
+      :data-test="`${prefix}-cascade-agent-id`"
+    >
       <OSelect
         :model-value="selectedAgentName"
         :label="t('aiObservability.scope.agent')"
@@ -84,11 +89,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     /** Page prefix — every emitted data-test is `${prefix}-cascade-...`. */
     prefix: string;
@@ -124,6 +130,14 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+// useAgentScope puts the ids behind each name on its option (`agentIds`).
+const selectedAgentIdHint = computed(() => {
+  const ids = props.agentNames.find((o) => o.value === props.selectedAgentName)?.agentIds;
+  return Array.isArray(ids) && ids.length
+    ? t("aiObservability.scope.agentIdHint", { ids: ids.join(", ") })
+    : undefined;
+});
 
 const onEnvChange = (value: unknown) => {
   emit("update:selectedEnv", value as string);

@@ -16,6 +16,7 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import fleet, {
   type FleetAuditList,
+  type FleetAuditParams,
   type FleetCollector,
   type FleetConfigDetail,
   type FleetConfigIssues,
@@ -45,7 +46,7 @@ import {
   type CollectorMetricValues,
 } from "@/components/fleet/collectorMetrics";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
-import { queryClient } from "@/composables/query/queryClient";
+import { quantizeRange, queryClient, stableFilters } from "@/composables/query/queryClient";
 
 // Delivery and rollout state move without any write from this tab, so the views poll while they do.
 const DELIVERY_POLL_MS = 5000;
@@ -257,16 +258,23 @@ export const fleetConfigVersionQuery = (org: string, id: string, version: number
     staleTime: Infinity,
   });
 
-export const fleetAuditQuery = (org: string) =>
-  queryOptions({
-    queryKey: fleetKeys.audit(org),
+export const fleetAuditQuery = (org: string, params: FleetAuditParams = {}) => {
+  const sent = stableFilters(params);
+  // A preset period starts at Date.now(), so the key rounds it to the minute to let a remount hit.
+  const keyed = stableFilters({
+    ...sent,
+    from: sent.from === undefined ? undefined : quantizeRange(sent.from, sent.from).start,
+  });
+  return queryOptions({
+    queryKey: [...fleetKeys.audit(org), keyed],
     queryFn: async (): Promise<FleetAuditList> => {
-      const list = (await fleet.listAudit(org)).data;
+      const list = (await fleet.listAudit(org, sent)).data;
       if (!Array.isArray(list?.items)) throw new Error("Malformed fleet audit response");
       return list;
     },
     staleTime: LIVE_STALE_TIME,
   });
+};
 
 export const fleetSettingsQuery = (org: string) =>
   queryOptions({

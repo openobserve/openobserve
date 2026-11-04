@@ -818,6 +818,7 @@ function storedFailureMessage(row?: RemoteTaskTestRunRow): I18nText {
     case "transport":
       return t("aiObservability.remoteTasks.testPanel.failure.transport");
     case "deadline_exceeded":
+    case "timeout":
       return t("aiObservability.remoteTasks.testPanel.failure.deadlineExceeded");
     case "http_status":
       return t("aiObservability.remoteTasks.testPanel.failure.httpStatus", {

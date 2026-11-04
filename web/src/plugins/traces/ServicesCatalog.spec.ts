@@ -1759,7 +1759,13 @@ describe("ServicesCatalog", () => {
 
       it("keeps inferred dependencies with the same name but different identities separate", async () => {
         mockStreamSchema.mockResolvedValueOnce({
-          data: { schema: [{ name: "infer_service_name" }] },
+          data: {
+            schema: [
+              { name: "infer_service_name" },
+              { name: "infer_service_system" },
+              { name: "infer_service_type" },
+            ],
+          },
         });
         mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
           callbacks.data(null, {
@@ -2273,6 +2279,34 @@ describe("ServicesCatalog", () => {
         status: "healthy",
       });
       expect(wrapper.find('[data-test="services-catalog-requests-nightly-cron"]').text()).toBe("0");
+    });
+
+    it("selects NULL for inferred system and type columns the stream does not have", async () => {
+      const sql = await loadWithSchema(
+        schemaWith("infer_service_name", "reference_parent_span_id"),
+      );
+      expect(selectItem(sql, "_infer_service_system").trim()).toBe(
+        "NULL AS _infer_service_system,",
+      );
+      expect(selectItem(sql, "_infer_service_type").trim()).toBe("NULL AS _infer_service_type,");
+      expect(sql).not.toContain("NULLIF(infer_service_system");
+      expect(sql).not.toContain("NULLIF(infer_service_type");
+      const groupBy = sql.split("GROUP BY")[1].split("ORDER BY")[0];
+      expect(groupBy.trim().split(",\n")).toEqual([
+        "COALESCE(NULLIF(infer_service_name, ''), service_name)",
+        "  NULLIF(infer_service_name, '')",
+      ]);
+    });
+
+    it("groups by only the inferred column the stream has", async () => {
+      const sql = await loadWithSchema(schemaWith("infer_service_name", "infer_service_type"));
+      expect(selectItem(sql, "_infer_service_system").trim()).toBe(
+        "NULL AS _infer_service_system,",
+      );
+      expect(selectItem(sql, "_infer_service_type")).toContain("NULLIF(infer_service_type, '')");
+      const groupBy = sql.split("GROUP BY")[1].split("ORDER BY")[0];
+      expect(groupBy).toContain("NULLIF(infer_service_type, '')");
+      expect(groupBy).not.toContain("infer_service_system");
     });
 
     it("discards a schema fetched for a stream that is no longer selected", async () => {
@@ -3077,6 +3111,76 @@ describe("ServicesCatalog", () => {
 
       expect(wrapper.vm.showSidePanel).toBe(false);
       expect(wrapper.vm.selectedServiceRow).toBeNull();
+    });
+  });
+
+  describe("search error state", () => {
+    const failSearch = () =>
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.error(null, {
+          type: "error",
+          content: { message: "Search field not found: infer_service_system" },
+        });
+      });
+    const errorState = () => wrapper.find('[data-test="services-catalog-error"]');
+    const retry = () => errorState().find('[data-test="o2-empty-state"] button');
+
+    it("shows the load-error state with the server message instead of the empty state", async () => {
+      failSearch();
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="services-catalog-empty"]').exists()).toBe(false);
+      expect(errorState().find('[data-test="o2-empty-state"]').exists()).toBe(true);
+      expect(errorState().text()).toContain("Search field not found: infer_service_system");
+      expect(retry().text()).toContain("Retry");
+    });
+
+    it("retry runs the search again and clears the error once it succeeds", async () => {
+      failSearch();
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const calls = mockFetchQueryDataWithHttpStream.mock.calls.length;
+
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.complete(null, {});
+      });
+      await retry().trigger("click");
+      await flushPromises();
+
+      expect(mockFetchQueryDataWithHttpStream.mock.calls.length).toBe(calls + 1);
+      expect(errorState().exists()).toBe(false);
+      expect(wrapper.find('[data-test="services-catalog-empty"]').exists()).toBe(true);
+    });
+
+    it("falls back to a generic message when the error has none", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.error(null, { type: "error", content: {} });
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(errorState().text()).toContain("Unknown error");
+    });
+
+    it("drops the previous rows and shows the error when a later search fails", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.data(null, {
+          type: "search_response_hits",
+          content: { results: { hits: [{ service_name: "frontend", total_requests: 3 }] } },
+        });
+        callbacks.complete(null, {});
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      expect(wrapper.find('[data-test="services-catalog-row-name-frontend"]').exists()).toBe(true);
+
+      failSearch();
+      await wrapper.vm.loadServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="services-catalog-row-name-frontend"]').exists()).toBe(false);
+      expect(errorState().text()).toContain("Search field not found: infer_service_system");
     });
   });
 

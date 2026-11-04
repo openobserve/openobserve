@@ -1,5 +1,5 @@
 export const SEVERITIES = ["p0", "p1", "p2", "p3"];
-// Per-review limits; p0 and p1 are never capped because a blocker must always be reported.
+// Per-review limits; p0 and p1 are never capped because a finding that blocks must always be reported.
 export const SEVERITY_CAPS = { p2: 3, p3: 2 };
 const LEGACY_SEVERITIES = new Map([
   ["critical", "p0"],

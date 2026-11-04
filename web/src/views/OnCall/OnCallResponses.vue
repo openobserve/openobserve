@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :has-staffed-rotation="setup.hasStaffedRotation"
       :has-policy="setup.hasPolicy"
       :has-routing="setup.hasRouting"
-      :compact="hasPages"
+      :compact="!setupOnly"
       :dismissible="hasPages"
       :can-configure="canConfigure"
       :first-team-id="teams[0]?.id ?? null"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!unavailable && !setupOnly"
       ref="oTableRef"
       :frame="false"
-      :data="tableRows"
+      :data="visibleRows"
       :columns="columns"
       row-key="rowKey"
       :loading="loading || !setupLoaded"
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-responses-table"
       :row-tone="rowTone"
       :row-rail-tone="rowRailTone"
-      :row-section="visibleRowSection"
+      :row-section="rowSection"
       :section-order="SECTION_ORDER"
       selection="multiple"
       v-model:selected-ids="selectedIds"
@@ -335,16 +335,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag variant="default-soft" size="sm" :data-test="`oncall-section-count-${sectionKey}`">
             {{ raw(String(sectionCounts[sectionKey] ?? 0)) }}
           </OTag>
-          <template v-if="sectionKey === 'ringing' && unroutedRinging > 0">
+          <template v-if="sectionKey === 'ringing' && unroutedRinging + stoppedRinging > 0">
             <OText v-if="routedRinging > 0" variant="meta" data-test="oncall-section-hint-routed">
               {{ t("oncall.sectionHint_ringingRouted", { count: routedRinging }, routedRinging) }}
             </OText>
             <OText v-if="routedRinging > 0" variant="meta" aria-hidden="true">
               {{ raw("·") }}
             </OText>
-            <OText variant="meta" data-test="oncall-section-hint-unrouted">
+            <OText
+              v-if="unroutedRinging > 0"
+              variant="meta"
+              data-test="oncall-section-hint-unrouted"
+            >
               {{
                 t("oncall.sectionHint_ringingUnrouted", { count: unroutedRinging }, unroutedRinging)
+              }}
+            </OText>
+            <OText
+              v-if="unroutedRinging > 0 && stoppedRinging > 0"
+              variant="meta"
+              aria-hidden="true"
+            >
+              {{ raw("·") }}
+            </OText>
+            <OText v-if="stoppedRinging > 0" variant="meta" data-test="oncall-section-hint-stopped">
+              {{
+                t("oncall.sectionHint_ringingStopped", { count: stoppedRinging }, stoppedRinging)
               }}
             </OText>
           </template>
@@ -463,6 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :progress-loaded="progressAnswered.has(row.latest.id)"
           :total-rungs="totalRungsFor(row.latest)"
           :reached-step="reachedStepFor(row.latest)"
+          :team-deleted="teamIsDeleted(row.latest.team_id)"
         />
       </template>
 
@@ -729,8 +746,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("oncall.rowCopyLink") }}
             </ODropdownItem>
+            <ODropdownItem
+              v-if="row.latest.team_id && canAcknowledge(row) && snoozedFirings(row).length"
+              icon-left="notifications-active"
+              :data-test="`oncall-row-unsnooze-${row.rowKey}`"
+              @select="unsnoozeRow(row)"
+            >
+              {{ t("oncall.unsnooze") }}
+            </ODropdownItem>
             <ODropdownGroup
-              v-if="row.latest.team_id && canAcknowledge(row)"
+              v-if="
+                row.latest.team_id &&
+                canAcknowledge(row) &&
+                snoozedFirings(row).length < row.escalating.length
+              "
               :label="t('oncall.snoozeFor')"
             >
               <ODropdownItem
@@ -862,6 +891,7 @@ import {
   responseProgressQuery,
   responseQuery,
   snoozeResponseMutation,
+  unsnoozeResponseMutation,
   teamPolicyQuery,
   teamScheduleQuery,
   whoIsOnCallQuery,
@@ -902,6 +932,7 @@ import {
   isEscalating,
   isOnCallUnavailable,
   isDeletedTeam,
+  ladderStopped,
   isSnoozed,
   reachedStepOf,
   nextHandover,
@@ -1147,6 +1178,7 @@ const isFiltered = computed(
     teamFilter.value !== "all" ||
     priorityFilter.value !== "all" ||
     mineScope.value ||
+    !!causeFilter.value ||
     activeFilter.value !== "all",
 );
 
@@ -1174,6 +1206,9 @@ const showChecklist = computed(
     ),
 );
 
+/// Team and cause narrow the fetch itself, so an empty answer says nothing about whether the org has pages.
+const serverFiltered = computed(() => teamFilter.value !== "all" || !!causeFilter.value);
+
 /// Whether this org has ever paged anybody — read from what was FETCHED, not
 /// from the filtered rows, so narrowing the table to nothing does not swap the
 /// page's whole shape underneath the reader.
@@ -1193,7 +1228,7 @@ const hasPages = computed(
 /// under it would only offer "no pages yet" as if that were healthy. Once a
 /// single page exists the checklist has to give the screen back — it becomes
 /// one bar over a live list.
-const setupOnly = computed(() => showChecklist.value && !hasPages.value);
+const setupOnly = computed(() => showChecklist.value && !hasPages.value && !serverFiltered.value);
 
 const columns = computed<OTableColumnDef<PageRow>[]>(() => [
   {
@@ -1397,8 +1432,10 @@ function toRows(records: OnCallResponse[]): PageRow[] {
 /// header controls alone.
 const rows = computed(() => toRows(scopedResponses.value));
 
-/// Only the tab's sections reach the table, so its pager counts what is on screen rather than every fetched row.
-const tableRows = computed(() => rows.value.filter((row) => visibleRowSection(row) !== null));
+/// The visible tab's rows, filtered before the table pages them, so the footer count and pages describe that tab.
+const visibleRows = computed(() =>
+  rows.value.filter((row) => sectionVisibility.value[rowSection(row)]),
+);
 
 const causeOptions = computed(() => [
   { label: t("oncall.causeFilterAny"), value: "" },
@@ -1562,6 +1599,7 @@ function ackTooltip(row: PageRow): I18nText {
 /// One list writes to many rows, so the id rides in the variables, not the setup.
 const ackWrite = useMutation(() => acknowledgeResponseMutation(orgId.value));
 const snoozeWrite = useMutation(() => snoozeResponseMutation(orgId.value));
+const unsnoozeWrite = useMutation(() => unsnoozeResponseMutation(orgId.value));
 const resolveWrite = useMutation(() => resolveResponseMutation(orgId.value));
 const handoffWrite = useMutation(() => handoffResponseMutation(orgId.value));
 const noteWrite = useMutation(() => addResponseNoteMutation(orgId.value));
@@ -1589,6 +1627,28 @@ async function snoozeRow(row: PageRow, minutes: number) {
     await Promise.allSettled(
       row.escalating.map((r) => snoozeWrite.mutateAsync({ responseId: r.id, minutes })),
     );
+    await fetchResponses();
+  } finally {
+    busyId.value = "";
+  }
+}
+
+function snoozedFirings(row: PageRow): OnCallResponse[] {
+  return row.escalating.filter((r) => isSnoozed(r));
+}
+
+/// Ends the snooze on every quiet firing the row stands for, so they all continue now.
+async function unsnoozeRow(row: PageRow) {
+  busyId.value = row.rowKey;
+  try {
+    const results = await Promise.allSettled(
+      snoozedFirings(row).map((r) => unsnoozeWrite.mutateAsync(r.id)),
+    );
+    if (results.some((r) => r.status === "rejected")) {
+      toast({ variant: "error", message: t("oncall.unsnoozeFailed") });
+    } else {
+      toast({ variant: "success", message: t("oncall.unsnoozed") });
+    }
     await fetchResponses();
   } finally {
     busyId.value = "";
@@ -1731,15 +1791,6 @@ function rowSection(row: PageRow): SectionKey {
   return "handled";
 }
 
-/// What `OTable` groups by. Unlike `rowSection`, a section the filters
-/// dropdown unchecked returns null here — `OTable` drops a row entirely when
-/// its section is null, which is how "hide Handled" hides Handled rows
-/// without touching `rows`, `sectionCounts`, or anything counted off it.
-function visibleRowSection(row: PageRow): SectionKey | null {
-  const section = rowSection(row);
-  return sectionVisibility.value[section] ? section : null;
-}
-
 /// Counted over the filtered set, not the page: a heading reading "3" on page
 /// one of five would be describing the pagination rather than the state.
 const sectionCounts = computed<Record<string, number>>(() => {
@@ -1757,7 +1808,20 @@ const unroutedRinging = computed(
         !row.escalating.some((r) => r.team_id && !r.acked_by && !isSnoozed(r)),
     ).length,
 );
-const routedRinging = computed(() => (sectionCounts.value.ringing ?? 0) - unroutedRinging.value);
+const stoppedRinging = computed(
+  () =>
+    rows.value.filter((row) => {
+      if (rowSection(row) !== "ringing") return false;
+      const live = row.escalating.filter((r) => r.team_id && !r.acked_by && !isSnoozed(r));
+      return (
+        live.length > 0 &&
+        live.every((r) => ladderStopped(progressById.value[r.id], teamIsDeleted(r.team_id)))
+      );
+    }).length,
+);
+const routedRinging = computed(
+  () => (sectionCounts.value.ringing ?? 0) - unroutedRinging.value - stoppedRinging.value,
+);
 
 /// Only the run that needs somebody gets colour. Snoozed is deliberately
 /// inert and handled and resolved are both finished, so all three stay in the
@@ -2114,11 +2178,15 @@ async function copyRowLink(row: PageRow) {
 
 function onEmptyAction(id?: string) {
   if (id === "clear-filters") {
+    const refetch = serverFiltered.value;
     search.value = "";
     teamFilter.value = "all";
     priorityFilter.value = "all";
+    causeFilter.value = "";
     setMineOnly(false);
     selectFilterTab("all");
+    // The loaded rows are the filtered server answer, so clearing team or cause must ask again.
+    if (refetch) void fetchResponses();
   }
 }
 

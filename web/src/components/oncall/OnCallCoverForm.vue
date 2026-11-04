@@ -123,6 +123,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           disable-relative
           auto-apply
           :trigger-text="windowLabel"
+          show-error
+          :min-date="calendarDay(0)"
+          :max-date="calendarDay(MAX_AHEAD_MICROS)"
           data-test="oncall-cover-window"
         >
           <!-- The presets set this same field, so they sit inside it; the one matching the range is lit. -->
@@ -191,7 +194,7 @@ export interface UpcomingShift extends Shift {
   rotationName: string;
 }
 import { formatInZone, fromZonedInputValue, toZonedInputValue } from "@/utils/oncall";
-import { makeOnCallCoverSchema } from "./OnCallCoverForm.schema";
+import { MAX_AHEAD_MICROS, makeOnCallCoverSchema } from "./OnCallCoverForm.schema";
 import OnCallPersonName from "./OnCallPersonName.vue";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 
@@ -462,6 +465,12 @@ function applyPreset(key: (typeof PRESETS)[number]["key"]) {
 /// The preset whose range the field still holds; any other edit to the window unlights it.
 const activePreset = ref<string | null>(null);
 let presetApplied: { key: string; from: number; to: number } | null = null;
+
+/// The picker's calendar day `aheadMicros` from now, on the clock the picker shows.
+function calendarDay(aheadMicros: number): string {
+  const at = Date.now() * 1000 + aheadMicros;
+  return toZonedInputValue(at, props.viewerTimezone).slice(0, 10).replace(/-/g, "/");
+}
 
 watch(windowValue, (value) => {
   const applied = presetApplied;

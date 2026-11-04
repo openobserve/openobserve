@@ -3,6 +3,7 @@
     bleed
     data-test="oncall-response-detail-page"
     :title="title"
+    title-min-width
     icon="notifications-active"
     tabs-below
     :back="{
@@ -83,7 +84,7 @@
     <template #title-trail>
       <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
       <template v-if="response && lgUp">
-        <!-- The title is the one that ellipsises; the state facts beside it never shrink under it. -->
+        <!-- The state facts never shrink; the long paging phrase gives way first. -->
         <span class="inline-flex shrink-0" data-test="oncall-response-state-tag">
           <OTag type="oncallResponseState" :value="response.state" size="sm" />
           <OTooltip v-if="closedAfter" :content="closedAfter" />
@@ -92,7 +93,7 @@
         <!-- A closed page's state tag already says it, and an acknowledged one names its holder in the subtitle. -->
         <span
           v-if="isOpenState && response.state !== 'acknowledged'"
-          class="shrink-0"
+          class="flex min-w-32 shrink-[1000] truncate"
           data-test="oncall-response-phrase"
         >
           <OnCallEscalationCell
@@ -102,6 +103,7 @@
             :total-rungs="totalRungs"
             :progress-loaded="escalationLoaded"
             :reached-step="headerReachedStep"
+            :team-deleted="teamDeleted"
           />
         </span>
         <!-- Why this team is looking at somebody else's outage, said where the
@@ -212,7 +214,18 @@
         </template>
 
         <!-- A menu of durations, not a panel that pushes the page down. -->
-        <ODropdown v-if="canSnooze && lgUp">
+        <OButton
+          v-if="canUnsnooze && lgUp"
+          variant="outline"
+          size="sm"
+          :loading="snoozing"
+          data-test="oncall-response-unsnooze-btn"
+          @click="unsnoozeRecord"
+        >
+          <OTooltip :content="t('oncall.unsnoozeHint')" />
+          <OIcon name="notifications-active" size="sm" />{{ t("oncall.unsnooze") }}
+        </OButton>
+        <ODropdown v-else-if="canSnooze && lgUp">
           <template #trigger>
             <OButton
               variant="outline"
@@ -316,7 +329,15 @@
             data-test="oncall-response-more-btn"
           />
         </template>
-        <ODropdownGroup v-if="canSnooze" :label="t('oncall.snoozeFor')">
+        <ODropdownItem
+          v-if="canUnsnooze"
+          icon-left="notifications-active"
+          data-test="oncall-response-unsnooze-btn-menu"
+          @select="unsnoozeRecord"
+        >
+          {{ t("oncall.unsnooze") }}
+        </ODropdownItem>
+        <ODropdownGroup v-else-if="canSnooze" :label="t('oncall.snoozeFor')">
           <ODropdownItem
             v-for="opt in snoozeOptions"
             :key="opt.minutes"
@@ -373,7 +394,11 @@
             <OTooltip v-if="closedAfter" :content="closedAfter" />
           </span>
           <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-          <span v-if="isOpenState" data-test="oncall-response-phrase">
+          <span
+            v-if="isOpenState"
+            class="flex min-w-32 shrink-[1000] truncate"
+            data-test="oncall-response-phrase"
+          >
             <OnCallEscalationCell
               :response-id="response.id"
               :record="response"
@@ -381,6 +406,7 @@
               :total-rungs="totalRungs"
               :progress-loaded="escalationLoaded"
               :reached-step="headerReachedStep"
+              :team-deleted="teamDeleted"
             />
           </span>
           <OTag
@@ -426,6 +452,17 @@
           data-test="oncall-response-snoozed-banner"
         >
           {{ t("oncall.snoozedUntil", { time: snoozedUntilLabel }) }}
+          <template v-if="canUnsnooze" #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              :loading="snoozing"
+              data-test="oncall-response-snoozed-banner-unsnooze"
+              @click="unsnoozeRecord"
+            >
+              <OIcon name="notifications-active" size="sm" />{{ t("oncall.unsnooze") }}
+            </OButton>
+          </template>
         </OBanner>
 
         <!-- D-21. This record exists because somebody else's failure reaches
@@ -895,6 +932,7 @@ import {
   responseQuery,
   responseReportQuery,
   snoozeResponseMutation,
+  unsnoozeResponseMutation,
   teamMembersQuery,
   teamPolicyQuery,
   teamReachabilityQuery,
@@ -942,6 +980,8 @@ import { formatMicrosDuration } from "@/utils/formatters";
 import { formatTimestampInTimezone } from "@/utils/date";
 
 const HOLD_RECHECK_MS = 10_000;
+/// Re-reads of a lapsed rung before giving up: a minute at HOLD_RECHECK_MS.
+const LAPSE_RECHECKS = 6;
 
 const { t } = useI18nTyped();
 const { nameOf, tooltipOf } = useOrgUserNames();
@@ -1015,15 +1055,11 @@ const severityOptions = computed(() =>
 /// The record's own severity is the default: the wire derives exactly this
 /// when no severity is sent, so the picker opens on the answer rather than on
 /// an empty box somebody has to fill in mid-incident.
-watch(
-  [response, promoteOpen],
-  () => {
-    if (!promoteOpen.value || !response.value) return;
-    promoteTitle.value = response.value.title || "";
-    promoteSeverity.value = promoteSeverityFloor(response.value.priority);
-  },
-  { immediate: true },
-);
+watch(promoteOpen, (open) => {
+  if (!open || !response.value) return;
+  promoteTitle.value = response.value.title || "";
+  promoteSeverity.value = promoteSeverityFloor(response.value.priority);
+});
 
 /// Makes an incident out of a page that turned out to be one. The refusal path
 /// matters as much as the success one: a 409 means somebody else promoted this
@@ -1091,6 +1127,7 @@ const subjectAlert = ref<{
   stream_type?: string;
   query_condition?: any;
   condition?: any;
+  trigger_condition?: any;
 } | null>(null);
 /// True once the alert lookup answers 404: the page outlived its alert, and the server can no longer release it.
 const subjectAlertMissing = ref(false);
@@ -1153,6 +1190,7 @@ const ackWords = computed(() =>
   ),
 );
 const snoozeWrite = useMutation(() => snoozeResponseMutation(orgId.value));
+const unsnoozeWrite = useMutation(() => unsnoozeResponseMutation(orgId.value));
 const noteWrite = useMutation(() => addResponseNoteMutation(orgId.value));
 const handoffWrite = useMutation(() => handoffResponseMutation(orgId.value));
 const recoveryWrite = useMutation(() => confirmRecoveryMutation(orgId.value));
@@ -1313,6 +1351,7 @@ const snoozedUntilLabel = computed(() => {
   if (!r || !isSnoozed(r)) return "";
   return formatOnCallInstant(r.snoozed_until as number, nowMicros.value, store.state.timezone);
 });
+const canUnsnooze = computed(() => canSnooze.value && !!snoozedUntilLabel.value);
 
 /// Cache-first; a force expires the entry first, so it costs one request, not two.
 async function read<T>(
@@ -1537,6 +1576,22 @@ async function snoozeRecord(minutes: number) {
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.snoozeFailed"),
+    });
+  } finally {
+    snoozing.value = false;
+  }
+}
+
+async function unsnoozeRecord() {
+  snoozing.value = true;
+  try {
+    await unsnoozeWrite.mutateAsync(responseId.value);
+    toast({ variant: "success", message: t("oncall.unsnoozed") });
+    await fetchResponse();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.unsnoozeFailed"),
     });
   } finally {
     snoozing.value = false;
@@ -1876,8 +1931,28 @@ async function fetchEscalation(force = false) {
   }
 }
 
+/// Re-reads the record and its events, so the rung card and activity agree with a newer progress.
+async function refreshRecord() {
+  const id = responseId.value;
+  try {
+    const data = await read<{ response: OnCallResponse; events: OnCallResponseEvent[] } | null>(
+      responseQuery(orgId.value, id),
+      true,
+    );
+    if (!data?.response || id !== responseId.value) return;
+    response.value = data.response;
+    events.value = data.events ?? [];
+  } catch (err: any) {
+    if (id !== responseId.value) return;
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.loadResponseFailed"),
+    });
+  }
+}
+
 /// A failed re-read keeps the last good progress, so the hold banner and its polling survive until the next tick.
-async function recheckHold() {
+async function recheckProgress() {
   try {
     escalation.value = await read<EscalationProgress | null>(
       responseProgressQuery(orgId.value, responseId.value),
@@ -1900,16 +1975,38 @@ function openResponse(id: string) {
   });
 }
 
-// The ladder's countdown lapses while the entry is still fresh, so this one forces.
+// A lapsed rung is sent a little later, so a few forced re-reads follow until next_at moves.
+let lapseRecheck: ReturnType<typeof setInterval> | null = null;
+function stopLapseRecheck() {
+  if (lapseRecheck !== null) clearInterval(lapseRecheck);
+  lapseRecheck = null;
+}
 watch(
   () => {
     const at = escalation.value?.next_at;
     return !!at && nowMicros.value >= at;
   },
   (lapsed) => {
-    if (lapsed) fetchEscalation(true);
+    stopLapseRecheck();
+    if (!lapsed) return;
+    fetchEscalation(true);
+    let triesLeft = LAPSE_RECHECKS;
+    lapseRecheck = setInterval(() => {
+      if (triesLeft-- <= 0) return stopLapseRecheck();
+      recheckProgress();
+    }, HOLD_RECHECK_MS);
   },
 );
+onBeforeUnmount(stopLapseRecheck);
+
+// The newest rung sent in any ladder run; a run restart resets the count but never moves this back.
+const lastSentAt = computed(() =>
+  escalation.value ? Math.max(0, ...escalation.value.fired.map((rung) => rung.at)) : undefined,
+);
+// A rung the progress saw sent is on the record and its activity too, which this view read earlier.
+watch(lastSentAt, (sent, before) => {
+  if (sent !== undefined && before !== undefined && sent > before) refreshRecord();
+});
 
 // Triage may release the first page before the deadline, so the progress is re-read while held.
 let holdRecheck: ReturnType<typeof setInterval> | null = null;
@@ -1921,7 +2018,7 @@ watch(
   () => holdSecondsLeft.value > 0,
   (held) => {
     stopHoldRecheck();
-    if (held) holdRecheck = setInterval(recheckHold, HOLD_RECHECK_MS);
+    if (held) holdRecheck = setInterval(recheckProgress, HOLD_RECHECK_MS);
   },
 );
 onBeforeUnmount(stopHoldRecheck);
@@ -1959,6 +2056,7 @@ watch(
     priorCauses.value = [];
     firingHistory.value = [];
     report.value = null;
+    promoteOpen.value = false;
     fetchResponse();
   },
   { immediate: true },

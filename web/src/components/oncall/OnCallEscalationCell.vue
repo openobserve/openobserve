@@ -73,8 +73,10 @@ const props = withDefaults(
     totalRungs?: number | null;
     /** The step the record says it reached, for a list with no progress per row. */
     reachedStep?: number | null;
+    /** The page names a team that no longer exists, so its ladder pages nobody. */
+    teamDeleted?: boolean;
   }>(),
-  { progress: null, progressLoaded: true, totalRungs: null, reachedStep: null },
+  { progress: null, progressLoaded: true, totalRungs: null, reachedStep: null, teamDeleted: false },
 );
 
 const { t } = useI18nTyped();
@@ -89,6 +91,7 @@ const phrase = computed(() =>
     progressLoaded: props.progressLoaded,
     totalRungs: props.totalRungs,
     reachedStep: props.reachedStep,
+    teamDeleted: props.teamDeleted,
     nowMicros: nowMicros.value,
   }),
 );
@@ -104,6 +107,7 @@ const toneClass = computed(() => {
       return "text-text-body";
     case "snoozed":
     case "reachedNobody":
+    case "nobodyPaged":
       return "text-status-warning-text";
     case "nobodyAnswered":
     case "held":
@@ -143,6 +147,8 @@ const headline = computed<I18nText>(() => {
       });
     case "nobodyAnswered":
       return t("oncall.state_exhausted");
+    case "nobodyPaged":
+      return t("oncall.escalationNobodyPaged");
     case "held":
       return t("oncall.escalationHeld", { n: p.secondsLeft });
     case "pagesNobody":

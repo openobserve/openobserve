@@ -33,6 +33,8 @@ pub const LOG_LIMIT: u64 = 50;
 /// How often the notifier ticks; a start one tick back is already behind every healthy checkpoint.
 pub const TICK_INTERVAL_SECS: u64 = 30;
 pub const RESULT_OK: &str = "ok";
+/// A failed send's stored outcome when it carries no HTTP status.
+pub const RESULT_FAILED: &str = "delivery failed";
 const DOWNTIME_VARIABLE_PREFIX: &str = "{downtime_";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -174,12 +176,13 @@ fn destinations_of(row: &Downtime) -> Vec<String> {
 }
 
 fn log_entry(row: DowntimeNotification) -> DowntimeNotificationLogEntry {
+    let destinations: Vec<String> = serde_json::from_value(row.destinations).unwrap_or_default();
     DowntimeNotificationLogEntry {
         window_start: row.window_start,
         event: row.event,
         sent_at: row.sent_at,
-        destinations: serde_json::from_value(row.destinations).unwrap_or_default(),
-        result: row.result,
+        result: row.result.map(|r| safe_result(r, &destinations)),
+        destinations,
     }
 }
 
@@ -195,7 +198,14 @@ async fn send(row: &Downtime, due: &DueEvent, destinations: &[String]) -> Result
     let mut errors = Vec::new();
     for name in destinations {
         if let Err(e) = send_one(&row.org, name, &vars).await {
-            errors.push(format!("{name}: {e}"));
+            // The full error stays in the server log; folder readers see only its summary.
+            log::warn!(
+                "[DOWNTIMES] {} notification of {}/{} to {name} failed: {e}",
+                due.event.as_str(),
+                row.org,
+                row.id
+            );
+            errors.push(outcome_summary(name, &e));
         }
     }
     if errors.is_empty() {
@@ -205,16 +215,16 @@ async fn send(row: &Downtime, due: &DueEvent, destinations: &[String]) -> Result
     }
 }
 
-async fn send_one(org: &str, name: &str, vars: &[(&str, String)]) -> Result<(), String> {
+async fn send_one(org: &str, name: &str, vars: &[(&str, String)]) -> Result<(), anyhow::Error> {
     let dest = crate::alerts::destinations::get(org, name)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
     let Module::Alert {
         template,
         destination_type,
     } = dest.module
     else {
-        return Err("not an alert destination".to_string());
+        return Err(anyhow::anyhow!("not an alert destination"));
     };
     let own = match template {
         Some(template) => db::alerts::templates::get(org, &template).await.ok(),
@@ -234,7 +244,33 @@ async fn send_one(org: &str, name: &str, vars: &[(&str, String)]) -> Result<(), 
     crate::alerts::alert::dispatch_notification(org, &destination_type, &subject, body)
         .await
         .map(|_| ())
-        .map_err(|e| e.to_string())
+}
+
+/// One destination's stored outcome: its HTTP status, never the reply body.
+fn outcome_summary(name: &str, e: &anyhow::Error) -> String {
+    match e.downcast_ref::<crate::alerts::alert::DestinationStatusError>() {
+        Some(status) => format!("{name}: HTTP {}", status.status.as_u16()),
+        None => format!("{name}: {RESULT_FAILED}"),
+    }
+}
+
+/// A stored outcome in the status-only format, else [RESULT_FAILED] so an older row never shows a
+/// reply body.
+fn safe_result(result: String, destinations: &[String]) -> String {
+    let safe_part = |part: &str| {
+        part.rsplit_once(": ").is_some_and(|(name, outcome)| {
+            destinations.iter().any(|d| d == name)
+                && (outcome == RESULT_FAILED
+                    || outcome.strip_prefix("HTTP ").is_some_and(|code| {
+                        code.len() == 3 && code.bytes().all(|b| b.is_ascii_digit())
+                    }))
+        })
+    };
+    if result == RESULT_OK || result.split("; ").all(safe_part) {
+        result
+    } else {
+        RESULT_FAILED.to_string()
+    }
 }
 
 fn template_for(own: Option<Template>, destination_type: &DestinationType) -> Template {
@@ -576,5 +612,62 @@ mod tests {
     #[test]
     fn counts_are_empty_when_unknown() {
         assert_eq!(counts_phrase(&row(None), None), "");
+    }
+
+    fn status_error(code: u16, body: &str, hide_body: bool) -> anyhow::Error {
+        crate::alerts::alert::send_outcome_for_test(
+            reqwest::StatusCode::from_u16(code).unwrap(),
+            body,
+            hide_body,
+        )
+        .unwrap_err()
+    }
+
+    #[test]
+    fn a_failed_send_stores_its_status_never_the_reply_body() {
+        let e = status_error(500, "token=abc", false);
+        assert!(
+            e.to_string().contains("token=abc"),
+            "the server log keeps the body"
+        );
+        assert_eq!(outcome_summary("hook", &e), "hook: HTTP 500");
+        assert_eq!(
+            outcome_summary("hook", &anyhow::anyhow!("no destination hook")),
+            "hook: delivery failed"
+        );
+    }
+
+    #[test]
+    fn an_older_row_with_a_reply_body_is_redacted_on_read() {
+        let dests = vec!["hook".to_string(), "mail".to_string()];
+        let legacy = "hook: sent error status: 500 Internal Server Error, err: token=abc";
+        assert_eq!(safe_result(legacy.to_string(), &dests), RESULT_FAILED);
+        assert_eq!(safe_result("ok".to_string(), &dests), "ok");
+        let current = "hook: HTTP 500; mail: delivery failed";
+        assert_eq!(safe_result(current.to_string(), &dests), current);
+        // A name the row never sent to, or a status that is not three digits, is not ours.
+        assert_eq!(
+            safe_result("other: HTTP 500".to_string(), &dests),
+            RESULT_FAILED
+        );
+        assert_eq!(
+            safe_result("hook: HTTP 5000".to_string(), &dests),
+            RESULT_FAILED
+        );
+    }
+
+    #[test]
+    fn the_log_entry_never_returns_an_older_reply_body() {
+        let entry = log_entry(DowntimeNotification {
+            id: "n1".to_string(),
+            org: "acme".to_string(),
+            downtime_id: "d1".to_string(),
+            window_start: 1,
+            event: "started".to_string(),
+            sent_at: 1,
+            destinations: serde_json::json!(["hook"]),
+            result: Some("hook: sent error status: 401, err: secret".to_string()),
+        });
+        assert_eq!(entry.result.as_deref(), Some(RESULT_FAILED));
     }
 }

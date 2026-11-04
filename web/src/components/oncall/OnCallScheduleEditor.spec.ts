@@ -1202,6 +1202,33 @@ describe("OnCallScheduleEditor", () => {
       ).toEqual([]);
     });
 
+    // C12: the server refuses a From == To window, so Save stays off until they differ.
+    it("keeps Save off while a window starts and ends at the same minute", async () => {
+      const wrapper = render({
+        schedule: schedule([
+          rota("Primary", [
+            layer({ restrictions: [{ days: [0], start_minute: 540, end_minute: 540 }] }),
+          ]),
+        ]),
+      });
+      await openRotation(wrapper);
+      const save = () => wrapper.find('[data-test="oncall-rotation-done"]');
+
+      const warning = wrapper.find('[data-test="oncall-schedule-restriction-zero-length-0-0"]');
+      expect(warning.text()).toContain("Save stays off");
+      expect(save().attributes("disabled")).toBeDefined();
+
+      // Days, From, To.
+      const to = wrapper
+        .find('[data-test="oncall-schedule-restriction-0-0"]')
+        .findAllComponents({ name: "OSelect" })
+        .at(2)!;
+      to.vm.$emit("update:modelValue", 1020);
+      await flushPromises();
+
+      expect(save().attributes("disabled")).toBeUndefined();
+    });
+
     /// Two rules of ONE rotation with the same priority and the same hours are
     /// refused as a WHOLE, so Save has to be unreachable rather than a 400.
     it("blocks a save when two rules have the same priority and hours", async () => {
