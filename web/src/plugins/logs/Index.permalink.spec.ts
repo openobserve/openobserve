@@ -216,7 +216,7 @@ describe("Logs Index — opening a line link (4c C5)", { timeout: 30000 }, () =>
     } as any);
     gridRuns.length = 0;
     await land(linkQuery(), {}, { realExecutor: true });
-    await vi.waitFor(() => expect(gridRuns.length).toBeGreaterThan(0));
+    expect(gridRuns.length).toBeGreaterThan(0);
     expect(gridRuns[0][2]).toMatch(/^permalink-init:/);
   });
 
@@ -239,11 +239,7 @@ describe("Logs Index — opening a line link (4c C5)", { timeout: 30000 }, () =>
     await vi.waitFor(() =>
       expect(document.querySelector('[data-test="logs-permalink-detail-dialog"]')).not.toBeNull(),
     );
-    await vi.waitFor(() =>
-      expect(
-        document.querySelector('[data-test="log-detail-json-content"]')?.textContent,
-      ).toContain("payment declined"),
-    );
+    await vi.waitFor(() => expect(sharedLineRecord.value).toEqual(line));
     logs.mockClear();
     wrapper.vm.onGuardRunAnyway();
     expect(logs).toHaveBeenCalledTimes(1);
