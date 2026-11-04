@@ -8,8 +8,14 @@ import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
+import {
+  OTableRowMessageKey,
+  TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH,
+} from "../OTable.types";
 
 const props = defineProps<{
   row: Row<any>;
@@ -88,6 +94,55 @@ const emit = defineEmits<{
 }>();
 
 const slots = useSlots();
+
+const rowMessages = inject(OTableRowMessageKey, null);
+const rowMessage = computed(() => rowMessages?.messageFor(props.row.original));
+const isActionColumn = (cell: { column: { id: string; columnDef: { meta?: unknown } } }) =>
+  cell.column.id === "actions" || !!(cell.column.columnDef.meta as any)?.isAction;
+// The message leaves the first data column and the actions in view, so the row stays recognisable and actionable.
+function messageSpan(): { start: number; count: number } | null {
+  if (!rowMessage.value) return null;
+  const cells = props.row.getVisibleCells();
+  const first = cells.findIndex((c) => c.column.id !== "#" && !isActionColumn(c));
+  if (first === -1) return null;
+  const actions = cells.findIndex((c, i) => i > first && isActionColumn(c));
+  const count = (actions === -1 ? cells.length : actions) - first - 1;
+  // The width-absorbing spacer can be zero wide, so a span of only spacer would hide the message.
+  const covered = cells.slice(first + 1, first + 1 + count);
+  const hasRealColumn = covered.some((c) => !(c.column.columnDef.meta as any)?.spacer);
+  return count > 0 && hasRealColumn ? { start: first + 1, count } : null;
+}
+// A sideways-scrolled table keeps the message text and its Dismiss in view, clear of pinned columns.
+function messageEdgeInsets(): { start: string; end: string | null } {
+  const span = messageSpan();
+  const cells = props.row.getVisibleCells();
+  const before = span ? cells[span.start - 1] : undefined;
+  const after = span ? cells[span.start + span.count] : undefined;
+  const leftPinned =
+    before?.column.getIsPinned?.() === "left"
+      ? (before.column.getStart?.("left") ?? 0) + before.column.getSize()
+      : 0;
+  const rightPinned =
+    after?.column.getIsPinned?.() === "right"
+      ? (after.column.getAfter?.("right") ?? 0) + after.column.getSize()
+      : null;
+  return {
+    start: `calc(${leftPinned}px + 0.5rem)`,
+    end: rightPinned === null ? null : `${rightPinned}px`,
+  };
+}
+// With no middle column to cover, the message shrinks to a marker at the end of the first data cell, its text in a tooltip.
+function messageMarkerIndex(): number | null {
+  if (!rowMessage.value || messageSpan()) return null;
+  const first = props.row
+    .getVisibleCells()
+    .findIndex((c) => c.column.id !== "#" && !isActionColumn(c));
+  return first === -1 ? 0 : first;
+}
+function coveredByMessage(index: number): boolean {
+  const span = messageSpan();
+  return !!span && index > span.start && index < span.start + span.count;
+}
 
 const rowRef = ref<HTMLElement | null>(null);
 
@@ -324,46 +379,110 @@ function onRowMouseleave() {
     </td>
 
     <!-- Data cells -->
-    <OTableBodyCell
-      v-for="cell in row.getVisibleCells()"
-      :key="cell.id"
-      :cell="cell"
-      :row="row"
-      :row-selected="isRowSelected"
-      :row-active="isActive"
-      :row-striped="isStriped"
-      :row-focusable="clickable"
-      :highlight-text="highlightText"
-      :should-highlight="shouldHighlightColumn?.(cell.column.id) ?? false"
-      :get-highlighted-html="getHighlightedHtml"
-      :wrap="wrap"
-      :dense="dense"
-      :compact="compact"
-      :bordered="bordered"
-      :enable-cell-copy="enableCellCopy"
-      :get-cell-style="getCellStyle"
-      :pivot-merge="getPivotMerge ? getPivotMerge(row.original, cell.column.id) : null"
-      @cell-click="emit('cell-click', $event)"
-      @cell-contextmenu="emit('cell-contextmenu', $event)"
-    >
-      <template v-if="slots[`cell-${cell.column.id}`]" #default>
-        <slot
-          :name="`cell-${cell.column.id}`"
-          :row="row.original"
-          :value="cell.getValue()"
-          :column="cell.column.columnDef"
-          :index="row.index"
-        />
-      </template>
-      <!-- Per-cell hover-action overlay — forwarded to every cell -->
-      <template v-if="slots['cell-hover-actions']" #cell-hover-actions="caProps">
-        <slot name="cell-hover-actions" v-bind="caProps" />
-      </template>
-      <!-- Inline actions beside the copy button — forwarded to every cell -->
-      <template v-if="slots['copy-actions']" #copy-actions="ccaProps">
-        <slot name="copy-actions" v-bind="ccaProps" />
-      </template>
-    </OTableBodyCell>
+    <template v-for="(cell, cellIndex) in row.getVisibleCells()" :key="cell.id">
+      <td
+        v-if="rowMessage && messageSpan()?.start === cellIndex"
+        :colspan="messageSpan()!.count"
+        :class="['max-w-0 px-2 align-middle', bordered ? 'border-table-row-divider border-b' : '']"
+        data-test="o2-table-row-message-cell"
+        @click.stop
+      >
+        <div
+          role="alert"
+          :data-test="rowMessage.dataTest"
+          class="bg-status-error-bg text-status-error-text rounded-default flex h-6 min-w-0 items-center gap-1.5 ps-2 pe-0.5 text-xs"
+        >
+          <span
+            class="sticky flex min-w-0 items-center gap-1.5"
+            :style="{ insetInlineStart: messageEdgeInsets().start }"
+            data-test="o2-table-row-message-text"
+          >
+            <OIcon name="error-outline" size="sm" class="shrink-0" />
+            <OTruncatedText class="min-w-0">{{ rowMessage.text }}</OTruncatedText>
+          </span>
+          <OButton
+            variant="ghost"
+            size="icon-xs"
+            icon-left="close"
+            :class="[
+              'bg-status-error-bg ms-auto shrink-0',
+              messageEdgeInsets().end ? 'sticky' : '',
+            ]"
+            :style="{ insetInlineEnd: messageEdgeInsets().end ?? undefined }"
+            :aria-label="t('common.dismiss')"
+            :data-test="rowMessage.dataTest ? `${rowMessage.dataTest}-dismiss` : undefined"
+            @click.stop="rowMessages?.dismiss(row.original)"
+          />
+        </div>
+      </td>
+      <OTableBodyCell
+        v-else-if="!coveredByMessage(cellIndex)"
+        :cell="cell"
+        :row="row"
+        :row-selected="isRowSelected"
+        :row-active="isActive"
+        :row-striped="isStriped"
+        :row-focusable="clickable"
+        :highlight-text="highlightText"
+        :should-highlight="shouldHighlightColumn?.(cell.column.id) ?? false"
+        :get-highlighted-html="getHighlightedHtml"
+        :wrap="wrap"
+        :dense="dense"
+        :compact="compact"
+        :bordered="bordered"
+        :enable-cell-copy="enableCellCopy"
+        :get-cell-style="getCellStyle"
+        :pivot-merge="getPivotMerge ? getPivotMerge(row.original, cell.column.id) : null"
+        @cell-click="emit('cell-click', $event)"
+        @cell-contextmenu="emit('cell-contextmenu', $event)"
+      >
+        <template v-if="slots[`cell-${cell.column.id}`]" #default>
+          <slot
+            :name="`cell-${cell.column.id}`"
+            :row="row.original"
+            :value="cell.getValue()"
+            :column="cell.column.columnDef"
+            :index="row.index"
+          />
+        </template>
+        <template v-if="rowMessage && messageMarkerIndex() === cellIndex" #overlay>
+          <div
+            role="alert"
+            :data-test="rowMessage.dataTest"
+            class="bg-status-error-bg text-status-error-text rounded-default flex h-6 items-center gap-0.5 ps-1 pe-0.5 text-xs"
+            @click.stop
+          >
+            <OTooltip :content="rowMessage.text" exclusive>
+              <span
+                tabindex="0"
+                class="rounded-default focus-visible:outline-focus-ring-accent inline-flex shrink-0 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
+                data-test="o2-table-row-message-marker"
+              >
+                <OIcon name="error-outline" size="sm" />
+                <span class="sr-only">{{ rowMessage.text }}</span>
+              </span>
+            </OTooltip>
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              icon-left="close"
+              class="shrink-0"
+              :aria-label="t('common.dismiss')"
+              :data-test="rowMessage.dataTest ? `${rowMessage.dataTest}-dismiss` : undefined"
+              @click.stop="rowMessages?.dismiss(row.original)"
+            />
+          </div>
+        </template>
+        <!-- Per-cell hover-action overlay — forwarded to every cell -->
+        <template v-if="slots['cell-hover-actions']" #cell-hover-actions="caProps">
+          <slot name="cell-hover-actions" v-bind="caProps" />
+        </template>
+        <!-- Inline actions beside the copy button — forwarded to every cell -->
+        <template v-if="slots['copy-actions']" #copy-actions="ccaProps">
+          <slot name="copy-actions" v-bind="ccaProps" />
+        </template>
+      </OTableBodyCell>
+    </template>
   </tr>
 
   <!-- Tree-mode warning row (rendered between parent and its children) -->

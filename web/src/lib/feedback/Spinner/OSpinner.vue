@@ -44,7 +44,7 @@ const containerClasses = computed(() => [
     aria-live="polite"
   >
     <svg
-      class="text-spinner size-full animate-spin"
+      class="text-spinner o2-motion-keep size-full animate-spin"
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
@@ -74,7 +74,10 @@ const containerClasses = computed(() => [
     <span
       v-for="i in 3"
       :key="i"
-      :class="['bg-spinner animate-bounce rounded-full', dotSizeClasses[size ?? 'md']]"
+      :class="[
+        'bg-spinner o2-motion-keep animate-bounce rounded-full',
+        dotSizeClasses[size ?? 'md'],
+      ]"
       :style="{ animationDelay: `${(i - 1) * 0.15}s` }"
       aria-hidden="true"
     />

@@ -1085,7 +1085,7 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
     });
 
-    it("should stay in place but disabled while a search is loading", async () => {
+    it("stays in place, aria-disabled and inert to clicks, while a search is loading", async () => {
       applySearch();
       searchObjInstance.loading = true;
       wrapper = mountSearchBar();
@@ -1093,7 +1093,17 @@ describe("SearchBar", () => {
 
       const btn = wrapper.find('[data-test="insights-button"]');
       expect(btn.exists()).toBe(true);
-      expect(btn.attributes("disabled")).toBeDefined();
+      expect(btn.attributes("aria-disabled")).toBe("true");
+      expect(btn.attributes("disabled")).toBeUndefined();
+      await btn.trigger("click");
+      expect(wrapper.emitted("drill-down")).toBeUndefined();
+      expect(wrapper.find('[data-test="insights-button-placeholder"]').exists()).toBe(false);
+
+      searchObjInstance.loading = false;
+      await flushPromises();
+      expect(btn.attributes("aria-disabled")).toBeUndefined();
+      await btn.trigger("click");
+      expect(wrapper.emitted("drill-down")).toHaveLength(1);
     });
 
     it("should be hidden when the org has no trace streams", async () => {
@@ -1121,6 +1131,77 @@ describe("SearchBar", () => {
 
       await wrapper.find('[data-test="insights-button"]').trigger("click");
       expect(wrapper.emitted("drill-down")).toHaveLength(1);
+    });
+
+    describe("reserved slot while results load (200% zoom shift)", () => {
+      const placeholder = () => wrapper.find('[data-test="insights-button-placeholder"]');
+
+      it.each([
+        ["streams are loading", () => (searchObjInstance.loadingStream = true)],
+        ["the search errored", () => (searchObjInstance.data.errorMsg = "boom")],
+      ])("holds an invisible, inert placeholder in the button's place while %s", async (_, set) => {
+        applySearch();
+        set();
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+        expect(placeholder().exists()).toBe(true);
+        expect(placeholder().classes()).toContain("invisible");
+        expect(placeholder().attributes("aria-hidden")).toBe("true");
+        expect(placeholder().attributes("inert")).toBeDefined();
+        const toggleGroup = wrapper.find(".o-toggle-group-stub").element;
+        expect(toggleGroup.nextElementSibling).toBe(placeholder().element);
+      });
+
+      it("reserves nothing when the button shows, or when the org has no trace streams", async () => {
+        applySearch();
+        wrapper = mountSearchBar();
+        await flushPromises();
+        expect(placeholder().exists()).toBe(false);
+        wrapper.unmount();
+
+        applySearch();
+        searchObjInstance.data.stream.streamLists = [];
+        wrapper = mountSearchBar();
+        await flushPromises();
+        expect(placeholder().exists()).toBe(false);
+        expect((wrapper.vm as any).drillDownSlot).toBe(false);
+      });
+
+      it.each(["service-graph", "services-catalog"] as const)(
+        "reserves nothing in %s mode",
+        async (mode) => {
+          searchObjInstance.meta.searchMode = mode;
+          applySearch();
+          searchObjInstance.loading = true;
+          wrapper = mountSearchBar();
+          await flushPromises();
+
+          expect(placeholder().exists()).toBe(false);
+        },
+      );
+
+      it("budgets the toolbar the same while loading as once the button shows", async () => {
+        const widthSpy = mockToolbarWidth(714);
+        try {
+          applySearch();
+          wrapper = mountSearchBar();
+          await flushPromises();
+          const shown = (wrapper.vm as any).shouldHideToolbarButtonText;
+          wrapper.unmount();
+
+          applySearch();
+          searchObjInstance.loadingStream = true;
+          wrapper = mountSearchBar();
+          await flushPromises();
+
+          expect((wrapper.vm as any).shouldHideToolbarButtonText).toBe(shown);
+          expect(placeholder().text().includes("traces.drillDown")).toBe(!shown);
+        } finally {
+          widthSpy.mockRestore();
+        }
+      });
     });
   });
 
@@ -1253,6 +1334,39 @@ describe("SearchBar", () => {
 
       expect(wrapper.emitted("searchdata")).toBeTruthy();
       expect(wrapper.emitted("searchdata")).toHaveLength(1);
+    });
+
+    it("moves focus from Run to Cancel and back as the run starts and ends", async () => {
+      wrapper = mountSearchBar({ isLoading: false });
+      await flushPromises();
+      const run = () => wrapper.find('[data-test="logs-search-bar-refresh-btn"]');
+      const cancel = () => wrapper.find('[data-test="traces-search-bar-cancel-btn"]');
+      (run().element as HTMLElement).focus();
+      expect(document.activeElement).toBe(run().element);
+
+      await wrapper.setProps({ isLoading: true });
+      await flushPromises();
+      expect(cancel().exists()).toBe(true);
+      expect(cancel().attributes("aria-busy")).toBe("true");
+      expect(document.activeElement).toBe(cancel().element);
+
+      await wrapper.setProps({ isLoading: false });
+      await flushPromises();
+      expect(document.activeElement).toBe(run().element);
+    });
+
+    it("leaves focus alone when it was outside the run control", async () => {
+      wrapper = mountSearchBar({ isLoading: false });
+      await flushPromises();
+      const outside = document.createElement("button");
+      document.body.appendChild(outside);
+      outside.focus();
+
+      await wrapper.setProps({ isLoading: true });
+      await flushPromises();
+
+      expect(document.activeElement).toBe(outside);
+      outside.remove();
     });
 
     it("should show cancel button when isLoading prop is true on enterprise", async () => {
@@ -2918,6 +3032,41 @@ describe("SearchBar", () => {
       vm.recentFocusOpen = false;
       await flushPromises();
       expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
+    });
+
+    it("types no placeholder while the stream loads, so a restored query paints first", async () => {
+      searchObjInstance.loadingStream = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      searchObjInstance.data.editorValue = "";
+      searchObjInstance.meta.queryEditorPlaceholderFlag = true;
+      await flushPromises();
+      expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(false);
+
+      searchObjInstance.loadingStream = false;
+      await flushPromises();
+      expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
+    });
+
+    it("never starts typing Select a stream first while the stream list may still pick one", async () => {
+      vi.useFakeTimers();
+      try {
+        searchObjInstance.loadingStream = true;
+        searchObjInstance.data.stream.selectedStream = { label: "", value: "" };
+        wrapper = mountSearchBar();
+        await vi.advanceTimersByTimeAsync(5000);
+        const typed = () => wrapper.find(".query-editor-placeholder-typewriter").text?.() ?? "";
+        expect((wrapper.vm as any).traceEditorPlaceholder).not.toMatch(/^Sel/);
+
+        searchObjInstance.data.stream.selectedStream = { label: "default", value: "default" };
+        searchObjInstance.loadingStream = false;
+        for (let i = 0; i < 20; i++) {
+          await vi.advanceTimersByTimeAsync(100);
+          expect(typed()).not.toMatch(/^Sel/);
+        }
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

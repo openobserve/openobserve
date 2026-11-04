@@ -139,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseover="onChartMouseOver"
           @mouseout="onChartMouseOut"
           @finished="onChartFinished"
+          @painted="onChartPainted"
         />
         <ExemplarMarkerList
           v-if="exemplarPoints.length"
@@ -203,6 +204,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
+      <PanelChartPlaceholder
+        v-if="showsChartPlaceholder"
+        class="absolute inset-0"
+        data-test="panel-chart-placeholder"
+      />
       <OEmptyState
         v-if="
           noData &&
@@ -403,6 +409,7 @@ import {
   withTimeRangeVariables,
 } from "@/utils/dashboard/variables/variablesUtils";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
 import {
   forecastPointOf,
   usePanelAlertCreation,
@@ -508,6 +515,19 @@ import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import { resolveNoDataText } from "@/utils/dashboard/noDataText";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
+// Panel types drawn by something other than ChartRenderer, which therefore never report a painted frame.
+const NON_ECHARTS_PANEL_TYPES = [
+  "maps",
+  "geomap",
+  "table",
+  "html",
+  "markdown",
+  "alert-list",
+  "flame-graph",
+  "logs",
+  "custom_chart",
+];
+
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
@@ -527,6 +547,7 @@ export default defineComponent({
     AddAnnotation,
     CustomChartRenderer,
     LoadingProgress,
+    PanelChartPlaceholder,
     OButton,
     OIcon,
     OTooltip,
@@ -706,6 +727,7 @@ export default defineComponent({
     "show-legends",
     "format-column",
     "sendToAiChat",
+    "painted",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -955,6 +977,16 @@ export default defineComponent({
       () =>
         isFirstLoadSettled?.value === false &&
         !["html", "markdown", "alert-list"].includes(panelSchema.value?.type),
+    );
+
+    // An ECharts canvas stays blank until a frame of the converted data is drawn, so the placeholder waits for that frame.
+    const chartPainted = ref(false);
+    let chartDataConverted = false;
+    const onChartPainted = () => {
+      if (chartDataConverted) chartPainted.value = true;
+    };
+    const drawsWithECharts = computed(
+      () => !NON_ECHARTS_PANEL_TYPES.includes(panelSchema.value?.type),
     );
 
     // Dashboard-level annotation sources are queried once by the dashboard and merged after the panel's own.
@@ -1664,6 +1696,7 @@ export default defineComponent({
           }
 
           panelData.value = result;
+          chartDataConverted = true;
           customChartRunSkipped = false;
 
           limitNumberOfSeriesWarningMessage.value =
@@ -2225,6 +2258,20 @@ export default defineComponent({
         { tabId: tabId.value, panelId: panelSchema.value?.id },
       ),
     );
+    const showsChartPlaceholder = computed(
+      () =>
+        !errorDetail.value?.message &&
+        (isAwaitingFirstLoad.value ||
+          (drawsWithECharts.value && !chartPainted.value && !noData.value)),
+    );
+    watch(
+      showsChartPlaceholder,
+      (shown) => {
+        if (!shown && !errorDetail.value?.message) emit("painted");
+      },
+      { immediate: true },
+    );
+
     const noDataTitle = computed(() =>
       customNoDataText.value ? raw(customNoDataText.value) : t("panel.noData"),
     );
@@ -2761,6 +2808,8 @@ export default defineComponent({
       exemplarActiveUnit,
       formatExemplarValue,
       onChartFinished,
+      onChartPainted,
+      showsChartPlaceholder,
     };
   },
 });

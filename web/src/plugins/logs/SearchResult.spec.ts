@@ -20,6 +20,7 @@ import SearchResult from "@/plugins/logs/SearchResult.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
+import { STALE_DIM, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -1303,17 +1304,21 @@ describe("SearchResult Component", () => {
     });
 
     it("keeps the previous chart dimmed until the re-run's chart has painted", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       await runUntilHistogramLands(landed());
       chart().vm.$emit("finished");
       await flushPromises();
 
       await runUntilHistogramLands(landed());
-      expect(wrapper.find(".histogram-chart").classes()).toContain("opacity-50");
+      expect(wrapper.find(".histogram-chart").classes()).not.toContain(STALE_DIM);
+      vi.advanceTimersByTime(STALE_DIM_DELAY_MS);
+      await nextTick();
+      expect(wrapper.find(".histogram-chart").classes()).toContain(STALE_DIM);
       expect(wrapper.vm.summaryView.updating).toBe(true);
 
       chart().vm.$emit("finished");
       await flushPromises();
-      expect(wrapper.find(".histogram-chart").classes()).not.toContain("opacity-50");
+      expect(wrapper.find(".histogram-chart").classes()).not.toContain(STALE_DIM);
       expect(wrapper.vm.summaryView.updating).toBe(false);
     });
 
@@ -1588,6 +1593,34 @@ describe("SearchResult rows while a search re-runs", () => {
     wrapper.vm.searchObj.data.queryResults = {};
     await nextTick();
   };
+
+  it("dims the kept rows to the shared 60% only after the shared 150 ms, and never in live mode", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await rerun();
+      expect(table().attributes("data-stale-rows")).toBe("true");
+      expect(table().classes()).not.toContain(STALE_DIM);
+      vi.advanceTimersByTime(STALE_DIM_DELAY_MS - 1);
+      await nextTick();
+      expect(table().classes()).not.toContain(STALE_DIM);
+      vi.advanceTimersByTime(1);
+      await nextTick();
+      expect(table().classes()).toContain(STALE_DIM);
+
+      wrapper.vm.searchObj.loading = false;
+      wrapper.vm.searchObj.data.queryResults = { hits: [...rows] };
+      wrapper.vm.searchObj.meta.refreshInterval = 10;
+      await nextTick();
+      await rerun();
+      vi.advanceTimersByTime(STALE_DIM_DELAY_MS);
+      await nextTick();
+      expect(table().attributes("data-stale-rows")).toBe("true");
+      expect(table().classes()).not.toContain(STALE_DIM);
+    } finally {
+      wrapper.vm.searchObj.meta.refreshInterval = 0;
+      vi.useRealTimers();
+    }
+  });
 
   it("keeps the previous rows on screen, marked as refreshing, until new rows arrive", async () => {
     await rerun();

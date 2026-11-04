@@ -2,7 +2,9 @@
 
 <script setup lang="ts">
 import { raw, useI18nTyped } from "@/types/i18n";
-import { useSlots, computed } from "vue";
+import { useSlots, computed, onBeforeUnmount, onMounted, onUpdated, ref, watch } from "vue";
+import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
+import { LOADER_DELAY_MS } from "@/lib/styles/motion";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -24,11 +26,18 @@ const props = withDefaults(
     isFirstPage: boolean;
     isLastPage: boolean;
     position?: "top" | "bottom";
-    /** When true, the range text is a skeleton bar and the start side is withheld. */
+    /** When true, the range text is a skeleton bar (shown after the loader delay) and the start side is withheld. */
     loading?: boolean;
+    /** A page request is in flight: paging and page size ignore input at once, before any dim. */
+    pending?: boolean;
+    /** The rows on screen are being refetched: the range stays dimmed, controls stay focusable but inactive. */
+    stale?: boolean;
     /** Rows currently selected; read only when `#selection-actions` is provided. */
     selectedCount?: number;
     bordered?: boolean;
+    /** No rows are on screen (the table shows its error state), so the range would describe rows nobody sees. */
+    rangeHidden?: boolean;
+    keepPageSizeLabel?: boolean;
   }>(),
   {
     position: "bottom",
@@ -46,9 +55,152 @@ const emit = defineEmits<{
   "last-page": [];
 }>();
 
+const showSkeleton = useDelayedFlag(() => !!props.loading, LOADER_DELAY_MS);
+
+const ACTIVATION_KEYS = new Set(["Enter", " ", "ArrowDown", "ArrowUp"]);
+// A second "next" before the first page arrives would count from the requested page, so paging waits for it.
+const pagingInactive = computed(() => !!props.pending || !!props.stale);
+
+// Controls a consumer renders or a select owns cannot take aria-disabled themselves, so their wrapper swallows activation.
+function swallowActivation(event: Event, inactive: boolean): void {
+  if (!inactive) return;
+  if (event instanceof KeyboardEvent && !ACTIVATION_KEYS.has(event.key)) return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+// Read in render, not cached: slot presence is not reactive.
+function statusNoteShown(): boolean {
+  return !props.loading && !!slots["status-note"];
+}
+
+function requestPage(event: "first-page" | "prev-page" | "next-page" | "last-page"): void {
+  if (pagingInactive.value) return;
+  if (event === "first-page") emit("first-page");
+  else if (event === "prev-page") emit("prev-page");
+  else if (event === "next-page") emit("next-page");
+  else emit("last-page");
+}
+
+const rootRef = ref<HTMLElement | null>(null);
+const statusNoteRef = ref<HTMLElement | null>(null);
+const labelYields = ref(false);
+
+// Measured, since whether the reserved note slot adds a line depends on every control's width; the label yields only when that ends the extra line.
+function fitPageSizeLabel(): void {
+  const root = rootRef.value;
+  const note = statusNoteRef.value;
+  let yields = false;
+  if (root && note && !props.keepPageSizeLabel) {
+    delete root.dataset.labelYield;
+    note.style.display = "none";
+    const withoutNote = root.offsetHeight;
+    note.style.display = "";
+    const withLabel = root.offsetHeight;
+    if (withLabel > withoutNote) {
+      root.dataset.labelYield = "";
+      yields = root.offsetHeight < withLabel;
+    }
+    if (!yields) delete root.dataset.labelYield;
+  }
+  labelYields.value = yields;
+}
+
+let footerResize: ResizeObserver | null = null;
+let fitFrame = 0;
+// A frame later, so the attribute toggles never resize an observed box inside the observer's own callback.
+const scheduleFit = (): void => {
+  cancelAnimationFrame(fitFrame);
+  fitFrame = requestAnimationFrame(fitPageSizeLabel);
+};
+// Only a footer with a status note is measured, so tables without one add no observer.
+watch(
+  statusNoteRef,
+  (note) => {
+    footerResize?.disconnect();
+    footerResize = null;
+    if (!note || typeof ResizeObserver === "undefined") return;
+    footerResize = new ResizeObserver(scheduleFit);
+    if (rootRef.value) footerResize.observe(rootRef.value);
+    footerResize.observe(note);
+  },
+  { flush: "post" },
+);
+onMounted(fitPageSizeLabel);
+onUpdated(fitPageSizeLabel);
+onBeforeUnmount(() => {
+  footerResize?.disconnect();
+  cancelAnimationFrame(fitFrame);
+});
+
+// Menus these wrappers open are portaled outside them, so an inactive wrapper closes them and blocks their items.
+const pageSizeRef = ref<HTMLElement | null>(null);
+const selectionActionsRef = ref<HTMLElement | null>(null);
+const MENU_EVENTS = ["pointerdown", "pointerup", "mousedown", "click", "keydown"] as const;
+
+// Reka fills a dropdown's aria-controls only after its trigger rendered, so the menu is also found by its aria-labelledby.
+function openMenus(root: HTMLElement | null): Element[] {
+  if (!root) return [];
+  const triggers = Array.from(root.querySelectorAll('[aria-expanded="true"]'));
+  if (!triggers.length) return [];
+  const triggerIds = new Set(triggers.map((trigger) => trigger.id).filter(Boolean));
+  const controlled = triggers.flatMap((trigger) =>
+    (trigger.getAttribute("aria-controls") ?? "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((id) => document.getElementById(id)),
+  );
+  const labelled = Array.from(document.querySelectorAll("[aria-labelledby]")).filter((el) =>
+    (el.getAttribute("aria-labelledby") ?? "").split(/\s+/).some((id) => triggerIds.has(id)),
+  );
+  return [...new Set([...controlled, ...labelled])].filter(
+    (menu): menu is Element => !!menu && !root.contains(menu),
+  );
+}
+
+function guardMenusWhile(root: () => HTMLElement | null, active: () => boolean): void {
+  let menus: Element[] = [];
+  const block = (event: Event): void => {
+    if (event instanceof KeyboardEvent && !ACTIVATION_KEYS.has(event.key)) return;
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+    if (![...menus, ...openMenus(root())].some((menu) => menu.contains(target))) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  const stop = (): void => {
+    MENU_EVENTS.forEach((type) => document.removeEventListener(type, block, true));
+    menus = [];
+  };
+  watch(active, (on) => {
+    if (!on) {
+      stop();
+      return;
+    }
+    menus = openMenus(root());
+    MENU_EVENTS.forEach((type) => document.addEventListener(type, block, true));
+    // Escape is the menus' own dismiss path and only reaches the topmost layer, which an open menu is.
+    menus.forEach((menu) =>
+      menu.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })),
+    );
+  });
+  onBeforeUnmount(stop);
+}
+
+guardMenusWhile(
+  () => pageSizeRef.value,
+  () => pagingInactive.value,
+);
+guardMenusWhile(
+  () => selectionActionsRef.value,
+  () => !!props.stale,
+);
+
 const pageSizeModel = computed({
   get: () => props.pageSize,
-  set: (val: number) => emit("update:pageSize", val),
+  set: (val: number) => {
+    if (!pagingInactive.value) emit("update:pageSize", val);
+  },
 });
 
 const pageSizeSelectOptions = computed(() => {
@@ -76,9 +228,11 @@ const selectionLabel = computed(() => {
 
 <template>
   <div
+    ref="rootRef"
     :data-test="`o2-table-pagination-${position}`"
+    :data-label-yield="labelYields ? '' : undefined"
     :class="[
-      'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1 max-md:gap-y-2',
+      'group/pager flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1 max-md:gap-y-2',
       bordered ? 'border-border-default border-t' : '',
     ]"
   >
@@ -95,7 +249,20 @@ const selectionLabel = computed(() => {
         >{{ selectionLabel }}</span
       >
       <span class="bg-border-default h-4 w-px shrink-0 max-md:hidden" aria-hidden="true" />
-      <div class="flex min-w-0 flex-wrap items-center gap-2">
+      <div
+        :class="[
+          'flex min-w-0 flex-wrap items-center gap-2 transition-opacity',
+          stale ? 'cursor-not-allowed opacity-60' : '',
+        ]"
+        :role="stale ? 'group' : undefined"
+        :aria-disabled="stale ? 'true' : undefined"
+        ref="selectionActionsRef"
+        data-test="o2-table-selection-actions"
+        @pointerdown.capture="swallowActivation($event, !!stale)"
+        @mousedown.capture="swallowActivation($event, !!stale)"
+        @click.capture="swallowActivation($event, !!stale)"
+        @keydown.capture="swallowActivation($event, !!stale)"
+      >
         <slot name="selection-actions" />
       </div>
     </div>
@@ -109,30 +276,71 @@ const selectionLabel = computed(() => {
       <slot name="footer-note" />
     </div>
 
+    <div
+      v-if="statusNoteShown()"
+      ref="statusNoteRef"
+      class="flex flex-[1_1_0] items-center text-xs"
+      data-test="o2-table-pagination-status-note"
+    >
+      <slot name="status-note" />
+    </div>
+
     <!-- min-h is one small control, so a one-row footer keeps its height even when the page-size select is absent. -->
     <div
-      class="ms-auto flex min-h-[2.125rem] min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 max-md:basis-full max-md:justify-between max-md:gap-x-2"
+      :class="[
+        'ms-auto flex min-h-[2.125rem] min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 max-md:gap-x-2',
+        statusNoteShown() ? '' : 'max-md:basis-full max-md:justify-between',
+      ]"
     >
       <span
         v-if="loading"
+        :class="showSkeleton ? '' : 'invisible'"
         class="o2-pag-skel rounded-default inline-block h-3 w-36 [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] [background-size:200%_100%] [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]"
         aria-hidden="true"
         data-test="o2-table-pagination-info-skel"
       />
       <span
         v-else
-        class="text-primary text-xs whitespace-nowrap"
+        :class="[
+          'text-primary text-xs whitespace-nowrap transition-opacity',
+          stale ? 'opacity-60' : '',
+          rangeHidden ? 'invisible' : '',
+        ]"
+        :aria-hidden="rangeHidden ? 'true' : undefined"
         data-test="o2-table-pagination-info"
       >
         {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }}
         {{ totalCount.toLocaleString() }}{{ totalCountExact ? "" : "+" }}
       </span>
       <div
-        class="bg-border-default h-4 w-px shrink-0 max-md:hidden"
+        :class="[
+          'bg-border-default h-4 w-px shrink-0 group-data-[label-yield]/pager:hidden max-md:hidden',
+          rangeHidden ? 'invisible' : '',
+        ]"
         v-if="pageSizeOptions.length > 0"
+        data-test="o2-table-pagination-divider"
       />
-      <div v-if="pageSizeOptions.length > 0" class="text-primary flex items-center gap-1.5 text-xs">
-        <span class="whitespace-nowrap max-md:hidden">{{ t("search.recordsPerPage") }}</span>
+      <div
+        v-if="pageSizeOptions.length > 0"
+        :class="[
+          'text-primary flex items-center gap-1.5 text-xs transition-opacity',
+          stale ? 'cursor-not-allowed opacity-60' : '',
+        ]"
+        :role="pagingInactive ? 'group' : undefined"
+        :aria-disabled="pagingInactive ? 'true' : undefined"
+        ref="pageSizeRef"
+        data-test="o2-table-page-size"
+        @pointerdown.capture="swallowActivation($event, pagingInactive)"
+        @mousedown.capture="swallowActivation($event, pagingInactive)"
+        @click.capture="swallowActivation($event, pagingInactive)"
+        @keydown.capture="swallowActivation($event, pagingInactive)"
+      >
+        <!-- The select keeps this as its name, so a status note may take the label's room. -->
+        <span
+          class="whitespace-nowrap group-data-[label-yield]/pager:hidden max-md:hidden"
+          data-test="o2-table-page-size-label"
+          >{{ t("search.recordsPerPage") }}</span
+        >
         <OSelect
           v-model="pageSizeModel"
           :options="pageSizeSelectOptions"
@@ -147,43 +355,63 @@ const selectionLabel = computed(() => {
         <OButton
           variant="outline"
           size="icon"
-          :disabled="isFirstPage"
+          :disabled="isFirstPage || stale"
+          focusable-unavailable
           :aria-label="t('search.firstPage')"
           data-test="o2-table-first-page-btn"
-          @click="emit('first-page')"
+          :aria-disabled="isFirstPage || pagingInactive ? 'true' : undefined"
+          @click="requestPage('first-page')"
         >
           <OIcon name="first-page" size="sm" />
+          <template v-if="stale && !isFirstPage" #unavailable-reason>{{
+            t("common.loading")
+          }}</template>
         </OButton>
         <OButton
           variant="outline"
           size="icon"
-          :disabled="isFirstPage"
+          :disabled="isFirstPage || stale"
+          focusable-unavailable
           :aria-label="t('components.pagination.previousPage')"
           data-test="o2-table-prev-page-btn"
-          @click="emit('prev-page')"
+          :aria-disabled="isFirstPage || pagingInactive ? 'true' : undefined"
+          @click="requestPage('prev-page')"
         >
           <OIcon name="chevron-left" size="sm" />
+          <template v-if="stale && !isFirstPage" #unavailable-reason>{{
+            t("common.loading")
+          }}</template>
         </OButton>
         <OButton
           variant="outline"
           size="icon"
-          :disabled="isLastPage"
+          :disabled="isLastPage || stale"
+          focusable-unavailable
           :aria-label="t('components.pagination.nextPage')"
           data-test="o2-table-next-page-btn"
-          @click="emit('next-page')"
+          :aria-disabled="isLastPage || pagingInactive ? 'true' : undefined"
+          @click="requestPage('next-page')"
         >
           <OIcon name="chevron-right" size="sm" />
+          <template v-if="stale && !isLastPage" #unavailable-reason>{{
+            t("common.loading")
+          }}</template>
         </OButton>
         <OButton
           v-if="totalCountExact"
           variant="outline"
           size="icon"
-          :disabled="isLastPage"
+          :disabled="isLastPage || stale"
+          focusable-unavailable
           :aria-label="t('search.lastPage')"
           data-test="o2-table-last-page-btn"
-          @click="emit('last-page')"
+          :aria-disabled="isLastPage || pagingInactive ? 'true' : undefined"
+          @click="requestPage('last-page')"
         >
           <OIcon name="last-page" size="sm" />
+          <template v-if="stale && !isLastPage" #unavailable-reason>{{
+            t("common.loading")
+          }}</template>
         </OButton>
       </nav>
     </div>

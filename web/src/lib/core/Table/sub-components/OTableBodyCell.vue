@@ -21,7 +21,8 @@ import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import { OTableCellActionsKey, OTableOverflowTooltipKey } from "../OTable.types";
+import { OTableCellActionsKey, OTableOverflowTooltipKey, OTableStaleKey } from "../OTable.types";
+import { injectContextMenuRootContext } from "reka-ui";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useI18nTyped } from "@/types/i18n";
@@ -303,11 +304,16 @@ function handleClick() {
 
 const { t } = useI18nTyped();
 
+const stale = inject(OTableStaleKey, null);
+const rowContextMenu = injectContextMenuRootContext(null);
+
 // Right-click. Emitted as plain values (not the TanStack cell) so a consumer's
 // context menu keeps rendering correctly even after the virtualizer recycles
-// the row underneath it. The event is NOT prevented — the consumer decides
+// the row underneath it. Outside a refetch the event is NOT prevented — the consumer decides
 // whether to open a menu or leave the native one alone.
-function handleContextMenu() {
+function handleContextMenu(event: MouseEvent) {
+  // The menu would act on a row about to be replaced; reka-ui skips opening a prevented event.
+  if (stale?.value && rowContextMenu) event.preventDefault();
   emit("cell-contextmenu", {
     columnId: props.cell.column.id,
     row: props.row.original,
@@ -482,7 +488,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
             ? 'overflow-clip whitespace-nowrap [overflow-clip-margin:0.25rem] has-[:focus-visible]:z-2!'
             : 'overflow-hidden text-ellipsis whitespace-nowrap',
       meta?.cellClass ?? '',
-      isTreeColumn ? 'relative' : '',
+      isTreeColumn || ($slots.overlay && !isPinned) ? 'relative' : '',
       enableCellCopy ? 'group/cell' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
       isTreeColumn && treeMeta && treeMeta.parentId !== null ? 'o2-tree-child' : '',
@@ -651,6 +657,13 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
         </div>
       </div>
     </Teleport>
+    <div
+      v-if="$slots.overlay"
+      class="absolute inset-y-0 end-0 z-1 flex items-center pe-1"
+      data-test="o2-table-cell-overlay"
+    >
+      <slot name="overlay" />
+    </div>
   </td>
 </template>
 

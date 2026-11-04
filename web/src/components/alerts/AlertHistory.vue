@@ -71,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-sm"
         icon-left="refresh"
+        ref="refreshButton"
         @click="refreshData"
         data-test="alert-history-refresh-btn"
         :loading="fetching"
@@ -130,6 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-by="sortBy"
           :sort-order="sortOrder"
           :loading="loading"
+          :error="refreshFailure ? null : historyError"
           show-index
           :show-global-filter="false"
           :default-columns="false"
@@ -139,6 +141,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @sort-change="onSortChange"
         >
           <!-- eslint-enable local/no-hardcoded-px -->
+          <template #status-note>
+            <div ref="failureSlot" class="@container flex min-w-[12rem] flex-1 items-center">
+              <ODataAge
+                v-if="refreshFailure"
+                :at="refreshFailure.dataFrom"
+                :failed-at="refreshFailure.failedAt"
+                data-test="alert-history-refresh-failed"
+                @retry="retryFailedRead"
+              />
+            </div>
+          </template>
           <template #empty>
             <div class="h-screen w-full">
               <NoData />
@@ -303,7 +316,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               />
             </OButton>
-            <ODropdown side="bottom" align="end">
+            <!-- Keyed by row, so a read that replaces the row under an open menu closes it instead of retargeting it. -->
+            <ODropdown :key="row.id" side="bottom" align="end">
               <template #trigger>
                 <OButton
                   :aria-label="t('common.moreActions')"
@@ -551,7 +565,7 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { alertHistoryQuery, alertsListQuery } from "@/services/alerts.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { ref, onMounted, watch, nextTick } from "vue";
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -572,15 +586,19 @@ import {
   isAckEventRow,
 } from "@/utils/alerts/ackState";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODataAge from "@/lib/core/RefreshButton/ODataAge.vue";
+import { announceAlert } from "@/lib/feedback/RegionStatus/announcer";
+import { formatRefreshFailed } from "@/utils/formatters";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
+
+type HistoryView = { page: number; size: number; sortBy: string; sortOrder: "asc" | "desc" };
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -616,6 +634,19 @@ const loading = historyList.isLoading;
 // spinner. `loading` is the skeleton, which only a cold read wants.
 const fetching = historyList.isFetching;
 const rows = ref<any[]>([]);
+// A failed read shows in the table, so the previous sort's or page's rows never pass for its result.
+const historyError = ref<string | null>(null);
+// Epoch ms the rows on screen were fetched, which a failed read reports as the data still shown.
+const shownAt = ref<number | null>(null);
+// A failed read with rows on screen keeps them under the failed-refresh notice instead of the table's error state; `retry` is the view it asked for.
+const refreshFailure = ref<{ failedAt: number; dataFrom: number; retry: HistoryView } | null>(null);
+// The view the rows on screen were read with, so a failed read puts the header and range back on it.
+let shownView: HistoryView | null = null;
+let withdrawFailure: (() => void) | null = null;
+// A read that settles after the page is left must not announce on the page the user went to.
+let unmounted = false;
+const failureSlot = ref<HTMLElement | null>(null);
+const refreshButton = ref<{ $el?: HTMLElement } | null>(null);
 const searchQuery = ref("");
 const selectedAlert = ref<any>(null);
 const allAlerts = ref<any[]>([]);
@@ -825,7 +856,12 @@ const manualSearch = () => {
   fetchAlertHistory(true);
 };
 
+// Only the latest read may set the rows or the failure, so an earlier read settling late never relabels the view.
+let historyReadSeq = 0;
 const fetchAlertHistory = async (force = false) => {
+  const seq = ++historyReadSeq;
+  const requested = currentView();
+  historyError.value = null;
   try {
     const org = store.state.selectedOrganization.identifier;
 
@@ -854,6 +890,9 @@ const fetchAlertHistory = async (force = false) => {
         id: `${hit.timestamp}_${index}`,
       }));
       totalCount.value = data.total || 0;
+      shownAt.value = historyList.dataUpdatedAt.value || Date.now();
+      shownView = requested;
+      clearRefreshFailure();
     };
 
     // Cached per query shape (range + page + sort + filter), so paging back to
@@ -864,15 +903,19 @@ const fetchAlertHistory = async (force = false) => {
     // Let the key pick up the new query shape before asking for the data.
     await nextTick();
 
+    let result;
     if (!hasRequestedHistory.value) {
       hasRequestedHistory.value = true;
       await nextTick();
-      await historyList.suspense();
+      result = await historyList.suspense();
     } else if (force) {
-      await historyList.refetch();
+      result = await historyList.refetch();
     } else {
-      await historyList.suspense();
+      result = await historyList.suspense();
     }
+    if (seq !== historyReadSeq) return;
+    // Both resolve with the failure instead of rejecting.
+    if (result?.error) throw result.error;
     await nextTick();
 
     {
@@ -888,13 +931,49 @@ const fetchAlertHistory = async (force = false) => {
       }
     }
   } catch (error: any) {
+    if (seq !== historyReadSeq) return;
     console.error("Error fetching alert history:", error);
-    console.error("Error response:", error.response);
-    toast({
-      variant: "error",
-      message: error.response?.data?.message || error.message || t("alerts.failedToFetchHistory"),
-    });
+    historyError.value =
+      error?.response?.data?.message || error?.message || t("alerts.failedToFetchHistory");
+    if (rows.value.length && shownAt.value) keepRowsAfterFailure(shownAt.value, requested);
   }
+};
+
+const currentView = (): HistoryView => ({
+  page: currentPage.value,
+  size: pageSize.value,
+  sortBy: sortBy.value,
+  sortOrder: sortOrder.value,
+});
+
+const applyView = (view: HistoryView) => {
+  currentPage.value = view.page;
+  pageSize.value = view.size;
+  sortBy.value = view.sortBy;
+  sortOrder.value = view.sortOrder;
+};
+
+const clearRefreshFailure = () => {
+  if (!refreshFailure.value) return;
+  // Retry leaves with the notice, so focus goes to the page's refresh button rather than to the document.
+  const retryHadFocus = !!failureSlot.value?.contains(document.activeElement);
+  refreshFailure.value = null;
+  withdrawFailure?.();
+  withdrawFailure = null;
+  if (retryHadFocus) void nextTick(() => refreshButton.value?.$el?.focus());
+};
+
+const keepRowsAfterFailure = (dataFrom: number, retry: HistoryView) => {
+  if (unmounted || !shownView) return;
+  applyView(shownView);
+  refreshFailure.value = { failedAt: Date.now(), dataFrom, retry };
+  withdrawFailure?.();
+  withdrawFailure = announceAlert(formatRefreshFailed(t, refreshFailure.value));
+};
+
+const retryFailedRead = () => {
+  if (refreshFailure.value) applyView(refreshFailure.value.retry);
+  fetchAlertHistory(true);
 };
 
 const updateDateTime = (value: any) => {
@@ -981,6 +1060,12 @@ const goBack = () => {
     query: { org_identifier: store.state.selectedOrganization.identifier, folder, tab },
   });
 };
+
+onBeforeUnmount(() => {
+  unmounted = true;
+  withdrawFailure?.();
+  withdrawFailure = null;
+});
 
 // Lifecycle
 onMounted(async () => {
