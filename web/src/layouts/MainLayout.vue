@@ -989,9 +989,12 @@ export default defineComponent({
         },
         aiObservabilityMenuState.value,
         () => {
-          const anchorIndex = linksList.value.findIndex(
-            (link) => link.name === "profiles" || link.name === "traces",
-          );
+          // Profiles first: Traces precedes it, so a combined match always lands before Profiles.
+          const profilesIndex = linksList.value.findIndex((link) => link.name === "profiles");
+          const anchorIndex =
+            profilesIndex !== -1
+              ? profilesIndex
+              : linksList.value.findIndex((link) => link.name === "traces");
           return anchorIndex === -1 ? linksList.value.length : anchorIndex + 1;
         },
       );
