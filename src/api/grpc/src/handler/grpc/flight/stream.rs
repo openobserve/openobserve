@@ -15,7 +15,7 @@
 
 use std::{collections::VecDeque, pin::Pin, task::Poll};
 
-use arrow::ipc::writer::IpcWriteOptions;
+use arrow::ipc::{CompressionType, writer::IpcWriteOptions};
 use arrow_flight::{FlightData, error::FlightError};
 use config::metrics;
 use datafusion::execution::SendableRecordBatchStream;
@@ -30,11 +30,9 @@ use crate::handler::grpc::flight::{SessionGuard, partition_encoder::PartitionEnc
 
 /// Cap on one encoded FlightData message. Mirrors the `ZO_GRPC_MAX_MESSAGE_SIZE` default,
 /// which is what the receiving channel accepts.
-pub(crate) const MAX_FLIGHT_DATA_SIZE: usize = 32 * 1024 * 1024;
+pub(super) const MAX_FLIGHT_DATA_SIZE: usize = 32 * 1024 * 1024;
 
 pub struct FlightEncoderStreamBuilder {
-    options: IpcWriteOptions,
-    max_flight_data_size: usize,
     node_messages: NodeMessages,
     // query context
     trace_id: String,
@@ -45,15 +43,8 @@ pub struct FlightEncoderStreamBuilder {
 }
 
 impl FlightEncoderStreamBuilder {
-    pub(crate) fn new(
-        options: IpcWriteOptions,
-        max_flight_data_size: usize,
-        session_guard: SessionGuard,
-        node_messages: NodeMessages,
-    ) -> Self {
+    pub(crate) fn new(session_guard: SessionGuard, node_messages: NodeMessages) -> Self {
         Self {
-            options,
-            max_flight_data_size,
             node_messages,
             trace_id: String::new(),
             is_super: false,
@@ -94,12 +85,12 @@ impl FlightEncoderStreamBuilder {
     ) -> FlightEncoderStream {
         let child_span = info_span!("grpc:search:flight:execute_physical_plan");
         let _ = child_span.set_parent(span.context());
+        let options = write_options();
 
         let (source, tasks) = if partitions.len() == 1 {
             // one partition: no parallelism to gain, poll inline (no task, no channel)
             let inner = partitions.into_iter().next().unwrap();
-            let stream =
-                PartitionEncoderStream::new(inner, self.options.clone(), self.max_flight_data_size);
+            let stream = PartitionEncoderStream::new(inner, options.clone());
             (FlightSource::Inline(Box::new(stream)), JoinSet::new())
         } else {
             // one task per partition, merged over the channel
@@ -108,11 +99,7 @@ impl FlightEncoderStreamBuilder {
             let (tx, rx) = mpsc::channel::<Result<Vec<FlightData>, FlightError>>(cap);
             for inner in partitions {
                 let tx = tx.clone();
-                let mut stream = PartitionEncoderStream::new(
-                    inner,
-                    self.options.clone(),
-                    self.max_flight_data_size,
-                );
+                let mut stream = PartitionEncoderStream::new(inner, options.clone());
                 tasks.spawn(async move {
                     while let Some(item) = stream.next().await {
                         let is_err = item.is_err();
@@ -130,7 +117,7 @@ impl FlightEncoderStreamBuilder {
 
         FlightEncoderStream {
             source,
-            encoder: FlightDataEncoder::new(self.options, self.max_flight_data_size),
+            encoder: FlightDataEncoder::new(options, MAX_FLIGHT_DATA_SIZE),
             queue: VecDeque::new(),
             node_messages: self.node_messages,
             first_data: true,
@@ -374,14 +361,18 @@ impl Drop for FlightEncoderStream {
     }
 }
 
+fn write_options() -> IpcWriteOptions {
+    IpcWriteOptions::default()
+        .try_with_compression(Some(CompressionType::ZSTD))
+        // Cannot fail: compression only needs IPC metadata V5, which is the default.
+        .expect("default IPC options accept compression")
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
-    use arrow::{
-        array::{Int32Array, RecordBatch},
-        ipc::writer::IpcWriteOptions,
-    };
+    use arrow::array::{Int32Array, RecordBatch};
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::search::ScanStats;
     use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
@@ -392,8 +383,6 @@ mod tests {
 
     fn make_builder() -> FlightEncoderStreamBuilder {
         FlightEncoderStreamBuilder::new(
-            IpcWriteOptions::default(),
-            4096,
             SessionGuard::new("test-trace".to_string()),
             follower_messages(),
         )
@@ -526,12 +515,7 @@ mod tests {
             make_partition(total / 2..total),
         ];
 
-        let options = IpcWriteOptions::default()
-            .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
-            .unwrap();
         let stream = FlightEncoderStreamBuilder::new(
-            options,
-            MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
             follower_messages(),
         )
@@ -587,8 +571,6 @@ mod tests {
         ));
 
         let stream = FlightEncoderStreamBuilder::new(
-            IpcWriteOptions::default(),
-            MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
             follower_messages(),
         )
@@ -702,12 +684,7 @@ mod tests {
         let id_base_1 = n_per_partition;
         let partitions = vec![make_partition(0, 0), make_partition(1, id_base_1)];
 
-        let options = IpcWriteOptions::default()
-            .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
-            .unwrap();
         let stream = FlightEncoderStreamBuilder::new(
-            options,
-            MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
             follower_messages(),
         )
@@ -776,12 +753,7 @@ mod tests {
             futures::stream::iter(batches.into_iter().map(Ok)),
         ));
 
-        let options = IpcWriteOptions::default()
-            .try_with_compression(Some(arrow::ipc::CompressionType::ZSTD))
-            .unwrap();
         let stream = FlightEncoderStreamBuilder::new(
-            options,
-            MAX_FLIGHT_DATA_SIZE,
             SessionGuard::new("test-trace".to_string()),
             follower_messages(),
         )

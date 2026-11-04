@@ -15,7 +15,6 @@
 
 use std::{io::Cursor, sync::Arc};
 
-use arrow::ipc::{CompressionType, writer::IpcWriteOptions};
 use arrow_flight::{
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
@@ -48,7 +47,7 @@ use {
 use crate::handler::grpc::{
     MetadataMap,
     flight::{
-        stream::{FlightEncoderStreamBuilder, MAX_FLIGHT_DATA_SIZE},
+        stream::FlightEncoderStreamBuilder,
         visitor::{get_peak_memory_from_ctx, node_role},
     },
 };
@@ -164,15 +163,6 @@ impl FlightService for FlightServiceImpl {
         }
 
         let start = std::time::Instant::now();
-        let write_options: IpcWriteOptions = IpcWriteOptions::default()
-            .try_with_compression(Some(CompressionType::ZSTD))
-            .map_err(|e| {
-                log::error!(
-                    "[trace_id {trace_id}] flight->search: do_get create IPC write options error: {e:?}",
-                );
-                Status::internal(e.to_string())
-            })?;
-
         let node_messages = NodeMessages {
             scan_stats,
             peak_memory: get_peak_memory_from_ctx(&ctx),
@@ -191,17 +181,12 @@ impl FlightService for FlightServiceImpl {
             Status::internal(e.to_string())
         })?;
 
-        let mut stream = FlightEncoderStreamBuilder::new(
-            write_options,
-            MAX_FLIGHT_DATA_SIZE,
-            session_guard,
-            node_messages,
-        )
-        .with_trace_id(trace_id.to_string())
-        .with_is_super(is_super_cluster)
-        .with_defer_lock(lock)
-        .with_start(start)
-        .build(streams, span);
+        let mut stream = FlightEncoderStreamBuilder::new(session_guard, node_messages)
+            .with_trace_id(trace_id.to_string())
+            .with_is_super(is_super_cluster)
+            .with_defer_lock(lock)
+            .with_start(start)
+            .build(streams, span);
 
         let stream = async_stream::stream! {
             let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));
