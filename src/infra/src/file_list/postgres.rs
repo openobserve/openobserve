@@ -1573,7 +1573,8 @@ DO UPDATE SET
         offset_range: (i64, i64),
     ) -> Result<bool> {
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
-        let pool = CLIENT_RO.clone();
+        // the primary: a replica may not show the claim that marked the peer running yet
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["query", "file_list_jobs"])
             .inc();
@@ -1597,7 +1598,8 @@ DO UPDATE SET
         offset: i64,
     ) -> Result<bool> {
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
-        let pool = CLIENT_RO.clone();
+        // the primary: a replica may not show the claim that marked the peer running yet
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["query", "file_list_jobs"])
             .inc();

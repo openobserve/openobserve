@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
+
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     COMPACT_OLD_DATA_STREAM_SET,
@@ -296,6 +298,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
     let mut need_release_ids = Vec::new();
     let mut need_done_ids = Vec::new();
     let mut merge_jobs = Vec::with_capacity(jobs.len());
+    let batch_day_jobs = batch_day_jobs(&jobs);
     for job in jobs {
         if job.offsets == 0 {
             log::error!("[COMPACTOR] merge job offset error: {}", job.offsets);
@@ -335,8 +338,11 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             continue;
         }
         // and while it runs, an old-data job must not rewrite an hour under it
+        let day_start = job.offsets - job.offsets % day_micros(1);
         if is_dynamic_hour_job(job.offsets, dynamic_merge)
-            && day_job_running(&org_id, stream_type, &stream_name, job.offsets).await
+            // a day job claimed in this batch yields to this hour job; only another node's runs
+            && !batch_day_jobs.contains(&(job.stream.clone(), day_start))
+            && day_job_running(&org_id, stream_type, &stream_name, day_start).await
         {
             need_release_ids.push(job.id);
             continue;
@@ -473,6 +479,14 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// The 00:00 rows of a claimed batch: each yields to the batch's hour jobs of its day.
+fn batch_day_jobs(jobs: &[infra_file_list::MergeJobRecord]) -> HashSet<(String, i64)> {
+    jobs.iter()
+        .filter(|job| job.offsets % day_micros(1) == 0)
+        .map(|job| (job.stream.clone(), job.offsets))
+        .collect()
+}
+
 /// Whether a job of the day past its 00:00 is pending or running; a failed lookup counts as one.
 async fn day_jobs_unfinished(
     org_id: &str,
@@ -492,14 +506,13 @@ async fn day_jobs_unfinished(
     }
 }
 
-/// Whether the 00:00 job of the hour's day is running; a failed lookup counts as running.
+/// Whether the day's 00:00 job is running; a failed lookup counts as running.
 async fn day_job_running(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    offset: i64,
+    day_start: i64,
 ) -> bool {
-    let day_start = offset - offset % day_micros(1);
     match infra_file_list::is_job_running(org_id, stream_type, stream_name, day_start).await {
         Ok(running) => running,
         Err(e) => {
@@ -577,5 +590,24 @@ mod tests {
         let open = now_micros() + hour_micros(1);
         assert!(!is_dynamic_day_job(open, true));
         assert!(!is_dynamic_hour_job(open, true));
+    }
+
+    /// A batch holding a day's 00:00 job and one of its hour jobs runs the hour job.
+    #[test]
+    fn test_batch_day_jobs_lists_the_00_rows_by_stream() {
+        let day = day_micros(20_000);
+        let job = |stream: &str, offsets| infra_file_list::MergeJobRecord {
+            id: 0,
+            stream: stream.to_string(),
+            offsets,
+        };
+        let batch = batch_day_jobs(&[
+            job("o/logs/a", day + hour_micros(15)),
+            job("o/logs/a", day),
+            job("o/logs/b", day + hour_micros(15)),
+        ]);
+        assert!(batch.contains(&("o/logs/a".to_string(), day)));
+        assert!(!batch.contains(&("o/logs/b".to_string(), day)));
+        assert!(!batch.contains(&("o/logs/a".to_string(), day + hour_micros(15))));
     }
 }
