@@ -289,6 +289,7 @@ export const BADGE_GROUPS = {
       covered: { variant: "success-soft", labelKey: "oncall.coverage_covered" },
       gap: { variant: "error-soft", labelKey: "oncall.coverage_gap" },
       unreachable: { variant: "warning-soft", labelKey: "oncall.coverage_cantReach" },
+      allunreachable: { variant: "error-soft", labelKey: "oncall.coverage_unreachable" },
     },
     fallback: { variant: "default-soft" },
   },

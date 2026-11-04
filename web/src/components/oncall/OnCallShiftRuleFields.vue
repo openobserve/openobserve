@@ -101,18 +101,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`oncall-schedule-handover-${ruleIndex}-time`"
         @update:model-value="(v: unknown) => moveHandover(handover.weekday, Number(v))"
       />
+      <OText variant="meta" as="span" :data-test="`oncall-schedule-handover-${ruleIndex}-zone`">
+        {{ raw(timezone) }}
+      </OText>
     </div>
 
     <OText variant="body-strong" class="pt-1.5">{{ t("oncall.ruleCovers") }}</OText>
     <div class="flex min-w-0 flex-col gap-2">
-      <OSelect
-        :model-value="covers"
-        width="md"
-        :aria-label="t('oncall.ruleCovers')"
-        :options="coversOptions"
-        :data-test="`oncall-schedule-covers-${ruleIndex}`"
-        @update:model-value="(v: unknown) => setCovers(v as CoversPreset)"
-      />
+      <span class="flex flex-wrap items-center gap-2">
+        <OSelect
+          :model-value="covers"
+          width="md"
+          :aria-label="t('oncall.ruleCovers')"
+          :options="coversOptions"
+          :data-test="`oncall-schedule-covers-${ruleIndex}`"
+          @update:model-value="(v: unknown) => setCovers(v as CoversPreset)"
+        />
+        <OText variant="meta" as="span" :data-test="`oncall-schedule-covers-${ruleIndex}-zone`">
+          {{ raw(timezone) }}
+        </OText>
+      </span>
 
       <template v-if="covers === 'custom'">
         <div

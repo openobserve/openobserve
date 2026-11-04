@@ -110,6 +110,16 @@ describe("OnCallCoverList", () => {
     expect(wrapper.findAll('[data-test="row"]')).toHaveLength(0);
   });
 
+  // The covers' times are on the team's clock, which nothing else on the row says.
+  it("names the team's zone beside the list title", async () => {
+    service.listOverrides.mockResolvedValue(ok([cover()]));
+    const wrapper = render({ timezone: "Asia/Kolkata" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-cover-list-zone"]').text()).toBe(
+      "Times in Asia/Kolkata",
+    );
+  });
+
   it("lists the covers standing over this team's rotations", async () => {
     service.listOverrides.mockResolvedValue(
       ok([cover({ covering_for: "ana@o2.ai", reason: "dentist" })]),

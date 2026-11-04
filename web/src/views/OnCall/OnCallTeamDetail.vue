@@ -221,6 +221,7 @@
               :pages="recentPages"
               :policy="policy"
               :loading="pagesLoading"
+              :window-days="ACTIVITY_WINDOW_DAYS"
               @open="openPage"
               @view-all="openOnCallList"
             />
@@ -433,10 +434,11 @@
       :viewer-timezone="store.state.timezone"
       :team-name="team?.name ?? ''"
       :saving="coverSaving"
-      :current-holder="coverHolder ?? onCallNow[0]?.user_email ?? null"
+      :current-holder="coverHolder"
+      :positions="onCallNow"
       :gap="coverGap"
       :default-user="coverDefaultUser"
-      :shifts="swappableShifts"
+      :shifts="swapShifts"
       :rotations="teamRotations"
       :default-rotation="coverRotation"
       :default-mode="coverMode"
@@ -491,6 +493,13 @@ import OnCallTeamDetailSkeleton from "@/views/OnCall/OnCallTeamDetailSkeleton.vu
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { useOnCallDefaultTeam } from "@/composables/useOnCallDefaultTeam";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
+import { useListViewState } from "@/composables/useListViewState";
+import {
+  shiftAround,
+  shiftLookupWindow,
+  SHIFT_LOOKUP_MICROS,
+  swappableRuns,
+} from "@/components/oncall/resolvedShifts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -554,7 +563,7 @@ import type {
   OwnershipRule,
   Unavailability,
 } from "@/ts/interfaces/oncall";
-import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY, MICROS_PER_HOUR } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   channelList,
@@ -778,7 +787,15 @@ function openPage(row: OnCallResponse) {
   });
 }
 
+// The Pages list keeps its filters in shared view state, not the URL, so the team is set there before the jump.
 function openOnCallList() {
+  const view = useListViewState("oncall-responses", { teamFilter: "all" });
+  Object.assign(view, {
+    teamFilter: teamId.value,
+    mineOnly: false,
+    activeFilter: "all",
+    currentPage: 1,
+  });
   router.push({ name: "onCallResponses", query: { org_identifier: orgId.value } });
 }
 
@@ -1010,14 +1027,19 @@ const unreachableHolders = computed(() => {
   return { total: holders.length, unreachable: known.filter((m) => !m.would_a_page_land).length };
 });
 
-const coverageState = computed<"covered" | "gap" | "unreachable">(() => {
+const coverageState = computed<"covered" | "gap" | "unreachable" | "allunreachable">(() => {
   const covered = overview.value?.covered_now ?? onCallNow.value.length > 0;
   if (!covered) return "gap";
-  return unreachableHolders.value.unreachable ? "unreachable" : "covered";
+  const { unreachable, total } = unreachableHolders.value;
+  if (!unreachable) return "covered";
+  // Nobody holding the pager would receive a page, which is the coverage bar's red, not a partial warning.
+  return unreachable === total ? "allunreachable" : "unreachable";
 });
 
 const coverageTip = computed<I18nText | undefined>(() => {
-  if (coverageState.value !== "unreachable") return undefined;
+  if (coverageState.value !== "unreachable" && coverageState.value !== "allunreachable") {
+    return undefined;
+  }
   const { unreachable, total } = unreachableHolders.value;
   return t("oncall.coverageCantReachTip", { count: unreachable, total });
 });
@@ -1229,16 +1251,16 @@ function openPolicyFromRemove() {
 
 /// Somebody else covers a window nobody holds: the hole is known, the person
 /// is the open question.
-function onFillGap(gap: ResolvedSegment) {
-  openCoverDialog({ gap: { from: gap.from, to: gap.to }, rotation: gap.rotation_id });
+async function onFillGap(gap: ResolvedSegment) {
+  await openCoverDialog({ gap: fromNow(await realSpan(gap)), rotation: gap.rotation_id });
 }
 
 /// A lane's own "Add a cover": the rotation is decided, the window and person are not.
 function openCoverFor(rotationId: string) {
-  openCoverDialog({ rotation: rotationId });
+  void openCoverDialog({ rotation: rotationId });
 }
 
-function openCoverDialog(opts: {
+async function openCoverDialog(opts: {
   gap?: { from: number; to: number } | null;
   user?: string;
   rotation?: string;
@@ -1246,6 +1268,7 @@ function openCoverDialog(opts: {
   swapFrom?: { rotationId: string; at: number } | null;
   holder?: string | null;
 }) {
+  swapShifts.value = await loadSwapShifts(opts.swapFrom ?? null);
   coverGap.value = opts.gap ?? null;
   coverDefaultUser.value = opts.user ?? "";
   coverRotation.value = opts.rotation ?? "";
@@ -1256,23 +1279,39 @@ function openCoverDialog(opts: {
 }
 
 /// From now, never from a shift's past: a cover or an absence over hours that are gone pages nobody.
-function fromNow(segment: ResolvedSegment): { from: number; to: number } {
-  return { from: Math.max(segment.from, Date.now() * 1000), to: segment.to };
+function fromNow(span: { from: number; to: number }): { from: number; to: number } {
+  return { from: Math.max(span.from, Date.now() * 1000), to: span.to };
 }
 
-function onShiftAction(action: ShiftAction, segment: ResolvedSegment) {
+/// The whole shift behind a drawn band: the calendar's read stops at its edges, so a band there is cut.
+async function realSpan(segment: ResolvedSegment): Promise<{ from: number; to: number }> {
+  const lookup = shiftLookupWindow(segment, scheduleWindow.value);
+  if (!lookup) return { from: segment.from, to: segment.to };
+  try {
+    const runs = await read<ResolvedSegment[]>(
+      resolvedScheduleQuery(orgId.value, teamId.value, lookup.from, lookup.to, segment.rotation_id),
+      false,
+    );
+    return shiftAround(segment, runs);
+  } catch {
+    return { from: segment.from, to: segment.to };
+  }
+}
+
+async function onShiftAction(action: ShiftAction, segment: ResolvedSegment) {
   const who = segment.user_email ?? "";
+  const span = await realSpan(segment);
   if (action === "away") {
     awayEmail.value = who;
-    awayWindow.value = fromNow(segment);
+    awayWindow.value = fromNow(span);
     awayOpen.value = true;
     return;
   }
-  openCoverDialog({
-    gap: action === "cover" ? fromNow(segment) : null,
+  await openCoverDialog({
+    gap: action === "cover" ? fromNow(span) : null,
     rotation: segment.rotation_id,
     mode: action === "swap" ? "swap" : "cover",
-    swapFrom: action === "swap" ? { rotationId: segment.rotation_id, at: segment.from } : null,
+    swapFrom: action === "swap" ? { rotationId: segment.rotation_id, at: span.from } : null,
     holder: who || null,
   });
 }
@@ -1289,7 +1328,7 @@ async function onAwaySaved() {
 /// pre-fill when the reader is not on this team, which is why the picker is
 /// still a picker.
 function openTakeOverride() {
-  openCoverDialog({ user: selfEmail.value });
+  void openCoverDialog({ user: selfEmail.value });
 }
 
 /// The weeks a swap can trade: the next few shifts of the rotation actually in
@@ -1342,6 +1381,37 @@ const swappableShifts = computed<UpcomingShift[]>(() => {
 const swapRotationIds = computed(() => [
   ...new Set(swappableShifts.value.map((s) => s.rotationId)),
 ]);
+
+/// What the swap picker offers, read from the resolved schedule so active hours and covers are already applied.
+const swapShifts = ref<UpcomingShift[]>([]);
+
+/// From the clicked shift when there is one, otherwise from the current hour, which keeps repeat opens on one cached read.
+async function loadSwapShifts(
+  anchor: { rotationId: string; at: number } | null,
+): Promise<UpcomingShift[]> {
+  const now = Date.now() * 1000;
+  const start = anchor ? anchor.at : Math.floor(now / MICROS_PER_HOUR) * MICROS_PER_HOUR;
+  const rotations = teamRotations.value.filter(
+    (rotation) =>
+      swapRotationIds.value.includes(rotation.id) && (!anchor || rotation.id === anchor.rotationId),
+  );
+  const lanes = await Promise.allSettled(
+    rotations.map(async (rotation) => {
+      const runs = await read<ResolvedSegment[]>(
+        resolvedScheduleQuery(
+          orgId.value,
+          teamId.value,
+          start,
+          start + SHIFT_LOOKUP_MICROS,
+          rotation.id,
+        ),
+        false,
+      );
+      return swappableRuns(runs, rotation, anchor ? start : now, SWAPPABLE_SHIFTS);
+    }),
+  );
+  return lanes.flatMap((lane) => (lane.status === "fulfilled" ? lane.value : []));
+}
 
 /// Two covers, one each way.
 ///
@@ -1411,7 +1481,7 @@ function coverSavedMessage(value: { user_email: string; start_at: number; end_at
       timeZoneName: "short",
     });
   return t("oncall.coverSaved", {
-    name: raw(value.user_email),
+    name: raw(nameOf(value.user_email)),
     team: raw(team.value?.name ?? ""),
     range: raw(`${at(value.start_at)} – ${at(value.end_at)}`),
   });
@@ -1424,6 +1494,7 @@ async function saveCover(value: {
   start_at: number;
   end_at: number;
   rotation_id?: string;
+  covering_for?: string;
 }) {
   coverSaving.value = true;
   try {

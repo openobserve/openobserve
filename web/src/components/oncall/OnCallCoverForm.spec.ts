@@ -125,9 +125,17 @@ const stubs = {
       <slot name="above" />
       <button data-test="window-pick" @click="set(PICKED)">{{ error }}</button>
       <button data-test="window-clear" @click="set(undefined)"></button>
+      <button data-test="window-round" @click="round()"></button>
     </span>`,
     setup(props: { name: string }) {
-      return { ...useStubbedField(props.name), PICKED };
+      const field = useStubbedField(props.name);
+      // What the real picker does to a range it is handed: it keeps whole minutes only.
+      const toMinute = (micros: number) => Math.floor(micros / 60_000_000) * 60_000_000;
+      const round = () => {
+        const range = field.value.value as { from: number; to: number };
+        field.set({ from: toMinute(range.from), to: toMinute(range.to) });
+      };
+      return { ...field, PICKED, round };
     },
   },
   OButton: {
@@ -309,6 +317,23 @@ describe("OnCallCoverForm — which clock the times are on", () => {
     await flushPromises();
     expect(tonight().attributes("aria-pressed")).toBe("false");
   });
+
+  /// "Rest of today" and "Next 7 days" start at now, which the picker reads back to the minute.
+  it.each(["rest-of-day", "tonight", "tomorrow", "next-7-days"])(
+    "keeps %s lit after the picker rounds its range to the minute",
+    async (key) => {
+      const wrapper = renderCover();
+      const button = () => wrapper.findComponent(`[data-test="oncall-cover-preset-${key}"]`);
+      await wrapper.find(`[data-test="oncall-cover-preset-${key}"]`).trigger("click");
+      await wrapper.find('[data-test="window-round"]').trigger("click");
+      await flushPromises();
+      expect(button().attributes("aria-pressed")).toBe("true");
+      const lit = wrapper
+        .findAll('[data-test^="oncall-cover-preset-"]')
+        .filter((one) => one.attributes("aria-pressed") === "true");
+      expect(lit).toHaveLength(1);
+    },
+  );
 });
 
 /// The header's *Cover a shift* opens this dialog on the reader — the answer
@@ -401,6 +426,16 @@ describe("OnCallCoverForm — swapping", () => {
 
   /// Slots do not compete — both are on call at the same instant — so trading
   /// across them staffs one pool twice instead of exchanging anything.
+  it("labels each shift with its start and end time, not only the dates", async () => {
+    const wrapper = render();
+    await intoSwapMode(wrapper);
+    const labels = wrapper
+      .findAll("select")[0]
+      .findAll("option")
+      .map((o) => o.text());
+    expect(labels[0]).toMatch(/\d{2}:\d{2}.* – .*\d{2}:\d{2}/);
+  });
+
   it("refuses a swap across two rotations", async () => {
     const wrapper = render([
       { ...shift("ana@o2.ai", 0), rotationId: "rot_primary", rotationName: "Primary" },
@@ -770,6 +805,67 @@ describe("OnCallCoverForm — taking a cover", () => {
 
   /// Reopening on a different gap must not inherit the last one's window or
   /// its complaints.
+  it("puts a space between the summary's two sentences", async () => {
+    const wrapper = renderCover({ gap: GAP, teamName: "Platform" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-cover-summary"]').element.textContent).toMatch(
+      /Platform\.\s+Outside that window/,
+    );
+  });
+
+  describe("whose shift it is", () => {
+    const ROTATIONS = [
+      { id: "rot_p", name: "Primary", shift_rules: [] },
+      { id: "rot_s", name: "Secondary", shift_rules: [] },
+    ];
+    const POSITIONS = [
+      { rotation_id: "rot_p", rotation_name: "Primary", rule: "Base", user_email: "ana@o2.ai" },
+      { rotation_id: "rot_s", rotation_name: "Secondary", rule: "Base", user_email: "bo@o2.ai" },
+    ];
+    const holderLine = (wrapper: ReturnType<typeof renderCover>) =>
+      wrapper.find('[data-test="oncall-cover-holder"]');
+
+    it("names the clicked shift's person and sends them as covering_for", async () => {
+      const wrapper = renderCover({
+        gap: GAP,
+        rotations: ROTATIONS,
+        positions: POSITIONS,
+        defaultRotation: "rot_s",
+        currentHolder: "raj@o2.ai",
+        defaultUser: "ana@o2.ai",
+      });
+      await flushPromises();
+      expect(holderLine(wrapper).text()).toBe("On call: raj@o2.ai");
+
+      const saved = (await save(wrapper)) as Record<string, unknown>;
+      expect(saved).toMatchObject({ rotation_id: "rot_s", covering_for: "raj@o2.ai" });
+    });
+
+    it("names the picked rotation's holder now, without claiming whose hours they are", async () => {
+      const wrapper = renderCover({
+        gap: GAP,
+        rotations: ROTATIONS,
+        positions: POSITIONS,
+        defaultRotation: "rot_s",
+      });
+      await flushPromises();
+      expect(holderLine(wrapper).text()).toBe("On call: bo@o2.ai");
+      expect(((await save(wrapper)) as Record<string, unknown>).covering_for).toBeUndefined();
+    });
+
+    it("sends no covering_for when the holder covers their own shift", async () => {
+      const wrapper = renderCover({ gap: GAP, currentHolder: "ana@o2.ai" });
+      await flushPromises();
+      expect(((await save(wrapper)) as Record<string, unknown>).covering_for).toBeUndefined();
+    });
+
+    it("shows no holder line when nobody is known to be on call", async () => {
+      const wrapper = renderCover({ gap: GAP });
+      await flushPromises();
+      expect(holderLine(wrapper).exists()).toBe(false);
+    });
+  });
+
   it("re-seeds from the gap it was reopened on", async () => {
     const wrapper = renderCover({ gap: GAP });
     expect(await save(wrapper)).toMatchObject({ start_at: GAP.from });

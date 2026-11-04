@@ -113,6 +113,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-cover-rotation"
       />
 
+      <i18n-t
+        v-if="holder"
+        keypath="oncall.coverHolderLine"
+        tag="p"
+        scope="global"
+        class="text-text-secondary text-sm"
+        data-test="oncall-cover-holder"
+      >
+        <template #name><OnCallPersonName :email="holder" /></template>
+      </i18n-t>
+
       <!-- Absolute only: a relative period resolves against the moment it is read, and a cover is forward-looking. -->
       <!-- A plain block: straight in the form's flex column, the picker's border stretches past its buttons. -->
       <div>
@@ -163,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #name><OnCallPersonName :email="summary.who" /></template>
           <template #team>{{ summary.team }}</template>
         </i18n-t>
+        {{ raw(" ") }}
         <span class="text-text-secondary">{{ t("oncall.coverSummaryAfter") }}</span>
       </OBanner>
     </OForm>
@@ -184,7 +196,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import type { OnCallTeamMember } from "@/ts/interfaces/oncall";
+import type { OnCallPosition, OnCallTeamMember } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -233,8 +245,10 @@ const props = withDefaults(
     members?: OnCallTeamMember[];
     timezone?: string;
     saving?: boolean;
-    /** Who currently holds the shift; hosts still pass it, nothing on the form names them. */
+    /** Whose shift a cover opened from a clicked shift relieves; sent as `covering_for`. */
     currentHolder?: string | null;
+    /** Who each rotation puts on call now, for the holder line when no shift was clicked. */
+    positions?: OnCallPosition[];
     /** The reader's own clock; the zone is named in the field, and the window restated in the tooltip, when it is not the team's. */
     viewerTimezone?: string;
     /** Named in the confirmation, because a cover is always a cover OF a team. */
@@ -275,6 +289,7 @@ const props = withDefaults(
     viewerTimezone: "UTC",
     saving: false,
     currentHolder: null,
+    positions: () => [],
     teamName: "",
     gap: null,
     defaultUser: "",
@@ -290,7 +305,13 @@ const emit = defineEmits<{
   (e: "update:open", open: boolean): void;
   (
     e: "save",
-    value: { user_email: string; start_at: number; end_at: number; rotation_id?: string },
+    value: {
+      user_email: string;
+      start_at: number;
+      end_at: number;
+      rotation_id?: string;
+      covering_for?: string;
+    },
   ): void;
   /**
    * Two covers, one each way — the caller writes both and owns what happens if
@@ -418,6 +439,21 @@ const windowValue = form.useStore(
 const userValue = form.useStore(
   (state: { values: OnCallCoverFormValues }) => state.values.user_email,
 );
+const rotationValue = form.useStore(
+  (state: { values: OnCallCoverFormValues }) => state.values.rotation_id,
+);
+
+/// The clicked shift's person while its rotation is still the one picked; otherwise whoever that rotation has on now.
+const holder = computed<string>(() => {
+  const rotation = String(rotationValue.value ?? "");
+  if (props.currentHolder && (!props.defaultRotation || rotation === props.defaultRotation)) {
+    return props.currentHolder;
+  }
+  const position =
+    props.positions.find((one) => one.rotation_id === rotation) ??
+    (props.rotations.length <= 1 ? props.positions[0] : undefined);
+  return position?.user_email ?? "";
+});
 
 const PRESETS = [
   { key: "rest-of-day", labelKey: "oncall.coverRestOfDay" },
@@ -446,29 +482,45 @@ function zonedInstant(micros: number, zone: string, addDays: number, time = "00:
 /// This used to say so while flooring the instant to a multiple of a day, which
 /// is midnight UTC — so an IST team's "tonight" began at 23:30 and its "rest of
 /// today" ran to half past five the following morning.
-function applyPreset(key: (typeof PRESETS)[number]["key"]) {
-  const now = Date.now() * 1000;
-  const zone = props.timezone;
-  const at = (addDays: number, time?: string) => zonedInstant(now, zone, addDays, time);
+type PresetKey = (typeof PRESETS)[number]["key"];
 
-  const ranges: Record<string, { from: number; to: number }> = {
+function presetRanges(now: number): Record<PresetKey, { from: number; to: number }> {
+  const at = (addDays: number, time?: string) => zonedInstant(now, props.timezone, addDays, time);
+  return {
     "rest-of-day": { from: now, to: at(1) },
     tonight: { from: at(0, "18:00"), to: at(1, "06:00") },
     tomorrow: { from: at(1), to: at(2) },
     "next-7-days": { from: now, to: now + 7 * MICROS_PER_DAY },
   };
+}
+
+function applyPreset(key: PresetKey) {
+  const ranges = presetRanges(Date.now() * 1000);
   // `type` travels with every write into this field, not just the seed: the
   // control is re-read whenever the value changes from outside it, and a range
   // with no type is re-read as a relative period and resolved against `now` —
   // which threw the preset away and put the past half hour back.
   form.setFieldValue("window", { type: "absolute", ...ranges[key] });
   presetApplied = { key, ...ranges[key] };
-  activePreset.value = key;
 }
 
-/// The preset whose range the field still holds; any other edit to the window unlights it.
-const activePreset = ref<string | null>(null);
-let presetApplied: { key: string; from: number; to: number } | null = null;
+/// The picker stores whole minutes, so a preset starting "now" comes back up to a minute off what was written.
+const PRESET_MATCH_MICROS = 60 * 1_000_000;
+
+let presetApplied: { key: PresetKey; from: number; to: number } | null = null;
+
+const near = (a: number, b: number) => Math.abs(a - b) <= PRESET_MATCH_MICROS;
+
+/// Derived from the range the field holds, against the last preset written and each preset as of now.
+const activePreset = computed<PresetKey | null>(() => {
+  const value = windowValue.value;
+  if (typeof value?.from !== "number" || typeof value?.to !== "number") return null;
+  const matches = (range: { from: number; to: number }) =>
+    near(value.from as number, range.from) && near(value.to as number, range.to);
+  if (presetApplied && matches(presetApplied)) return presetApplied.key;
+  const fresh = presetRanges(Date.now() * 1000);
+  return PRESETS.find((preset) => matches(fresh[preset.key]))?.key ?? null;
+});
 
 /// The zone the picker reads its fields in: the team's when it opens, and the reader may pick another.
 const pickedZone = ref(props.timezone);
@@ -484,12 +536,6 @@ function calendarDay(aheadMicros: number): string {
   const at = Date.now() * 1000 + aheadMicros;
   return toZonedInputValue(at, pickedZone.value).slice(0, 10).replace(/-/g, "/");
 }
-
-watch(windowValue, (value) => {
-  const applied = presetApplied;
-  activePreset.value =
-    applied && value?.from === applied.from && value?.to === applied.to ? applied.key : null;
-});
 
 /// The field states the window on the team's clock, naming the zone once, at the end, when the picker is on another one.
 const windowLabel = computed<string>(() => {
@@ -542,16 +588,24 @@ const rotationOptions = computed(() =>
 /// weeks with the same dates and different positions are otherwise
 /// indistinguishable in the picker, and picking the wrong one writes a cover on
 /// the wrong rotation.
+const SHIFT_STAMP: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
 const shiftLabel = (shift: UpcomingShift): I18nText =>
   t(props.rotations.length > 1 ? "oncall.swapShiftOptionInRotation" : "oncall.swapShiftOption", {
     name: raw(nameOf(shift.member)),
     rotation: raw(shift.rotationName),
     range: raw(
-      `${formatInZone(shift.startMicros, props.timezone, {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-      })} – ${formatInZone(shift.endMicros, props.timezone, { day: "numeric", month: "short" })}`,
+      `${formatInZone(shift.startMicros, props.timezone, SHIFT_STAMP)} – ${formatInZone(
+        shift.endMicros,
+        props.timezone,
+        SHIFT_STAMP,
+      )}`,
     ),
   });
 
@@ -606,13 +660,7 @@ const swapSummary = computed<{
   const pair = swapPair.value;
   if (!pair || swapProblem.value) return null;
   const when = (shift: UpcomingShift) =>
-    raw(
-      formatInZone(shift.startMicros, props.timezone, {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-      }),
-    );
+    raw(formatInZone(shift.startMicros, props.timezone, SHIFT_STAMP));
   return {
     first: pair.first.member,
     second: pair.second.member,
@@ -659,11 +707,18 @@ function close() {
 function onSubmit(value: OnCallCoverFormValues) {
   const window = value.window;
   if (typeof window?.from !== "number" || typeof window?.to !== "number") return;
+  const user = String(value.user_email ?? "");
+  // Only a clicked shift says whose shift this is; the rotation's holder now may not hold the picked hours.
+  const coveringFor =
+    props.currentHolder && holder.value === props.currentHolder && holder.value !== user
+      ? props.currentHolder
+      : undefined;
   emit("save", {
-    user_email: String(value.user_email ?? ""),
+    user_email: user,
     start_at: window.from,
     end_at: window.to,
     rotation_id: String(value.rotation_id ?? "") || undefined,
+    ...(coveringFor ? { covering_for: coveringFor } : {}),
   });
 }
 </script>

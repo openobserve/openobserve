@@ -179,7 +179,7 @@ describe("OnCallEscalationLadder", () => {
   });
 
   /// The card folds a repeat into one row, but the chip counts every step, as the policy editor does.
-  it("counts every configured step, repeats included", () => {
+  it("draws one row per configured step, matching the chip's step count", () => {
     const whole = (after: number) => ({
       after_micros: after,
       targets: ["the whole team"],
@@ -201,8 +201,9 @@ describe("OnCallEscalationLadder", () => {
       }),
     });
 
-    expect(wrapper.findAll('[data-test^="oncall-ladder-rung-time-"]')).toHaveLength(2);
+    expect(wrapper.findAll('[data-test^="oncall-ladder-rung-time-"]')).toHaveLength(3);
     expect(wrapper.find('[data-test="oncall-ladder-priority-p1"]').text()).toContain("3 steps");
+    expect(wrapper.find('[data-test="oncall-ladder-rungs"]').text()).not.toContain("repeats");
   });
 
   /// An unselected priority has no preview, so the policy's steps are counted the same way.
@@ -644,7 +645,7 @@ describe("OnCallEscalationLadder", () => {
 
   /// A ladder that pages the same unreachable people at every level is one
   /// finding, not four identical blocks a reader has to compare by eye.
-  it("folds consecutive rungs that resolve to the same people into one row", () => {
+  it("keeps consecutive rungs that resolve to the same people as separate rows", () => {
     const stale = (afterMicros: number) => ({
       after_micros: afterMicros,
       targets: ["the whole team"],
@@ -666,11 +667,10 @@ describe("OnCallEscalationLadder", () => {
       }),
     });
 
-    // One folded row — not four rows saying the same thing.
-    expect(wrapper.findAll('[data-test^="oncall-ladder-rung-time-"]')).toHaveLength(1);
-    const row = wrapper.find('[data-test="oncall-ladder-rung-0"]');
-    expect(row.text()).toContain("· repeats until 30 min");
-    expect(row.text()).toContain("3 of 3 unreachable");
+    expect(wrapper.findAll('[data-test^="oncall-ladder-rung-time-"]')).toHaveLength(4);
+    const last = wrapper.find(`[data-test="oncall-ladder-rung-${30 * MICROS_PER_MINUTE}"]`);
+    expect(last.text()).toContain("3 of 3 unreachable");
+    expect(wrapper.text()).not.toContain("repeats until");
   });
 
   /// A rung that differs from its neighbour — even by one person's

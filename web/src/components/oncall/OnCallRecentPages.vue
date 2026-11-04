@@ -26,6 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-4 py-3">
       <OText variant="panel-title">{{ t("oncall.teamRecentPages") }}</OText>
+      <!-- Not while loading: a count under a skeleton reads as an answer. -->
+      <OText v-if="!loading" variant="meta" data-test="oncall-recent-pages-window">
+        {{ windowLabel }}
+      </OText>
       <OButton
         variant="ghost-primary"
         size="xs"
@@ -121,7 +125,7 @@ import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import type { OnCallPolicy, OnCallResponse } from "@/ts/interfaces/oncall";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { reachedStepOf } from "@/utils/oncall";
 
@@ -137,8 +141,10 @@ const props = withDefaults(
     /** How many rows to show before deferring to the full list. */
     limit?: number;
     loading?: boolean;
+    /** How many days `pages` spans, for the header's count. */
+    windowDays?: number;
   }>(),
-  { pages: () => [], policy: null, limit: 3, loading: false },
+  { pages: () => [], policy: null, limit: 3, loading: false, windowDays: 7 },
 );
 
 const emit = defineEmits<{ open: [page: OnCallResponse]; "view-all": [] }>();
@@ -200,4 +206,15 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
     size: 160,
   },
 ]);
+
+/// A capped list that does not say it is capped reads as the team's whole history.
+const windowLabel = computed<I18nText>(() =>
+  props.pages.length > rows.value.length
+    ? t("oncall.teamRecentPagesWindowOf", {
+        shown: rows.value.length,
+        total: props.pages.length,
+        days: props.windowDays,
+      })
+    : t("oncall.teamRecentPagesWindow", { count: props.pages.length, days: props.windowDays }),
+);
 </script>

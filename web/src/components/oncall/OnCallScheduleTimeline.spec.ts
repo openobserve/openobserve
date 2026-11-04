@@ -178,21 +178,16 @@ describe("OnCallScheduleTimeline", () => {
   });
 
   /// One "Cover a shift" lives in the team header, and templates replace a schedule, so neither sits in the toolbar.
-  it("keeps only Add rotation in the toolbar, with a leading icon", () => {
+  it("labels Add rotation with a leading icon", () => {
     const wrapper = render();
 
     const add = wrapper.find('[data-test="oncall-timeline-add"]');
-    const actions = Array.from(add.element.parentElement?.children ?? []);
-    expect(actions.map((el) => el.getAttribute("data-test"))).toEqual([
-      "oncall-timeline-range-group",
-      "oncall-timeline-add",
-    ]);
     expect(add.text()).toBe("Add rotation");
     expect(add.attributes("data-icon")).toBe("add");
   });
 
-  // A template rewrites the first rotation, so a staffed team's Add rotation adds from scratch and offers no template.
-  it("offers a template or scratch from Add rotation only before any rotation exists", async () => {
+  // A staffed team still finds the templates where it adds a rotation, not only in the first lane's menu.
+  it("offers a template or scratch from Add rotation, with or without rotations", async () => {
     const empty = render({ rotations: [], segments: [] });
     expect(empty.find('[data-test="oncall-timeline-add"]').text()).toBe("Add rotation");
     expect(empty.find('[data-test="oncall-timeline-add-template"]').text()).toBe("From a template");
@@ -202,20 +197,21 @@ describe("OnCallScheduleTimeline", () => {
     expect(empty.emitted("add")).toHaveLength(1);
 
     const staffed = render();
-    expect(staffed.find('[data-test="oncall-timeline-add-template"]').exists()).toBe(false);
-    expect(staffed.find('[data-test="oncall-timeline-add-scratch"]').exists()).toBe(false);
-    const add = staffed.find('[data-test="oncall-timeline-add"]');
-    expect(add.attributes("data-icon")).toBe("add");
-    await add.trigger("click");
+    const template = staffed.find('[data-test="oncall-timeline-add-template"]');
+    expect(template.text()).toBe("Start from a template");
+    await template.trigger("click");
+    expect(staffed.emitted("presets")).toHaveLength(1);
+    await staffed.find('[data-test="oncall-timeline-add-scratch"]').trigger("click");
     expect(staffed.emitted("add")).toHaveLength(1);
-    expect(staffed.emitted("presets")).toBeUndefined();
+    expect(staffed.find('[data-test^="oncall-lane-presets-"]').exists()).toBe(true);
   });
 
   // An open shift or lane menu holds the pointer, so the hover line would freeze under it.
   it("hides the hover line while a shift or lane menu is open", async () => {
     const wrapper = render();
     const chart = wrapper.findComponent({ name: "OScheduleTimeline" });
-    const menus = wrapper.findAllComponents({ name: "ODropdown" });
+    // The first is the toolbar's Add rotation menu, which sits off the chart.
+    const menus = wrapper.findAllComponents({ name: "ODropdown" }).slice(1);
     expect(chart.props("hideHover")).toBe(false);
 
     menus[0].vm.$emit("update:open", true);
@@ -249,7 +245,7 @@ describe("OnCallScheduleTimeline", () => {
     const tip = wrapper
       .findAllComponents({ name: "OTooltip" })
       .find((one) => one.attributes("data-test") === `oncall-shift-tip-${band.key}`);
-    expect(String(tip!.props("content"))).toMatch(/^ana@o2\.ai · .+ – .+/);
+    expect(String(tip!.props("content"))).toMatch(/^ana@o2\.ai · .+ – .+ \(UTC\)$/);
   });
 
   it("draws one lane per rotation", () => {
@@ -761,6 +757,86 @@ describe("OnCallScheduleTimeline", () => {
       expect(menuIds(render({ segments: [seg({ user_email: null })] }))).toEqual([
         "oncall-shift-menu-cover",
       ]);
+    });
+
+    it("offers no swap on a cover's span, which is not the roster's shift", () => {
+      const cover = seg({ override_id: "ov1" });
+      expect(menuIds(render({ segments: [cover], swapRotations: [rid("Primary")] }))).toEqual([
+        "oncall-shift-menu-cover",
+        "oncall-shift-menu-away",
+      ]);
+    });
+
+    /// Two rotations may share a name; a band keyed by name acted on the other one's person.
+    it("keys bands by rotation id, so same-named rotations act on their own shifts", async () => {
+      const first: Rotation = { ...rotation("Secondary"), id: "rot_a" };
+      const second: Rotation = { ...rotation("Secondary"), id: "rot_b" };
+      const wrapper = render({
+        rotations: [first, second],
+        segments: [
+          seg({ rotation_id: "rot_a", user_email: "raj@o2.ai" }),
+          seg({ rotation_id: "rot_b", user_email: "sam@o2.ai" }),
+        ],
+      });
+      const [a, b] = tracksOf(wrapper).map((track) => track.bands[0].key);
+      expect(a).not.toBe(b);
+
+      const away = wrapper.findAll('[data-test="oncall-shift-menu-away"]');
+      expect(away.map((item) => item.text())).toEqual([
+        "Mark raj@o2.ai away",
+        "Mark sam@o2.ai away",
+      ]);
+      await wrapper.findAll('[data-test="oncall-shift-menu-cover"]')[0].trigger("click");
+      const [, segment] = wrapper.emitted("shift-action")![0] as [string, ResolvedSegment];
+      expect(segment).toMatchObject({ rotation_id: "rot_a", user_email: "raj@o2.ai" });
+    });
+  });
+
+  describe("the day view", () => {
+    const toDay = async (wrapper: VueWrapper) => {
+      wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "day");
+      await nextTick();
+    };
+
+    it("labels the axis with hours, not one date", async () => {
+      const wrapper = render();
+      await toDay(wrapper);
+      const ticks = wrapper
+        .findComponent({ name: "OScheduleTimeline" })
+        .props("axisTicks") as ScheduleAxisTick[];
+      expect(ticks.map((tick) => String(tick.label))).toEqual([
+        "00:00",
+        "03:00",
+        "06:00",
+        "09:00",
+        "12:00",
+        "15:00",
+        "18:00",
+        "21:00",
+      ]);
+    });
+
+    it("thins the hour ticks on a phone", async () => {
+      mockViewport.mdUp = false;
+      const wrapper = render();
+      await toDay(wrapper);
+      const ticks = wrapper
+        .findComponent({ name: "OScheduleTimeline" })
+        .props("axisTicks") as ScheduleAxisTick[];
+      expect(ticks).toHaveLength(4);
+    });
+
+    it("names a single day once, with its weekday and year", async () => {
+      const wrapper = render();
+      await toDay(wrapper);
+      const label = wrapper.find('[data-test="oncall-timeline-range"]').text();
+      expect(label).not.toContain("–");
+      expect(label).toMatch(/\d{4}/);
+      expect(label).toContain(
+        new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" }).format(
+          new Date(start / 1000),
+        ),
+      );
     });
   });
 

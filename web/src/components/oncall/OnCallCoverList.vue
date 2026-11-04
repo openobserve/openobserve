@@ -29,9 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Nothing at all without covers: the timeline and its legend already say there are none. -->
   <section v-if="covers.length" class="flex flex-col gap-2" data-test="oncall-cover-list">
-    <OText variant="section" as="h3" data-test="oncall-cover-list-title">
-      {{ t("oncall.coverListCount", { count: covers.length }) }}
-    </OText>
+    <span class="flex flex-wrap items-baseline gap-x-2">
+      <OText variant="section" as="h3" data-test="oncall-cover-list-title">
+        {{ t("oncall.coverListCount", { count: covers.length }) }}
+      </OText>
+      <OText variant="meta" data-test="oncall-cover-list-zone">
+        {{ t("oncall.timesInZone", { zone: raw(timezone) }) }}
+      </OText>
+    </span>
 
     <OTable
       :data="covers"

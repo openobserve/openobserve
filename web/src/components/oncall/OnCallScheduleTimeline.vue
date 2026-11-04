@@ -99,18 +99,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- A template only rewrites the first rotation, so once one exists Add rotation adds from scratch; Start over lives in that lane's menu. -->
-        <OButton
-          v-if="rotations.length"
-          variant="outline"
-          size="sm-action"
-          icon-left="add"
-          data-test="oncall-timeline-add"
-          @click="emit('add')"
-        >
-          {{ t("oncall.addRotation") }}
-        </OButton>
-        <ODropdown v-else align="end">
+        <!-- A template rewrites the first rotation; the drawer it opens names which one. -->
+        <ODropdown align="end">
           <template #trigger>
             <OButton
               variant="outline"
@@ -127,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="oncall-timeline-add-template"
             @select="emit('presets')"
           >
-            {{ t("oncall.addRotationFromTemplate") }}
+            {{ rotations.length ? t("oncall.presetsTitle") : t("oncall.addRotationFromTemplate") }}
           </ODropdownItem>
           <ODropdownItem
             icon-left="edit"
@@ -545,13 +535,15 @@ const fmt = (micros: number, opts: Intl.DateTimeFormatOptions) =>
   formatInZone(micros, props.timezone, opts);
 
 const rangeLabel = computed<I18nText>(() =>
-  raw(
-    `${fmt(from.value, { day: "numeric", month: "short" })} – ${fmt(to.value - 1, {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    })}`,
-  ),
+  days.value === 1
+    ? raw(fmt(from.value, { weekday: "short", day: "numeric", month: "short", year: "numeric" }))
+    : raw(
+        `${fmt(from.value, { day: "numeric", month: "short" })} – ${fmt(to.value - 1, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })}`,
+      ),
 );
 
 const localZone = computed(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -723,7 +715,8 @@ function emptyLine(track: ScheduleTrack): I18nText {
   return t("oncall.laneEmptyNeverWins");
 }
 
-const bandKeyOf = (lane: Lane, segment: ResolvedSegment) => `${lane.name}-${segment.from}`;
+// By id: two rotations may share a name, and a name-keyed band acted on the other one.
+const bandKeyOf = (lane: Lane, segment: ResolvedSegment) => `${lane.id}-${segment.from}`;
 
 const AWAY_TRACK = "__away";
 
@@ -830,9 +823,10 @@ const segmentByBand = computed(() => {
 });
 
 const tipRange = (start: number, end: number) =>
-  t("oncall.shiftBandTipRange", {
-    from: raw(fmt(start, { weekday: "short", hour: "2-digit", minute: "2-digit" })),
-    to: raw(fmt(end, { weekday: "short", hour: "2-digit", minute: "2-digit" })),
+  t("oncall.shiftBandTipRangeZoned", {
+    from: raw(fmt(start, { weekday: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })),
+    to: raw(fmt(end, { weekday: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })),
+    zone: raw(props.timezone),
   });
 
 /// Name and email for a band's person, because the band itself only has room for a name and two people can share one.
@@ -867,7 +861,13 @@ function shiftActions(bandKey: string): ShiftMenuItem[] {
   if (props.canCover) {
     items.push({ id: "cover", icon: "person-add", label: t("oncall.shiftMenuCover") });
   }
-  if (who && props.canCover && props.swapRotations.includes(segment.rotation_id)) {
+  // A cover's span is not the roster's, so it has no shift of its own to trade.
+  if (
+    who &&
+    !segment.override_id &&
+    props.canCover &&
+    props.swapRotations.includes(segment.rotation_id)
+  ) {
     items.push({ id: "swap", icon: "swap-horiz", label: t("oncall.shiftMenuSwap") });
   }
   if (who && (props.canMarkAway || who.toLowerCase() === props.selfEmail.toLowerCase())) {
@@ -892,6 +892,7 @@ function onShiftAction(action: ShiftAction, bandKey: string) {
 /// reader scanning for "which day is that band on" reads the number. Today is
 /// called out, because every other instant on the chart is read relative to it.
 const axisTicks = computed<ScheduleAxisTick[]>(() => {
+  if (days.value === 1) return hourTicks.value;
   const step = days.value > 7 ? 2 : 1;
   const today = zonedMidnight(nowMicros.value, props.timezone);
   const ticks: ScheduleAxisTick[] = [];
@@ -906,6 +907,21 @@ const axisTicks = computed<ScheduleAxisTick[]>(() => {
           ? t("oncall.schedAxisToday", { weekday: raw(fmt(at, { weekday: "short" })) })
           : raw(fmt(at, { weekday: "short" })),
       emphasis: at === today,
+    });
+  }
+  return ticks;
+});
+
+const HOUR_MICROS = MICROS_PER_DAY / 24;
+
+// Stepped from the window's start rather than per wall hour, so a clock-change day keeps evenly spaced ticks.
+const hourTicks = computed<ScheduleAxisTick[]>(() => {
+  const every = isMobile.value ? 6 : 3;
+  const ticks: ScheduleAxisTick[] = [];
+  for (let at = from.value; at < to.value; at += every * HOUR_MICROS) {
+    ticks.push({
+      offset: share(at),
+      label: raw(fmt(at, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })),
     });
   }
   return ticks;

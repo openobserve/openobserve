@@ -74,13 +74,16 @@ export class OnCallTeamDetailPage {
       configRisks: '[data-test="oncall-attention-expand"]',
       coverageCard: '[data-test="oncall-team-coverage-card"]',
       openSchedule: '[data-test="oncall-team-open-schedule"]',
+      coverageZone: '[data-test="oncall-coverage-zone"]',
+      recentPagesWindow: '[data-test="oncall-recent-pages-window"]',
+      recentPagesViewAll: '[data-test="oncall-recent-pages-view-all"]',
 
       // Schedule tab — the read surface.
       timeline: '[data-test="oncall-schedule-timeline"]',
       timelineChart: '[data-test="oncall-timeline-chart"]',
       timelineEmpty: '[data-test="oncall-timeline-empty"]',
       timelineAdd: '[data-test="oncall-timeline-add"]',
-      // A team with no rotations yet gets a From a template / From scratch menu on Add rotation.
+      // Add rotation is a menu: a template or from scratch, with or without rotations.
       timelineAddScratch: '[data-test="oncall-timeline-add-scratch"]',
       timelineAddTemplate: '[data-test="oncall-timeline-add-template"]',
       laneMenus: '[data-test^="oncall-lane-menu-"]',
@@ -371,7 +374,8 @@ export class OnCallTeamDetailPage {
   async openRotationEditor() {
     await this.page.locator(this.locators.timelineAdd).click();
     const scratch = this.page.locator(this.locators.timelineAddScratch);
-    if (await scratch.isVisible({ timeout: 1500 }).catch(() => false)) await scratch.click();
+    await scratch.waitFor({ state: 'visible', timeout: 10000 });
+    await scratch.click();
     await expect(this.page.locator(this.locators.rotationDrawer)).toBeVisible({ timeout: 20000 });
   }
 
