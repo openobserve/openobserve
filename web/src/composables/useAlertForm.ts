@@ -107,11 +107,7 @@ import {
 } from "@/utils/alerts/forecastAlert";
 import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  buildAnomalyFilterExpression,
-  operatorNeedsValue,
-} from "@/utils/alerts/anomalyFilterOperators";
-import { anomalyFilterRows, toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
+import { anomalyWhereClause, toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import {
@@ -666,15 +662,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       c.detection_function,
       c.detection_function_field || "<field>",
     );
-    const filterLines = anomalyFilterRows(c.filters)
-      .filter((f: any) => f.field && (operatorNeedsValue(f.operator) ? f.value : true))
-      .map((f: any) => `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`);
-    const where = filterLines.length
-      ? [
-          "WHERE",
-          ...filterLines.map((l: string, i: number) => (i === 0 ? l.replace(/^\s+AND /, "  ") : l)),
-        ].join("\n")
-      : "";
+    const where = anomalyWhereClause(c.filters);
     return [
       `SELECT histogram(_timestamp, '${interval}') AS time_bucket,`,
       `       ${fn} AS value`,

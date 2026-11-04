@@ -11,10 +11,6 @@ import {
   isNumericYField,
 } from "@/utils/dashboard/heatmapYAxis";
 
-const VALUE_PLACEHOLDER =
-  /\{\{\s*[\w-]+\s*(:\s*[a-zA-Z]+\s*)?\}\}|\$\{\s*[\w-]+\s*(:\s*[a-zA-Z]+\s*)?\}|\$[\w-]+/g;
-const TOP_LEVEL_CONNECTOR = /(^|[^\w.])(or|and)(?!\w)/i;
-
 export function buildSQLQueryFromInput(fields: any, defaultStream: any): string {
   // Handle undefined or null fields
   if (!fields) {
@@ -610,28 +606,6 @@ export function addMissingArgs(fields: any): any {
   };
 }
 
-// Typed-column values stay raw SQL expressions (now(), $var*1000), so only a value that would end or widen the condition is refused.
-const splicesSql = (raw: string, escaped: string): boolean => {
-  if ((raw.match(/'/g)?.length ?? 0) % 2 === 1) return true;
-  let depth = 0;
-  let inQuote = false;
-  let unquoted = "";
-  let topLevel = "";
-  for (const char of escaped.replace(VALUE_PLACEHOLDER, "0")) {
-    if (char === "'") inQuote = !inQuote;
-    if (inQuote || char === "'") {
-      unquoted += " ";
-      topLevel += " ";
-      continue;
-    }
-    if (char === "(") depth++;
-    else if (char === ")") depth--;
-    unquoted += char;
-    topLevel += depth > 0 ? " " : char;
-  }
-  return /;|--/.test(unquoted) || TOP_LEVEL_CONNECTOR.test(topLevel);
-};
-
 /**
  * Format a value to be used in a SQL query.
  * @param value - the value to format
@@ -664,13 +638,10 @@ const formatValue = (
   if (value?.length > 1 && value.startsWith("'") && value.endsWith("'")) {
     tempValue = value.substring(1, value.length - 1);
   }
-  const rawValue = String(tempValue);
   // escape any single quotes in the value
-  tempValue = escapeSingleQuotes(rawValue);
+  tempValue = escapeSingleQuotes(String(tempValue));
   // Quote string values, leave numeric values unquoted
   if (columnType === "Utf8") {
-    tempValue = `'${tempValue}'`;
-  } else if (columnType !== undefined && splicesSql(rawValue, tempValue)) {
     tempValue = `'${tempValue}'`;
   } else if (columnType === undefined) {
     // Schema not loaded — infer from value: quote unless it's purely numeric

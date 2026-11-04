@@ -1054,7 +1054,7 @@ export const serializeWorkflow = (opts?: { onlyNodeId?: string }) => {
 
 const BRANCH_PROBE_SEP = "::path::";
 
-// The Branch's declared handles that have an edge in the current graph, in declaration order.
+// Wired in the current graph, not the run's graph.
 const wiredBranchHandles = (nodeId: string): string[] => {
   const node = (workflowObj.currentSelectedWorkflow?.nodes || []).find((n: any) => n.id === nodeId);
   const wired = new Set(

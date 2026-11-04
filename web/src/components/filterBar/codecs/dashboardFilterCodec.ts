@@ -29,6 +29,7 @@ import {
   isTreePristine,
   makeGroup,
   makeRawNode,
+  nodeSig,
   operatorFromWire,
   parsedField,
   parsedOperator,
@@ -242,6 +243,8 @@ function columnOf(
 function serializeLeaf(node: FilterCondition, context: CodecContext): DashboardFilterCondition {
   const raw = rawOf<DashboardFilterCondition>(node);
   if (isPristine(node) && raw) return raw;
+  // Re-serializing unchanged values would rewrite a saved `prod,$env` as `'prod',$env` and change the SQL.
+  if (raw && onlyConnectorChanged(node)) return { ...raw, logicalOperator: node.connector };
   const sameOperator = parsedOperator(node) === node.operator;
   const base: DashboardFilterCondition = raw ?? {
     type: "condition",
@@ -278,6 +281,12 @@ function serializeLeaf(node: FilterCondition, context: CodecContext): DashboardF
   else out.value = node.values[0] ?? "";
   return out;
 }
+
+const onlyConnectorChanged = (node: FilterCondition): boolean => {
+  if (!node.meta) return false;
+  const loadedConnector = (JSON.parse(node.meta.sig) as unknown[])[4] as FilterConnector;
+  return nodeSig({ ...node, connector: loadedConnector }) === node.meta.sig;
+};
 
 // A locked leaf keeps its saved payload; only its AND/OR can change.
 function serializeRaw(item: FilterNode): DashboardFilterCondition {

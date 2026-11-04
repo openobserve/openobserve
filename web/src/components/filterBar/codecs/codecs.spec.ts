@@ -1020,7 +1020,7 @@ describe("dashboard filter codec, an IN list with a $variable", () => {
         "env IN ('prod','$env','stage')",
         "env IN ('prod','$env')",
       ],
-      ["prod,$env", ["prod", "$env"], "env IN ('prod',$env,'stage')", "env IN ('prod',$env)"],
+      ["prod,$env", ["prod", "$env"], "env IN ('prod',$env,'stage')", "env IN (prod,$env)"],
     ];
 
     it.each(cases)("keeps %s byte-identical when untouched", (value) => {
@@ -1035,9 +1035,9 @@ describe("dashboard filter codec, an IN list with a $variable", () => {
       expect(sqlAfter(value, addStage)).toBe(added);
     });
 
-    it.each(cases)("writes %s as valid SQL after toggling AND/OR", (value, _c, _a, toggled) => {
+    it.each(cases)("keeps %s and main's SQL after toggling AND/OR", (value, _c, _a, toggled) => {
       const out = codec.serialize(toggle(parsed(value)), context) as any;
-      expect(out.conditions[1].logicalOperator).toBe("OR");
+      expect(out.conditions[1]).toEqual({ ...savedLeaf(value), logicalOperator: "OR" });
       expect(buildCondition(out.conditions[1], panel)).toBe(toggled);
     });
   });

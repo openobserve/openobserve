@@ -1971,22 +1971,12 @@ describe("dashboardAutoQueryBuilder", () => {
     });
 
     it.each([
-      ["1); DROP TABLE logs; --", "count IN (1, '1); DROP TABLE logs; --')"],
-      ["1 OR 1=1", "count IN (1, '1 OR 1=1')"],
-      ["2' OR '1'='1", "count IN (1, '2'' OR ''1''=''1')"],
-    ])("quotes a non-numeric list value %s on a numeric column", (payload, expected) => {
+      ["1); DROP TABLE logs; --", "count IN (1, 1); DROP TABLE logs; --)"],
+      ["1 OR 1=1", "count IN (1, 1 OR 1=1)"],
+      ["2' OR '1'='1", "count IN (1, 2'' OR ''1''=''1)"],
+    ])("emits list value %s raw on a numeric column as main does", (payload, expected) => {
       const condition = { type: "list", column: { field: "count" }, values: ["1", payload] };
       expect(buildCondition(condition, mockDashboardPanelData)).toBe(expected);
-    });
-
-    it("quotes a non-numeric comparison value on a numeric column", () => {
-      const condition = {
-        type: "condition",
-        operator: "=",
-        column: { field: "count" },
-        value: "1 OR 1=1",
-      };
-      expect(buildCondition(condition, mockDashboardPanelData)).toBe("count = '1 OR 1=1'");
     });
 
     it.each([
@@ -2024,16 +2014,12 @@ describe("dashboardAutoQueryBuilder", () => {
     });
 
     it.each([
-      ["1 OR 1=1", "count = '1 OR 1=1'"],
-      ["'1 or 1=1'", "count = '1 or 1=1'"],
-      ["1) OR (1=1", "count = '1) OR (1=1'"],
-      ["x BETWEEN 1 AND 5", "count = 'x BETWEEN 1 AND 5'"],
-      ["1 -- x", "count = '1 -- x'"],
-      ["(1 -- x)", "count = '(1 -- x)'"],
-      ["1; SELECT 1", "count = '1; SELECT 1'"],
-      ["2' OR '1'='1", "count = '2'' OR ''1''=''1'"],
-      ["abc'", "count = 'abc'''"],
-    ])("quotes the injection shape %s on a numeric column", (value, expected) => {
+      ["1 OR 1=1", "count = 1 OR 1=1"],
+      ["200 or status=404", "count = 200 or status=404"],
+      ["x BETWEEN 1 AND 5", "count = x BETWEEN 1 AND 5"],
+      ["abc'", "count = abc''"],
+      ["$x--", "count = $x--"],
+    ])("emits %s raw on a numeric column as main does", (value, expected) => {
       const condition = { type: "condition", operator: "=", column: { field: "count" }, value };
       expect(buildCondition(condition, mockDashboardPanelData)).toBe(expected);
     });

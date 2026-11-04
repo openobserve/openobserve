@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  anomalyFilterRows,
+  anomalyWhereClause,
   toDetectionFunctionSql,
   buildAnomalyPreviewSql,
 } from "./anomalySqlBuilder";
@@ -476,7 +476,7 @@ describe("buildAnomalyPreviewSql", () => {
   });
 });
 
-describe("anomalyFilterRows", () => {
+describe("anomalyWhereClause", () => {
   const leaf = (column: string, operator: string, value: unknown, logicalOperator = "AND") => ({
     filterType: "condition",
     column,
@@ -484,42 +484,80 @@ describe("anomalyFilterRows", () => {
     value,
     logicalOperator,
   });
-  const group = (conditions: unknown[]) => ({
+  const group = (conditions: unknown[], logicalOperator = "AND") => ({
     filterType: "group",
-    logicalOperator: "AND",
+    logicalOperator,
     conditions,
   });
 
-  it("returns the saved row array untouched", () => {
-    const rows = [{ field: "level", operator: "=", value: "error" }];
-    expect(anomalyFilterRows(rows)).toBe(rows);
+  it("renders saved rows exactly as main did", () => {
+    const rows = [
+      { field: "level", operator: "=", value: "error" },
+      { field: "", operator: "=", value: "x" },
+      { field: "code", operator: "IN", value: "'a', 'b'" },
+      { field: "msg", operator: "Contains", value: "" },
+      { field: "host", operator: "Is Null", value: "" },
+    ];
+    expect(anomalyWhereClause(rows)).toBe(
+      "WHERE\n  level = 'error'\n  AND code IN ('a', 'b')\n  AND host IS NULL",
+    );
   });
 
-  it("reads null and undefined as no rows", () => {
-    expect(anomalyFilterRows(null)).toEqual([]);
-    expect(anomalyFilterRows(undefined)).toEqual([]);
+  it("reads null, undefined and a non-object as no WHERE", () => {
+    expect(anomalyWhereClause(null)).toBe("");
+    expect(anomalyWhereClause(undefined)).toBe("");
+    expect(anomalyWhereClause("level = 'error'")).toBe("");
   });
 
-  it("flattens an AND-only V2 group of leaves into rows", () => {
+  it("renders an AND-only V2 group one part per line", () => {
     const filters = group([
       leaf("level", "=", "error"),
       leaf("code", "!=", 500),
       leaf("host", "is_null", null),
     ]);
-    expect(anomalyFilterRows(filters)).toEqual([
-      { field: "level", operator: "=", value: "error" },
-      { field: "code", operator: "<>", value: "500" },
-      { field: "host", operator: "Is Null", value: "" },
+    expect(anomalyWhereClause(filters)).toBe(
+      "WHERE\n  level = 'error'\n  AND code <> '500'\n  AND host IS NULL",
+    );
+  });
+
+  it("renders OR and nested groups with parentheses", () => {
+    const filters = group([
+      leaf("a", "=", "1"),
+      leaf("b", "=", "2", "OR"),
+      group([leaf("c", "=", "3"), leaf("d", "=", "4", "OR")], "OR"),
     ]);
+    expect(anomalyWhereClause(filters)).toBe(
+      "WHERE\n  a = '1'\n  OR b = '2'\n  OR (c = '3' OR d = '4')",
+    );
   });
 
   it.each([
-    ["an OR leaf", group([leaf("a", "=", "1"), leaf("b", "=", "2", "OR")])],
-    ["a nested group", group([leaf("a", "=", "1"), group([leaf("b", "=", "2")])])],
-    ["a list operator", group([{ ...leaf("a", "in", null), values: ["x", "y"] }])],
-    ["a non-object", "level = 'error'"],
-  ])("reads a group with %s as no rows", (_label, filters) => {
-    expect(anomalyFilterRows(filters)).toEqual([]);
+    ["contains", "x", false, "str_match(f, 'x')"],
+    ["contains", "x", true, "str_match_ignore_case(f, 'x')"],
+    ["Contains", "x", true, "str_match_ignore_case(f, 'x')"],
+    ["not_contains", "x", false, "f NOT LIKE '%x%'"],
+    ["Not Contains", "x", false, "f NOT LIKE '%x%'"],
+    ["in", ["a", "b"], false, "f IN ('a', 'b')"],
+    ["not_in", '["a"]', false, "f NOT IN ('a')"],
+    ["IN", ["a"], false, "f IN ('a')"],
+    ["starts_with", "x", false, "f LIKE 'x%'"],
+    ["ends_with", "x", false, "f LIKE '%x'"],
+    ["regex", "^a", false, "re_match(f, '^a')"],
+    ["not_regex", "^a", false, "re_not_match(f, '^a')"],
+    ["IsNotNull", null, false, "f IS NOT NULL"],
+  ])("maps the engine operator %s", (operator, value, caseInsensitive, expected) => {
+    const filters = group([{ ...leaf("f", operator, value), case_insensitive: caseInsensitive }]);
+    expect(anomalyWhereClause(filters)).toBe(`WHERE\n  ${expected}`);
+  });
+
+  it("skips leaves it cannot render and the connector before them", () => {
+    const filters = group([
+      leaf("a", "is_empty", null),
+      leaf("b", "=", "2", "OR"),
+      group([]),
+      leaf("c", "in", []),
+    ]);
+    expect(anomalyWhereClause(filters)).toBe("WHERE\n  b = '2'");
   });
 
   it("builds the preview from an API-written V2 group instead of throwing", () => {
@@ -533,7 +571,7 @@ describe("anomalyFilterRows", () => {
     expect(result).toContain("WHERE\n  level = 'error'\n  AND code > '499'\n");
   });
 
-  it("builds the preview without a WHERE for a V2 group it cannot flatten", () => {
+  it("builds the preview with an OR group instead of dropping it", () => {
     const result = buildAnomalyPreviewSql({
       query_mode: "filters",
       stream_name: "logs",
@@ -541,6 +579,6 @@ describe("anomalyFilterRows", () => {
       histogram_interval: "5m",
       filters: group([leaf("a", "=", "1"), leaf("b", "=", "2", "OR")]),
     });
-    expect(result).not.toContain("WHERE");
+    expect(result).toContain("FROM logs\nWHERE\n  a = '1'\n  OR b = '2'\nGROUP BY");
   });
 });
