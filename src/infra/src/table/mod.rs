@@ -294,6 +294,23 @@ pub(crate) fn convert_skipping_unreadable<M, T, E: std::fmt::Display>(
         .collect()
 }
 
+/// Converts every row, failing on the first one this version cannot read, for reference checks.
+pub(crate) fn convert_failing_on_unreadable<M, T, E: std::fmt::Display>(
+    store: &str,
+    rows: impl IntoIterator<Item = M>,
+    row_key: impl Fn(&M) -> String,
+    convert: impl Fn(M) -> Result<T, E>,
+) -> Result<Vec<T>, crate::errors::Error> {
+    rows.into_iter()
+        .map(|row| {
+            let key = row_key(&row);
+            convert(row).map_err(|e| {
+                crate::errors::Error::Message(format!("[{store}] row {key} is unreadable: {e}"))
+            })
+        })
+        .collect()
+}
+
 #[macro_export]
 macro_rules! orm_err {
     ($e:expr) => {

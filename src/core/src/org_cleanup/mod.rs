@@ -1523,7 +1523,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // backfill jobs, OFGA ownership, and the executable-pipeline caches are all
     // torn down and evicted cluster-wide — a raw infra::pipeline::delete would
     // leave those side effects (and stale cache entries) behind.
-    let pipelines = infra::pipeline::list_by_org(org_id).await?;
+    let pipelines = infra::pipeline::list_by_org_fully_decoded(org_id).await?;
     for p in pipelines {
         let id = p.id.clone();
         crate::pipeline::delete_listed_pipeline(p)

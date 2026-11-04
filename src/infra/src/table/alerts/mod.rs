@@ -464,6 +464,20 @@ pub async fn list<C: ConnectionTrait>(
     ))
 }
 
+/// Lists alerts like `list` but fails on a row this version cannot read, for reference checks.
+pub async fn list_fully_decoded<C: ConnectionTrait>(
+    conn: &C,
+    params: ListAlertsParams,
+) -> Result<Vec<(MetaFolder, MetaAlert)>, errors::Error> {
+    let models = list_models(conn, params).await?;
+    super::convert_failing_on_unreadable(
+        "alerts",
+        models,
+        |(_, a)| alert_row_key(a),
+        |(f, a)| MetaAlert::try_from(a).map(|a| (MetaFolder::from(f), a)),
+    )
+}
+
 /// The `(long, short)` burn-window pairs of every alert pointing at this SLO.
 ///
 /// The reverse lookup D60 put the indexed `slo_id` column there for: it runs
@@ -2278,7 +2292,7 @@ pub(super) mod tests {
 
             use super::*;
             use crate::table::{
-                alerts::{get_by_id, list, list_all},
+                alerts::{get_by_id, list, list_all, list_fully_decoded},
                 testing::{capture_error_logs, logged_errors_containing},
             };
 
@@ -2338,6 +2352,23 @@ pub(super) mod tests {
                     "{logged:?}"
                 );
                 assert!(!logged_errors_containing(&junk).is_empty());
+            }
+
+            #[tokio::test]
+            async fn list_fully_decoded_fails_on_a_row_it_cannot_read() {
+                let (db, [good, ..]) = db_with_unreadable_rows().await;
+                let err = list_fully_decoded(&db, ListAlertsParams::new(ORG))
+                    .await
+                    .unwrap_err()
+                    .to_string();
+                assert!(err.contains("unreadable"), "{err}");
+
+                let db = db_with_folder().await;
+                insert_alert(&db, AlertSpec::plain(&good, "good")).await;
+                let listed = list_fully_decoded(&db, ListAlertsParams::new(ORG))
+                    .await
+                    .unwrap();
+                assert_eq!(listed.len(), 1);
             }
 
             #[tokio::test]

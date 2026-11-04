@@ -1996,13 +1996,15 @@ fn build_extended_expr(
             } else {
                 pattern.to_string()
             };
-            let func = if matches!(cond.operator, Operator::ReMatch) {
-                "re_match"
+            // Not the re_match UDF: it strips escapes like `\b`, so SQL would disagree with
+            // in-memory evaluation.
+            let negation = if matches!(cond.operator, Operator::ReMatch) {
+                ""
             } else {
-                "re_not_match"
+                "NOT "
             };
             Ok(format!(
-                "{func}({field_alias}, '{}')",
+                "{negation}regexp_like({field_alias}, '{}')",
                 sql_string_literal(&pattern)
             ))
         }
@@ -4002,12 +4004,12 @@ mod tests {
         let cond = make_cond("c", Operator::ReMatch, json!("^GET '/api"));
         assert_eq!(
             build_expr(&cond, "", &DataType::Utf8).unwrap(),
-            r#"re_match("c", '^GET ''/api')"#
+            r#"regexp_like("c", '^GET ''/api')"#
         );
         let cond = make_ci_cond("c", Operator::ReNotMatch, json!("timeout|refused"));
         assert_eq!(
             build_expr(&cond, "", &DataType::Utf8).unwrap(),
-            r#"re_not_match("c", '(?i)timeout|refused')"#
+            r#"NOT regexp_like("c", '(?i)timeout|refused')"#
         );
         let cond = make_cond("c", Operator::ReMatch, json!("5.."));
         assert!(build_expr(&cond, "", &DataType::Int64).is_err());
@@ -4080,6 +4082,68 @@ mod tests {
             count(make_cond("c", Operator::NotIn, json!(["50%_off"]))).await,
             3
         );
+    }
+
+    #[tokio::test]
+    async fn test_regex_sql_agrees_with_in_memory_evaluation() {
+        use std::sync::Arc;
+
+        use arrow::{array::StringArray, record_batch::RecordBatch};
+        use datafusion::{datasource::MemTable, prelude::SessionContext};
+
+        let texts = [Some("an error here"), Some("berrorb"), Some("a\tb"), None];
+        let schema = Arc::new(Schema::new(vec![Field::new("c", DataType::Utf8, true)]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(texts.to_vec()))],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        let table = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(table)).unwrap();
+        use config::utils::json::{Map, json};
+        for (pattern, ic) in [
+            (r"\berror\b", false),
+            (r"\b{start}ERROR", true),
+            (r"\Aberr", false),
+            (r"a\tb", false),
+        ] {
+            for op in [Operator::ReMatch, Operator::ReNotMatch] {
+                let cond = if ic {
+                    make_ci_cond("c", op, json!(pattern))
+                } else {
+                    make_cond("c", op, json!(pattern))
+                };
+                let expr = build_expr(&cond, "", &DataType::Utf8).unwrap();
+                let batches = ctx
+                    .sql(&format!("SELECT c FROM t WHERE {expr}"))
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                let mut selected = Vec::new();
+                for batch in &batches {
+                    let col = batch
+                        .column(0)
+                        .as_any()
+                        .downcast_ref::<StringArray>()
+                        .unwrap();
+                    selected.extend(col.iter().map(|v| v.map(str::to_string)));
+                }
+                let mut expected = Vec::new();
+                for text in texts {
+                    let mut row = Map::new();
+                    if let Some(text) = text {
+                        row.insert("c".to_string(), json!(text));
+                    }
+                    if evaluate_condition(&row, "c", &op, &json!(pattern), ic).await {
+                        expected.push(text.map(str::to_string));
+                    }
+                }
+                assert_eq!(selected, expected, "{op:?} {pattern}");
+            }
+        }
     }
 
     #[tokio::test]

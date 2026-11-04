@@ -348,15 +348,27 @@ pub async fn list(
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
 ) -> Result<Vec<Alert>, infra::errors::Error> {
-    let params = ListAlertsParams::new(org_id).in_folder("default");
-    let params = if let Some(stream_name) = stream_name {
-        params.for_stream(stream_type.unwrap_or_default(), Some(stream_name))
-    } else {
-        params
-    };
-
     let client = get_orm_client_ro().await;
-    let alerts = table::list(client, params)
+    let alerts = table::list(
+        client,
+        default_folder_params(org_id, stream_type, stream_name),
+    )
+    .await?
+    .into_iter()
+    .map(|(_f, a)| a)
+    .collect();
+    Ok(alerts)
+}
+
+/// Like `list` but fails on an unreadable row, so a stream delete cannot leave its alert behind.
+pub async fn list_fully_decoded(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
+) -> Result<Vec<Alert>, infra::errors::Error> {
+    let client = get_orm_client_ro().await;
+    let params = default_folder_params(org_id, stream_type, stream_name);
+    let alerts = table::list_fully_decoded(client, params)
         .await?
         .into_iter()
         .map(|(_f, a)| a)
@@ -364,10 +376,10 @@ pub async fn list(
     Ok(alerts)
 }
 
-/// Every alert of the org in every folder; `list` reads only the default folder.
+/// Every alert of the org in every folder, failing on an unreadable row so teardown misses none.
 pub async fn list_all_for_cleanup(org_id: &str) -> Result<Vec<Alert>, infra::errors::Error> {
     let client = get_orm_client_ro().await;
-    let alerts = table::list(client, ListAlertsParams::new(org_id))
+    let alerts = table::list_fully_decoded(client, ListAlertsParams::new(org_id))
         .await?
         .into_iter()
         .map(|(_f, a)| a)
@@ -380,6 +392,14 @@ pub async fn list_with_folders<C: ConnectionTrait>(
     params: ListAlertsParams,
 ) -> Result<Vec<(Folder, Alert)>, infra::errors::Error> {
     table::list(conn, params).await
+}
+
+/// Like `list_with_folders` but fails on an unreadable row; unreadable must not mean "unused".
+pub async fn list_with_folders_fully_decoded<C: ConnectionTrait>(
+    conn: &C,
+    params: ListAlertsParams,
+) -> Result<Vec<(Folder, Alert)>, infra::errors::Error> {
+    table::list_fully_decoded(conn, params).await
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
@@ -501,6 +521,19 @@ async fn delete_from_cache(org: String, alert_id: String) -> Result<(), anyhow::
     }
 
     Ok(())
+}
+
+fn default_folder_params(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
+) -> ListAlertsParams {
+    let params = ListAlertsParams::new(org_id).in_folder("default");
+    if let Some(stream_name) = stream_name {
+        params.for_stream(stream_type.unwrap_or_default(), Some(stream_name))
+    } else {
+        params
+    }
 }
 
 pub async fn get_alert_from_cache(org_id: &str, alert_id: &str) -> Option<(Folder, Alert)> {

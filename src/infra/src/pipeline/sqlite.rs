@@ -285,7 +285,7 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 A
         Ok(super::decode_rows(rows))
     }
 
-    async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline> {
+    async fn get_by_id(&self, pipeline_id: &str) -> Result<super::Decoded> {
         let pool = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline WHERE id = $1;";
         let row = sqlx::query(query)
@@ -324,23 +324,23 @@ SELECT * FROM pipeline
         Ok(similar_pipelines)
     }
 
-    async fn list(&self) -> Result<Vec<Pipeline>> {
+    async fn list(&self) -> Result<super::DecodedPipelines> {
         let client = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline ORDER BY id;";
         match sqlx::query(query).fetch_all(&client).await {
-            Ok(rows) => Ok(super::decode_rows(rows)),
+            Ok(rows) => Ok(super::decode_all_rows(rows)),
             Err(e) => {
                 log::debug!("[SQLITE] list all pipelines error: {e}");
-                Ok(vec![])
+                Ok(super::DecodedPipelines::default())
             }
         }
     }
 
-    async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>> {
+    async fn list_by_org(&self, org: &str) -> Result<super::DecodedPipelines> {
         let client = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline WHERE org = $1 ORDER BY id;";
         match sqlx::query(query).bind(org).fetch_all(&client).await {
-            Ok(rows) => Ok(super::decode_rows(rows)),
+            Ok(rows) => Ok(super::decode_all_rows(rows)),
             Err(e) => {
                 log::error!("[SQLITE] list pipeline by org error: {e}");
                 Err(e.into())
@@ -404,6 +404,8 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
 
 #[cfg(test)]
 mod tests {
+    use config::meta::stream::StreamType;
+
     use super::*;
     use crate::table::testing::{capture_error_logs, logged_errors_containing};
 
@@ -505,6 +507,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_decode_all_rows_reports_the_rows_it_cannot_read() {
+        let pool = pool_with_unreadable_rows().await;
+        let rows = sqlx::query("SELECT * FROM pipeline ORDER BY id;")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+
+        let decoded = super::super::decode_all_rows(rows);
+
+        let ids: Vec<&str> = decoded.pipelines.iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ids, ["p1_good"]);
+        let unreadable: Vec<(&str, bool, Option<&StreamParams>)> = decoded
+            .unreadable
+            .iter()
+            .map(|u| (u.id.as_str(), u.enabled, u.realtime_stream.as_ref()))
+            .collect();
+        let stream = StreamParams::new("o", "s", StreamType::Logs);
+        assert_eq!(
+            unreadable,
+            [
+                ("p2_in_node", true, Some(&stream)),
+                ("p3_in_source", true, None),
+                ("p4_junk", true, Some(&stream)),
+            ]
+        );
+        assert_eq!(decoded.unreadable[0].name, "p2_in_node");
+        let err = decoded.into_fully_decoded().unwrap_err().to_string();
+        assert!(err.contains("org=o id=p2_in_node is unreadable"), "{err}");
+    }
+
+    #[tokio::test]
     async fn test_decode_row_of_an_unreadable_pipeline_is_an_error_not_missing() {
         let pool = pool_with_unreadable_rows().await;
         let fetch = |id: &'static str| {
@@ -514,9 +547,12 @@ mod tests {
         };
 
         let good = super::super::decode_row("p1_good", fetch("p1_good").await.unwrap());
-        assert_eq!(good.unwrap().id, "p1_good");
-        let bad = super::super::decode_row("p3_in_source", fetch("p3_in_source").await.unwrap());
-        assert!(matches!(bad, Err(Error::SqlxError(_))));
+        assert_eq!(good.unwrap().unwrap().id, "p1_good");
+        let bad = super::super::decode_row("p3_in_source", fetch("p3_in_source").await.unwrap())
+            .unwrap()
+            .unwrap_err();
+        assert_eq!((bad.id.as_str(), bad.org.as_str()), ("p3_in_source", "o"));
+        assert!(bad.error.contains("unknown variant `future_op`"), "{bad:?}");
         let missing = super::super::decode_row("nope", fetch("nope").await.unwrap());
         assert!(matches!(
             missing,

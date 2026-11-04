@@ -264,9 +264,10 @@ fn filter_predicate(col: &str, filter: &ProfileFilter) -> Result<String, String>
                 &serde_json::Value::String(filter.value.clone()),
                 false,
             )?;
-            let func = if negated { "re_not_match" } else { "re_match" };
+            // regexp_like, not the re_match UDF, so the pattern runs exactly as validated.
+            let negation = if negated { "NOT " } else { "" };
             Ok(format!(
-                "{func}({quoted}, {})",
+                "{negation}regexp_like({quoted}, {})",
                 quote_sql_string(&filter.value)
             ))
         }
@@ -718,11 +719,11 @@ mod tests {
         assert_eq!(where_for("<>", "a", &[]).unwrap(), r#""env" != 'a'"#);
         assert_eq!(
             where_for("=~", "^pro.*", &[]).unwrap(),
-            r#"re_match("env", '^pro.*')"#
+            r#"regexp_like("env", '^pro.*')"#
         );
         assert_eq!(
             where_for("!~", "^dev", &[]).unwrap(),
-            r#"re_not_match("env", '^dev')"#
+            r#"NOT regexp_like("env", '^dev')"#
         );
         assert_eq!(
             where_for("in", "prod, stage", &[]).unwrap(),
@@ -737,6 +738,10 @@ mod tests {
     #[test]
     fn filter_ops_reject_bad_input() {
         assert!(where_for("=~", "a(", &[]).is_err());
+        assert_eq!(
+            where_for("=~", r"\berror\b", &[]).unwrap(),
+            r#"regexp_like("env", '\berror\b')"#
+        );
         assert!(where_for("in", " , ", &[]).is_err());
         assert!(where_for("like", "a", &[]).is_err());
     }

@@ -198,6 +198,16 @@ pub async fn list_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
     Ok(readable_workflows(entities))
 }
 
+/// An org's workflows, failing on a row this version cannot read, for reference checks.
+pub async fn list_by_org_fully_decoded(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
+    let client = get_orm_client_ro().await;
+    let entities = workflows::Entity::find()
+        .filter(workflows::Column::OrgId.eq(org_id))
+        .all(client)
+        .await?;
+    Ok(fully_decoded_workflows(entities)?)
+}
+
 /// Lists an org's workflows, optionally restricted to one folder and/or to rows
 /// whose name or description contains `search_substring`.
 ///
@@ -871,6 +881,17 @@ fn readable_workflows(models: Vec<workflows::Model>) -> Vec<Workflow> {
     )
 }
 
+fn fully_decoded_workflows(
+    models: Vec<workflows::Model>,
+) -> Result<Vec<Workflow>, crate::errors::Error> {
+    super::convert_failing_on_unreadable(
+        "workflows",
+        models,
+        |m| format!("org={} id={}", m.org_id, m.id),
+        Workflow::try_from,
+    )
+}
+
 fn readable_drafts(models: Vec<workflow_drafts::Model>) -> Vec<Workflow> {
     super::convert_skipping_unreadable(
         "workflow_drafts",
@@ -1039,6 +1060,17 @@ mod tests {
             "{logged:?}"
         );
         assert!(!logged_errors_containing("id=w3_junk").is_empty());
+    }
+
+    #[test]
+    fn test_fully_decoded_workflows_fail_on_a_row_they_cannot_read() {
+        let Err(err) = fully_decoded_workflows(rows()) else {
+            panic!("an unreadable row must fail the list");
+        };
+        let err = err.to_string();
+        assert!(err.contains("org=o id=w2_in is unreadable"), "{err}");
+        let good = fully_decoded_workflows(rows().into_iter().take(1).collect()).unwrap();
+        assert_eq!(good.len(), 1);
     }
 
     #[test]

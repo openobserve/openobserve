@@ -45,11 +45,20 @@ pub fn regex_is_match(pattern: &str, case_insensitive: bool, text: &str) -> Opti
     )
 }
 
-/// Items of an `in`/`not_in` value: a JSON array, or a single scalar as a one-item list.
-pub fn list_values(value: &Value) -> &[Value] {
+/// Items of an `in`/`not_in` value as the UI reads them: an array, a JSON array string, or one
+/// scalar.
+pub fn list_values(value: &Value) -> Cow<'_, [Value]> {
     match value {
-        Value::Array(items) => items.as_slice(),
-        other => std::slice::from_ref(other),
+        Value::Array(items) => Cow::Borrowed(items.as_slice()),
+        Value::Null => Cow::Borrowed(&[]),
+        Value::String(text) if text.is_empty() => Cow::Borrowed(&[]),
+        Value::String(text) if text.trim_start().starts_with('[') => {
+            match crate::utils::json::from_str::<Vec<Value>>(text) {
+                Ok(items) => Cow::Owned(items),
+                Err(_) => Cow::Borrowed(std::slice::from_ref(value)),
+            }
+        }
+        other => Cow::Borrowed(std::slice::from_ref(other)),
     }
 }
 
@@ -119,6 +128,15 @@ pub fn validate_condition_value(
             }
             Ok(())
         }
+        Operator::StartsWith | Operator::EndsWith => {
+            if value.is_string() || value.is_number() || value.is_boolean() {
+                Ok(())
+            } else {
+                Err(format!(
+                    "Condition on '{column}': operator '{operator}' needs a string, number or boolean value"
+                ))
+            }
+        }
         Operator::ReMatch | Operator::ReNotMatch => {
             let Some(pattern) = value.as_str() else {
                 return Err(format!(
@@ -138,14 +156,12 @@ pub fn validate_condition_value(
     }
 }
 
-/// Case-insensitive string equality without allocating.
+/// Case-insensitive string equality, folded like SQL `lower()` so both paths agree.
 pub fn eq_ci(a: &str, b: &str) -> bool {
     if a.is_ascii() && b.is_ascii() {
         return a.eq_ignore_ascii_case(b);
     }
-    a.chars()
-        .flat_map(char::to_lowercase)
-        .eq(b.chars().flat_map(char::to_lowercase))
+    a.to_lowercase() == b.to_lowercase()
 }
 
 fn compile_regex(pattern: &str, case_insensitive: bool) -> Result<Regex, regex::Error> {
@@ -167,9 +183,12 @@ fn cached_is_match(
     let compiled = compile_regex(pattern, case_insensitive).ok();
     let result = compiled.as_ref().map(|re| re.is_match(text));
     let mut cache = cache.write();
-    // Clearing is cheap and rare; it only bounds memory when many distinct patterns appear.
-    if cache.len() >= REGEX_CACHE_CAPACITY && !cache.contains_key(pattern) {
-        cache.clear();
+    // Evicting one entry, not clearing, keeps a full cache from recompiling every pattern.
+    if cache.len() >= REGEX_CACHE_CAPACITY
+        && !cache.contains_key(pattern)
+        && let Some(victim) = cache.keys().next().cloned()
+    {
+        cache.remove(&victim);
     }
     cache.insert(pattern.to_string(), compiled);
     result
@@ -221,21 +240,22 @@ fn scalar_text(value: &Value) -> Option<Cow<'_, str>> {
     }
 }
 
+// Per-char folding would miss context rules (final sigma) that `str::to_lowercase` and SQL apply.
 fn starts_with_ci(field: &str, needle: &str) -> bool {
-    let mut field = field.chars().flat_map(char::to_lowercase);
-    needle
-        .chars()
-        .flat_map(char::to_lowercase)
-        .all(|c| field.next() == Some(c))
+    if field.is_ascii() && needle.is_ascii() {
+        return field.len() >= needle.len()
+            && field.as_bytes()[..needle.len()].eq_ignore_ascii_case(needle.as_bytes());
+    }
+    field.to_lowercase().starts_with(&needle.to_lowercase())
 }
 
 fn ends_with_ci(field: &str, needle: &str) -> bool {
-    let mut field = field.chars().rev().flat_map(char::to_lowercase);
-    needle
-        .chars()
-        .rev()
-        .flat_map(char::to_lowercase)
-        .all(|c| field.next() == Some(c))
+    if field.is_ascii() && needle.is_ascii() {
+        return field.len() >= needle.len()
+            && field.as_bytes()[field.len() - needle.len()..]
+                .eq_ignore_ascii_case(needle.as_bytes());
+    }
+    field.to_lowercase().ends_with(&needle.to_lowercase())
 }
 
 #[cfg(test)]
@@ -439,6 +459,23 @@ mod tests {
     }
 
     #[test]
+    fn test_full_regex_cache_evicts_one_entry() {
+        let cache = RwLock::new(HashMap::new());
+        let patterns: Vec<String> = (0..REGEX_CACHE_CAPACITY)
+            .map(|n| format!("^evict-{n}$"))
+            .collect();
+        for pattern in &patterns {
+            cached_is_match(&cache, pattern, false, "x");
+        }
+        cached_is_match(&cache, "^evict-new$", false, "x");
+        let cache = cache.read();
+        assert_eq!(cache.len(), REGEX_CACHE_CAPACITY);
+        assert!(cache.contains_key("^evict-new$"));
+        let kept = patterns.iter().filter(|p| cache.contains_key(*p)).count();
+        assert_eq!(kept, REGEX_CACHE_CAPACITY - 1);
+    }
+
+    #[test]
     fn test_regex_cache_concurrent_access() {
         let handles: Vec<_> = (0..8)
             .map(|t| {
@@ -463,6 +500,78 @@ mod tests {
         assert!(starts_with_ci("ÉCOLE-1", "école"));
         assert!(ends_with_ci("app.LOG", ".log"));
         assert!(!ends_with_ci("log", "a.log"));
+    }
+
+    #[test]
+    fn test_case_insensitive_helpers_fold_like_str_to_lowercase() {
+        let final_sigma = "\u{3bf}\u{3b4}\u{3bf}\u{3c2}";
+        assert!(eq_ci("ΟΔΟΣ", final_sigma));
+        assert!(ends_with_ci("ΟΔΟΣ", "\u{3bf}\u{3c2}"));
+        assert!(starts_with_ci("İSTANBUL", "i\u{307}st"));
+        assert!(ends_with_ci("app.LOG", ".log"));
+        assert!(!starts_with_ci("ab", "abc"));
+        for (a, b) in [
+            ("ΟΔΟΣ", final_sigma),
+            ("ΟΔΟΣ", "\u{3bf}\u{3b4}\u{3bf}\u{3c3}"),
+            ("İ", "i\u{307}"),
+            ("İ", "i"),
+            ("STRASSE", "strasse"),
+            ("ÉCOLE", "école"),
+        ] {
+            assert_eq!(eq_ci(a, b), a.to_lowercase() == b.to_lowercase(), "{a} {b}");
+            assert_eq!(
+                starts_with_ci(a, b),
+                a.to_lowercase().starts_with(&b.to_lowercase()),
+                "{a} {b}"
+            );
+            assert_eq!(
+                ends_with_ci(a, b),
+                a.to_lowercase().ends_with(&b.to_lowercase()),
+                "{a} {b}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_starts_and_ends_with_need_a_scalar() {
+        for op in [Operator::StartsWith, Operator::EndsWith] {
+            for ok in [json!("api"), json!(5), json!(true)] {
+                assert!(validate_condition_value("c", &op, &ok, false).is_ok());
+            }
+            for bad in [json!(null), json!(["api"]), json!({"a": 1})] {
+                assert!(validate_condition_value("c", &op, &bad, false).is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn test_list_values_reads_a_json_array_string_like_the_ui() {
+        assert_eq!(
+            list_values(&json!(r#"["a", "b"]"#)).as_ref(),
+            [json!("a"), json!("b")]
+        );
+        assert_eq!(
+            list_values(&json!(" [1, true]")).as_ref(),
+            [json!(1), json!(true)]
+        );
+        assert_eq!(list_values(&json!(["x"])).as_ref(), [json!("x")]);
+        assert_eq!(
+            list_values(&json!("[not json")).as_ref(),
+            [json!("[not json")]
+        );
+        assert_eq!(list_values(&json!("a,b")).as_ref(), [json!("a,b")]);
+        assert_eq!(list_values(&json!(7)).as_ref(), [json!(7)]);
+        assert!(list_values(&json!("")).is_empty());
+        assert!(list_values(&json!(null)).is_empty());
+        assert!(eval(Operator::In, json!("b"), json!(r#"["a","b"]"#), false));
+        assert!(eval(
+            Operator::NotIn,
+            json!("c"),
+            json!(r#"["a","b"]"#),
+            false
+        ));
+        assert!(validate_condition_value("c", &Operator::In, &json!(""), false).is_err());
+        assert!(validate_condition_value("c", &Operator::In, &json!("[]"), false).is_err());
     }
 
     #[test]

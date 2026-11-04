@@ -288,7 +288,7 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 A
         Ok(super::decode_rows(rows))
     }
 
-    async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline> {
+    async fn get_by_id(&self, pipeline_id: &str) -> Result<super::Decoded> {
         let pool = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline WHERE id = $1;";
         let row = sqlx::query(query)
@@ -329,23 +329,23 @@ SELECT * FROM pipeline
         Ok(similar_pipelines)
     }
 
-    async fn list(&self) -> Result<Vec<Pipeline>> {
+    async fn list(&self) -> Result<super::DecodedPipelines> {
         let pool = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline ORDER BY id;";
         match sqlx::query(query).fetch_all(&pool).await {
-            Ok(rows) => Ok(super::decode_rows(rows)),
+            Ok(rows) => Ok(super::decode_all_rows(rows)),
             Err(e) => {
                 log::debug!("[POSTGRES] list all pipelines  error: {e}");
-                Ok(vec![]) // Return empty vector instead of error
+                Ok(super::DecodedPipelines::default()) // Return empty vector instead of error
             }
         }
     }
 
-    async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>> {
+    async fn list_by_org(&self, org: &str) -> Result<super::DecodedPipelines> {
         let pool = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline WHERE org = $1 ORDER BY id;";
         match sqlx::query(query).bind(org).fetch_all(&pool).await {
-            Ok(rows) => Ok(super::decode_rows(rows)),
+            Ok(rows) => Ok(super::decode_all_rows(rows)),
             Err(e) => {
                 log::error!("[POSTGRES] list pipelines by org error: {e}");
                 Err(e.into())
