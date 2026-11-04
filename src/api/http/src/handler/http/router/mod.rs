@@ -2397,6 +2397,11 @@ fn oncall_routes(router: Router) -> Router {
             "/{org_id}/oncall/teams",
             get(oncall::list_teams).post(oncall::create_team),
         )
+        // A literal, so axum routes it here rather than to `/teams/{team_id}`.
+        .route(
+            "/{org_id}/oncall/teams/context",
+            get(oncall::list_team_context),
+        )
         .route(
             "/{org_id}/oncall/teams/{team_id}",
             get(oncall::get_team)
@@ -2518,6 +2523,11 @@ fn oncall_routes(router: Router) -> Router {
         .route(
             "/{org_id}/oncall/responses/{response_id}/escalation",
             get(oncall::get_escalation_progress),
+        )
+        // A literal, so axum routes it here rather than to `/responses/{response_id}`.
+        .route(
+            "/{org_id}/oncall/responses/escalation",
+            get(oncall::list_escalation_progress),
         )
         .route(
             "/{org_id}/oncall/responses/{response_id}/prior-causes",
@@ -5399,10 +5409,12 @@ mod tests {
             "GET /{org_id}/mcp",
             "GET /{org_id}/oncall/incidents/{incident_id}/responses",
             "GET /{org_id}/oncall/responses",
+            "GET /{org_id}/oncall/responses/escalation",
             "GET /{org_id}/oncall/responses/{response_id}",
             "GET /{org_id}/oncall/responses/{response_id}/escalation",
             "GET /{org_id}/oncall/responses/{response_id}/history",
             "GET /{org_id}/oncall/teams",
+            "GET /{org_id}/oncall/teams/context",
             "GET /{org_id}/oncall/teams/{team_id}",
             "GET /{org_id}/oncall/teams/{team_id}/members",
             "GET /{org_id}/oncall/teams/{team_id}/on-call",
