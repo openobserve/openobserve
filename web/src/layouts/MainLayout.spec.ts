@@ -2178,6 +2178,32 @@ describe("MainLayout — first-time cloud login", () => {
     wrapper.unmount();
   });
 
+  it("decides for the org switched to while the first org's lists loaded", async () => {
+    store.state.organizations.push({ id: 2, name: "org2", identifier: "org2" });
+    let answer!: () => void;
+    const held = new Promise<void>((resolve) => (answer = resolve));
+    vi.mocked(stream.nameList).mockImplementation((async (org: string, type: string) => {
+      if (org !== "org1") return { data: { list: [] } };
+      await held;
+      return {
+        data: {
+          list:
+            type === "logs"
+              ? [{ name: "default", stream_type: "logs", stats: { doc_num: 3 } }]
+              : [],
+        },
+      };
+    }) as never);
+    const { wrapper, replace } = await mountAtHome();
+    store.state.selectedOrganization = { ...store.state.selectedOrganization, identifier: "org2" };
+
+    answer();
+    await flushPromises();
+    expect(replace).toHaveBeenCalledWith({ name: "onboarding", query: { org_identifier: "org2" } });
+    expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    wrapper.unmount();
+  });
+
   // a flag set before it held the email, by a login just before the deploy
   it("takes a legacy 'true' flag as this user's first login, once", async () => {
     localStorage.setItem("isFirstTimeLogin", "true");

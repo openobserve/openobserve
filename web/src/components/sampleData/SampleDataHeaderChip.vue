@@ -109,7 +109,8 @@ const offerTry = computed(
     presence.ready.value &&
     !presence.hasRealData.value &&
     !store.state.kioskMode &&
-    !(session.status.value === "loading" && session.loadingOrg.value === org.value),
+    // one load runs at a time, so a click during another org's load would be dropped
+    session.status.value !== "loading",
 );
 const confirmRemove = ref(false);
 // the confirmation belongs to the org that opened it, so an org switch closes it

@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="sm"
       icon-left="play-arrow"
       class="shrink-0"
+      :disabled="session.status.value === 'loading'"
       data-test="sample-data-callout-load"
       @click="session.loadInDialog(org, store.state.zoConfig?.ingest_allowed_upto)"
     >

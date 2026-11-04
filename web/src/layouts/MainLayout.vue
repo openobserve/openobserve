@@ -782,7 +782,7 @@ export default defineComponent({
     };
 
     // A brand-new cloud user goes to the onboarding page once; the flag is cleared so a reload does not repeat it.
-    const firstLoginRedirect = async () => {
+    const firstLoginRedirect = async (): Promise<void> => {
       if (!isFirstLoginOf(store.state.userInfo?.email)) return;
       await router.isReady();
       // the flow switches arrive with the full config
@@ -797,13 +797,16 @@ export default defineComponent({
         config.isCloud === "true" &&
         redirectPending(router.currentRoute.value.name as string | undefined);
       if (notNow()) return;
+      const org = store.state.selectedOrganization?.identifier;
       const hasData =
         config.isCloud !== "true" ||
         store.state.organizationData.isDataIngested === true ||
         // the store flag is still false at mount, so an org with data shows only in its stream lists
-        (await orgHasUserData(store.state.selectedOrganization?.identifier)) === true;
+        (await orgHasUserData(org)) === true;
       // A user who left Home while the lists loaded keeps the flag too.
       if (notNow()) return;
+      // The answer belongs to the org queried; after a switch, decide again for the org now selected.
+      if (store.state.selectedOrganization?.identifier !== org) return firstLoginRedirect();
       localStorage.removeItem("isFirstTimeLogin");
       if (hasData) return;
       markStartPending(store.state.userInfo?.email);

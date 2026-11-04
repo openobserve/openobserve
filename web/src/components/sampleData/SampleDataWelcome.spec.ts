@@ -372,6 +372,17 @@ describe("SampleDataWelcome finish", () => {
       expect(byTest("sample-welcome-start-tour").exists()).toBe(true);
     });
 
+    it("disables Explore With Sample Data while another org's load runs", async () => {
+      await mountAtHome();
+      session.status.value = "loading";
+      session.loadingOrg.value = "other-org";
+      await flush();
+      expect(byTest("onboarding-get-started-sample-btn").attributes("disabled")).toBeDefined();
+      await click("onboarding-get-started-sample-btn");
+      expect(session.start).not.toHaveBeenCalled();
+      expect(submitNewUserInfo).not.toHaveBeenCalled();
+    });
+
     it("closing the progress view is not a skip", async () => {
       await mountAtHome();
       await click("onboarding-get-started-sample-btn");

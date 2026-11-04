@@ -112,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="cta"
           class="w-full"
+          :disabled="sampleLoading"
           data-test="onboarding-get-started-sample-btn"
           @click="emit('sample')"
         >
@@ -144,6 +145,7 @@ import { FIRST_SOURCE_OPTIONS, type FirstSourceId } from "./firstSourceOptions";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import SampleLivePreview from "@/components/sampleData/SampleLivePreview.vue";
+import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 
 const emit = defineEmits<{ pick: [id: FirstSourceId]; sample: []; skip: []; browse: [] }>();
 
@@ -153,6 +155,10 @@ const HIDDEN_CHIPS: readonly FirstSourceId[] = ["sample", "unsure", "http"];
 const { t } = useI18nTyped();
 
 const { isLocked, lockedReason } = useLicenseLocks();
+
+const session = useSampleDataSession();
+// one load runs at a time, so a pick during another org's load would be dropped
+const sampleLoading = computed(() => session.status.value === "loading");
 
 // a source whose guide the license locks stays visible but cannot be picked
 const chipOptions = computed(() =>

@@ -43,4 +43,24 @@ describe("SampleDataCallout", () => {
     await wrapper.find('[data-test="sample-data-callout-load"]').trigger("click");
     expect(session.loadInDialog).toHaveBeenCalledWith("test-org", undefined);
   });
+
+  it("disables the load while another org's load runs, since one load runs at a time", async () => {
+    session.status.value = "loading";
+    session.loadingOrg.value = "other-org";
+    session.loadInDialog.mockClear();
+    const wrapper = mount(SampleDataCallout, {
+      global: {
+        plugins: [
+          createI18n({ legacy: false, locale: "en", messages: { en: enLocale } }),
+          createStore({ state: { selectedOrganization: { identifier: "test-org" } } }),
+        ],
+      },
+    });
+    const btn = wrapper.find('[data-test="sample-data-callout-load"]');
+    expect(btn.attributes("disabled")).toBeDefined();
+    await btn.trigger("click");
+    expect(session.loadInDialog).not.toHaveBeenCalled();
+    session.status.value = "idle";
+    session.loadingOrg.value = "";
+  });
 });

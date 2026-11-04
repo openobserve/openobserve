@@ -77,6 +77,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { expireSession } from "@/utils/sessionServices";
 import { isSameOriginRedirect } from "@/utils/safeUrl";
 import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
+import { capturePrefill } from "@/components/login/firstSourceOptions";
 
 export default defineComponent({
   name: "LoginPage",
@@ -98,6 +99,20 @@ export default defineComponent({
       identifier: "",
       name: "",
     });
+
+    // The SSO round trip drops the signup link's query and referrer, so keep them for the onboarding pick.
+    const pendingUtmContent = (): string | null => {
+      try {
+        const uri = window.sessionStorage.getItem("redirectURI");
+        return uri ? new URL(uri, window.location.origin).searchParams.get("utm_content") : null;
+      } catch {
+        return null;
+      }
+    };
+    capturePrefill(
+      router?.currentRoute.value.query?.utm_content ?? pendingUtmContent(),
+      document.referrer,
+    );
 
     onBeforeMount(async () => {
       if (!router?.currentRoute.value.hash) {

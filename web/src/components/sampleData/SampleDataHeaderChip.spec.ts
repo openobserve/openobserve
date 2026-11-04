@@ -31,7 +31,12 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 const push = vi.fn();
 vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
 
-const data = vi.hoisted(() => ({ sample: true, own: false, loadingHere: false }));
+const data = vi.hoisted(() => ({
+  sample: true,
+  own: false,
+  loadingHere: false,
+  loadingElsewhere: false,
+}));
 vi.mock("@/composables/sampleData/useSampleDataPresence", async () => {
   const { computed } = await import("vue");
   return {
@@ -51,8 +56,8 @@ vi.mock("@/composables/sampleData/useSampleDataSession", () => ({
     remove,
     startTourAndShow,
     loadInDialog,
-    status: { value: data.loadingHere ? "loading" : "idle" },
-    loadingOrg: { value: data.loadingHere ? ORG : "" },
+    status: { value: data.loadingHere || data.loadingElsewhere ? "loading" : "idle" },
+    loadingOrg: { value: data.loadingHere ? ORG : data.loadingElsewhere ? "other-org" : "" },
   }),
 }));
 
@@ -119,7 +124,7 @@ describe("SampleDataHeaderChip", () => {
     push.mockClear();
     startTourAndShow.mockClear();
     loadInDialog.mockClear();
-    Object.assign(data, { sample: true, own: false, loadingHere: false });
+    Object.assign(data, { sample: true, own: false, loadingHere: false, loadingElsewhere: false });
     remove.mockReset();
     remove.mockResolvedValue(undefined);
     mountChip();
@@ -146,6 +151,11 @@ describe("SampleDataHeaderChip", () => {
     it.each([
       ["the org holds its own data", { sample: false, own: true }],
       ["sample data is loading here", { sample: false, own: false, loadingHere: true }],
+      // one load runs at a time, so a click here would be dropped
+      [
+        "sample data is loading in another org",
+        { sample: false, own: false, loadingElsewhere: true },
+      ],
     ])("shows nothing when %s", (_name, state) => {
       Object.assign(data, state);
       mountChip();
