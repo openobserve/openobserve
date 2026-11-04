@@ -1230,6 +1230,39 @@ describe("ModelPricingEditor.vue", () => {
         "regex",
       );
     });
+    it("keeps a usage-keyed rule a rule when another rule's values are edited in the builder", async () => {
+      const kept = { keys: ["input"], op: "gt", value: 5 };
+      const wrapper = await loadTiers([
+        { name: "Default", prices: { input: 0.000001 } },
+        {
+          name: "Tagged",
+          rules: [kept, { keys: ["tier"], op: "in", values: ["x"] }],
+          prices: { input: 0.000002 },
+        },
+      ]);
+      const dt = "model-pricing-tier-filter-builder-1";
+      await wrapper.find(`[data-test="${dt}-chip-tier-value"]`).trigger("click");
+      await flushPromises();
+      const search = document.body.querySelector<HTMLInputElement>(`[data-test="${dt}-search"]`)!;
+      search.value = "y";
+      search.dispatchEvent(new Event("input"));
+      await flushPromises();
+      search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await flushPromises();
+      document.body
+        .querySelector<HTMLElement>(`[data-test="${dt}-apply"]`)!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flushPromises();
+      expect(wrapper.find('[data-test="model-pricing-tier-filter-errors-1"]').exists()).toBe(false);
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+      const call = mockService.update.mock.calls[0];
+      const saved = call[call.length - 1].tiers[1];
+      expect(saved.condition ?? null).toBeNull();
+      expect(saved.rules).toEqual([kept, { keys: ["tier"], op: "in", values: ["x", "y"] }]);
+      wrapper.unmount();
+    });
+
     it("round-trips a priority on the default tier", async () => {
       const wrapper = await loadTiers([
         { name: "Default", priority: 3, prices: { input: 0.000001 } },

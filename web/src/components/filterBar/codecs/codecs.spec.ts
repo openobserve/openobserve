@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import type { DimensionCondition } from "@/services/downtimes";
 import {
   appendNode,
+  insertNode,
   makeCondition,
   removeNode,
   replaceNode,
@@ -862,6 +863,44 @@ describe("model pricing codec", () => {
     const out = codec.serialize(tree, usage);
     expect(out.condition).toEqual(saved.condition);
     expect(out.rules?.[3]).toEqual({ keys: ["usage.input"], op: "lte", value: 10 });
+  });
+
+  describe("a tier with no condition and a rule keyed like a usage field", () => {
+    const tier = {
+      rules: [
+        { keys: ["input"], op: "gt", value: 5 },
+        { keys: ["tier"], op: "in", values: ["x"] },
+      ],
+    };
+
+    it("keeps the untouched rule as it was when another rule is edited", () => {
+      const tree = codec.parse(clone(tier), usage);
+      const out = codec.serialize(edit(tree, 1, { values: ["x", "y"] }), usage);
+      expect(out.condition).toBeNull();
+      expect(out.rules).toEqual([tier.rules[0], { keys: ["tier"], op: "in", values: ["x", "y"] }]);
+    });
+
+    it("keeps an edited rule a rule with its original keys", () => {
+      const tree = codec.parse(clone(tier), usage);
+      const out = codec.serialize(edit(tree, 0, { values: ["7"] }), usage);
+      expect(out.condition).toBeNull();
+      expect(out.rules).toEqual([{ keys: ["input"], op: "gt", value: 7 }, tier.rules[1]]);
+    });
+
+    it("still lets a newly added usage threshold become the tier condition", () => {
+      const tree = codec.parse(clone(tier), usage);
+      const out = codec.serialize(appendNode(tree, makeCondition("input", "lte", ["10"])), usage);
+      expect(out.condition).toEqual({ usage_key: "input", operator: "lte", value: 10 });
+      expect(out.rules).toEqual(tier.rules);
+    });
+  });
+
+  it("keeps the saved condition when a usage threshold is inserted before it", () => {
+    const tree = codec.parse(clone(saved), usage);
+    const inserted = insertNode(tree, makeCondition("input", "lte", ["10"]), null, 0);
+    const out = codec.serialize(inserted, usage);
+    expect(out.condition).toEqual(saved.condition);
+    expect(out.rules?.[0]).toEqual({ keys: ["usage.input"], op: "lte", value: 10 });
   });
 
   it("leaves an unfinished threshold rule without a value instead of writing 0 or null", () => {

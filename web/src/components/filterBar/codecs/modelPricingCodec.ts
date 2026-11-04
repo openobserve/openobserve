@@ -142,11 +142,21 @@ function parseRule(rule: TierRule): FilterNode {
   return stamp(node, rule);
 }
 
+const savedRuleOf = (node: FilterNode): TierRule | undefined => {
+  const raw = rawOf<TierRule>(node);
+  return node.id !== TIER_CONDITION_ID && Array.isArray(raw?.keys) ? raw : undefined;
+};
+
 function writeRule(node: FilterCondition, usageKey: boolean): TierRule {
   const raw = rawOf<TierRule>(node);
   if (isPristine(node) && raw) return raw;
+  const saved = savedRuleOf(node);
   const op = RULE_WIRE[node.operator] ?? node.operator;
-  const keys = keysOf(node.field).map((key) => (usageKey ? `usage.${key}` : key));
+  // A saved rule keeps its keys while its field is unchanged; `input` there is an attribute, not usage.
+  const keys =
+    saved && node.field === saved.keys.join(", ")
+      ? [...saved.keys]
+      : keysOf(node.field).map((key) => (usageKey ? `usage.${key}` : key));
   const out: TierRule = { keys, op };
   const threshold = (node.values[0] ?? "").trim();
   if (node.operator === "in" || node.operator === "not_in") out.values = [...node.values];
@@ -156,7 +166,7 @@ function writeRule(node: FilterCondition, usageKey: boolean): TierRule {
 }
 
 function writeCondition(node: FilterCondition): TierCondition {
-  const raw = rawOf<TierCondition>(node);
+  const raw = node.id === TIER_CONDITION_ID ? rawOf<TierCondition>(node) : undefined;
   if (isPristine(node) && raw) return raw;
   return {
     ...raw,
@@ -180,19 +190,31 @@ export function modelPricingCodec(): FilterCodec<ModelPricingFilter> {
       if (isTreePristine(tree) && raw) return raw;
       let condition: TierCondition | null = null;
       const rules: TierRule[] = [];
-      for (const node of tree.items.flatMap((item) =>
+      const nodes = tree.items.flatMap((item) =>
         item.kind === "group" ? leafConditions(item) : [item],
-      )) {
+      );
+      const representable = (node: FilterNode) =>
+        node.kind === "raw" ||
+        (node.kind === "condition" && Object.hasOwn(CONDITION_OPERATORS, node.operator));
+      // The saved condition keeps its slot wherever a new line was inserted.
+      const keepsCondition = nodes.some(
+        (node) => node.id === TIER_CONDITION_ID && representable(node),
+      );
+      for (const node of nodes) {
         if (node.kind === "raw") {
           if (node.id === TIER_CONDITION_ID) condition = rawOf<TierCondition>(node)!;
           else rules.push(rawOf<TierRule>(node)!);
           continue;
         }
         const usage = isUsageField(context, node.field);
+        // Only a new line may claim the free slot by its field; a saved rule moves only for = / !=, which no rule holds.
+        const claims = savedRuleOf(node)
+          ? TIER_CONDITION_ONLY.includes(node.operator)
+          : usage || TIER_CONDITION_ONLY.includes(node.operator);
         const isCondition =
           !condition &&
-          (node.id === TIER_CONDITION_ID || usage || TIER_CONDITION_ONLY.includes(node.operator)) &&
-          Object.hasOwn(CONDITION_OPERATORS, node.operator);
+          (node.id === TIER_CONDITION_ID || (!keepsCondition && claims)) &&
+          representable(node);
         if (isCondition) condition = writeCondition(node);
         else rules.push(writeRule(node, usage && !node.field.startsWith("usage.")));
       }
