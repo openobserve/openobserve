@@ -172,7 +172,8 @@
 
           <p
             v-if="nameClash"
-            class="text-status-warning-text text-xs"
+            class="text-status-error-text text-xs"
+            role="alert"
             data-test="oncall-schedule-name-clash"
           >
             {{ nameClash }}
@@ -649,9 +650,7 @@ const wouldDiscardEdits = computed(() => {
   return JSON.stringify(rotation) !== openedAs.value;
 });
 
-/// Two rotations with one name is a screen where "page the Secondary" names
-/// two things. The server keys on the id, so this is a legibility rule rather
-/// than a storage one — which is why it warns rather than blocks.
+/// Blocks Save: two rotations with one name make every level, menu and cover that names one ambiguous.
 const nameClash = computed<I18nText | "">(() => {
   const rotation = active.value;
   if (!rotation) return "";
@@ -677,6 +676,7 @@ const scheduleWrite = useMutation(() => setTeamScheduleMutation(orgId.value, pro
 const activeIsSavable = computed(() => {
   const rotation = active.value;
   if (!rotation?.name?.trim()) return false;
+  if (nameClash.value) return false;
   if (!rotation.shift_rules.length) return false;
   if (rotation.shift_rules.some((rule) => !rule.members.length)) return false;
   // The server refuses a From == To window outright.

@@ -64,6 +64,7 @@ export class OnCallCoveragePage {
       rotation: '[data-test="oncall-cover-rotation"]',
       window: '[data-test="oncall-cover-window"]',
       summary: '[data-test="oncall-cover-summary"]',
+      holder: '[data-test="oncall-cover-holder"]',
       swapA: '[data-test="oncall-swap-a"]',
       swapB: '[data-test="oncall-swap-b"]',
       swapSummary: '[data-test="oncall-swap-summary"]',
@@ -72,6 +73,7 @@ export class OnCallCoveragePage {
       // the cover list
       coverList: '[data-test="oncall-cover-list"]',
       coverTable: '[data-test="oncall-cover-table"]',
+      coverListZone: '[data-test="oncall-cover-list-zone"]',
       coverRemoveDialog: '[data-test="oncall-cover-remove-dialog"]',
 
       // the schedule bar and its plain-words answer

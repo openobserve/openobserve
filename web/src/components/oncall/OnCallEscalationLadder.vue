@@ -200,9 +200,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ raw(seat) }}
                 </OTag>
               </template>
-              <span v-if="group.count > 1" class="text-text-secondary text-xs">
-                {{ t("oncall.ladderRepeatsUntil", { to: durationLabel(group.lastMicros) }) }}
-              </span>
               <!-- Only when something is wrong, as a badge; the server's sentence is one hover away. -->
               <OTag
                 v-if="problems[group.firstMicros]"
@@ -479,50 +476,18 @@ function delayLabel(afterMicros: number): I18nText {
 
 interface RungGroup {
   key: string;
-  /** The first rung in the run — every rung it absorbs reads identically. */
   rung: PreviewRung;
-  count: number;
   firstMicros: number;
-  lastMicros: number;
 }
 
-/// What makes two rungs the same finding: who they aim at, who that resolves
-/// to, and whether each of those people is reachable. Delay is deliberately
-/// absent — that is the axis being folded, not part of the match.
-function rungSignature(rung: PreviewRung): string {
-  const people = rung.recipients
-    .map((one) => `${one.user_email}:${one.would_a_page_land}:${one.why_not ?? ""}`)
-    .join(",");
-  return JSON.stringify([rung.targets, people, rung.resolves_to_nobody]);
-}
-
-/// Consecutive rungs sharing a signature fold into one row. A ladder that
-/// pages the same unreachable people every 5 minutes for half an hour is one
-/// fact — "still nobody" — not six rows saying it again.
-const rungGroups = computed<RungGroup[]>(() => {
-  const rungs = preview.value?.rungs ?? [];
-  const out: RungGroup[] = [];
-  let previousSignature: string | null = null;
-
-  for (const rung of rungs) {
-    const signature = rungSignature(rung);
-    const last = out[out.length - 1];
-    if (last && signature === previousSignature) {
-      last.count += 1;
-      last.lastMicros = rung.after_micros;
-    } else {
-      out.push({
-        key: `${rung.after_micros}`,
-        rung,
-        count: 1,
-        firstMicros: rung.after_micros,
-        lastMicros: rung.after_micros,
-      });
-    }
-    previousSignature = signature;
-  }
-  return out;
-});
+/// One row per configured step, so the rows always count what the priority chip says.
+const rungGroups = computed<RungGroup[]>(() =>
+  (preview.value?.rungs ?? []).map((rung) => ({
+    key: `${rung.after_micros}`,
+    rung,
+    firstMicros: rung.after_micros,
+  })),
+);
 
 /// The seat a target names: a rotation's name for its on-call, the engine's own words otherwise.
 function seatOf(target: string): string {

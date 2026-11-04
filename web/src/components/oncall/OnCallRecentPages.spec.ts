@@ -121,17 +121,24 @@ describe("OnCallRecentPages", () => {
     expect(subject(render([page()])).size).toBe(200);
   });
 
-  it("shows the newest few with no count line beside the title", () => {
+  it("says how many of the window's pages the capped list shows", () => {
     const wrapper = render(
       Array.from({ length: 6 }, (_, i) => page({ id: `p${i}`, opened_at: OPENED - i * MINUTE })),
     );
 
     expect(rows(wrapper)).toHaveLength(3);
-    const header = wrapper.find('[data-test="oncall-recent-pages"] > div');
-    expect(header.findAll(":scope > *").map((el) => el.text())).toEqual([
-      "Recent pages",
-      "View all in On-Call",
-    ]);
+    expect(wrapper.find('[data-test="oncall-recent-pages-window"]').text()).toBe(
+      "3 of 6 in the last 7 days",
+    );
+  });
+
+  it("states the plain count when nothing is cut, and nothing while loading", async () => {
+    const wrapper = render([page({ id: "only" })], { windowDays: 14 });
+    expect(wrapper.find('[data-test="oncall-recent-pages-window"]').text()).toBe(
+      "1 in the last 14 days",
+    );
+    await wrapper.setProps({ loading: true });
+    expect(wrapper.find('[data-test="oncall-recent-pages-window"]').exists()).toBe(false);
   });
 
   it("orders newest first regardless of the order it was handed", () => {

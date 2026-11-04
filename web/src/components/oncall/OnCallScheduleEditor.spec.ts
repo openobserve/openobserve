@@ -558,6 +558,45 @@ describe("OnCallScheduleEditor", () => {
     ).toBeUndefined();
   });
 
+  // Handover and active hours are wall times on the team's clock, so both say which.
+  it("names the team's zone beside the handover time and the active hours", async () => {
+    const wrapper = render({
+      schedule: schedule([rota("Primary")]),
+      timezone: "Asia/Kolkata",
+      drawerOnly: true,
+      intent: { mode: "edit", id: "rot_primary" },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-schedule-handover-0-zone"]').text()).toBe(
+      "Asia/Kolkata",
+    );
+    expect(wrapper.find('[data-test="oncall-schedule-covers-0-zone"]').text()).toBe("Asia/Kolkata");
+  });
+
+  /// A name two rotations share makes every menu, cover and level naming it ambiguous, so it cannot be saved.
+  it("blocks saving a rotation renamed to another rotation's name, and says why", async () => {
+    const wrapper = render({
+      schedule: schedule([rota("Primary"), rota("Secondary")]),
+      drawerOnly: true,
+      intent: { mode: "edit", id: "rot_secondary" },
+    });
+    await flushPromises();
+    const done = () => wrapper.find('[data-test="oncall-rotation-done"]');
+    expect(done().attributes("disabled")).toBeUndefined();
+
+    await wrapper.findComponent({ name: "OInput" }).vm.$emit("update:modelValue", " primary ");
+    await flushPromises();
+    expect(done().attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="oncall-schedule-name-clash"]').text()).toBe(
+      "Another rotation is already called Primary. Pick a different name to save.",
+    );
+
+    await wrapper.findComponent({ name: "OInput" }).vm.$emit("update:modelValue", "Backup");
+    await flushPromises();
+    expect(done().attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="oncall-schedule-name-clash"]').exists()).toBe(false);
+  });
+
   /// Nothing in this drawer can add a person, so the empty picker has to hand
   /// the reader to the one screen that can.
   it("sends the reader to the roster from inside the drawer", async () => {

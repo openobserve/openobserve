@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #legend>
-        <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span class="flex w-full flex-wrap items-center gap-x-4 gap-y-1">
           <span
             v-for="entry in legend"
             :key="entry.key"
@@ -123,6 +123,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="size-2 rounded-full" :class="entry.swatch" aria-hidden="true" />
             {{ entry.label }}
           </span>
+          <OText variant="meta" class="ms-auto" data-test="oncall-coverage-zone">
+            {{ t("oncall.timesInZone", { zone: raw(timezone) }) }}
+          </OText>
         </span>
       </template>
     </OScheduleTimeline>
@@ -147,6 +150,7 @@ import type { Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import OText from "@/lib/core/Typography/OText.vue";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { formatInZone, resolveHolder, wallTimeInZone } from "@/utils/oncall";
 
@@ -355,9 +359,11 @@ function tooltipFor(bandKey: string): TooltipSegment[] {
   const rows: TooltipSegment[] = shown.map((segment) => ({
     key: `${segment.from}`,
     range: showRange
-      ? raw(
-          `${rangeStamp(Math.max(segment.from, run.from))} – ${rangeStamp(Math.min(segment.to, run.to))}`,
-        )
+      ? t("oncall.shiftBandTipRangeZoned", {
+          from: raw(rangeStamp(Math.max(segment.from, run.from))),
+          to: raw(rangeStamp(Math.min(segment.to, run.to))),
+          zone: raw(props.timezone),
+        })
       : null,
     primary: t("oncall.coveragePrimaryOnly", { primary: tooltipOf(segment.primary ?? "") }),
     secondary: segment.secondary

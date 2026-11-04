@@ -26,6 +26,9 @@ import oncallService from "@/services/oncall";
 import { oncallKeys } from "@/services/oncall.querykeys";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { userKeys } from "@/services/users.querykeys";
+import { orgUsersQuery } from "@/services/users.queries";
+import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { ok } from "@/test/unit/helpers/mockService";
 import store from "@/test/unit/helpers/store";
 import type { UpcomingShift } from "@/components/oncall/OnCallCoverForm.vue";
@@ -85,7 +88,6 @@ vi.mock("vue-router", () => ({
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 import analytics from "@/services/product_analytics";
-import shiftParity from "../../../../src/config/src/meta/oncall/shift_parity.json";
 
 const service = vi.mocked(oncallService);
 
@@ -404,7 +406,12 @@ describe("OnCallTeamDetail", () => {
       const wrapper = render();
       await flushPromises();
 
-      expect(chip(wrapper)).toContain("On call but can't be reached");
+      expect(chip(wrapper)).toContain("Rostered, unreachable");
+      const tag = wrapper
+        .findAllComponents({ name: "OTag" })
+        .find((one) => one.props("type") === "oncallCoverage")!;
+      expect(tag.props("value")).toBe("allunreachable");
+      expect(resolveBadge("oncallCoverage", "allunreachable").variant).toBe("error-soft");
     });
 
     // Green only when every holder can be paged, so the chip agrees with the banner naming the one who cannot.
@@ -667,45 +674,54 @@ describe("OnCallTeamDetail", () => {
       expect(service.listOverrides.mock.calls.length).toBeGreaterThan(before);
     });
 
-    // Swap covers are stored at the handovers the server counts in the team's zone.
-    it("offers swap shifts at the team-zone handovers the server uses", async () => {
-      const c = shiftParity[0];
-      const now = vi.spyOn(Date, "now").mockReturnValue(c.at_micros / 1000);
-      service.getTeam.mockResolvedValue(
-        ok({ id: "team_1", name: "Platform", timezone: c.timezone }),
-      );
+    // The resolved schedule already drops hours outside a rule's active window and the covers on top.
+    it("offers swap shifts from the resolved schedule, without gaps or covers", async () => {
+      const HOUR = 3_600_000_000;
+      const base = Math.floor((Date.now() * 1000) / HOUR) * HOUR;
       service.getSchedule.mockResolvedValue(
-        ok({
-          timezone: c.timezone,
-          rotations: [
-            {
-              id: "rot_1",
-              name: "Primary",
-              shift_rules: [
+        ok({ timezone: "UTC", rotations: [rotation("rot_1", "Primary")] }),
+      );
+      service.resolvedSchedule.mockImplementation(async (args) =>
+        ok(
+          args.from === base
+            ? [
                 {
-                  name: "Base",
-                  members: c.members,
-                  shift_micros: c.shift_micros,
-                  anchor_micros: c.anchor_micros,
+                  rotation_id: "rot_1",
+                  from: base,
+                  to: base + 8 * HOUR,
+                  user_email: "ana@corp.com",
                 },
-              ],
-            },
-          ],
-        }),
+                { rotation_id: "rot_1", from: base + 8 * HOUR, to: base + 24 * HOUR },
+                {
+                  rotation_id: "rot_1",
+                  from: base + 24 * HOUR,
+                  to: base + 32 * HOUR,
+                  user_email: "bo@corp.com",
+                  override_id: "ov_9",
+                },
+                {
+                  rotation_id: "rot_1",
+                  from: base + 48 * HOUR,
+                  to: base + 56 * HOUR,
+                  user_email: "bo@corp.com",
+                },
+              ]
+            : [],
+        ),
       );
       const wrapper = render();
       await flushPromises();
-      wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await wrapper.find('[data-test="oncall-team-override-btn"]').trigger("click");
       await flushPromises();
-      const [first] = wrapper
+
+      const shifts = wrapper
         .findComponent({ name: "OnCallCoverForm" })
         .props("shifts") as UpcomingShift[];
-      now.mockRestore();
-      expect(first).toMatchObject({
-        startMicros: c.shift_start,
-        endMicros: c.next_handover,
-        member: c.holder,
-      });
+      expect(shifts.map((one) => [one.member, one.startMicros, one.endMicros])).toEqual([
+        ["ana@corp.com", base, base + 8 * HOUR],
+        ["bo@corp.com", base + 48 * HOUR, base + 56 * HOUR],
+      ]);
+      service.resolvedSchedule.mockReset();
     });
 
     /// A swap is two covers written back to back, so it invalidates exactly
@@ -747,6 +763,34 @@ describe("OnCallTeamDetail", () => {
       // " covers  · " — the shape the sentence collapses to when vue-i18n is
       // handed no params for its placeholders.
       expect(message).not.toMatch(/^\s*covers\s/);
+    });
+
+    it("names the person by display name in the success toast", async () => {
+      queryClient.setQueryData(orgUsersQuery("default").queryKey, [
+        { email: "bo@corp.com", first_name: "Bo", last_name: "Lin" },
+      ]);
+      service.createOverride.mockResolvedValue(ok({ id: "ov_1" }));
+      const wrapper = render();
+      await flushPromises();
+      await save(wrapper);
+
+      const message = String(toasted.mock.calls.at(-1)?.[0]?.message ?? "");
+      expect(message).toMatch(/^Bo Lin covers Platform/);
+      queryClient.removeQueries({ queryKey: orgUsersQuery("default").queryKey });
+    });
+
+    it("passes covering_for through to the write", async () => {
+      service.createOverride.mockResolvedValue(ok({ id: "ov_1" }));
+      const wrapper = render();
+      await flushPromises();
+      wrapper
+        .findComponent({ name: "OnCallCoverForm" })
+        .vm.$emit("save", { ...COVER, covering_for: "ana@corp.com" });
+      await flushPromises();
+
+      expect(service.createOverride).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { ...COVER, covering_for: "ana@corp.com" } }),
+      );
     });
 
     it("tracks oncall_override_created as a cover once it is saved", async () => {
@@ -1738,6 +1782,7 @@ describe("OnCallTeamDetail", () => {
 
   describe("acting on a shift bar", () => {
     const WEEK = 604_800_000_000;
+    const DAY_MICROS = 86_400_000_000;
     const DialogStub = {
       name: "ODialog",
       props: ["open"],
@@ -1814,30 +1859,76 @@ describe("OnCallTeamDetail", () => {
       ]);
     });
 
-    /// The real form, not a stub: the swap it opens on is the clicked shift's week.
-    it("opens the real cover form on Swap with the clicked week chosen", async () => {
+    /// The real form, not a stub: a shift far beyond the next few still opens the swap on itself.
+    it("opens the real cover form on Swap with a far-off clicked shift chosen", async () => {
       const { wrapper, timeline } = await onSchedule({
         OnCallCoverForm: false,
         ODialog: DialogStub,
       });
-      const [shift] = wrapper
-        .findComponent({ name: "OnCallCoverForm" })
-        .props("shifts") as UpcomingShift[];
       expect(timeline.props("swapRotations")).toEqual(["rot_1"]);
-
-      timeline.vm.$emit(
-        "shift-action",
-        "swap",
-        future({ from: shift.startMicros, to: shift.endMicros }),
+      const far = future({ from: Date.now() * 1000 + 15 * DAY_MICROS });
+      far.to = far.from + DAY_MICROS;
+      const next = { ...far, from: far.to, to: far.to + DAY_MICROS, user_email: "bo@o2.ai" };
+      service.resolvedSchedule.mockImplementation(async (args) =>
+        ok(args.from === far.from ? [far, next] : []),
       );
+
+      timeline.vm.$emit("shift-action", "swap", far);
       await flushPromises();
 
       expect(wrapper.find('[data-test="oncall-swap-form"]').exists()).toBe(true);
-      expect(
-        (wrapper.findComponent('[data-test="oncall-swap-a"]') as AnyPropsWrapper).props(
-          "modelValue",
-        ),
-      ).toBe(`rot_1:${shift.startMicros}`);
+      const first = wrapper.findComponent('[data-test="oncall-swap-a"]') as AnyPropsWrapper;
+      expect(first.props("modelValue")).toBe(`rot_1:${far.from}`);
+      const options = first.props("options") as { value: string; label: string }[];
+      expect(options.map((one) => one.value)).toEqual([`rot_1:${far.from}`, `rot_1:${next.from}`]);
+      expect(String(options[0].label)).toMatch(/\d{2}:\d{2}/);
+      service.resolvedSchedule.mockReset();
+      service.resolvedSchedule.mockResolvedValue(ok([]));
+    });
+
+    /// The calendar's read stops at its window, so a band touching the edge is a cut, not the shift's end.
+    it.each([
+      ["week", 7],
+      ["day", 1],
+    ])("covers a shift cut at the %s view's edge until its real end", async (_view, days) => {
+      const { wrapper, timeline } = await onSchedule();
+      const now = Date.now() * 1000;
+      const windowTo = now + days * DAY_MICROS;
+      timeline.vm.$emit("update:window", { from: now - DAY_MICROS, to: windowTo });
+      await flushPromises();
+      const drawn = future({ to: windowTo });
+      const realEnd = drawn.from + 7 * DAY_MICROS;
+      service.resolvedSchedule.mockImplementation(async (args) =>
+        ok(args.from === drawn.from ? [{ ...drawn, to: realEnd }] : []),
+      );
+
+      timeline.vm.$emit("shift-action", "cover", drawn);
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallCoverForm" }).props("gap")).toEqual({
+        from: drawn.from,
+        to: realEnd,
+      });
+      service.resolvedSchedule.mockReset();
+      service.resolvedSchedule.mockResolvedValue(ok([]));
+    });
+
+    it("hands the cover form the clicked shift's holder and everyone on call now", async () => {
+      service.whoIsOnCall.mockResolvedValue(
+        ok([
+          { rotation_id: "rot_1", rotation_name: "Primary", rule: "Base", user_email: "bo@o2.ai" },
+        ]),
+      );
+      const { wrapper, timeline } = await onSchedule();
+      timeline.vm.$emit("shift-action", "cover", future());
+      await flushPromises();
+      const cover = wrapper.findComponent({ name: "OnCallCoverForm" });
+      expect(cover.props("currentHolder")).toBe("ana@o2.ai");
+      expect(cover.props("positions")).toMatchObject([{ user_email: "bo@o2.ai" }]);
+
+      await wrapper.find('[data-test="oncall-team-override-btn"]').trigger("click");
+      await flushPromises();
+      expect(cover.props("currentHolder")).toBe(null);
     });
 
     /// The real away dialog: opened on the shift's person and window, and saved against them.
@@ -1944,6 +2035,32 @@ describe("OnCallTeamDetail", () => {
         "1 priority from P1–P3 pages nobody",
       );
     });
+  });
+
+  /// The card shows three; its link must land on this team's pages, not the whole org's.
+  it("opens the Pages list filtered to this team from the Recent pages card", async () => {
+    const opened = Date.now() * 1000;
+    service.listResponses.mockResolvedValue(
+      ok(
+        Array.from({ length: 5 }, (_, i) => ({
+          id: `r${i}`,
+          opened_at: opened - i,
+          subject: { source_id: `a${i}` },
+          state: "open",
+          priority: 1,
+        })),
+      ),
+    );
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-recent-pages-window"]').text()).toBe(
+      "3 of 5 in the last 7 days",
+    );
+    await wrapper.find('[data-test="oncall-recent-pages-view-all"]').trigger("click");
+    expect(router.push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallResponses" }));
+    expect(useListViewState("oncall-responses", { teamFilter: "all" }).teamFilter).toBe("team_1");
+    resetListViewState("oncall-responses");
   });
 
   it("counts the same routing rules in the header as the Routing tab lists", async () => {
