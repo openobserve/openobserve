@@ -69,3 +69,28 @@ export function swappableRuns(
       rotationName: rotation.name,
     }));
 }
+
+/** Identifies one drawn segment, so a span looked up for it can be found again. [pure] */
+export function segmentSpanKey(
+  segment: Pick<ResolvedSegment, "rotation_id" | "from" | "to">,
+): string {
+  return `${segment.rotation_id}:${segment.from}:${segment.to}`;
+}
+
+/** Who holds any of `window`, in order, and the one person holding all of it with no gap, if any. [pure] */
+export function holdersOver(
+  runs: readonly ResolvedSegment[],
+  window: { from: number; to: number },
+): { people: string[]; sole: string | null } {
+  const inside = runs
+    .filter((run) => run.to > window.from && run.from < window.to)
+    .sort((a, b) => a.from - b.from);
+  const people = [...new Set(inside.map((run) => run.user_email ?? "").filter(Boolean))];
+  if (people.length !== 1) return { people, sole: null };
+  let reached = window.from;
+  for (const run of inside) {
+    if (run.from > reached || !run.user_email) return { people, sole: null };
+    reached = Math.max(reached, run.to);
+  }
+  return { people, sole: reached >= window.to ? people[0] : null };
+}

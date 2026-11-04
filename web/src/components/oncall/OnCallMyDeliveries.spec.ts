@@ -678,6 +678,15 @@ describe("OnCallMyDeliveries", () => {
     expect(history(wrapper).text()).toMatch(/\d{4}, \d{2}:\d{2}/);
   });
 
+  it("dates an open page with its clock time, as History does", async () => {
+    answer([delivery({ response_state: "triggered" })]);
+    const wrapper = render();
+    await flushPromises();
+
+    const sent = wrapper.find('[data-test="oncall-my-deliveries-sent-at"]');
+    expect(sent.text()).toMatch(/\d{4}, \d{2}:\d{2}/);
+  });
+
   /// Nothing to page through, so no pager under a handful of rows.
   it("hides the pager while every row fits on one page", async () => {
     answer([delivery()]);

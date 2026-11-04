@@ -278,6 +278,7 @@
               :can-mark-away="canConfigure"
               :self-email="selfEmail"
               :swap-rotations="swapRotationIds"
+              :shift-spans="shiftSpans"
               @fill-gap="onFillGap"
               @add="openScheduleEditor({ mode: 'new' })"
               @edit="openScheduleEditor({ mode: 'edit', id: $event })"
@@ -443,6 +444,7 @@
       :default-rotation="coverRotation"
       :default-mode="coverMode"
       :swap-from="coverSwapFrom"
+      :resolve-runs="resolveCoverRuns"
       @save="saveCover"
       @swap="saveSwap"
     />
@@ -495,6 +497,7 @@ import { useOnCallDefaultTeam } from "@/composables/useOnCallDefaultTeam";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { useListViewState } from "@/composables/useListViewState";
 import {
+  segmentSpanKey,
   shiftAround,
   shiftLookupWindow,
   SHIFT_LOOKUP_MICROS,
@@ -606,6 +609,8 @@ const insightsCheckedAt = ref<number | null>(null);
 const teamLoad = ref<TeamLoad | null>(null);
 const segments = ref<ResolvedSegment[]>([]);
 const segmentsLoading = ref(false);
+/// The whole shift behind each band the calendar's edges cut, keyed by `segmentSpanKey`.
+const shiftSpans = ref<Record<string, { from: number; to: number }>>({});
 /// Read or edit, never both — the editor brings its own calendar and table.
 
 /// What the drawer opens on. One click lands on the rotation the user pointed
@@ -1147,6 +1152,7 @@ async function fetchSegments(force = false) {
         rotation_id: segment.rotation_id || rotations[index].id,
       })),
     );
+    void fetchShiftSpans(segments.value);
   } catch (err: unknown) {
     if (readId !== latestSegmentsRead) return;
     segments.value = [];
@@ -1276,6 +1282,26 @@ async function openCoverDialog(opts: {
   coverSwapFrom.value = opts.swapFrom ?? null;
   coverHolder.value = opts.holder ?? null;
   coverOpen.value = true;
+}
+
+function resolveCoverRuns(rotationId: string, from: number, to: number) {
+  return read<ResolvedSegment[]>(
+    resolvedScheduleQuery(orgId.value, teamId.value, from, to, rotationId),
+    false,
+  );
+}
+
+let latestSpansRead = 0;
+
+/// Only bands cut by the calendar's edges need a second read, at most two per rotation.
+async function fetchShiftSpans(list: ResolvedSegment[]) {
+  const readId = ++latestSpansRead;
+  const window = scheduleWindow.value;
+  const cut = list.filter((segment) => segment.user_email && shiftLookupWindow(segment, window));
+  const entries = await Promise.all(
+    cut.map(async (segment) => [segmentSpanKey(segment), await realSpan(segment)] as const),
+  );
+  if (readId === latestSpansRead) shiftSpans.value = Object.fromEntries(entries);
 }
 
 /// From now, never from a shift's past: a cover or an absence over hours that are gone pages nobody.

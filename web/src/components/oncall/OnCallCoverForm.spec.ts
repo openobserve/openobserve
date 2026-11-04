@@ -385,7 +385,7 @@ describe("OnCallCoverForm — swapping", () => {
     await intoSwapMode(wrapper);
 
     await pick(wrapper, 0, 0); // ana's first week
-    await pick(wrapper, 1, 1); // bo's week
+    await pick(wrapper, 1, 0); // bo's week
     await wrapper.find('[data-test="dialog-primary"]').trigger("click");
 
     const swap = wrapper.emitted("swap")?.[0]?.[0] as any;
@@ -416,7 +416,7 @@ describe("OnCallCoverForm — swapping", () => {
     ]);
     await intoSwapMode(wrapper);
     await pick(wrapper, 0, 0);
-    await pick(wrapper, 1, 1);
+    await pick(wrapper, 1, 0);
     await wrapper.find('[data-test="dialog-primary"]').trigger("click");
 
     const swap = wrapper.emitted("swap")?.[0]?.[0] as any;
@@ -443,7 +443,7 @@ describe("OnCallCoverForm — swapping", () => {
     ]);
     await intoSwapMode(wrapper);
     await pick(wrapper, 0, 0);
-    await pick(wrapper, 1, 1);
+    await pick(wrapper, 1, 0);
 
     expect(wrapper.find('[data-test="oncall-swap-problem"]').text()).toContain("same rotation");
     expect(wrapper.find('[data-test="oncall-swap-summary"]').exists()).toBe(false);
@@ -455,7 +455,7 @@ describe("OnCallCoverForm — swapping", () => {
     const wrapper = render();
     await intoSwapMode(wrapper);
     await pick(wrapper, 0, 0);
-    await pick(wrapper, 1, 1);
+    await pick(wrapper, 1, 0);
 
     const text = wrapper.find('[data-test="oncall-swap-summary"]').text();
     expect(text).toContain("bo@o2.ai takes ana@o2.ai's shift");
@@ -468,7 +468,7 @@ describe("OnCallCoverForm — swapping", () => {
     const wrapper = render();
     await intoSwapMode(wrapper);
     await pick(wrapper, 0, 0); // ana
-    await pick(wrapper, 1, 2); // ana again
+    await pick(wrapper, 1, 1); // ana again
 
     expect(wrapper.find('[data-test="oncall-swap-problem"]').text()).toContain("changes nothing");
     expect(wrapper.find('[data-test="oncall-swap-summary"]').exists()).toBe(false);
@@ -477,17 +477,17 @@ describe("OnCallCoverForm — swapping", () => {
     expect(wrapper.emitted("swap")).toBeFalsy();
   });
 
-  it("refuses a shift swapped with itself", async () => {
+  it("does not offer the picked shift as its own partner", async () => {
     const wrapper = render();
     await intoSwapMode(wrapper);
     await pick(wrapper, 0, 1);
-    await pick(wrapper, 1, 1);
 
-    expect(wrapper.find('[data-test="oncall-swap-problem"]').text()).toContain(
-      "cannot swap with itself",
-    );
-    await wrapper.find('[data-test="dialog-primary"]').trigger("click");
-    expect(wrapper.emitted("swap")).toBeFalsy();
+    const partners = wrapper
+      .findAll("select")[1]
+      .findAll("option")
+      .map((o) => o.element.value);
+    expect(partners).toHaveLength(SHIFTS.length - 1);
+    expect(partners).not.toContain(wrapper.findAll("select")[0].element.value);
   });
 
   /// The dialog had NO footer at all: it passed `primary-label` and
@@ -857,6 +857,67 @@ describe("OnCallCoverForm — taking a cover", () => {
       const wrapper = renderCover({ gap: GAP, currentHolder: "ana@o2.ai" });
       await flushPromises();
       expect(((await save(wrapper)) as Record<string, unknown>).covering_for).toBeUndefined();
+    });
+
+    describe("following the picked window", () => {
+      const run = (user_email: string | null, from: number, to: number) => ({
+        rotation_id: "rot_s",
+        from,
+        to,
+        user_email,
+      });
+      const calls: Array<[string, number, number]> = [];
+      /// The clicked shift is raj's; the hand-picked hour is bo's.
+      const resolveRuns = async (rotationId: string, from: number, to: number) => {
+        calls.push([rotationId, from, to]);
+        if (to === PICKED.to) return [run("bo@o2.ai", from - MICROS_PER_HOUR, to)];
+        return [run("raj@o2.ai", from, to)];
+      };
+      const open = (props: Record<string, unknown> = {}) =>
+        renderCover({
+          gap: GAP,
+          rotations: ROTATIONS,
+          positions: POSITIONS,
+          defaultRotation: "rot_s",
+          currentHolder: "raj@o2.ai",
+          resolveRuns,
+          ...props,
+        });
+
+      it("names and relieves whoever holds the window after it changes", async () => {
+        calls.length = 0;
+        const wrapper = open();
+        await flushPromises();
+        expect(holderLine(wrapper).text()).toBe("On call: raj@o2.ai");
+
+        await wrapper.find('[data-test="window-pick"]').trigger("click");
+        await flushPromises();
+        expect(holderLine(wrapper).text()).toBe("On call: bo@o2.ai");
+        expect(calls.at(-1)).toEqual(["rot_s", PICKED.from, PICKED.to]);
+        expect(await save(wrapper)).toMatchObject({ covering_for: "bo@o2.ai" });
+      });
+
+      it("names every holder of a window several share, and relieves nobody", async () => {
+        const split = async (_rotation: string, from: number, to: number) => [
+          run("raj@o2.ai", from, from + MICROS_PER_HOUR),
+          run("bo@o2.ai", from + MICROS_PER_HOUR, to),
+        ];
+        const wrapper = open({ resolveRuns: split });
+        await flushPromises();
+        expect(holderLine(wrapper).text()).toBe("On call: raj@o2.ai, bo@o2.ai");
+        expect(((await save(wrapper)) as Record<string, unknown>).covering_for).toBeUndefined();
+      });
+
+      it("relieves nobody when part of the window has no holder", async () => {
+        const holed = async (_rotation: string, from: number, to: number) => [
+          run("raj@o2.ai", from, from + MICROS_PER_HOUR),
+          run(null, from + MICROS_PER_HOUR, to),
+        ];
+        const wrapper = open({ resolveRuns: holed });
+        await flushPromises();
+        expect(holderLine(wrapper).text()).toBe("On call: raj@o2.ai");
+        expect(((await save(wrapper)) as Record<string, unknown>).covering_for).toBeUndefined();
+      });
     });
 
     it("shows no holder line when nobody is known to be on call", async () => {

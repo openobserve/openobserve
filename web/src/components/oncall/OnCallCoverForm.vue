@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         v-model="swapB"
         :label="t('oncall.swapSecondShift')"
-        :options="shiftOptions"
+        :options="swapWithOptions"
         data-test="oncall-swap-b"
       />
 
@@ -114,14 +114,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <i18n-t
-        v-if="holder"
+        v-if="holders.length"
         keypath="oncall.coverHolderLine"
         tag="p"
         scope="global"
         class="text-text-secondary text-sm"
         data-test="oncall-cover-holder"
       >
-        <template #name><OnCallPersonName :email="holder" /></template>
+        <template #name>
+          <template v-for="(email, index) in holders" :key="email">
+            <template v-if="index > 0">{{ raw(", ") }}</template>
+            <OnCallPersonName :email="email" />
+          </template>
+        </template>
       </i18n-t>
 
       <!-- Absolute only: a relative period resolves against the moment it is read, and a cover is forward-looking. -->
@@ -196,7 +201,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import type { OnCallPosition, OnCallTeamMember } from "@/ts/interfaces/oncall";
+import type { OnCallPosition, OnCallTeamMember, ResolvedSegment } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -224,6 +229,7 @@ import {
 import { MAX_AHEAD_MICROS, makeOnCallCoverSchema } from "./OnCallCoverForm.schema";
 import OnCallPersonName from "./OnCallPersonName.vue";
 import OnCallZoneInfo from "./OnCallZoneInfo.vue";
+import { SHIFT_LOOKUP_MICROS, holdersOver } from "./resolvedShifts";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 
 /**
@@ -281,6 +287,9 @@ const props = withDefaults(
     defaultMode?: "cover" | "swap";
     /** Pre-selects the swap's first shift: the one of this rotation running at `at`. */
     swapFrom?: { rotationId: string; at: number } | null;
+    /** Reads the resolved schedule of one rotation, so the holder line and `covering_for` follow the picked window. */
+    resolveRuns?:
+      ((rotationId: string, from: number, to: number) => Promise<ResolvedSegment[]>) | null;
   }>(),
   {
     open: false,
@@ -298,6 +307,7 @@ const props = withDefaults(
     defaultRotation: "",
     defaultMode: "cover",
     swapFrom: null,
+    resolveRuns: null,
   },
 );
 
@@ -443,8 +453,8 @@ const rotationValue = form.useStore(
   (state: { values: OnCallCoverFormValues }) => state.values.rotation_id,
 );
 
-/// The clicked shift's person while its rotation is still the one picked; otherwise whoever that rotation has on now.
-const holder = computed<string>(() => {
+/// Fallback without a resolved read: the clicked shift's person while its rotation is still picked, else whoever it has on now.
+const fallbackHolder = computed<string>(() => {
   const rotation = String(rotationValue.value ?? "");
   if (props.currentHolder && (!props.defaultRotation || rotation === props.defaultRotation)) {
     return props.currentHolder;
@@ -453,6 +463,63 @@ const holder = computed<string>(() => {
     props.positions.find((one) => one.rotation_id === rotation) ??
     (props.rotations.length <= 1 ? props.positions[0] : undefined);
   return position?.user_email ?? "";
+});
+
+/// Who the resolved schedule puts on the picked rotation over the picked window, tagged with the read it answers.
+const windowHolders = ref<{ key: string; people: string[]; sole: string | null } | null>(null);
+
+const holderQuery = computed<{ key: string; rotation: string; from: number; to: number } | null>(
+  () => {
+    const window = windowValue.value;
+    const rotation = String(rotationValue.value ?? "");
+    if (!props.open || !props.resolveRuns || !rotation) return null;
+    if (typeof window?.from !== "number" || typeof window?.to !== "number") return null;
+    if (window.to <= window.from) return null;
+    return {
+      key: `${rotation}:${window.from}:${window.to}`,
+      rotation,
+      from: window.from,
+      to: window.to,
+    };
+  },
+);
+
+const windowKey = computed<string>(() => holderQuery.value?.key ?? "");
+
+watch(
+  windowKey,
+  async (key) => {
+    const query = holderQuery.value;
+    if (!query || !props.resolveRuns) {
+      windowHolders.value = null;
+      return;
+    }
+    // The server caps one read, so a longer window is read in part and can never prove a sole holder.
+    const readTo = Math.min(query.to, query.from + SHIFT_LOOKUP_MICROS);
+    try {
+      const runs = await props.resolveRuns(query.rotation, query.from, readTo);
+      if (key !== windowKey.value) return;
+      const found = holdersOver(runs, { from: query.from, to: readTo });
+      windowHolders.value = {
+        key,
+        people: found.people,
+        sole: readTo === query.to ? found.sole : null,
+      };
+    } catch {
+      if (key === windowKey.value) windowHolders.value = null;
+    }
+  },
+  { immediate: true },
+);
+
+/// The current read's answer only: a stale one names whoever held the window before it changed.
+const currentHolders = computed(() =>
+  windowHolders.value && windowHolders.value.key === windowKey.value ? windowHolders.value : null,
+);
+
+const holders = computed<string[]>(() => {
+  if (holderQuery.value) return currentHolders.value?.people ?? [];
+  return fallbackHolder.value ? [fallbackHolder.value] : [];
 });
 
 const PRESETS = [
@@ -616,6 +683,14 @@ const shiftOptions = computed(() =>
   })),
 );
 
+/// A shift cannot trade with itself, so the picked one is not offered as its partner.
+const swapWithOptions = computed(() =>
+  shiftOptions.value.filter((option) => option.value !== swapA.value),
+);
+watch(swapA, (picked) => {
+  if (swapB.value === picked) swapB.value = "";
+});
+
 function swapFromKey(): string {
   const from = props.swapFrom;
   if (!from) return "";
@@ -697,6 +772,19 @@ function close() {
   emit("update:open", false);
 }
 
+/// Whose hours the cover takes: only one person holding the whole window, and never the person covering.
+function coveredPerson(user: string): string | undefined {
+  let sole: string | null | undefined = currentHolders.value?.sole;
+  // Without a read, only a clicked shift says whose shift this is; the holder now may not hold the picked hours.
+  if (!holderQuery.value) {
+    sole =
+      props.currentHolder && fallbackHolder.value === props.currentHolder
+        ? props.currentHolder
+        : null;
+  }
+  return sole && sole !== user ? sole : undefined;
+}
+
 /// Where the form's shape becomes the request's shape. The range picker holds
 /// one `window`; the API takes `start_at` and `end_at`. Mapping here — rather
 /// than asking the schema to validate a pair no control renders — is what makes
@@ -708,11 +796,7 @@ function onSubmit(value: OnCallCoverFormValues) {
   const window = value.window;
   if (typeof window?.from !== "number" || typeof window?.to !== "number") return;
   const user = String(value.user_email ?? "");
-  // Only a clicked shift says whose shift this is; the rotation's holder now may not hold the picked hours.
-  const coveringFor =
-    props.currentHolder && holder.value === props.currentHolder && holder.value !== user
-      ? props.currentHolder
-      : undefined;
+  const coveringFor = coveredPerson(user);
   emit("save", {
     user_email: user,
     start_at: window.from,

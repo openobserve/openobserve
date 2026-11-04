@@ -78,13 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTruncatedText>
           </template>
           <template #cell-at="{ row }">
-            <OTimeCell
-              :value="row.at"
-              unit="us"
-              mode="relative"
-              :timezone="store.state.timezone"
-              :empty-label="raw('—')"
-            />
+            <span class="whitespace-nowrap tabular-nums" data-test="oncall-my-deliveries-sent-at">
+              {{ row.at ? raw(clock(row.at)) : raw("—") }}
+            </span>
           </template>
           <template #cell-row-actions="{ row }">
             <div class="flex items-center justify-center">
@@ -287,7 +283,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -526,7 +521,7 @@ const openColumns = computed<OTableColumnDef<MyDelivery>[]>(() => [
   },
   { id: "state", header: t("oncall.myDeliveriesStatus"), size: 128, sortable: false },
   { id: "team", header: t("oncall.team"), size: 160, sortable: false },
-  { id: "at", header: t("oncall.myDeliveriesSent"), size: 120, sortable: false },
+  { id: "at", header: t("oncall.myDeliveriesSent"), size: 176, sortable: false },
   // Not `isAction`: a pinned column draws a divider that reads as a stray border on a table with nothing to scroll past.
   {
     id: "row-actions",

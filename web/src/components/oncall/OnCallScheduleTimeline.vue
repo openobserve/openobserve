@@ -70,16 +70,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
 
       <!-- Only when the reader is elsewhere: a handover time is ambiguous only then. -->
-      <OTag
-        v-if="zoneDiffers"
-        variant="default-outline"
-        size="sm"
-        icon="schedule"
-        data-test="oncall-timeline-zone"
-      >
-        {{ raw(timezone) }}
-        <OTooltip side="bottom" :content="zoneLine" />
-      </OTag>
+      <OTooltip v-if="zoneDiffers" side="bottom" :content="zoneLine">
+        <OTag
+          variant="default-outline"
+          size="sm"
+          icon="schedule"
+          tabindex="0"
+          class="cursor-help"
+          data-test="oncall-timeline-zone"
+        >
+          {{ raw(timezone) }}
+        </OTag>
+      </OTooltip>
 
       <span class="ms-auto flex flex-wrap items-center gap-2 max-md:ms-0 max-md:w-full">
         <OToggleGroup
@@ -415,6 +417,7 @@ import {
 } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
+import { segmentSpanKey } from "./resolvedShifts";
 
 export type ShiftAction = "cover" | "swap" | "away";
 
@@ -441,6 +444,8 @@ const props = withDefaults(
     selfEmail?: string;
     /** Rotations with upcoming shifts to trade; a shift of any other offers no swap. */
     swapRotations?: string[];
+    /** The whole shift behind a band the window's edges cut, keyed by `segmentSpanKey`. */
+    shiftSpans?: Record<string, { from: number; to: number }>;
   }>(),
   {
     rotations: () => [],
@@ -452,6 +457,7 @@ const props = withDefaults(
     canMarkAway: true,
     selfEmail: "",
     swapRotations: () => [],
+    shiftSpans: () => ({}),
   },
 );
 
@@ -603,7 +609,15 @@ function nextHandover(rotationId: string): number | null {
       segment.from <= nowMicros.value &&
       segment.to > nowMicros.value,
   );
-  return current && endsInWindow(current) ? current.to : null;
+  if (!current) return null;
+  const whole = props.shiftSpans[segmentSpanKey(current)];
+  if (whole) return whole.to;
+  return endsInWindow(current) ? current.to : null;
+}
+
+/// The real start and end of the shift behind a segment, which the window's edges may have cut.
+function realSpanOf(segment: ResolvedSegment): { from: number; to: number } {
+  return props.shiftSpans[segmentSpanKey(segment)] ?? segment;
 }
 
 // A segment ending where the fetch stopped was cut there, so its end says nothing about a handover.
@@ -833,9 +847,10 @@ const tipRange = (start: number, end: number) =>
 function bandTip(bandKey: string): I18nText | undefined {
   const segment = segmentByBand.value.get(bandKey);
   if (segment?.user_email) {
+    const whole = realSpanOf(segment);
     return t("oncall.shiftBandTip", {
       person: tooltipOf(segment.user_email),
-      range: tipRange(segment.from, segment.to),
+      range: tipRange(whole.from, whole.to),
     });
   }
   const absence = props.absences.find((one) => `away-${one.id}` === bandKey);

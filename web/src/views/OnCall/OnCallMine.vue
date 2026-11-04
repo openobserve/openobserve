@@ -387,6 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :gap="coverGap"
       :rotations="coverRotations"
       :default-rotation="coverTeam?.rotationId ?? ''"
+      :resolve-runs="resolveCoverRuns"
       @save="saveCover"
     />
 
@@ -828,6 +829,13 @@ const coverSaving = ref(false);
 const coverWrite = useMutation(() =>
   createOverrideMutation(orgId.value, coverTeam.value?.team_id ?? ""),
 );
+
+function resolveCoverRuns(rotationId: string, from: number, to: number) {
+  return readQuery(
+    resolvedScheduleQuery(orgId.value, coverTeam.value?.team_id ?? "", from, to, rotationId),
+    false,
+  );
+}
 
 /// Opens the team's cover form on the reader's own seat, from now to the end of the shift.
 async function openCover(row: ShiftRow) {

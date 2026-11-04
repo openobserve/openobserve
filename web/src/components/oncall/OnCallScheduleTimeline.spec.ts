@@ -92,7 +92,7 @@ const stubs = {
     template: "<span data-test='band' :data-key='band.key'>{{ band.label }}</span>",
   },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
-  OTooltip: { name: "OTooltip", template: "<span />" },
+  OTooltip: { name: "OTooltip", template: "<span><slot /></span>" },
   OEmptyState: {
     name: "OEmptyState",
     props: ["preset"],
@@ -238,7 +238,10 @@ describe("OnCallScheduleTimeline", () => {
       },
       global: {
         plugins: [i18n, store],
-        stubs: { ...stubs, OTooltip: { name: "OTooltip", props: ["content"], template: "<i />" } },
+        stubs: {
+          ...stubs,
+          OTooltip: { name: "OTooltip", props: ["content"], template: "<i><slot /></i>" },
+        },
       },
     });
     const band = tracksOf(wrapper)[0].bands[0];
@@ -447,6 +450,48 @@ describe("OnCallScheduleTimeline", () => {
     const [band] = tracksOf(wrapper)[0].bands;
     expect(String(band.label)).toContain("on now");
     expect(String(band.label)).not.toContain("until");
+  });
+
+  it("names the handover from the whole shift when the window cut it, as the Day view does", async () => {
+    const cut = seg({ from: start, to: start + DAY });
+    const wrapper = render({
+      segments: [cut],
+      shiftSpans: {
+        [`${cut.rotation_id}:${cut.from}:${cut.to}`]: { from: start - DAY, to: start + 6 * DAY },
+      },
+    });
+    wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "day");
+    await nextTick();
+    expect(wrapper.find('[data-test="oncall-lane-cadence-rot_primary"]').text()).toContain(
+      "hands over",
+    );
+  });
+
+  it("tips a cut band with its whole shift, not the window's edges", () => {
+    const cut = seg({ from: start, to: start + 7 * DAY });
+    const whole = { from: start - 2 * DAY, to: start + 9 * DAY };
+    const wrapper = mount(OnCallScheduleTimeline, {
+      props: {
+        rotations: [rotation("Primary")],
+        segments: [cut],
+        shiftSpans: { [`${cut.rotation_id}:${cut.from}:${cut.to}`]: whole },
+        timezone: "UTC",
+        window: { from: 0, to: 0 },
+        "onUpdate:window": () => {},
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: { ...stubs, OTooltip: { name: "OTooltip", props: ["content"], template: "<i />" } },
+      },
+    });
+    const band = tracksOf(wrapper)[0].bands[0];
+    const tip = wrapper
+      .findAllComponents({ name: "OTooltip" })
+      .find((one) => one.attributes("data-test") === `oncall-shift-tip-${band.key}`);
+    const day = (micros: number) => String(new Date(micros / 1000).getUTCDate());
+    const [from, to] = String(tip!.props("content")).split(" · ")[1].split(" – ");
+    expect(from).toContain(day(whole.from));
+    expect(to).toContain(day(whole.to));
   });
 
   /// Changing the range must move the window, or the control is decoration.
@@ -915,5 +960,29 @@ describe("OnCallScheduleTimeline", () => {
     const chip = render({ timezone: "Asia/Kolkata" }).find('[data-test="oncall-timeline-zone"]');
     expect(chip.text()).toContain("Asia/Kolkata");
     expect(chip.text()).not.toContain("times in");
+  });
+
+  it("opens the zone tip from the whole chip, which takes keyboard focus", () => {
+    const wrapper = mount(OnCallScheduleTimeline, {
+      props: {
+        rotations: [rotation("Primary")],
+        segments: [seg()],
+        timezone: "Asia/Kolkata",
+        window: { from: 0, to: 0 },
+        "onUpdate:window": () => {},
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ...stubs,
+          OTooltip: { name: "OTooltip", props: ["content"], template: "<i><slot /></i>" },
+        },
+      },
+    });
+    const tip = wrapper
+      .findAllComponents({ name: "OTooltip" })
+      .find((one) => one.find('[data-test="oncall-timeline-zone"]').exists());
+    expect(String(tip!.props("content"))).toContain("times in Asia/Kolkata");
+    expect(wrapper.find('[data-test="oncall-timeline-zone"]').attributes("tabindex")).toBe("0");
   });
 });

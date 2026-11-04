@@ -16,6 +16,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  holdersOver,
+  segmentSpanKey,
   SHIFT_LOOKBACK_MICROS,
   SHIFT_LOOKUP_MICROS,
   shiftAround,
@@ -88,5 +90,36 @@ describe("swappableRuns", () => {
   it("caps the list", () => {
     const runs = Array.from({ length: 12 }, (_, i) => seg({ from: i * DAY, to: (i + 1) * DAY }));
     expect(swappableRuns(runs, { id: "rot_1", name: "Primary" }, 0, 8)).toHaveLength(8);
+  });
+});
+
+describe("holdersOver", () => {
+  const window = { from: 10 * DAY, to: 12 * DAY };
+
+  it("names the one person holding the whole window as its sole holder", () => {
+    const runs = [seg({ from: 9 * DAY, to: 11 * DAY }), seg({ from: 11 * DAY, to: 13 * DAY })];
+    expect(holdersOver(runs, window)).toEqual({ people: ["ana@o2.ai"], sole: "ana@o2.ai" });
+  });
+
+  it("lists every holder in order, with no sole holder, when several share it", () => {
+    const runs = [
+      seg({ from: 11 * DAY, to: 12 * DAY, user_email: "bo@o2.ai" }),
+      seg({ from: 10 * DAY, to: 11 * DAY }),
+      seg({ from: 13 * DAY, to: 14 * DAY, user_email: "cy@o2.ai" }),
+    ];
+    expect(holdersOver(runs, window)).toEqual({ people: ["ana@o2.ai", "bo@o2.ai"], sole: null });
+  });
+
+  it("has no sole holder when part of the window is a gap or unread", () => {
+    expect(
+      holdersOver([seg({ to: 11 * DAY }), seg({ from: 11 * DAY, user_email: null })], window).sole,
+    ).toBeNull();
+    expect(holdersOver([seg({ to: 11 * DAY })], window).sole).toBeNull();
+  });
+});
+
+describe("segmentSpanKey", () => {
+  it("tells two rotations' segments over the same hours apart", () => {
+    expect(segmentSpanKey(seg())).not.toBe(segmentSpanKey(seg({ rotation_id: "rot_2" })));
   });
 });
