@@ -96,12 +96,12 @@ describe("SampleDataHeaderChip", () => {
   let wrapper: VueWrapper;
 
   let store: ReturnType<typeof createStore<any>>;
-  const mountChip = (sampleDataFlow = true) => {
+  const mountChip = (sampleDataFlow = true, version = "v0.0.0") => {
     store = createStore({
       state: {
         selectedOrganization: { identifier: ORG },
         kioskMode: false,
-        zoConfig: { sample_data_onboarding_enabled: sampleDataFlow },
+        zoConfig: { version, sample_data_onboarding_enabled: sampleDataFlow },
       },
     });
     wrapper = mount(SampleDataHeaderChip, {
@@ -140,6 +140,15 @@ describe("SampleDataHeaderChip", () => {
       expect(tryBtn().text()).toBe("Try Sample Data");
       await tryBtn().trigger("click");
       expect(loadInDialog).toHaveBeenCalledWith(ORG, undefined);
+    });
+
+    it("offers no Try Sample Data until the full config has loaded, then offers it", async () => {
+      Object.assign(data, { sample: false, own: false });
+      mountChip(true, "");
+      expect(tryBtn().exists()).toBe(false);
+      store.state.zoConfig.version = "v0.0.0";
+      await nextTick();
+      expect(tryBtn().exists()).toBe(true);
     });
 
     it("offers no Try Sample Data when the deployment runs another first-run flow", () => {

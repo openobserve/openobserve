@@ -105,6 +105,8 @@ const shown = computed(() => presence.hasSample.value && !store.state.kioskMode)
 // an empty org gets the way in; once it holds data of its own the header stays clear
 const offerTry = computed(
   () =>
+    // the flow is decided only once the full config has loaded
+    !!store.state.zoConfig?.version &&
     sampleDataFlowOn(store.state.zoConfig) &&
     presence.ready.value &&
     !presence.hasRealData.value &&
