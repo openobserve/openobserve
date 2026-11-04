@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #cell-actions="{ row }">
-            <div class="flex items-center justify-end">
+            <div class="flex items-center justify-center">
               <OButton
                 v-if="isEscalating(row.response_state)"
                 variant="ghost-warning"
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
           <template #cell-row-actions="{ row }">
-            <div class="flex items-center justify-end">
+            <div class="flex items-center justify-center">
               <!-- An open tooltip is the top dismissable layer, so it would take the menu's Escape. -->
               <ODropdown
                 side="bottom"

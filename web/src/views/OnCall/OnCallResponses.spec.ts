@@ -922,6 +922,18 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(true);
     });
 
+    /// A ⋯-only row reserves no empty slots, so its menu centres under the Actions header.
+    it("centres a resolved row's lone ⋯ with no empty slots beside it", async () => {
+      const resolved = await withPages([
+        page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
+      ]);
+      const cell = resolved
+        .find('[data-test="oncall-row-more-alert:al_ckt"]')
+        .element.closest(".justify-center")!;
+      expect(cell).not.toBeNull();
+      expect(cell.querySelectorAll(":scope > span.size-8[aria-hidden='true']").length).toBe(0);
+    });
+
     /// Snoozing only makes sense while the ladder is still climbing, so a
     /// handled row's menu must not offer it.
     it("offers no snooze once nothing is escalating", async () => {

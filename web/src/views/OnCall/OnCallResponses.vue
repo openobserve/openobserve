@@ -624,9 +624,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <!-- Three fixed slots, so icons line up down the column: acknowledge, resolve, then ⋯ on every row. -->
+      <!-- Slots stay fixed while a row has an inline action; a ⋯-only row drops them so it centres under the header. -->
       <template #cell-actions="{ row }">
-        <div class="flex items-center justify-end">
+        <div class="flex items-center justify-center">
           <template v-if="!row.latest.team_id">
             <ODropdown>
               <template #trigger>
@@ -671,7 +671,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="check-circle" size="sm" aria-hidden="true" />
               <OTooltip :content="ackTooltip(row)" />
             </OButton>
-            <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
+            <span
+              v-else-if="hasUnresolved(row)"
+              class="size-8 shrink-0 max-md:hidden"
+              aria-hidden="true"
+            />
             <OButton
               v-if="hasUnresolved(row)"
               variant="ghost-primary"
@@ -685,7 +689,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="task-alt" size="sm" aria-hidden="true" />
               <OTooltip :content="t('oncall.resolve')" />
             </OButton>
-            <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
+            <span
+              v-else-if="canAcknowledge(row)"
+              class="size-8 shrink-0 max-md:hidden"
+              aria-hidden="true"
+            />
           </template>
           <!-- An open tooltip is the top dismissable layer, so it would take the menu's Escape. -->
           <ODropdown
