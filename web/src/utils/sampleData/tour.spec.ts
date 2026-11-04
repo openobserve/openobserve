@@ -62,17 +62,39 @@ describe("resolveTourTarget", () => {
     expect((await target("logs")).query.period).toBe("1h");
   });
 
+  // a user's copy of a sample dashboard, with the same title, lives in their own folder
+  const withUserCopy = async (opts: any) => {
+    const { SAMPLE_DASHBOARD_TITLES, SAMPLE_FOLDER_NAME } = await import("./catalog");
+    const key: unknown[] = opts.queryKey;
+    const title = SAMPLE_DASHBOARD_TITLES.overview;
+    if (key.includes("sampleData")) return loaded;
+    if (key.includes("folders")) {
+      return [
+        { name: "Mine", folderId: "mine" },
+        { name: SAMPLE_FOLDER_NAME, folderId: "sf" },
+      ];
+    }
+    if (key.includes("search")) {
+      return [
+        { title, dashboardId: "copy", folderId: "mine" },
+        { title, dashboardId: "d1", folderId: "sf" },
+      ];
+    }
+    return key.includes("sf") ? [{ title, dashboard_id: "d1", folder_id: "sf" }] : [];
+  };
+
   it("opens the dashboard without a period so its own range applies", async () => {
-    const { SAMPLE_DASHBOARD_TITLES } = await import("./catalog");
-    fetchQuery.mockImplementation(async (opts: any) =>
-      opts.queryKey.includes("sampleData")
-        ? loaded
-        : [{ title: SAMPLE_DASHBOARD_TITLES.overview, dashboardId: "d1", folderId: "f1" }],
-    );
+    fetchQuery.mockImplementation(withUserCopy);
     const res = await target("dashboard");
     expect(res.name).toBe("viewDashboard");
     expect(res.query.period).toBeUndefined();
     expect(res.query.from).toBeUndefined();
+  });
+
+  it("opens the dashboard in the sample folder, not a same-titled copy elsewhere", async () => {
+    fetchQuery.mockImplementation(withUserCopy);
+    const res = await target("dashboard");
+    expect(res.query).toMatchObject({ dashboard: "d1", folder: "sf" });
   });
 
   it("opens the alert list on the sample alerts folder", async () => {

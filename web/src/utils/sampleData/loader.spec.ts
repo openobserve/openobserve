@@ -15,13 +15,21 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { loadSampleData, removeSampleData } from "./loader";
+import alertsService from "@/services/alerts";
+import commonService from "@/services/common";
+import dashboardService from "@/services/dashboards";
+import { SAMPLE_DASHBOARD_TITLES, SAMPLE_FOLDER_NAME } from "./catalog";
+import { loadSampleData, removeSampleData, sampleWindowHours } from "./loader";
+
+const accepted = (rows: unknown[]) => ({
+  data: { code: 200, status: [{ name: "s", successful: rows.length, failed: 0 }] },
+});
 
 const mocks = vi.hoisted(() => ({
   sampleData: {
-    ingestLogs: vi.fn(),
-    ingestMetrics: vi.fn(),
-    ingestTraces: vi.fn(),
+    ingestLogs: vi.fn(async (_org: string, _stream: string, rows: unknown[]) => accepted(rows)),
+    ingestMetrics: vi.fn(async (_org: string, rows: unknown[]) => accepted(rows)),
+    ingestTraces: vi.fn(async () => ({ data: {} })),
     putState: vi.fn(),
     deleteState: vi.fn(),
   },
@@ -71,11 +79,11 @@ vi.mock("./generator", () => ({
   createSampleGenerator: vi.fn(() => ({
     chunkCount: 1,
     generateChunk: () => ({
-      appLogs: [],
-      accessLogs: [],
-      metrics: [],
+      appLogs: [{ _timestamp: 1, service_name: "cart", message: "ok" }],
+      accessLogs: [{ _timestamp: 1 }, { _timestamp: 2 }],
+      metrics: [{ _timestamp: 1 }],
       traces: {},
-      spanCount: 0,
+      spanCount: 3,
     }),
   })),
 }));
@@ -110,6 +118,56 @@ describe("loadSampleData", () => {
     });
   });
 
+  it("counts the records the server accepted, not the ones it was sent", async () => {
+    mocks.sampleData.ingestLogs.mockResolvedValueOnce({
+      data: { code: 200, status: [{ name: "s", successful: 0, failed: 1, error: "Too old data" }] },
+    });
+    mocks.sampleData.ingestTraces.mockResolvedValueOnce({
+      data: { partialSuccess: { rejectedSpans: "2", errorMessage: "Too old data" } },
+    });
+    const res = await loadSampleData("acme", 5, () => {});
+    expect(res.counts).toEqual({ logs: 2, spans: 1, metrics: 1 });
+  });
+
+  it("fails with the server's message when the server accepted nothing", async () => {
+    const tooOld = "Too old data, only last 1 hours data can be ingested";
+    const rejected = {
+      data: { code: 200, status: [{ name: "s", successful: 0, failed: 1, error: tooOld }] },
+    };
+    mocks.sampleData.ingestLogs.mockResolvedValue(rejected);
+    mocks.sampleData.ingestMetrics.mockResolvedValue(rejected);
+    mocks.sampleData.ingestTraces.mockResolvedValue({
+      data: { partialSuccess: { rejectedSpans: "3", errorMessage: tooOld } },
+    });
+    try {
+      await expect(loadSampleData("acme", 1, () => {})).rejects.toThrow(tooOld);
+      expect(mocks.sampleData.putState).not.toHaveBeenCalled();
+    } finally {
+      mocks.sampleData.ingestLogs.mockImplementation(async (_o, _s, rows) => accepted(rows));
+      mocks.sampleData.ingestMetrics.mockImplementation(async (_o, rows) => accepted(rows));
+      mocks.sampleData.ingestTraces.mockImplementation(async () => ({ data: {} }));
+    }
+  });
+
+  it("keeps the oldest record minutes inside a one-hour ingest window", async () => {
+    const { createSampleGenerator } =
+      await vi.importActual<typeof import("./generator")>("./generator");
+    const minuteUs = 60_000_000;
+    const endUs = Date.now() * 1000;
+    const startUs = endUs - sampleWindowHours(1) * 60 * minuteUs;
+    const batch = createSampleGenerator({ startUs, endUs }).generateChunk(0);
+    const oldest = Math.min(
+      ...[...batch.appLogs, ...batch.accessLogs].map((r) => Number(r._timestamp)),
+    );
+    expect(oldest).toBeGreaterThanOrEqual(endUs - 60 * minuteUs + 5 * minuteUs);
+  });
+
+  it("loads four hours when the server allows more", () => {
+    expect(sampleWindowHours(undefined)).toBe(4);
+    expect(sampleWindowHours(5)).toBe(4);
+    expect(sampleWindowHours(720)).toBe(4);
+  });
+
   it("still finishes when the window cannot be saved", async () => {
     mocks.sampleData.putState.mockRejectedValueOnce(new Error("down"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -127,6 +185,56 @@ describe("removeSampleData", () => {
     expect(mocks.streamDelete.mock.invocationCallOrder.at(-1)).toBeLessThan(
       mocks.sampleData.deleteState.mock.invocationCallOrder[0],
     );
+  });
+
+  it("deletes only the sample dashboards and alerts, and keeps a folder that still has the user's", async () => {
+    vi.mocked(commonService.list_Folders).mockResolvedValue({
+      data: { list: [{ name: SAMPLE_FOLDER_NAME, folderId: "sf" }] },
+    } as any);
+    vi.mocked(dashboardService.list).mockResolvedValueOnce({
+      data: {
+        dashboards: [
+          { dashboard_id: "d1", title: SAMPLE_DASHBOARD_TITLES.overview, folder_id: "sf" },
+          { dashboard_id: "mine", title: "My dashboard", folder_id: "sf" },
+        ],
+      },
+    } as any);
+    vi.mocked(alertsService.listByFolderId).mockResolvedValueOnce({
+      data: {
+        list: [
+          { alert_id: "a1", name: "o2_demo_payment_errors_spike" },
+          { alert_id: "mine", name: "my_alert" },
+        ],
+      },
+    } as any);
+    try {
+      await removeSampleData("acme");
+    } finally {
+      vi.mocked(commonService.list_Folders).mockResolvedValue({ data: { list: [] } } as any);
+    }
+    expect(vi.mocked(dashboardService.delete).mock.calls).toEqual([["acme", "d1", "sf"]]);
+    expect(vi.mocked(alertsService.delete_by_alert_id).mock.calls).toEqual([["acme", "a1", "sf"]]);
+    expect(commonService.delete_Folder).not.toHaveBeenCalled();
+  });
+
+  it("deletes the sample folder once it holds nothing else", async () => {
+    vi.mocked(commonService.list_Folders).mockResolvedValue({
+      data: { list: [{ name: SAMPLE_FOLDER_NAME, folderId: "sf" }] },
+    } as any);
+    vi.mocked(dashboardService.list).mockResolvedValueOnce({
+      data: {
+        dashboards: [
+          { dashboard_id: "d1", title: SAMPLE_DASHBOARD_TITLES.overview, folder_id: "sf" },
+        ],
+      },
+    } as any);
+    try {
+      await removeSampleData("acme");
+    } finally {
+      vi.mocked(commonService.list_Folders).mockResolvedValue({ data: { list: [] } } as any);
+    }
+    expect(commonService.delete_Folder).toHaveBeenCalledWith("acme", "dashboards", "sf");
+    expect(commonService.delete_Folder).toHaveBeenCalledWith("acme", "alerts", "sf");
   });
 
   it("still resolves when the state cannot be deleted", async () => {

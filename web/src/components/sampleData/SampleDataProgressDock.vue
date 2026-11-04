@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    v-if="loading || done"
+    v-if="loading || done || failed"
     class="bg-surface-base border-border-default rounded-surface fixed end-4 bottom-4 z-40 flex w-92 max-w-[calc(100vw-2rem)] flex-col gap-3 border p-4 shadow-lg"
     role="status"
     data-test="sample-data-progress-dock"
-    :data-state="done ? 'done' : 'loading'"
+    :data-state="failed ? 'failed' : done ? 'done' : 'loading'"
   >
     <template v-if="loading">
       <div class="flex items-center gap-2">
@@ -46,6 +46,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="session.openWelcome()"
         >
           {{ t("sampleData.dock.details") }}
+        </OButton>
+      </div>
+    </template>
+
+    <template v-else-if="failed">
+      <div class="flex items-center gap-2">
+        <OIcon name="error" size="sm" class="text-status-error-text" />
+        <strong class="text-text-heading flex-1 text-sm">{{
+          t("sampleData.toast.loadFailed")
+        }}</strong>
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          :aria-label="t('common.close')"
+          data-test="sample-data-progress-dock-close"
+          @click="dismissed = true"
+        >
+          <OIcon name="close" size="sm" />
+        </OButton>
+      </div>
+      <span
+        v-if="session.error.value"
+        class="text-text-secondary text-xs"
+        data-test="sample-data-progress-dock-error"
+        >{{ raw(session.error.value) }}</span
+      >
+      <div class="flex justify-end">
+        <OButton
+          variant="primary"
+          size="sm"
+          data-test="sample-data-progress-dock-retry"
+          @click="retry"
+        >
+          {{ t("common.retry") }}
         </OButton>
       </div>
     </template>
@@ -99,6 +133,7 @@ const session = useSampleDataSession();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const dismissed = ref(false);
 const finishedInBackground = ref(false);
+const failedInBackground = ref(false);
 
 // the dialog shows the same progress, so the dock only takes over once it is closed
 const ownLoad = computed(
@@ -114,6 +149,13 @@ const done = computed(
     !dismissed.value &&
     !session.tour.value,
 );
+const failed = computed(
+  () =>
+    ownLoad.value &&
+    session.status.value === "failed" &&
+    failedInBackground.value &&
+    !dismissed.value,
+);
 const percent = computed(() => raw(`${Math.round(session.fraction.value * 100)}%`));
 
 // only a load that finishes with the dialog closed needs this notice; the dialog shows its own ready view
@@ -121,10 +163,17 @@ watch(session.status, (now, before) => {
   if (now === "loading") {
     dismissed.value = false;
     finishedInBackground.value = false;
+    failedInBackground.value = false;
   } else if (before === "loading" && now === "loaded") {
     finishedInBackground.value = !session.welcomeOpen.value;
+  } else if (before === "loading" && now === "failed") {
+    failedInBackground.value = !session.welcomeOpen.value;
   }
 });
+
+const retry = () => {
+  session.start(org.value, store.state.zoConfig?.ingest_allowed_upto);
+};
 
 const startTour = () => {
   dismissed.value = true;

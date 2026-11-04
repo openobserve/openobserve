@@ -134,12 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("sampleData.tour.finale.connect") }}
           </OButton>
           <div class="flex items-center justify-between gap-2">
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="sample-tour-restart"
-              @click="session.setTourIndex(0)"
-            >
+            <OButton variant="outline" size="sm" data-test="sample-tour-restart" @click="restart">
               {{ t("sampleData.tour.finale.restart") }}
             </OButton>
             <OButton
@@ -222,11 +217,15 @@ const stepLook = (id: SampleTourStepId): I18nText => t(`sampleData.tour.steps.${
 const capabilityLabel = (cap: SampleTourStep["capability"]): I18nText =>
   t(`sampleData.tour.capabilities.${cap}`);
 
+let stepRequest = 0;
 const showStep = async () => {
   if (!current.value) return;
+  const request = ++stepRequest;
   navigating.value = true;
   try {
     const to = await resolveTourTarget(org.value, current.value.id);
+    // a newer step was requested while this one resolved
+    if (request !== stepRequest) return;
     const target = router.resolve(to);
     // Logs reads its query from the URL only on mount, and the tour itself survives a reload
     if (target.name === "logs" && route.name === "logs") window.location.assign(target.href);
@@ -234,7 +233,7 @@ const showStep = async () => {
   } catch {
     // a redundant navigation to the page already open is fine
   } finally {
-    navigating.value = false;
+    if (request === stepRequest) navigating.value = false;
   }
 };
 
@@ -246,6 +245,11 @@ const next = async () => {
 const back = async () => {
   session.setTourIndex(index.value - 1);
   if (current.value) await showStep();
+};
+
+const restart = async () => {
+  session.setTourIndex(0);
+  await showStep();
 };
 
 const connectOwnData = () => {

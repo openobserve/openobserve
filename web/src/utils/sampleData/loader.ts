@@ -26,6 +26,7 @@ import streamService from "@/services/stream";
 import {
   SAMPLE_ALERT_DESTINATION,
   SAMPLE_ALERT_TEMPLATE,
+  SAMPLE_DASHBOARD_TITLES,
   SAMPLE_ENRICHMENT_TABLE,
   SAMPLE_FOLDER_NAME,
   SAMPLE_FUNCTIONS,
@@ -104,11 +105,13 @@ export interface SampleLoadResult {
 }
 
 const HOUR_US = 3_600_000_000;
+// covers the generator rounding its start down a minute, plus browser-to-server clock skew
+const WINDOW_MARGIN_HOURS = 10 / 60;
 
 /** Stays inside the server's back-fill window so no record is rejected as too old. */
 export const sampleWindowHours = (ingestAllowedUptoHours: number | undefined) => {
   const limit = Number(ingestAllowedUptoHours) || 5;
-  return Math.max(1, Math.min(4, limit - 0.5));
+  return Math.min(4, limit - WINDOW_MARGIN_HOURS);
 };
 
 const findOrCreateFolder = async (org: string, type: "dashboards" | "alerts") => {
@@ -128,6 +131,30 @@ const findFolder = async (org: string, type: "dashboards" | "alerts") => {
   return folder ? String(folder.folderId) : undefined;
 };
 
+interface IngestOutcome {
+  accepted: number;
+  error?: string;
+}
+
+// the /_json routes answer 200 even when they drop records; the per-stream status says how many were kept
+const jsonOutcome = (res: any, sent: number): IngestOutcome => {
+  const status: { successful?: number; error?: string }[] | undefined = res?.data?.status;
+  if (!Array.isArray(status)) return { accepted: sent };
+  return {
+    accepted: status.reduce((n, s) => n + (Number(s.successful) || 0), 0),
+    error: status.find((s) => s.error)?.error ?? res.data.error,
+  };
+};
+
+// OTLP JSON reports drops as partialSuccess, with the int64 count as a string
+const tracesOutcome = (res: any, sent: number): IngestOutcome => {
+  const partial = res?.data?.partialSuccess;
+  return {
+    accepted: Math.max(0, sent - (Number(partial?.rejectedSpans) || 0)),
+    error: partial?.errorMessage,
+  };
+};
+
 const ingestTelemetry = async (
   org: string,
   hours: number,
@@ -137,21 +164,34 @@ const ingestTelemetry = async (
   const range: SampleWindow = { startUs: endUs - hours * HOUR_US, endUs };
   const gen = createSampleGenerator(range);
   const counts: SampleCounts = { logs: 0, spans: 0, metrics: 0 };
+  let error: string | undefined;
   for (let i = 0; i < gen.chunkCount; i++) {
     const batch = gen.generateChunk(i);
-    const writes: Promise<unknown>[] = [
-      sampleDataService.ingestLogs(org, SAMPLE_STREAMS.appLogs, batch.appLogs),
-      sampleDataService.ingestLogs(org, SAMPLE_STREAMS.accessLogs, batch.accessLogs),
-      sampleDataService.ingestMetrics(org, batch.metrics),
-    ];
-    if (batch.spanCount) {
-      writes.push(sampleDataService.ingestTraces(org, SAMPLE_STREAMS.traces, batch.traces));
-    }
-    await Promise.all(writes);
-    counts.logs += batch.appLogs.length + batch.accessLogs.length;
-    counts.spans += batch.spanCount;
-    counts.metrics += batch.metrics.length;
+    const outcomes: IngestOutcome[] = await Promise.all([
+      sampleDataService
+        .ingestLogs(org, SAMPLE_STREAMS.appLogs, batch.appLogs)
+        .then((res) => jsonOutcome(res, batch.appLogs.length)),
+      sampleDataService
+        .ingestLogs(org, SAMPLE_STREAMS.accessLogs, batch.accessLogs)
+        .then((res) => jsonOutcome(res, batch.accessLogs.length)),
+      sampleDataService
+        .ingestMetrics(org, batch.metrics)
+        .then((res) => jsonOutcome(res, batch.metrics.length)),
+      batch.spanCount
+        ? sampleDataService
+            .ingestTraces(org, SAMPLE_STREAMS.traces, batch.traces)
+            .then((res) => tracesOutcome(res, batch.spanCount))
+        : { accepted: 0 },
+    ]);
+    const [app, access, metrics, traces] = outcomes;
+    counts.logs += app.accepted + access.accepted;
+    counts.spans += traces.accepted;
+    counts.metrics += metrics.accepted;
+    error ??= outcomes.find((o) => o.error)?.error;
     report((i + 1) / gen.chunkCount, { ...counts }, feedOf(batch.appLogs));
+  }
+  if (!counts.logs && !counts.spans && !counts.metrics) {
+    throw new Error(error || "The server did not accept any sample records");
   }
   return { counts, window: range };
 };
@@ -280,26 +320,40 @@ const ignoreMissing = async (fn: () => Promise<unknown>) => {
   }
 };
 
+const SAMPLE_DASHBOARD_TITLE_SET: ReadonlySet<string> = new Set(
+  Object.values(SAMPLE_DASHBOARD_TITLES),
+);
+const SAMPLE_ALERT_NAMES: ReadonlySet<string> = new Set(sampleAlerts("").map((a) => a.name));
+
+// the folder may predate the load or hold the user's own assets, so only sample names go
 const removeDashboards = async (org: string) => {
   const folderId = await findFolder(org, "dashboards");
   if (!folderId) return;
   const res = await dashboardService.list(0, 1000, "name", false, "", org, folderId, "");
-  for (const hit of (res.data?.dashboards ?? []).map(toSearchHit)) {
+  const hits = (res.data?.dashboards ?? []).map(toSearchHit);
+  const sample = hits.filter((hit: { title: string }) => SAMPLE_DASHBOARD_TITLE_SET.has(hit.title));
+  for (const hit of sample) {
     await ignoreMissing(() => dashboardService.delete(org, hit.dashboardId, folderId));
   }
-  await ignoreMissing(() => commonService.delete_Folder(org, "dashboards", folderId));
+  if (sample.length === hits.length) {
+    await ignoreMissing(() => commonService.delete_Folder(org, "dashboards", folderId));
+  }
 };
 
 const removeAlerts = async (org: string) => {
   const folderId = await findFolder(org, "alerts");
   if (!folderId) return;
   const res = await alertsService.listByFolderId(1, 1000, "name", false, "", org, folderId);
-  for (const alert of res.data?.list ?? []) {
+  const alerts = res.data?.list ?? [];
+  const sample = alerts.filter((alert: any) => SAMPLE_ALERT_NAMES.has(alert.name));
+  for (const alert of sample) {
     await ignoreMissing(() =>
       alertsService.delete_by_alert_id(org, alert.alert_id ?? alert.id, folderId),
     );
   }
-  await ignoreMissing(() => commonService.delete_Folder(org, "alerts", folderId));
+  if (sample.length === alerts.length) {
+    await ignoreMissing(() => commonService.delete_Folder(org, "alerts", folderId));
+  }
 };
 
 const removeAlertDelivery = async (org: string) => {

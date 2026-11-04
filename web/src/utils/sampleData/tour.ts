@@ -17,7 +17,7 @@ import type { RouteLocationRaw } from "vue-router";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { queryClient } from "@/composables/query/queryClient";
 import { foldersQuery } from "@/services/common.queries";
-import { dashboardsSearchQuery, type DashboardSearchHit } from "@/services/dashboards.queries";
+import { dashboardsByFolderQuery, toSearchHit } from "@/services/dashboards.queries";
 import { sampleDataStateQuery } from "@/services/sample_data.queries";
 import type { SampleDataState } from "@/services/sample_data";
 import type { SampleWindow } from "./assets";
@@ -92,17 +92,20 @@ const logsQuery = (org: string, stream: string, filter: string, win: SampleWindo
   },
 });
 
+const sampleFolderId = async (org: string, type: "dashboards" | "alerts") => {
+  const folders = await queryClient.fetchQuery(foldersQuery(org, type));
+  return folders.find((f) => f.name === SAMPLE_FOLDER_NAME)?.folderId;
+};
+
+// only the sample folder, so a user's same-titled copy elsewhere is never opened
 const dashboardTarget = async (org: string, title: string): Promise<RouteLocationRaw> => {
-  const hits = await queryClient.fetchQuery(dashboardsSearchQuery(org, title));
-  const hit = hits.find((h: DashboardSearchHit) => h.title === title);
+  const folder = await sampleFolderId(org, "dashboards");
+  const rows = folder ? await queryClient.fetchQuery(dashboardsByFolderQuery(org, folder)) : [];
+  const hit = rows.map(toSearchHit).find((h) => h.title === title);
   if (!hit) return { name: "dashboards", query: { org_identifier: org } };
   return {
     name: "viewDashboard",
-    query: {
-      org_identifier: org,
-      dashboard: hit.dashboardId,
-      folder: hit.folderId ?? "default",
-    },
+    query: { org_identifier: org, dashboard: hit.dashboardId, folder },
   };
 };
 
@@ -112,8 +115,7 @@ const stateToWindow = (state?: SampleDataState): SampleWindow | undefined =>
     : undefined;
 
 const alertsTarget = async (org: string): Promise<RouteLocationRaw> => {
-  const folders = await queryClient.fetchQuery(foldersQuery(org, "alerts"));
-  const folder = folders.find((f) => f.name === SAMPLE_FOLDER_NAME)?.folderId;
+  const folder = await sampleFolderId(org, "alerts");
   return { name: "alertList", query: { org_identifier: org, ...(folder ? { folder } : {}) } };
 };
 
