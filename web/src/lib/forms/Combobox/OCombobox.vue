@@ -18,6 +18,7 @@ import { computed, nextTick, onMounted, ref, useAttrs, useId, useSlots, watch } 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import { useI18nTyped } from "@/types/i18n";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 const { t } = useI18nTyped();
 
@@ -43,6 +44,7 @@ const props = withDefaults(defineProps<ComboboxProps>(), {
 
 const emit = defineEmits<ComboboxEmits>();
 defineSlots<ComboboxSlots>();
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 const slots = useSlots();
 const _fallbackId = useId();
@@ -199,7 +201,7 @@ const hasInsideLabel = computed(
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
-        disabled
+        isDisabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text font-medium',
       ]"
@@ -221,7 +223,7 @@ const hasInsideLabel = computed(
       :ignore-filter="true"
       :open-on-click="true"
       :open-on-focus="true"
-      :disabled="disabled"
+      :disabled="isDisabled"
       @update:model-value="onSelect"
     >
       <ComboboxAnchor class="relative flex w-full items-center">
@@ -238,7 +240,7 @@ const hasInsideLabel = computed(
           :id="inputId"
           :name="name"
           :placeholder="placeholder"
-          :disabled="disabled"
+          :disabled="isDisabled"
           :tabindex="inputTabindex"
           auto-complete="off"
           :class="[

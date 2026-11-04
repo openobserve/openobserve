@@ -316,6 +316,16 @@ describe("SampleDataWelcome finish", () => {
     expect(byTest("onboarding-get-started-more-chip").exists()).toBe(false);
   });
 
+  it("locks a chip whose guide the license locks, and a click picks nothing", async () => {
+    await mountAtHome({ sample_data_onboarding_enabled: true, features: { rum: "locked" } });
+    const push = pushSpy();
+    expect(byTest("onboarding-get-started-source-rum").attributes("disabled")).toBeDefined();
+    expect(byTest("onboarding-get-started-source-otel").attributes("disabled")).toBeUndefined();
+    await click("onboarding-get-started-source-rum");
+    expect(push).not.toHaveBeenCalled();
+    expect(submitNewUserInfo).not.toHaveBeenCalled();
+  });
+
   it("Explore Other Data Sources opens the Data Sources page as a skip", async () => {
     await mountAtHome();
     const push = pushSpy();

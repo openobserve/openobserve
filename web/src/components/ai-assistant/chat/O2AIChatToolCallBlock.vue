@@ -13,6 +13,8 @@ import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { navigationFeature } from "@/components/O2AIChat.navigation";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 
 const props = defineProps<{
   block: ToolCallBlock;
@@ -37,6 +39,12 @@ const isExpanded = computed(() =>
 const formatToolCallMessage = (block: ToolCallBlock) => formatToolCall(block, t);
 
 const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp, t);
+
+const { isLocked, lockedReason } = useLicenseLocks();
+const navLockReason = computed(() => {
+  const key = props.block.navigationAction ? navigationFeature(props.block.navigationAction) : null;
+  return key && isLocked(key) ? lockedReason(key) : null;
+});
 </script>
 
 <template>
@@ -86,8 +94,23 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
         >{{ formatToolCallMessage(block).suffix }}
       </span>
       <!-- Navigation icon -->
+      <OTooltip
+        v-if="block.navigationAction && !block.pendingConfirmation && !readonly && navLockReason"
+        :content="navLockReason"
+      >
+        <span class="ms-auto inline-flex" @click.stop>
+          <OButton
+            variant="ghost"
+            size="icon-xs"
+            disabled
+            icon-left="lock"
+            :aria-label="block.navigationAction.label"
+            data-test="o2-ai-chat-tool-navigate-locked"
+          />
+        </span>
+      </OTooltip>
       <OIcon
-        v-if="block.navigationAction && !block.pendingConfirmation && !readonly"
+        v-else-if="block.navigationAction && !block.pendingConfirmation && !readonly"
         name="open-in-new"
         size="xs"
         class="navigation-icon ms-auto cursor-pointer opacity-70 transition-opacity duration-200 hover:opacity-100"

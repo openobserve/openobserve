@@ -21,6 +21,8 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
 import { useToolbarPins, type ToolbarPinKey } from "@/composables/useToolbarPins";
+import { provideFeatureLock } from "@/composables/useFeatureLock";
+import { defineComponent, ref } from "vue";
 
 const router = createRouter({
   history: createMemoryHistory(),
@@ -105,5 +107,29 @@ describe("SearchBar — toolbar controls are spaced only by the row gap", () => 
     for (const control of controls) {
       expect(marginClassesOf(control), control.outerHTML.slice(0, 120)).toEqual([]);
     }
+  });
+
+  it.each([
+    ["unlocked", null, "bg-button-primary!", "enabled:bg-button-primary!"],
+    ["license-locked", "logs", "enabled:bg-button-primary!", "bg-button-primary!"],
+  ])("forces the Run query fill only while the page is %s", async (_s, feature, fill, other) => {
+    wrapper = mount(
+      defineComponent({
+        components: { SearchBar },
+        setup() {
+          provideFeatureLock(ref(feature));
+          return {};
+        },
+        template: "<SearchBar />",
+      }),
+      {
+        attachTo: document.body,
+        global: { provide: { store }, plugins: [i18n, router], stubs: { QueryEditor: true } },
+      },
+    );
+    await flushPromises();
+    const run = wrapper.get('[data-test="logs-search-bar-refresh-btn"]');
+    expect(run.classes()).toContain(fill);
+    expect(run.classes()).not.toContain(other);
   });
 });

@@ -16,7 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { formatTimestampInTimezone } from "@/utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -48,8 +49,11 @@ const props = withDefaults(
     verdict: TraceVerdict;
     anchor?: DOMRect | null;
     clamped?: "top" | "bottom" | false;
+    /** Set while the traces license is locked: Open trace shows locked and does nothing. */
+    lockedReason?: I18nText;
   }>(),
   {
+    lockedReason: undefined,
     unit: undefined,
     unitCustom: undefined,
     decimals: undefined,
@@ -197,8 +201,28 @@ const position = computed(() => {
           <span class="min-w-0">{{ t("dashboard.exemplars.traceNotAvailable") }}</span>
         </div>
         <div v-else class="flex min-w-0 flex-wrap items-center gap-2">
+          <OTooltip v-if="lockedReason" :content="lockedReason">
+            <span class="inline-flex">
+              <OButton
+                variant="outline"
+                size="sm"
+                disabled
+                data-test="dashboard-panel-exemplar-open-trace-locked"
+              >
+                <template #icon-left>
+                  <OIcon
+                    name="lock"
+                    class="text-icon-locked"
+                    size="sm"
+                    data-test="dashboard-panel-exemplar-open-trace-lock"
+                  />
+                </template>
+                {{ t("dashboard.exemplars.openTrace") }}
+              </OButton>
+            </span>
+          </OTooltip>
           <OButton
-            v-if="verdict.state === 'checking'"
+            v-else-if="verdict.state === 'checking'"
             variant="outline"
             size="sm"
             disabled
@@ -237,7 +261,7 @@ const position = computed(() => {
         >
           {{ marker.traceId }}
         </div>
-        <div v-if="verdict.state === 'found'" class="text-text-secondary text-2xs">
+        <div v-if="verdict.state === 'found' && !lockedReason" class="text-text-secondary text-2xs">
           {{ t("dashboard.exemplars.openTraceHint") }}
         </div>
         <div

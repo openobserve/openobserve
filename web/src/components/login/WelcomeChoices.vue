@@ -43,31 +43,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="grid h-[10.25rem] grid-cols-3 content-between gap-2"
           data-test="onboarding-get-started-chips"
         >
-          <button
+          <OTooltip
             v-for="option in chipOptions"
             :key="option.id"
-            type="button"
-            class="border-border-default bg-surface-base text-text-body hover:border-accent rounded-default flex h-10 min-w-0 cursor-pointer items-center gap-2 border px-2 text-left text-xs font-medium transition hover:-translate-y-px"
-            :title="t(option.labelKey)"
-            :data-test="`onboarding-get-started-source-${option.id}`"
-            @click="emit('pick', option.id)"
+            :content="option.lockedReason"
+            :disabled="!option.lockedReason"
           >
-            <span
-              class="bg-surface-subtle rounded-default flex size-6 shrink-0 items-center justify-center"
-            >
-              <img
-                v-if="option.logo"
-                :src="getImageURL(option.logo)"
-                alt=""
-                class="size-4"
-                :class="{ 'dark:invert': option.logoInvertDark }"
-              />
-              <OIcon v-else-if="option.icon" :name="option.icon" size="xs" />
+            <span class="flex min-w-0">
+              <button
+                type="button"
+                class="border-border-default bg-surface-base text-text-body hover:border-accent rounded-default flex h-10 w-full min-w-0 cursor-pointer items-center gap-2 border px-2 text-left text-xs font-medium transition hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                :title="option.lockedReason ? undefined : t(option.labelKey)"
+                :disabled="!!option.lockedReason"
+                :data-test="`onboarding-get-started-source-${option.id}`"
+                @click="emit('pick', option.id)"
+              >
+                <span
+                  class="bg-surface-subtle rounded-default flex size-6 shrink-0 items-center justify-center"
+                >
+                  <OIcon v-if="option.lockedReason" name="lock" size="xs" class="lock-chip" />
+                  <img
+                    v-else-if="option.logo"
+                    :src="getImageURL(option.logo)"
+                    alt=""
+                    class="size-4"
+                    :class="{ 'dark:invert': option.logoInvertDark }"
+                  />
+                  <OIcon v-else-if="option.icon" :name="option.icon" size="xs" />
+                </span>
+                <span class="line-clamp-2 leading-tight">{{
+                  t(`login.getStarted.chips.${option.id}`)
+                }}</span>
+              </button>
             </span>
-            <span class="line-clamp-2 leading-tight">{{
-              t(`login.getStarted.chips.${option.id}`)
-            }}</span>
-          </button>
+          </OTooltip>
         </div>
         <OButton
           variant="primary"
@@ -129,6 +138,8 @@ import { computed } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { FIRST_SOURCE_OPTIONS, type FirstSourceId } from "./firstSourceOptions";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
@@ -141,7 +152,16 @@ const HIDDEN_CHIPS: readonly FirstSourceId[] = ["sample", "unsure", "http"];
 
 const { t } = useI18nTyped();
 
-const chipOptions = FIRST_SOURCE_OPTIONS.filter((option) => !HIDDEN_CHIPS.includes(option.id));
+const { isLocked, lockedReason } = useLicenseLocks();
+
+// a source whose guide the license locks stays visible but cannot be picked
+const chipOptions = computed(() =>
+  FIRST_SOURCE_OPTIONS.filter((option) => !HIDDEN_CHIPS.includes(option.id)).map((option) => ({
+    ...option,
+    lockedReason:
+      option.feature && isLocked(option.feature) ? lockedReason(option.feature) : undefined,
+  })),
+);
 
 const connectPoints = computed<I18nText[]>(() => [
   t("login.getStarted.connect.point1"),

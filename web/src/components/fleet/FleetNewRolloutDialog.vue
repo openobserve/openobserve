@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("fleet.rollouts.collapsed") }}</OText
           >
           <OText variant="meta" data-test="fleet-new-rollout-dialog-timeout">{{
-            t("fleet.rollouts.phaseTimeoutNote", { minutes: phaseTimeoutMin })
+            phaseTimeoutNote
           }}</OText>
         </div>
       </div>
@@ -288,12 +288,16 @@ const fleetOptions = computed(() =>
 );
 const fleetRow = computed(() => readableFleets.value.find((f) => f.id === chosenFleet.value));
 
-const phaseTimeoutMin = computed(() => {
+const phaseTimeoutNote = computed(() => {
   const secs =
     fleetRow.value?.settings.phase_timeout_secs ??
     orgSettings.settings.value?.fleet_defaults?.phase_timeout_secs ??
     DEFAULT_PHASE_TIMEOUT_SECS;
-  return Math.round(secs / 60);
+  const minutes = Math.floor(secs / 60);
+  const seconds = secs % 60;
+  return seconds
+    ? t("fleet.rollouts.phaseTimeoutNoteSeconds", { minutes, seconds })
+    : t("fleet.rollouts.phaseTimeoutNote", { minutes });
 });
 
 const published = computed(() => configs.rows.value.filter((c) => c.version > 0));

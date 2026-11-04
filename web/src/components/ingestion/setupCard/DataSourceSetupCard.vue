@@ -39,6 +39,7 @@ import {
   importSetupDashboard,
 } from "@/composables/useSetupDashboardImport";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
@@ -90,7 +91,31 @@ const tokenState = computed<IngestTokenState>(() => {
 
 // Inside onboarding, its tracing answer shapes the card (the Kubernetes tracing step).
 const onboarding = inject(SETUP_CARD_ONBOARDING, null);
-const content = computed(() => getDataSourceCard(props.slug, subs.value, t, onboarding?.value));
+const { locked: dashboardsLocked, lockedReason: dashboardsLockedReason } =
+  useLicenseLock("dashboards");
+const { locked: hostsLocked } = useLicenseLock("host_monitoring");
+const DASHBOARD_ACTIONS = new Set(["view-host-dashboard", "open-setup-dashboard"]);
+
+const content = computed(() => {
+  const card = getDataSourceCard(props.slug, subs.value, t, onboarding?.value);
+  if (!card || !dashboardsLocked.value) return card;
+  return {
+    ...card,
+    steps: card.steps.map((step) =>
+      step.action && DASHBOARD_ACTIONS.has(step.action.id)
+        ? {
+            ...step,
+            action: {
+              ...step.action,
+              icon: "lock" as const,
+              disabled: true,
+              disabledReason: dashboardsLockedReason.value,
+            },
+          }
+        : step,
+    ),
+  };
+});
 
 const passcodeForbidden = computed(
   () => !!store.state.organizationData?.organizationPasscodeForbidden,
@@ -172,6 +197,7 @@ const onOpenSetupDashboard = async () => {
 
 const onDetected = async (count: number) => {
   emit("detected", count);
+  if (dashboardsLocked.value) return;
   if (setupDashboard.value) return onSetupDashboardDetected();
   if (!isHostAgentSlug.value) return;
   // Captured at detect time — an org switch before the toast click must not retarget.
@@ -188,14 +214,17 @@ const onDetected = async (count: number) => {
         : "ingestion.setupCard.hostDashboardExists",
     ),
     timeout: 5000,
-    action: {
-      label: t("ingestion.setupCard.viewHosts"),
-      handler: () => router.push({ path: "/infra/hosts", query: { org_identifier: org } }),
-    },
+    action: hostsLocked.value
+      ? undefined
+      : {
+          label: t("ingestion.setupCard.viewHosts"),
+          handler: () => router.push({ path: "/infra/hosts", query: { org_identifier: org } }),
+        },
   });
 };
 
 const onStepAction = async (actionId: string) => {
+  if (dashboardsLocked.value && DASHBOARD_ACTIONS.has(actionId)) return;
   if (actionId === "open-setup-dashboard") return onOpenSetupDashboard();
   if (actionId !== "view-host-dashboard" || !isHostAgentSlug.value) return;
   const org = store.state.selectedOrganization?.identifier ?? "";
