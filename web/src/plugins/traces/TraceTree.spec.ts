@@ -794,6 +794,32 @@ describe("TraceTree", () => {
     });
   });
 
+  describe("name and badge layout", () => {
+    const SPAN = "d9603ec7f76eb499";
+
+    it("lets every row's name shrink instead of reserving a fixed width", () => {
+      const nameBoxes = wrapper.findAll('[data-test^="trace-tree-span-select-btn-"]');
+      expect(nameBoxes.length).toBeGreaterThan(0);
+      for (const box of nameBoxes) {
+        const row = box.element.parentElement as HTMLElement;
+        expect(box.classes()).toEqual(expect.arrayContaining(["min-w-0", "flex-1"]));
+        expect(row.classList.contains("min-w-0")).toBe(true);
+        expect(row.classList.contains("flex-1")).toBe(true);
+        expect(row.className).not.toMatch(/w-full|w-\[calc/);
+        expect(box.element.className).not.toMatch(/w-\[calc/);
+      }
+    });
+
+    it("never shrinks the child-count pill or the badge cluster", () => {
+      const pill = wrapper.find(`[data-test="trace-tree-span-badge-collapse-btn-${SPAN}"]`);
+      const cluster = wrapper.find(`[data-test="trace-tree-span-view-logs-container-${SPAN}"]`)
+        .element.parentElement as HTMLElement;
+
+      expect(pill.classes()).toContain("shrink-0");
+      expect(cluster.classList.contains("shrink-0")).toBe(true);
+    });
+  });
+
   describe("Theme support", () => {
     it("should apply light theme by default", () => {
       const operationContainer = wrapper.find(

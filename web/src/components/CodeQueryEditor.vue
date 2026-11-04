@@ -27,6 +27,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :id="editorId"
     />
     <div
+      v-if="!editorReady && previewLines.length"
+      aria-hidden="true"
+      data-test="query-editor-preview"
+      class="text-text-body pointer-events-none absolute inset-0 overflow-hidden pt-0.75 font-mono text-xs leading-4.5"
+    >
+      <div v-for="(line, index) in previewLines" :key="index" class="flex">
+        <span v-if="showLineNumbers" class="text-text-muted w-6 shrink-0 pe-2.5 text-end">{{
+          index + 1
+        }}</span>
+        <span class="min-w-0 break-all whitespace-pre-wrap">{{ line }}</span>
+      </div>
+    </div>
+    <div
       class="sr-only"
       role="status"
       aria-live="polite"
@@ -416,6 +429,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    textPreview: {
+      type: Boolean,
+      default: false,
+    },
     showLineNumbers: {
       type: Boolean,
       default: true,
@@ -530,6 +547,21 @@ export default defineComponent({
     };
     const editorRef: any = ref();
     let editorObj: any = null;
+    // Monaco is a large chunk; until it mounts the query is drawn as plain text so it is readable at once.
+    const editorReady = ref(false);
+    const previewLines = computed(() => {
+      if (!props.textPreview) return [];
+      const value = props.query?.trim();
+      return value ? value.split("\n").slice(0, 50) : [];
+    });
+    // Monaco draws its first lines in a later frame; handing over in that same frame keeps the two layers from ever sharing one.
+    const handOverWhenPainted = (host: HTMLElement, framesLeft = 10) =>
+      requestAnimationFrame(() => {
+        if (host.querySelector(".view-line") || framesLeft <= 1) editorReady.value = true;
+        else handOverWhenPainted(host, framesLeft - 1);
+      });
+    // A setup still awaiting must not bind to a remounted sibling that reuses this editorId.
+    let unmounted = false;
     let escapeCount = 0;
     let programmatic = false;
     const asProgrammatic = (edit: () => void) => {
@@ -828,6 +860,7 @@ export default defineComponent({
     const setupEditor = async () => {
       // Lazy load Monaco Editor on first use
       const monacoModule = await loadMonaco();
+      if (unmounted) return;
       monaco = monacoModule;
 
       // Expose Monaco on window for e2e tests (read-only assertions against editor model).
@@ -843,6 +876,7 @@ export default defineComponent({
         // The vendored PromQL grammar — without a tokenizer the
         // query renders monochrome (#9779, #9793).
         const promql = await loadPromqlLanguage();
+        if (unmounted) return;
         monaco.languages.setMonarchTokensProvider("promql", promql.language as any);
         monaco.languages.setLanguageConfiguration("promql", promql.languageConfiguration as any);
       }
@@ -865,19 +899,20 @@ export default defineComponent({
 
       // Faces load lazily on first use, so without this the first measurement can hit the fallback font.
       await document.fonts?.load?.(`1rem ${getFontMono()}`).catch(() => {});
+      if (unmounted) return;
 
       let editorElement = document.getElementById(props.editorId);
       let retryCount = 0;
       const maxRetries = 5;
 
       // Retry mechanism to ensure the editor element is found
-      while (!editorElement && retryCount < maxRetries) {
+      while (!editorElement && retryCount < maxRetries && !unmounted) {
         await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for 100ms
         editorElement = document.getElementById(props.editorId);
         retryCount++;
       }
 
-      if (!editorElement) {
+      if (unmounted || !editorElement) {
         return;
       }
 
@@ -976,6 +1011,7 @@ export default defineComponent({
         },
         ...suggestKeyOptions(suggestMode.value, props.language),
       });
+      handOverWhenPainted(editorElement as HTMLElement);
 
       publishEditorConfig();
       navSkipKey = editorObj.createContextKey(
@@ -1272,6 +1308,7 @@ export default defineComponent({
     onDeactivated(() => {});
 
     onUnmounted(() => {
+      unmounted = true;
       // Clean up global event listeners
       if (editorObj) {
         if (editorObj._windowClickHandler) {
@@ -2224,6 +2261,8 @@ export default defineComponent({
       aiIcon,
       toggleNlpMode,
       suggestAnnouncement,
+      editorReady,
+      previewLines,
       queryEditorClass: QUERY_EDITOR_CLASS,
     };
   },

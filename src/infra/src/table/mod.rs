@@ -67,6 +67,7 @@ pub mod llm_prompts;
 pub mod llm_secrets;
 mod migration;
 pub mod model_pricing;
+pub mod oncall_chat_messages;
 pub mod oncall_deliveries;
 pub mod oncall_overrides;
 pub mod oncall_ownership;
@@ -144,6 +145,8 @@ mod ttl_cache;
 pub mod user_auth_state;
 pub mod user_password_history;
 pub mod users;
+pub mod workflow_http_trigger_requests;
+pub mod workflow_http_triggers;
 pub mod workflows;
 
 pub async fn init() -> Result<(), anyhow::Error> {

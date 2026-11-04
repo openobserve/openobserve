@@ -62,12 +62,14 @@
                       v-model.number="picker.data.selectedDate.relative.value"
                       type="number"
                       :min="1"
+                      :aria-label="t('common.duration')"
                     />
                   </div>
                   <div class="flex flex-col">
                     <OSelect
                       v-model="picker.data.selectedDate.relative.period"
                       :options="relativePeriodsSelect"
+                      :aria-label="t('dashboard.unitLabel')"
                       @update:model-value="updateCustomPeriod"
                     >
                       <template v-slot:selected-item>

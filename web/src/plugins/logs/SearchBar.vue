@@ -568,6 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="toolbarRightRef"
         class="flex flex-shrink-0 items-center gap-1 max-md:w-full max-md:justify-end"
       >
+        <OPageHeaderStatus />
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
           <FunctionSelector
             :function-options="functionOptions"
@@ -828,7 +829,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownGroup v-if="searchObj.meta.sqlMode" :label="t('search.menuGroupExplain')">
             <ODropdownItem
               data-test="logs-search-bar-explain-query-menu-btn"
-              :disabled="!searchObj.data.query || searchObj.data.query.trim() === ''"
+              :disabled="
+                !searchObj.data.query ||
+                searchObj.data.query.trim() === '' ||
+                isExplainQuery(searchObj.data.query)
+              "
               @select="openExplainDialog"
             >
               <template #icon-left>
@@ -936,13 +941,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
             </OButtonGroup>
             <RecentSearchesButton
-              source="logs"
-              :examples="recentExamples"
+              class="me-1 size-[2.125rem]!"
               data-test="logs-search-bar-recent-searches-btn"
-              @run="(entry, when) => restoreRecent(entry, when, true)"
-              @load="(entry, when) => restoreRecent(entry, when, false)"
               @view-all="openRecentSearches"
-              @example="applyRecentExample"
             />
             <div
               v-if="
@@ -1282,6 +1283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :ai-placeholder="aiQueryPlaceholder || t('search.askAIPlaceholder')"
                 data-test="logs-search-bar-query-editor"
                 data-test-prefix="logs-search-bar"
+                text-preview
                 :free-text-decorations="
                   searchObj.meta.sqlMode ? null : searchObj.data.freeTextDecorations
                 "
@@ -1694,6 +1696,7 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import RecentSearchesButton from "@/components/queryHistory/RecentSearchesButton.vue";
 import RecentSearchesDrawer from "@/components/queryHistory/RecentSearchesDrawer.vue";
@@ -1765,7 +1768,7 @@ import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
-import { isSqlQuery } from "@/utils/query/sqlUtils";
+import { isExplainQuery, isSqlQuery } from "@/utils/query/sqlUtils";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
 import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
@@ -1865,21 +1868,22 @@ const replaceExistingFieldCondition = (
   newExpression: string,
 ): string => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
   const fieldPat = `(?:"${esc}"|${esc})`;
-  const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
+  // The lookbehind stops `operation_name` from matching inside `db_operation_name`.
+  const condPat = `(?<!\\w)(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
   const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
   if (multiRegex.test(queryStr)) {
-    return queryStr.replace(multiRegex, newExpression);
+    return queryStr.replace(multiRegex, () => newExpression);
   }
 
   // Try single condition
   const singleRegex = new RegExp(condPat, "gi");
   if (singleRegex.test(queryStr)) {
-    return queryStr.replace(singleRegex, newExpression);
+    return queryStr.replace(singleRegex, () => newExpression);
   }
 
   return queryStr;
@@ -1888,6 +1892,7 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OPageHeaderStatus,
     CreateAlertAction,
     OSeparator,
     OSplitter,
@@ -3545,9 +3550,12 @@ export default defineComponent({
       clearColumnsFromUrl();
       searchObj.shouldIgnoreWatcher = true;
       searchObj.meta.sqlMode = false;
+      const viewOrg = store.state.selectedOrganization.identifier;
+      const leftViewOrg = () => store.state.selectedOrganization.identifier !== viewOrg;
       savedviewsService
-        .getViewDetail(store.state.selectedOrganization.identifier, item.view_id)
+        .getViewDetail(viewOrg, item.view_id)
         .then(async (res) => {
+          if (leftViewOrg()) return;
           if (res.status == 200) {
             store.dispatch("setSavedViewFlag", true);
             const extractedObj = res.data.data;
@@ -3697,6 +3705,7 @@ export default defineComponent({
 
                 try {
                   const streamDataList = await Promise.all(streamDataPromises);
+                  if (leftViewOrg()) return;
 
                   // Extract max_query_range from each stream's settings
                   const streamMaxQueryRanges = streamDataList
@@ -3783,6 +3792,7 @@ export default defineComponent({
                 await updatedLocalLogFilterField();
               }
               await getStreams("logs", true);
+              if (leftViewOrg()) return;
             } else {
               // ----- Here we are explicitly handling stream change -----
               resetStreamData();
@@ -3842,6 +3852,7 @@ export default defineComponent({
               await restoreBuildData(extractedObj.data.buildData ?? null);
 
               const streamData = await getStreams(searchObj.data.stream.streamType, true);
+              if (leftViewOrg()) return;
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
               searchObj.data.stream.selectedStream = [selectedStreams];
@@ -3910,6 +3921,7 @@ export default defineComponent({
             });
             markSavedViewApplied(item.view_id);
             setTimeout(async () => {
+              if (leftViewOrg()) return;
               try {
                 searchObj.loadingHistogram = false;
                 searchObj.meta.refreshHistogram = true;
@@ -3961,6 +3973,7 @@ export default defineComponent({
           }
         })
         .catch((err) => {
+          if (leftViewOrg()) return;
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
           toast({
@@ -4814,15 +4827,12 @@ export default defineComponent({
         guardJobSnapshot.value = null;
         await getJobData(false, snapshot);
       } catch (e) {
-        const status = e?.response?.status;
+        if (e?.response?.status === 403) return;
         toast({
           variant: "error",
-          message:
-            status === 403
-              ? t("search.searchJobNoPermission")
-              : e?.response?.data?.message
-                ? raw(e.response.data.message)
-                : t("search.errorAddingJob"),
+          message: e?.response?.data?.message
+            ? raw(e.response.data.message)
+            : t("search.errorAddingJob"),
         });
       }
     };
@@ -5240,6 +5250,7 @@ export default defineComponent({
       buildStreamQuery,
       updateEditorWidth,
       showExplainDialog,
+      isExplainQuery,
       openExplainDialog,
       vrlEditorNlpMode,
       shouldMoveShareToMenu,

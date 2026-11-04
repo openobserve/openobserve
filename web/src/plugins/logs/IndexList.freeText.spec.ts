@@ -149,4 +149,18 @@ describe("IndexList with a free-text filter (item 1)", () => {
     searchObj.data.query = "timeout";
     expect(wrapper.vm.activeIncludeFilterValues).toEqual({});
   });
+
+  describe("quote unescaping (issue 11966)", () => {
+    it("returns an included value with its embedded quote undoubled (issue 11966)", () => {
+      select(stream("fts_a", true));
+      searchObj.data.query = "level='it''s' or level='b'";
+      expect(wrapper.vm.activeIncludeFilterValues).toEqual({ level: ["it's", "b"] });
+    });
+
+    it("returns an excluded value with its embedded quote undoubled (issue 11966)", () => {
+      select(stream("fts_a", true));
+      searchObj.data.query = "level!='it''s'";
+      expect(wrapper.vm.activeExcludeFilterValues).toEqual({ level: ["it's"] });
+    });
+  });
 });

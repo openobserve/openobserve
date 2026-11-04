@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             class="indexlist-search-input w-full"
             :placeholder="t('common.search')"
+            :aria-label="t('common.search')"
           />
         </div>
         <div class="min-h-0 flex-1 overflow-y-auto">
@@ -145,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     clearable
                     class="indexlist-search-input w-full"
                     :placeholder="t('common.search')"
+                    :aria-label="t('common.search')"
                   />
                 </div>
                 <div class="min-h-0 flex-1 overflow-y-auto">

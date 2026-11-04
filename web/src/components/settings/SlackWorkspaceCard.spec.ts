@@ -174,6 +174,24 @@ describe("SlackWorkspaceCard (A3)", () => {
     expect(line.attributes("data-state")).toBe("warning");
   });
 
+  it("warns about refused alert posts only when the server reports some", () => {
+    const health = installationView().health;
+    const refused_posts = {
+      count: 3,
+      last_reason: "is_archived",
+      last_destination: "sre-app",
+      last_at: (Date.now() - 120_000) * 1000,
+    };
+    const line = mountCard(installationView({ health: { ...health, refused_posts } })).find(
+      '[data-test="slack-workspace-refused"]',
+    );
+    expect(line.text()).toContain(
+      "3 alert posts failed in the last 24 h. Last: is_archived on sre-app,",
+    );
+    expect(line.text()).toMatch(/2 min/);
+    expect(mountCard().find('[data-test="slack-workspace-refused"]').exists()).toBe(false);
+  });
+
   it("AC-12.1 credentials unreadable: says so and opens Update credentials", async () => {
     const w = mountCard(installationView({ credentials_readable: false }));
     const banner = w.find('[data-test="slack-credentials-unreadable"]');

@@ -204,6 +204,7 @@ export function priorityTone(priority: number): RowRailTone {
 /** Whether a channel reaches a locked, silenced phone: texts and calls do; email and webhook land in apps a night-mode phone does not ring for. */
 export const CHANNEL_WAKES: Record<Channel, boolean> = {
   email: false,
+  slack: false,
   sms: true,
   voice: true,
   webhook: false,
@@ -301,12 +302,21 @@ export function isDeletedTeam(
   return !!teamId && knownTeamIds !== null && !knownTeamIds.includes(teamId);
 }
 
+/** A ringing page whose ladder stopped, or whose team was deleted, pages nobody; a ladder that ran out also sets `stopped_because` but is still paging. [pure] */
+export function ladderStopped(
+  progress: EscalationProgress | null | undefined,
+  teamDeleted: boolean,
+): boolean {
+  return teamDeleted || (!!progress?.stopped_because && !progress?.exhausted);
+}
+
 /** What is happening to a page, as one phrase: the Pages list, Recent pages and the page header all say this. */
 export type PagePhrase =
   | { kind: "resolved"; afterMicros: number | null }
   | { kind: "acknowledged"; by: string }
   | { kind: "snoozed"; until: number }
   | { kind: "nobodyAnswered" }
+  | { kind: "nobodyPaged" }
   | { kind: "held"; secondsLeft: number }
   | { kind: "pagesNobody" }
   | { kind: "unknown" }
@@ -330,6 +340,7 @@ export function pagePhrase(input: {
   progressLoaded: boolean;
   totalRungs?: number | null;
   reachedStep?: number | null;
+  teamDeleted?: boolean;
   nowMicros: number;
 }): PagePhrase {
   const { record, progress, nowMicros } = input;
@@ -345,6 +356,7 @@ export function pagePhrase(input: {
   // Before the exhausted check: the server flags an empty ladder exhausted, and nobody can fail to answer it.
   if (input.totalRungs === 0) return { kind: "pagesNobody" };
   if (pageState(record, progress) === "exhausted") return { kind: "nobodyAnswered" };
+  if (ladderStopped(progress, !!input.teamDeleted)) return { kind: "nobodyPaged" };
   const heldUntil = progress?.held_until_micros;
   if (heldUntil && heldUntil > nowMicros) {
     return { kind: "held", secondsLeft: Math.ceil((heldUntil - nowMicros) / 1_000_000) };
@@ -356,8 +368,10 @@ export function pagePhrase(input: {
     return { kind: "unknown" };
   }
   const step = progress ? progress.fired.length : (input.reachedStep ?? 0);
-  if (!step) return { kind: "notPaged" };
   const total = input.totalRungs ?? null;
+  // A restarted ladder's first rung is due before the scheduler sends it; that is paging, not "not paged".
+  const due = !!progress?.next_at && progress.next_at <= nowMicros;
+  if (!step) return due ? { kind: "paging", step: 1, total, who: [] } : { kind: "notPaged" };
   const last = progress?.fired[progress.fired.length - 1];
   if (last?.reached_nobody) return { kind: "reachedNobody", step, total };
   return { kind: "paging", step, total, who: last?.reached ?? [] };
@@ -525,6 +539,8 @@ export function shortReachReason(
   // Matched on the distinctive noun, not the whole sentence: the engine has
   // reworded these before, and a near-miss must degrade to the sentence rather
   // than to silence.
+  // Before "smtp": the From sentence names `ZO_SMTP_FROM_EMAIL`, which contains it.
+  if (said.includes("zo_smtp_from_email")) return t("oncall.reachShortNoFromAddress");
   if (said.includes("smtp")) return t("oncall.reachShortNoSmtp");
   if (said.includes("not a user of this organization")) return t("oncall.reachShortNoAddress");
   if (said.includes("login, not a mailbox")) return t("oncall.reachShortNotMailbox");
@@ -567,7 +583,7 @@ export function rungProblem(
 }
 
 /// The order a priority's channels are said in, whatever order they are stored in.
-const CHANNEL_ORDER: Channel[] = ["email", "sms", "voice", "webhook"];
+const CHANNEL_ORDER: Channel[] = ["email", "slack", "sms", "voice", "webhook"];
 
 /** A priority's channels as one phrase, "Email, SMS, Voice call". [pure] */
 export function channelList(channels: readonly Channel[] | undefined, t: TranslateFn): string {
@@ -709,7 +725,7 @@ export function dimensionsSentence(dimensions: Record<string, string>): string {
 }
 
 /** Mirrors `Channel::deliverable()` on the server — add to this list only when a new channel's provider actually sends. */
-export const DELIVERABLE_CHANNELS: Channel[] = ["email", "sms", "voice", "webhook"];
+export const DELIVERABLE_CHANNELS: Channel[] = ["email", "slack", "sms", "voice", "webhook"];
 
 export function isDeliverableChannel(channel: Channel): boolean {
   return DELIVERABLE_CHANNELS.includes(channel);
@@ -1085,6 +1101,17 @@ export function shiftBoundary(rule: ShiftRule, index: number, timezone: string):
   return fromLocalMicros(localAnchor + index * rule.shift_micros, timezone);
 }
 
+/** `rule`'s anchor `shifts` handovers earlier on `timezone`'s clock; mirrors `ShiftRule::offset_from`. [pure] */
+export function offsetAnchor(rule: ShiftRule, shifts: number, timezone: string): number {
+  return shiftBoundary(rule, -shifts, timezone) ?? rule.anchor_micros - shifts * rule.shift_micros;
+}
+
+/** How many shifts before `rule`'s anchor the shift containing `nowMicros` starts; zero or negative once the anchor has passed. [pure] */
+export function shiftsBackToNow(rule: ShiftRule, nowMicros: number, timezone: string): number {
+  if (!rule.shift_micros || rule.shift_micros <= 0) return 0;
+  return -localShiftIndex(rule, nowMicros, timezone);
+}
+
 /** Whether `rule` has people and a positive turn length, so its shifts can be counted. [pure] */
 function isCountable(rule: ShiftRule): boolean {
   return !!rule.members?.length && !!rule.shift_micros && rule.shift_micros > 0;
@@ -1318,14 +1345,16 @@ export function stopConsequence(
   return { takers, gap: spansOf(minutes) };
 }
 
-/** Whether the server refuses `a` and `b` side by side: same priority and identical windows. [pure] */
+/** Whether the server refuses `a` and `b` side by side: identical windows, or tied keys with hours and validity that meet. [pure] */
 export function rulesClash(a: ShiftRule, b: ShiftRule): boolean {
   const left = a.restrictions ?? [];
   const right = b.restrictions ?? [];
+  if ((a.priority ?? 0) !== (b.priority ?? 0) || left.length !== right.length) return false;
+  if (left.every((w, i) => sameWindow(w, right[i]))) return true;
   return (
-    (a.priority ?? 0) === (b.priority ?? 0) &&
-    left.length === right.length &&
-    left.every((w, i) => sameWindow(w, right[i]))
+    a.anchor_micros === b.anchor_micros &&
+    validityMeets(a, b) &&
+    spansMeet(weekCoverage(a), weekCoverage(b))
   );
 }
 
@@ -1404,6 +1433,13 @@ function sameWindow(a: TimeWindow, b: TimeWindow): boolean {
     left.length === right.length &&
     left.every((day, i) => day === right[i])
   );
+}
+
+/** Whether the two rules' `[starts_at, ends_at)` validity periods intersect; a missing bound is open. */
+function validityMeets(a: ShiftRule, b: ShiftRule): boolean {
+  const start = Math.max(a.starts_at ?? -Infinity, b.starts_at ?? -Infinity);
+  const end = Math.min(a.ends_at ?? Infinity, b.ends_at ?? Infinity);
+  return start < end;
 }
 
 /** The team-local minutes of the week a rule covers, as `[start, end)` spans. */
@@ -2083,6 +2119,25 @@ export const DEFAULT_ACTIVITY_KINDS: ResponseEventKind[] = [
   "severity_promoted",
   "flapped",
 ];
+
+/** How the engine's give-up line opens; twin of escalation.rs `GAVE_UP_MARKER`. */
+const GAVE_UP_MARKER = "nothing could be delivered to this rung";
+
+/** Whether a page that reached nobody is still retried: not once the engine gave up on its run and rung. [pure] */
+export function rungStillRetrying(
+  page: OnCallResponseEvent,
+  events: OnCallResponseEvent[],
+): boolean {
+  if (page.kind !== "page" || page.delivered !== false) return false;
+  const run = page.ladder_run ?? 1;
+  return !events.some(
+    (e) =>
+      e.kind === "sys" &&
+      (e.ladder_run ?? 1) === run &&
+      (e.rung_micros ?? null) === (page.rung_micros ?? null) &&
+      e.body.startsWith(GAVE_UP_MARKER),
+  );
+}
 
 /** What the Phone card shows; `empty` is also the form that Change reopens. */
 export type PhoneCardState = "empty" | "codeSent" | "verified" | "noProvider" | "changed";

@@ -19,6 +19,7 @@ import {
   computePrefixAssignment,
   computeSuffixGroups,
   matchesSearch,
+  matchesSearchName,
   MISC_GROUP_ID,
   type PrefixGroup,
 } from "./prefixGrouping";
@@ -314,6 +315,28 @@ describe("matchesSearch", () => {
   it("handles an undefined help text", () => {
     expect(matchesSearch(NAME, undefined, "seconds")).toBe(true);
     expect(matchesSearch(NAME, undefined, "mode")).toBe(false);
+  });
+});
+
+describe("matchesSearchName", () => {
+  const NAME = "node_disk_read_bytes_total";
+
+  it("is true only when every term is in the name", () => {
+    expect(matchesSearchName(NAME, "disk")).toBe(true);
+    expect(matchesSearchName(NAME, "READ disk")).toBe(true);
+    expect(matchesSearchName("cnpg_pg_stat_database_blks_read", "disk")).toBe(false);
+    expect(matchesSearchName(NAME, "disk spent")).toBe(false);
+  });
+
+  it("ignores the help text a matchesSearch hit may have come from", () => {
+    const help = "Blocks read from disk";
+    expect(matchesSearch("cnpg_blks_read", help, "disk")).toBe(true);
+    expect(matchesSearchName("cnpg_blks_read", "disk")).toBe(false);
+  });
+
+  it("is false for an empty or punctuation-only query", () => {
+    expect(matchesSearchName(NAME, "")).toBe(false);
+    expect(matchesSearchName(NAME, " -- ")).toBe(false);
   });
 });
 

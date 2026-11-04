@@ -29,6 +29,8 @@ use crate::{
 };
 
 const MAX_INDEX: usize = 100;
+const TRACELOOP_PROMPT_PREFIX: &str = "gen_ai.prompt";
+const TRACELOOP_COMPLETION_PREFIX: &str = "gen_ai.completion";
 
 pub struct InputOutputExtractor;
 
@@ -134,6 +136,15 @@ impl InputOutputExtractor {
             return (Some(input.clone()), output.cloned());
         }
 
+        // Structured OpenInference messages first: they keep roles and tool calls over `*.value`.
+        let (input, output) = self.extract_openinference_nested(attributes);
+        if input.is_some() || output.is_some() {
+            return (
+                input.or_else(|| attributes.get(FrameworkAttributes::INPUT_VALUE).cloned()),
+                output.or_else(|| attributes.get(FrameworkAttributes::OUTPUT_VALUE).cloned()),
+            );
+        }
+
         // SmolAgents
         if let Some(input) = attributes.get(FrameworkAttributes::INPUT_VALUE) {
             let output = attributes.get(FrameworkAttributes::OUTPUT_VALUE);
@@ -150,12 +161,6 @@ impl InputOutputExtractor {
         if let Some(input) = attributes.get(FrameworkAttributes::TOOL_ARGUMENTS) {
             let output = attributes.get(FrameworkAttributes::TOOL_RESPONSE);
             return (Some(input.clone()), output.cloned());
-        }
-
-        // OpenInference nested attributes (llm.input_messages.* and llm.output_messages.*)
-        let (input, output) = self.extract_openinference_nested(attributes);
-        if input.is_some() || output.is_some() {
-            return (input, output);
         }
 
         (None, None)
@@ -218,11 +223,28 @@ impl InputOutputExtractor {
             return true;
         }
 
-        // Check prefixes for nested attributes
-        key.starts_with("gen_ai.prompt")
-            || key.starts_with("gen_ai.completion")
-            || key.starts_with("llm.input_messages")
-            || key.starts_with("llm.output_messages")
+        // OpenInference nested messages
+        if key.starts_with("llm.input_messages") || key.starts_with("llm.output_messages") {
+            return true;
+        }
+
+        // TraceLoop nested prompt/completion (`gen_ai.prompt.0.content`, …) and
+        // other `gen_ai.prompt.*` / `gen_ai.completion.*` keys such as prompt
+        // template variables are not stored as columns. The prompt reference
+        // (name/version/label) is not a message; the processor overwrites it
+        // with the normalised value, or removes it when the value is invalid.
+        if matches!(
+            key,
+            GenAiAttributes::PROMPT_NAME
+                | GenAiAttributes::PROMPT_VERSION
+                | GenAiAttributes::PROMPT_LABEL
+        ) {
+            return false;
+        }
+        key == TRACELOOP_PROMPT_PREFIX
+            || key == TRACELOOP_COMPLETION_PREFIX
+            || key.starts_with("gen_ai.prompt.")
+            || key.starts_with("gen_ai.completion.")
     }
 
     fn extract_vercel_ai_sdk(
@@ -241,11 +263,20 @@ impl InputOutputExtractor {
 
         let output = if let Some(text) = attributes.get(VercelAiSdkAttributes::RESPONSE_TEXT) {
             if let Some(tool_calls) = attributes.get(VercelAiSdkAttributes::RESPONSE_TOOL_CALLS) {
-                Some(json::json!({
-                    "role": "assistant",
-                    "content": text,
-                    "tool_calls": tool_calls
-                }))
+                // `ai.response.toolCalls` arrives as a JSON string; embed it structurally.
+                let tool_calls = tool_calls
+                    .as_str()
+                    .and_then(|s| json::from_str::<json::Value>(s).ok())
+                    .unwrap_or_else(|| tool_calls.clone());
+                // A string, since an object would be flattened into `_role`/`_content` columns.
+                Some(json::Value::String(
+                    json::json!({
+                        "role": "assistant",
+                        "content": text,
+                        "tool_calls": tool_calls
+                    })
+                    .to_string(),
+                ))
             } else {
                 Some(text.clone())
             }
@@ -404,13 +435,13 @@ impl InputOutputExtractor {
     ) -> (Option<json::Value>, Option<json::Value>) {
         let input_attrs: HashMap<String, json::Value> = attributes
             .iter()
-            .filter(|(k, _)| k.starts_with("gen_ai.prompt"))
+            .filter(|(k, _)| is_traceloop_nested_key(k, TRACELOOP_PROMPT_PREFIX))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
 
         let output_attrs: HashMap<String, json::Value> = attributes
             .iter()
-            .filter(|(k, _)| k.starts_with("gen_ai.completion"))
+            .filter(|(k, _)| is_traceloop_nested_key(k, TRACELOOP_COMPLETION_PREFIX))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
 
@@ -421,7 +452,7 @@ impl InputOutputExtractor {
         let input = if !input_attrs.is_empty() {
             Some(convert_key_path_to_nested_object(
                 &input_attrs,
-                "gen_ai.prompt",
+                TRACELOOP_PROMPT_PREFIX,
             ))
         } else {
             None
@@ -430,7 +461,7 @@ impl InputOutputExtractor {
         let output = if !output_attrs.is_empty() {
             Some(convert_key_path_to_nested_object(
                 &output_attrs,
-                "gen_ai.completion",
+                TRACELOOP_COMPLETION_PREFIX,
             ))
         } else {
             None
@@ -480,6 +511,24 @@ impl InputOutputExtractor {
 
         (input, output)
     }
+}
+
+/// True for TraceLoop's legacy indexed message keys: `<prefix>` itself or
+/// `<prefix>.<N>[.…]` (e.g. `gen_ai.prompt.0.content`). Named keys under the
+/// same prefix, such as the prompt reference `gen_ai.prompt.name`, are not
+/// TraceLoop messages.
+fn is_traceloop_nested_key(key: &str, prefix: &str) -> bool {
+    let Some(rest) = key.strip_prefix(prefix) else {
+        return false;
+    };
+    if rest.is_empty() {
+        return true;
+    }
+    let Some(rest) = rest.strip_prefix('.') else {
+        return false;
+    };
+    let index = rest.split('.').next().unwrap_or_default();
+    !index.is_empty() && index.bytes().all(|b| b.is_ascii_digit())
 }
 
 /// Converts nested key paths (e.g., "gen_ai.prompt.0.role") to nested objects/arrays
@@ -650,6 +699,92 @@ mod tests {
         assert!(!extractor.is_input_output_attribute("gen_ai.request.model"));
     }
 
+    /// Issue #3138: two chat spans, identical except span B carries the prompt
+    /// reference (`gen_ai.prompt.name|version|label`). Both must keep their
+    /// messages, and B must keep the reference attributes.
+    #[test]
+    fn test_prompt_reference_does_not_swallow_messages() {
+        let extractor = InputOutputExtractor;
+        let input_messages =
+            json::json!(r#"[{"role":"user","parts":[{"type":"text","content":"What is 2+2?"}]}]"#);
+        let output_messages =
+            json::json!(r#"[{"role":"assistant","parts":[{"type":"text","content":"4"}]}]"#);
+        let span_a: HashMap<String, json::Value> = HashMap::from([
+            ("gen_ai.operation.name".to_string(), json::json!("chat")),
+            (
+                GenAiAttributes::INPUT_MESSAGES.to_string(),
+                input_messages.clone(),
+            ),
+            (
+                GenAiAttributes::OUTPUT_MESSAGES.to_string(),
+                output_messages.clone(),
+            ),
+        ]);
+        let mut span_b = span_a.clone();
+        span_b.insert(
+            GenAiAttributes::PROMPT_NAME.to_string(),
+            json::json!("support-answer"),
+        );
+        span_b.insert(
+            GenAiAttributes::PROMPT_VERSION.to_string(),
+            json::json!("3"),
+        );
+        span_b.insert(
+            GenAiAttributes::PROMPT_LABEL.to_string(),
+            json::json!("production"),
+        );
+
+        for attrs in [&span_a, &span_b] {
+            let (input, output) = extractor.extract(&[], attrs, "");
+            assert_eq!(input.as_ref(), Some(&input_messages));
+            assert_eq!(output.as_ref(), Some(&output_messages));
+        }
+
+        let kept: Vec<&str> = span_b
+            .keys()
+            .map(String::as_str)
+            .filter(|k| !extractor.is_input_output_attribute(k))
+            .collect();
+        for key in [
+            GenAiAttributes::PROMPT_NAME,
+            GenAiAttributes::PROMPT_VERSION,
+            GenAiAttributes::PROMPT_LABEL,
+        ] {
+            assert!(kept.contains(&key), "{key} must be kept");
+        }
+        assert!(!kept.contains(&GenAiAttributes::INPUT_MESSAGES));
+    }
+
+    #[test]
+    fn test_traceloop_nested_ignores_prompt_reference() {
+        let extractor = InputOutputExtractor;
+        let attrs = HashMap::from([
+            ("gen_ai.prompt.0.role".to_string(), json::json!("user")),
+            ("gen_ai.prompt.0.content".to_string(), json::json!("Hello")),
+            ("gen_ai.completion.0.content".to_string(), json::json!("Hi")),
+            (
+                GenAiAttributes::PROMPT_NAME.to_string(),
+                json::json!("support-answer"),
+            ),
+            (
+                "gen_ai.prompt.variable.customer".to_string(),
+                json::json!("acme"),
+            ),
+        ]);
+
+        let (input, output) = extractor.extract(&[], &attrs, "");
+        assert_eq!(
+            input,
+            Some(json::json!([{"role": "user", "content": "Hello"}]))
+        );
+        assert_eq!(output, Some(json::json!([{"content": "Hi"}])));
+
+        assert!(extractor.is_input_output_attribute("gen_ai.prompt.0.content"));
+        assert!(extractor.is_input_output_attribute("gen_ai.completion.0.content"));
+        assert!(extractor.is_input_output_attribute("gen_ai.prompt.variable.customer"));
+        assert!(!extractor.is_input_output_attribute(GenAiAttributes::PROMPT_NAME));
+    }
+
     #[test]
     fn test_extract_traceloop_nested() {
         let extractor = InputOutputExtractor;
@@ -688,6 +823,105 @@ mod tests {
         assert!(input_arr.is_array());
         assert_eq!(input_arr[0]["role"], "user");
         assert_eq!(input_arr[0]["content"], "Test");
+    }
+
+    #[test]
+    fn test_openinference_structured_messages_win_over_input_value() {
+        let extractor = InputOutputExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "input.value".to_string(),
+            json::json!(r#"{"messages":[{"role":"user","content":"Weather?"}]}"#),
+        );
+        attrs.insert("output.value".to_string(), json::json!(r#"{"id":"x"}"#));
+        attrs.insert(
+            "llm.input_messages.0.message.role".to_string(),
+            json::json!("user"),
+        );
+        attrs.insert(
+            "llm.input_messages.0.message.content".to_string(),
+            json::json!("Weather?"),
+        );
+        attrs.insert(
+            "llm.input_messages.1.message.role".to_string(),
+            json::json!("tool"),
+        );
+        attrs.insert(
+            "llm.input_messages.1.message.content".to_string(),
+            json::json!("sunny"),
+        );
+        attrs.insert(
+            "llm.output_messages.0.message.role".to_string(),
+            json::json!("assistant"),
+        );
+        attrs.insert(
+            "llm.output_messages.0.message.tool_calls.0.tool_call.function.name".to_string(),
+            json::json!("get_weather"),
+        );
+
+        let (input, output) = extractor.extract(&[], &attrs, "openinference");
+        let input = input.unwrap();
+        assert_eq!(input[0]["message"]["role"], "user");
+        assert_eq!(input[0]["message"]["content"], "Weather?");
+        assert_eq!(input[1]["message"]["role"], "tool");
+        let output = output.unwrap();
+        assert_eq!(output[0]["message"]["role"], "assistant");
+        assert_eq!(
+            output[0]["message"]["tool_calls"][0]["tool_call"]["function"]["name"],
+            "get_weather"
+        );
+    }
+
+    #[test]
+    fn test_openinference_side_without_structured_messages_keeps_its_value() {
+        let extractor = InputOutputExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("input.value".to_string(), json::json!("raw request"));
+        attrs.insert("output.value".to_string(), json::json!("streamed answer"));
+        attrs.insert(
+            "llm.input_messages.0.message.role".to_string(),
+            json::json!("user"),
+        );
+        attrs.insert(
+            "llm.input_messages.0.message.content".to_string(),
+            json::json!("Weather?"),
+        );
+
+        let (input, output) = extractor.extract(&[], &attrs, "openinference");
+        assert_eq!(input.unwrap()[0]["message"]["content"], "Weather?");
+        assert_eq!(output, Some(json::json!("streamed answer")));
+    }
+
+    #[test]
+    fn test_smolagents_input_value_without_structured_messages() {
+        let extractor = InputOutputExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("input.value".to_string(), json::json!("task"));
+        attrs.insert("output.value".to_string(), json::json!("answer"));
+
+        let (input, output) = extractor.extract(&[], &attrs, "smolagents");
+        assert_eq!(input, Some(json::json!("task")));
+        assert_eq!(output, Some(json::json!("answer")));
+    }
+
+    #[test]
+    fn test_vercel_tool_call_step_output_is_single_string() {
+        let extractor = InputOutputExtractor;
+        let mut attrs = HashMap::new();
+        attrs.insert("ai.response.text".to_string(), json::json!(""));
+        attrs.insert(
+            "ai.response.toolCalls".to_string(),
+            json::json!(r#"[{"toolCallId":"c1","toolName":"weather","input":"{}"}]"#),
+        );
+
+        let (_, output) = extractor.extract(&[], &attrs, "ai");
+        let output = output.unwrap();
+        let s = output
+            .as_str()
+            .expect("output must be a single JSON string");
+        let parsed: json::Value = json::from_str(s).unwrap();
+        assert_eq!(parsed["role"], "assistant");
+        assert_eq!(parsed["tool_calls"][0]["toolName"], "weather");
     }
 
     #[test]

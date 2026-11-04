@@ -352,22 +352,20 @@ export default class DashboardactionPage {
       const applyBtn = document.querySelector('[data-test="dashboard-apply"]');
       if (!applyBtn) return false;
       return !applyBtn.disabled;
-    }, { timeout: 30000 });
+    }, undefined, { timeout: 30000 });
   }
 
   // The apply button stays enabled for ~100ms after the click, so waitForChartToRender alone can pass before the query starts and the table later resets to empty.
-  async applyAndWaitForPromQLQuery() {
+  async applyAndWaitForPromQLQuery(isTarget = () => true) {
     const promqlResponse = this.page.waitForResponse(
-      (res) => res.url().includes("/prometheus/api/v1/query_range"),
+      (res) => res.url().includes("/prometheus/api/v1/query_range") && isTarget(new URL(res.url())),
       { timeout: 30000 }
     );
     await this.applyDashboardBtn();
     const response = await promqlResponse;
-    // A streamed (text/event-stream) response never reports finished; waitForChartToRender covers completion.
-    if (!(await response.headerValue("content-type"))?.includes("text/event-stream")) {
-      await response.finished();
-    }
+    await response.finished();
     await this.waitForChartToRender();
+    return response;
   }
 
   /** Resolves with the URL of the next PromQL query_range request; call before the action that fires it. */
@@ -384,6 +382,23 @@ export default class DashboardactionPage {
     return this.page.locator(
       `[data-test="dashboard-edit-panel-${panelName}-dropdown"]`
     );
+  }
+
+  /** Sorted sample values of every series in a finished PromQL query_range event-stream response. */
+  async promqlSampleValues(response) {
+    return (await response.text())
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => {
+        try {
+          return JSON.parse(line.slice("data: ".length));
+        } catch {
+          return null;
+        }
+      })
+      .flatMap((event) => event?.data?.result ?? [])
+      .map((series) => Number((series.value ?? series.values?.at(-1))?.[1]))
+      .sort((a, b) => a - b);
   }
 
   async selectPanelAction(panelName, action) {
@@ -606,6 +621,7 @@ export default class DashboardactionPage {
             cell.offsetParent !== null && cell.textContent.trim().length > 0,
         );
       },
+      undefined,
       { timeout },
     );
   }
@@ -738,15 +754,6 @@ export default class DashboardactionPage {
     );
   }
 
-  /** Sum of the first pie's positive slice values: the basis ECharts and the legend take percents of. */
-  async getPieSliceTotal() {
-    const [pie] = await this.getChartSeries();
-    return (pie?.values ?? [])
-      .map(Number)
-      .filter((v) => Number.isFinite(v) && v > 0)
-      .reduce((a, b) => a + b, 0);
-  }
-
   /**
    * Assert every entry reads "<value>  <percent>%" with `decimals` digits, the value matching its slice
    * (a K/M/B/T abbreviation is expanded) and the percent matching its share of the positive total.
@@ -754,7 +761,11 @@ export default class DashboardactionPage {
    * @param {number} decimals - panel Decimals setting
    */
   async expectPieLegendValueAndPercent(entries, decimals = 2) {
-    const total = await this.getPieSliceTotal();
+    // Summed from the same snapshot: a second read can land on a later render with different data.
+    const total = entries
+      .map((entry) => entry.value)
+      .filter((v) => Number.isFinite(v) && v > 0)
+      .reduce((a, b) => a + b, 0);
     expect(total, "pie slice total").toBeGreaterThan(0);
     for (const entry of entries) {
       const [valueText, percentText] = this.getPieLegendTokens(entry);

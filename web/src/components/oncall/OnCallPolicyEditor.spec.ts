@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
 import { resetOnCallPermissions } from "@/composables/useOnCallPermissions";
@@ -160,6 +160,109 @@ describe("OnCallPolicyEditor", () => {
     expect(wrapper.find('[data-test="oncall-policy-channels-hint"]').text()).toBe(
       "Everyone paged at P1 gets the same set. Texts and calls go to people with a verified phone.",
     );
+  });
+
+  /// DM-2: Slack is offered only while the org has Slack on, and never pages without Email.
+  describe("the Slack tick", () => {
+    const tick = async (wrapper: ReturnType<typeof render>, channel: string, on: boolean) => {
+      wrapper
+        .findComponent(`[data-test="oncall-policy-channel-1-${channel}"]`)
+        .vm.$emit("update:modelValue", on);
+      await flushPromises();
+    };
+    const email = (wrapper: ReturnType<typeof render>) =>
+      wrapper.find('[data-test="oncall-policy-channel-1-email"] input');
+    const locked = (wrapper: ReturnType<typeof render>) =>
+      wrapper.find('[data-test="oncall-policy-email-locked"]');
+
+    afterEach(() => {
+      store.state.zoConfig.slack_enabled = undefined;
+    });
+
+    it("sits after Email while Slack is on for the org", async () => {
+      store.state.zoConfig.slack_enabled = true;
+      const wrapper = render();
+      await flushPromises();
+
+      const ticks = wrapper
+        .findAll('[data-test^="oncall-policy-channel-1-"]')
+        .map((el) => el.attributes("data-test"));
+      expect(ticks).toEqual([
+        "oncall-policy-channel-1-email",
+        "oncall-policy-channel-1-slack",
+        "oncall-policy-channel-1-sms",
+        "oncall-policy-channel-1-voice",
+        "oncall-policy-channel-1-webhook",
+      ]);
+      expect(wrapper.find('[data-test="oncall-policy-channel-1-slack"]').text()).toBe("Slack");
+    });
+
+    it("ticks and locks Email with the reason, and unticking Slack unlocks Email still ticked", async () => {
+      store.state.zoConfig.slack_enabled = true;
+      const wrapper = render();
+      await flushPromises();
+      await tick(wrapper, "email", false);
+
+      await tick(wrapper, "slack", true);
+      expect((email(wrapper).element as HTMLInputElement).checked).toBe(true);
+      expect(email(wrapper).attributes("disabled")).toBeDefined();
+      expect(locked(wrapper).text()).toBe(
+        "Email stays on with Slack: people without a linked Slack account still get the email.",
+      );
+
+      await tick(wrapper, "slack", false);
+      expect((email(wrapper).element as HTMLInputElement).checked).toBe(true);
+      expect(email(wrapper).attributes("disabled")).toBeUndefined();
+      expect(locked(wrapper).exists()).toBe(false);
+    });
+
+    it("keeps a stored Slack tick while Slack is off so it can be unticked", async () => {
+      const stored = { ...policy, rungs: [{ ...policy.rungs[0], channels: ["email", "slack"] }] };
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: {
+          teamId: "team_1",
+          policy: stored as OnCallPolicy,
+          open: true,
+          rotations: ROTATIONS,
+        },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+
+      const slack = wrapper.find('[data-test="oncall-policy-channel-1-slack"] input');
+      expect((slack.element as HTMLInputElement).checked).toBe(true);
+      expect(email(wrapper).attributes("disabled")).toBeDefined();
+
+      await tick(wrapper, "slack", false);
+      expect(email(wrapper).attributes("disabled")).toBeUndefined();
+    });
+
+    /// DM-8: a Slack step is refused while a node runs another version; the server's words are shown.
+    it("shows the server's 409 when a node is on another version", async () => {
+      store.state.zoConfig.slack_enabled = true;
+      service.setPolicy.mockRejectedValue({
+        response: { status: 409, data: { message: "Upgrade every node first: node-b" } },
+      });
+      const wrapper = render();
+      await flushPromises();
+      await tick(wrapper, "slack", true);
+
+      await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+      await flushPromises();
+
+      expect(service.setPolicy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            rungs: expect.arrayContaining([
+              expect.objectContaining({ priority: 1, channels: ["email", "slack"] }),
+            ]),
+          }),
+        }),
+      );
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "error", message: "Upgrade every node first: node-b" }),
+      );
+    });
   });
 
   /// U4, D13: said as soon as the tick changes; Save still goes to the server.
@@ -666,6 +769,101 @@ describe("OnCallPolicyEditor", () => {
       expect(wrapper.find('[data-test="oncall-team-channel-silent"]').exists()).toBe(false);
     });
 
+    /// RO-1: the Slack card sits under the team channel; its changes are written at once.
+    describe("the Slack channel", () => {
+      const SLACK_READ = {
+        team_id: "team_1",
+        destinations: ["slack-eng"],
+        source: "team",
+        slack_channel_set: true,
+        slack_channel_name: "pay",
+        slack_same_room_destination: null,
+        slack_native: true,
+        slack_connected: true,
+        slack_unavailable_reason: null,
+        slack_post_problem: null,
+      };
+      const card = (wrapper: any) => wrapper.findComponent({ name: "OnCallTeamSlackChannel" });
+
+      afterEach(() => {
+        store.state.zoConfig.slack_enabled = undefined;
+      });
+
+      it("is hidden while Slack is off for the org", async () => {
+        service.getTeamChannel.mockResolvedValue({ data: SLACK_READ } as any);
+        const wrapper = render();
+        await flushPromises();
+        expect(card(wrapper).exists()).toBe(false);
+      });
+
+      it("sends the card's change with the team's stored list, keeping the draft", async () => {
+        store.state.zoConfig.slack_enabled = true;
+        service.getTeamChannel.mockResolvedValue({ data: SLACK_READ } as any);
+        service.setTeamChannel.mockResolvedValue({
+          data: { ...SLACK_READ, slack_same_room_destination: "slack-eng" },
+        } as any);
+        const wrapper = mount(OnCallPolicyEditor, {
+          props: { teamId: "team_1", policy, open: true, teamName: "Payments" },
+          global: { plugins: [i18n, store], stubs },
+        });
+        await flushPromises();
+        expect(card(wrapper).props("teamName")).toBe("Payments");
+
+        wrapper
+          .findComponent('[data-test="oncall-team-channel-select"]')
+          .vm.$emit("update:modelValue", ["slack-ops"]);
+        card(wrapper).vm.$emit("save", { slack_same_room_destination: "slack-eng" });
+        await flushPromises();
+
+        expect(service.setTeamChannel).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: { destinations: ["slack-eng"], slack_same_room_destination: "slack-eng" },
+          }),
+        );
+        expect(card(wrapper).props("channel").slack_same_room_destination).toBe("slack-eng");
+        expect(
+          wrapper.findComponent('[data-test="oncall-team-channel-select"]').props("modelValue"),
+        ).toEqual(["slack-ops"]);
+      });
+
+      it("sends null for a list the team inherits from the policy", async () => {
+        store.state.zoConfig.slack_enabled = true;
+        service.getTeamChannel.mockResolvedValue({
+          data: { ...SLACK_READ, source: "policy" },
+        } as any);
+        service.setTeamChannel.mockResolvedValue({ data: SLACK_READ } as any);
+        const wrapper = render();
+        await flushPromises();
+
+        card(wrapper).vm.$emit("save", { clear_slack: true });
+        await flushPromises();
+
+        expect(service.setTeamChannel).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { destinations: null, clear_slack: true } }),
+        );
+      });
+
+      it("names a refused change", async () => {
+        store.state.zoConfig.slack_enabled = true;
+        service.getTeamChannel.mockResolvedValue({ data: SLACK_READ } as any);
+        service.setTeamChannel.mockRejectedValue({
+          response: { status: 400, data: { message: "not one of the team's destinations" } },
+        });
+        const wrapper = render();
+        await flushPromises();
+
+        card(wrapper).vm.$emit("save", { slack_same_room_destination: "x" });
+        await flushPromises();
+
+        expect(toast).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            variant: "error",
+            message: "not one of the team's destinations",
+          }),
+        );
+      });
+    });
+
     // S13: one Save in the drawer, writing the channel only when it changed.
     describe("one Save", () => {
       const channelSelect = (wrapper: any) =>
@@ -972,6 +1170,49 @@ describe("targets that name a rotation", () => {
     await flushPromises();
 
     expect(savedTargets().filter((t: any) => t.rotation_id === "rot_primary")).toHaveLength(2);
+  });
+
+  /// R8: a rotation lands on the open priority alone until "All priorities" is ticked.
+  it("adds a rotation to the open priority only, unless All priorities is ticked", async () => {
+    const twoPriorities: OnCallPolicy = {
+      ...policy,
+      rungs: [1, 2].map((priority) => ({
+        priority,
+        steps: [{ after_micros: 0, targets: [{ kind: "user", email: "ana@o2.ai" }] }],
+        channels: ["email"],
+      })),
+    };
+    const wrapper = mount(OnCallPolicyEditor, {
+      props: { teamId: "team_1", policy: twoPriorities, open: true, rotations: TWO },
+      global: { plugins: [i18n, store], stubs },
+    });
+    await flushPromises();
+    const pick = async (rotationId: string, allPriorities?: boolean) => {
+      targetPicker(wrapper).vm.$emit("update:modelValue", "rotation");
+      await flushPromises();
+      const box = wrapper.findComponent('[data-test="oncall-policy-rotation-all-priorities"]');
+      if (allPriorities === undefined) expect(box.props("modelValue")).toBe(false);
+      else box.vm.$emit("update:modelValue", allPriorities);
+      await flushPromises();
+      wrapper
+        .findComponent('[data-test="oncall-policy-pick-rotation-1-0"]')
+        .vm.$emit("update:modelValue", rotationId);
+      await flushPromises();
+    };
+    await pick("rot_primary");
+    await pick("rot_secondary", true);
+
+    await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+    await flushPromises();
+
+    const { rungs } = (service.setPolicy.mock.calls.at(-1)![0] as any).data;
+    const rotationsOf = (priority: number) =>
+      rungs
+        .find((r: any) => r.priority === priority)
+        .steps[0].targets.filter((t: any) => t.kind === "rotation")
+        .map((t: any) => t.rotation_id);
+    expect(rotationsOf(1)).toEqual(["rot_primary", "rot_secondary"]);
+    expect(rotationsOf(2)).toEqual(["rot_secondary"]);
   });
 
   /// Found by this suite leaking between tests: `reset` shallow-copied each

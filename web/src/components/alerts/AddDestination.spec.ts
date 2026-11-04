@@ -324,6 +324,35 @@ describe("AddDestination - custom path schema gating + payload parity", () => {
   });
 });
 
+describe("AddDestination - refused save", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it.each([
+    ["create", undefined],
+    ["update", { name: "dest1", url: "https://example.com/webhook", method: "post", type: "http" }],
+  ])("closes its loading toast when a %s is refused with a 403", async (op, destination) => {
+    const dismissLoading = vi.fn();
+    vi.mocked(toast).mockReturnValueOnce(dismissLoading);
+    const service = destinationService as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    service[op].mockRejectedValueOnce({ response: { status: 403 } });
+    wrapper = mountComp({ isAlerts: true, ...(destination ? { destination } : {}) });
+    await flushPromises();
+    const form = destination ? getForm(wrapper) : await toCustomHttp(wrapper);
+    form.setFieldValue("name", "dest1");
+    form.setFieldValue("url", "https://example.com/webhook");
+    form.setFieldValue("method", "post");
+    form.setFieldValue("template", "tmpl1");
+    await nextTick();
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(service[op]).toHaveBeenCalledTimes(1);
+    expect(dismissLoading).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls.map((c) => c[0].variant)).toEqual(["loading"]);
+  });
+});
+
 describe("AddDestination - pipeline (!isAlerts) branch", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -1669,6 +1698,46 @@ describe("AddDestination — email destinations", () => {
     expect(wrapper.find('[data-test="prebuilt-additional-settings"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
       true,
+    );
+  });
+
+  it("keeps Save hidden for Jira until the create screen has loaded", async () => {
+    wrapper = mountComp();
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "jira");
+    form.setFieldValue("type", "http");
+    form.setFieldValue("credentials", {
+      deployment: "cloud",
+      connectedAs: "Alerts Bot",
+      projectKey: "OPS",
+      issueTypeId: "10004",
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="add-destination-submit-btn"]').exists()).toBe(false);
+  });
+
+  it("hides Additional Settings for Jira once it is ready to save", async () => {
+    wrapper = mountComp();
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "jira");
+    form.setFieldValue("type", "http");
+    form.setFieldValue("credentials", {
+      deployment: "cloud",
+      connectedAs: "Alerts Bot",
+      projectKey: "OPS",
+      issueTypeId: "10004",
+      createMeta: {
+        projectName: "Operations",
+        issueTypeName: "Bug",
+        hasLabels: true,
+        requiredFields: [],
+      },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="add-destination-submit-btn"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="prebuilt-additional-settings"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="add-destination-skip-tls-verify-toggle"]').exists()).toBe(
+      false,
     );
   });
 

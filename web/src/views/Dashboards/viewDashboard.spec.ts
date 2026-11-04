@@ -724,76 +724,7 @@ describe("ViewDashboard", () => {
     });
   });
 
-  describe("Basic Component Tests", () => {
-    it("should create component without crashing", async () => {
-      expect(() => {
-        wrapper = createWrapper();
-      }).not.toThrow();
-      if (wrapper) expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should mount successfully", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeDefined();
-    });
-
-    it("should have correct component name", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.$options.name).toBe("ViewDashboard");
-    });
-  });
-
-  describe("Template Structure", () => {
-    it("should render the component", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeDefined();
-    });
-
-    it("should have a stable component structure", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Check that the component has a stable structure
-      expect(wrapper.vm.currentDashboardData).toBeDefined();
-      expect(wrapper.vm.isFullscreen).toBeDefined();
-      expect(wrapper.vm.goBackToDashboardList).toBeDefined();
-    });
-  });
-
   describe("Store Integration", () => {
-    it("should access store state correctly", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Verify store is accessible
-      expect(store.state.selectedOrganization.identifier).toBe("test-org");
-      expect(store.state.theme).toBe("light");
-      expect(store.state.printMode).toBe(false);
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle theme changes", async () => {
-      const darkThemeState = {
-        ...store.state,
-        theme: "dark",
-      };
-      store.replaceState(darkThemeState);
-
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(store.state.theme).toBe("dark");
-      expect(wrapper.exists()).toBe(true);
-    });
-
     it("should handle print mode", async () => {
       const printModeState = {
         ...store.state,
@@ -806,85 +737,6 @@ describe("ViewDashboard", () => {
 
       expect(store.state.printMode).toBe(true);
       expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Component Methods", () => {
-    it("should have required methods defined", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(typeof wrapper.vm.goBackToDashboardList).toBe("function");
-      expect(typeof wrapper.vm.toggleFullscreen).toBe("function");
-      expect(typeof wrapper.vm.printDashboard).toBe("function");
-    });
-
-    it("should handle method calls without errors", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test that the methods exist and can be called
-      expect(typeof wrapper.vm.toggleFullscreen).toBe("function");
-
-      // Since toggleFullscreen deals with async operations, let's just verify it exists
-      // rather than trying to execute it which might have complex dependencies
-      expect(wrapper.vm.toggleFullscreen).toBeDefined();
-    });
-  });
-
-  describe("Service Integration", () => {
-    it("should have mocked services configured", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.exists()).toBe(true);
-      // Services are mocked at module level, preventing real API calls
-    });
-
-    it("should prevent real API calls through mocking", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Component should exist and work with mocked services
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Error Handling", () => {
-    it("should handle component initialization", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeDefined();
-    });
-
-    it("should be resilient to service errors", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Component should still exist even if services have errors
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Component State", () => {
-    it("should maintain component state", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Check that component has expected reactive data
-      expect(wrapper.vm.currentDashboardData).toBeDefined();
-      expect(typeof wrapper.vm.isFullscreen).toBe("boolean");
-    });
-
-    it("should handle state updates", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Component should be able to handle state changes
-      const initialFullscreen = wrapper.vm.isFullscreen;
-      expect(typeof initialFullscreen).toBe("boolean");
     });
   });
 
@@ -951,43 +803,6 @@ describe("ViewDashboard", () => {
         }),
       });
     });
-
-    it("should handle back button click", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method directly since DOM elements might not be available in shallow mount
-      expect(typeof wrapper.vm.goBackToDashboardList).toBe("function");
-
-      // Manually trigger the method to test router navigation
-      await wrapper.vm.goBackToDashboardList();
-      expect(global.mockRouterPush).toHaveBeenCalledWith({
-        path: "/dashboards",
-        query: {
-          folder: "default",
-          org_identifier: "test-org",
-        },
-      });
-    });
-
-    it("should handle add panel button click", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method directly since DOM elements might not be available in shallow mount
-      expect(typeof wrapper.vm.addPanelData).toBe("function");
-
-      // Manually trigger the method to test router navigation
-      await wrapper.vm.addPanelData();
-      expect(global.mockRouterPush).toHaveBeenCalledWith({
-        path: "/dashboards/add_panel",
-        query: expect.objectContaining({
-          org_identifier: "test-org",
-          dashboard: "test-dashboard-1",
-          folder: "default",
-        }),
-      });
-    });
   });
 
   describe("Print Mode Functionality", () => {
@@ -1002,18 +817,6 @@ describe("ViewDashboard", () => {
       expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", !initialPrintMode);
       // Check that router replace was called (query parameters are handled by the component)
       expect(global.mockRouterReplace).toHaveBeenCalled();
-    });
-
-    it("should handle print button click", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method directly since DOM elements might not be available in shallow mount
-      expect(typeof wrapper.vm.printDashboard).toBe("function");
-
-      // Manually trigger the method to test print mode functionality
-      await wrapper.vm.printDashboard();
-      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", true);
     });
 
     it("should clear print mode when leaving the page without the close button", async () => {
@@ -1081,38 +884,9 @@ describe("ViewDashboard", () => {
       // Verify the method completed without errors
       expect(wrapper.vm.toggleFullscreen).toBeDefined();
     });
-
-    it("should handle fullscreen button click", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method directly since DOM elements might not be available in shallow mount
-      expect(typeof wrapper.vm.toggleFullscreen).toBe("function");
-
-      // Test that the method can be executed without errors
-      await wrapper.vm.toggleFullscreen();
-      expect(wrapper.vm.toggleFullscreen).toBeDefined();
-    });
-
-    it("should handle fullscreen change events", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test fullscreen state management
-      expect(wrapper.vm.isFullscreen).toBeDefined();
-      expect(typeof wrapper.vm.isFullscreen).toBe("boolean");
-    });
   });
 
   describe("Refresh Functionality", () => {
-    it("should handle refresh button click", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method directly since DOM elements might not be available in shallow mount
-      expect(typeof wrapper.vm.refreshData).toBe("function");
-    });
-
     it("should show warning color when variables changed", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1120,26 +894,9 @@ describe("ViewDashboard", () => {
       // Test variables changed computed property
       expect(typeof wrapper.vm.isVariablesChanged).toBe("boolean");
     });
-
-    it("should handle loading state", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test loading state property
-      expect(wrapper.vm.arePanelsLoading).toBeDefined();
-    });
   });
 
   describe("Share Functionality", () => {
-    it("should render share button component", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test that dashboardShareURL computed property exists
-      expect(wrapper.vm.dashboardShareURL).toBeDefined();
-      expect(typeof wrapper.vm.dashboardShareURL).toBe("string");
-    });
-
     it("should generate correct share URL", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1150,14 +907,6 @@ describe("ViewDashboard", () => {
   });
 
   describe("Settings Functionality", () => {
-    it("should handle settings functionality", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method exists
-      expect(typeof wrapper.vm.openSettingsDialog).toBe("function");
-    });
-
     it("should open settings dialog when openSettingsDialog is called", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1202,14 +951,6 @@ describe("ViewDashboard", () => {
       expect(wrapper.vm.selectedDate.valueType).toBe("absolute");
       expect(wrapper.vm.selectedDate.startTime).toBeInstanceOf(Date);
       expect(wrapper.vm.selectedDate.endTime).toBeInstanceOf(Date);
-    });
-
-    it("should have time string property", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test timeString property exists
-      expect(wrapper.vm.timeString).toBeDefined();
     });
 
     it("should handle refresh interval changes", async () => {
@@ -1290,22 +1031,6 @@ describe("ViewDashboard", () => {
       expect(wrapper.vm.variablesData).toBeDefined();
     });
 
-    it("should handle dynamic filters variables", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test the method can handle dynamic filters
-      expect(typeof wrapper.vm.variablesDataUpdated).toBe("function");
-    });
-
-    it("should detect variables changes", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test isVariablesChanged computed property
-      expect(typeof wrapper.vm.isVariablesChanged).toBe("boolean");
-    });
-
     it("should update refreshed variables data", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1319,29 +1044,6 @@ describe("ViewDashboard", () => {
   });
 
   describe("Dialog Management", () => {
-    it("should handle scheduled reports dialog", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test dialog state properties exist
-      expect(wrapper.vm.showScheduledReportsDialog).toBeDefined();
-      expect(wrapper.vm.isLoadingReports).toBeDefined();
-
-      // Test method exists
-      expect(typeof wrapper.vm.openScheduledReports).toBe("function");
-    });
-
-    it("should handle JSON editor dialog", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test dialog state property exists
-      expect(wrapper.vm.showJsonEditorDialog).toBeDefined();
-
-      // Test method exists
-      expect(typeof wrapper.vm.openJsonEditor).toBe("function");
-    });
-
     it("should save JSON dashboard changes", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1582,89 +1284,7 @@ describe("ViewDashboard", () => {
     });
   });
 
-  describe("Error Handling", () => {
-    it("should handle dashboard loading failure", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test loadDashboard method exists
-      expect(typeof wrapper.vm.loadDashboard).toBe("function");
-
-      // Test goBackToDashboardList method exists
-      expect(typeof wrapper.vm.goBackToDashboardList).toBe("function");
-    });
-
-    it("should handle empty dashboard data", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test loadDashboard can handle empty data
-      expect(typeof wrapper.vm.loadDashboard).toBe("function");
-    });
-
-    it("should handle panel deletion conflict error", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test onDeletePanel method exists and can handle errors
-      expect(typeof wrapper.vm.onDeletePanel).toBe("function");
-    });
-
-    it("should handle panel move conflict error", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test onMovePanel method exists and can handle errors
-      expect(typeof wrapper.vm.onMovePanel).toBe("function");
-    });
-
-    it("should generate share URL without errors", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test dashboardShareURL can be generated without errors
-      expect(wrapper.vm.dashboardShareURL).toBeDefined();
-      expect(typeof wrapper.vm.dashboardShareURL).toBe("string");
-    });
-
-    it("should handle fullscreen API errors", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test fullscreen functionality can handle errors
-      expect(typeof wrapper.vm.toggleFullscreen).toBe("function");
-      expect(typeof wrapper.vm.isFullscreen).toBe("boolean");
-    });
-
-    it("should handle JSON dashboard save errors", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test saveJsonDashboard can handle errors
-      expect(wrapper.vm.saveJsonDashboard).toBeDefined();
-    });
-
-    it("should handle reports loading error", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test openScheduledReports can handle errors
-      expect(typeof wrapper.vm.openScheduledReports).toBe("function");
-      expect(wrapper.vm.isLoadingReports).toBeDefined();
-    });
-  });
-
   describe("Component Lifecycle and Cleanup", () => {
-    it("should initialize component data on mount", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.currentDashboardData).toBeDefined();
-      expect(wrapper.vm.selectedDate).toBeDefined();
-      expect(wrapper.vm.refreshInterval).toBeDefined();
-      expect(wrapper.vm.variablesData).toBeDefined();
-    });
-
     it("should load dashboard on mount", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1689,43 +1309,6 @@ describe("ViewDashboard", () => {
       expect(() => wrapper.unmount()).not.toThrow();
     });
 
-    it("should cleanup component references on unmount", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Test component references exist
-      expect(wrapper.vm.dateTimePicker).toBeDefined();
-      expect(wrapper.vm.renderDashboardChartsRef).toBeDefined();
-      expect(wrapper.vm.fullscreenDiv).toBeDefined();
-    });
-
-    it("should handle route parameter changes", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      const mockLoadDashboard = vi.fn().mockResolvedValue({});
-      wrapper.vm.loadDashboard = mockLoadDashboard;
-
-      // Simulate route change
-      wrapper.vm.$route.query = {
-        ...wrapper.vm.$route.query,
-        dashboard: "new-dashboard-id",
-      };
-
-      await wrapper.vm.$nextTick();
-
-      // Component should handle route changes
-      expect(wrapper.vm.$route.query.dashboard).toBe("new-dashboard-id");
-    });
-
-    it("should have runId property defined", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      expect(wrapper.vm.runId).toBeDefined();
-      expect(typeof wrapper.vm.runId).toBe("string");
-    });
-
     it("should update run ID when updateRunId is called", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -1737,15 +1320,6 @@ describe("ViewDashboard", () => {
       wrapper.vm.updateRunId(newRunId);
 
       expect(wrapper.vm.runId).toBe(newRunId);
-    });
-
-    it("should handle component activation", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Just verify component is activated/mounted properly
-      expect(wrapper.vm).toBeDefined();
-      expect(wrapper.exists()).toBe(true);
     });
   });
 

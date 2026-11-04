@@ -107,15 +107,27 @@ test.describe("Reports form validation — required field errors", () => {
 test.describe("Reports form validation — absolute timerange with no dates falls back to relative", () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
+    let dashboard = null;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
+        // The default folder can be empty, so the dashboard dropdown needs one of our own to list.
+        const res = await createDashboardViaApi(pm.apiCleanup, `test_fv_reports_tr_dash_${uniqueSuffix()}`);
+        expect(res.success, res.error).toBe(true);
+        dashboard = res.dashboard;
         await pm.reportsFormValidation.navigateToReports();
         await pm.reportsFormValidation.openCreateReportForm();
         await pm.reportsFormValidation.waitForFormSeeded();
         testLogger.info('Navigated to Create Report form for timerange test');
+    });
+
+    test.afterEach(async () => {
+        if (dashboard) {
+            await pm.apiCleanup.deleteDashboard(dashboard.dashboard_id, 'default');
+            dashboard = null;
+        }
     });
 
     test("absolute timerange with no dates falls back to the relative default", {
@@ -125,8 +137,8 @@ test.describe("Reports form validation — absolute timerange with no dates fall
 
         // Select folder and dashboard (must be present to reach timerange validation)
         await pm.reportsFormValidation.selectDashboardFolder('default');
-        await pm.reportsFormValidation.selectFirstDashboard();
-        await pm.reportsFormValidation.selectFirstDashboardTab();
+        await pm.reportsFormValidation.selectDashboard(dashboard.dashboard_id, dashboard.title);
+        await pm.reportsFormValidation.selectDashboardTab(dashboard.tabs[0].tab_id);
         await pm.reportsFormValidation.fillReportName('validname_tr_test');
 
         // Open the timerange picker and switch to absolute mode without setting dates

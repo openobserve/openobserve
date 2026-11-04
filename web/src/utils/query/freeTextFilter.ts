@@ -361,7 +361,13 @@ export function quoteFreeTextPhrase(raw: string): string {
 
 export function isAuthoredStatement(raw: string): boolean {
   const word = leadingWord(raw);
-  return word === "select" || word === "with";
+  if (word === "select" || word === "with") return true;
+  if (word !== "explain") return false;
+  // A bare "explain" is a field name; only a plan keyword after it makes a statement.
+  const start = skipTrivia(raw, 0, false);
+  return (
+    start !== null && /^explain\s+(?:analyze|verbose|format|select|with)\b/i.test(raw.slice(start))
+  );
 }
 
 export function looksLikeSqlStatement(raw: string, lookup?: StreamLookup): boolean {

@@ -6,6 +6,7 @@ import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
+const { ingestTraces } = require('../../playwright-tests/utils/trace-ingestion.js');
 
 // Rate and Errors come from web/src/plugins/traces/metrics/metrics.json; Duration is the latency heatmap.
 const TRACES_METRICS_PANELS = ['Rate', 'Errors', 'Duration'];
@@ -13,8 +14,50 @@ const CHART_ZOOM_START_RATIO = 0.35;
 const CHART_ZOOM_END_RATIO = 0.75;
 const CHART_DRAG_STEPS = 20;
 const QUERY_CLEAR_ATTEMPTS = 10;
+const DURATION_UNIT_US = { us: 1, ms: 1000, s: 1000000 };
+
+export function decodedSqlOf(request) {
+  if (request.method() !== 'POST' || !/_search/.test(request.url())) return null;
+  const body = request.postDataJSON?.() ?? null;
+  const query = body?.query ?? {};
+  if (typeof query.sql !== 'string') return null;
+  const base64 = body.encoding === 'base64' || query.encoding === 'base64';
+  return {
+    sql: base64 ? Buffer.from(query.sql, 'base64').toString('utf8') : query.sql,
+    start: query.start_time,
+    end: query.end_time,
+  };
+}
+
+// The comparison sends its own counts and LIMIT 4000 samples; nothing else does.
+export const isComparison = (q) => /^SELECT count\(\*\) AS n\b/.test(q.sql) || /LIMIT 4000$/.test(q.sql);
+export const isCount = (q) => /^SELECT count\(\*\) AS n\b/.test(q.sql);
+// The table search: spans mode posts a base64 `SELECT *` SQL.
+export const isTableSearch = (q) => /^SELECT \* FROM/.test(q.sql);
+
+// The band's bounds in µs as the SQL writes them; a missing side is absent.
+export function bandSql(editorBand) {
+  const toUs = (m) => (m ? Number(m[1]) * DURATION_UNIT_US[m[2]] : null);
+  const lo = toUs(editorBand.match(/duration >= '(\d+)(us|ms|s)'/));
+  const hi = toUs(editorBand.match(/duration < '(\d+)(us|ms|s)'/));
+  return [lo ? `duration >= ${lo}` : '', hi !== null ? `duration < ${hi}` : ''].filter(Boolean).join(' AND ');
+}
 
 export class TracesPage {
+  // Static so a beforeAll, which has no page fixture, can seed through its own context.
+  static async seedTraces(browser, ageMs = 0) {
+    const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
+    const page = await context.newPage();
+    try {
+      for (const scenario of [{ count: 6, forceScenario: 'error' }, { count: 10, forceScenario: 'success' }]) {
+        const seeded = await ingestTraces(page, scenario.count, { forceScenario: scenario.forceScenario, ageMs });
+        expect(seeded.failed, `Seeding ${scenario.forceScenario} traces must succeed`).toBe(0);
+      }
+    } finally {
+      await context.close();
+    }
+  }
+
   constructor(page) {
     this.page = page;
 
@@ -119,6 +162,12 @@ export class TracesPage {
     this.tracesNoStreamCard = '[data-test="traces-no-stream-select-stream-card"]';
     // Duration latency heatmap — source: web/src/plugins/traces/metrics/TracesLatencyHeatmap.vue
     this.latencyHeatmap = '[data-test="traces-latency-heatmap"]';
+    // A drawn box opens a popover; nothing is applied until one of its actions is clicked.
+    this.heatmapSelectionBox = '[data-test="traces-latency-heatmap-selection"]';
+    this.heatmapSelectionCount = '[data-test="traces-latency-heatmap-selection-count"]';
+    this.heatmapSelectionFilter = '[data-test="traces-latency-heatmap-selection-filter"]';
+    this.heatmapSelectionDrillDown = '[data-test="traces-latency-heatmap-selection-drill-down"]';
+    this.heatmapSelectionClear = '[data-test="traces-latency-heatmap-selection-clear"]';
     // Auto Run (live mode) toggle in the Run Query dropdown — source: web/src/plugins/traces/SearchBar.vue
     this.liveModeToggleItem = '[data-test="traces-search-bar-live-mode-toggle-btn"]';
 
@@ -133,6 +182,7 @@ export class TracesPage {
     this.comparisonBaselineBefore = '[data-test="traces-comparison-baseline-toggle-before"]';
     this.comparisonBaselineOutside = '[data-test="traces-comparison-baseline-toggle-outside"]';
     this.comparisonFieldCards = '[data-test^="traces-comparison-field-"]';
+    this.drillDownPage = '[data-test="traces-drill-down-page"]';
     this.drillDownBackButton = '[data-test="traces-drill-down-back-btn"]';
 
     // Index List / Field List
@@ -207,16 +257,8 @@ export class TracesPage {
   }
 
   // Getter methods for common trace elements
-  getTraceDetailsElements() {
-    return this.page.locator('[data-test="trace-details-header"], [data-test="trace-details-tree"], [data-test="trace-details-sidebar"]');
-  }
-
   getTraceResultItems() {
     return this.page.locator(this.searchResultItem);
-  }
-
-  getResultsContainer() {
-    return this.page.locator(this.searchResultList).first();
   }
 
   async navigateToTraces() {
@@ -895,6 +937,32 @@ export class TracesPage {
     }
   }
 
+  traceRowLinks() {
+    return this.page.locator('[data-test="trace-row-link"]');
+  }
+
+  // A cell without the link, so the row's own middle-click handler runs rather than the browser's native link handling.
+  firstRowNonLinkCell() {
+    return this.page
+      .locator('[data-test^="o2-table-row-"]')
+      .first()
+      .locator('td[data-test^="o2-table-cell-"]:not(:has(a))')
+      .first();
+  }
+
+  trackNewPages(context) {
+    const opened = [];
+    context.on('page', (p) => opened.push(p));
+    return opened;
+  }
+
+  // The fixed wait is deliberate: a second tab would open late, and there is no event for "nothing else opened".
+  async expectOneNewPage(opened) {
+    await expect.poll(() => opened.length, { timeout: 10000 }).toBe(1);
+    await this.page.waitForTimeout(1000);
+    expect(opened, 'exactly one new tab must open').toHaveLength(1);
+  }
+
   /**
    * Setup trace search with stream and time range
    * @param {string} streamName - Stream name to select
@@ -1078,14 +1146,6 @@ export class TracesPage {
     } catch {
       return false;
     }
-  }
-
-  /**
-   * Get trace count from results
-   * @returns {number} Number of visible traces
-   */
-  async getTraceCount() {
-    return await this.page.locator(this.searchResultItem).count();
   }
 
   /**
@@ -2040,6 +2100,12 @@ export class TracesPage {
     return '';
   }
 
+  /** Leave the Drill down page with its back button and wait for it to close. */
+  async closeComparison() {
+    await this.page.locator(this.drillDownBackButton).click();
+    await this.page.locator(this.drillDownPage).waitFor({ state: 'hidden', timeout: 15000 });
+  }
+
   /** @returns {Promise<{ name: string, score: number }[]>} the comparison cards in render order */
   async getComparisonCards() {
     return await this.page.locator(this.comparisonFieldCards).evaluateAll((cards) =>
@@ -2216,17 +2282,41 @@ export class TracesPage {
   }
 
   /**
-   * Drag across both axes of the Duration panel so the selection carries a real
-   * duration band; a flat horizontal drag collapses it to a single value.
-   * @returns {Promise<boolean>} true when the drag was performed
+   * Draw a box on the Duration heatmap and wait for its popover; the box alone writes nothing.
+   * @param {{ startRatio?: number, endRatio?: number, yStartRatio?: number, yEndRatio?: number }} [range]
+   * @returns {Promise<boolean>} true when the box was drawn and its popover opened
+   */
+  async boxDurationBand(range = { startRatio: 0.25, endRatio: 0.8, yStartRatio: 0.15, yEndRatio: 0.85 }) {
+    if (!(await this.zoomOnMetricsPanel('Duration', range))) return false;
+    return await this.page
+      .locator(this.heatmapSelectionCount)
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  /** Click "Filter to selection" in the open heatmap popover and wait for the popover to close. */
+  async filterToHeatmapSelection() {
+    await this.page.locator(this.heatmapSelectionFilter).click();
+    await this.page.locator(this.heatmapSelectionCount).waitFor({ state: 'hidden', timeout: 15000 });
+    await this.page.waitForTimeout(1000);
+  }
+
+  /** Click "Drill down" in the open heatmap popover; returns the comparison's terminal state. */
+  async drillDownHeatmapSelection() {
+    await this.page.locator(this.heatmapSelectionDrillDown).click();
+    return await this.waitForComparisonState();
+  }
+
+  /**
+   * Box a real duration band on the Duration heatmap and apply it with "Filter to selection",
+   * which writes the band into the editor.
+   * @returns {Promise<boolean>} true when the box was drawn and applied
    */
   async zoomDurationBand() {
-    return await this.zoomOnMetricsPanel('Duration', {
-      startRatio: 0.25,
-      endRatio: 0.8,
-      yStartRatio: 0.15,
-      yEndRatio: 0.85,
-    });
+    if (!(await this.boxDurationBand())) return false;
+    await this.filterToHeatmapSelection();
+    return true;
   }
 
   /**

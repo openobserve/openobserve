@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="email"
           :loading="loading"
           :forbidden="forbidden"
+          forbidden-resource="users"
           :selected-ids="selectedUserIds"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
@@ -407,7 +408,8 @@ import {
 import { blockEmailsInConfig } from "@/components/settings/orgDomainRestrictions";
 import { queryClient } from "@/composables/query/queryClient";
 import { useMutation } from "@tanstack/vue-query";
-import { defineComponent, ref, onActivated, onBeforeMount, watch, computed } from "vue";
+import { defineComponent, ref, toRef, onActivated, onBeforeMount, watch, computed } from "vue";
+import { useListViewState } from "@/composables/useListViewState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -485,7 +487,7 @@ export default defineComponent({
     const { usersState } = usePermissions();
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
-    const filterQuery = ref("");
+    const filterQuery = toRef(useListViewState("iam-users", { filterQuery: "" }), "filterQuery");
 
     const toCamelCase = (str: string) => {
       return str.charAt(0).toUpperCase() + str.slice(1);
@@ -1053,7 +1055,6 @@ export default defineComponent({
             console.error("Failed to fetch org members:", err);
             dismiss();
             forbidden.value = err?.response?.status === 403;
-            // The grouped access toast already reports a 403; a second red toast adds nothing.
             if (!forbidden.value) {
               toast({
                 variant: "error",
@@ -1191,6 +1192,8 @@ export default defineComponent({
 
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
+      // A manually opened dialog consumes the ?email= latch so the post-save repaint cannot reopen it.
+      deepLinkOpened = true;
       selectedUser.value.organization = store.state.selectedOrganization.identifier;
 
       if (props.row != undefined) {
@@ -1580,7 +1583,7 @@ export default defineComponent({
           });
         }
       } catch (err: any) {
-        if (err.response?.status != 403 || err?.status != 403) {
+        if (err.response?.status !== 403 && err?.status !== 403) {
           toast({
             message: blocked
               ? t("iam.user.blockedUsersNotRemoved", { count: emails.length })

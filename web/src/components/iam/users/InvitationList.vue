@@ -333,7 +333,6 @@ export default defineComponent({
         const e = error as { response?: { status?: number; data?: { message?: string } } };
         dismiss();
         forbidden.value = e.response?.status === 403;
-        // The grouped access toast already reports a 403; a second red toast adds nothing.
         if (!forbidden.value) {
           toast({
             message: raw(e.response?.data?.message || t("iam.invitationList.failedLoadPending")),

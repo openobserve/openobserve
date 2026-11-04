@@ -1875,6 +1875,10 @@ export const BADGE_GROUPS = {
       action: { variant: "purple-soft", labelKey: "components.badge.rumEventType.action" },
       error: { variant: "error-soft", labelKey: "common.error" },
       resource: { variant: "teal-soft", labelKey: "components.badge.rumEventType.resource" },
+      failedrequest: {
+        variant: "error-soft",
+        labelKey: "components.badge.rumEventType.failedrequest",
+      },
       longtask: { variant: "warning-soft", labelKey: "components.badge.rumEventType.longtask" },
     },
     fallback: { variant: "default-soft" },
@@ -2004,6 +2008,7 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       scheduled: { variant: "default-soft", labelKey: "fleet.badge.scheduled" },
+      waiting: { variant: "warning-soft", labelKey: "fleet.badge.waiting" },
       inprogress: { variant: "primary-soft", labelKey: "fleet.badge.inProgress" },
       completed: { variant: "success-soft", labelKey: "fleet.badge.completed" },
       halted: { variant: "error-soft", labelKey: "fleet.badge.halted" },
@@ -2052,6 +2057,19 @@ export const BADGE_GROUPS = {
       },
       pending: { variant: "blue-soft", labelKey: "components.badge.slackInstallStatus.pending" },
       revoked: { variant: "error-soft", labelKey: "components.badge.slackInstallStatus.revoked" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+  // Workflow run status as the history API stores it; rendered as given, never derived from `error`.
+  hookRunStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      queued: { variant: "warning-soft", labelKey: "workflow.history.statusQueued" },
+      running: { variant: "blue-soft", labelKey: "workflow.history.statusRunning" },
+      succeeded: { variant: "success-soft", labelKey: "workflow.history.success" },
+      failed: { variant: "error-soft", labelKey: "workflow.history.failed" },
+      expired: { variant: "default-soft", labelKey: "workflow.history.statusExpired" },
     },
     fallback: { variant: "default-soft" },
   },

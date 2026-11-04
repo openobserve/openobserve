@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             width="xs"
             :placeholder="t('alerts.priorityUnset')"
+            :aria-label="t('alerts.priority')"
             data-test="anomaly-priority-select"
           />
         </div>
@@ -53,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="min-w-60 flex-1">
           <OTagInput
             v-model="tagsModel"
+            :aria-label="t('alerts.tags')"
             :placeholder="t('alerts.placeholders.addTag')"
             data-test="anomaly-tags-input"
           />
@@ -61,7 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Enable Notifications toggle -->
       <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
+        <div
+          id="anomaly-alert-enabled-heading"
+          class="flex h-9 w-47.5 shrink-0 items-center font-semibold"
+        >
           {{ t("alerts.anomaly.notifications") }}
           <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
@@ -69,7 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex h-11 items-center">
           <OSwitch
+            id="anomaly-alert-enabled-switch"
             v-model="configModel.alert_enabled"
+            aria-labelledby="anomaly-alert-enabled-heading anomaly-alert-enabled-switch-label"
             :label="
               config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')
             "
@@ -87,13 +94,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex flex-wrap items-center gap-y-1">
             <OSelect
               v-model="configModel.alert_destination_ids"
-              :options="destinations"
+              :options="destinationOptions"
               labelKey="name"
               valueKey="name"
               multiple
               searchable
               :placeholder="t('alerts.summary.noDestination')"
               class="h-auto! min-h-auto! max-w-105 min-w-0 flex-1 basis-75"
+              :aria-label="t('alerts.destination')"
               data-test="anomaly-destination"
             >
               <template #selected-item="{ index, opt, removeAtIndex }">
@@ -166,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             valueKey="value"
             :searchable="false"
             width="sm"
+            :aria-label="t('alerts.anomaly.alertDirection')"
             data-test="anomaly-alert-direction"
           />
         </div>
@@ -273,7 +282,7 @@ export default defineComponent({
       required: true,
     },
     destinations: {
-      type: Array as PropType<(SelectOption & { name: string })[]>,
+      type: Array as PropType<(SelectOption & { name: string; destination_type_name?: string })[]>,
       default: () => [],
     },
   },
@@ -367,6 +376,11 @@ export default defineComponent({
       return 1;
     });
 
+    // Anomaly detection posts a plain body to the destination URL, which for Jira is the site root.
+    const destinationOptions = computed(() =>
+      props.destinations.filter((d) => d.destination_type_name !== "jira"),
+    );
+
     const openAddDestination = () => {
       const route = router.resolve({
         name: "alertDestinations",
@@ -383,6 +397,7 @@ export default defineComponent({
       priorityOptions,
       tagsModel,
       openAddDestination,
+      destinationOptions,
       visibleChipCount,
       destinationStatus,
       directionOptions,

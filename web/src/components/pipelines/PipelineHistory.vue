@@ -767,7 +767,6 @@ const fetchPipelineHistory = async (force = false) => {
     console.error("Error fetching pipeline history:", error);
     console.error("Error response:", error.response);
     forbidden.value = error?.response?.status === 403;
-    // The grouped access toast already reports a 403; a second red toast adds nothing.
     if (!forbidden.value) {
       toast({
         variant: "error",

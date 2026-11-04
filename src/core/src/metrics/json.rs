@@ -311,7 +311,7 @@ fn finish_rows(
 async fn buffer_stream_rows(
     org_id: &str,
     stream_name: &str,
-    (rows, first_type): (Vec<Row>, Option<&'static str>),
+    (mut rows, first_type): (Vec<Row>, Option<&'static str>),
     lookups: &mut StreamLookups,
     partitions: &mut HashMap<String, SchemaRecords>,
 ) -> Result<Option<TriggerAlertData>> {
@@ -340,18 +340,16 @@ async fn buffer_stream_rows(
 
     let has_uds = matches!(lookups.user_defined_schemas.get(stream_name), Some(Some(_)));
     let min_timestamp = rows.iter().map(|(_, ts)| *ts).min().unwrap_or(0);
-    let record_refs: Vec<&json::Map<String, json::Value>> =
-        rows.iter().map(|(record, ..)| record).collect();
     let (schema, schema_key) = ingest::resolve_batch_schema(
         org_id,
         stream_name,
         &mut lookups.schemas,
-        &record_refs,
+        &mut rows,
+        |(record, _)| record,
         min_timestamp,
         has_uds,
     )
     .await?;
-    drop(record_refs);
 
     let alerts = lookups
         .alerts
@@ -554,7 +552,7 @@ pub async fn ingest(
     )
     .await?;
 
-    ingest::observe_request(ENDPOINT, org_id, &start);
+    ingest::observe_request(ENDPOINT, org_id, &start, http::StatusCode::OK);
     ingest::spawn_triggers(stream_trigger_map);
 
     Ok(IngestionResponse::new(
@@ -1413,7 +1411,7 @@ mod tests {
         }
 
         #[test]
-        fn test_json_serialization_performance() {
+        fn test_json_serialization_round_trips() {
             let record = create_test_metric_record(
                 "serialization_test",
                 "counter",
@@ -1425,16 +1423,11 @@ mod tests {
                 ],
             );
 
-            let start = std::time::Instant::now();
-            let serialized = serde_json::to_string(&record);
-            let duration = start.elapsed();
-
-            assert!(serialized.is_ok());
-            assert!(duration.as_micros() < 1000); // Should be very fast
-
-            let json_string = serialized.unwrap();
+            let json_string = serde_json::to_string(&record).unwrap();
             assert!(json_string.contains("serialization_test"));
             assert!(json_string.contains("999.999"));
+            let parsed: serde_json::Value = serde_json::from_str(&json_string).unwrap();
+            assert_eq!(parsed, record);
         }
     }
 }

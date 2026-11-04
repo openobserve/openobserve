@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="name"
             :loading="loading"
             :forbidden="forbidden"
+            forbidden-resource="functions"
             pagination="client"
             :current-page="currentPage"
             @update:current-page="onPageChange"
@@ -938,7 +939,7 @@ export default defineComponent({
           error.response?.data?.message ||
           error?.message ||
           t("functions.bulkDeleteFunctionsFailed");
-        if (error.response?.status != 403 || error?.status != 403) {
+        if (error.response?.status !== 403 && error?.status !== 403) {
           toast({
             variant: "error",
             message: errorMessage,

@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             :name="row.starred ? 'star' : 'history'"
             size="xs"
-            :class="row.starred ? 'text-accent' : 'text-select-item-selected-text'"
+            :class="row.starred ? 'text-favorite' : 'text-select-item-selected-text'"
           />
         </span>
         <OTruncatedText :tooltip="false" class="flex-1 font-mono text-xs">
@@ -416,20 +416,5 @@ const pickActive = (event: KeyboardEvent) => {
   return true;
 };
 
-/** Handles a key pressed while focus is still outside the list; true when it was used. */
-const handleOutsideKey = (event: KeyboardEvent) => {
-  if (isPlainEnter(event)) return hoveredId.value !== null && pickActive(event);
-  if (event.key === "PageDown" || event.key === "PageUp") {
-    onKeydown(event);
-    return event.defaultPrevented;
-  }
-  if (!["ArrowDown", "ArrowUp", "Escape"].includes(event.key)) return false;
-  onKeydown(event);
-  return true;
-};
-
-/** Focuses the list itself rather than its first control, so Enter reaches the hovered row. */
-const focusRoot = () => rootRef.value?.focus();
-
-defineExpose({ focusFirst, focusRoot, pickActive, handleOutsideKey, scrollDetails, ownsNode });
+defineExpose({ focusFirst, pickActive, scrollDetails, ownsNode });
 </script>

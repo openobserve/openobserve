@@ -115,7 +115,7 @@ vi.mock("./llmInsightsDashboard.utils", () => ({
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import SessionDetails from "./SessionDetails.vue";
 
 // ---------------------------------------------------------------------------
@@ -387,6 +387,22 @@ describe("SessionDetails — KPI strip", () => {
     expect(latencyKpi.text()).toContain("traces.sessionDetail.kpi.duration");
   });
 
+  it("shows the session's duration in the Duration tile, not the average turn", async () => {
+    mockFetchSession.mockResolvedValue({
+      detail: makeDetail({ durationNanos: 90_000_000_000 }),
+      traces: [
+        makeTrace({ traceId: "t1", durationNanos: 400_000_000 }),
+        makeTrace({ traceId: "t2", durationNanos: 600_000_000 }),
+      ],
+    });
+    const wrapper = await mountComponent();
+    const latencyKpi = wrapper.find("[data-test='session-detail-kpi-latency']");
+    // splitDuration is mocked to echo its µs input: the tile value is the
+    // session's 90 s; the 500 ms average turn moves to the sub-line.
+    expect(latencyKpi.text()).toContain("traces.sessionDetail.kpi.duration90000000ns");
+    expect(latencyKpi.text()).toContain('"avg":"500000ns"');
+  });
+
   it("renders KPI strip with Tokens label", async () => {
     const wrapper = await mountComponent();
     const tokensKpi = wrapper.find("[data-test='session-detail-kpi-tokens']");
@@ -410,6 +426,64 @@ describe("SessionDetails — KPI strip", () => {
 
     expect(costKpi.text()).toContain("$0.0069");
     expect(costKpi.text()).not.toContain("$0.01");
+  });
+
+  describe("peak-turn chip on the Cost tile", () => {
+    const peakChips = (wrapper: VueWrapper) =>
+      wrapper
+        .find("[data-test='session-detail-kpi-cost']")
+        .findAll("[data-test='turn-preview-stub']");
+
+    it("is shown for an exact cost", async () => {
+      const wrapper = await mountComponent();
+      expect(peakChips(wrapper)).toHaveLength(1);
+    });
+
+    it("is hidden when the cost is unknown (every token unpriced)", async () => {
+      mockFetchSession.mockResolvedValue({
+        detail: makeDetail({ cost: 0, tokens: 300, unpricedTokens: 300, unpricedModels: ["m"] }),
+        traces: [
+          makeTrace({ traceId: "t1", cost: 0, tokens: 150, unpricedTokens: 150 }),
+          makeTrace({ traceId: "t2", cost: 0, tokens: 150, unpricedTokens: 150 }),
+        ],
+      });
+      const wrapper = await mountComponent();
+      expect(peakChips(wrapper)).toHaveLength(0);
+    });
+
+    it("for a partial cost, names the peak turn only when it carries a priced cost", async () => {
+      mockFetchSession.mockResolvedValue({
+        detail: makeDetail({
+          cost: 0.004,
+          tokens: 300,
+          unpricedTokens: 150,
+          unpricedModels: ["m"],
+        }),
+        traces: [
+          makeTrace({ traceId: "t1", cost: 0.004, tokens: 150, unpricedTokens: 0 }),
+          makeTrace({ traceId: "t2", cost: 0, tokens: 150, unpricedTokens: 150 }),
+        ],
+      });
+      let wrapper = await mountComponent();
+      expect(peakChips(wrapper)).toHaveLength(1);
+
+      // Rounding left every turn at $0: the peak is turn 1 by default, whose
+      // tokens are all unpriced, so there is no priced peak to name.
+      mockFetchSession.mockResolvedValue({
+        detail: makeDetail({
+          cost: 0.004,
+          tokens: 300,
+          unpricedTokens: 150,
+          unpricedModels: ["m"],
+        }),
+        traces: [
+          makeTrace({ traceId: "t1", cost: 0, tokens: 150, unpricedTokens: 150 }),
+          makeTrace({ traceId: "t2", cost: 0, tokens: 150, unpricedTokens: 0 }),
+        ],
+      });
+      wrapper = await mountComponent();
+      expect(peakChips(wrapper)).toHaveLength(0);
+    });
   });
 
   it("renders net cache impact with cost breakdown from session cache fields", async () => {

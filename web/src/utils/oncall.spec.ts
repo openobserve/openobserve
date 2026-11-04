@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import type {
   EscalationLevel,
   EscalationTarget,
+  OnCallResponseEvent,
   Rotation,
   ShiftRule,
   TimeWindow,
@@ -44,6 +45,7 @@ import {
   isShiftRuleValid,
   isSnoozed,
   isDeletedTeam,
+  ladderStopped,
   pagePhrase,
   reachedStepOf,
   pageState,
@@ -94,6 +96,8 @@ import {
   dayRows,
   stopChoices,
   stopConsequence,
+  offsetAnchor,
+  rungStillRetrying,
   stateTagVariant,
   upcomingShifts,
   windowContains,
@@ -135,6 +139,11 @@ describe("shift maths matches the server (shift_parity.json)", () => {
       member: c.holder,
     });
     expect(second).toMatchObject({ startMicros: c.next_handover, member: c.next_holder });
+    const secondaryAnchor = offsetAnchor(rule, 1, c.timezone);
+    expect(secondaryAnchor).toBe(c.secondary_anchor);
+    expect(
+      nextHandover({ ...rule, anchor_micros: secondaryAnchor }, secondaryAnchor, c.timezone),
+    ).toBe(c.secondary_next_handover);
   });
 });
 
@@ -508,6 +517,36 @@ describe("isDeletedTeam", () => {
   });
 });
 
+describe("ladderStopped", () => {
+  const progress = (exhausted: boolean, stopped_because: string | null) =>
+    ({ fired: [], next_targets: [], next_at: null, exhausted, stopped_because }) as any;
+
+  it.each([
+    [
+      "an exhausted ladder",
+      progress(true, "the ladder is exhausted — nobody acknowledged"),
+      false,
+      false,
+    ],
+    [
+      "a ladder stopped for another reason",
+      progress(false, "the owning team was deleted"),
+      false,
+      true,
+    ],
+    ["a climbing ladder", progress(false, null), false, false],
+    [
+      "a deleted team, even with an exhausted ladder",
+      progress(true, "the ladder is exhausted — nobody acknowledged"),
+      true,
+      true,
+    ],
+    ["a deleted team with no progress loaded", undefined, true, true],
+  ])("%s", (_name, ladder, teamDeleted, expected) => {
+    expect(ladderStopped(ladder, teamDeleted)).toBe(expected);
+  });
+});
+
 describe("reachedStepOf", () => {
   it("names the 1-based step a recorded rung delay matches, or nothing", () => {
     const steps = [{ after_micros: 900 }, { after_micros: 0 }, { after_micros: 300 }];
@@ -607,6 +646,35 @@ describe("pagePhrase", () => {
         { kind: "paging", step: 2, total: 3, who: [] },
       ],
       ["not paged", {}, { progress: ladder() }, { kind: "notPaged" }],
+      [
+        "the first rung is due but not sent yet (after an unack restarts the ladder)",
+        {},
+        { progress: ladder({ next_at: NOW - SEC }) },
+        { kind: "paging", step: 1, total: 3, who: [] },
+      ],
+      [
+        "the first rung is still to come",
+        {},
+        { progress: ladder({ next_at: NOW + 60 * SEC }) },
+        { kind: "notPaged" },
+      ],
+      [
+        "its team was deleted, with no progress loaded",
+        {},
+        { reachedStep: 2, teamDeleted: true },
+        { kind: "nobodyPaged" },
+      ],
+      [
+        "the ladder stopped (its team was deleted)",
+        {},
+        {
+          progress: ladder({
+            fired: [rung(["ana@o2.ai"]), rung(["bo@o2.ai"]), rung(["cy@o2.ai"])],
+            stopped_because: "the owning team was deleted",
+          }),
+        },
+        { kind: "nobodyPaged" },
+      ],
       [
         "empty ladder on a list without progress, where the record says it ran out",
         { exhausted_at: NOW },
@@ -1261,6 +1329,7 @@ describe("CHANNEL_WAKES", () => {
   // how a team discovers at 3 a.m. that their P1 only ever sent an email.
   it.each([
     ["email", false],
+    ["slack", false],
     ["sms", true],
     ["voice", true],
     ["webhook", false],
@@ -1660,6 +1729,35 @@ describe("isOnCallUnavailable", () => {
   });
 });
 
+/// A rung the engine gave up on is settled, so its lost page must not still promise a retry.
+describe("rungStillRetrying", () => {
+  const event = (over: Partial<OnCallResponseEvent>): OnCallResponseEvent => ({
+    kind: "page",
+    at: 1,
+    actor: "engine",
+    body: "paged ana@o2.ai",
+    rung_micros: 0,
+    ladder_run: 2,
+    ...over,
+  });
+  const lost = event({ delivered: false });
+  const gaveUp = (over: Partial<OnCallResponseEvent> = {}) =>
+    event({
+      kind: "sys",
+      body: "nothing could be delivered to this rung in 3 attempts; the ladder carries on",
+      ...over,
+    });
+  it.each([
+    ["a lost page with no give-up", lost, [lost], true],
+    ["a lost page the engine gave up on", lost, [lost, gaveUp()], false],
+    ["a give-up for another rung", lost, [lost, gaveUp({ rung_micros: 60 })], true],
+    ["a give-up from an earlier run", lost, [lost, gaveUp({ ladder_run: 1 })], true],
+    ["a page that reached somebody", event({}), [event({})], false],
+  ] as const)("%s", (_name, page, events, expected) => {
+    expect(rungStillRetrying(page, [...events])).toBe(expected);
+  });
+});
+
 /// A finished sentence is a paragraph on a rail. The badge is four words and
 /// the sentence stays on hover — but only where the cause is one we know.
 describe("shortReachReason", () => {
@@ -1672,6 +1770,12 @@ describe("shortReachReason", () => {
         t,
       ),
     ).toBe("oncall.reachShortNoSmtp");
+    expect(
+      shortReachReason(
+        "`ZO_SMTP_FROM_EMAIL` is missing or invalid, so no email page can be sent",
+        t,
+      ),
+    ).toBe("oncall.reachShortNoFromAddress");
     expect(shortReachReason("`ana@o2.ai` is not a user of this organization", t)).toBe(
       "oncall.reachShortNoAddress",
     );
@@ -2280,9 +2384,27 @@ describe("rotation editor: how several shift rules add up", () => {
       ],
       ["different priority, same hours", shiftRule("A", { priority: 1 }), shiftRule("B"), false],
       [
-        "days in a different order are different",
+        "days in a different order still share their hours",
         shiftRule("A", { restrictions: [window([0, 1], 0, 60)] }),
         shiftRule("B", { restrictions: [window([1, 0], 0, 60)] }),
+        true,
+      ],
+      [
+        "same priority, window count and anchor, overlapping hours",
+        shiftRule("A", { restrictions: [window([], 0, 1440)] }),
+        shiftRule("B", { restrictions: [window([], 180, 300)] }),
+        true,
+      ],
+      [
+        "overlapping hours with a different anchor",
+        shiftRule("A", { restrictions: [window([], 0, 1440)] }),
+        shiftRule("B", { anchor_micros: MON + 1, restrictions: [window([], 180, 300)] }),
+        false,
+      ],
+      [
+        "overlapping hours in validity periods that never meet",
+        shiftRule("A", { ends_at: MON + MICROS_PER_WEEK, restrictions: [window([], 0, 1440)] }),
+        shiftRule("B", { starts_at: MON + MICROS_PER_WEEK, restrictions: [window([], 180, 300)] }),
         false,
       ],
     ])("%s", (_name, a, b, expected) => {
@@ -2495,8 +2617,8 @@ describe("channelList", () => {
   const t = ((k: string) => k) as any;
 
   it("says the channels in the fixed order, whatever order they are stored in", () => {
-    expect(channelList(["voice", "email", "sms"], t)).toBe(
-      "oncall.channel_email, oncall.channel_sms, oncall.channel_voice",
+    expect(channelList(["voice", "slack", "email", "sms"], t)).toBe(
+      "oncall.channel_email, oncall.channel_slack, oncall.channel_sms, oncall.channel_voice",
     );
   });
 

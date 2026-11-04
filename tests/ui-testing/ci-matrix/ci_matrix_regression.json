@@ -12,7 +12,10 @@
       "logs-14376-int64-precision.spec.js",
       "logs-stream-selector.spec.js",
       "logs-table-stream-switch.spec.js",
-      "logs-internal-streams.spec.js"
+      "logs-internal-streams.spec.js",
+      "logs-11966-value-multiselect-quotes.spec.js",
+      "logs-explain-sql-mode.spec.js",
+      "logs-3322-field-filter-similar-names.spec.js"
     ],
     "disabled": []
   },
@@ -108,7 +111,9 @@
       "traces-15189-saved-views-more-menu.spec.js",
       "traces-15222-string-replay-flag.spec.js",
       "traces-15248-llm-session-reply.spec.js",
-      "traces-15269-services-catalog-state.spec.js"
+      "traces-15269-services-catalog-state.spec.js",
+      "traces-15477-open-trace-new-tab.spec.js",
+      "traces-ent3126-dag-controls-dark.spec.js"
     ],
     "disabled": []
   },

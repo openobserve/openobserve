@@ -34,7 +34,7 @@ const replaceExistingFieldConditionForTest = (
   newExpression: string,
 ): string => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
   const fieldPat = `(?:"${esc}"|${esc})`;
   const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
@@ -4484,7 +4484,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
       newExpr: string,
     ): string => {
       const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+      const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
       const opPat = `(?:=|!=|is(?:\\s+not)?)`;
       const fieldPat = `(?:"${esc}"|${esc})`;
       const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;

@@ -702,6 +702,18 @@ describe("FieldList.vue Comprehensive Coverage", () => {
     });
   });
 
+  describe("Active filter values with embedded quotes (issue 11966)", () => {
+    it("returns an included value with its quote undoubled", () => {
+      wrapper = createWrapper({ query: "brand = 'it''s'" });
+      expect((wrapper.vm as any).activeIncludeFilterValues["brand"]).toEqual(["it's"]);
+    });
+
+    it("returns an excluded value with its quote undoubled", () => {
+      wrapper = createWrapper({ query: "brand != 'it''s'" });
+      expect((wrapper.vm as any).activeExcludeFilterValues["brand"]).toEqual(["it's"]);
+    });
+  });
+
   describe("Embedded Single Quote Escaping", () => {
     // Regression: a value containing a literal ' must have it doubled before
     // being wrapped in the outer quotes, otherwise the generated SQL is invalid.

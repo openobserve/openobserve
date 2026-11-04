@@ -39,6 +39,7 @@ export class LogsPage {
         this.logsMenuItem = '[data-test="menu-link-\\/logs-item"]';
         this.homeButton = "[name ='home']";
         this.queryButton = "[data-test='logs-search-bar-refresh-btn']";
+        this.runQueryButton = "button[data-test='logs-search-bar-refresh-btn']:not([title*='Cancel'])";
         this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
         // Post UX-revamp: renamed from logs-search-bar-quick-mode-toggle-btn
         this.quickModeToggle = '[data-test="logs-search-bar-menu-quick-mode-toggle-btn"]';
@@ -1920,7 +1921,7 @@ export class LogsPage {
 
     // Search partition methods
     async clickRunQueryButton() {
-        await this.page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
+        await this.page.locator(this.runQueryButton).click();
     }
 
     async verifySearchPartitionResponse() {
@@ -2630,7 +2631,7 @@ export class LogsPage {
         await this.enableSqlModeIfNeeded();
         await this.page.waitForTimeout(1000);
 
-        await this.page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
+        await this.page.locator(this.runQueryButton).click();
         
         // Wait for query execution and results to load
         await this.page.waitForTimeout(3000);
@@ -3077,7 +3078,7 @@ export class LogsPage {
             const isCancel = text.includes('Cancel') || title.toLowerCase().includes('cancel');
             return !disabled && !isCancel;
         }, this.queryButton, { timeout: 30000 });
-        return await btn.click();
+        return await this.page.locator(this.runQueryButton).click();
     }
 
     /**
@@ -3129,27 +3130,13 @@ export class LogsPage {
             testLogger.warn('runQueryAndWaitForResults: refresh button never exited Cancel state, force-clicking to cancel in-flight search');
         });
 
-        // Click Run query (or Cancel, if the prior search is still running)
-        await btn.click({ force: true });
-
-        // If we had to force-click a Cancel button, we cancelled the in-flight search
-        // instead of starting a new one.  Wait for the Cancel to resolve, then click
-        // the Run button again to actually submit the intended query.
         if (buttonWasInCancelState) {
             testLogger.warn('runQueryAndWaitForResults: re-clicking Run to submit the intended query after cancel');
-            await this.page.waitForFunction(
-                (selector) => {
-                    const el = document.querySelector(selector);
-                    if (!el) return false;
-                    const text = (el.textContent || '').trim();
-                    const isDisabled = el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true';
-                    return !isDisabled && !text.includes('Cancel');
-                },
-                this.queryButton,
-                { timeout: 15000 }
-            ).catch(() => {});
             await btn.click({ force: true });
         }
+
+        // The page can start its own search after the idle check; a click on the shared selector then lands on Cancel.
+        await this.page.locator(this.runQueryButton).click({ timeout });
 
         // Wait for the button to enter loading/disabled state (query started)
         await this.page.waitForFunction(
@@ -3343,6 +3330,7 @@ export class LogsPage {
         try {
             await this.page.waitForFunction(
                 () => document.querySelector('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]') !== null,
+                undefined,
                 { timeout },
             );
             return true;
@@ -3459,13 +3447,7 @@ export class LogsPage {
         // Create lives in the Saved views submenu, which only renders while open.
         const createSavedViewBtn = this.page.locator(this.menuCreateSavedViewBtn);
         if (!(await createSavedViewBtn.isVisible({ timeout: 500 }).catch(() => false))) {
-            const submenuTrigger = this.page.locator(this.menuListSavedViewsBtn);
-            if (!(await submenuTrigger.isVisible().catch(() => false))) {
-                await this.page.locator(this.utilitiesMenuButton).click({ force: true });
-                await submenuTrigger.waitFor({ state: 'visible', timeout: 5000 });
-            }
-            await submenuTrigger.click({ force: true });
-            await createSavedViewBtn.waitFor({ state: 'visible', timeout: 5000 });
+            await this.openSavedViewsSubmenu(this.menuCreateSavedViewBtn);
         }
         await createSavedViewBtn.click();
         await this.page.locator(this.savedViewDialog).waitFor({ state: 'visible', timeout: 10000 });
@@ -6232,7 +6214,7 @@ export class LogsPage {
         this._queryTriggerTime = Date.now();
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
         try {
-            await this.page.waitForFunction(() => true, { timeout: 1 }).catch(() => {});
+            await this.page.waitForFunction(() => true, undefined, { timeout: 1 }).catch(() => {});
             await expect.poll(() => sawHistogram && sawSearch, { timeout: 15000, intervals: [200] }).toBe(true);
         } catch {
             // Fall through — verifyAPICallCounts will assert the failure with full context.
@@ -9047,10 +9029,27 @@ export class LogsPage {
             await listMenuItem.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
         }
         if (!opened) throw new Error('Could not open saved views menu after 3 attempts');
-        // force: true — ODropdown portal transiently detaches items during initial render
-        await listMenuItem.click({ force: true });
-        await this.page.locator(this.savedViewSearchInput).waitFor({ state: 'visible', timeout: 10000 });
+        await this.openSavedViewsSubmenu(this.savedViewSearchInput);
         testLogger.info('Clicked saved views dropdown arrow');
+    }
+
+    /**
+     * Open the Saved views submenu of the utilities menu and wait for `targetSelector` inside it.
+     * @param {string} targetSelector - element that only renders while the submenu is open
+     */
+    async openSavedViewsSubmenu(targetSelector) {
+        const trigger = this.page.locator(this.menuListSavedViewsBtn);
+        const target = this.page.locator(targetSelector);
+        for (let attempt = 0; attempt < 3; attempt++) {
+            if (!(await trigger.isVisible().catch(() => false))) {
+                await this.page.locator(this.utilitiesMenuButton).click({ force: true });
+                await trigger.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+            }
+            // No force: a click during the menu's open animation lands outside it and dismisses the whole menu.
+            await trigger.click({ timeout: 5000 }).catch(() => {});
+            if (await target.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false)) return;
+        }
+        await target.waitFor({ state: 'visible', timeout: 5000 });
     }
 
     /**
@@ -11208,7 +11207,7 @@ export class LogsPage {
                     }
                 }
                 return null;
-            }, { timeout });
+            }, undefined, { timeout });
 
             const chartType = await result.jsonValue();
             if (chartType) {
@@ -11663,7 +11662,7 @@ export class LogsPage {
             const widget = document.querySelector('.monaco-editor .suggest-widget');
             if (!widget) return false;
             return widget.classList.contains('visible') || widget.classList.contains('focused');
-        }, { timeout });
+        }, undefined, { timeout });
         testLogger.info('Suggestion widget became visible');
     }
 
@@ -12094,7 +12093,7 @@ export class LogsPage {
             return el.getAttribute('title') !== 'Cancel query'
                 && el.getAttribute('aria-busy') !== 'true'
                 && !el.hasAttribute('disabled');
-        }, { timeout: 30000 }).catch(() => {});
+        }, undefined, { timeout: 30000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
     }
 
@@ -12462,7 +12461,7 @@ export class LogsPage {
             } catch {
                 return false;
             }
-        }, { timeout }).catch(() => {
+        }, undefined, { timeout }).catch(() => {
             testLogger.warn('streamKeywords hydration not observed — autocomplete may still work via cached state');
         });
     }
@@ -12496,7 +12495,7 @@ export class LogsPage {
             } catch {
                 return false;
             }
-        }, { timeout }).catch(() => {
+        }, undefined, { timeout }).catch(() => {
             testLogger.warn('field keywords hydration not observed — field suggestions may be absent');
         });
     }
@@ -13493,7 +13492,7 @@ export class LogsPage {
                     !r.url().includes('is_ui_histogram'),
                 { timeout }
             ),
-            this.page.locator(this.searchBarRefreshButton).click(),
+            this.page.locator(this.runQueryButton).click(),
         ]);
         // A streamed (text/event-stream) response never reports finished; the Run button wait covers completion.
         if (!(await response.headerValue('content-type'))?.includes('text/event-stream')) {
@@ -13812,4 +13811,13 @@ export class LogsPage {
         await this.expectSuggestWidgetVisible();
     }
 
+    /** Field-value row (label) in the expanded field list, matched by visible text. */
+    fieldValueRow(field, text) {
+        return this.page.locator(`label${this.fieldValueLabelPrefix(field)}`).filter({ hasText: text });
+    }
+
+    /** Checkbox inside the field-value row matched by text. */
+    fieldValueCheckbox(field, text) {
+        return this.fieldValueRow(field, text).locator('input[type="checkbox"], [role="checkbox"]').first();
+    }
 }

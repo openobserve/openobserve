@@ -98,6 +98,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("workflow.ndv.editStep") }}
           </OButton>
+          <OButton
+            v-if="canUseRunAsTestInput"
+            variant="outline"
+            size="sm-action"
+            icon-left="science"
+            data-test="workflow-run-use-as-test-input"
+            @click="useRunAsTestInput"
+          >
+            {{ t("workflow.http.useAsTestInput") }}
+          </OButton>
           <!-- Replays the run from THIS step down (from_node). Only for a run the
                backend stored input for — a Test/Retry run shows nothing here. -->
           <OButton
@@ -194,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="loadedRunRow?.start_time"
                         unit="us"
                         mode="absolute"
+                        :format="RUN_TIME_LONG"
                         :timezone="store.state.timezone"
                         :empty-label="raw('—')"
                       />
@@ -207,6 +218,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </button>
                 </template>
               </WorkflowRunSwitcher>
+              <OTag
+                v-if="loadedRunIsHttp"
+                variant="blue-soft"
+                icon="webhook"
+                size="sm"
+                :label="t('workflow.history.sourceHttp')"
+                data-test="workflow-run-source"
+              />
             </template>
           </div>
         </div>
@@ -380,6 +399,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-sm">{{ t("workflow.ndv.notInRun") }}</span>
       </div>
 
+      <!-- A request that never ran has no step data; its stored status is the whole story. -->
+      <div
+        v-else-if="httpRunOutcome && httpNeverRan"
+        data-test="workflow-ndv-http-never-ran"
+        class="flex min-w-0 flex-1 flex-col gap-3"
+      >
+        <WorkflowRunHttpOutcome v-bind="httpRunOutcome" />
+      </div>
+
       <div
         v-else-if="runStoredNoData"
         data-test="workflow-ndv-no-run-data"
@@ -537,7 +565,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </button>
           </div>
           <WorkflowConfigSummary v-if="canvasReadOnly" :key="nodeId" />
-          <component v-else-if="bodyComponent" :is="bodyComponent" :key="nodeId" ref="bodyRef" />
+          <component
+            v-else-if="bodyComponent"
+            :is="bodyComponent"
+            :key="nodeId"
+            ref="bodyRef"
+            @open-http-endpoint="openHttpEndpoint"
+          />
           <div
             v-else
             data-test="workflow-ndv-config-placeholder"
@@ -578,7 +612,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showIo && !nodeMissingFromRun && !runStoredNoData"
         data-test="workflow-ndv-output"
         class="relative flex min-w-0 flex-col gap-2"
-        :class="isReadonlyTrigger ? 'flex-1' : 'w-[var(--io-w,21.25rem)] shrink-0'"
+        :class="outputSectionClass"
         :style="isReadonlyTrigger ? undefined : { '--io-w': outputWidth + 'px' }"
       >
         <!-- Drag handle on Output's LEFT edge (sits in the gap toward Config). Extends
@@ -594,7 +628,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="bg-border-default hover:bg-accent h-full w-0.5 rounded-full transition-colors"
           />
         </div>
-        <div class="flex h-8 items-center gap-2 ps-2">
+        <template v-if="httpRunOutcome">
+          <WorkflowRunHttpOutcome v-bind="httpRunOutcome" @open-step="navigateTo" />
+          <WorkflowRunRequestFacts
+            v-if="httpFacts"
+            :facts="httpFacts"
+            :received-at="httpReceivedAt"
+            :headers="httpHeaders"
+          />
+        </template>
+        <div class="flex h-8 shrink-0 items-center gap-2 ps-2">
           <div class="text-text-body text-sm font-bold">{{ t("workflow.ndv.output") }}</div>
           <!-- Run status (Passed / Errored / No Records) — same source as the canvas
                badge and the results dock. -->
@@ -606,6 +649,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t(`workflow.test.stepResult.status.${outputStatus}`) }}
           </OBadge>
+          <span v-if="httpRunOutcome" class="text-text-secondary text-xs">
+            {{ t("workflow.http.outputCaption") }}
+          </span>
           <div
             v-if="outputCount > 1"
             data-test="workflow-ndv-output-pager"
@@ -635,7 +681,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div
-          class="border-border-default bg-code-bg rounded-default flex min-h-0 flex-1 flex-col overflow-hidden border"
+          class="border-border-default bg-code-bg rounded-default flex flex-1 flex-col overflow-hidden border"
+          :class="httpRunOutcome ? 'min-h-60' : 'min-h-0'"
         >
           <!-- The node errored: show the error message(s), then the records it still
                passed downstream (mirrors the Step Results dock). -->
@@ -789,6 +836,24 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import WorkflowRunSwitcher from "./WorkflowRunSwitcher.vue";
+import WorkflowRunHttpOutcome from "./WorkflowRunHttpOutcome.vue";
+import { DEFAULT_TRIGGER_KIND } from "@/plugins/workflows/triggers";
+import WorkflowRunRequestFacts from "./WorkflowRunRequestFacts.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import type { HttpRequestFacts, WorkflowHistoryRow } from "@/services/workflows";
+import { isHttpRun } from "@/plugins/workflows/httpEndpoint";
+import {
+  httpPreviewSample,
+  openHttpPanel,
+  usesHttpPayload,
+} from "@/plugins/workflows/httpEndpointUi";
+import {
+  RUN_TIME_LONG,
+  firstFailedStep,
+  hasStoredRunData,
+  runReasonOf,
+} from "@/plugins/workflows/runStatus";
+import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { branchPathCounts, forwardedRunCount, isNoMatchRun } from "./nodeRunOutcome";
 import WorkflowTrigger from "@/plugins/workflows/nodes/WorkflowTrigger.vue";
 import WorkflowCondition from "@/plugins/workflows/nodes/WorkflowCondition.vue";
@@ -819,6 +884,8 @@ import useWorkflowCanvas, {
   setNodeEditedInput,
   getNodeEditedInput,
   clearNodeEditedInput,
+  humanizeNodeIds,
+  persistTestData,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const { t } = useI18nTyped();
@@ -933,6 +1000,79 @@ watch(
 const canRetryFromHere = computed(
   () => canvasReadOnly.value && !!historyRunId.value && isRetryableRun(loadedRunRow.value),
 );
+
+// ── HTTP request run on the read-only trigger (request facts, failure line) ──
+const loadedRunIsHttp = computed(() => !!loadedRunRow.value && isHttpRun(loadedRunRow.value));
+const httpTriggerRecords = computed<
+  { meta?: { headers?: Record<string, string>; received_at?: unknown } }[] | null
+>(() => {
+  if (!loadedRunIsHttp.value) return null;
+  const recs = nodeTestOutput(nodeId.value) || nodeTestInput(nodeId.value);
+  return recs && recs.length ? recs : null;
+});
+const httpFacts = computed<HttpRequestFacts | null>(
+  () => (loadedRunRow.value as WorkflowHistoryRow | null)?.http_request ?? null,
+);
+const httpHeaders = computed<Record<string, string>>(
+  () => httpTriggerRecords.value?.[0]?.meta?.headers ?? {},
+);
+const httpReceivedAt = computed<number>(
+  () =>
+    Number(httpTriggerRecords.value?.[0]?.meta?.received_at) || loadedRunRow.value?._timestamp || 0,
+);
+const httpNeverRan = computed(() => !hasStoredRunData(loadedRunRow.value));
+const httpFailedStep = computed(() => {
+  const row = loadedRunRow.value;
+  const errors = workflowObj.testRun.result?.errors;
+  if (row?.status !== "failed" || !errors) return null;
+  const id = firstFailedStep(
+    errors,
+    stepTree.value.map((s) => s.id),
+  );
+  const step = id ? stepTree.value.find((s) => s.id === id) : null;
+  if (!id || !step) return null;
+  const nodes: { id: string; data?: { node_type?: string } }[] =
+    workflowObj.currentSelectedWorkflow?.nodes || [];
+  const node = nodes.find((n) => n.id === id);
+  const message = errors[id]?.errors?.[0]?.[0];
+  return {
+    step: { id, label: step.label, isFunction: node?.data?.node_type === "function" },
+    error: message ? String(humanizeNodeIds(message, t)) : null,
+  };
+});
+const httpRunOutcome = computed(() => {
+  const row = loadedRunRow.value;
+  if (!isReadonlyTrigger.value || !row || !loadedRunIsHttp.value) return null;
+  return {
+    status: row.status,
+    reason: runReasonOf(row),
+    receivedAt: httpReceivedAt.value,
+    failedStep: httpFailedStep.value?.step ?? null,
+    error: httpFailedStep.value?.error ?? null,
+    triggerKind: currentTriggerKind() ?? DEFAULT_TRIGGER_KIND,
+  };
+});
+// The request block sits above Output, so the pane scrolls rather than squeezing the event to a few lines.
+const outputSectionClass = computed(() => {
+  if (!isReadonlyTrigger.value) return "w-[var(--io-w,21.25rem)] shrink-0";
+  return httpRunOutcome.value ? "flex-1 overflow-y-auto" : "flex-1";
+});
+const canUseRunAsTestInput = computed(() => !!httpRunOutcome.value && !!httpTriggerRecords.value);
+// Seeds the same shared state the Test dialog's run picker writes, then hands over to that dialog.
+const useRunAsTestInput = () => {
+  const records = httpTriggerRecords.value;
+  if (!records) return;
+  workflowObj.testRun.input = JSON.stringify(records, null, 2);
+  workflowObj.testRun.inputSource = "run";
+  workflowObj.testRun.inputRunLabel = timestampToTimezoneDate(
+    Math.floor((loadedRunRow.value?.start_time || 0) / 1000),
+    store.state.timezone,
+  );
+  workflowObj.testRun.fromNode = "";
+  persistTestData();
+  closeNodeDrawer();
+  workflowObj.testRun.show = true;
+};
 
 const retryingFromHere = ref(false);
 const retryFromHere = async () => {
@@ -1082,6 +1222,7 @@ const isTriggerNode = (node: any) => node?.data?.node_type === "workflow_trigger
 const defaultTriggerSample = computed<any[]>(() => {
   const kind = currentTriggerKind();
   if (!kind) return [];
+  if (usesHttpPayload()) return httpPreviewSample();
   try {
     return triggerDef(kind).buildSample() || [];
   } catch {
@@ -1189,6 +1330,8 @@ const outputRecords = computed<any[] | null>(() => {
   // The node's OUTPUT is reported directly by the backend `outputs` map.
   const recs = nodeTestOutput(nodeId.value);
   if (recs && recs.length) return recs;
+  // An HTTP run's trigger emitted the request, so the kind's alert sample would misreport it.
+  if (httpRunOutcome.value && httpTriggerRecords.value) return httpTriggerRecords.value;
   // The trigger has no input — its output IS the event. Show its sample even before a
   // run, so the trigger's Output is always populated (it has no Input pane).
   if (isTriggerNode(workflowObj.currentSelectedNodeData) && defaultTriggerSample.value.length)
@@ -1592,5 +1735,11 @@ const onConfirmDelete = () => {
 // so no dirty guard is needed here.
 const onOpenChange = async (open: boolean) => {
   if (!open) await commitAndClose();
+};
+
+// One overlay per flow: the step dialog closes through its normal path before the panel opens.
+const openHttpEndpoint = async () => {
+  await commitAndClose();
+  openHttpPanel();
 };
 </script>

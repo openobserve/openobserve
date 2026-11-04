@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filter-values="(f) => emit('filter-values', f)"
               @load-fields="emit('load-fields')"
             />
-            <ODropdown align="end" @update:open="(o) => o && emit('load-fields')">
+            <ODropdown align="end">
               <template #trigger>
                 <OButton
                   variant="ghost"

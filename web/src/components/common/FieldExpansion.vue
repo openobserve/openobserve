@@ -108,6 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="py-0 ps-4 pe-2">
+      <slot name="caption" />
       <slot name="body">
         <FieldValuesPanel
           ref="fieldValuesPanelRef"

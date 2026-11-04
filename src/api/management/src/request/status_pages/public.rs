@@ -127,6 +127,24 @@ impl PublicEntry {
 }
 
 /// GET /api/status_pages_public/{slug} — the snapshot JSON, cache-first.
+#[utoipa::path(
+    get,
+    path = "/status_pages_public/{slug}",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "GetPublicStatusPageSnapshot",
+    summary = "Get the public snapshot of a status page",
+    security(),
+    params(
+        ("slug" = String, Path, description = "Public slug"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn snapshot(
     Path(slug): Path<String>,
     ip: Option<Extension<RealIp>>,
@@ -230,6 +248,24 @@ pub async fn auth(
 // Kuma CVE-2026-32230).
 /// GET /api/status_pages_public/{slug}/badge.svg — password pages get 404 so no badge leaks their
 /// state.
+#[utoipa::path(
+    get,
+    path = "/status_pages_public/{slug}/badge.svg",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "GetPublicStatusPageBadge",
+    summary = "Get the status badge of a page",
+    security(),
+    params(
+        ("slug" = String, Path, description = "Public slug"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "image/svg+xml", body = String),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn badge(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> Response {
     if read_rate_limited(ip.map(|e| e.0)) {
         return too_many();
@@ -273,6 +309,24 @@ pub async fn badge(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> R
 
 /// GET /api/status_pages_public/{slug}/feed.xml — Atom feed of a public page's notices; password
 /// pages get 404.
+#[utoipa::path(
+    get,
+    path = "/status_pages_public/{slug}/feed.xml",
+    context_path = "/api",
+    tag = "Status Pages",
+    operation_id = "GetPublicStatusPageFeed",
+    summary = "Get the notice feed of a page",
+    security(),
+    params(
+        ("slug" = String, Path, description = "Public slug"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/atom+xml", body = String),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
 pub async fn feed(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> Response {
     if read_rate_limited(ip.map(|e| e.0)) {
         return too_many();
@@ -343,6 +397,8 @@ pub async fn host_route_middleware(
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Response {
+    use axum::response::IntoResponse;
+    use config::meta::feature::Feature;
     use o2_enterprise::enterprise::status_pages::host_routing::{
         HostRouteDecision, PageRoute, resolve_host_route,
     };
@@ -362,6 +418,18 @@ pub async fn host_route_middleware(
     match resolve_host_route(&host, &method, request.uri().path()).await {
         HostRouteDecision::Fallthrough => next.run(request).await,
         HostRouteDecision::NotConnected => domain_not_connected(),
+        HostRouteDecision::Page { .. }
+            if !o2_enterprise::enterprise::license::check_features(&[Feature::Synthetics]) =>
+        {
+            let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled(
+                <&str>::from(Feature::Synthetics).to_owned(),
+            );
+            (
+                StatusCode::FORBIDDEN,
+                Json(common::meta::http::HttpResponse::error_code(err)),
+            )
+                .into_response()
+        }
         HostRouteDecision::Page { slug, route } => {
             // The RealIp layer sits outside this one, so the resolved visitor IP is already on the
             // request.
@@ -868,6 +936,21 @@ mod tests {
         String::from_utf8(bytes.to_vec()).unwrap()
     }
 
+    // A reload reads the meta store, so its tables must exist or the read fails as a 503.
+    async fn meta_store() -> bool {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return false;
+        }
+        ONCE.get_or_init(|| async {
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+        true
+    }
+
     // Synthetics is off in tests, so every DB-backed path answers "unknown": a 200 can only come
     // from the cache.
     #[tokio::test]
@@ -1071,6 +1154,9 @@ mod tests {
 
     #[tokio::test]
     async fn expired_entries_are_reloaded_and_misses_are_negative_cached() {
+        if !meta_store().await {
+            return;
+        }
         let slug = "t-expired";
         let stale = Instant::now() - CACHE_TTL - Duration::from_secs(1);
         prime(slug, public_entry("{}"), stale);

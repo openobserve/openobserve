@@ -90,6 +90,7 @@
         :query="query"
         :nlp-mode="nlpMode"
         :read-only="readOnly"
+        :text-preview="textPreview"
         :release-wheel-to-page="releaseWheelToPage"
         :show-auto-complete="showAutoComplete"
         :keywords="keywords"
@@ -179,6 +180,7 @@ interface Props {
   // Query props
   query: string;
   readOnly?: boolean;
+  textPreview?: boolean; // Draw the query as plain text until Monaco has painted
   showAutoComplete?: boolean;
   releaseWheelToPage?: boolean; // default true: let the page scroll when editor has nothing left to scroll
 
@@ -212,6 +214,7 @@ const props = withDefaults(defineProps<Props>(), {
   languages: () => ["sql"],
   defaultLanguage: "sql",
   readOnly: false,
+  textPreview: false,
   showAutoComplete: true,
   releaseWheelToPage: true,
   keywords: () => [],

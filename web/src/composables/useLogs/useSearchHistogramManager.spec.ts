@@ -139,6 +139,21 @@ describe("useSearchHistogramManager", () => {
     });
   });
 
+  describe("EXPLAIN statements", () => {
+    beforeEach(() => {
+      mockState.searchObj.data.stream.selectedStream = ["stream1"];
+      mockState.searchObj.meta.sqlMode = true;
+      mockState.searchObj.data.query = 'explain analyze select * from "stream1"';
+    });
+
+    it("shows no histogram and requests no page count", () => {
+      expect(histogramManager.shouldShowHistogram({})).toBe(false);
+      expect(histogramManager.shouldGetPageCount({ query: { from: 0, size: 100 } }, {})).toBe(
+        false,
+      );
+    });
+  });
+
   describe("shouldGetPageCount", () => {
     it("should return false when histogram should be shown", () => {
       const queryReq = { query: { from: 0, size: 100 } };
@@ -249,6 +264,50 @@ describe("useSearchHistogramManager", () => {
       expect(mockHistogramFunctions.generateHistogramSkeleton).toHaveBeenCalled();
       expect(buildWebSocketPayload).toHaveBeenCalled();
       expect(initializeSearchConnection).toHaveBeenCalled();
+    });
+  });
+
+  describe("page-count follow-up without a histogram", () => {
+    const runWithoutHistogram = (total: number) => {
+      mockHistogramFunctions.isHistogramEnabled.mockReturnValue(false);
+      mockState.searchObj.data.queryResults = { hits: [{ id: 1 }], total } as any;
+      const build = vi.fn(() => ({ traceId: "t-count", queryReq: { query: {} } }));
+      const init = vi.fn();
+      histogramManager.processHistogramRequest({ query: { from: 0, size: 51 } }, build, init);
+      return { build, init };
+    };
+
+    it("marks the count as loading before the deferred request goes out", () => {
+      const { init } = runWithoutHistogram(51);
+      expect(init).not.toHaveBeenCalled();
+      expect(mockState.searchObj.loadingHistogram).toBe(true);
+    });
+
+    it("sends the deferred count request and keeps the count loading", async () => {
+      const { init } = runWithoutHistogram(51);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(init).toHaveBeenCalledTimes(1);
+      expect(mockState.searchObj.loadingHistogram).toBe(true);
+    });
+
+    it("settles the count when building the deferred request throws", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      mockHistogramFunctions.isHistogramEnabled.mockReturnValue(false);
+      mockState.searchObj.data.queryResults = { hits: [{ id: 1 }], total: 51 } as any;
+      const build = vi.fn(() => {
+        throw new Error("bad payload");
+      });
+      histogramManager.processHistogramRequest({ query: { from: 0, size: 51 } }, build, vi.fn());
+      expect(mockState.searchObj.loadingHistogram).toBe(true);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(mockState.searchObj.loadingHistogram).toBe(false);
+    });
+
+    it("settles the count when the hits already prove the total", async () => {
+      const { init } = runWithoutHistogram(500);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(init).not.toHaveBeenCalled();
+      expect(mockState.searchObj.loadingHistogram).toBe(false);
     });
   });
 

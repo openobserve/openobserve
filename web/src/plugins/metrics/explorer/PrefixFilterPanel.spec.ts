@@ -174,6 +174,20 @@ describe("PrefixFilterPanel", () => {
     });
   });
 
+  describe("loading", () => {
+    it("shows loading rows, not the empty state, while the metrics load", () => {
+      wrapper = createWrapper({ facets: [], loading: true });
+      expect(wrapper.find('[data-test="metrics-explorer-prefix-loading"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-prefix-empty"]').exists()).toBe(false);
+    });
+
+    it("shows the empty state once loading settles with no facets", () => {
+      wrapper = createWrapper({ facets: [], loading: false });
+      expect(wrapper.find('[data-test="metrics-explorer-prefix-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-prefix-empty"]').exists()).toBe(true);
+    });
+  });
+
   describe("hide empty", () => {
     it("hides zero-count facets by default", () => {
       wrapper = createWrapper();

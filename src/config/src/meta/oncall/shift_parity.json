@@ -13,7 +13,9 @@
     "holder": "b",
     "next_holder": "c",
     "shift_start": 1773147600000000,
-    "next_handover": 1773234000000000
+    "next_handover": 1773234000000000,
+    "secondary_anchor": 1767535200000000,
+    "secondary_next_handover": 1767621600000000
   },
   {
     "case": "daily 09:00 New York, half an hour before that handover",
@@ -29,7 +31,9 @@
     "holder": "a",
     "next_holder": "b",
     "shift_start": 1773061200000000,
-    "next_handover": 1773147600000000
+    "next_handover": 1773147600000000,
+    "secondary_anchor": 1767535200000000,
+    "secondary_next_handover": 1767621600000000
   },
   {
     "case": "weekly New York, second 01:15 of the fall back",
@@ -45,7 +49,9 @@
     "holder": "b",
     "next_holder": "c",
     "shift_start": 1793511000000000,
-    "next_handover": 1794119400000000
+    "next_handover": 1794119400000000,
+    "secondary_anchor": 1792301400000000,
+    "secondary_next_handover": 1792906200000000
   },
   {
     "case": "weekly New York, just after the spring gap",
@@ -61,7 +67,9 @@
     "holder": "b",
     "next_holder": "c",
     "shift_start": 1772953200000000,
-    "next_handover": 1773556200000000
+    "next_handover": 1773556200000000,
+    "secondary_anchor": 1771745400000000,
+    "secondary_next_handover": 1772350200000000
   },
   {
     "case": "weekly UTC team",
@@ -77,7 +85,9 @@
     "holder": "b",
     "next_holder": "c",
     "shift_start": 1782723600000000,
-    "next_handover": 1783328400000000
+    "next_handover": 1783328400000000,
+    "secondary_anchor": 1766998800000000,
+    "secondary_next_handover": 1767603600000000
   },
   {
     "case": "daily Asia/Kolkata, a zone with no DST",
@@ -93,7 +103,9 @@
     "holder": "a",
     "next_holder": "b",
     "shift_start": 1782876600000000,
-    "next_handover": 1782963000000000
+    "next_handover": 1782963000000000,
+    "secondary_anchor": 1767497400000000,
+    "secondary_next_handover": 1767583800000000
   },
   {
     "case": "weekly Lord Howe, the 30-minute fall back",
@@ -109,7 +121,9 @@
     "holder": "b",
     "next_holder": "c",
     "shift_start": 1806763500000000,
-    "next_handover": 1807370100000000
+    "next_handover": 1807370100000000,
+    "secondary_anchor": 1805553900000000,
+    "secondary_next_handover": 1806158700000000
   },
   {
     "case": "weekly New York, ten days before the anchor",
@@ -125,6 +139,44 @@
     "holder": "b",
     "next_holder": "c",
     "shift_start": 1779109200000000,
-    "next_handover": 1779714000000000
+    "next_handover": 1779714000000000,
+    "secondary_anchor": 1779714000000000,
+    "secondary_next_handover": 1780318800000000
+  },
+  {
+    "case": "weekly Europe/London, the clocks go back in the week before the first handover",
+    "timezone": "Europe/London",
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "shift_micros": 604800000000,
+    "anchor_micros": 1793005200000000,
+    "at_micros": 1793008800000000,
+    "holder": "a",
+    "next_holder": "b",
+    "shift_start": 1793005200000000,
+    "next_handover": 1793610000000000,
+    "secondary_anchor": 1792396800000000,
+    "secondary_next_handover": 1793005200000000
+  },
+  {
+    "case": "weekly New York 02:30, one shift earlier sits in the spring gap: Secondary anchors at 03:00 and the pair overlaps 30 minutes a week (known limit)",
+    "timezone": "America/New_York",
+    "members": [
+      "a",
+      "b",
+      "c"
+    ],
+    "shift_micros": 604800000000,
+    "anchor_micros": 1773556200000000,
+    "at_micros": 1773559800000000,
+    "holder": "a",
+    "next_holder": "b",
+    "shift_start": 1773556200000000,
+    "next_handover": 1774161000000000,
+    "secondary_anchor": 1772953200000000,
+    "secondary_next_handover": 1773558000000000
   }
 ]

@@ -15,12 +15,18 @@
 
 use promql_parser::parser::{Expr, SubqueryExpr};
 
-use crate::{DEFAULT_SUBQUERY_STEP, micros, utils::offset_micros};
+use crate::{DEFAULT_SUBQUERY_STEP, ast::at_modifier::at_micros, micros, utils::offset_micros};
 
 /// The most steps any subquery evaluates per series when `expr` is evaluated over `[start, end]`.
 pub fn max_subquery_steps(expr: &Expr, start: i64, end: i64) -> i64 {
     match expr {
         Expr::Subquery(sq) => {
+            // a pinned subquery evaluates once, at its `@`, whatever range is evaluated
+            let (start, end) = sq
+                .at
+                .as_ref()
+                .and_then(at_micros)
+                .map_or((start, end), |at| (at, at));
             let (sq_start, sq_end, step) = subquery_grid(start, end, sq);
             if sq_start > sq_end {
                 return 0;
@@ -124,6 +130,8 @@ mod tests {
         assert_eq!(steps("max_over_time(up[10m:1m])", T, T + 60 * MINUTE), 70);
         assert_eq!(steps("max_over_time(up[10m:])", T, T + 60 * MINUTE), 70);
         assert_eq!(steps("up[30s:1m]", T + 40 * SECOND, T + 40 * SECOND), 0);
+        let pinned = format!("max_over_time(up[10m:1m] @ {})", T / SECOND);
+        assert_eq!(steps(&pinned, T, T + 30 * 24 * 60 * MINUTE), 10);
         // the largest subquery wins, wherever it sits
         assert_eq!(
             steps(

@@ -411,11 +411,16 @@ mod test_telemetry {
     }
 
     #[test]
-    fn test_get_base_info_deployment_type_is_open_source() {
+    fn test_get_base_info_deployment_type_names_the_build() {
         let mut data = HashMap::new();
         let result = get_base_info(&mut data);
         let deployment_type = result["deployment_type"].as_str().unwrap();
-        assert_eq!(deployment_type, "open_source");
+        let expected = if cfg!(feature = "enterprise") {
+            "enterprise"
+        } else {
+            "open_source"
+        };
+        assert_eq!(deployment_type, expected);
     }
 
     #[test]

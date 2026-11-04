@@ -487,4 +487,82 @@ describe("LabelFilterBar", () => {
       expect(wrapper.find('[data-test="metrics-explorer-label-picker-label"]').exists()).toBe(true);
     });
   });
+
+  describe("OR groups", () => {
+    const grouped: LabelFilter[] = [
+      { label: "job", value: "api", operator: "=" } as LabelFilter,
+      { label: "code", value: "500", operator: "=", group: 1 } as LabelFilter,
+      { label: "env", value: "prod", operator: "=", group: 2, negate: true } as LabelFilter,
+    ];
+
+    it("offers an OR group only once there is a filter to OR against", async () => {
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test="metrics-explorer-label-add-group"]').exists()).toBe(false);
+      await wrapper.setProps({ filters: grouped.slice(0, 1) });
+      expect(wrapper.find('[data-test="metrics-explorer-label-add-group"]').exists()).toBe(true);
+    });
+
+    it("adds the next filter as a new OR group", async () => {
+      wrapper = createWrapper({ filters: grouped });
+      await wrapper.find('[data-test="metrics-explorer-label-add-group"]').trigger("click");
+      await flushPromises();
+      await wrapper.vm.onLabelPicked("code");
+      await flushPromises();
+      await wrapper.vm.onValuePicked("503");
+      await flushPromises();
+      expect(wrapper.emitted("add")![0]).toEqual([
+        { label: "code", value: "503", operator: "=", group: 3 },
+      ]);
+    });
+
+    it("adds into an existing group, negated when the group is", async () => {
+      wrapper = createWrapper({ filters: grouped });
+      await wrapper.find('[data-test="metrics-explorer-label-group-add-2"]').trigger("click");
+      await flushPromises();
+      await wrapper.vm.onLabelPicked("instance");
+      await flushPromises();
+      await wrapper.vm.onValuePicked("a");
+      await flushPromises();
+      expect(wrapper.emitted("add")![0]).toEqual([
+        { label: "instance", value: "a", operator: "=", group: 2, negate: true },
+      ]);
+    });
+
+    it("renders groups joined by or and emits negate-group from the NOT toggle", async () => {
+      wrapper = createWrapper({ filters: grouped });
+      expect(wrapper.find('[data-test="metrics-explorer-label-group-join-1"]').text()).toBe(
+        "and any of",
+      );
+      expect(wrapper.find('[data-test="metrics-explorer-label-group-join-2"]').text()).toBe("or");
+      expect(wrapper.find('[data-test="metrics-explorer-label-group-2"]').text()).toContain(
+        "env = prod",
+      );
+
+      await wrapper.find('[data-test="metrics-explorer-label-group-not-1"]').trigger("click");
+      await wrapper.find('[data-test="metrics-explorer-label-group-not-2"]').trigger("click");
+      expect(wrapper.emitted("negate-group")).toEqual([
+        [1, true],
+        [2, false],
+      ]);
+    });
+
+    it("refuses an add that expands past the branch cap, and says so", async () => {
+      const negated = Array.from(
+        { length: 16 },
+        (_, i) =>
+          ({ label: `l${i}`, value: "x", operator: "=", group: 1, negate: true }) as LabelFilter,
+      );
+      wrapper = createWrapper({ filters: negated });
+      await wrapper.find('[data-test="metrics-explorer-label-group-add-1"]').trigger("click");
+      await flushPromises();
+      await wrapper.vm.onLabelPicked("job");
+      await flushPromises();
+      await wrapper.vm.onValuePicked("api");
+      await flushPromises();
+      expect(wrapper.emitted("add")).toBeUndefined();
+      expect(
+        wrapper.find('[data-test="metrics-explorer-label-too-many-branches"]').text(),
+      ).toContain("17");
+    });
+  });
 });

@@ -16,6 +16,7 @@
 import type { I18nText } from "@/types/i18n";
 
 import { getServiceColorHex } from "@/utils/traces/traceColors";
+import { CHART_ZOOM_MAX, CHART_ZOOM_MIN } from "@/composables/traces/useChartZoom";
 
 /**
  * Tree node interface for tree visualization with coordinate support
@@ -85,8 +86,9 @@ export function createTreeVisualizationEngine() {
     };
 
     // Convert TreeNode format to ECharts tree format
-    const convertToEChartsFormat = (nodes: TreeNode[]): any[] => {
-      return nodes.map((node) => {
+    const convertToEChartsFormat = (nodes: TreeNode[], parentPath: number[] = []): any[] => {
+      return nodes.map((node, index) => {
+        const treePath = [...parentPath, index];
         const errorCount = getNodeErrorRate(node);
         const serviceColor =
           data.getNodeServiceColor?.(node) ||
@@ -103,6 +105,8 @@ export function createTreeVisualizationEngine() {
         return {
           name: node.name,
           value: node.value,
+          // Repeated services share name and id, so the tooltip resolves the node by position.
+          treePath,
           symbol: getCircleSvg(fillColor, borderColor, 4),
           symbolSize:
             nodeSize === "dynamic"
@@ -181,7 +185,7 @@ export function createTreeVisualizationEngine() {
               },
             },
           },
-          children: node.children ? convertToEChartsFormat(node.children) : undefined,
+          children: node.children ? convertToEChartsFormat(node.children, treePath) : undefined,
         };
       });
     };
@@ -221,6 +225,8 @@ export function createTreeVisualizationEngine() {
           initialTreeDepth: -1,
           symbolSize: symbolSize,
           roam: true, // Enable panning and zooming
+          // Same bounds as the zoom buttons, so wheel and buttons agree.
+          scaleLimit: { min: CHART_ZOOM_MIN, max: CHART_ZOOM_MAX },
           selectedMode: "single", // Enable single node selection
           label: {
             position: layoutType === "vertical" ? "bottom" : "right",
@@ -305,26 +311,15 @@ export function createTreeVisualizationEngine() {
     }
   };
 
-  /**
-   * Helper to find tree node by name (more reliable than index)
-   * Traverses the tree data to find the node with matching name
-   */
-  const findNodeByName = (nodes: TreeNode[], targetName: string): TreeNode | null => {
-    const traverse = (nodeList: TreeNode[]): TreeNode | null => {
-      for (const node of nodeList) {
-        if (node.name === targetName || node.id === targetName) {
-          return node;
-        }
-
-        if (node.children && node.children.length > 0) {
-          const found = traverse(node.children);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-
-    return traverse(nodes);
+  const findNodeByPath = (nodes: TreeNode[], treePath: number[]): TreeNode | null => {
+    let level: TreeNode[] | undefined = nodes;
+    let node: TreeNode | null = null;
+    for (const index of treePath) {
+      node = level?.[index] ?? null;
+      if (!node) return null;
+      level = node.children;
+    }
+    return node;
   };
 
   /**
@@ -387,7 +382,7 @@ export function createTreeVisualizationEngine() {
     chartDom.appendChild(tooltipEl);
 
     let hideTimer: ReturnType<typeof setTimeout> | null = null;
-    let activeNodeId: string | null = null;
+    let activeNode: TreeNode | null = null;
 
     // Positioning logic from Service Graph with proper dimension measurement
     const positionTooltip = (mouseX: number, mouseY: number) => {
@@ -433,23 +428,22 @@ export function createTreeVisualizationEngine() {
 
     const hideTooltip = () => {
       tooltipEl.style.display = "none";
-      activeNodeId = null;
+      activeNode = null;
     };
 
     // ECharts event handling - use built-in hover events directly on chart elements
     const onNodeMouseOver = (params: any) => {
-      if (!params || !params.data) return;
+      if (!params?.data?.treePath) return;
 
-      // Use node name to find matching TreeNode instead of unreliable dataIndex
-      const hoveredNode = findNodeByName(data.treeData, params.data.name);
-      if (hoveredNode && hoveredNode.id !== activeNodeId) {
+      const hoveredNode = findNodeByPath(data.treeData, params.data.treePath);
+      if (hoveredNode && hoveredNode !== activeNode) {
         // Clear any existing timer to prevent race conditions
         if (hideTimer) {
           clearTimeout(hideTimer);
           hideTimer = null;
         }
 
-        activeNodeId = hoveredNode.id;
+        activeNode = hoveredNode;
 
         // Use event pixel coordinates if available, otherwise use chart center
         const mouseX = params.event?.offsetX || chartDom.clientWidth / 2;
@@ -460,7 +454,7 @@ export function createTreeVisualizationEngine() {
     };
 
     const onNodeMouseOut = () => {
-      if (activeNodeId) {
+      if (activeNode) {
         // Clear existing timer before setting new one
         if (hideTimer) {
           clearTimeout(hideTimer);
@@ -499,7 +493,6 @@ export function createTreeVisualizationEngine() {
     generateEChartsOptions,
     setupTraceNodeTooltips,
     findNodeAtPoint, // Export for testing
-    findNodeByName, // Export helper for testing
     findNodeByIndex, // Export helper for testing
     getHealthColor,
   };

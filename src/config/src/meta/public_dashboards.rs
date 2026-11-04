@@ -29,8 +29,9 @@ pub const MAX_REFRESH_SECS: i32 = 30 * 86_400;
 pub const MIN_REFRESH_SECS: i32 = 60;
 
 /// Draft configures the share without exposing it; Public serves it and is the default.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
+#[schema(as = PublicDashboardVisibility)]
 pub enum Visibility {
     Draft,
     #[default]
@@ -54,8 +55,9 @@ impl Visibility {
 }
 
 /// One window a link offers: rolling and refreshed on read, or fixed and built once.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[schema(as = PublicDashboardTimeRange)]
 pub enum TimeRange {
     Relative {
         secs: i64,
@@ -107,14 +109,14 @@ impl TimeRange {
 }
 
 /// The ranges a link offers; with more than one, viewers can switch between them.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TimeRangePolicy {
     pub ranges: Vec<TimeRange>,
     pub default: TimeRange,
 }
 
 /// Admin body to create or update a link; variables stay frozen at the author's values.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PublicDashboardConfig {
     /// Label that tells a dashboard's links apart; empty is allowed.
     #[serde(default)]
@@ -123,6 +125,7 @@ pub struct PublicDashboardConfig {
     pub visibility: Visibility,
     pub time_range: TimeRangePolicy,
     #[serde(default)]
+    #[schema(value_type = Object)]
     pub frozen_variables: BTreeMap<String, serde_json::Value>,
     #[serde(default = "default_refresh_secs")]
     pub refresh_secs: i32,
@@ -131,7 +134,7 @@ pub struct PublicDashboardConfig {
 }
 
 /// Admin body to take over a link; a publisher other than the one the caller saw is a 409.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TakeOverRequest {
     pub expected_publisher: String,
 }
@@ -273,7 +276,7 @@ pub struct LinkStatusReport {
 }
 
 /// The org's settings as the settings API has them; a null `max_links` is the env default.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OrgPublicDashboardSettings {
     pub enabled: bool,
     #[serde(default)]
@@ -427,6 +430,12 @@ pub struct PublicVariable {
     /// Set for a panel-scoped variable: the panel this value belongs to.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub panel_id: Option<String>,
+    /// `date` for a date variable, so the page formats titles and text as the dashboard does.
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub var_type: Option<String>,
+    /// A date variable's default output format.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub date_format: Option<String>,
 }
 
 impl PublicVariable {
@@ -471,6 +480,7 @@ impl PublicVariable {
                             .collect(),
                         _ => vec![(v.name.clone(), None, None)],
                     };
+                let is_date = v.type_field == "date";
                 instances
                     .into_iter()
                     .map(|(key, tab_id, panel_id)| {
@@ -480,6 +490,8 @@ impl PublicVariable {
                             value: values.get(&key).cloned().unwrap_or(serde_json::Value::Null),
                             tab_id,
                             panel_id,
+                            var_type: is_date.then(|| "date".to_string()),
+                            date_format: v.date_format.clone().filter(|_| is_date),
                         };
                         (key, entry)
                     })
@@ -780,6 +792,35 @@ mod tests {
             serde_json::from_value(serde_json::json!({ "label": "Level", "value": "error" }))
                 .unwrap();
         assert_eq!(stored.name, "");
+    }
+
+    #[test]
+    fn public_variables_carry_a_date_variables_format() {
+        let dash = Dashboard {
+            v8: Some(
+                serde_json::from_value(serde_json::json!({
+                    "variables": { "list": [
+                        { "type": "date", "name": "day", "label": "Day",
+                          "dateFormat": "dmy" },
+                        { "type": "textbox", "name": "q", "label": "Q",
+                          "dateFormat": "dmy" }
+                    ] }
+                }))
+                .unwrap(),
+            ),
+            ..Default::default()
+        };
+        let values = BTreeMap::from([("day".to_string(), serde_json::json!("2026-10-30"))]);
+        let list = PublicVariable::list(&dash, &values);
+        let day = serde_json::to_value(&list[0]).unwrap();
+        assert_eq!(day["type"], "date");
+        assert_eq!(day["date_format"], "dmy");
+        let q = serde_json::to_value(&list[1]).unwrap();
+        assert!(q.get("type").is_none() && q.get("date_format").is_none());
+        let stored: PublicVariable =
+            serde_json::from_value(serde_json::json!({ "label": "Day", "value": "2026-10-30" }))
+                .unwrap();
+        assert_eq!(stored.var_type, None);
     }
 
     #[test]

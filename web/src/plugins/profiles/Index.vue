@@ -413,6 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="activeView === 'top'"
                 :data="topRows"
                 :loading="showSkeleton"
+                :loading-reset-key="selectedProfileType"
                 :columns="profileColumns"
                 :default-columns="false"
                 row-key="name"
@@ -566,12 +567,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :search-query="searchQuery"
                 :unit-label="tableUnitLabel"
                 :value-formatter="formatTableValue"
+                @search="searchForFunction"
               />
               <OTable
                 v-else-if="activeView === 'tree'"
                 v-model:expanded-ids="expandedStackIds"
                 :data="stackTree"
                 :loading="showSkeleton"
+                :loading-reset-key="selectedProfileType"
                 :columns="profileColumns"
                 :default-columns="false"
                 row-key="id"

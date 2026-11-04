@@ -151,7 +151,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="tab === 'alertTriggers'" #default>
               <div class="flex items-center gap-1.5">
                 <span>{{ tabLabels.alertTriggers }}</span>
-                <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
+                <OTag
+                  v-if="!loading"
+                  type="countChip"
+                  value="neutral"
+                  data-test="incident-alert-triggers-count"
+                  >{{ triggers.length }}</OTag
+                >
               </div>
             </template>
           </OTab>
@@ -1499,6 +1505,8 @@ import type { OnCallResponse } from "@/ts/interfaces/oncall";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { updateIncidentMutation, updateIncidentStatusMutation } from "@/services/incidents.queries";
+import type { AckAlertResponse, UnackAlertResponse } from "@/ts/interfaces/alert";
+import { incidentRefusalToast, incidentStatusToast } from "@/utils/alerts/ackState";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import serviceStreamsApi, {
@@ -1782,11 +1790,18 @@ export default defineComponent({
     const editableSeverity = ref<"P1" | "P2" | "P3" | "P4">("P3");
 
     // Status and Severity options
-    const statusOptions = [
-      { label: t("alerts.incidents.statusOpen"), value: "open" },
+    // Leaving Acknowledged for Open is an Unacknowledge: it clears the ack everywhere and pages again.
+    const statusOptions = computed(() => [
+      {
+        label:
+          editableStatus.value === "acknowledged"
+            ? t("alerts.ack.unacknowledge")
+            : t("alerts.incidents.statusOpen"),
+        value: "open",
+      },
       { label: t("alerts.incidents.statusAcknowledged"), value: "acknowledged" },
       { label: t("alerts.incidents.statusResolved"), value: "resolved" },
-    ];
+    ]);
 
     const severityOptions = [
       { label: t("alerts.incidents.severityP1"), value: "P1" },
@@ -2675,6 +2690,20 @@ export default defineComponent({
       emit("sendToAiChat", value, append);
     };
 
+    /** The one ack's toast for an acknowledge or unacknowledge; `null` for any other change. */
+    const statusToastOf = (
+      status: "open" | "acknowledged" | "resolved",
+      response:
+        { data?: Incident } | { data?: Incident; ack: AckAlertResponse | UnackAlertResponse },
+    ) =>
+      incidentStatusToast(
+        status,
+        "ack" in response ? response.ack : undefined,
+        incidentDetails.value?.title || incidentDetails.value?.id || "",
+        store.state.userInfo?.email,
+        t,
+      );
+
     const updateStatus = async (newStatus: "open" | "acknowledged" | "resolved") => {
       if (!incidentDetails.value) return;
       updating.value = true;
@@ -2682,21 +2711,35 @@ export default defineComponent({
         const response = await updateIncidentStatus.mutateAsync({
           id: incidentDetails.value.id,
           status: newStatus,
+          from: incidentDetails.value.status,
         });
         // Update local state with the actual status from the API response
-        incidentDetails.value.status = response.data.status;
-        incidentDetails.value.acknowledged_by = response.data.acknowledged_by;
-        incidentDetails.value.acknowledged_at = response.data.acknowledged_at;
-        incidentDetails.value.resolved_at = response.data.resolved_at ?? undefined;
-        incidentDetails.value.updated_at = response.data.updated_at || Date.now() * 1000;
-        editableStatus.value = response.data.status;
-        toast({
-          variant: "success",
-          message: t("alerts.incidents.statusUpdated"),
-        });
+        const updated = response.data;
+        if (updated) {
+          incidentDetails.value.status = updated.status;
+          incidentDetails.value.acknowledged_by = updated.acknowledged_by;
+          incidentDetails.value.acknowledged_at = updated.acknowledged_at;
+          incidentDetails.value.resolved_at = updated.resolved_at ?? undefined;
+          incidentDetails.value.updated_at = updated.updated_at || Date.now() * 1000;
+          editableStatus.value = updated.status;
+        } else {
+          // The write stood but its read-back failed: read the incident again.
+          void loadDetails(incidentDetails.value.id);
+        }
+        toast(
+          statusToastOf(newStatus, response) ?? {
+            variant: "success",
+            message: t("alerts.incidents.statusUpdated"),
+          },
+        );
         // Mark data as stale so incident list will refresh when navigating back
         store.dispatch("incidents/setShouldRefresh", true);
         emit("status-updated");
+        // The one ack stopped or restarted the incident's pages; the write expired their read.
+        void loadOnCallResponse(
+          store.state.selectedOrganization.identifier,
+          incidentDetails.value.id,
+        );
 
         // Refresh events in timeline if Activity tab is active
         if (activeTab.value === "activity") {
@@ -2709,10 +2752,12 @@ export default defineComponent({
         }
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
-        toast({
-          variant: "error",
-          message: t("alerts.incidents.statusUpdateFailed"),
-        });
+        toast(
+          incidentRefusalToast(error, newStatus, t) ?? {
+            variant: "error",
+            message: t("alerts.incidents.statusUpdateFailed"),
+          },
+        );
       } finally {
         updating.value = false;
       }

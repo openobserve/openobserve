@@ -167,6 +167,7 @@ vi.mock("@/composables/useLogsHighlighter", () => ({
 vi.mock("@/utils/common", () => ({
   logsErrorMessage: vi.fn((code: number) => {
     if (code === 20009) return "search.searchCancelled";
+    if (code === 20002) return "message.SearchStreamNotFound";
     return null;
   }),
 }));
@@ -405,6 +406,45 @@ describe("useSearchResponseHandler", () => {
       expect(mockState.searchObj.data.histogram.errorMsg).toContain("Histogram failed");
       expect(mockState.searchObj.data.histogram.errorCode).toBe(404);
       expect(mockState.searchObj.data.histogram.errorDetail).toBe("Data not found");
+    });
+    it("recomputes the title parts when the histogram fails, so the rows probe total is not final", () => {
+      mockHistogram.getHistogramTitleParts.mockReturnValueOnce({
+        start: 1,
+        end: 50,
+        total: "50+",
+        took: 1,
+      } as any);
+
+      responseHandler.handleSearchError({ type: "histogram" }, {
+        content: { message: "Histogram failed", code: 500 },
+      } as any);
+
+      expect(mockState.searchObj.data.histogram.chartParams.titleParts).toMatchObject({
+        total: "50+",
+      });
+    });
+    it("keeps the backend text as detail when a known code swaps the message for generic text", () => {
+      responseHandler.handleSearchError({ type: "search" }, {
+        content: { message: "Search stream not found: nosuch", code: 20002, error_detail: "" },
+      } as any);
+
+      expect(mockState.searchObj.data.errorDetail).toBe("Search stream not found: nosuch");
+    });
+
+    it("keeps the backend error_detail over the message when both exist", () => {
+      responseHandler.handleSearchError({ type: "search" }, {
+        content: { message: "Search SQL execute error", code: 20008, error_detail: "Cast error" },
+      } as any);
+
+      expect(mockState.searchObj.data.errorDetail).toBe("Cast error");
+    });
+
+    it("adds no detail when the message is shown as sent", () => {
+      responseHandler.handleSearchError({ type: "search" }, {
+        content: { message: 'Error# SQL error: ParserError("x")', code: 400 },
+      } as any);
+
+      expect(mockState.searchObj.data.errorDetail).toBe("");
     });
   });
 

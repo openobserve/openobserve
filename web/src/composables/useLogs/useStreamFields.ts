@@ -24,6 +24,8 @@ import config from "@/aws-exports";
 import { searchState } from "@/composables/useLogs/searchState";
 import { columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
 import useStreams from "@/composables/useStreams";
+import { queryClient } from "@/composables/query/queryClient";
+import { streamKeys } from "@/services/stream.querykeys";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { captureFromSearchHits } from "@/composables/fieldValueStore";
 
@@ -57,8 +59,14 @@ import { pickLatestStream, type StreamStatsEntry } from "@/utils/logs/estimateSc
 import { restoreLogsSelectedStreams } from "@/utils/streamPersist";
 import { sqlSources } from "@/utils/logs/sqlSources";
 
+/** How long a cold load keeps the field list loading for the semantic groups before showing it ungrouped. */
+export const FIELD_GROUPS_WAIT_MS = 1000;
+
 let correlationWatcherUsers = 0;
 let correlationWatcherScope: EffectScope | null = null;
+let fieldGroupsHoldId = 0;
+// Streams a fresh list already lacked: re-asking for them on every load would only repeat the miss.
+const refetchedMissing = new Set<string>();
 
 export interface InitialStreamInput {
   list: StreamStatsEntry[];
@@ -107,7 +115,7 @@ export function pickInitialLogsStreams(input: InitialStreamInput): InitialStream
 
 export const useStreamFields = () => {
   const { t } = useI18nTyped();
-  const { getStreams, getStream } = useStreams(t);
+  const { getStreams, getStream, prefetchStreamSchema } = useStreams(t);
   const { updateFieldKeywords } = useSqlSuggestions();
   const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 
@@ -197,6 +205,9 @@ export const useStreamFields = () => {
     const regroupPass = options.regroupWith !== undefined;
     const orgId = store.state.selectedOrganization.identifier;
     let lateSemanticGroups: { load: Promise<FieldAlias[]>; used: FieldAlias[] } | null = null;
+    // A list still held for its groups has not been shown yet.
+    const listWasEmpty =
+      !searchObj.data.stream.selectedStreamFields?.length || searchObj.loadingFieldGroups;
     if (!regroupPass) searchObj.loadingStream = true;
     await nextTick();
     try {
@@ -924,12 +935,19 @@ export const useStreamFields = () => {
       correlationFilters.restore();
 
       searchObjDebug["extractFieldsEndTime"] = performance.now();
-      if (!regroupPass) searchObj.loadingStream = false;
+      if (!regroupPass) {
+        // Without cached groups every row would move when they land, so the list stays loading for them.
+        searchObj.loadingFieldGroups = listWasEmpty && lateSemanticGroups?.used.length === 0;
+        searchObj.loadingStream = false;
+      }
       if (lateSemanticGroups) {
         regroupWhenSemanticGroupsArrive(lateSemanticGroups, capturedToken, orgId);
       }
     } catch (e: any) {
-      if (!regroupPass) searchObj.loadingStream = false;
+      if (!regroupPass) {
+        searchObj.loadingFieldGroups = false;
+        searchObj.loadingStream = false;
+      }
       console.log("Error while extracting fields.", e);
       notificationMsg.value = t("search.errorWhileExtractingStreamFields");
     }
@@ -940,16 +958,27 @@ export const useStreamFields = () => {
     token: number,
     orgId: string,
   ) => {
-    void late.load.then(() => {
-      // fetchQuery returns the raw response; the cached copy keeps its reference when nothing changed, and survives a failed refresh.
-      const aliases = getCachedSemanticGroups(orgId);
-      if (!aliases?.length || aliases === late.used) return;
-      if (token !== schemaRequestToken.value) return;
-      // A stream or org change in flight runs its own extract, which reads these groups from the cache.
-      if (searchObj.loadingStream || orgId !== store.state.selectedOrganization.identifier) return;
-      if (!selectedSchemasLoaded()) return;
-      void extractFields({ reuseLoadedSchema: true, regroupWith: aliases });
-    });
+    const holdId = ++fieldGroupsHoldId;
+    const release = () => {
+      if (holdId === fieldGroupsHoldId) searchObj.loadingFieldGroups = false;
+    };
+    const timer = searchObj.loadingFieldGroups ? setTimeout(release, FIELD_GROUPS_WAIT_MS) : null;
+    void late.load
+      .then(async () => {
+        // fetchQuery returns the raw response; the cached copy keeps its reference when nothing changed, and survives a failed refresh.
+        const aliases = getCachedSemanticGroups(orgId);
+        if (!aliases?.length || aliases === late.used) return;
+        if (token !== schemaRequestToken.value) return;
+        // A stream or org change in flight runs its own extract, which reads these groups from the cache.
+        if (searchObj.loadingStream || orgId !== store.state.selectedOrganization.identifier)
+          return;
+        if (!selectedSchemasLoaded()) return;
+        await extractFields({ reuseLoadedSchema: true, regroupWith: aliases });
+      })
+      .finally(() => {
+        if (timer) clearTimeout(timer);
+        release();
+      });
   };
 
   const selectedSchemasLoaded = () =>
@@ -972,12 +1001,24 @@ export const useStreamFields = () => {
     }
   };
 
+  /** Starts the requests extractFields() would otherwise make one after another, once the URL names the streams. */
+  const prefetchSelectedStreamFields = () => {
+    const streamType = searchObj.data.stream.streamType || "logs";
+    void loadKeyFields();
+    void loadFieldGrouping();
+    if (config.isEnterprise === "true" || config.isCloud === "true") void loadSemanticGroups();
+    for (const name of searchObj.data.stream.selectedStream) prefetchStreamSchema(name, streamType);
+  };
+
   const getStreamList = async (selectStream: boolean = true, options: StreamListOptions = {}) => {
     try {
       // commented below function as we are doing resetStreamData from all the places where getStreamList is called
       // resetStreamData();
       const streamType = searchObj.data.stream.streamType || "logs";
-      const streamData: any = await getStreams(streamType, false);
+      const requestOrg = store.state.selectedOrganization.identifier;
+      const cached: any = await getStreams(streamType, false);
+      const streamData = await withUnlistedRefetched(cached, streamType, requestOrg, options);
+      if (store.state.selectedOrganization.identifier !== requestOrg) return;
       if (options.isCurrent && !options.isCurrent()) return;
       searchObj.data.streamResults = {
         ...streamData,
@@ -992,15 +1033,54 @@ export const useStreamFields = () => {
     }
   };
 
+  // The list is cached for minutes, so a URL stream created since then would read as missing.
+  const withUnlistedRefetched = async (
+    cached: any,
+    streamType: string,
+    org: string,
+    options: StreamListOptions,
+  ) => {
+    if (!options.fromUrl) return cached;
+    const { missing } = pickInitialLogsStreams({
+      list: cached?.list ?? [],
+      current: requestedStreams(options),
+      currentFromUrl: true,
+      persisted: [],
+      allowLatest: false,
+    });
+    const key = (name: string) => `${org}/${streamType}/${name}`;
+    const unseen = missing.filter((name) => !refetchedMissing.has(key(name)));
+    if (!unseen.length) return cached;
+    try {
+      await queryClient.invalidateQueries({
+        queryKey: streamKeys.nameList(org, streamType),
+        exact: true,
+      });
+      const fresh: any = await getStreams(streamType, false);
+      // Marked only once a fresh list confirms the miss, so a failed or concurrent load still retries.
+      const listed = new Set((fresh?.list ?? []).map((entry: { name: string }) => entry.name));
+      unseen.filter((name) => !listed.has(name)).forEach((name) => refetchedMissing.add(key(name)));
+      return fresh;
+    } catch (e: unknown) {
+      if (e instanceof CancelledError) throw e;
+      return cached;
+    }
+  };
+
+  const requestedStreams = (options: StreamListOptions): string[] => {
+    const selected: string[] = Array.isArray(searchObj.data.stream.selectedStream)
+      ? [...searchObj.data.stream.selectedStream]
+      : [];
+    if (options.fromUrl && !selected.length && searchObj.meta.sqlMode && searchObj.data.query) {
+      return sqlSources(searchObj.data.query).sources;
+    }
+    return selected;
+  };
+
   const initialStreamInput = (options: StreamListOptions): InitialStreamInput => {
     const zoConfig = store.state.zoConfig ?? {};
     const streamType = searchObj.data.stream.streamType || "logs";
-    let current: string[] = Array.isArray(searchObj.data.stream.selectedStream)
-      ? [...searchObj.data.stream.selectedStream]
-      : [];
-    if (options.fromUrl && !current.length && searchObj.meta.sqlMode && searchObj.data.query) {
-      current = sqlSources(searchObj.data.query).sources;
-    }
+    const current = requestedStreams(options);
     const legacy =
       zoConfig.query_on_stream_selection === false ||
       router?.currentRoute?.value?.query?.type === "stream_explorer";
@@ -1394,6 +1474,7 @@ export const useStreamFields = () => {
   return {
     updateFieldValues,
     extractFields,
+    prefetchSelectedStreamFields,
     loadStreamFields,
     getStreamList,
     loadStreamLists,

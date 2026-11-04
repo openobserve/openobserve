@@ -418,6 +418,37 @@ describe("PanelEditor.vue", () => {
     vi.clearAllMocks();
   });
 
+  describe("chart toolbar", () => {
+    const mountWithRenderer = (noData: boolean) =>
+      shallowMount(PanelEditor, {
+        props: { pageType: "build" },
+        global: {
+          ...mountGlobal,
+          stubs: {
+            ...mountGlobal.stubs,
+            OButton: false,
+            PanelSchemaRenderer: {
+              name: "PanelSchemaRenderer",
+              props: ["searchType", "panelSchema", "selectedTimeObj", "width", "height"],
+              setup(_: unknown, { expose }: { expose: (exposed: object) => void }) {
+                expose({ noData });
+              },
+              template: "<div />",
+            },
+          },
+        },
+      });
+
+    it("keeps the legends button in place while the chart has no data, so the chart never jumps", async () => {
+      mockChartData.value = { type: "line", queries: [] };
+      wrapper = mountWithRenderer(true);
+      await flushPromises();
+      const btn = wrapper.find('[data-test="panel-editor-show-legends-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.classes()).toContain("invisible");
+    });
+  });
+
   describe("Component Initialization", () => {
     it("should mount successfully with dashboard pageType", () => {
       wrapper = shallowMount(PanelEditor, {
@@ -1053,6 +1084,47 @@ describe("PanelEditor.vue", () => {
         },
         { name: "end_time", value: mockDashboardPanelData.meta.dateTime.end_time.getTime() },
       ]);
+    });
+  });
+
+  describe("Preview Chart | Data view", () => {
+    const TOGGLE = { name: "PanelViewToggle" };
+
+    beforeEach(() => {
+      mockChartData.value = {};
+      mockDashboardPanelData.data.type = "line";
+    });
+
+    afterEach(() => {
+      mockChartData.value = undefined;
+    });
+
+    const mountEditor = (pageType = "dashboard") =>
+      shallowMount(PanelEditor, { props: { pageType: pageType as any }, global: mountGlobal });
+
+    it("offers the switch on a dashboard chart and starts on Chart", () => {
+      wrapper = mountEditor();
+      expect(wrapper.findComponent(TOGGLE).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "PanelDataView" }).exists()).toBe(false);
+    });
+
+    it("hides the switch for table panels and outside dashboards", () => {
+      mockDashboardPanelData.data.type = "table";
+      wrapper = mountEditor();
+      expect(wrapper.findComponent(TOGGLE).exists()).toBe(false);
+      wrapper.unmount();
+
+      mockDashboardPanelData.data.type = "line";
+      wrapper = mountEditor("metrics");
+      expect(wrapper.findComponent(TOGGLE).exists()).toBe(false);
+    });
+
+    it("overlays the raw rows when Data is picked", async () => {
+      wrapper = mountEditor();
+      wrapper.findComponent({ name: "PanelViewToggle" }).vm.$emit("update:modelValue", "data");
+      await nextTick();
+      expect(wrapper.findComponent({ name: "PanelDataView" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "PanelSchemaRenderer" }).exists()).toBe(true);
     });
   });
 

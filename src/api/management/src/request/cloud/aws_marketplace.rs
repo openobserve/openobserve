@@ -118,6 +118,9 @@ pub struct LinkSubscriptionResponse {
     context_path = "/api",
     tag = "AWS Marketplace",
     operation_id = "LinkAwsMarketplaceSubscription",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     summary = "Link AWS Marketplace subscription to organization",
     description = "Exchanges AWS Marketplace token for customer info and creates pending subscription",
     security(
@@ -131,6 +134,10 @@ pub struct LinkSubscriptionResponse {
         (status = 409, description = "Conflict (already subscribed)", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Billings", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn link_subscription(
     Path(org_id): Path<String>,
@@ -330,6 +337,10 @@ pub async fn link_subscription(
         (status = 404, description = "Not Found", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Billings", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn activation_status(
     Path(org_id): Path<String>,

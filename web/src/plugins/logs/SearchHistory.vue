@@ -582,7 +582,6 @@ export default defineComponent({
         }
       } catch (error: any) {
         forbidden.value = error?.response?.status === 403;
-        // The grouped access toast already reports a 403; a second red toast adds nothing.
         if (!forbidden.value) {
           toast({
             variant: "error",

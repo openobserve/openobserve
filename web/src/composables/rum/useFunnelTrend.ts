@@ -49,6 +49,7 @@ import {
 import {
   WINDOW_MS,
   funnelTrendSql,
+  isAttributeBreakdown,
   type FunnelDef,
   type FunnelPair,
   type Granularity,
@@ -111,7 +112,11 @@ export default function useFunnelTrend(deps: TrendDeps) {
     if ("tooShort" in p) return "tooShort";
     return "tooMany" in p ? "tooMany" : null;
   });
-  const breakdown = computed(() => !!def.value.breakdown);
+  // The SQL drops an attribute breakdown whose field the schema lacks, so the trend reads it as none.
+  const breakdown = computed(() => {
+    const b = def.value.breakdown;
+    return !!b && (!isAttributeBreakdown(b) || pa.scope.value.schema[b.f] === true);
+  });
   // A breakdown's lines are its own comparison, so the previous period runs only without one.
   const comparing = computed(() => !!deps.compareMode.value && !breakdown.value);
   const prevKey = (k: string | null) => `${k}|prev:${deps.compareMode.value}`;
@@ -236,6 +241,11 @@ export default function useFunnelTrend(deps: TrendDeps) {
     });
   });
 
+  const selectedInterval = computed<Granularity>(() => {
+    const v = pa.funnelInterval.value;
+    return intervalOptions.value.find((o) => o.value === v && !o.disabled) ? v : "auto";
+  });
+
   // Step 1 to the last step is the default, so it stays out of the link.
   const writePair = (a: number, b: number) => {
     pa.funnelPair.value = a === 1 && b === def.value.steps.length ? null : { a, b };
@@ -358,6 +368,7 @@ export default function useFunnelTrend(deps: TrendDeps) {
     fromOptions,
     toOptions,
     intervalOptions,
+    selectedInterval,
     rangeText,
     setFrom,
     setTo,

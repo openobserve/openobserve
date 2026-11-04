@@ -51,6 +51,7 @@
         :columns="columns"
         row-key="entityId"
         :loading="promptQuery.isPending.value"
+        :loading-reset-key="activeFolderId"
         :error="listError"
         :forbidden="errorStatus(promptQuery.error.value) === 403"
         :frame="false"
@@ -245,6 +246,7 @@
       :initial-version="routeVersion"
       :initial-tab="detailTab"
       :protected-labels="protectedLabels"
+      :show-playground="!hidesOnlineEvalEntries(store.state.zoConfig)"
       @update:open="closeDetail"
       @updated="replacePrompt"
       @edit="openEditorForVersion"
@@ -347,6 +349,7 @@ import { storePromptPlaygroundHandoff } from "./promptPlaygroundHandoff";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { hidesOnlineEvalEntries } from "@/composables/shared/useOnlineEvalsGate";
 
 const store = useStore();
 const { t } = useI18nTyped();

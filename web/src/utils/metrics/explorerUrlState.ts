@@ -16,16 +16,17 @@
 /**
  * URL <-> explorer filter state.
  *
- * The explorer keeps its filters in the URL so leaving the page (e.g. into the
- * editor) and coming back restores them. Defaults are omitted, so an
+ * The explorer keeps its filters in the URL so leaving the page and coming
+ * back restores them. Defaults are omitted, so an
  * unfiltered grid keeps a bare `/metrics` URL.
  *
  * None of these keys may appear in METRICS_EDITOR_PARAM_KEYS — a `/metrics`
- * URL carrying an editor key redirects to `/metrics/editor` and the filters
- * would never be seen.
+ * URL carrying an editor key is rewritten into a Visualize link and the
+ * filters would never be seen.
  */
 
 import { raw } from "@/types/i18n";
+import { compileLabelFilters, type LabelMatchOp } from "@/components/promql/labelBoolean";
 import {
   isForecastHorizon,
   isForecastMethod,
@@ -34,7 +35,11 @@ import {
 } from "./forecast";
 
 import type { LocationQuery } from "vue-router";
-import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
+import type {
+  ExplorerSort,
+  LabelFilter,
+  UsageFilter,
+} from "@/composables/metrics/useMetricsExplorerGrid";
 
 export interface ExplorerFilterState {
   searchTerm: string;
@@ -44,7 +49,11 @@ export interface ExplorerFilterState {
   labelFilters: LabelFilter[];
   showFavoritesOnly: boolean;
   hideEmptyPanels: boolean;
-  sortBy: "a-z" | "z-a";
+  sortBy: ExplorerSort;
+  /** Absent means no usage filter. */
+  usageFilters?: Set<UsageFilter>;
+  /** Read from a URL only: the branch count of label groups dropped for passing the cap. */
+  labelGroupsOverCap?: number;
   viewMode: "grid" | "rows";
   /** Page mode — the Explore grid vs the query-driven Visualize workspace. */
   mode: "explore" | "visualize" | "workspace";
@@ -83,6 +92,7 @@ export const EXPLORER_FILTER_PARAM_KEYS = [
   "labels",
   "show_empty",
   "sort",
+  "usage",
   "view",
   "mode",
   // Never `stream`: that is an editor key and would redirect /metrics to the editor.
@@ -95,6 +105,8 @@ export const EXPLORER_FILTER_PARAM_KEYS = [
 ] as const;
 
 const TYPE_IDS = new Set(["counter", "gauge", "histogram", "summary", "other"]);
+const SORT_IDS = new Set<string>(["z-a", "dashboards", "alerts"]);
+const USAGE_IDS = new Set<string>(["dashboards", "alerts", "slos"]);
 
 // Sorted for a stable URL: the same selection always serializes identically,
 // so the change-guard in the component can compare strings.
@@ -120,13 +132,17 @@ export function explorerFiltersToQuery(
   // arbitrary strings, but a label NAME cannot contain `=` or `!`, so the
   // first operator token splits unambiguously — no JSON needed.
   if (state.labelFilters.length) {
-    query.labels = state.labelFilters.map((f) => `${f.label}${f.operator ?? "="}${f.value}`);
+    query.labels = state.labelFilters.map(
+      (f) =>
+        `${f.group ? `${f.negate ? "!" : ""}${f.group}:` : ""}${f.label}${f.operator ?? "="}${f.value}`,
+    );
   }
   // `showFavoritesOnly` is NOT serialized: it is now derived from the mode
   // (Workspace ⇒ pinned-only), so `?mode=workspace` already implies it. Keeping
   // it out of the URL removes the double-source that could flip it unexpectedly.
   if (!state.hideEmptyPanels) query.show_empty = "true";
-  if (state.sortBy === "z-a") query.sort = "z-a";
+  if (state.sortBy !== "a-z") query.sort = state.sortBy;
+  if (state.usageFilters?.size) query.usage = joinSet(state.usageFilters);
   if (state.viewMode === "rows") query.view = "rows";
   // Explore is the default landing mode, so only the non-default is serialized.
   if (state.mode === "visualize" || state.mode === "workspace") query.mode = state.mode;
@@ -165,13 +181,20 @@ export function queryToExplorerFilters(
     : query.labels != null
       ? [query.labels]
       : [];
-  const labelFilters = rawLabels.map(parseMatcher).filter((f): f is LabelFilter => f !== null);
+  const parsed = rawLabels.map(parseMatcher).filter((f): f is LabelFilter => f !== null);
+  const overCap = branchesOverCap(parsed);
+  const labelFilters = overCap ? parsed.filter((f) => !f.group) : parsed;
+  if (overCap) out.labelGroupsOverCap = overCap;
   if (labelFilters.length) out.labelFilters = labelFilters;
 
   // `favorites` is intentionally not read from the URL — the mode drives
   // showFavoritesOnly (see explorerFiltersToQuery).
   if (query.show_empty === "true") out.hideEmptyPanels = false;
-  if (query.sort === "z-a") out.sortBy = "z-a";
+  if (typeof query.sort === "string" && SORT_IDS.has(query.sort)) {
+    out.sortBy = query.sort as ExplorerSort;
+  }
+  const usage = splitList(query.usage).filter((u) => USAGE_IDS.has(u)) as UsageFilter[];
+  if (usage.length) out.usageFilters = new Set(usage);
   if (query.view === "rows") out.viewMode = "rows";
   if (query.mode === "visualize" || query.mode === "workspace") out.mode = query.mode;
 
@@ -200,12 +223,24 @@ const LABEL_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
 // `=~` before `=` so the regex operator is not split into `=` + a value
 // starting with `~`. The `s` flag lets a matcher value carry newlines.
-const MATCHER = /^([a-zA-Z_:][a-zA-Z0-9_:]*)(=~|!~|!=|=)(.*)$/s;
+// An OR group rides as a `2:` (or negated `!2:`) prefix, which no label name can start with.
+const MATCHER = /^(?:(!?)([1-9]\d*):)?([a-zA-Z_:][a-zA-Z0-9_:]*)(=~|!~|!=|=)(.*)$/s;
+
+/** The branch count when groups pass the cap, which would make every selector throw; 0 within it. */
+function branchesOverCap(filters: LabelFilter[]): number {
+  const compiled = compileLabelFilters(
+    filters.map((f) => ({ ...f, label: String(f.label), op: (f.operator ?? "=") as LabelMatchOp })),
+  );
+  return compiled.ok ? 0 : compiled.branchCount;
+}
 
 /** A hand-edited or truncated URL must degrade to "no filter", never throw. */
 function parseMatcher(matcher: unknown): LabelFilter | null {
   if (typeof matcher !== "string") return null;
   const m = matcher.match(MATCHER);
   if (!m) return null;
-  return { label: raw(m[1]), operator: m[2], value: m[3] };
+  const filter: LabelFilter = { label: raw(m[3]), operator: m[4], value: m[5] };
+  if (m[2]) filter.group = Number(m[2]);
+  if (m[2] && m[1]) filter.negate = true;
+  return filter;
 }

@@ -71,4 +71,25 @@ describe("updateStreams", () => {
     ]);
     wrapper.unmount();
   });
+
+  it("leaves the picker untouched when the org switched while the list loaded", async () => {
+    searchObj.data.streamResults = { list: [{ name: "keep" }] } as any;
+    searchObj.data.stream.streamType = "logs";
+    const originalOrg = store.state.selectedOrganization.identifier;
+    getStreamsMock.mockImplementationOnce(async () => {
+      store.state.selectedOrganization.identifier = "other-org";
+      return { list: [{ name: "usage" }] };
+    });
+    const wrapper = mount(Host, { global: { plugins: [store, i18n] } });
+
+    try {
+      await (wrapper.vm as any).updateStreams();
+    } finally {
+      store.state.selectedOrganization.identifier = originalOrg;
+    }
+
+    expect(searchObj.data.streamResults.list).toEqual([{ name: "keep" }]);
+    expect(searchObj.data.stream.streamLists).toEqual([]);
+    wrapper.unmount();
+  });
 });

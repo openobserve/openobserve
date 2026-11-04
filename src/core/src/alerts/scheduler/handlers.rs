@@ -20,7 +20,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        alerts::{TriggerCondition, fixed_offset, level::DeliveryDecision},
+        alerts::{TriggerCondition, cron_fires_between, level::DeliveryDecision, next_cron_after},
         dashboards::reports::{ReportFrequency, ReportFrequencyType},
         pipeline::components::{DerivedStream, NodeData, PipelineSource},
         self_reporting::{
@@ -961,7 +961,38 @@ pub async fn handle_triggers(
             super::calibration::handle_triggers(trace_id, trigger).await
         }
         db::scheduler::TriggerModule::FleetRollout => handle_fleet_rollout_triggers(trigger).await,
+        db::scheduler::TriggerModule::OncallSlackSync => {
+            handle_oncall_slack_sync_triggers(trigger).await
+        }
     }
+}
+
+/// Runs one Slack sync pass of the page; the pass ends its own row (C11).
+#[cfg(feature = "enterprise")]
+async fn handle_oncall_slack_sync_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    o2_enterprise::enterprise::oncall::chat::pass::run(&trigger).await
+}
+
+/// Completes the page's sync row with no Slack call, fenced by this claim: this build has no
+/// sync pass. Region-local: `infra::scheduler` never replicates.
+#[cfg(not(feature = "enterprise"))]
+async fn handle_oncall_slack_sync_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    let finish = config::meta::triggers::SlackSyncFinish {
+        status: db::scheduler::TriggerStatus::Completed,
+        next_run_at: trigger.next_run_at,
+        data: Default::default(),
+    };
+    if !infra::scheduler::finish_slack_sync(&trigger, &finish).await? {
+        log::warn!(
+            "[ONCALL] Slack sync of {} lost its claim before it finished",
+            trigger.module_key
+        );
+    }
+    Ok(())
 }
 
 /// Region-local (D21): only `infra::scheduler`, which never replicates to other regions.
@@ -1080,6 +1111,13 @@ async fn handle_oncall_escalation_triggers(
 
     let response_id = trigger.module_key.clone();
     if !oncall::is_enabled() {
+        if oncall::is_unlicensed()
+            && let Err(e) =
+                oncall::escalation::note_unlicensed_pause(&trigger.org, &response_id, now_micros())
+                    .await
+        {
+            log::error!("[ONCALL] could not note the license pause on {response_id}: {e}");
+        }
         // Turned off mid-ladder: drop the job rather than hold a timer nobody will service.
         db::scheduler::delete(
             &trigger.org,
@@ -1496,13 +1534,11 @@ async fn handle_composite_alert_trigger(
         #[cfg(feature = "enterprise")]
         let opens_incident = composite_opens_incident(
             has_targets,
-            definition.definition.creates_incident
-                && o2_enterprise::enterprise::common::config::get_config()
-                    .incidents
-                    .enabled,
+            definition.definition.creates_incident && crate::alerts::incidents::incidents_enabled(),
         );
         if delivery.should_deliver() && has_targets {
-            let notification_alert = composite_notification_alert(&definition.definition);
+            let notification_alert =
+                crate::alerts::composite::notification_alert(&definition.definition);
             let notification_row = composite_notification_row(
                 &definition.definition.expression,
                 evaluated.result,
@@ -1607,7 +1643,8 @@ async fn handle_composite_alert_trigger(
         #[cfg(feature = "enterprise")]
         if let Some(downtime) = suppressed_by {
             if opens_incident {
-                let notification_alert = composite_notification_alert(&definition.definition);
+                let notification_alert =
+                    crate::alerts::composite::notification_alert(&definition.definition);
                 let rows = [composite_notification_row(
                     &definition.definition.expression,
                     evaluated.result,
@@ -1628,17 +1665,22 @@ async fn handle_composite_alert_trigger(
 
         // Outside the deliverable branch: a silenced composite never reaches correlation.
         #[cfg(feature = "enterprise")]
-        if o2_enterprise::enterprise::oncall::is_enabled()
-            && !composite_incident_handled
-            && downtime.is_none()
-        {
-            let notification_alert = composite_notification_alert(&definition.definition);
-            let rows = [composite_notification_row(
-                &definition.definition.expression,
-                evaluated.result,
-                &evaluated.children,
-            )];
-            page_for_alert_firing(trace_id, &notification_alert, &rows).await;
+        if !composite_incident_handled && downtime.is_none() {
+            if o2_enterprise::enterprise::oncall::is_enabled() {
+                let notification_alert =
+                    crate::alerts::composite::notification_alert(&definition.definition);
+                let rows = [composite_notification_row(
+                    &definition.definition.expression,
+                    evaluated.result,
+                    &evaluated.children,
+                )];
+                page_for_alert_firing(trace_id, &notification_alert, &rows).await;
+            }
+            delivery_error = crate::alerts::alert::with_unlicensed_page_reason(
+                delivery_error,
+                o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(&trigger.org)
+                    .await,
+            );
         }
     }
 
@@ -1820,36 +1862,6 @@ fn composite_delivery_error(
             incident_error,
         )),
     }
-}
-
-fn composite_notification_alert(
-    definition: &infra::table::entity::alert_composites::Model,
-) -> config::meta::alerts::alert::Alert {
-    let mut alert = config::meta::alerts::alert::Alert::default();
-    alert.id = svix_ksuid::Ksuid::from_str(&definition.id).ok();
-    alert.org_id = definition.org.clone();
-    alert.name = definition.name.clone();
-    alert.description = definition.description.clone().unwrap_or_default();
-    alert.destinations =
-        serde_json::from_value(definition.destinations.clone()).unwrap_or_default();
-    alert.template = definition.template.clone();
-    alert.context_attributes = definition
-        .context_attributes
-        .clone()
-        .and_then(|value| serde_json::from_value(value).ok());
-    alert.creates_incident = definition.creates_incident;
-    alert.workflows = serde_json::from_value(definition.workflows.clone()).unwrap_or_default();
-    alert.priority = definition
-        .priority
-        .and_then(config::meta::alerts::priority::AlertPriority::from_i32);
-    alert.tags = definition
-        .tags
-        .clone()
-        .and_then(|value| serde_json::from_value(value).ok())
-        .unwrap_or_default();
-    alert.trigger_condition.silence = definition.silence_seconds;
-    alert.pending_period_sec = definition.pending_period_sec;
-    alert
 }
 
 fn composite_notification_row(
@@ -2196,7 +2208,7 @@ fn get_skipped_timestamps(
     let mut next_run_at;
     if !cron.is_empty() {
         let Some((skipped, next)) =
-            skipped_cron_timestamps(supposed_to_run_at, cron, tz_offset, delay)
+            skipped_cron_timestamps(supposed_to_run_at, cron, timezone_str, tz_offset, delay)
         else {
             log::warn!(
                 "[ALERT] cron '{cron}' with tz_offset {tz_offset} cannot be evaluated, skipping none"
@@ -2243,22 +2255,16 @@ fn get_skipped_timestamps(
 fn skipped_cron_timestamps(
     supposed_to_run_at: i64,
     cron: &str,
+    timezone: Option<&str>,
     tz_offset: i32,
     delay: i64,
 ) -> Option<(Vec<i64>, i64)> {
     let cron = Schedule::from_str(cron).ok()?;
-    let tz = fixed_offset(tz_offset)?;
-    let next_after = |ts: i64| {
-        let dt = DateTime::from_timestamp_micros(ts)?.with_timezone(&tz);
-        cron.after(&dt).next().map(|next| next.timestamp_micros())
-    };
-    let mut skipped = Vec::new();
-    let mut next_run_at = next_after(supposed_to_run_at)?;
-    while next_run_at <= supposed_to_run_at + delay {
-        skipped.push(next_run_at);
-        next_run_at = next_after(next_run_at)?;
-    }
-    Some((skipped, next_run_at))
+    let after = DateTime::from_timestamp_micros(supposed_to_run_at)?;
+    let until = DateTime::from_timestamp_micros(supposed_to_run_at.saturating_add(delay))?;
+    let (fires, next) = cron_fires_between(&cron, timezone, tz_offset, after, until)?;
+    let skipped = fires.iter().map(|t| t.timestamp_micros()).collect();
+    Some((skipped, next.timestamp_micros()))
 }
 
 /// Returns maximum considerable delay in microseconds - minimum of 1 hour or 20% of the frequency.
@@ -2516,7 +2522,7 @@ async fn trigger_rca_for_alert_firing(
 
     let cfg = get_o2_config();
     // Must agree with the condition `analysis_at_start` used to mark these records `Pending`.
-    if !cfg.incidents.rca_enabled || !cfg.ai.enabled || !cfg.ai.has_agent_target() {
+    if !cfg.incidents.rca_enabled || !crate::alerts::incidents::rca_agent_available() {
         release_alert_firing_hold(&alert.org_id, &opened).await;
         return;
     }
@@ -3036,9 +3042,7 @@ pub(crate) async fn correlate_muted_incident(
     let Some(first_row) = rows.first() else {
         return;
     };
-    let incidents_enabled = o2_enterprise::enterprise::common::config::get_config()
-        .incidents
-        .enabled;
+    let incidents_enabled = crate::alerts::incidents::incidents_enabled();
     if !correlates_muted_firing(alert.creates_incident, incidents_enabled, downtime) {
         return;
     }
@@ -3074,9 +3078,7 @@ async fn correlate_repeated_incident(
     let Some(first_row) = rows.first() else {
         return;
     };
-    let incidents_enabled = o2_enterprise::enterprise::common::config::get_config()
-        .incidents
-        .enabled;
+    let incidents_enabled = crate::alerts::incidents::incidents_enabled();
     if !correlates_repeated_firing(alert.creates_incident, incidents_enabled) {
         return;
     }
@@ -4158,9 +4160,7 @@ async fn handle_alert_triggers(
         let correlation_rows = unmuted_rows.as_deref().unwrap_or(data.as_slice());
         #[cfg(feature = "enterprise")]
         let (incident_handled_notification, incident_notify_error) = if alert.creates_incident
-            && o2_enterprise::enterprise::common::config::get_config()
-                .incidents
-                .enabled
+            && crate::alerts::incidents::incidents_enabled()
             && let Some(first_row) = correlation_rows.first()
         {
             match crate::alerts::incidents::correlate_alert_to_incident(
@@ -4221,6 +4221,12 @@ async fn handle_alert_triggers(
                 page_for_alert_identity(&scheduler_trace_id, &alert, &identity).await;
             }
         }
+        #[cfg(feature = "enterprise")]
+        let incident_notify_error = crate::alerts::alert::with_unlicensed_page_reason(
+            incident_notify_error,
+            o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(&alert.org_id)
+                .await,
+        );
 
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
@@ -4945,8 +4951,13 @@ async fn handle_report_triggers(
         return Ok(());
     }
     let run_once = report.frequency.frequency_type == ReportFrequencyType::Once;
-    let (next_run_at, frequency_seconds) =
-        report_next_run(&report.frequency, report.tz_offset, new_trigger.next_run_at);
+    let timezone = (!report.timezone.is_empty()).then_some(report.timezone.as_str());
+    let (next_run_at, frequency_seconds) = report_next_run(
+        &report.frequency,
+        timezone,
+        report.tz_offset,
+        new_trigger.next_run_at,
+    );
     new_trigger.next_run_at = next_run_at;
 
     if report.frequency.align_time && report.frequency.frequency_type != ReportFrequencyType::Cron {
@@ -5112,7 +5123,12 @@ fn report_retry_outcome(run_once: bool, retries: i32, max_retries: i32) -> Retry
 }
 
 /// Next run and frequency in seconds of a report schedule; a week out if it cannot be evaluated.
-fn report_next_run(frequency: &ReportFrequency, tz_offset: i32, now: i64) -> (i64, i64) {
+fn report_next_run(
+    frequency: &ReportFrequency,
+    timezone: Option<&str>,
+    tz_offset: i32,
+    now: i64,
+) -> (i64, i64) {
     let step = |unit_secs: i64| {
         let secs = frequency.interval.checked_mul(unit_secs)?;
         let next = now.checked_add(secs.checked_mul(1_000_000)?)?;
@@ -5126,7 +5142,12 @@ fn report_next_run(frequency: &ReportFrequency, tz_offset: i32, now: i64) -> (i6
         ReportFrequencyType::Months => step(2592000),
         ReportFrequencyType::Once => None,
         ReportFrequencyType::Cron => Schedule::from_str(&frequency.cron).ok().and_then(|cron| {
-            let next = cron.upcoming(fixed_offset(tz_offset)?).next()?;
+            let next = next_cron_after(
+                &cron,
+                timezone,
+                tz_offset,
+                DateTime::from_timestamp_micros(now)?,
+            )?;
             Some((next.timestamp_micros(), 60))
         }),
     };
@@ -8111,11 +8132,101 @@ mod tests {
             (every(ReportFrequencyType::Months, i64::MAX), 0),
         ] {
             assert_eq!(
-                report_next_run(&frequency, tz_offset, now),
+                report_next_run(&frequency, None, tz_offset, now),
                 (now + week, 60),
                 "{frequency:?} @ {tz_offset}"
             );
         }
+    }
+
+    fn utc_micros(y: i32, m: u32, d: u32, h: u32) -> i64 {
+        use chrono::TimeZone;
+        Utc.with_ymd_and_hms(y, m, d, h, 0, 0)
+            .unwrap()
+            .timestamp_micros()
+    }
+
+    #[test]
+    fn report_next_run_follows_the_zone_name_across_dst() {
+        let nine_am = ReportFrequency {
+            cron: "0 0 9 * * *".to_string(),
+            frequency_type: ReportFrequencyType::Cron,
+            ..Default::default()
+        };
+        let ny = Some("America/New_York");
+        // The stored offset is the one in force when the report was saved, stale after the change.
+        assert_eq!(
+            report_next_run(&nine_am, ny, -240, utc_micros(2026, 11, 1, 12)),
+            (utc_micros(2026, 11, 1, 14), 60)
+        );
+        assert_eq!(
+            report_next_run(&nine_am, ny, -300, utc_micros(2026, 3, 8, 12)),
+            (utc_micros(2026, 3, 8, 13), 60)
+        );
+        let half_past_three_utc = utc_micros(2026, 6, 15, 3) + 30 * 60_000_000;
+        assert_eq!(
+            report_next_run(&nine_am, None, 330, utc_micros(2026, 6, 15, 0)),
+            (half_past_three_utc, 60)
+        );
+    }
+
+    #[test]
+    fn skipped_cron_timestamps_follow_the_zone_name_across_dst() {
+        let ny = Some("America/New_York");
+        let hour = 3_600_000_000;
+        assert_eq!(
+            skipped_cron_timestamps(
+                utc_micros(2026, 10, 31, 13),
+                "0 0 9 * * *",
+                ny,
+                -240,
+                48 * hour
+            ),
+            Some((
+                vec![utc_micros(2026, 11, 1, 14)],
+                utc_micros(2026, 11, 2, 14)
+            ))
+        );
+        assert_eq!(
+            skipped_cron_timestamps(
+                utc_micros(2026, 3, 7, 14),
+                "0 0 9 * * *",
+                ny,
+                -300,
+                48 * hour
+            ),
+            Some((
+                vec![utc_micros(2026, 3, 8, 13), utc_micros(2026, 3, 9, 13)],
+                utc_micros(2026, 3, 10, 13)
+            ))
+        );
+        let ist_nine_am = |d| utc_micros(2026, 6, d, 3) + 30 * 60_000_000;
+        assert_eq!(
+            skipped_cron_timestamps(ist_nine_am(15), "0 0 9 * * *", None, 330, 24 * hour),
+            Some((vec![ist_nine_am(16)], ist_nine_am(17)))
+        );
+    }
+
+    #[test]
+    fn get_skipped_timestamps_passes_the_zone_name_to_cron_catch_up() {
+        let supposed_to_run_at = utc_micros(2026, 10, 31, 13);
+        let delay = 72 * 3_600_000_000;
+        assert_eq!(
+            get_skipped_timestamps(
+                supposed_to_run_at,
+                "0 0 9 * * *",
+                -240,
+                0,
+                delay,
+                true,
+                supposed_to_run_at + delay,
+                Some("America/New_York"),
+            ),
+            (
+                vec![utc_micros(2026, 11, 1, 14)],
+                utc_micros(2026, 11, 2, 14)
+            )
+        );
     }
 
     #[test]
@@ -8174,14 +8285,17 @@ mod tests {
             frequency_type: ReportFrequencyType::Hours,
             ..Default::default()
         };
-        assert_eq!(report_next_run(&hours, 0, now), (now + 2 * hour, 7200));
+        assert_eq!(
+            report_next_run(&hours, None, 0, now),
+            (now + 2 * hour, 7200)
+        );
         let months = ReportFrequency {
             interval: 1,
             frequency_type: ReportFrequencyType::Months,
             ..Default::default()
         };
         assert_eq!(
-            report_next_run(&months, 0, now),
+            report_next_run(&months, None, 0, now),
             (now + 30 * 24 * hour, 2592000)
         );
         let cron = ReportFrequency {
@@ -8189,9 +8303,10 @@ mod tests {
             frequency_type: ReportFrequencyType::Cron,
             ..Default::default()
         };
-        let (next, frequency_seconds) = report_next_run(&cron, 1439, now);
-        assert!(next > now_micros() && next <= now_micros() + hour, "{next}");
-        assert_eq!(frequency_seconds, 60);
+        assert_eq!(
+            report_next_run(&cron, None, 1439, now),
+            (now + 60_000_000, 60)
+        );
     }
 
     #[test]
@@ -9556,6 +9671,34 @@ mod tests {
         let kept =
             record_incident_notify_failure(&mut workflow_failed, "slack: http 500".to_string());
         assert_eq!(kept, RunOutcome::NotifyFailed);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_unlicensed_page_is_recorded_in_alert_history() {
+        use o2_enterprise::enterprise::oncall::escalation::UNLICENSED_PAGE_REASON;
+
+        use crate::alerts::alert::with_unlicensed_page_reason;
+
+        assert_eq!(with_unlicensed_page_reason(None, None), None);
+        let mut fired = TriggerData {
+            status: RunOutcome::Firing,
+            ..Default::default()
+        };
+        let error = with_unlicensed_page_reason(None, Some(UNLICENSED_PAGE_REASON)).unwrap();
+        let kept = record_incident_notify_failure(&mut fired, error);
+        assert_eq!(kept, RunOutcome::Firing);
+        assert_eq!(fired.status, RunOutcome::NotifyFailed);
+        assert_eq!(fired.error.as_deref(), Some(UNLICENSED_PAGE_REASON));
+
+        let both = with_unlicensed_page_reason(
+            Some("slack: http 500".to_string()),
+            Some(UNLICENSED_PAGE_REASON),
+        );
+        assert_eq!(
+            both.as_deref(),
+            Some(format!("slack: http 500; {UNLICENSED_PAGE_REASON}").as_str())
+        );
     }
 
     const PARK_NOW: i64 = 10_000_000_000;

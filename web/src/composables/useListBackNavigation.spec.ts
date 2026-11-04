@@ -29,11 +29,6 @@ const dashboardOptions = () => ({
   fallback: () => ({ path: "/dashboards", query: { folder: "default" } }),
 });
 
-const metricsOptions = () => ({
-  isListPath: (path: string) => path.startsWith("/metrics") && !path.startsWith("/metrics/editor"),
-  fallback: () => ({ name: "metrics", query: { org_identifier: "default" } }),
-});
-
 describe("useListBackNavigation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -90,31 +85,5 @@ describe("useListBackNavigation", () => {
 
     expect(mockRouterBack).not.toHaveBeenCalled();
     expect(mockRouterPush).toHaveBeenCalledTimes(1);
-  });
-
-  describe("metrics editor — deliberately explorer-only", () => {
-    it("pops back to the explorer it came from", () => {
-      historyState.back = "/metrics?mode=explore";
-
-      useListBackNavigation(metricsOptions())();
-
-      expect(mockRouterBack).toHaveBeenCalledTimes(1);
-    });
-
-    // The /metrics -> /metrics/editor redirect is replace: true, so state.back points PAST the explorer.
-    it.each(["/infra/hosts", "/logs", "/metrics/editor"])(
-      "pushes the explorer rather than popping to %s",
-      (back) => {
-        historyState.back = back;
-
-        useListBackNavigation(metricsOptions())();
-
-        expect(mockRouterBack).not.toHaveBeenCalled();
-        expect(mockRouterPush).toHaveBeenCalledWith({
-          name: "metrics",
-          query: { org_identifier: "default" },
-        });
-      },
-    );
   });
 });

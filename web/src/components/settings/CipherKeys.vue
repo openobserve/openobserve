@@ -608,7 +608,7 @@ export default defineComponent({
           getData(true);
         })
         .catch((err: any) => {
-          if (err.response?.status != 403 || err?.status != 403) {
+          if (err.response?.status !== 403 && err?.status !== 403) {
             toast({
               variant: "error",
               message:

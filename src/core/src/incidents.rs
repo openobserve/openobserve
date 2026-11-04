@@ -109,6 +109,11 @@ async fn get_event_metadata(
             metadata.push(("reason", reason.into()));
         }
 
+        IncidentEventType::AckEndedByPageResolve { user_id } => {
+            metadata.push(("event_type", "ack_ended_by_page_resolve".into()));
+            metadata.push(("user_id", user_id.into()));
+        }
+
         IncidentEventType::DimensionsUpgraded { from_key, to_key } => {
             metadata.push(("event_type", "dimensions_upgraded".into()));
             metadata.push(("from_key", from_key.into()));

@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-globalVersion="{ row }">
-          <span class="tabular-nums">{{ versionLabel(row.globalVersion) }}</span>
+          <span class="tabular-nums">{{ versionLabel(row.writeVersion) }}</span>
         </template>
 
         <template #cell-updatedAt="{ row }">
@@ -409,9 +409,10 @@ const columns = computed<OTableColumnDef[]>(() => [
     meta: { align: "left" },
   },
   {
+    // The id predates write versions; persisted column preferences key on it.
     id: "globalVersion",
     header: t("aiObservability.datasets.columns.version"),
-    accessorKey: "globalVersion",
+    accessorKey: "writeVersion",
     hideable: true,
     sortable: true,
     size: 100,
@@ -448,7 +449,6 @@ async function refresh(force = true) {
     // refresh control. A plain mount passes false and keeps the cached rows.
     if (force) await datasetsList.refetch();
   } catch {
-    // The grouped access toast already reports a 403; a second red toast adds nothing.
     if (!forbidden.value) {
       toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
     }

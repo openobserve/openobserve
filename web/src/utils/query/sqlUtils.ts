@@ -1,6 +1,31 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 
+const EXPLAIN_HEAD = /^EXPLAIN\s+(?:ANALYZE|VERBOSE|FORMAT|SELECT|WITH)\b/i;
+
+// A linear scan, not a regex: a repeated comment group backtracks exponentially on hostile input.
+const skipLeadingTrivia = (query: string): number => {
+  let i = 0;
+  while (i < query.length) {
+    if (/\s/.test(query[i])) {
+      i += 1;
+    } else if (query.startsWith("--", i)) {
+      const eol = query.indexOf("\n", i);
+      i = eol === -1 ? query.length : eol + 1;
+    } else if (query.startsWith("/*", i)) {
+      const close = query.indexOf("*/", i + 2);
+      if (close === -1) return query.length;
+      i = close + 2;
+    } else {
+      break;
+    }
+  }
+  return i;
+};
+
+export const isExplainQuery = (query: string): boolean =>
+  typeof query === "string" && EXPLAIN_HEAD.test(query.slice(skipLeadingTrivia(query)));
+
 let parser: any;
 let parserImportPromise: Promise<any> | null = null;
 
@@ -8,8 +33,8 @@ let parserImportPromise: Promise<any> | null = null;
  * Returns true when the query is a full SQL statement, false when it is a plain
  * filter/WHERE-clause expression used in non-SQL mode.
  *
- * Full SQL always starts with SELECT or WITH (CTE); filter expressions start
- * with a field name, function call, or operator — never with those keywords.
+ * Full SQL always starts with SELECT, WITH (CTE) or EXPLAIN <plan keyword>; filter
+ * expressions start with a field name, function call, or operator — never with those.
  *
  * Examples that return true  (SQL mode):
  *   SELECT * FROM "stream"
@@ -27,7 +52,7 @@ export const isSqlQuery = (query: string): boolean => {
   if (!query || typeof query !== "string") return false;
   // Anchored at start so field names like "select_count" or "with_clause"
   // are not mistaken for SQL keywords.
-  return /^\s*(SELECT|WITH)\s+/i.test(query);
+  return /^\s*(SELECT|WITH)\s+/i.test(query) || isExplainQuery(query);
 };
 
 /**

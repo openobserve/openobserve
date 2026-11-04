@@ -396,6 +396,35 @@ describe("OnCallMembers", () => {
       );
     });
 
+    /// R9: a following rotation shares the roster, so the dialog says its person can change.
+    it("says a rotation whose order the remove changes can change who is on call", async () => {
+      const rule = (members: string[]) => ({
+        name: "Base",
+        members,
+        shift_micros: 604_800_000_000,
+        anchor_micros: 0,
+      });
+      const wrapper = render({
+        members: [member("ana@o2.ai"), member("bob@o2.ai")],
+        onCallNow: [
+          ...now,
+          { rotation_id: "r2", rotation_name: "Secondary", rule: "Base", user_email: "bob@o2.ai" },
+        ],
+        rotations: [
+          { id: "r1", name: "Primary", shift_rules: [rule(["ana@o2.ai", "bob@o2.ai"])] },
+          { id: "r2", name: "Secondary", shift_rules: [rule(["ana@o2.ai", "bob@o2.ai"])] },
+          { id: "r3", name: "Weekend", shift_rules: [rule(["bob@o2.ai"])] },
+        ],
+      } as any);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-remove-ana@o2.ai"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="dialog-box"]').text()).toBe(
+        "They will no longer be paged for this team. Bob takes over Ana Sharma's current shift in Primary. They also leave Secondary, so who is on call there can change too.",
+      );
+    });
+
     // Before the team name loads, the title names the person alone rather than "from ?".
     it("names only the person while the team name is unknown", async () => {
       const wrapper = render({ members: [member("ana@o2.ai")], onCallNow: now });
@@ -891,7 +920,7 @@ describe("OnCallMembers", () => {
   /// U2, U5, S1: three person chips per row, the server's reason on each, and red only when nothing lands.
   describe("the reach chips", () => {
     const SELF = String(store.state.userInfo.email);
-    const blocked = (channel: "sms" | "voice", why: string): ChannelReadiness => ({
+    const blocked = (channel: "sms" | "voice" | "slack", why: string): ChannelReadiness => ({
       channel,
       deliverable: false,
       configured_but_unverified: false,
@@ -924,10 +953,11 @@ describe("OnCallMembers", () => {
       });
     }
 
-    it("orders the chips Email, SMS, Voice whatever order the server sent", async () => {
+    it("orders the chips Email, Slack, SMS, Voice whatever order the server sent", async () => {
       const wrapper = renderReach([
         reach("bob@o2.ai", true, [
           blocked("voice", "no phone on file"),
+          blocked("slack", "not linked"),
           ready("email"),
           blocked("sms", "no phone on file"),
         ]),
@@ -936,6 +966,8 @@ describe("OnCallMembers", () => {
 
       expect(chipsOf(wrapper, "bob@o2.ai")).toEqual([
         "oncall-channel-bob@o2.ai-email",
+        "tip",
+        "oncall-channel-bob@o2.ai-slack",
         "tip",
         "oncall-channel-bob@o2.ai-sms",
         "tip",
@@ -991,6 +1023,46 @@ describe("OnCallMembers", () => {
         name: "onCallMine",
         query: { org_identifier: store.state.selectedOrganization.identifier },
       });
+    });
+
+    /// DM-7: green when a DM would land, dashed with the server's reason when not.
+    it.each([
+      [
+        "a DM would land",
+        ready("slack"),
+        "bg-icon-chip-success-bg",
+        "Slack — verified, a page lands here",
+      ],
+      ["not linked", blocked("slack", "not linked"), "border-dashed", "not linked"],
+      ["DMs failing", blocked("slack", "Slack DMs failing"), "border-dashed", "Slack DMs failing"],
+      [
+        "Slack not set up",
+        blocked("slack", "Slack is not set up. An admin sets it up in Settings › Slack."),
+        "border-dashed",
+        "Slack is not set up. An admin sets it up in Settings › Slack.",
+      ],
+    ])("draws the Slack chip when %s", async (_, slack, tone, tip) => {
+      const wrapper = renderReach([reach("bob@o2.ai", true, [ready("email"), slack])]);
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-channel-bob@o2.ai-slack"]').classes()).toContain(
+        tone,
+      );
+      expect(tipsOf(wrapper, "bob@o2.ai")[1]).toBe(tip);
+    });
+
+    /// The caller links their own Slack account from Slack, so their chip says where and links nowhere.
+    it("tells the caller to run /o2 link when their own Slack is not linked", async () => {
+      const own = SELF.toUpperCase();
+      const wrapper = renderReach([
+        reach(own, true, [ready("email"), blocked("slack", "not linked")]),
+        reach("bob@o2.ai", true, [ready("email"), blocked("slack", "not linked")]),
+      ]);
+      await flushPromises();
+
+      expect(tipsOf(wrapper, own)[1]).toBe("not linked. Run /o2 link in Slack");
+      expect(tipsOf(wrapper, "bob@o2.ai")[1]).toBe("not linked");
+      expect(wrapper.find(`[data-test="oncall-channel-${own}-slack-link"]`).exists()).toBe(false);
     });
 
     // S8: one muted word after the icons, only when something is blocked.

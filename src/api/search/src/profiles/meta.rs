@@ -103,6 +103,7 @@ pub async fn get_profiles_meta(
     let sql_params = ProfilesSqlParams {
         request_trace_id: &request_trace_id,
         org_id: &org_id,
+        stream_name: &stream_name,
         user_id: &user_email.user_id,
         start_time,
         end_time,

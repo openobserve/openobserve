@@ -678,6 +678,8 @@ const activeIsSavable = computed(() => {
   if (!rotation?.name?.trim()) return false;
   if (!rotation.shift_rules.length) return false;
   if (rotation.shift_rules.some((rule) => !rule.members.length)) return false;
+  // The server refuses a From == To window outright.
+  if (rotation.shift_rules.some(hasZeroLengthWindow)) return false;
   return !rotation.shift_rules.some((rule) => priorityClashFor(rule));
 });
 
@@ -772,12 +774,16 @@ const minuteOptions = computed(() =>
 // The server refuses a window starting at 24:00.
 const fromMinuteOptions = computed(() => minuteOptions.value.slice(0, -1));
 
-// The server refuses two rules of one rotation only when priority and hours are both identical.
+// Mirrors the server's tie refusal (spec S3), so Save is off for exactly what it would refuse.
 function priorityClashFor(rule: ShiftRule): I18nText | "" {
   const rules = active.value?.shift_rules ?? [];
   const at = rules.indexOf(rule);
   const rival = rules.findIndex((other, k) => k !== at && rulesClash(rule, other));
   return rival < 0 ? "" : t("oncall.ruleClash", { name: raw(namedShiftRules.value[rival].name) });
+}
+
+function hasZeroLengthWindow(rule: ShiftRule): boolean {
+  return (rule.restrictions ?? []).some((window) => window.start_minute === window.end_minute);
 }
 
 function overlapNames(index: number): string {

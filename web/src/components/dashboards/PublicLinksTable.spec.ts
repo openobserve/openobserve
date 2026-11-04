@@ -194,6 +194,9 @@ const selectTile = async (w: ReturnType<typeof build>, key: string) => {
   await flushPromises();
 };
 
+// Every test mounts the table; on a loaded CI runner one mount can exceed the 5s default.
+vi.setConfig({ testTimeout: 20000 });
+
 describe("PublicLinksTable", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -664,7 +667,7 @@ describe("PublicLinksTable", () => {
   });
 
   it("asks the batch status for every link, in calls of at most 50", async () => {
-    const many = Array.from({ length: 60 }, (_, i) => link({ id: `m${i}` }));
+    const many = Array.from({ length: 51 }, (_, i) => link({ id: `m${i}` }));
     vi.mocked(admin.listOrg).mockResolvedValue({ data: { list: many } } as never);
     build();
     await flushPromises();

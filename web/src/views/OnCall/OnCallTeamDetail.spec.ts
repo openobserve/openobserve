@@ -564,6 +564,10 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
       wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
       await flushPromises();
+      wrapper
+        .findComponent({ name: "OnCallScheduleTimeline" })
+        .vm.$emit("update:window", { from: 1_000, to: 2_000 });
+      await flushPromises();
       const before = service.listOverrides.mock.calls.length;
       expect(before).toBeGreaterThan(0);
 
@@ -617,6 +621,10 @@ describe("OnCallTeamDetail", () => {
       const wrapper = render();
       await flushPromises();
       wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
+      await flushPromises();
+      wrapper
+        .findComponent({ name: "OnCallScheduleTimeline" })
+        .vm.$emit("update:window", { from: 1_000, to: 2_000 });
       await flushPromises();
       const before = service.listOverrides.mock.calls.length;
 
@@ -1151,6 +1159,14 @@ describe("OnCallTeamDetail", () => {
       expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).props("priority")).toBe(3);
     });
 
+    // The Slack channel card names `/o2 oncall here {team}`.
+    it("hands the drawer the team's name", async () => {
+      const wrapper = await openEscalation();
+      expect(wrapper.findComponent({ name: "OnCallPolicyEditor" }).props("teamName")).toBe(
+        "Platform",
+      );
+    });
+
     /// Closing from inside the drawer (× / Escape / Cancel) has to reach the
     /// page state, or the drawer reopens itself on the next render.
     it("closes when the drawer asks to close", async () => {
@@ -1393,7 +1409,11 @@ describe("OnCallTeamDetail", () => {
     const expiries = [
       { queryKey: oncallKeys.all("default"), exact: false, refetchType: "none" },
       { queryKey: userKeys.users("default"), exact: true, refetchType: "none" },
-      { queryKey: destinationKeys.list("default", "alert"), exact: true, refetchType: "none" },
+      {
+        queryKey: destinationKeys.list("default", "alert", false, ["jira"]),
+        exact: true,
+        refetchType: "none",
+      },
       { queryKey: serviceStreamKeys.all("default"), exact: false, refetchType: "none" },
     ];
     const pageReads = () => [

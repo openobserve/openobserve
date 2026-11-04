@@ -81,6 +81,7 @@ use crate::{
             custom::{VarValue, process_variable_replace},
             derive_channel_format,
             format::ChannelFormat,
+            jira,
             modifiers::{PreparedTemplate, prepare_modifiers},
             platform::{self, platform_of},
             render,
@@ -354,6 +355,8 @@ pub enum AlertError {
     MultiAlertGroupingError(String),
     #[error("Group by column {column} not found on stream {stream_name}")]
     GroupByColumnNotFound { column: String, stream_name: String },
+    #[error("{reason}")]
+    JiraDestinationNotSupported { destination: String, reason: String },
 }
 
 /// What a manual trigger did: sent, with its messages, or held by an active downtime.
@@ -374,6 +377,17 @@ impl ManualTrigger {
             Self::Suppressed(downtime) => {
                 format!("Alert suppressed by downtime {}", downtime.name)
             }
+        }
+    }
+
+    /// What the send could not deliver, such as a failed destination or a page the license
+    /// withheld.
+    pub fn warning(&self) -> Option<&str> {
+        match self {
+            Self::Sent { error_message, .. } if !error_message.trim().is_empty() => {
+                Some(error_message)
+            }
+            _ => None,
         }
     }
 }
@@ -561,6 +575,33 @@ async fn validate_recovery_templates(org_id: &str, alert: &Alert) -> Result<(), 
                 destination: dest_name.clone(),
                 platform: format!("{platform:?}"),
                 template: template.name.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Jira keeps one issue per alert, so it refuses alerts that would send for several at once.
+pub(crate) async fn validate_jira_destinations(
+    org_id: &str,
+    alert: &Alert,
+) -> Result<(), AlertError> {
+    for dest_name in alert
+        .destinations
+        .iter()
+        .chain(&alert.recovery_destinations)
+    {
+        if let Ok(destination) = db::alerts::destinations::get(org_id, dest_name).await
+            && let Module::Alert {
+                destination_type: DestinationType::Http(endpoint),
+                ..
+            } = &destination.module
+            && jira::is_jira(endpoint)
+            && let Some(reason) = jira::save_refusal(alert, dest_name)
+        {
+            return Err(AlertError::JiraDestinationNotSupported {
+                destination: dest_name.clone(),
+                reason,
             });
         }
     }
@@ -862,7 +903,7 @@ async fn prepare_alert(
             if max_query_range > 0
                 && !alert.query_condition.promql_rule_mode
                 && !alert.is_real_time
-                && alert.trigger_condition.period > max_query_range * 60
+                && alert.trigger_condition.period > max_query_range.saturating_mul(60)
             {
                 return Err(AlertError::PeriodExceedsMaxQueryRange {
                     max_query_range_hours: max_query_range,
@@ -1016,6 +1057,8 @@ async fn prepare_alert(
 
     validate_recovery_templates(org_id, alert).await?;
 
+    validate_jira_destinations(org_id, alert).await?;
+
     // PromQL carries a third threshold family: the condition value baked into
     // the query. Its warning needs the same §4.5 direction check, measured
     // against `promql_condition.operator`.
@@ -1061,7 +1104,7 @@ async fn prepare_alert(
                     let max_query_range = settings.max_query_range;
                     if max_query_range > 0
                         && !alert.is_real_time
-                        && alert.trigger_condition.period > max_query_range * 60
+                        && alert.trigger_condition.period > max_query_range.saturating_mul(60)
                     {
                         return Err(AlertError::PeriodExceedsMaxQueryRange {
                             max_query_range_hours: max_query_range,
@@ -2326,6 +2369,18 @@ pub(crate) fn with_incident_notify_error(
     }
 }
 
+/// A failure, not a skip, so alert history says why on-call stayed silent.
+#[cfg(feature = "enterprise")]
+pub(crate) fn with_unlicensed_page_reason(
+    notify_error: Option<String>,
+    unlicensed: Option<&str>,
+) -> Option<String> {
+    match unlicensed {
+        None => notify_error,
+        Some(reason) => Some(with_incident_notify_error(reason.to_string(), notify_error)),
+    }
+}
+
 /// Whether a send tried any destination or workflow; an `Err` is a failed delivery, so it counts.
 pub(crate) fn send_attempted(result: &Result<NotificationOutcome, AlertError>) -> bool {
     result.as_ref().map_or(true, |outcome| outcome.attempted)
@@ -2376,9 +2431,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
     let (incident_notified, incident_notify_error) = if alert.creates_incident
-        && o2_enterprise::enterprise::common::config::get_config()
-            .incidents
-            .enabled
+        && crate::alerts::incidents::incidents_enabled()
     {
         let synthetic_row = manual_trigger_row(&alert);
         let notify = std::slice::from_ref(&synthetic_row);
@@ -2446,6 +2499,11 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     if o2_enterprise::enterprise::oncall::is_enabled() && !incident_notified {
         crate::alerts::scheduler::handlers::page_for_alert_firing(&trace_id, &alert, &rows).await;
     }
+    #[cfg(feature = "enterprise")]
+    let incident_notify_error = with_unlicensed_page_reason(
+        incident_notify_error,
+        o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(&alert.org_id).await,
+    );
     let outcome = alert
         .send_notification(
             &trace_id,
@@ -2944,7 +3002,7 @@ impl AlertExt for Alert {
         }
 
         outcome.success_message = success_message;
-        outcome.error_message = err_message;
+        outcome.error_message = format!("{err_message}{workflow_err_msg}");
 
         // Attempted = destinations not skipped by the ledger. An attempt in
         // which every attempted destination failed is still a hard error, so
@@ -3287,6 +3345,12 @@ async fn send_to_destination_type(
     template: &Template,
     ctx: &mut NotificationContext,
 ) -> Result<String, anyhow::Error> {
+    // Jira builds its own text and keeps one issue per alert, so no template is rendered for it.
+    if let DestinationType::Http(endpoint) = dest_type
+        && jira::is_jira(endpoint)
+    {
+        return jira::send(endpoint, ctx).await;
+    }
     let is_email = matches!(dest_type, DestinationType::Email(_));
     let empty_meta = hashbrown::HashMap::new();
     let metadata: &hashbrown::HashMap<String, String> = match dest_type {
@@ -3534,6 +3598,10 @@ fn members_to_send(kept: Vec<String>, skipped: &[String]) -> Result<Email, anyho
 }
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
+    // A plain body posted at a Jira site root does nothing, so senders without a Jira branch fail.
+    if jira::is_jira(endpoint) {
+        return Err(anyhow::anyhow!(jira::UNSUPPORTED_SENDER));
+    }
     // Block SSRF: validate the destination URL (including DNS resolution) before
     // making any outbound request. The client is built through `build_safe_destination_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.
@@ -4204,6 +4272,13 @@ async fn build_notification_context(
             alert.trigger_condition.warning_threshold.map(|w| w as f64),
         )
     };
+    let family_operator = if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+        agg.having.operator.to_string()
+    } else if let Some(pc) = alert.query_condition.promql_condition.as_ref() {
+        pc.operator.to_string()
+    } else {
+        alert.trigger_condition.operator.to_string()
+    };
     let mut vars = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
         for (key, value) in row.iter() {
@@ -4386,6 +4461,8 @@ async fn build_notification_context(
         stream_type: alert.stream_type.as_str().to_string(),
         stream_name: alert.stream_name.clone(),
         alert_name: alert.name.clone(),
+        alert_id: alert.id.map(|id| id.to_string()).unwrap_or_default(),
+        incident_id: String::new(),
         alert_type: alert_type.to_string(),
         alert_period: alert.trigger_condition.period.to_string(),
         alert_operator: alert.trigger_condition.operator.to_string(),
@@ -4421,6 +4498,7 @@ async fn build_notification_context(
             fmt_observed(family_crit)
         },
         alert_threshold_warn: family_warn.map(fmt_observed).unwrap_or_default(),
+        alert_threshold_operator: family_operator,
         alert_start_time: alert_start_time_str,
         alert_end_time: alert_end_time_str,
         alert_start_time_millis: epoch_millis_or_na(alert_start_time),
@@ -4640,6 +4718,7 @@ pub async fn permitted_alerts(
                 use_self_context: false,
                 use_self_parent: true,
                 auth: "".to_string(), // We don't need to pass the auth token here.
+                feature: None,
             },
             user_role,
             false,
@@ -8651,6 +8730,16 @@ mod tests {
             error_message: String::new(),
         };
         assert_eq!(sent.response_message(), "Alert triggered");
+        assert_eq!(sent.warning(), None);
+        assert_eq!(suppressed.warning(), None);
+        let partial = ManualTrigger::Sent {
+            success_message: String::new(),
+            error_message: "not paged: On-Call is not included in your license".to_string(),
+        };
+        assert_eq!(
+            partial.warning(),
+            Some("not paged: On-Call is not included in your license")
+        );
     }
 
     #[test]

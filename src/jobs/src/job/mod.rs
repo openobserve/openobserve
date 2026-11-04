@@ -586,6 +586,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::org_status::watch());
     // KV reads are served from a per-node cache, so every node, routers included, must hear writes.
     tokio::task::spawn(db::kv::watch());
+    #[cfg(feature = "enterprise")]
+    tokio::spawn(o2_enterprise::enterprise::common::settings::watch());
     retry_with_backoff(
         "load the org status cache",
         ORG_STATUS_LOAD_ATTEMPTS,
@@ -688,6 +690,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Routers serve the inbound /api/slack/* routes, whose audit and lookups need the hooks.
     #[cfg(feature = "enterprise")]
     slack_hooks::register();
+
+    // Routers serve the hook routes, so the hook node tasks start before the router return.
+    #[cfg(feature = "enterprise")]
+    openobserve_core::workflows::http_trigger::spawn_node_tasks();
 
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
@@ -867,11 +873,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::common::remote_defaults::spawn_refresher();
 
     if config::get_config().common.model_pricing_enabled {
+        // Warm from committed seed rows even offline or when coordinator notification fails.
+        if let Err(e) = openobserve_builtins::model_pricing::load_seed().await {
+            log::error!("[model_pricing] loading seed prices failed: {e}");
+        }
         db::model_pricing::cache()
             .await
             .expect("model pricing cache failed");
 
-        // Sync built-in model pricing from GitHub (initial + periodic)
+        // Only queriers perform the initial and periodic GitHub sync.
         if LOCAL_NODE.is_querier() {
             tokio::task::spawn(async {
                 if let Err(e) =

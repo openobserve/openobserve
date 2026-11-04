@@ -34,6 +34,7 @@ Key changes from original:
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import os
 import random
@@ -136,7 +137,12 @@ def streams_setup(create_session):
     base_url = ZO_BASE_URL
 
     with open(ROOT_DIR / "test-data/logs_data.json") as f:
-        data = f.read()
+        rows = json.load(f)
+    # Unstamped rows take their arrival time, so an upload crossing a 10-second boundary splits the histogram.
+    bucket_start_us = int(datetime.now(UTC).timestamp()) // 10 * 10 * 1_000_000
+    for row in rows:
+        row["_timestamp"] = bucket_start_us
+    data = json.dumps(rows)
 
     # Ingest main + join streams (use the same dataset for both)
     for stream in (STREAM_NAME, STREAM_JOIN):

@@ -78,12 +78,17 @@ fn error_response(error: SlackOAuthError) -> Response {
     context_path = "/api",
     tag = "Alerts",
     operation_id = "StartSlackDestinationOAuth",
+    summary = "Start Slack OAuth for a destination",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses(
         (status = 200, description = "Slack authorization URL", body = SlackOAuthStartResponse),
         (status = 500, description = "Internal server error"),
         (status = 503, description = "Slack OAuth is not configured")
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn start(
@@ -105,6 +110,7 @@ pub async fn start(
     context_path = "/api",
     tag = "Alerts",
     operation_id = "ExchangeSlackDestinationOAuth",
+    summary = "Exchange the Slack OAuth code",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = SlackOAuthExchangeRequest, content_type = "application/json"),
@@ -113,6 +119,10 @@ pub async fn start(
         (status = 400, description = "Invalid or rejected authorization"),
         (status = 502, description = "Slack authorization service failure"),
         (status = 503, description = "Slack OAuth is not configured")
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn exchange(

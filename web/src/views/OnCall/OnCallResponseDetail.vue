@@ -3,6 +3,7 @@
     bleed
     data-test="oncall-response-detail-page"
     :title="title"
+    title-min-width
     icon="notifications-active"
     :back="{
       label: t('oncall.backToResponses'),
@@ -66,8 +67,8 @@
     <template #title-trail>
       <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
       <template v-if="response && lgUp">
-        <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-        <span data-test="oncall-response-phrase">
+        <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" class="shrink-0" />
+        <span class="flex min-w-32 shrink-[1000] truncate" data-test="oncall-response-phrase">
           <OnCallEscalationCell
             :response-id="response.id"
             :record="response"
@@ -75,12 +76,13 @@
             :total-rungs="totalRungs"
             :progress-loaded="escalationLoaded"
             :reached-step="headerReachedStep"
+            :team-deleted="teamDeleted"
           />
         </span>
         <!-- How long it has been ringing, beside the word "ringing". The two
              were a stat tile apart, and the one people read first is the
              one that says how bad this already is. -->
-        <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
+        <span class="text-text-secondary shrink-0 text-xs" data-test="oncall-response-elapsed">
           {{ elapsedLabel }}
         </span>
         <!-- Why this team is looking at somebody else's outage, said where the
@@ -117,10 +119,45 @@
           @click="acknowledgeRecord"
         >
           {{ t("oncall.acknowledge") }}
+          <OTooltip :content="ackWords.ackHint" />
         </OButton>
+        <template v-if="response.state === 'acknowledged'">
+          <OButton
+            v-if="response.acked_by !== me"
+            variant="outline"
+            size="sm-action"
+            :loading="acking"
+            data-test="oncall-response-take-over-btn"
+            @click="takeOverRecord"
+          >
+            {{ t("oncall.takeOver") }}
+            <OTooltip :content="t('oncall.takeOverHint')" />
+          </OButton>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            :loading="acking"
+            data-test="oncall-response-unack-btn"
+            @click="unacknowledgeRecord"
+          >
+            {{ t("oncall.unacknowledge") }}
+            <OTooltip :content="ackWords.unackHint" />
+          </OButton>
+        </template>
 
         <!-- A menu of durations, not a panel that pushes the page down. -->
-        <ODropdown v-if="canSnooze && lgUp">
+        <OButton
+          v-if="canUnsnooze && lgUp"
+          variant="outline"
+          size="sm-action"
+          :loading="snoozing"
+          data-test="oncall-response-unsnooze-btn"
+          @click="unsnoozeRecord"
+        >
+          {{ t("oncall.unsnooze") }}
+          <OTooltip :content="t('oncall.unsnoozeHint')" />
+        </OButton>
+        <ODropdown v-else-if="canSnooze && lgUp">
           <template #trigger>
             <OButton
               variant="outline"
@@ -227,7 +264,14 @@
             data-test="oncall-response-more-btn"
           />
         </template>
-        <ODropdownGroup v-if="canSnooze" :label="t('oncall.snoozeFor')">
+        <ODropdownItem
+          v-if="canUnsnooze"
+          data-test="oncall-response-unsnooze-btn-menu"
+          @select="unsnoozeRecord"
+        >
+          {{ t("oncall.unsnooze") }}
+        </ODropdownItem>
+        <ODropdownGroup v-else-if="canSnooze" :label="t('oncall.snoozeFor')">
           <ODropdownItem
             v-for="opt in snoozeOptions"
             :key="opt.minutes"
@@ -281,7 +325,7 @@
           data-test="oncall-response-meta"
         >
           <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-          <span data-test="oncall-response-phrase">
+          <span class="flex min-w-32 shrink-[1000] truncate" data-test="oncall-response-phrase">
             <OnCallEscalationCell
               :response-id="response.id"
               :record="response"
@@ -289,6 +333,7 @@
               :total-rungs="totalRungs"
               :progress-loaded="escalationLoaded"
               :reached-step="headerReachedStep"
+              :team-deleted="teamDeleted"
             />
           </span>
           <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
@@ -337,6 +382,17 @@
           data-test="oncall-response-snoozed-banner"
         >
           {{ t("oncall.snoozedUntil", { time: snoozedUntilLabel }) }}
+          <template v-if="canUnsnooze" #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              :loading="snoozing"
+              data-test="oncall-response-snoozed-banner-unsnooze"
+              @click="unsnoozeRecord"
+            >
+              {{ t("oncall.unsnooze") }}
+            </OButton>
+          </template>
         </OBanner>
 
         <!-- D-21. This record exists because somebody else's failure reaches
@@ -779,6 +835,7 @@ import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { notAckedToast, pageAckWords, unchangedAckToast } from "@/utils/alerts/ackState";
 import OnCallFiringHistory from "@/components/oncall/OnCallFiringHistory.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
 import OnCallReportCard from "@/components/oncall/OnCallReportCard.vue";
@@ -801,6 +858,8 @@ import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import {
   acknowledgeResponseMutation,
+  takeOverResponseMutation,
+  unacknowledgeResponseMutation,
   addResponseNoteMutation,
   confirmRecoveryMutation,
   escalateNowMutation,
@@ -817,6 +876,7 @@ import {
   responseQuery,
   responseReportQuery,
   snoozeResponseMutation,
+  unsnoozeResponseMutation,
   teamMembersQuery,
   teamPolicyQuery,
   teamReachabilityQuery,
@@ -861,6 +921,8 @@ import { formatMicrosDuration } from "@/utils/formatters";
 import { formatTimestampInTimezone } from "@/utils/date";
 
 const HOLD_RECHECK_MS = 10_000;
+/// Re-reads of a lapsed rung before giving up: a minute at HOLD_RECHECK_MS.
+const LAPSE_RECHECKS = 6;
 
 const { t } = useI18nTyped();
 const { lgUp } = useBreakpoint();
@@ -933,15 +995,11 @@ const severityOptions = computed(() =>
 /// The record's own severity is the default: the wire derives exactly this
 /// when no severity is sent, so the picker opens on the answer rather than on
 /// an empty box somebody has to fill in mid-incident.
-watch(
-  [response, promoteOpen],
-  () => {
-    if (!promoteOpen.value || !response.value) return;
-    promoteTitle.value = response.value.title || "";
-    promoteSeverity.value = promoteSeverityFloor(response.value.priority);
-  },
-  { immediate: true },
-);
+watch(promoteOpen, (open) => {
+  if (!open || !response.value) return;
+  promoteTitle.value = response.value.title || "";
+  promoteSeverity.value = promoteSeverityFloor(response.value.priority);
+});
 
 /// Makes an incident out of a page that turned out to be one. The refusal path
 /// matters as much as the success one: a 409 means somebody else promoted this
@@ -1011,6 +1069,7 @@ const subjectAlert = ref<{
   stream_type?: string;
   query_condition?: any;
   condition?: any;
+  trigger_condition?: any;
 } | null>(null);
 const escalation = ref<EscalationProgress | null>(null);
 /// False until the progress has answered, so the header makes no paging claim from a missing value.
@@ -1048,7 +1107,18 @@ const responseId = computed(() => String(route.params.responseId ?? ""));
 // The id rides in the variables: the origin link swaps it under a reused instance.
 const resolveWrite = useMutation(() => resolveResponseMutation(orgId.value));
 const ackWrite = useMutation(() => acknowledgeResponseMutation(orgId.value));
+const takeOverWrite = useMutation(() => takeOverResponseMutation(orgId.value));
+const unackWrite = useMutation(() => unacknowledgeResponseMutation(orgId.value));
+const me = computed(() => store.state.userInfo?.email);
+const ackWords = computed(() =>
+  pageAckWords(
+    response.value?.team_id ? teamName.value : "",
+    response.value?.subject.subject_type ?? "alert",
+    t,
+  ),
+);
 const snoozeWrite = useMutation(() => snoozeResponseMutation(orgId.value));
+const unsnoozeWrite = useMutation(() => unsnoozeResponseMutation(orgId.value));
 const noteWrite = useMutation(() => addResponseNoteMutation(orgId.value));
 const handoffWrite = useMutation(() => handoffResponseMutation(orgId.value));
 const recoveryWrite = useMutation(() => confirmRecoveryMutation(orgId.value));
@@ -1260,6 +1330,7 @@ const snoozedUntilLabel = computed(() => {
   if (!r || !isSnoozed(r)) return "";
   return formatOnCallInstant(r.snoozed_until as number, nowMicros.value, store.state.timezone);
 });
+const canUnsnooze = computed(() => canSnooze.value && !!snoozedUntilLabel.value);
 
 const timeToAck = computed(() => {
   const r = response.value;
@@ -1393,17 +1464,71 @@ async function resolveRecord() {
   }
 }
 
+/// A press that changed nothing on a closed page says so; nobody acknowledged it then (ack, take over).
+function resolvedToast(page: OnCallResponse, unheld: boolean) {
+  const closed = !!page.closed_at || !isUnresolved(page.state);
+  return closed && (!unheld || !page.acked_by)
+    ? { variant: "info" as const, message: t("oncall.alreadyResolved") }
+    : null;
+}
+
 async function acknowledgeRecord() {
   acking.value = true;
   try {
-    await ackWrite.mutateAsync(responseId.value);
+    const res = await ackWrite.mutateAsync(responseId.value);
     analytics.track("oncall_page_acknowledged", { count: 1 });
-    toast({ variant: "success", message: t("oncall.acknowledged") });
+    toast(
+      res.data.ack?.changed === false
+        ? (resolvedToast(res.data, true) ?? unchangedAckToast(res.data.acked_by, me.value, t))
+        : { variant: "success", message: ackWords.value.acked },
+    );
     await fetchResponse();
   } catch (err: any) {
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.acknowledgeFailed"),
+    });
+  } finally {
+    acking.value = false;
+  }
+}
+
+async function takeOverRecord() {
+  const from = response.value?.acked_by ?? "";
+  acking.value = true;
+  try {
+    const res = await takeOverWrite.mutateAsync(responseId.value);
+    toast(
+      res.data.ack?.changed === false
+        ? (resolvedToast(res.data, true) ?? unchangedAckToast(res.data.acked_by, me.value, t))
+        : { variant: "success", message: t("oncall.tookOver", { who: raw(from) }) },
+    );
+    await fetchResponse();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.acknowledgeFailed"),
+    });
+  } finally {
+    acking.value = false;
+  }
+}
+
+async function unacknowledgeRecord() {
+  acking.value = true;
+  try {
+    const res = await unackWrite.mutateAsync(responseId.value);
+    toast(
+      res.data.ack?.changed === false
+        ? (resolvedToast(res.data, false) ??
+            notAckedToast(res.data.title || res.data.subject.source_id, t))
+        : { variant: "success", message: ackWords.value.unacked },
+    );
+    await fetchResponse();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.unacknowledgeFailed"),
     });
   } finally {
     acking.value = false;
@@ -1420,6 +1545,22 @@ async function snoozeRecord(minutes: number) {
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.snoozeFailed"),
+    });
+  } finally {
+    snoozing.value = false;
+  }
+}
+
+async function unsnoozeRecord() {
+  snoozing.value = true;
+  try {
+    await unsnoozeWrite.mutateAsync(responseId.value);
+    toast({ variant: "success", message: t("oncall.unsnoozed") });
+    await fetchResponse();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.unsnoozeFailed"),
     });
   } finally {
     snoozing.value = false;
@@ -1728,8 +1869,28 @@ async function fetchEscalation(force = false) {
   }
 }
 
+/// Re-reads the record and its events, so the rung card and activity agree with a newer progress.
+async function refreshRecord() {
+  const id = responseId.value;
+  try {
+    const data = await read<{ response: OnCallResponse; events: OnCallResponseEvent[] } | null>(
+      responseQuery(orgId.value, id),
+      true,
+    );
+    if (!data?.response || id !== responseId.value) return;
+    response.value = data.response;
+    events.value = data.events ?? [];
+  } catch (err: any) {
+    if (id !== responseId.value) return;
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.loadResponseFailed"),
+    });
+  }
+}
+
 /// A failed re-read keeps the last good progress, so the hold banner and its polling survive until the next tick.
-async function recheckHold() {
+async function recheckProgress() {
   try {
     escalation.value = await read<EscalationProgress | null>(
       responseProgressQuery(orgId.value, responseId.value),
@@ -1752,16 +1913,38 @@ function openResponse(id: string) {
   });
 }
 
-// The ladder's countdown lapses while the entry is still fresh, so this one forces.
+// A lapsed rung is sent a little later, so a few forced re-reads follow until next_at moves.
+let lapseRecheck: ReturnType<typeof setInterval> | null = null;
+function stopLapseRecheck() {
+  if (lapseRecheck !== null) clearInterval(lapseRecheck);
+  lapseRecheck = null;
+}
 watch(
   () => {
     const at = escalation.value?.next_at;
     return !!at && nowMicros.value >= at;
   },
   (lapsed) => {
-    if (lapsed) fetchEscalation(true);
+    stopLapseRecheck();
+    if (!lapsed) return;
+    fetchEscalation(true);
+    let triesLeft = LAPSE_RECHECKS;
+    lapseRecheck = setInterval(() => {
+      if (triesLeft-- <= 0) return stopLapseRecheck();
+      recheckProgress();
+    }, HOLD_RECHECK_MS);
   },
 );
+onBeforeUnmount(stopLapseRecheck);
+
+// The newest rung sent in any ladder run; a run restart resets the count but never moves this back.
+const lastSentAt = computed(() =>
+  escalation.value ? Math.max(0, ...escalation.value.fired.map((rung) => rung.at)) : undefined,
+);
+// A rung the progress saw sent is on the record and its activity too, which this view read earlier.
+watch(lastSentAt, (sent, before) => {
+  if (sent !== undefined && before !== undefined && sent > before) refreshRecord();
+});
 
 // Triage may release the first page before the deadline, so the progress is re-read while held.
 let holdRecheck: ReturnType<typeof setInterval> | null = null;
@@ -1773,7 +1956,7 @@ watch(
   () => holdSecondsLeft.value > 0,
   (held) => {
     stopHoldRecheck();
-    if (held) holdRecheck = setInterval(recheckHold, HOLD_RECHECK_MS);
+    if (held) holdRecheck = setInterval(recheckProgress, HOLD_RECHECK_MS);
   },
 );
 onBeforeUnmount(stopHoldRecheck);
@@ -1804,7 +1987,9 @@ watch(
     teamName.value = "";
     subjectAlert.value = null;
     priorCauses.value = [];
+    firingHistory.value = [];
     report.value = null;
+    promoteOpen.value = false;
     fetchResponse();
   },
   { immediate: true },

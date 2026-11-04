@@ -74,6 +74,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onVariablesValueUpdated(Number(index))"
         />
       </div>
+      <div v-else-if="item.type == 'date'" class="max-w-[40rem] min-w-37.5">
+        <ODate
+          v-show="!item.hideOnDashboard"
+          class="me-4 mt-1 w-37.5!"
+          v-model="item.value"
+          :label="item.label || item.name"
+          label-position="inside"
+          :clearable="!item.readOnly"
+          :readonly="item.readOnly === true"
+          :data-test="`variable-selector-${item.name}`"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
+        />
+      </div>
       <div v-else-if="item.type == 'custom'" class="max-w-[40rem] min-w-37.5">
         <VariableCustomValueSelector
           v-show="!item.hideOnDashboard"
@@ -129,6 +142,7 @@ import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import ODate from "@/lib/forms/Date/ODate.vue";
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { b64EncodeUnicode, escapeSingleQuotes, generateTraceContext } from "@/utils/zincutils";
@@ -136,6 +150,7 @@ import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/varia
 import {
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
+  formatDateVariable,
 } from "@/utils/dashboard/variables/variablesUtils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
@@ -198,6 +213,7 @@ export default defineComponent({
     VariableCustomValueSelector,
     OButton,
     OInput,
+    ODate,
   },
   setup(props: any, { emit }) {
     const store = useStore();
@@ -427,6 +443,41 @@ export default defineComponent({
       }
     };
 
+    const isEmptyValue = (value: any) =>
+      value === null || value === undefined || (Array.isArray(value) && value.length === 0);
+
+    const selectQueryValuesValue = (variableObject: any) => {
+      if (oldVariablesData[variableObject.name] !== undefined) {
+        variableLog(
+          variableObject.name,
+          `Old values before processing: ${JSON.stringify(oldVariablesData[variableObject.name])}`,
+        );
+
+        const oldValues = Array.isArray(oldVariablesData[variableObject.name])
+          ? oldVariablesData[variableObject.name]
+          : [oldVariablesData[variableObject.name]];
+
+        handleQueryValuesLogic(variableObject, oldValues);
+        return;
+      }
+
+      variableLog(variableObject.name, `Old values not found - keeping existing value if set`);
+
+      if (!isEmptyValue(variableObject.value)) return;
+
+      // Don't auto-select a blank option as default. Find the first non-blank option.
+      const firstNonBlankOption = variableObject.options.find(
+        (opt: any) => opt.value !== "" && opt.label !== "<blank>",
+      );
+      if (firstNonBlankOption) {
+        variableObject.value = variableObject.multiSelect
+          ? [firstNonBlankOption.value]
+          : firstNonBlankOption.value;
+      } else {
+        variableObject.value = variableObject.multiSelect ? [] : null;
+      }
+    };
+
     const handleSearchResponse = (payload: any, response: any, variableObject: any) => {
       variableLog(variableObject.name, `Received response...`);
 
@@ -452,6 +503,11 @@ export default defineComponent({
         (response.type === "event_progress" && response.content.percent === 100) ||
         response.type === "end"
       ) {
+        // A cached query streams its empty newest delta first, which settled the value before any rows arrived.
+        if (isEmptyValue(variableObject.value) && variableObject.options?.length) {
+          selectQueryValuesValue(variableObject);
+        }
+
         // Mark as partially loaded
         variableObject.isVariablePartialLoaded = true;
 
@@ -572,53 +628,7 @@ export default defineComponent({
             const originalValue = JSON.parse(JSON.stringify(variableObject.value));
 
             if (isFirstResponse) {
-              // Update options and handle first response
-              if (oldVariablesData[variableObject.name] !== undefined) {
-                variableLog(
-                  variableObject.name,
-                  `Old values before processing: ${JSON.stringify(oldVariablesData[variableObject.name])}`,
-                );
-
-                const oldValues = Array.isArray(oldVariablesData[variableObject.name])
-                  ? oldVariablesData[variableObject.name]
-                  : [oldVariablesData[variableObject.name]];
-
-                handleQueryValuesLogic(variableObject, oldValues);
-              } else {
-                // Don't auto-set value to first option if dropdown was just opened
-                // Only set default value during initial load or when explicitly needed
-                variableLog(
-                  variableObject.name,
-                  `Old values not found - keeping existing value if set`,
-                );
-
-                // Only set to first option if current value is null/undefined/empty
-                if (
-                  variableObject.value === null ||
-                  variableObject.value === undefined ||
-                  (Array.isArray(variableObject.value) && variableObject.value.length === 0)
-                ) {
-                  // Don't auto-select a blank option as default. Find the first non-blank option.
-                  if (variableObject.options.length) {
-                    // Find the first non-blank option
-                    const firstNonBlankOption = variableObject.options.find(
-                      (opt: any) => opt.value !== "" && opt.label !== "<blank>",
-                    );
-
-                    if (firstNonBlankOption) {
-                      // For multi-select, wrap in array; for single-select, use the value directly
-                      variableObject.value = variableObject.multiSelect
-                        ? [firstNonBlankOption.value]
-                        : firstNonBlankOption.value;
-                    } else {
-                      // All options are blank - keep value unset
-                      variableObject.value = variableObject.multiSelect ? [] : null;
-                    }
-                  } else {
-                    variableObject.value = variableObject.multiSelect ? [] : null;
-                  }
-                }
-              }
+              selectQueryValuesValue(variableObject);
 
               const hasValueChanged =
                 Array.isArray(originalValue) && Array.isArray(variableObject.value)
@@ -883,8 +893,8 @@ export default defineComponent({
             variableData.value = item.multiSelect ? [] : null;
           }
         } else if (item.type != "constant") {
-          // for textbox type variable, if initial value is not exist, use the default value
-          if (item.type == "textbox") {
+          // for textbox/date type variable, if initial value is not exist, use the default value
+          if (item.type == "textbox" || item.type == "date") {
             variableData.value = initialValue ?? variableData.value;
           } else {
             // use the initial value
@@ -1834,6 +1844,7 @@ export default defineComponent({
         }
         case "constant":
         case "textbox":
+        case "date":
         case "dynamic_filters": {
           finalizePartialVariableLoading(variableObject, true, isInitialLoad);
           finalizeVariableLoading(variableObject, true);
@@ -1952,7 +1963,7 @@ export default defineComponent({
       queryContext = replaceVariablePlaceholders(
         queryContext,
         variablesByName.keys(),
-        ({ name, quoted }) => {
+        ({ name, quoted, format }) => {
           const variable = variablesByName.get(name);
           // an unloaded variable keeps its placeholder rather than resolving as a shorter name
           if (!variable.isVariablePartialLoaded) return undefined;
@@ -1965,7 +1976,8 @@ export default defineComponent({
               : values.map((value: any) => `'${value}'`).join(", ");
           }
           if (variable.value === null || variable.value === undefined) return undefined;
-          return `${escapeSingleQuotes(variable.value)}`;
+          // a date variable passes its effective format, like a scalar value
+          return `${escapeSingleQuotes(formatDateVariable(variable, format) ?? variable.value)}`;
         },
       );
 

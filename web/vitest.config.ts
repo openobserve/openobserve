@@ -3,6 +3,7 @@ import { mergeConfig, defineConfig, configDefaults } from 'vitest/config'
 import type { ConfigEnv } from 'vite'
 import type { UserConfig } from 'vite'
 import viteConfig from './vite.config'
+import UiShardSequencer from './scripts/ui-shard-sequencer'
 
 // Convert the vite config to a plain object if it's a function
 const viteConfigObj = typeof viteConfig === 'function'
@@ -84,6 +85,7 @@ export default mergeConfig(
       // Suppress all console output during tests except test results
       silent: false,
       reporters: ['default'],
+      ...(process.env.UI_SHARD_BALANCE === '1' && { sequence: { sequencer: UiShardSequencer } }),
       // Suppress all console output (both stderr and stdout)
       onConsoleLog: (log: string, type: 'stdout' | 'stderr') => {
         // Return false to prevent all console logs from being printed

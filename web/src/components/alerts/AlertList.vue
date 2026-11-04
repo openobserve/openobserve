@@ -88,6 +88,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             shortcut-id="alertsImport"
           />
         </OButton>
+        <OButton
+          v-if="showAlertLibrary"
+          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
+          variant="outline"
+          size="sm"
+          icon-left="menu-book"
+          data-test="alert-list-alert-library-btn"
+          @click="goToAlertLibrary"
+        >
+          <template v-if="!isCompactToolbar">{{ t("alerts.alertLibrary") }}</template>
+          <OTooltip v-if="isCompactToolbar" :content="t('alerts.alertLibrary')" side="bottom" />
+        </OButton>
       </template>
 
       <div data-test="alert-list-splitter" class="flex min-h-0 flex-1 max-md:flex-col">
@@ -115,7 +127,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               show-index
               row-key="alert_id"
               :loading="loading"
+              :loading-reset-key="`${activeFolderId}:${activeTab}`"
               :forbidden="forbidden"
+              forbidden-resource="alert_folders"
               pagination="client"
               :page-size="pageSize"
               :page-size-options="pageSizeOptions"
@@ -148,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OStatStrip
                     :items="summaryStats"
                     :loading="loading"
+                    compact
                     selectable
                     :selected-key="stateFilter"
                     default-key="total"
@@ -490,6 +505,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     size="sm"
                   />
+                  <OTag
+                    v-else
+                    variant="default-soft"
+                    dot
+                    :label="t('alerts.groups.firingCount', { count: 0 })"
+                    size="sm"
+                    :data-test="`alert-list-${row.name}-groups-none-firing`"
+                  />
                   <span class="text-text-secondary text-2xs">
                     {{
                       t("alerts.groups.ofNGroups", {
@@ -809,16 +832,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OEmptyState
                   v-else
-                  size="hero"
+                  size="block"
                   preset="no-alerts"
                   :filtered="!!(filterQuery || searchQuery || stateFilter)"
                   @action="
                     (id) =>
-                      id === 'clear-filters'
-                        ? ((filterQuery = ''), (searchQuery = ''), (stateFilter = null))
-                        : showAddUpdateFn({})
+                      id === 'clear-filters' &&
+                      ((filterQuery = ''), (searchQuery = ''), (stateFilter = null))
                   "
-                />
+                >
+                  <!-- First run only: the filtered state keeps its single Clear filters action. -->
+                  <template v-if="!(filterQuery || searchQuery || stateFilter)" #actions>
+                    <OButton
+                      v-if="showAlertLibrary"
+                      variant="primary"
+                      size="lg"
+                      icon-left="menu-book"
+                      data-test="alert-list-empty-alert-library"
+                      @click="goToAlertLibrary"
+                    >
+                      {{ t("alerts.alertLibrary") }}
+                    </OButton>
+                    <OButton
+                      v-if="!showAlertLibrary"
+                      variant="primary"
+                      size="lg"
+                      icon-left="add"
+                      data-test="alert-list-empty-new-alert"
+                      @click="showAddUpdateFn({})"
+                    >
+                      {{ t("emptyState.noAlerts.action") }}
+                    </OButton>
+                    <OButton
+                      variant="outline"
+                      size="lg"
+                      icon-left="upload-file"
+                      data-test="alert-list-empty-import"
+                      @click="importAlert"
+                    >
+                      {{ t("alerts.importAlert") }}
+                    </OButton>
+                    <OButton
+                      v-if="showAlertLibrary"
+                      variant="outline"
+                      size="lg"
+                      icon-left="add"
+                      data-test="alert-list-empty-new-alert"
+                      @click="showAddUpdateFn({})"
+                    >
+                      {{ t("emptyState.noAlerts.action") }}
+                    </OButton>
+                  </template>
+                </OEmptyState>
               </template>
 
               <template #selection-actions>
@@ -2365,7 +2430,6 @@ export default defineComponent({
         console.error(error);
         dismiss();
         forbidden.value = error?.response?.status === 403;
-        // The grouped access toast already reports a 403; a second red toast adds nothing.
         if (!forbidden.value) {
           toast({
             variant: "error",
@@ -2736,8 +2800,9 @@ export default defineComponent({
           if (!(await divertSloAlert(alert))) {
             showAddUpdateFn({ row: alert });
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("AlertList: Failed to load alert", error);
+          if (error?.response?.status === 403) return;
           const draftDropped =
             isNotFoundError(error) &&
             dropDraftOfMissingAlert({
@@ -2791,12 +2856,13 @@ export default defineComponent({
         .then((list: any) => {
           destinations.value = list as any;
         })
-        .catch(() =>
+        .catch((err: { response?: { status?: number } }) => {
+          if (err?.response?.status === 403) return;
           toast({
             variant: "error",
             message: t("toastMessages.alerts.errorWhileFetchingDestinations"),
-          }),
-        );
+          });
+        });
     };
 
     const getTemplates = (force = false) => {
@@ -2814,12 +2880,13 @@ export default defineComponent({
         .then((list: any) => {
           templates.value = list;
         })
-        .catch(() =>
+        .catch((err: { response?: { status?: number } }) => {
+          if (err?.response?.status === 403) return;
           toast({
             variant: "error",
             message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
-          }),
-        );
+          });
+        });
     };
     // The form's refresh event carries no payload, so a bare `getTemplates` handler would never see `force`.
     const refreshTemplates = () => getTemplates(true);
@@ -2952,6 +3019,10 @@ export default defineComponent({
           activeFolderId.value = folderIdToBeCloned.value;
         } catch (e: any) {
           dismiss();
+          if (e?.response?.status === 403) {
+            showForm.value = false;
+            return;
+          }
           toast({
             variant: "error",
             message: e?.response?.data?.message || t("alerts.messages.cloneAnomalyFailed"),
@@ -2995,6 +3066,10 @@ export default defineComponent({
           activeFolderId.value = folderIdToBeCloned.value;
         } catch (e: any) {
           dismiss();
+          if (e?.response?.status === 403) {
+            showForm.value = false;
+            return;
+          }
           toast({
             variant: "error",
             message: e?.response?.data?.message,
@@ -3073,12 +3148,12 @@ export default defineComponent({
             }
           })
           .catch((e: any) => {
+            dismiss();
             if (e.response?.status == 403) {
               showForm.value = false;
               isSubmitting.value = false;
               return;
             }
-            dismiss();
             toast({
               variant: "error",
               message: e.response.data.message,
@@ -3399,6 +3474,18 @@ export default defineComponent({
       });
     };
 
+    // Raw split (no trim), the same rule AlertSectionTabs hides the Library tab by.
+    const showAlertLibrary = computed(
+      () => !(store.state.zoConfig?.custom_hide_menus ?? "").split(",").includes("alertLibrary"),
+    );
+
+    const goToAlertLibrary = () => {
+      router.push({
+        name: "alertLibrary",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    };
+
     const goToAlertInsights = () => {
       router.push({
         name: "alertInsights",
@@ -3457,6 +3544,7 @@ export default defineComponent({
         alertsToExport.value = [alert];
         showExportDialog.value = true;
       } catch (error: any) {
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message:
@@ -3499,6 +3587,7 @@ export default defineComponent({
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
         }
       } catch (error: any) {
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message: error?.response?.data?.message || t("alerts.messages.triggerAlertFailed"),
@@ -3517,6 +3606,7 @@ export default defineComponent({
           message: t("toastMessages.alerts.retrainingTriggered"),
         });
       } catch (error: any) {
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message: error?.response?.data?.message || t("alerts.messages.triggerRetrainingFailed"),
@@ -3811,8 +3901,9 @@ export default defineComponent({
             }),
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error exporting alerts:", error);
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message: t("toastMessages.alerts.errorExportingAlertsPleaseTryAgain"),
@@ -3946,9 +4037,10 @@ export default defineComponent({
         if (filterQuery.value) {
           filterAlertsByQuery(filterQuery.value);
         }
-      } catch (error) {
+      } catch (error: any) {
         dismiss();
         console.error(`Error ${action}ing alerts:`, error);
+        if (error?.response?.status === 403) return;
         toast({
           variant: "error",
           message:
@@ -4070,7 +4162,7 @@ export default defineComponent({
           error.response?.data?.message ||
           error?.message ||
           t("alerts.messages.bulkDeleteAlertsFailed");
-        if (error.response?.status != 403 || error?.status != 403) {
+        if (error.response?.status !== 403 && error?.status !== 403) {
           toast({
             variant: "error",
             message: errorMessage,
@@ -4236,6 +4328,8 @@ export default defineComponent({
       refreshDestination,
       showImportAlertDialog,
       importAlert,
+      showAlertLibrary,
+      goToAlertLibrary,
       goToAlertInsights,
       goToAlertHistory,
       getTemplates,

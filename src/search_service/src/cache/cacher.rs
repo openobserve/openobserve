@@ -31,7 +31,9 @@ use infra::cache::{
 use crate::{
     cache::{
         MultiCachedQueryResponse,
-        result_utils::{get_ts_value, has_non_timestamp_ordering, is_timestamp_field},
+        result_utils::{
+            get_ts_value, has_non_timestamp_ordering, is_timestamp_field, is_ts_order_field,
+        },
     },
     sql::Sql,
 };
@@ -642,7 +644,15 @@ pub fn get_ts_col_order_by(
                     ts_col = alias.clone();
                 }
             }
-            if !_is_aggregate
+            // an alias of _timestamp is the only time column the hits carry
+            let ts_alias = parsed_sql
+                .aliases
+                .iter()
+                .find(|(original, _)| original == _ts_col)
+                .map(|(_, alias)| alias.clone());
+            if !_is_aggregate && let Some(alias) = ts_alias {
+                ts_col = alias;
+            } else if !_is_aggregate
                 && (parsed_sql
                     .columns
                     .iter()
@@ -667,7 +677,7 @@ pub fn get_ts_col_order_by(
 
     if !order_by.is_empty() && !result_ts_col.is_empty() {
         for (field, order) in order_by {
-            if is_timestamp_field(field, &result_ts_col) {
+            if is_ts_order_field(field, &result_ts_col, &parsed_sql.aliases) {
                 is_descending = order == &OrderBy::Desc;
                 break;
             }
@@ -1180,6 +1190,51 @@ mod tests {
         assert!(is_descending);
     }
 
+    // #16175: the hits carry only the alias, so the alias is the time column
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn test_get_ts_col_order_by_prefers_timestamp_alias() {
+        let sql = Sql {
+            sql: "SELECT _timestamp AS ts, status FROM logs ORDER BY _timestamp ASC".to_string(),
+            is_complex: false,
+            org_id: "test_org".to_string(),
+            stream_type: StreamType::Logs,
+            stream_names: vec![TableReference::from("logs")],
+            has_match_all: false,
+            equal_items: hashbrown::HashMap::new(),
+            columns: {
+                let mut cols = hashbrown::HashMap::new();
+                let mut set = hashbrown::HashSet::new();
+                set.insert("_timestamp".to_string());
+                set.insert("status".to_string());
+                cols.insert(TableReference::from("logs"), set);
+                cols
+            },
+            aliases: vec![("_timestamp".to_string(), "ts".to_string())],
+            schemas: {
+                let mut schemas = hashbrown::HashMap::new();
+                schemas.insert(
+                    TableReference::from("logs"),
+                    Arc::new(SchemaCache::new(Schema::empty())),
+                );
+                schemas
+            },
+            limit: 100,
+            offset: 0,
+            time_range: (0, 0),
+            group_by: vec![],
+            order_by: vec![("_timestamp".to_string(), OrderBy::Asc)],
+            histogram_interval: None,
+            timezone: None,
+            sorted_by_time: true,
+            sampling_config: None,
+        };
+
+        let (ts_col, is_descending) = get_ts_col_order_by(&sql, "_timestamp", false).unwrap();
+        assert_eq!(ts_col, "ts");
+        assert!(!is_descending);
+    }
+
     #[tokio::test]
     async fn test_invalidate_cached_response_by_stream_min_ts() {
         let mock_stream_min_ts = now_micros() - 3600000000; // 1 hour ago
@@ -1364,19 +1419,8 @@ mod tests {
                 sql: "SELECT _timestamp, message FROM logs WHERE _timestamp >= 1640995200000000 AND _timestamp <= 1641081600000000 ORDER BY _timestamp DESC LIMIT 100".to_string(),
                 start_time: 1640995200000000,
                 end_time: 1641081600000000,
-                from: 0,
                 size: 100,
-                track_total_hits: false,
-                query_fn: None,
-                quick_mode: false,
-                uses_zo_fn: false,
-                    skip_wal: false,
-                streaming_output: false,
-                streaming_id: None,
-                histogram_interval: 0,
-                timezone: None,
-                sampling_ratio: None,
-                sampling_config: None,
+                ..Default::default()
             },
             encoding: RequestEncoding::Empty,
             regions: vec![],
