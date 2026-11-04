@@ -237,6 +237,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                these three are grouped and spaced on the header's rhythm. -->
           <div class="ms-2 flex items-center gap-2">
             <OButton
+              v-if="showAskAi"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('traces.askAi.askAboutSpan')"
+              data-test="trace-span-ask-ai-btn"
+              @click.stop="askAiAboutSpan"
+            >
+              <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+              <OTooltip side="bottom" :content="t('traces.askAi.askAboutSpan')" />
+            </OButton>
+
+            <OButton
               v-if="showEvaluateButton && canPreviewSpan"
               variant="outline"
               size="icon-xs"
@@ -1036,11 +1048,14 @@ import {
   onUnmounted,
   defineAsyncComponent,
   nextTick,
+  unref,
 } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
+import { useAiIcon } from "@/composables/useAiIcon";
+import { buildSpanAiPayload } from "@/plugins/traces/utils/traceAiPayload";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -1195,6 +1210,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showAskAi: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     OSeparator,
@@ -1246,6 +1265,7 @@ export default defineComponent({
     "evaluate",
     "add-to-dataset",
     "update:activeTab",
+    "sendToAiChat",
   ],
   setup(props, { emit }) {
     const serviceDetectionConfig = inject(TRACE_SERVICE_DETECTION_KEY, ref(null));
@@ -2022,12 +2042,18 @@ export default defineComponent({
       { immediate: true },
     );
 
-    const operationPercentile = computed(() => {
+    const reliableOperationStats = computed((): OperationStats | null => {
       const req = operationStatsRequest.value;
       const stats = req ? operationStatsCache.value[req.key] : null;
-      const duration = Number(props.span?.duration);
       // approx_percentile_cont returns 0 when the column type is not inferred.
       if (!stats || !(stats.n >= OPERATION_STATS_MIN_SAMPLES) || !(stats.p50 > 0)) return null;
+      return stats;
+    });
+
+    const operationPercentile = computed(() => {
+      const stats = reliableOperationStats.value;
+      const duration = Number(props.span?.duration);
+      if (!stats) return null;
       if (!Number.isFinite(duration)) return null;
       let band = t("traces.traceDetailsSidebar.operationBandAboveP99");
       let variant: BadgeVariant = "error-soft";
@@ -2049,6 +2075,23 @@ export default defineComponent({
       });
       return { band, variant, tooltip };
     });
+
+    const { aiIconSrc } = useAiIcon();
+
+    const askAiAboutSpan = () => {
+      const trace = searchObj.data?.traceDetails?.selectedTrace;
+      emit(
+        "sendToAiChat",
+        buildSpanAiPayload(t, {
+          span: props.span,
+          stream: spanSourceStream.value,
+          traceStartTime: Number(trace?.trace_start_time) || 0,
+          traceEndTime: Number(trace?.trace_end_time) || 0,
+          operationP50Us: reliableOperationStats.value?.p50 ?? null,
+          hasError: !!unref(hasSpanError),
+        }),
+      );
+    };
 
     const spanProfileCache = ref<Record<string, SpanProfileMatch | null>>({});
     const pendingSpanProfiles = new Set<string>();
@@ -2797,6 +2840,8 @@ export default defineComponent({
       navigateToError,
       getDuration,
       operationPercentile,
+      aiIconSrc,
+      askAiAboutSpan,
       spanProfileMatch,
       viewSpanProfile,
       getTTFT,

@@ -67,7 +67,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_backend_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
     steps:
@@ -91,6 +91,10 @@ jobs:
 
       - name: Install Protoc
         run: bash ./.github/protoc.sh
+
+      # The EKS runner image has no libclang, which bindgen needs to build custom-labels.
+      - name: Install libclang
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
 
       - name: Simulate building frontend code
         run: mkdir -p web/dist && touch web/dist/index.html
@@ -141,7 +145,7 @@ jobs:
           toolchain: nightly-2026-10-24
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
+      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -210,7 +214,7 @@ jobs:
           toolchain: nightly-2026-10-24
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
+      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2.89.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -272,7 +276,7 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4]
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
 
@@ -290,7 +294,7 @@ jobs:
 
       - name: Restore node_modules
         id: nm
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: web/node_modules
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
@@ -304,7 +308,7 @@ jobs:
       # Only main saves it: a PR-saved cache is visible to that PR alone and fills the 10 GB repo cache.
       - name: Save node_modules
         if: github.ref == 'refs/heads/main' && steps.nm.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: web/node_modules
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
@@ -333,7 +337,8 @@ jobs:
     needs: [check_changes, ui_unit_test_shards]
     if: always() && needs.check_changes.outputs.has_ui_changes == 'true'
     timeout-minutes: 20
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: eks-openobserve-standard-4
     permissions:
       contents: read
 
@@ -354,7 +359,7 @@ jobs:
 
       - name: Restore node_modules
         id: nm
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: web/node_modules
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
@@ -379,7 +384,7 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_ui_changes == 'true'
     runs-on:
-      labels: ubicloud-standard-8
+      labels: eks-openobserve-standard-8
     permissions:
       contents: read
 

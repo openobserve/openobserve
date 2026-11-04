@@ -65,6 +65,7 @@ const ROUTER_PREFIXES: &[(&str, &str)] = &[
     ("fleet_router", "/api"),
     ("slack_routes", "/api"),
     ("es_compat_routes", "/api"),
+    ("workflow_hook_routes", ""),
 ];
 
 /// Only serves UI redirects, computed from `base_uri` at startup.

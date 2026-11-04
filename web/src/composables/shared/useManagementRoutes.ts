@@ -153,8 +153,10 @@ const useManagementRoutes = () => {
     path: "llm_providers",
     name: "llmProviders",
     component: () => import("@/components/settings/LlmProvidersSettings.vue"),
+    // `/providers` is unregistered when the server reports `online_evals_enabled: false`.
     meta: {
       titleKey: "llmProviders.title",
+      requiresOnlineEvals: true,
     },
     beforeEnter: withFeatureGate("llmProviders", routeGuard),
   });

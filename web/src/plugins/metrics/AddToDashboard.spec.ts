@@ -85,8 +85,9 @@ const mockStore = {
       label: "Test Org",
     },
     organizationData: {
-      folders: [],
+      folders: [] as any[],
     },
+    userInfo: { email: "user@example.com" },
   },
 };
 
@@ -171,19 +172,20 @@ const createWrapper = (props: Record<string, any> = {}) => {
         },
         SelectFolderDropdown: {
           template:
-            '<div class=\'select-folder-dropdown\' @click=\'$emit("folder-selected", { value: "folder-1", label: "Folder 1" })\'></div>',
+            "<div class='select-folder-dropdown' :data-active-folder-id='activeFolderId' @click='$emit(\"folder-selected\", { value: \"folder-1\", label: \"Folder 1\" })'></div>",
+          props: ["activeFolderId"],
           emits: ["folder-selected"],
         },
         SelectDashboardDropdown: {
           template:
-            '<div class=\'select-dashboard-dropdown\' @click=\'$emit("dashboard-selected", { value: "dash-1", label: "Dashboard 1" })\'></div>',
-          props: ["folderId"],
+            "<div class='select-dashboard-dropdown' :data-preferred='preferredDashboardId' @click='$emit(\"dashboard-selected\", { value: \"dash-1\", label: \"Dashboard 1\" })'></div>",
+          props: ["folderId", "preferredDashboardId"],
           emits: ["dashboard-selected"],
         },
         SelectTabDropdown: {
           template:
-            '<div class=\'select-tab-dropdown\' @click=\'$emit("tab-selected", { value: "tab-1", label: "Tab 1" })\'></div>',
-          props: ["folderId", "dashboardId"],
+            "<div class='select-tab-dropdown' :data-preferred-tab='preferredTabId' @click='$emit(\"tab-selected\", { value: \"tab-1\", label: \"Tab 1\" })'></div>",
+          props: ["folderId", "dashboardId", "preferredTabId"],
           emits: ["tab-selected"],
         },
       },
@@ -590,6 +592,19 @@ describe("AddToDashboard — onSubmit validation", () => {
       query: { dashboard: "dash-1", folder: "folder-1", tab: "tab-1" },
     });
   });
+
+  it("closes itself after a successful add, so a kept-alive page does not reopen with it", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+
+    await wrapper.vm.onSubmit({ panelTitle: "New Panel" });
+    await flushPromises();
+
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+  });
 });
 
 describe("AddToDashboard — error handling in addPanelToDashboard", () => {
@@ -645,6 +660,20 @@ describe("AddToDashboard — error handling in addPanelToDashboard", () => {
 
     // The finally block always emits save
     expect(wrapper.emitted("save")).toBeTruthy();
+  });
+
+  it("stays open when addPanel throws, so the user can retry", async () => {
+    mockAddPanel.mockRejectedValue(new Error("failure"));
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+
+    await wrapper.vm.onSubmit({ panelTitle: "Panel" });
+    await flushPromises();
+
+    expect(wrapper.emitted("update:open")).toBeFalsy();
   });
 
   it("calls dismiss function in finally block", async () => {
@@ -1051,5 +1080,215 @@ describe("AddToDashboard — product analytics", () => {
     await flushPromises();
 
     expect(analytics.track).not.toHaveBeenCalled();
+  });
+});
+
+describe("AddToDashboard — multi-panel title list", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAddPanel.mockResolvedValue({});
+  });
+
+  const mountWithForm = (props: Record<string, any> = {}) =>
+    mount(AddToDashboard, {
+      props: { dashboardPanelData: { data: {} }, open: true, ...props },
+      global: {
+        stubs: {
+          ODialog: { template: "<div><slot /></div>" },
+          SelectFolderDropdown: true,
+          SelectDashboardDropdown: true,
+          SelectTabDropdown: true,
+        },
+      },
+    });
+
+  it("lists the panel titles instead of the panel title field", async () => {
+    const wrapper = mountWithForm({
+      panels: [
+        { title: "Rate", queries: [] },
+        { title: "Errors", queries: [] },
+      ],
+    });
+    await flushPromises();
+
+    const items = wrapper.findAll('[data-test="add-to-dashboard-panel-title"]');
+    expect(items.map((i) => i.text())).toEqual(["Rate", "Errors"]);
+    expect(wrapper.find('[data-test="metrics-new-dashboard-panel-title"]').exists()).toBe(false);
+  });
+
+  it("keeps the panel title field in single-panel mode", async () => {
+    const wrapper = mountWithForm();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="add-to-dashboard-panel-titles"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="metrics-new-dashboard-panel-title"]').exists()).toBe(true);
+  });
+
+  it("submits multi-panel mode with no panel title", async () => {
+    const wrapper = mountWithForm({ panels: [{ title: "Rate", queries: [] }] });
+    await flushPromises();
+    (wrapper.vm as any).selectedDashboard = "dash-1";
+    (wrapper.vm as any).activeTabId = "tab-1";
+
+    const form = (wrapper.findComponent(OFormReal).vm as any).form;
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(mockAddPanel).toHaveBeenCalledTimes(1);
+    expect(mockAddPanel.mock.calls[0][2].title).toBe("Rate");
+  });
+});
+
+describe("AddToDashboard — retry after a partial failure", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const threePanels = () => [
+    { title: "Rate", queries: [] },
+    { title: "Errors", queries: [] },
+    { title: "Duration", queries: [] },
+  ];
+
+  it("adds only the panels that failed on the next submit", async () => {
+    mockAddPanel
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error("Server error"))
+      .mockResolvedValue({});
+    const wrapper = createWrapper({ panels: threePanels() });
+    await flushPromises();
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+
+    await wrapper.vm.onSubmit({ panelTitle: "" });
+    await flushPromises();
+    expect(mockAddPanel.mock.calls.map((c: any[]) => c[2].title)).toEqual(["Rate", "Errors"]);
+
+    mockAddPanel.mockClear();
+    await wrapper.vm.onSubmit({ panelTitle: "" });
+    await flushPromises();
+
+    expect(mockAddPanel.mock.calls.map((c: any[]) => c[2].title)).toEqual(["Errors", "Duration"]);
+  });
+
+  it("adds every panel again after a full success to the same dashboard", async () => {
+    mockAddPanel.mockResolvedValue({});
+    const wrapper = createWrapper({ panels: threePanels() });
+    await flushPromises();
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+    await wrapper.vm.onSubmit({ panelTitle: "" });
+    await flushPromises();
+
+    mockAddPanel.mockClear();
+    await wrapper.vm.onSubmit({ panelTitle: "" });
+    await flushPromises();
+
+    expect(mockAddPanel).toHaveBeenCalledTimes(3);
+  });
+
+  it("adds every panel again when the retry targets another dashboard", async () => {
+    mockAddPanel.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error("Server error"));
+    const wrapper = createWrapper({ panels: threePanels() });
+    await flushPromises();
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+    await wrapper.vm.onSubmit({ panelTitle: "" });
+    await flushPromises();
+
+    mockAddPanel.mockClear();
+    mockAddPanel.mockResolvedValue({});
+    wrapper.vm.selectedDashboard = "dash-2";
+    await wrapper.vm.onSubmit({ panelTitle: "" });
+    await flushPromises();
+
+    expect(mockAddPanel).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("AddToDashboard — remembers the last dashboard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAddPanel.mockResolvedValue({});
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    mockStore.state.organizationData.folders = [];
+    window.localStorage.clear();
+  });
+
+  const saveTo = async (folder: string, dashboard: string, tab: string) => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    wrapper.vm.activeFolderId = folder;
+    wrapper.vm.selectedDashboard = dashboard;
+    wrapper.vm.activeTabId = tab;
+    await wrapper.vm.onSubmit({ panelTitle: "Panel" });
+    await flushPromises();
+    wrapper.unmount();
+  };
+
+  it("preselects the folder and dashboard used last time", async () => {
+    mockStore.state.organizationData.folders = [{ folderId: "folder-9", name: "Ops" }];
+    await saveTo("folder-9", "dash-9", "tab-9");
+
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    expect(wrapper.vm.activeFolderId).toBe("folder-9");
+    expect(wrapper.find(".select-folder-dropdown").attributes("data-active-folder-id")).toBe(
+      "folder-9",
+    );
+    expect(wrapper.find(".select-dashboard-dropdown").attributes("data-preferred")).toBe("dash-9");
+  });
+
+  it("preselects the remembered tab only on the remembered dashboard", async () => {
+    mockStore.state.organizationData.folders = [{ folderId: "folder-9", name: "Ops" }];
+    await saveTo("folder-9", "dash-9", "tab-9");
+
+    const wrapper = createWrapper();
+    await flushPromises();
+    wrapper.vm.selectedDashboard = "dash-9";
+    await flushPromises();
+    expect(wrapper.find(".select-tab-dropdown").attributes("data-preferred-tab")).toBe("tab-9");
+
+    wrapper.vm.selectedDashboard = "dash-other";
+    await flushPromises();
+    expect(wrapper.find(".select-tab-dropdown").attributes("data-preferred-tab")).toBeUndefined();
+  });
+
+  it("does not save a target when adding the panel fails", async () => {
+    mockAddPanel.mockRejectedValueOnce(new Error("Server error"));
+    mockStore.state.organizationData.folders = [{ folderId: "folder-9", name: "Ops" }];
+    await saveTo("folder-9", "dash-9", "tab-9");
+
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    expect(wrapper.vm.activeFolderId).toBe("default");
+  });
+
+  it("falls back to the default folder when the remembered one is gone", async () => {
+    mockStore.state.organizationData.folders = [{ folderId: "folder-9", name: "Ops" }];
+    await saveTo("folder-9", "dash-9", "tab-9");
+    mockStore.state.organizationData.folders = [];
+
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    expect(wrapper.vm.activeFolderId).toBe("default");
+  });
+
+  it("keeps the remembered target per user", async () => {
+    mockStore.state.organizationData.folders = [{ folderId: "folder-9", name: "Ops" }];
+    await saveTo("folder-9", "dash-9", "tab-9");
+    mockStore.state.userInfo = { email: "other@example.com" };
+
+    const wrapper = createWrapper();
+    await flushPromises();
+    mockStore.state.userInfo = { email: "user@example.com" };
+
+    expect(wrapper.vm.activeFolderId).toBe("default");
   });
 });

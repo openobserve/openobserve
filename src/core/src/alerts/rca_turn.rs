@@ -3362,12 +3362,12 @@ mod tests {
         }
     }
 
-    /// Paused time that moves 100x faster than the wall clock.
+    /// 10x time: auto-advance fires the DB acquire timeout; faster makes CI stalls false backoffs.
     fn fast_clock() -> tokio::task::JoinHandle<()> {
         tokio::spawn(async {
             loop {
                 std::thread::sleep(Duration::from_millis(1));
-                tokio::time::advance(Duration::from_millis(100)).await;
+                tokio::time::advance(Duration::from_millis(10)).await;
             }
         })
     }
@@ -3491,9 +3491,9 @@ mod tests {
         clock.abort();
     }
 
-    #[tokio::test(start_paused = true)]
+    // Real clock: even the 10x fast_clock turns a 500 ms CI stall into a false 5 s backoff.
+    #[tokio::test]
     async fn other_start_errors_fail_the_continuation_at_once() {
-        let clock = fast_clock();
         let _db = db().await;
         for (error, can_retry, code) in [
             (RcaTurnError::Busy, true, "busy"),
@@ -3543,7 +3543,6 @@ mod tests {
                 "{stored_error:?}"
             );
         }
-        clock.abort();
     }
 
     #[tokio::test]

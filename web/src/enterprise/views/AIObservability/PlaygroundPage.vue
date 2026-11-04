@@ -356,13 +356,17 @@ import {
   hasReference as benchHasReference,
   idleCell,
   playgroundId,
+  promptConfigFor,
   requestMessages,
   renderTemplate,
+  runParams,
   scorerEvidence,
+  seedModel,
   settledResults,
   snapshotPayload,
   starterDraft,
   variantLabel,
+  variantSettingsFromPrompt,
   withSampledVars,
   type PlaygroundCell,
   type PlaygroundDraft,
@@ -416,20 +420,8 @@ const savePromptPayload = computed(() =>
 const savePromptConfig = computed<PromptConfig>(() => {
   const variant = savePromptVariant.value;
   if (!variant) return { model: null, params: null, tools: null, responseFormat: null };
-  const temperature = Number(variant.temperature);
-  return {
-    model: variant.model || null,
-    params: Number.isFinite(temperature) ? { temperature } : null,
-    tools: variant.tools.map((tool) => ({
-      type: "function",
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: parsePromptJson(tool.parameters) ?? {},
-      },
-    })),
-    responseFormat: variant.responseSchema ? parsePromptJson(variant.responseSchema) : null,
-  };
+  const provider = providers.value.find((candidate) => candidate.id === variant.providerId);
+  return promptConfigFor(variant, provider ? providerDefaultModel(provider) : "");
 });
 
 /** The snapshot this bench descends from — the link it was opened on, or the
@@ -595,6 +587,11 @@ async function loadDatasets() {
   }
 }
 
+/** The model a provider runs when none is named — also what the bench seeds. */
+function providerDefaultModel(provider: Provider): string {
+  return provider.defaultModel ?? provider.default_model ?? "";
+}
+
 /** A first variant with no provider cannot run, and picking one for the user is
  *  never wrong when there is exactly one sensible answer. */
 function seedDefaultProvider() {
@@ -611,7 +608,7 @@ function seedDefaultProvider() {
       : null;
     const selected = supporting ?? preferred;
     variant.providerId = selected.id;
-    if (!variant.model) variant.model = selected.defaultModel ?? selected.default_model ?? "";
+    seedModel(variant, providerDefaultModel(selected));
   }
 }
 
@@ -636,25 +633,6 @@ function promptMessages(payload: unknown): PlaygroundMessage[] {
   });
 }
 
-function promptTools(value: unknown): PlaygroundTool[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry): PlaygroundTool[] => {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
-    const candidate =
-      "function" in entry &&
-      entry.function &&
-      typeof entry.function === "object" &&
-      !Array.isArray(entry.function)
-        ? entry.function
-        : entry;
-    const name = "name" in candidate ? String(candidate.name ?? "") : "";
-    if (!name) return [];
-    const description = "description" in candidate ? String(candidate.description ?? "") : "";
-    const parameters = "parameters" in candidate ? candidate.parameters : {};
-    return [{ name, description, parameters: JSON.stringify(parameters ?? {}, null, 2) }];
-  });
-}
-
 /**
  * Loads a trace or managed Prompt into a fresh editable fork. Prompt content
  * stays in one-shot session storage and never appears in browser history.
@@ -666,15 +644,7 @@ function applyHandoff() {
     if (!handoff) return;
     const variant = emptyVariant();
     variant.messages = promptMessages(handoff.payload);
-    variant.model = handoff.config.model ?? "";
-    const params = handoff.config.params;
-    variant.temperature =
-      params && typeof params.temperature === "number" ? String(params.temperature) : "";
-    variant.tools = promptTools(handoff.config.tools);
-    variant.responseSchema =
-      handoff.config.responseFormat == null
-        ? null
-        : JSON.stringify(handoff.config.responseFormat, null, 2);
+    Object.assign(variant, variantSettingsFromPrompt(handoff.config));
     Object.assign(draft, starterDraft());
     draft.variants = [variant];
     draft.provenance = { type: "prompt", label: raw(handoff.provenance.label) };
@@ -768,7 +738,7 @@ async function runCell(variant: PlaygroundVariant, rowKey: string): Promise<bool
         providerType: provider?.providerType ?? provider?.provider_type,
         model: variant.model,
         messages,
-        params: { temperature: Number(variant.temperature) || 0 },
+        params: runParams(variant),
         tools: variant.tools.map((tool) => ({
           name: tool.name,
           description: tool.description,
@@ -1245,16 +1215,6 @@ function goToProviders() {
   router.push({ name: "llmProviders" });
 }
 
-/** The one durable exit. Everything the experiment form needs travels in the
- *  query, so the handoff survives a full page load. */
-function parsePromptJson(value: string): unknown | null {
-  try {
-    return JSON.parse(value) as unknown;
-  } catch {
-    return null;
-  }
-}
-
 function openSaveAsPrompt(variantId: string) {
   const variant = draft.variants.find((candidate) => candidate.id === variantId);
   if (!variant) return;
@@ -1262,6 +1222,7 @@ function openSaveAsPrompt(variantId: string) {
   savePromptOpen.value = true;
 }
 
+/** The one durable exit, carrying the experiment form's inputs in the query to survive a reload. */
 function createExperiment(variantId: string) {
   const variant = draft.variants.find((candidate) => candidate.id === variantId);
   if (!variant) return;

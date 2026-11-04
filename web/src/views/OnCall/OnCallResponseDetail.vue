@@ -146,7 +146,18 @@
         </template>
 
         <!-- A menu of durations, not a panel that pushes the page down. -->
-        <ODropdown v-if="canSnooze && lgUp">
+        <OButton
+          v-if="canUnsnooze && lgUp"
+          variant="outline"
+          size="sm-action"
+          :loading="snoozing"
+          data-test="oncall-response-unsnooze-btn"
+          @click="unsnoozeRecord"
+        >
+          {{ t("oncall.unsnooze") }}
+          <OTooltip :content="t('oncall.unsnoozeHint')" />
+        </OButton>
+        <ODropdown v-else-if="canSnooze && lgUp">
           <template #trigger>
             <OButton
               variant="outline"
@@ -253,7 +264,14 @@
             data-test="oncall-response-more-btn"
           />
         </template>
-        <ODropdownGroup v-if="canSnooze" :label="t('oncall.snoozeFor')">
+        <ODropdownItem
+          v-if="canUnsnooze"
+          data-test="oncall-response-unsnooze-btn-menu"
+          @select="unsnoozeRecord"
+        >
+          {{ t("oncall.unsnooze") }}
+        </ODropdownItem>
+        <ODropdownGroup v-else-if="canSnooze" :label="t('oncall.snoozeFor')">
           <ODropdownItem
             v-for="opt in snoozeOptions"
             :key="opt.minutes"
@@ -364,6 +382,17 @@
           data-test="oncall-response-snoozed-banner"
         >
           {{ t("oncall.snoozedUntil", { time: snoozedUntilLabel }) }}
+          <template v-if="canUnsnooze" #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              :loading="snoozing"
+              data-test="oncall-response-snoozed-banner-unsnooze"
+              @click="unsnoozeRecord"
+            >
+              {{ t("oncall.unsnooze") }}
+            </OButton>
+          </template>
         </OBanner>
 
         <!-- D-21. This record exists because somebody else's failure reaches
@@ -847,6 +876,7 @@ import {
   responseQuery,
   responseReportQuery,
   snoozeResponseMutation,
+  unsnoozeResponseMutation,
   teamMembersQuery,
   teamPolicyQuery,
   teamReachabilityQuery,
@@ -1088,6 +1118,7 @@ const ackWords = computed(() =>
   ),
 );
 const snoozeWrite = useMutation(() => snoozeResponseMutation(orgId.value));
+const unsnoozeWrite = useMutation(() => unsnoozeResponseMutation(orgId.value));
 const noteWrite = useMutation(() => addResponseNoteMutation(orgId.value));
 const handoffWrite = useMutation(() => handoffResponseMutation(orgId.value));
 const recoveryWrite = useMutation(() => confirmRecoveryMutation(orgId.value));
@@ -1299,6 +1330,7 @@ const snoozedUntilLabel = computed(() => {
   if (!r || !isSnoozed(r)) return "";
   return formatOnCallInstant(r.snoozed_until as number, nowMicros.value, store.state.timezone);
 });
+const canUnsnooze = computed(() => canSnooze.value && !!snoozedUntilLabel.value);
 
 const timeToAck = computed(() => {
   const r = response.value;
@@ -1513,6 +1545,22 @@ async function snoozeRecord(minutes: number) {
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.snoozeFailed"),
+    });
+  } finally {
+    snoozing.value = false;
+  }
+}
+
+async function unsnoozeRecord() {
+  snoozing.value = true;
+  try {
+    await unsnoozeWrite.mutateAsync(responseId.value);
+    toast({ variant: "success", message: t("oncall.unsnoozed") });
+    await fetchResponse();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.unsnoozeFailed"),
     });
   } finally {
     snoozing.value = false;

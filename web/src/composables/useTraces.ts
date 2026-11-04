@@ -276,6 +276,8 @@ const useTraces = () => {
     searchObj.meta.lastRunSignature = null;
     urlColumns = null;
     searchObj.runQuery = false;
+    // Only a run sets it again; left true, a new org mounts the Rate/Duration panels and they query without a run.
+    searchObj.searchApplied = false;
     searchObj.data.traceDetails.isLoadingTraceDetails = false;
     searchObj.data.traceDetails.isLoadingTraceMeta = false;
   };

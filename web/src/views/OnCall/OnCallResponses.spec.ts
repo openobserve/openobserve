@@ -43,6 +43,7 @@ vi.mock("@/services/oncall", () => ({
     acknowledgeResponse: vi.fn(),
     resolveResponse: vi.fn(),
     snoozeResponse: vi.fn(),
+    unsnoozeResponse: vi.fn(),
     getPolicy: vi.fn(),
     getSchedule: vi.fn(),
     escalationProgress: vi.fn(),
@@ -564,6 +565,9 @@ describe("OnCallResponses", () => {
 
       expect(sections(wrapper)).toEqual({ ringing: 1 });
       expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(true);
+      const header = wrapper.find("[data-test='oncall-section-header-ringing']").text();
+      expect(header).toContain("nobody has acknowledged — these are still paging");
+      expect(header).not.toContain("not being paged");
     });
 
     /// A priority with no rungs configured (P4, by design) never starts a
@@ -858,6 +862,29 @@ describe("OnCallResponses", () => {
       ]);
       // Resolve is labelled now — it must not also appear as an item.
       expect(handled.findAll('[data-test^="oncall-row-resolve-"]')).toHaveLength(1);
+    });
+
+    it("offers unsnooze instead of snooze on a snoozed row", async () => {
+      const wrapper = await withPages([page({ snoozed_until: (Date.now() + 60_000) * 1000 })]);
+      service.unsnoozeResponse.mockResolvedValue({ data: {} } as any);
+
+      expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(false);
+      await wrapper.find('[data-test^="oncall-row-unsnooze-"]').trigger("click");
+      await flushPromises();
+
+      expect(service.unsnoozeResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ response_id: "resp_1" }),
+      );
+    });
+
+    it("keeps snooze for the awake firing of a row whose other firing is snoozed", async () => {
+      const wrapper = await withPages([
+        page({ id: "a", snoozed_until: (Date.now() + 60_000) * 1000 }),
+        page({ id: "b" }),
+      ]);
+
+      expect(wrapper.find('[data-test^="oncall-row-unsnooze-"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(true);
     });
 
     /// Snoozing only makes sense while the ladder is still climbing, so a
