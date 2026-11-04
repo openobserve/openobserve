@@ -389,7 +389,10 @@ fn variables(
         ("downtime_counts", counts_phrase(row, counts)),
         (
             "downtime_url",
-            format!("{web_url}/web/downtimes?org_identifier={}", row.org),
+            format!(
+                "{web_url}/web/downtimes/{}?org_identifier={}",
+                row.id, row.org
+            ),
         ),
         ("org_name", row.org.clone()),
     ]
@@ -690,7 +693,7 @@ mod tests {
         assert_eq!(json["downtime"]["org"], "acme");
         assert_eq!(
             json["text"],
-            "Downtime Nightly \"deploy\" <db>: ends soon. 1970-01-01 10:00 UTC to 1970-01-01 12:00 UTC, muting 2 alerts, 1 synthetics check. https://o2.example.com/web/downtimes?org_identifier=acme"
+            "Downtime Nightly \"deploy\" <db>: ends soon. 1970-01-01 10:00 UTC to 1970-01-01 12:00 UTC, muting 2 alerts, 1 synthetics check. https://o2.example.com/web/downtimes/2f9KQe4b7Nq1vH3sT0mLzXpRcWd?org_identifier=acme"
         );
         assert_eq!(route(&resolved_for("slack"), &ctx).unwrap(), Route::Render);
     }

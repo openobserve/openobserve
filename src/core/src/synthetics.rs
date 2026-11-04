@@ -366,7 +366,7 @@ fn run_url(n: &CheckNotification) -> String {
     let web_url = cfg.common.web_url.trim_end_matches('/');
     let base_uri = &cfg.common.base_uri;
     format!(
-        "{web_url}{base_uri}/web/synthetic/{}/results?org_identifier={}",
+        "{web_url}{base_uri}/web/synthetics/{}/results?org_identifier={}",
         n.check_id, n.org_id
     )
 }

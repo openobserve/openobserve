@@ -3336,13 +3336,13 @@ fn fmt_alert_us(us: i64) -> String {
         .unwrap_or_else(|| "unknown".to_string())
 }
 
-/// Deep link to the config's detail page (`alerts/anomaly/edit/:anomaly_id`), where the
+/// Deep link to the detector's detail page (`alerts/detail/:id`, anomaly tab), where the
 /// operator sees the score timeline and threshold behind this alert.
 #[cfg(feature = "enterprise")]
 fn anomaly_detail_link(org_id: &str, anomaly_id: &str) -> String {
     let cfg = config::get_config();
     format!(
-        "{}{}/web/alerts/anomaly/edit/{}?org_identifier={}",
+        "{}{}/web/alerts/detail/{}?org_identifier={}&tab=anomalyDetection",
         cfg.common.web_url.trim_end_matches('/'),
         cfg.common.base_uri,
         anomaly_id,
@@ -6979,7 +6979,8 @@ mod tests {
 
         use super::super::{anomaly_alert_message, anomaly_alert_payload};
 
-        const LINK: &str = "https://o2.example/web/alerts/anomaly/edit/id1?org_identifier=org";
+        const LINK: &str =
+            "https://o2.example/web/alerts/detail/id1?org_identifier=org&tab=anomalyDetection";
 
         fn ctx(kind: AnomalyAlertKind) -> AnomalyAlertContext {
             AnomalyAlertContext {

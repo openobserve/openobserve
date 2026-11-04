@@ -5,7 +5,7 @@
         "type": "section",
         "text": {
           "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/synthetic/chk_9d/results?org_identifier=acme|🔴 checkout API is failing>*"
+          "text": "*<https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme|🔴 checkout API is failing>*"
         }
       },
       {
@@ -61,7 +61,7 @@
               "type": "plain_text",
               "text": "View in OpenObserve"
             },
-            "url": "https://o2.acme.com/web/synthetic/chk_9d/results?org_identifier=acme",
+            "url": "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme",
             "style": "primary"
           }
         ]
@@ -74,7 +74,7 @@
         "type": "section",
         "text": {
           "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/synthetic/chk_9d/results?org_identifier=acme|🟢 checkout API is recovered>*"
+          "text": "*<https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme|🟢 checkout API is recovered>*"
         }
       },
       {
@@ -126,7 +126,7 @@
               "type": "plain_text",
               "text": "View in OpenObserve"
             },
-            "url": "https://o2.acme.com/web/synthetic/chk_9d/results?org_identifier=acme",
+            "url": "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme",
             "style": "primary"
           }
         ]
@@ -151,7 +151,7 @@
     "links": [
       {
         "label": "",
-        "url": "https://o2.acme.com/web/synthetic/chk_9d/results?org_identifier=acme"
+        "url": "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme"
       }
     ],
     "severity": "critical",
@@ -178,7 +178,7 @@
       "alert_warning_threshold": null,
       "alert_start_time": "N/A",
       "alert_end_time": "N/A",
-      "alert_url": "https://o2.acme.com/web/synthetic/chk_9d/results?org_identifier=acme",
+      "alert_url": "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme",
       "alert_trigger_time_str": "2026-11-02 10:05:00",
       "alert_time": "2026-11-02 10:05:00",
       "alert_description": "checkout API is failing\nconnection timed out after 10s",
@@ -211,7 +211,7 @@
       "check_flaky": "false",
       "check_degraded": "false",
       "check_run_id": "run_42",
-      "check_url": "https://o2.acme.com/web/synthetic/chk_9d/results?org_identifier=acme",
+      "check_url": "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme",
       "check_error": "connection timed out after 10s",
       "check_environments": "production",
       "check_checked_at": "2026-11-02 10:05:00 UTC",
@@ -220,11 +220,11 @@
   },
   "email_firing": {
     "subject": "🔴 checkout API is failing",
-    "html": "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"border-collapse:collapse;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#202124;\"><tr><td style=\"padding:16px;\"><h2 style=\"margin:0 0 8px 0;font-size:20px;line-height:1.3;color:#202124;\">🔴 checkout API is failing</h2><div style=\"margin:16px 0;color:#202124;\"><p>checkout API is failing<br />\nconnection timed out after 10s</p></div><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;margin:16px 0;\"><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Event</td><td style=\"padding:4px 0;color:#202124;\">Firing</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Check</td><td style=\"padding:4px 0;color:#202124;\">checkout API (http)</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Target</td><td style=\"padding:4px 0;color:#202124;\">https://shop.acme.com/api/health</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Status</td><td style=\"padding:4px 0;color:#202124;\">failed</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Locations</td><td style=\"padding:4px 0;color:#202124;\">1 of 2 failed: us-east-1</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Environments</td><td style=\"padding:4px 0;color:#202124;\">production</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Error</td><td style=\"padding:4px 0;color:#202124;\">connection timed out after 10s</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Time</td><td style=\"padding:4px 0;color:#202124;\">2026-11-02 10:05:00 UTC</td></tr></table><div style=\"margin:16px 0;\"><a href=\"https://o2.acme.com/web/synthetic/chk_9d/results?org_identifier=acme\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;background-color:#2EB67D;border-radius:4px;color:#FFFFFF;font-weight:600;text-decoration:none;\">View in OpenObserve</a></div><div style=\"margin:24px 0 0 0;padding-top:12px;border-top:1px solid #DADCE0;color:#5F6368;font-size:12px;\">Sent by OpenObserve.</div></td></tr></table>",
-    "text": "🔴 checkout API is failing\n\ncheckout API is failing\nconnection timed out after 10s\n\nEvent: Firing\nCheck: checkout API (http)\nTarget: https://shop.acme.com/api/health\nStatus: failed\nLocations: 1 of 2 failed: us-east-1\nEnvironments: production\nError: connection timed out after 10s\nTime: 2026-11-02 10:05:00 UTC\n\nView in OpenObserve: https://o2.acme.com/web/synthetic/chk_9d/results?org_identifier=acme\n\nSent by OpenObserve."
+    "html": "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"border-collapse:collapse;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#202124;\"><tr><td style=\"padding:16px;\"><h2 style=\"margin:0 0 8px 0;font-size:20px;line-height:1.3;color:#202124;\">🔴 checkout API is failing</h2><div style=\"margin:16px 0;color:#202124;\"><p>checkout API is failing<br />\nconnection timed out after 10s</p></div><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;margin:16px 0;\"><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Event</td><td style=\"padding:4px 0;color:#202124;\">Firing</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Check</td><td style=\"padding:4px 0;color:#202124;\">checkout API (http)</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Target</td><td style=\"padding:4px 0;color:#202124;\">https://shop.acme.com/api/health</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Status</td><td style=\"padding:4px 0;color:#202124;\">failed</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Locations</td><td style=\"padding:4px 0;color:#202124;\">1 of 2 failed: us-east-1</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Environments</td><td style=\"padding:4px 0;color:#202124;\">production</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Error</td><td style=\"padding:4px 0;color:#202124;\">connection timed out after 10s</td></tr><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Time</td><td style=\"padding:4px 0;color:#202124;\">2026-11-02 10:05:00 UTC</td></tr></table><div style=\"margin:16px 0;\"><a href=\"https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;background-color:#2EB67D;border-radius:4px;color:#FFFFFF;font-weight:600;text-decoration:none;\">View in OpenObserve</a></div><div style=\"margin:24px 0 0 0;padding-top:12px;border-top:1px solid #DADCE0;color:#5F6368;font-size:12px;\">Sent by OpenObserve.</div></td></tr></table>",
+    "text": "🔴 checkout API is failing\n\ncheckout API is failing\nconnection timed out after 10s\n\nEvent: Firing\nCheck: checkout API (http)\nTarget: https://shop.acme.com/api/health\nStatus: failed\nLocations: 1 of 2 failed: us-east-1\nEnvironments: production\nError: connection timed out after 10s\nTime: 2026-11-02 10:05:00 UTC\n\nView in OpenObserve: https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme\n\nSent by OpenObserve."
   },
   "sns_firing": {
     "subject": "🔴 checkout API is failing",
-    "message": "🔴 checkout API is failing\n\ncheckout API is failing\nconnection timed out after 10s\n\nEvent: Firing\nCheck: checkout API (http)\nTarget: https://shop.acme.com/api/health\nStatus: failed\nLocations: 1 of 2 failed: us-east-1\nEnvironments: production\nError: connection timed out after 10s\nTime: 2026-11-02 10:05:00 UTC\n\nhttps://o2.acme.com/web/synthetic/chk_9d/results?org_identifier=acme"
+    "message": "🔴 checkout API is failing\n\ncheckout API is failing\nconnection timed out after 10s\n\nEvent: Firing\nCheck: checkout API (http)\nTarget: https://shop.acme.com/api/health\nStatus: failed\nLocations: 1 of 2 failed: us-east-1\nEnvironments: production\nError: connection timed out after 10s\nTime: 2026-11-02 10:05:00 UTC\n\nhttps://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme"
   }
 }

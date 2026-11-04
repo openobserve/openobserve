@@ -251,7 +251,8 @@ fn base(kind: NotificationKind, resolved: bool, level: AlertLevel) -> Notificati
 }
 
 fn anomaly_example(resolved: bool) -> NotificationContext {
-    let link = "https://o2.acme.com/web/alerts/anomaly/edit/a1b2c3?org_identifier=acme";
+    let link =
+        "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection";
     let level = if resolved {
         AlertLevel::Ok
     } else {
@@ -313,7 +314,7 @@ fn anomaly_example(resolved: bool) -> NotificationContext {
 }
 
 fn synthetics_example(resolved: bool) -> NotificationContext {
-    let url = "https://o2.acme.com/web/synthetic/chk_9d/results?org_identifier=acme";
+    let url = "https://o2.acme.com/web/synthetics/chk_9d/results?org_identifier=acme";
     let level = if resolved {
         AlertLevel::Ok
     } else {
@@ -427,7 +428,7 @@ fn on_call_example(resolved: bool) -> NotificationContext {
 
 /// A downtime start, or its end; platforms skip both (D8), so it has no key.
 fn downtime_example(resolved: bool) -> NotificationContext {
-    let url = "https://o2.acme.com/web/downtimes?org_identifier=acme";
+    let url = "https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme";
     let level = if resolved {
         AlertLevel::Ok
     } else {
