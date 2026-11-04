@@ -284,7 +284,6 @@ pub fn apply_combined_filter(
     exec_plan: Arc<dyn ExecutionPlan>,
     filter_projection: Option<&Vec<usize>>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
-    let index_condition = index_condition.and_then(IndexCondition::without_required_filters);
     if index_condition.is_none() && timestamp_filter.is_none() {
         return Ok(exec_plan);
     }

@@ -67,11 +67,7 @@ pub enum Condition {
     // term, distance
     FuzzyMatchAll(String, u8),
     // `field LIKE '%value%'` on an FTS field, answered by `_all` as a superset
-    Like {
-        field: String,
-        value: String,
-        case_insensitive: bool,
-    },
+    Like { field: String, value: String },
     All(),
     // n-ary so a long OR/AND chain does not recurse one level per term
     Or(Vec<Condition>),
@@ -106,13 +102,8 @@ impl Condition {
             Condition::FuzzyMatchAll(value, distance) => {
                 format!("{INDEX_FIELD_NAME_FOR_ALL}:fuzzy({value}, {distance})")
             }
-            Condition::Like {
-                field,
-                value,
-                case_insensitive,
-            } => {
-                let op = if *case_insensitive { "ILIKE" } else { "LIKE" };
-                format!("{field} {op} '%{value}%' ON {INDEX_FIELD_NAME_FOR_ALL}")
+            Condition::Like { field, value } => {
+                format!("{field} LIKE '%{value}%' ON {INDEX_FIELD_NAME_FOR_ALL}")
             }
             Condition::All() => "ALL".to_string(),
             Condition::Or(items) => format!("({})", Self::join_query(items, " OR ")),
@@ -208,20 +199,15 @@ impl Condition {
         } else if let Some(expr) = expr.downcast_ref::<LikeExpr>() {
             let field = get_physical_column_name(expr.expr()).to_string();
             let pattern = get_physical_value(expr.pattern());
-            let case_insensitive = expr.case_insensitive();
             if index_fields.contains(&field) {
                 let value =
                     like_substring(&pattern).expect("LIKE pattern is validated before conversion");
-                Condition::StrMatch(field, value.to_string(), !case_insensitive)
+                Condition::StrMatch(field, value.to_string(), !expr.case_insensitive())
             } else {
                 let value = like_contains_term(&pattern)
                     .expect("LIKE pattern is validated before conversion")
                     .to_string();
-                Condition::Like {
-                    field,
-                    value,
-                    case_insensitive,
-                }
+                Condition::Like { field, value }
             }
         } else if let Some(expr) = expr.downcast_ref::<NotExpr>() {
             Condition::Not(Box::new(Condition::from_physical_expr(
@@ -344,7 +330,7 @@ impl Condition {
                 let term = Term::from_field_text(default_field, value);
                 Box::new(FuzzyTermQuery::new(term, *distance, false))
             }
-            Condition::Like { field, value, .. } => {
+            Condition::Like { field, value } => {
                 let default_field = default_field.ok_or_else(|| {
                     anyhow::anyhow!("There's no FullTextSearch field for LIKE on {field}")
                 })?;
@@ -546,24 +532,10 @@ impl Condition {
                 }
                 Ok(disjunction(expr_list))
             }
-            Condition::Like {
-                field,
-                value,
-                case_insensitive,
-                ..
-            } => {
-                let index = schema.index_of(field)?;
-                let column = Arc::new(Column::new(field, index));
-                let pattern =
-                    get_scalar_value(&format!("%{value}%"), schema.field(index).data_type())?;
-                Ok(Arc::new(LikeExpr::new(
-                    false,
-                    *case_insensitive,
-                    column,
-                    pattern,
-                )))
+            // the plan's own filter still evaluates a LIKE
+            Condition::All() | Condition::Like { .. } => {
+                Ok(Arc::new(Literal::new(ScalarValue::Boolean(Some(true)))))
             }
-            Condition::All() => Ok(Arc::new(Literal::new(ScalarValue::Boolean(Some(true))))),
             Condition::Or(items) => {
                 let exprs = items
                     .iter()
@@ -982,11 +954,10 @@ mod tests {
         assert!(condition.to_physical_expr(&arrow_schema, &[]).is_ok());
     }
 
-    fn like(field: &str, value: &str, case_insensitive: bool) -> Condition {
+    fn like(field: &str, value: &str) -> Condition {
         Condition::Like {
             field: field.to_string(),
             value: value.to_string(),
-            case_insensitive,
         }
     }
 
@@ -1033,24 +1004,20 @@ mod tests {
     #[test]
     fn test_condition_like_to_query() {
         assert_eq!(
-            like("message", "err", true).to_query(),
-            "message ILIKE '%err%' ON _all"
-        );
-        assert_eq!(
-            like("message", "err", false).to_query(),
+            like("message", "err").to_query(),
             "message LIKE '%err%' ON _all"
         );
     }
 
     #[test]
     fn test_condition_like_searches_all_field() {
-        let condition = like("message", "Error", false);
+        let condition = like("message", "Error");
         assert!(!condition.can_remove_filter());
         assert!(condition.requires_filter());
-        // `_all` is lowercased, so case-sensitive LIKE also gets a case-insensitive superset
+        // `_all` is lowercased, so LIKE and ILIKE share one case-insensitive superset
         assert_eq!(count_like(&condition), 2);
-        assert_eq!(count_like(&like("message", "refused", true)), 1);
-        assert_eq!(count_like(&like("message", "missing", true)), 0);
+        assert_eq!(count_like(&like("message", "refused")), 1);
+        assert_eq!(count_like(&like("message", "missing")), 0);
         assert_eq!(
             condition.need_all_term_fields(),
             HashSet::from([INDEX_FIELD_NAME_FOR_ALL.to_string()])
@@ -1064,7 +1031,7 @@ mod tests {
     #[test]
     fn test_condition_like_without_all_field_is_skipped() {
         let (index, _) = build_like_index();
-        let condition = like("message", "error", true);
+        let condition = like("message", "error");
         assert!(condition.to_tantivy_query(&index.schema(), None).is_err());
 
         let index_condition = IndexCondition {
@@ -1081,7 +1048,7 @@ mod tests {
 
     #[test]
     fn test_condition_requires_filter_propagates() {
-        let fts = like("message", "error", true);
+        let fts = like("message", "error");
         let exact = Condition::Equal("service".to_string(), "a".to_string());
         let str_match = Condition::StrMatch("service".to_string(), "ab".to_string(), true);
         assert!(Condition::Or(vec![exact.clone(), fts.clone()]).requires_filter());
@@ -1092,6 +1059,22 @@ mod tests {
     }
 
     #[test]
+    fn test_condition_like_physical_expr_leaves_rows_to_plan_filter() {
+        let schema = arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+            "service",
+            arrow_schema::DataType::Utf8,
+            true,
+        )]);
+        let expr = like("message", "err")
+            .to_physical_expr(&schema, &[])
+            .unwrap();
+        assert_eq!(
+            expr.downcast_ref::<Literal>().unwrap().value(),
+            &ScalarValue::Boolean(Some(true))
+        );
+    }
+
+    #[test]
     fn test_condition_like_from_physical_expr() {
         let index_fields = HashSet::from(["service".to_string()]);
         for data_type in [
@@ -1099,32 +1082,21 @@ mod tests {
             arrow_schema::DataType::LargeUtf8,
             arrow_schema::DataType::Utf8View,
         ] {
-            let schema = arrow_schema::Schema::new(vec![
-                arrow_schema::Field::new("message", data_type.clone(), true),
-                arrow_schema::Field::new("service", data_type.clone(), true),
-            ]);
-            for condition in [
-                like("message", "err42", false),
-                like("message", "Err", true),
-            ] {
-                let expr = condition.to_physical_expr(&schema, &[]).unwrap();
-                let like_expr = expr.downcast_ref::<LikeExpr>().unwrap();
-                assert!(!like_expr.negated());
-                assert_eq!(like_expr.pattern().data_type(&schema).unwrap(), data_type);
-                assert_eq!(
-                    Condition::from_physical_expr(&expr, &index_fields),
-                    condition
-                );
-            }
             for (ilike, case_sensitive) in [(false, true), (true, false)] {
-                let expr: Arc<dyn PhysicalExpr> = Arc::new(LikeExpr::new(
-                    false,
-                    ilike,
-                    Arc::new(Column::new("service", 1)),
-                    get_scalar_value("%auth-gw%", &data_type).unwrap(),
-                ));
+                let like_on = |field: &str, pattern: &str| -> Arc<dyn PhysicalExpr> {
+                    Arc::new(LikeExpr::new(
+                        false,
+                        ilike,
+                        Arc::new(Column::new(field, 0)),
+                        get_scalar_value(pattern, &data_type).unwrap(),
+                    ))
+                };
                 assert_eq!(
-                    Condition::from_physical_expr(&expr, &index_fields),
+                    Condition::from_physical_expr(&like_on("message", "%Err42%"), &index_fields),
+                    like("message", "Err42")
+                );
+                assert_eq!(
+                    Condition::from_physical_expr(&like_on("service", "%auth-gw%"), &index_fields),
                     Condition::StrMatch(
                         "service".to_string(),
                         "auth-gw".to_string(),

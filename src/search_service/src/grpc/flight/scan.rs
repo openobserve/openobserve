@@ -27,7 +27,7 @@ use config::{
         stream::{FileKey, StreamSettings, StreamType},
     },
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::Error,
     schema::{
@@ -142,18 +142,19 @@ impl StreamSearchSettings {
     }
 
     /// FTS fields whose terms are in `_all` for every row at or after `start_time`.
-    pub(super) fn fts_fields_indexed_since(
-        &self,
-        start_time: i64,
-    ) -> impl Iterator<Item = &String> {
-        self.fts_fields.iter().filter(move |field| {
-            get_stream_setting_index_updated_at_for_fields(
-                &self.settings,
-                self.stream_type,
-                std::slice::from_ref(*field),
-                0,
-            ) <= start_time
-        })
+    pub(super) fn fts_fields_indexed_since(&self, start_time: i64) -> HashSet<String> {
+        self.fts_fields
+            .iter()
+            .filter(|field| {
+                get_stream_setting_index_updated_at_for_fields(
+                    &self.settings,
+                    self.stream_type,
+                    std::slice::from_ref(*field),
+                    0,
+                ) <= start_time
+            })
+            .cloned()
+            .collect()
     }
 }
 

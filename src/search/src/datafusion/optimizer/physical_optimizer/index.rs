@@ -272,16 +272,6 @@ fn is_expr_valid_for_index(
     index_fields: &HashSet<String>,
     fts_fields: &HashSet<String>,
 ) -> bool {
-    is_valid_for_index(expr, index_fields, fts_fields, false)
-}
-
-// `negated` is set below a NOT, where a superset index result would turn into a subset.
-fn is_valid_for_index(
-    expr: &Arc<dyn PhysicalExpr>,
-    index_fields: &HashSet<String>,
-    fts_fields: &HashSet<String>,
-    negated: bool,
-) -> bool {
     if let Some(expr) = expr.downcast_ref::<BinaryExpr>() {
         match expr.op() {
             Operator::Eq | Operator::NotEq => {
@@ -298,8 +288,8 @@ fn is_valid_for_index(
                 }
             }
             Operator::And | Operator::Or => {
-                return is_valid_for_index(expr.left(), index_fields, fts_fields, negated)
-                    && is_valid_for_index(expr.right(), index_fields, fts_fields, negated);
+                return is_expr_valid_for_index(expr.left(), index_fields, fts_fields)
+                    && is_expr_valid_for_index(expr.right(), index_fields, fts_fields);
             }
             _ => return false,
         }
@@ -332,9 +322,11 @@ fn is_valid_for_index(
             _ => false,
         };
     } else if let Some(expr) = expr.downcast_ref::<LikeExpr>() {
-        return is_like_valid_for_index(expr, index_fields, fts_fields, negated);
+        return is_like_valid_for_index(expr, index_fields, fts_fields);
     } else if let Some(expr) = expr.downcast_ref::<NotExpr>() {
-        return is_valid_for_index(expr.arg(), index_fields, fts_fields, true);
+        // a superset from `_all` turns into a subset under NOT
+        return is_expr_valid_for_index(expr.arg(), index_fields, fts_fields)
+            && !Condition::from_physical_expr(expr.arg(), index_fields).requires_filter();
     } else {
         return false;
     }
@@ -346,8 +338,13 @@ fn is_like_valid_for_index(
     expr: &LikeExpr,
     index_fields: &HashSet<String>,
     fts_fields: &HashSet<String>,
-    negated: bool,
 ) -> bool {
+    if !config::get_config()
+        .search
+        .inverted_index_like_optimizer_enabled
+    {
+        return false;
+    }
     let Some(column) = expr.expr().downcast_ref::<Column>() else {
         return false;
     };
@@ -361,8 +358,7 @@ fn is_like_valid_for_index(
         // exact like `str_match`, but the index folds ASCII case only
         like_substring(&pattern).is_some_and(|x| !expr.case_insensitive() || x.is_ascii())
     } else {
-        // a superset from `_all` turns into a subset under NOT
-        !negated && fts_fields.contains(column.name()) && like_contains_term(&pattern).is_some()
+        fts_fields.contains(column.name()) && like_contains_term(&pattern).is_some()
     }
 }
 
@@ -594,10 +590,9 @@ mod tests {
     fn test_is_expr_valid_for_index_like() {
         let index_fields = HashSet::from(["name".to_string(), "both".to_string()]);
         let fts_fields = HashSet::from(["message".to_string(), "both".to_string()]);
-        let like_condition = |field: &str, value: &str, case_insensitive| Condition::Like {
+        let like_condition = |field: &str, value: &str| Condition::Like {
             field: field.to_string(),
             value: value.to_string(),
-            case_insensitive,
         };
         let str_match = |field: &str, value: &str, case_sensitive| {
             Condition::StrMatch(field.to_string(), value.to_string(), case_sensitive)
@@ -640,12 +635,12 @@ mod tests {
             (
                 like("message", "%Err42%", false, true),
                 true,
-                Some(like_condition("message", "Err42", true)),
+                Some(like_condition("message", "Err42")),
             ),
             (
                 like("message", &max_term, false, false),
                 true,
-                Some(like_condition("message", &"a".repeat(63), false)),
+                Some(like_condition("message", &"a".repeat(63))),
             ),
             (
                 or(
@@ -655,7 +650,7 @@ mod tests {
                 true,
                 Some(Condition::Or(vec![
                     Condition::Equal("name".to_string(), "a".to_string()),
-                    like_condition("message", "err", false),
+                    like_condition("message", "err"),
                 ])),
             ),
             (like("name", "%é%", false, true), false, None),
@@ -720,7 +715,6 @@ mod tests {
         let message_like = Condition::Like {
             field: "message".to_string(),
             value: "error".to_string(),
-            case_insensitive: false,
         };
         // sql, expected conditions, can_optimize, LIKE left in the plan
         let cases = vec![

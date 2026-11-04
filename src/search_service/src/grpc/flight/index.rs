@@ -83,13 +83,9 @@ pub(super) fn optimizer_physical_plan(
     let index_fields: HashSet<String> = settings.index_fields.iter().cloned().collect();
 
     // files written before a field joined FTS have none of its terms in `_all`
-    let fts_fields: HashSet<String> = settings
-        .fts_fields_indexed_since(time_range.0)
-        .cloned()
-        .collect();
     let index_rule = IndexRule::new(
         index_fields.clone(),
-        fts_fields,
+        settings.fts_fields_indexed_since(time_range.0),
         index_condition_ref.clone(),
     );
     let original_plan = Arc::clone(&plan);
@@ -338,7 +334,6 @@ mod tests {
                 conditions: vec![Condition::Like {
                     field: "message".to_string(),
                     value: "timeout".to_string(),
-                    case_insensitive: false,
                 }],
             })
         );
