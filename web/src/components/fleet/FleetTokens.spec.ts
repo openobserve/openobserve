@@ -409,7 +409,7 @@ describe("FleetTokens", () => {
     expect(fleet.listTokens).toHaveBeenCalledTimes(2);
   });
 
-  it("defaults to a token that never expires", async () => {
+  it("defaults to a token that never expires and has no use limit", async () => {
     vi.mocked(fleet.createToken).mockResolvedValue({
       data: { ...token({ id: "t7" }), token: "o2ft_y" },
     } as any);
@@ -418,7 +418,7 @@ describe("FleetTokens", () => {
     expect(fleet.createToken).toHaveBeenCalledWith(expect.any(String), {
       name: "n",
       expires_in_days: null,
-      max_uses: 100,
+      max_uses: null,
       fleet: "f1",
     });
   });
