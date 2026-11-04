@@ -574,7 +574,7 @@ function nodeSignal(n: MapNode): FlowSignal {
 
 function nodeLabel(n: MapNode): I18nText {
   if (n.column === "fleet") return raw(fleetName(n.name));
-  if (n.column === "destination") return destinationLabel(n.name);
+  if (n.column === "destination" || n.column === "sink") return destinationLabel(n.name);
   return raw(n.name);
 }
 

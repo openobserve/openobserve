@@ -232,6 +232,9 @@ describe("FleetFlowOverview map", () => {
     const data = (id: string) => nodes().find((n) => n.id === id).data;
     expect(data(`d:${D1.id}`)).toMatchObject({ ring: "error", outbound: true });
     expect(data(`d:${D2.id}`)).toMatchObject({ ring: "warning", outbound: false });
+    const sink = nodes().find((n) => n.id === `x:d:${D1.id}`);
+    expect(sink.ariaLabel).toBe("o2.acme.io");
+    expect(sink.data.label).toBe("o2.acme.io");
   });
 
   it("opens the failing destination's details from the branch", async () => {
