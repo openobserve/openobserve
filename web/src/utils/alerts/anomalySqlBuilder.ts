@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import {
+  ANOMALY_FILTER_OPERATORS,
   buildAnomalyFilterExpression,
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
@@ -23,6 +24,16 @@ const percentileMap: Record<string, number> = {
   p50: 0.5,
   p95: 0.95,
   p99: 0.99,
+};
+
+// Engine spellings a V2 group leaf can carry that the anomaly row operator list spells differently.
+const ENGINE_TO_ANOMALY_OPERATOR: Record<string, string> = {
+  "!=": "<>",
+  NotContains: "Not Contains",
+  starts_with: "Starts With",
+  ends_with: "Ends With",
+  is_null: "Is Null",
+  is_not_null: "Is Not Null",
 };
 
 /**
@@ -74,7 +85,7 @@ export const buildAnomalyPreviewSql = (config: any): string => {
   const rawFn = config.detection_function || "count";
   const fn = toDetectionFunctionSql(rawFn, config.detection_function_field || "*");
 
-  const filterLines = (config.filters || [])
+  const filterLines = anomalyFilterRows(config.filters)
     .filter((f: any) => f.field && (operatorNeedsValue(f.operator) ? f.value : true))
     .map((f: any) => `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`);
 
@@ -95,4 +106,25 @@ export const buildAnomalyPreviewSql = (config: any): string => {
   ]
     .filter(Boolean)
     .join("\n");
+};
+
+/** The anomaly filter rows; an API-written V2 group is read as rows only when it is one AND level of plain leaves, else as no rows. */
+export const anomalyFilterRows = (filters: unknown): any[] => {
+  if (Array.isArray(filters)) return filters;
+  const group = filters as any;
+  if (group?.filterType !== "group" || !Array.isArray(group.conditions)) return [];
+  const andOnly = group.conditions.every(
+    (leaf: any, index: number) =>
+      index === 0 || String(leaf?.logicalOperator ?? "AND").toUpperCase() !== "OR",
+  );
+  const rows = group.conditions.map(anomalyRowOf);
+  return andOnly && rows.every(Boolean) ? rows : [];
+};
+
+const anomalyRowOf = (leaf: any): { field: string; operator: string; value: string } | null => {
+  if (leaf?.filterType !== "condition" || typeof leaf.column !== "string") return null;
+  const operator = ENGINE_TO_ANOMALY_OPERATOR[leaf.operator] ?? leaf.operator;
+  if (!(ANOMALY_FILTER_OPERATORS as readonly string[]).includes(operator)) return null;
+  if (typeof leaf.value === "object" && leaf.value !== null) return null;
+  return { field: leaf.column, operator, value: leaf.value == null ? "" : String(leaf.value) };
 };

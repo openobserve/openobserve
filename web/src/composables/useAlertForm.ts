@@ -111,7 +111,7 @@ import {
   buildAnomalyFilterExpression,
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
-import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
+import { anomalyFilterRows, toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import {
@@ -666,7 +666,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       c.detection_function,
       c.detection_function_field || "<field>",
     );
-    const filterLines = (c.filters || [])
+    const filterLines = anomalyFilterRows(c.filters)
       .filter((f: any) => f.field && (operatorNeedsValue(f.operator) ? f.value : true))
       .map((f: any) => `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`);
     const where = filterLines.length

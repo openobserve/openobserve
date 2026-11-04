@@ -1999,6 +1999,50 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(buildCondition(condition, mockDashboardPanelData)).toBe(expected);
     });
 
+    it.each([
+      ["=", "now()", "count = now()"],
+      [">", "now()", "count > now()"],
+      [">", "$var*1000", "count > $var*1000"],
+      ["=", "(${var})", "count = (${var})"],
+      ["Contains", "(${var})", "str_match(count, (${var}))"],
+      [">", "5 ", "count > 5 "],
+      ["=", "CAST(x AS INT)", "count = CAST(x AS INT)"],
+      ["=", "100", "count = 100"],
+      ["=", "-1.5e3", "count = -1.5e3"],
+      ["=", "true", "count = true"],
+      ["=", "$count", "count = $count"],
+      ["=", "${count:csv}", "count = ${count:csv}"],
+      ["=", "{{count}}", "count = {{count}}"],
+      ["=", "$or", "count = $or"],
+      ["=", "'abc'", "count = abc"],
+      ["=", "abc", "count = abc"],
+      ["=", "(1 OR 2)", "count = (1 OR 2)"],
+      ["<=", "$a + $b", "count <= $a + $b"],
+    ])("keeps main's raw SQL for %s %s on a numeric column", (operator, value, expected) => {
+      const condition = { type: "condition", operator, column: { field: "count" }, value };
+      expect(buildCondition(condition, mockDashboardPanelData)).toBe(expected);
+    });
+
+    it.each([
+      ["1 OR 1=1", "count = '1 OR 1=1'"],
+      ["'1 or 1=1'", "count = '1 or 1=1'"],
+      ["1) OR (1=1", "count = '1) OR (1=1'"],
+      ["x BETWEEN 1 AND 5", "count = 'x BETWEEN 1 AND 5'"],
+      ["1 -- x", "count = '1 -- x'"],
+      ["(1 -- x)", "count = '(1 -- x)'"],
+      ["1; SELECT 1", "count = '1; SELECT 1'"],
+      ["2' OR '1'='1", "count = '2'' OR ''1''=''1'"],
+      ["abc'", "count = 'abc'''"],
+    ])("quotes the injection shape %s on a numeric column", (value, expected) => {
+      const condition = { type: "condition", operator: "=", column: { field: "count" }, value };
+      expect(buildCondition(condition, mockDashboardPanelData)).toBe(expected);
+    });
+
+    it("emits number-typed list values instead of throwing", () => {
+      const condition = { type: "list", column: { field: "count" }, values: ["1", 2] };
+      expect(buildCondition(condition, mockDashboardPanelData)).toBe("count IN (1, 2)");
+    });
+
     it("should escape single quotes in value", () => {
       const condition = {
         type: "condition",

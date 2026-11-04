@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { toDetectionFunctionSql, buildAnomalyPreviewSql } from "./anomalySqlBuilder";
+import {
+  anomalyFilterRows,
+  toDetectionFunctionSql,
+  buildAnomalyPreviewSql,
+} from "./anomalySqlBuilder";
 
 // ─── toDetectionFunctionSql ──────────────────────────────────────────────────
 
@@ -469,5 +473,74 @@ describe("buildAnomalyPreviewSql", () => {
       training_window_days: 1,
     });
     expect(result).toMatch(/ORDER BY time_bucket$/m);
+  });
+});
+
+describe("anomalyFilterRows", () => {
+  const leaf = (column: string, operator: string, value: unknown, logicalOperator = "AND") => ({
+    filterType: "condition",
+    column,
+    operator,
+    value,
+    logicalOperator,
+  });
+  const group = (conditions: unknown[]) => ({
+    filterType: "group",
+    logicalOperator: "AND",
+    conditions,
+  });
+
+  it("returns the saved row array untouched", () => {
+    const rows = [{ field: "level", operator: "=", value: "error" }];
+    expect(anomalyFilterRows(rows)).toBe(rows);
+  });
+
+  it("reads null and undefined as no rows", () => {
+    expect(anomalyFilterRows(null)).toEqual([]);
+    expect(anomalyFilterRows(undefined)).toEqual([]);
+  });
+
+  it("flattens an AND-only V2 group of leaves into rows", () => {
+    const filters = group([
+      leaf("level", "=", "error"),
+      leaf("code", "!=", 500),
+      leaf("host", "is_null", null),
+    ]);
+    expect(anomalyFilterRows(filters)).toEqual([
+      { field: "level", operator: "=", value: "error" },
+      { field: "code", operator: "<>", value: "500" },
+      { field: "host", operator: "Is Null", value: "" },
+    ]);
+  });
+
+  it.each([
+    ["an OR leaf", group([leaf("a", "=", "1"), leaf("b", "=", "2", "OR")])],
+    ["a nested group", group([leaf("a", "=", "1"), group([leaf("b", "=", "2")])])],
+    ["a list operator", group([{ ...leaf("a", "in", null), values: ["x", "y"] }])],
+    ["a non-object", "level = 'error'"],
+  ])("reads a group with %s as no rows", (_label, filters) => {
+    expect(anomalyFilterRows(filters)).toEqual([]);
+  });
+
+  it("builds the preview from an API-written V2 group instead of throwing", () => {
+    const result = buildAnomalyPreviewSql({
+      query_mode: "filters",
+      stream_name: "logs",
+      detection_function: "count",
+      histogram_interval: "5m",
+      filters: group([leaf("level", "=", "error"), leaf("code", ">", "499")]),
+    });
+    expect(result).toContain("WHERE\n  level = 'error'\n  AND code > '499'\n");
+  });
+
+  it("builds the preview without a WHERE for a V2 group it cannot flatten", () => {
+    const result = buildAnomalyPreviewSql({
+      query_mode: "filters",
+      stream_name: "logs",
+      detection_function: "count",
+      histogram_interval: "5m",
+      filters: group([leaf("a", "=", "1"), leaf("b", "=", "2", "OR")]),
+    });
+    expect(result).not.toContain("WHERE");
   });
 });
