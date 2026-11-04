@@ -403,7 +403,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
 
       // The picker commits a condition only once it has its value, so leaving early adds nothing.
       await fvPage.openFilterConditionColumnPopover();
-      await fvPage.conditions.chooseField('');
+      await fvPage.conditions.pickListedField(0);
       await fvPage.conditions.closePicker();
 
       await fvPage.conditions.expectChipCount(0);

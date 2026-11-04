@@ -308,6 +308,15 @@ class FilterBuilderDriver {
   /** Builds a condition on the `position`-th listed field (0 is the first), for specs that take any column. */
   async addConditionOnListedField(position, operator, value) {
     await this.openForNew();
+    const field = await this.pickListedField(position);
+    const id = await this.pickOperator(operator);
+    await this.enterValues(id, value);
+    await this.close();
+    return field;
+  }
+
+  /** Clicks the `position`-th listed field in the open picker (0 is the first) and returns its name. */
+  async pickListedField(position = 0) {
     const fields = this.page.locator(`[data-test^="${this.dataTest}-suggest-item-"]:not([data-test$="group"])`);
     await fields.first().waitFor({ state: "visible", timeout: 10000 });
     const count = await fields.count();
@@ -315,9 +324,6 @@ class FilterBuilderDriver {
     const field = (await row.getAttribute("data-test")).slice(`${this.dataTest}-suggest-item-`.length);
     await row.click();
     await this.page.waitForTimeout(250);
-    const id = await this.pickOperator(operator);
-    await this.enterValues(id, value);
-    await this.close();
     return field;
   }
 
