@@ -15,7 +15,7 @@
 
 import { format as echartsFormat } from "echarts/core";
 import { gt } from "@/types/i18n";
-import { chartColor } from "@/utils/chartTheme";
+import { chartAxisTextColor, chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { addCommasToNumber } from "@/utils/formatters";
 import { formatAxisTickValue } from "./axisTickFormat";
@@ -210,7 +210,7 @@ export const convertDistributionData = (panelSchema: any, data: any, store: any)
       max: buckets.start + buckets.count * buckets.size,
       axisLabel: {
         hideOverlap: true,
-        color: chartColor("--color-text-secondary"),
+        color: chartAxisTextColor(),
         formatter: (value: number) => {
           const text = formatAxisTickValue(value, config.unit, config.unit_custom, config.decimals);
           return !config.unit || config.unit === "default" ? trimZeroFraction(text) : text;
@@ -221,9 +221,9 @@ export const convertDistributionData = (panelSchema: any, data: any, store: any)
     yAxis: {
       type: "value",
       name: gt("dashboard.utils.distributionCount"),
-      nameTextStyle: { color: chartColor("--color-text-secondary") },
+      nameTextStyle: { color: chartAxisTextColor() },
       minInterval: 1,
-      axisLabel: { color: chartColor("--color-text-secondary") },
+      axisLabel: { color: chartAxisTextColor() },
       splitLine: {
         show: config.show_gridlines !== false,
         lineStyle: getGridLineStyle(theme),
