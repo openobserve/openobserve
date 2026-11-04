@@ -115,7 +115,50 @@ jobs:
           DELIM="hintEOF_$(openssl rand -hex 16 2>/dev/null || echo "${RANDOM}${RANDOM}${RANDOM}")"
           printf 'hint<<%s\n%s\n%s\n' "$DELIM" "$HINT" "$DELIM" >> "$GITHUB_OUTPUT"
 
+      - name: Leave bug fixes to the regression door (one owner per fix PR)
+        id: owner
+        if: github.event_name == 'pull_request' && vars.E2E_AUTO_REGRESSION == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MEMBERSHIP_PAT: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ steps.ctx.outputs.pr }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          ASSOC: ${{ github.event.pull_request.author_association }}
+        run: |
+          set -uo pipefail
+          go() { echo "::notice::dispatching as usual: $1"; exit 0; }
+          BUGS=$(gh api graphql -F owner="${REPO%%/*}" -F name="${REPO##*/}" -F n="$PR" -f query='
+            query($owner: String!, $name: String!, $n: Int!) {
+              repository(owner: $owner, name: $name) { pullRequest(number: $n) {
+                closingIssuesReferences(first: 25) { nodes { number repository { nameWithOwner } issueType { name } labels(first: 50) { nodes { name } } } }
+              } } }' --jq '[.data.repository.pullRequest.closingIssuesReferences.nodes[]
+                | select(.repository.nameWithOwner == "openobserve/openobserve")
+                | select((.issueType.name // "") == "Bug" or any(.labels.nodes[]; .name == "☢️ Bug")) | "#\(.number)"] | join(" ")') \
+            || go "could not read the closing issues of #${PR}"
+          [ -n "$BUGS" ] || go "#${PR} closes no openobserve/openobserve bug"
+          FILES=$(gh api --paginate "repos/${REPO}/pulls/${PR}/files" --jq '.[].filename') || go "could not list the files of #${PR}"
+          grep -q '^web/' <<<"$FILES" || go "#${PR} closes bug ${BUGS} but does not touch web/, so the regression door declines it"
+          # Mirrors the PR-author gate of o2-enterprise e2e-council.yml (authz step), which a regression run must also pass.
+          case "$ASSOC" in
+            OWNER|MEMBER|COLLABORATOR) HOW="author_association=${ASSOC}" ;;
+            *)
+              if [ -n "$MEMBERSHIP_PAT" ] && GH_TOKEN="$MEMBERSHIP_PAT" gh api "orgs/openobserve/members/${AUTHOR}" --silent 2>/dev/null; then
+                HOW="org member (membership API)"
+              else
+                LVL=$(gh api "repos/${REPO}/collaborators/${AUTHOR}/permission" --jq '.permission' 2>/dev/null) \
+                  || go "author gate for @${AUTHOR} is inconclusive, so the regression door may decline #${PR}"
+                case "$LVL" in
+                  admin|maintain|write) HOW="repo collaborator (${LVL})" ;;
+                  *) go "author @${AUTHOR} fails the engine's author gate (permission=${LVL:-none})" ;;
+                esac
+              fi ;;
+          esac
+          echo "::notice::not dispatching: #${PR} closes bug ${BUGS}, touches web/ and its author passes the gate (${HOW}), so regression-council-caller.yml owns its test"
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+
       - name: Dispatch the E2E Council engine (o2-enterprise) via the org-admin PAT
+        if: steps.owner.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           PR: ${{ steps.ctx.outputs.pr }}
