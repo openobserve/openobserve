@@ -936,6 +936,39 @@ describe("TraceDetails", () => {
       expect(series()).toMatchObject({ left: 55, right: 55 });
     });
 
+    it("zooms both views from the chart's live level and fit recreates the chart", async () => {
+      let liveZoom = 1;
+      fakeChart.getOption = () => ({ series: [{ zoom: liveZoom }] });
+      fakeChart.setOption = vi.fn((opt: any) => {
+        liveZoom = opt.series[0].zoom;
+      });
+      await mountMap();
+
+      for (const view of ["tree", "graph"]) {
+        if (view === "graph") {
+          await graphBtn().trigger("click");
+          await flushPromises();
+        }
+        expect(wrapper.find('[data-test="trace-graph-zoom-controls"]').exists()).toBe(true);
+        liveZoom = 1;
+        await wrapper.find('[data-test="trace-graph-zoom-in"]').trigger("click");
+        expect(liveZoom).toBeCloseTo(1.25);
+        await wrapper.find('[data-test="trace-graph-zoom-out"]').trigger("click");
+        expect(liveZoom).toBeCloseTo(1);
+
+        const keyBefore = wrapper.vm.traceGraphChartKey;
+        await wrapper.find('[data-test="trace-graph-fit-screen"]').trigger("click");
+        expect(wrapper.vm.traceGraphChartKey).toBe(keyBefore + 1);
+      }
+    });
+
+    it("hides the zoom controls when no service matches", async () => {
+      await mountMap();
+      wrapper.vm.traceGraphSearch = "nope";
+      await flushPromises();
+      expect(wrapper.find('[data-test="trace-graph-zoom-controls"]').exists()).toBe(false);
+    });
+
     it("truncates graph labels and hides overlapping ones", async () => {
       await mountMap();
       await graphBtn().trigger("click");
@@ -987,6 +1020,29 @@ describe("TraceDetails", () => {
       await flushPromises();
 
       expect(fakeChart.off).toHaveBeenCalledWith("mouseover", expect.any(Function));
+    });
+
+    it("resolves the hovered node in the searched tree, not the full one", async () => {
+      const tooltipSetupDelay = () => new Promise((resolve) => setTimeout(resolve, 350));
+      const chartDom = document.createElement("div");
+      fakeChart.getDom = () => chartDom;
+      await mountMap();
+      wrapper.vm.setTraceGraphView("tree");
+      await tooltipSetupDelay();
+      const fullCatalog = series().data[0].children.find((n: any) => n.name === "catalog");
+      wrapper.vm.traceGraphSearch = "catalog";
+      await flushPromises();
+      await tooltipSetupDelay();
+
+      const catalog = series().data[0].children[0];
+      expect(catalog.name).toBe("catalog");
+      expect(catalog.treePath).not.toEqual(fullCatalog.treePath);
+      const handlers = fakeChart.on.mock.calls.filter(([event]: any[]) => event === "mouseover");
+      handlers.at(-1)[1]({ data: catalog, event: { offsetX: 10, offsetY: 10 } });
+
+      const tooltip = chartDom.lastElementChild as HTMLElement;
+      expect(tooltip.innerHTML).toContain("catalog");
+      expect(tooltip.innerHTML).not.toContain("checkout");
     });
 
     it("does not attach the tree tooltip when Graph View is chosen during the setup delay", async () => {
