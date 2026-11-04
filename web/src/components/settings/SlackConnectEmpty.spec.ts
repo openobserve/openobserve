@@ -104,6 +104,9 @@ describe("SlackConnectEmpty on Cloud (A1)", () => {
     expect(text).not.toMatch(/Acknowledge|unfurl|Phase/);
     // A privacy fact rides behind one info icon, not a banner under the steps.
     expect(w.find('[data-test="slack-connect-consent"]').exists()).toBe(true);
+    expect(w.find('[data-test="slack-connect-consent"]').attributes("aria-label")).not.toContain(
+      "nothing is shared with a third party",
+    );
     expect(text).not.toContain("It never reads other channel history.");
     expect(text).toContain("Needs the Manage Slack permission");
     expect(w.find('[data-test="slack-setup-app"]').exists()).toBe(false);
@@ -289,7 +292,10 @@ describe("SlackConnectEmpty self-hosted (A1)", () => {
     expect(steps[2]).toContain("Install and link people");
     expect(text).not.toContain("Ask questions; answers use your own permissions");
     expect(text).toContain("Needs the Manage Slack permission");
-    expect(w.find('[data-test="slack-connect-consent"]').exists()).toBe(true);
+    // A screen reader gets both tooltip lines, not just the first.
+    const consent = w.find('[data-test="slack-connect-consent"]').attributes("aria-label");
+    expect(consent).toContain("It never reads other channel history.");
+    expect(consent).toContain("nothing is shared with a third party");
     expect(w.find('[data-test="slack-connect-steps"]').attributes("role")).toBe("list");
   });
 

@@ -139,7 +139,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :range="windowValue"
             />
           </template>
-          <!-- The presets set this same field; the one matching the range is lit. -->
           <template #above>
             <span class="flex flex-wrap gap-2" data-test="oncall-cover-presets">
               <OButton

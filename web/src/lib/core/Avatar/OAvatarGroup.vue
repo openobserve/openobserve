@@ -8,7 +8,7 @@ import { computed } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeSize } from "@/lib/core/Badge/OBadge.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { raw } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import OAvatar from "./OAvatar.vue";
 import type { AvatarGroupPerson, AvatarGroupProps } from "./OAvatar.types";
@@ -34,9 +34,13 @@ const OVERLAP: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
   lg: "-ms-1",
 };
 
+const { t } = useI18nTyped();
+
 const label = (person: AvatarGroupPerson) => {
   const name = person.name?.trim();
-  return name && name !== person.value ? `${name} (${person.value})` : person.value;
+  return name && name !== person.value
+    ? t("common.personWithEmail", { name, email: person.value })
+    : person.value;
 };
 // The tooltip is hover- and focus-only, so a screen reader is handed the same names as the chip's name.
 const hiddenLabel = computed(() =>

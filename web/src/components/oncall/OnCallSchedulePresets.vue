@@ -100,7 +100,7 @@
                   v-if="row.help"
                   name="info"
                   size="sm"
-                  :label="row.help || undefined"
+                  :label="row.help"
                   tabindex="0"
                   class="text-icon-color cursor-pointer"
                 >

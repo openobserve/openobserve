@@ -25,6 +25,8 @@ import type {
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import {
+  apiErrorMessage,
+  apiErrorStatus,
   CHANNEL_WAKES,
   fieldLabel,
   readableConditions,
@@ -2745,5 +2747,20 @@ describe("routing field helpers", () => {
         startsWith: (field) => `${field} starts with`,
       }),
     ).toBe("K8s namespace prod and Service starts with api");
+  });
+});
+
+describe("apiErrorMessage / apiErrorStatus", () => {
+  it("reads the axios response's message and status", () => {
+    const err = { response: { status: 403, data: { message: "denied" } } };
+    expect(apiErrorMessage(err)).toBe("denied");
+    expect(apiErrorStatus(err)).toBe(403);
+  });
+
+  it("answers undefined for a client-side error or nothing at all", () => {
+    expect(apiErrorMessage(new Error("offline"))).toBeUndefined();
+    expect(apiErrorStatus(new Error("offline"))).toBeUndefined();
+    expect(apiErrorMessage(null)).toBeUndefined();
+    expect(apiErrorStatus(undefined)).toBeUndefined();
   });
 });

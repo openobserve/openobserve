@@ -112,7 +112,13 @@ import { createUnavailabilityMutation } from "@/services/oncall.queries";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nKey } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatZonedRange, toZonedInputValue, zonedMidnight } from "@/utils/oncall";
+import {
+  apiErrorMessage,
+  apiErrorStatus,
+  formatZonedRange,
+  toZonedInputValue,
+  zonedMidnight,
+} from "@/utils/oncall";
 import { makeOnCallAwaySchema } from "./OnCallAwayDialog.schema";
 
 /** What the form holds: the window may be half-picked, which the schema exists to reject. */
@@ -252,13 +258,12 @@ async function save(value: OnCallAwayFormValues) {
   } catch (err: unknown) {
     // A 403 on your own absence is a responses denial, not a configuration one.
     if (props.email.toLowerCase() !== selfEmail.value) noteConfigurationDenied(err);
-    const failure = err as { response?: { status?: number; data?: { message?: string } } };
     toast({
       variant: "error",
       message:
-        failure?.response?.status === 403
+        apiErrorStatus(err) === 403
           ? t("oncall.configDenied")
-          : raw(failure?.response?.data?.message) || t("oncall.awaySaveFailed"),
+          : raw(apiErrorMessage(err)) || t("oncall.awaySaveFailed"),
     });
   } finally {
     saving.value = false;

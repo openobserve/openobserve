@@ -360,7 +360,9 @@ const nextSteps = computed<I18nText[]>(() =>
           <span class="text-text-secondary flex items-center gap-1 text-xs">
             {{ t("slackApp.connect.permissionHint") }}
             <OnCallHint
-              :hint="t('slackApp.connect.consent')"
+              :hint="
+                isCloud ? t('slackApp.connect.consent') : t('slackApp.connect.consentSelfHosted')
+              "
               icon-class=""
               max-width="24rem"
               data-test="slack-connect-consent"

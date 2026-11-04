@@ -75,7 +75,6 @@
 
     <!-- Attached to the header, as on the Incident page; only once there is a team to show. -->
     <template v-if="loaded && !oncallUnavailable && !teamNotFound && !loadError" #header-tabs>
-      <!-- What the team has been doing first, then the chain that decides it, then who the people are. -->
       <OTabs v-model="activeTab" align="left" class="flex-1" data-test="oncall-team-tabs">
         <OTab
           name="overview"
@@ -188,11 +187,6 @@
 
       <OTabPanels :key="tabsKey" v-model="activeTab" grow scroll="y" class="min-h-0">
         <OTabPanel name="overview">
-          <!-- Two blocks in one column. The demo read as a wall: five sortable
-               columns of history beside a rail restating reach and readiness that
-               the Escalation and Members tabs already own. What is left is the
-               pair of questions this tab exists for — is anybody there to answer
-               next, and has this team been answering. -->
           <OContent y class="flex flex-col gap-5">
             <!-- Gaps are the only thing worth looking at here, so they are the
                  only bands that get an alarming colour. -->

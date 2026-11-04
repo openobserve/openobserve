@@ -664,15 +664,7 @@ export class OnCallTeamDetailPage {
     if (await confirm.count()) await confirm.click();
   }
 
-  /**
-   * Stage one person for adding, inside the Add members dialog.
-   *
-   * The picker is a MULTI-select over org users, and the dialog's Save stays
-   * disabled until something is staged. When the user lookup fails the
-   * component swaps the picker for a free-text email input, so both shapes are
-   * handled — the fallback is the only path that can add a NON-org address,
-   * which is the one the server must refuse.
-   */
+  /** Stages one person in Add members; handles the free-text fallback shown when the user lookup fails. */
   async pickMemberToAdd(email) {
     await this.openAddMember();
     const picker = this.page.locator(this.locators.membersUserSelect);
