@@ -57,7 +57,7 @@ use {
     config::utils::time::now_micros,
     o2_enterprise::enterprise::{
         common::{
-            auditor::{AuditMessage, DelegatedAudit, Protocol, ResponseMeta},
+            auditor::{AuditMessage, AuditTarget, DelegatedAudit, Protocol, ResponseMeta},
             config::get_config as get_o2_config,
         },
         fleet::opamp,
@@ -775,6 +775,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
 
         // ERROR_HEADER is an internal detail channel for the auditor and must never reach a client.
         response.headers_mut().remove(ERROR_HEADER);
+        let named = response.extensions_mut().remove::<AuditTarget>();
 
         if response.status().is_success() || response.status().is_redirection() {
             let slack_chat = delegated_chat_audit_body(
@@ -808,6 +809,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                     trace_id: None,
                 },
                 delegated,
+                fleet_id: named.as_ref().and_then(|n| n.fleet_id.clone()),
+                target: named.map(|n| n.target),
             })
             .await;
             if fleet_mutation(&http_method, &path) {

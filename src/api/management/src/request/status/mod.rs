@@ -1193,6 +1193,8 @@ pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl Into
             trace_id: None,
         },
         delegated: None,
+        fleet_id: None,
+        target: None,
     })
     .await;
     (
@@ -1314,6 +1316,8 @@ pub async fn redirect(
             trace_id: None,
         },
         delegated: None,
+        fleet_id: None,
+        target: None,
     };
 
     let state_cookie = cookies.get(LOGIN_STATE_COOKIE).map(|c| c.value());
@@ -1565,6 +1569,8 @@ pub async fn refresh_token_with_dex(
             trace_id: None,
         },
         delegated: None,
+        fleet_id: None,
+        target: None,
     };
 
     let token = if let Some(cookie) = cookies.get("auth_tokens") {
@@ -1856,6 +1862,8 @@ pub async fn logout(
                 trace_id: None,
             },
             delegated: None,
+            fleet_id: None,
+            target: None,
         })
         .await;
     }
