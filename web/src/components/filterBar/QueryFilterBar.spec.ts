@@ -540,6 +540,25 @@ describe("QueryFilterBar", () => {
     expect(wrapper!.find('[data-test^="query-filter-bar-summary-"]').exists()).toBe(false);
   });
 
+  it("moves focus to the redrawn fold toggle even when the group id holds a quote", async () => {
+    const deep = parseSqlFilter(
+      "level = 'a' AND (level = 'b' OR (level = 'c' AND (level = 'd' OR status = 1)))",
+    )!;
+    const quoteIds = (node: FilterGroup): FilterGroup => ({
+      ...node,
+      id: `${node.id}"]`,
+      items: node.items.map((item) => (item.kind === "group" ? quoteIds(item) : item)),
+    });
+    mountBar({ modelValue: quoteIds(deep), layout: "vertical" });
+    const toggle = wrapper!.find('[data-test="query-filter-bar-expand-1-1-1"]');
+    const id = toggle.attributes("data-fold-toggle");
+    expect(id).toContain('"]');
+    (toggle.element as HTMLElement).focus();
+    await toggle.trigger("click");
+    await flushPromises();
+    expect((document.activeElement as HTMLElement).getAttribute("data-fold-toggle")).toBe(id);
+  });
+
   it("hides a field already used in the group only for any-of-groups bars", async () => {
     const used = parseSqlFilter("level = 'a'")!;
     mountBar({ dialect: "promql", modelValue: used });
@@ -549,6 +568,20 @@ describe("QueryFilterBar", () => {
     mountBar({ modelValue: used });
     await openBar();
     expect(rowKeys()).toContain("level");
+  });
+
+  it("offers no shorthand or custom-field row for a field a one-per-field profile already uses", async () => {
+    const used = parseSqlFilter("level = 'a' AND my_col = 'b'")!;
+    mountBar({ profile: "rum-funnel", modelValue: used });
+    await openBar();
+    await type("level=x");
+    expect(rowKeys()).not.toContain("\u0000shorthand");
+    await type("my_col");
+    expect(rowKeys()).not.toContain("\u0000custom-field");
+    await type("other_col");
+    expect(rowKeys()).toContain("\u0000custom-field");
+    await type("status=1");
+    expect(rowKeys()).toContain("\u0000shorthand");
   });
 
   describe("extra suggestions", () => {
@@ -604,6 +637,93 @@ describe("QueryFilterBar", () => {
       expect(onExtraSelect).not.toHaveBeenCalled();
       expect(wrapper!.find('[data-test="query-filter-bar-draft"]').exists()).toBe(true);
     });
+  });
+
+  describe("value suggestions", () => {
+    const withService: FilterField[] = [...fields, { name: "service", type: "string" }];
+
+    async function pickEquals(field: string) {
+      await openBar();
+      await type(field);
+      await press("Enter");
+      await press("Enter");
+    }
+
+    async function leave() {
+      await press("Escape");
+      await press("Escape");
+    }
+
+    it("asks the loader again each time, so a host whose context changed is not shown old values", async () => {
+      let context = "a";
+      const loadValues = vi.fn(async () => [`${context}-1`]);
+      mountBar({ loadValues });
+      await pickEquals("level");
+      await vi.waitFor(() => expect(rowKeys()).toContain("a-1"));
+      await leave();
+      context = "b";
+      await pickEquals("level");
+      await vi.waitFor(() => expect(rowKeys()).toContain("b-1"));
+      expect(rowKeys()).not.toContain("a-1");
+      expect(loadValues).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not keep an empty answer, so values show once the host recovers", async () => {
+      const loadValues = vi.fn(async () => [] as string[]);
+      mountBar({ loadValues });
+      await pickEquals("level");
+      await vi.waitFor(() => expect(loadValues).toHaveBeenCalledTimes(1));
+      await leave();
+      loadValues.mockResolvedValue(["error"]);
+      await pickEquals("level");
+      await vi.waitFor(() => expect(rowKeys()).toContain("error"));
+    });
+
+    it("drops a slow answer for a field the user already left", async () => {
+      let landLevel: (values: string[]) => void = () => {};
+      const loadValues = vi.fn((field: string) =>
+        field === "level"
+          ? new Promise<string[]>((resolve) => (landLevel = resolve))
+          : Promise.resolve(["cart"]),
+      );
+      mountBar({ fields: withService, loadValues });
+      await pickEquals("service");
+      await vi.waitFor(() => expect(rowKeys()).toContain("cart"));
+      await leave();
+      await pickEquals("level");
+      await vi.waitFor(() => expect(loadValues).toHaveBeenCalledWith("level", ""));
+      await leave();
+      await pickEquals("service");
+      await vi.waitFor(() => expect(rowKeys()).toContain("cart"));
+      landLevel(["error"]);
+      await flushPromises();
+      expect(rowKeys()).toContain("cart");
+      expect(rowKeys()).not.toContain("error");
+      expect(
+        document.body.querySelector('[data-test="query-filter-bar-suggest"] [role="status"]'),
+      ).toBeNull();
+    });
+  });
+
+  it("splits values on a typed comma only in a multi-value step", async () => {
+    const state = mountBar({ loadValues: vi.fn(async () => []) });
+    await openBar();
+    await type("level");
+    await press("Enter");
+    await type("any");
+    await press("Enter");
+    await type("a");
+    await press(",");
+    await type("b");
+    await press(",");
+    await press("Enter");
+    expect(sql(state)).toBe("level IN ('a', 'b')");
+    await type("level");
+    await press("Enter");
+    await press("Enter");
+    const comma = new KeyboardEvent("keydown", { key: ",", bubbles: true, cancelable: true });
+    input()!.dispatchEvent(comma);
+    expect(comma.defaultPrevented).toBe(false);
   });
 
   it("draws no OR group controls outside any-of-groups bars", () => {

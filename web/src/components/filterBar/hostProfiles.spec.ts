@@ -162,7 +162,7 @@ describe("RUM profiles", () => {
     const funnel = issuesFor("rum-funnel", [
       { field: "Bad-Name", operator: "in", values: ["x"] },
       { field: "usr_email", operator: "in", values: ["a".repeat(1025)] },
-      { field: "usr_email", operator: "regex", values: ["(?=x)"] },
+      { field: "usr_name", operator: "regex", values: ["(?=x)"] },
       { field: "context_plan", operator: "not_regex", values: ["a".repeat(257)] },
       { field: "geo_info_country", operator: "in", values: ["India"] },
     ]);

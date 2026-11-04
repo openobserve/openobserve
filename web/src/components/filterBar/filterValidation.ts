@@ -54,12 +54,21 @@ export function filterIssues(
       }
     }
   }
-  if (
-    profile.required &&
-    !leaves.some(isConditionComplete) &&
-    !tree.items.some((i) => i.kind === "raw")
-  ) {
+  if (profile.required && !leaves.some(isConditionComplete) && !hasRaw(tree)) {
     issues.push({ nodeId: null, message: t("filterBar.validation.required") });
+  }
+  if (profile.limits.uniqueFields) {
+    const seen = new Set<string>();
+    for (const leaf of leaves) {
+      if (!leaf.field) continue;
+      if (seen.has(leaf.field)) {
+        issues.push({
+          nodeId: leaf.id,
+          message: t("filterBar.validation.uniqueField", { field: leaf.field }),
+        });
+      }
+      seen.add(leaf.field);
+    }
   }
   const { maxConditions, maxValues } = profile.limits;
   if (maxConditions !== undefined && countConditions(tree) > maxConditions) {
@@ -80,4 +89,9 @@ export function filterIssues(
   }
   if (profile.validate) issues.push(...profile.validate(tree, context));
   return issues;
+}
+
+// A raw part kept as loaded counts as a filter wherever it sits, not only at the root.
+function hasRaw(group: FilterGroup): boolean {
+  return group.items.some((item) => item.kind === "raw" || (item.kind === "group" && hasRaw(item)));
 }

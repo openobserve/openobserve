@@ -453,6 +453,8 @@ function onKeydown(event: KeyboardEvent) {
       }
       return;
     case ",":
+      // Only a multi-select splits on a comma; every other input must be able to type one.
+      if (!props.multiple) return;
       event.preventDefault();
       emit("separator", ",");
   }

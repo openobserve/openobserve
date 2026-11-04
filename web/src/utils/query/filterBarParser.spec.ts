@@ -162,6 +162,29 @@ describe("parseSqlFilter", () => {
     expect(parseSqlFilter("NOT level = 'a'")).toBeNull();
     expect(parseSqlFilter("level LIKE 'a%b'")).toBeNull();
   });
+
+  it("reads only plain SQL identifiers unquoted, so an expression is never taken for a field", () => {
+    expect(parseSqlFilter("end_time-start_time > 1000")).toBeNull();
+    expect(parseSqlFilter("status-1 > 0")).toBeNull();
+    expect(parseSqlFilter("t.level = 'x'")).toBeNull();
+    expect(parseSqlFilter("@timestamp > 1")).toBeNull();
+    expect(roundTrip(`"k8s.pod" = 'x' AND "@ts" > 1 AND _col9 = 'y'`)).toBe(
+      `"k8s.pod" = 'x' AND "@ts" > '1' AND _col9 = 'y'`,
+    );
+  });
+
+  it("keeps a double-quoted identifier a field even when it spells a keyword or boolean", () => {
+    const tree = parseSqlFilter(`"AND" = 'a' OR "NOT" IN ('x')`);
+    expect(tree).not.toBeNull();
+    expect(tree!.items).toHaveLength(2);
+    expect(tree!.items[0]).toMatchObject({ field: "AND", operator: "eq", values: ["a"] });
+    expect(tree!.items[1]).toMatchObject({ field: "NOT", operator: "in", connector: "OR" });
+    expect(parseSqlFilter(`level = "true"`)).toBeNull();
+    expect(parseSqlFilter(`ok IS "NULL"`)).toBeNull();
+    expect(parseSqlFilter(`level = 'a' "AND" level = 'b'`)).toBeNull();
+    expect(parseSqlFilter(`"re_match"(level, 'x')`)).toBeNull();
+    expect(parseSqlFilter("level = TRUE")!.items[0]).toMatchObject({ values: ["true"] });
+  });
 });
 
 describe("parseShorthand", () => {

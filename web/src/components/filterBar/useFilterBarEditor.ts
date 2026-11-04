@@ -135,7 +135,6 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   // The value of a chip being edited, until the user types over it.
   const editedValue = ref<string | null>(null);
 
-  const valueCache = new Map<string, string[]>();
   let valueTimer: ReturnType<typeof setTimeout> | undefined;
   let valueRequest = 0;
 
@@ -234,8 +233,12 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const needle = text.value.trim();
     const rows: ChipInputSuggestion[] = [];
     if (!editingId.value && atConditionLimit.value) return rows;
+    const editedField = editedNode.value?.field;
+    const unique = config.value.limits.uniqueFields;
+    // Every way to name a field honours one-condition-per-field, not just the picked list.
+    const taken = (name: string) => unique && name !== editedField && usedFields.value.has(name);
     const shorthand = parseShorthand(needle);
-    if (shorthand && fieldMap.value.has(shorthand.field)) {
+    if (shorthand && fieldMap.value.has(shorthand.field) && !taken(shorthand.field)) {
       rows.push({
         key: SHORTHAND_KEY,
         label: raw(
@@ -245,12 +248,10 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
         icon: "filter-list",
       });
     }
-    const editedField = editedNode.value?.field;
-    const unique = config.value.limits.uniqueFields;
     const names = rankByMatch(
       fields.value
         .map((field) => field.name)
-        .filter((name) => !unique || name === editedField || !usedFields.value.has(name))
+        .filter((name) => !taken(name))
         // A label typed in full stays reachable, for matchers like job!="a", job!="b".
         .filter((name) => name === editedField || name === needle || !usedInGroup.value.has(name)),
       needle,
@@ -269,6 +270,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       needle &&
       config.value.allowCustomFields &&
       !fieldMap.value.has(needle) &&
+      !taken(needle) &&
       (dialect.value === "promql" ? PROMQL_LABEL_NAME : SQL_FIELD_NAME).test(needle)
     ) {
       rows.push({
@@ -395,23 +397,25 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     return t(dialect.value === "promql" ? "filterBar.searchLabels" : "filterBar.searchFields");
   });
 
+  // An answer still in flight belongs to the step being left, so it must not land in the next one.
+  function dropValues() {
+    clearTimeout(valueTimer);
+    valueRequest++;
+    values.value = [];
+    valuesLoading.value = false;
+  }
+
+  // Not cached here: a host's loader reads its stream, metric or time range at call time, and caches by them itself.
   async function fetchValues(field: string, search: string) {
     const loader = options.loadValues.value;
     if (!loader || draftType.value === "boolean") {
-      values.value = [];
-      return;
-    }
-    const cacheKey = `${field}\u0000${search}`;
-    const cached = valueCache.get(cacheKey);
-    if (cached) {
-      values.value = cached;
+      dropValues();
       return;
     }
     const request = ++valueRequest;
     valuesLoading.value = true;
     try {
       const result = await loader(field, search);
-      valueCache.set(cacheKey, result);
       if (request === valueRequest) values.value = result;
     } catch {
       if (request === valueRequest) values.value = [];
@@ -419,9 +423,6 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       if (request === valueRequest) valuesLoading.value = false;
     }
   }
-
-  // A new loader reads another stream, so values cached from the old one no longer apply.
-  watch(options.loadValues, () => valueCache.clear());
 
   // A typed needle is passed to the loader so high-cardinality fields search server side.
   watch([step, () => draft.value?.field, text], ([currentStep, field, typed]) => {
@@ -432,7 +433,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   });
 
   function startDraft(field: string) {
-    values.value = [];
+    dropValues();
     draft.value = { field, operator: null, values: [] };
     text.value = "";
     step.value = "operator";
@@ -673,7 +674,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   function addIn(groupId: string | null) {
     reset();
     moveCaretTo(groupId && groupId !== tree.value.id ? groupId : null);
-    values.value = [];
+    dropValues();
     open.value = true;
   }
 
@@ -684,7 +685,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     reset();
     const at = parent.items.findIndex((item) => item.id === id);
     moveCaretTo(parent.id, parent.items[at + 1]?.id ?? null);
-    values.value = [];
+    dropValues();
     open.value = true;
   }
 
@@ -825,7 +826,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     if (node?.kind !== "condition") return;
     reset();
     editingId.value = id;
-    values.value = [];
+    dropValues();
     open.value = true;
     if (node.operator === "match_all") {
       step.value = "field";

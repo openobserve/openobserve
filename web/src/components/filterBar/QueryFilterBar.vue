@@ -306,7 +306,12 @@ function onToggleFold(id: string) {
   const focused = (document.activeElement as HTMLElement | null)?.closest("[data-fold-toggle]");
   folds.setFolded(id, folding);
   if (!focused) return;
-  nextTick(() => rowsRef.value?.querySelector<HTMLElement>(`[data-fold-toggle="${id}"]`)?.focus());
+  // Matched by attribute value, not a selector, so a saved group id holding a quote cannot break the lookup.
+  nextTick(() =>
+    Array.from(rowsRef.value?.querySelectorAll<HTMLElement>("[data-fold-toggle]") ?? [])
+      .find((toggle) => toggle.dataset.foldToggle === id)
+      ?.focus(),
+  );
 }
 
 function clearAll() {

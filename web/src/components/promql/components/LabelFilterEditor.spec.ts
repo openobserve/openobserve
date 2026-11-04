@@ -43,7 +43,6 @@ const panelData = () => ({
   meta: {
     promql: {
       availableLabels: ["method", "status", "path"],
-      labelValuesMap: new Map([["method", ["GET", "POST"]]]),
       loadingLabels: false,
     },
   },
@@ -65,6 +64,7 @@ const emitted = () => wrapper!.emitted("update:labels") as unknown[][] | undefin
 
 beforeEach(() => {
   vi.clearAllMocks();
+  valueStore.requestFieldValues.mockReset().mockResolvedValue(["api", "web"]);
   fetchQuery.mockResolvedValue({
     schema: [{ name: "job" }, { name: "value" }, { name: "_timestamp" }, { name: "instance" }],
   });
@@ -132,10 +132,27 @@ describe("LabelFilterEditor", () => {
 
     it("loads a label's values only when they are asked for", async () => {
       mountEditor({ dashboardPanelData: panelData() });
-      expect(panelApi.fetchPromQLLabelValues).not.toHaveBeenCalled();
+      await flushPromises();
+      expect(valueStore.requestFieldValues).not.toHaveBeenCalled();
       const values = await builder().props("loadValues")!("method", "");
-      expect(panelApi.fetchPromQLLabelValues).toHaveBeenCalledWith("http_requests_total", "method");
-      expect(values).toEqual(["GET", "POST"]);
+      expect(valueStore.requestFieldValues).toHaveBeenCalledWith(
+        expect.objectContaining({ streamType: "metrics", streamName: "http_requests_total" }),
+        "method",
+      );
+      expect(values).toEqual(["api", "web"]);
+    });
+
+    it("reads the values of the metric now selected, not the panel's values for an earlier one", async () => {
+      mountEditor({ dashboardPanelData: panelData() });
+      const load = builder().props("loadValues")!;
+      await load("method", "");
+      await wrapper!.setProps({ metric: "cpu_usage" });
+      valueStore.requestFieldValues.mockResolvedValueOnce(["PUT"]);
+      expect(await load("method", "")).toEqual(["PUT"]);
+      expect(valueStore.requestFieldValues).toHaveBeenLastCalledWith(
+        expect.objectContaining({ streamName: "cpu_usage" }),
+        "method",
+      );
     });
 
     it("offers the dashboard's variables before the loaded values", () => {
@@ -229,6 +246,7 @@ describe("LabelFilterEditor", () => {
       await flushPromises();
     };
     const pickMethodGet = async () => {
+      valueStore.requestFieldValues.mockResolvedValueOnce(["GET", "POST"]);
       await pick("method");
       await pick("eq");
       await vi.waitFor(() => expect(rowExists("GET")).toBe(true));

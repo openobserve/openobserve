@@ -1278,6 +1278,7 @@
     "validation": {
       "incomplete": "Finish this filter or remove it",
       "required": "Add at least one filter",
+      "uniqueField": "{field} already has a filter; edit that one or remove this one",
       "oneUsageCondition": "A tier takes one usage condition; turn this one into a rule or remove it",
       "rumField": "Use a built-in field or a column of lowercase letters, digits and underscores, up to 128 characters",
       "valueLength": "Each value needs 1 to {max} characters",

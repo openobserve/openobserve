@@ -82,7 +82,7 @@ export interface ChipInputEmits {
   (_e: "close"): void;
   /** The caret was clicked or typed into while the popover was shut. */
   (_e: "activate"): void;
-  /** A typed character the parent may treat as a separator (`,`). */
+  /** A comma typed into a `multiple` input, which the parent treats as a separator. */
   (_e: "separator", _char: string): void;
   /** Left or Right on an empty caret: move it one place among the chips. */
   (_e: "caret-move", _step: -1 | 1): void;

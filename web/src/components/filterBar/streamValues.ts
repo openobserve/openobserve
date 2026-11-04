@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { requestFieldValues, type StreamContext } from "@/composables/fieldValueStore";
+import {
+  requestFieldValues,
+  requestFieldValuesMatching,
+  type StreamContext,
+} from "@/composables/fieldValueStore";
 
 export type FilterValueLoader = (field: string, search: string) => Promise<string[]>;
 
@@ -26,6 +30,8 @@ export const streamValuesLoader = (
 ): FilterValueLoader | undefined => {
   const { org, streamType, streamName } = context ?? {};
   if (!org || !streamType || !streamName || UNRESOLVED.test(streamName)) return undefined;
+  const ctx = { org, streamType, streamName };
+  // Typed keystrokes share one request lane per field, and a complete shorter answer serves a longer search.
   return (field, search) =>
-    requestFieldValues({ org, streamType, streamName }, field, { keyword: search || undefined });
+    search.trim() ? requestFieldValuesMatching(ctx, field, search) : requestFieldValues(ctx, field);
 };

@@ -134,6 +134,31 @@ describe("OChipInput", () => {
     expect(input.emitted("select")!.map(([key]) => key)).toEqual(["b", "b"]);
   });
 
+  it("lets a comma be typed unless the input is a multi-select", async () => {
+    const input = mountInput({ open: true });
+    const typed = new KeyboardEvent("keydown", { key: ",", bubbles: true, cancelable: true });
+    caret().dispatchEvent(typed);
+    await flushPromises();
+    expect(typed.defaultPrevented).toBe(false);
+    expect(input.emitted("separator")).toBeUndefined();
+    await input.setProps({ multiple: true });
+    const split = new KeyboardEvent("keydown", { key: ",", bubbles: true, cancelable: true });
+    caret().dispatchEvent(split);
+    await flushPromises();
+    expect(split.defaultPrevented).toBe(true);
+    expect(input.emitted("separator")).toEqual([[","]]);
+  });
+
+  it("lets a comma be typed into the list's search box", async () => {
+    const input = mountInput({ open: true, searchInList: true });
+    await flushPromises();
+    const search = document.querySelector<HTMLInputElement>('[data-test="ci-search"]')!;
+    const typed = new KeyboardEvent("keydown", { key: ",", bubbles: true, cancelable: true });
+    search.dispatchEvent(typed);
+    expect(typed.defaultPrevented).toBe(false);
+    expect(input.emitted("separator")).toBeUndefined();
+  });
+
   it("heads a section once and rules it off from the rows after it", async () => {
     mountInput({
       open: true,

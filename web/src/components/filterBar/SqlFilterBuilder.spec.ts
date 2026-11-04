@@ -65,6 +65,28 @@ describe("SqlFilterBuilder", () => {
     expect(wrapper!.emitted("update:query")).toEqual([["level = 'error'"]]);
   });
 
+  it("re-reads its own last query when the page sets it again after another change", async () => {
+    mountBuilder("level = 'error' AND status = 1");
+    await wrapper!.find('[data-test="b-bar-chip-status-remove"]').trigger("click");
+    await wrapper!.setProps({ query: "level = 'error'" });
+    await wrapper!.setProps({ query: "status = 2" });
+    expect(chips()).toHaveLength(1);
+    await wrapper!.setProps({ query: "level = 'error'" });
+    expect(chips().map((chip) => chip.text())).toEqual(["level"]);
+    await wrapper!.setProps({ query: "upper(level) = 'x'" });
+    expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(true);
+    await wrapper!.setProps({ query: "level = 'error'" });
+    expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(false);
+  });
+
+  it("re-reads an earlier emitted query the page restores without echoing it first", async () => {
+    mountBuilder("level = 'error' AND status = 1");
+    await wrapper!.find('[data-test="b-bar-chip-status-remove"]').trigger("click");
+    await wrapper!.setProps({ query: "status = 2" });
+    await wrapper!.setProps({ query: "level = 'error'" });
+    expect(chips().map((chip) => chip.text())).toEqual(["level"]);
+  });
+
   it("offers to keep a query it cannot draw as text, or clear it and build", async () => {
     mountBuilder("upper(level) = 'ERROR'");
     expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(true);

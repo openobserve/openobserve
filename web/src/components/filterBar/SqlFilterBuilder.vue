@@ -43,7 +43,10 @@ let lastEmitted: string | null = null;
 watch(
   () => props.query,
   (query) => {
-    if (query === lastEmitted) return;
+    // The echo is skipped once only, so a later external change back to the same text is still read.
+    const echo = query === lastEmitted;
+    lastEmitted = null;
+    if (echo) return;
     const parsed = parseSqlFilter(query ?? "");
     unparsable.value = !parsed;
     if (!parsed) return;

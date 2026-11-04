@@ -126,6 +126,26 @@ describe("LabelFilterBar", () => {
     expect(wrapper!.emitted("add")).toEqual([[{ label: "job", operator: "=", value: "api" }]]);
   });
 
+  it("asks for a label's values again after the window changes, through the same loader", async () => {
+    let range = "15m";
+    const loadValues = vi.fn(async () => [`api-${range}`]);
+    createWrapper({ loadValues });
+    await focus();
+    await type("job");
+    await press("Enter");
+    await press("Enter");
+    await vi.waitFor(() => expect(rowKeys()).toContain("api-15m"));
+    await press("Escape");
+    await press("Escape");
+    range = "7d";
+    await focus();
+    await type("job");
+    await press("Enter");
+    await press("Enter");
+    await vi.waitFor(() => expect(rowKeys()).toContain("api-7d"));
+    expect(loadValues).toHaveBeenCalledTimes(2);
+  });
+
   it.each([
     ["neq", "!="],
     ["regex", "=~"],

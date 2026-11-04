@@ -28,6 +28,8 @@ type TokenKind = "ident" | "string" | "number" | "op" | "lparen" | "rparen" | "c
 interface Token {
   kind: TokenKind;
   text: string;
+  /** A double-quoted identifier, which is never a keyword, function or boolean. */
+  quoted?: boolean;
 }
 
 const COMPARISON: Record<string, FilterOperatorId> = {
@@ -49,7 +51,7 @@ const FUNCTION_OPERATORS: Record<string, FilterOperatorId> = {
 };
 
 const TOKEN_PATTERN =
-  /\s*(?:('(?:[^']|'')*')|("(?:[^"]|"")*")|(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\b|(>=|<=|!=|<>|==|=|>|<)|(\()|(\))|(,)|([A-Za-z_@][\w.@-]*))/y;
+  /\s*(?:('(?:[^']|'')*')|("(?:[^"]|"")*")|(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\b|(>=|<=|!=|<>|==|=|>|<)|(\()|(\))|(,)|([A-Za-z_][A-Za-z0-9_]*))/y;
 
 const WHITESPACE = /\s*/y;
 
@@ -66,7 +68,7 @@ const tokenize = (text: string): Token[] | null => {
     if (str !== undefined)
       tokens.push({ kind: "string", text: str.slice(1, -1).replace(/''/g, "'") });
     else if (quoted !== undefined)
-      tokens.push({ kind: "ident", text: quoted.slice(1, -1).replace(/""/g, '"') });
+      tokens.push({ kind: "ident", text: quoted.slice(1, -1).replace(/""/g, '"'), quoted: true });
     else if (num !== undefined) tokens.push({ kind: "number", text: num });
     else if (op !== undefined) tokens.push({ kind: "op", text: op });
     else if (lparen !== undefined) tokens.push({ kind: "lparen", text: "(" });
@@ -115,7 +117,7 @@ class Parser {
 
   private keyword(word: string, offset = 0): boolean {
     const token = this.peek(offset);
-    return token?.kind === "ident" && token.text.toUpperCase() === word;
+    return token?.kind === "ident" && !token.quoted && token.text.toUpperCase() === word;
   }
 
   private expression(): FilterNode[] | null {
@@ -152,7 +154,7 @@ class Parser {
       this.pos++;
       return token.text;
     }
-    if (token.kind === "ident" && /^(true|false)$/i.test(token.text)) {
+    if (token.kind === "ident" && !token.quoted && /^(true|false)$/i.test(token.text)) {
       this.pos++;
       return token.text.toLowerCase();
     }
@@ -233,7 +235,8 @@ class Parser {
   private predicate(connector: FilterConnector): FilterCondition | null {
     const head = this.peek();
     if (head?.kind !== "ident") return null;
-    if (this.peek(1)?.kind === "lparen") return this.functionPredicate(connector);
+    if (this.peek(1)?.kind === "lparen")
+      return head.quoted ? null : this.functionPredicate(connector);
     this.pos++;
     const field = head.text;
     const next = this.peek();

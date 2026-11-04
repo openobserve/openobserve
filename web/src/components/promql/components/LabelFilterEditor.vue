@@ -71,10 +71,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 
 const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-const { fetchPromQLLabels, fetchPromQLLabelValues } = useDashboardPanelData(
-  dashboardPanelDataPageKey,
-  t,
-);
+const { fetchPromQLLabels } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
 const NON_LABEL_COLUMNS = new Set(["value", "_timestamp", "__hash__", "__name__"]);
 
@@ -152,13 +149,10 @@ watch(
   { immediate: true },
 );
 
+// Keyed by metric through the value store, not the panel's per-label map, so a metric switch never offers the old metric's values.
 const loadValues = async (label: string): Promise<string[]> => {
   const metric = props.metric;
   if (!metric || !label) return [];
-  if (inPanel.value) {
-    await fetchPromQLLabelValues(metric, label);
-    return props.dashboardPanelData?.meta?.promql?.labelValuesMap?.get(label) ?? [];
-  }
   const cached = await getFieldValuesForSuggestion(streamContext(metric), label);
   return cached.length ? cached : requestFieldValues(streamContext(metric), label);
 };
