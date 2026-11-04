@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="folderOptions"
       data-test="index-dropdown-stream_type"
       labelKey="label"
+      :disabled="disabled"
       class="flex-1"
     >
       <template v-if="selectedFolder" #icon-left>
@@ -37,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="outline"
       size="icon-xs-sq"
       class="h-8! w-8!"
+      :disabled="disabled"
       @mousedown.prevent
       @click="
         () => {
@@ -89,6 +91,10 @@ export default defineComponent({
     labelPosition: {
       type: String as PropType<"inside" | "outside">,
       default: "outside",
+    },
+    disabled: {
+      type: Boolean,
+      default: false,
     },
   },
   setup(props, { emit }) {
