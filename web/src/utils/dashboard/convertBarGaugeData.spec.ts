@@ -24,7 +24,10 @@ import {
 } from "./convertBarGaugeData";
 import { calculateWidthText } from "./chartDimensionUtils";
 import { chartColor } from "@/utils/chartTheme";
-import { getLegendSeriesNames } from "@/composables/dashboard/useSeriesFormatting";
+import {
+  getLegendSeriesNames,
+  readOriginalNames,
+} from "@/composables/dashboard/useSeriesFormatting";
 
 vi.mock("./convertCustomChartData", () => ({
   runJavaScriptCode: vi.fn(),
@@ -688,25 +691,15 @@ describe("bar gauge through convertPanelData", () => {
     expect(getLegendSeriesNames(prom, "bar-gauge")).toEqual(["api", "web", "db", "cache"]);
   });
 
-  it("lists every bar, (empty) included, when converted into a detached panel as Series formatting does", async () => {
+  it("Series formatting lists every bar, (empty) included, for Gauge and Bar gauge", async () => {
     const data = [
       { x_axis_1: "api", y_axis_1: 7 },
       { x_axis_1: "", y_axis_1: 88 },
     ];
     for (const type of ["bar-gauge", "gauge"]) {
-      const result: any = await convertPanelData(
-        sqlPanel(type, {}, {}, fixedRange),
-        [data],
-        store,
-        { value: document.createElement("div") },
-        null,
-        { value: [] },
-        {},
-        { height: "100%", width: "100%" },
-        { value: [] },
-        false,
-      );
-      expect(getLegendSeriesNames(result.options, type).sort()).toEqual(["(empty)", "api"]);
+      const source = { panelSchema: sqlPanel(type, {}, {}, fixedRange), data: [data], metadata };
+      const names = await readOriginalNames(source as any, type, store);
+      expect(names.sort()).toEqual(["(empty)", "api"]);
     }
   });
 
