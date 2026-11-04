@@ -3727,18 +3727,7 @@
       "heard": {
         "label": "How did you hear about us?",
         "placeholder": "Select an Option",
-        "thanks": "Thanks!",
-        "options": {
-          "search": "Search Engine",
-          "ai": "AI Assistant",
-          "social": "Social Media",
-          "github": "GitHub",
-          "blog": "Blog or Article",
-          "video": "YouTube or Video",
-          "friend": "Colleague or Friend",
-          "event": "Event or Conference",
-          "other": "Other"
-        }
+        "thanks": "Thanks!"
       },
       "connect": {
         "title": "Connect Your Data",

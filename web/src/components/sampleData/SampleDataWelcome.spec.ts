@@ -452,6 +452,30 @@ describe("SampleDataWelcome finish", () => {
       });
     });
 
+    it("offers the onboarding flow's answer list and sends its codes", async () => {
+      await mountAtHome();
+      const select = wrapper!.findComponent({ name: "OSelect" });
+      expect(select.props("options")).toEqual([
+        { value: "search_engine", label: "Search engine" },
+        { value: "friend_or_colleague", label: "Friend or colleague" },
+        { value: "ai_assistant", label: "AI assistant" },
+        { value: "github", label: "GitHub" },
+        { value: "linkedin", label: "LinkedIn" },
+        { value: "reddit", label: "Reddit" },
+        { value: "youtube", label: "YouTube" },
+        { value: "other", label: "Other" },
+      ]);
+      select.vm.$emit("update:modelValue", "search_engine");
+      await flush();
+      await click("onboarding-get-started-skip-btn");
+      expect(submitNewUserInfo).toHaveBeenCalledWith(ORG, {
+        from: "search_engine",
+        company: "",
+        first_source: undefined,
+        skipped: true,
+      });
+    });
+
     it.each([
       ["cloud after the first login", "true", "false", false],
       ["an open-source build", "false", "false", true],
