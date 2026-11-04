@@ -3,7 +3,7 @@
 // Covers: Label Filters, Operations, Options, Query Mode tabs, Add to Dashboard
 
 import { expect } from '@playwright/test';
-import { FilterBuilderDriver } from '../generalPages/filterBuilderPage.js';
+import { FieldNotOfferedError, FilterBuilderDriver } from '../generalPages/filterBuilderPage.js';
 
 const LABEL_BUILDER = 'promql-label-filter-builder';
 
@@ -505,12 +505,18 @@ export class MetricsBuilderPage {
     }
 
     /**
-     * Pick a label in the open list (typed, so labels not loaded yet can be used too)
+     * Pick a label in the open list (typed, so labels not loaded yet can be used too); false when it is not offered
      * @param {string} labelName
      */
     async selectLabel(labelName) {
-        await this.labelBuilder.pickField(labelName);
-        return true;
+        try {
+            await this.labelBuilder.pickField(labelName);
+            return true;
+        } catch (error) {
+            if (!(error instanceof FieldNotOfferedError)) throw error;
+            await this.labelBuilder.close();
+            return false;
+        }
     }
 
     /**

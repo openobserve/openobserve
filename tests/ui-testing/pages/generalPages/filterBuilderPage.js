@@ -44,6 +44,10 @@ const OPERATOR_LABELS = {
   contains: "Contains",
   contains_ci: "Contains (ignore case)",
   not_contains: "Not Contains",
+  starts_with: "Starts With",
+  not_starts_with: "Not Starts With",
+  ends_with: "Ends With",
+  not_ends_with: "Not Ends With",
   is_null: "Is Null",
   is_not_null: "Is Not Null",
   is_empty: "Is Empty",
@@ -59,6 +63,14 @@ const operatorId = (operator) => {
 };
 
 const VARIABLE = /^\$(\w+)$/;
+
+class FieldNotOfferedError extends Error {
+  constructor(field) {
+    super(`Field "${field}" is not offered`);
+    this.name = "FieldNotOfferedError";
+    this.field = field;
+  }
+}
 
 class FilterBuilderDriver {
   /**
@@ -205,7 +217,7 @@ class FilterBuilderDriver {
     await this.page.waitForTimeout(250);
   }
 
-  /** Picks a listed field, else the "Use field" row for a custom one, else the first listed field. */
+  /** Picks a listed field, else the "Use field" row for a custom one; throws FieldNotOfferedError when neither exists. */
   async pickField(field, search) {
     await this.waitForPicker();
     await this.typeInPicker(search ?? field);
@@ -218,8 +230,7 @@ class FilterBuilderDriver {
     } else if (search) {
       await this.page.keyboard.press("Enter");
     } else {
-      await this.typeInPicker("");
-      await this.page.locator(`[data-test^="${this.dataTest}-suggest-item-"]:not([data-test$="group"])`).first().click();
+      throw new FieldNotOfferedError(field);
     }
     await this.page.waitForTimeout(250);
   }
@@ -266,7 +277,8 @@ class FilterBuilderDriver {
 
   /** `value` is an array, or comma-separated text for `in` / `not_in` unless it holds a variable. */
   async enterValues(id, value) {
-    if (NO_VALUE_OPERATORS.has(id)) return;
+    // Picking "" would press Enter on the auto-highlighted first suggestion and save that value.
+    if (NO_VALUE_OPERATORS.has(id) || value === undefined || value === "") return;
     const many = LIST_OPERATORS.has(id);
     let values = [String(value)];
     if (Array.isArray(value)) values = value.map(String);
@@ -289,7 +301,7 @@ class FilterBuilderDriver {
     await this.openForNew(spec.groupPath);
     await this.pickField(spec.field, spec.search);
     const id = await this.pickOperator(spec.operator ?? "=");
-    await this.enterValues(id, spec.value ?? "");
+    await this.enterValues(id, spec.value);
     if (spec.close) await this.close();
   }
 
@@ -323,17 +335,11 @@ class FilterBuilderDriver {
     await this.page.waitForTimeout(250);
   }
 
-  async sameIdIndex(index, testId) {
-    let n = 0;
-    for (let i = 0; i < index; i++) {
-      if ((await this.chipAt(i).getAttribute("data-test")) === testId) n++;
-    }
-    return n;
-  }
-
+  /** A part inside the `index`-th chip; looked up within that chip because unary chips have no value part to count. */
   async partAt(index, part) {
-    const testId = await this.chipAt(index).getAttribute("data-test");
-    return this.scope.locator(`[data-test="${testId}-${part}"]`).nth(await this.sameIdIndex(index, testId));
+    const chip = this.chipAt(index);
+    const testId = await chip.getAttribute("data-test");
+    return chip.locator(`[data-test="${testId}-${part}"]`);
   }
 
   async removeChipAt(index) {
@@ -388,7 +394,7 @@ class FilterBuilderDriver {
 
   async expectOperator(index, operator) {
     const id = operatorId(operator);
-    await expect(await this.partAt(index, "operator")).toContainText(OPERATOR_LABELS[id] ?? operator);
+    await expect(await this.partAt(index, "operator")).toHaveText(OPERATOR_LABELS[id] ?? operator);
   }
 
   async expectValue(index, value) {
@@ -398,6 +404,7 @@ class FilterBuilderDriver {
 
 module.exports = {
   FilterBuilderDriver,
+  FieldNotOfferedError,
   operatorId,
   OPERATOR_IDS,
   OPERATOR_LABELS,

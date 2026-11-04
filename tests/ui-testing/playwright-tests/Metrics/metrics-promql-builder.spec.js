@@ -416,7 +416,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // Setup: add filter, operation, step value
     const added = await builder.addFirstLabelFilter();
-    expect(await builder.getLabelFilterCount()).toBe(added.label ? 1 : 0);
+    expect(added.label).toBeTruthy();
+    expect(await builder.getLabelFilterCount()).toBe(1);
 
     const opAdded = await builder.addOperation('Rate');
     expect(opAdded).toBe(true);
@@ -436,7 +437,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Switched back to Builder mode');
 
     // Verify all state persisted
-    expect(await builder.getLabelFilterCount()).toBe(added.label ? 1 : 0);
+    expect(await builder.getLabelFilterCount()).toBe(1);
     expect(await builder.getOperationCount()).toBe(1);
 
     expect(await builder.getStepValue()).toBe('2m');
