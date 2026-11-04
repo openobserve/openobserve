@@ -1758,6 +1758,29 @@ describe("MetricDetailView", () => {
       expect(wrapper.find('[data-test="metrics-detail-data-age"]').exists()).toBe(true);
     });
 
+    it("drops the old query's failed-refresh sentence when a changed query fails with nothing to keep", async () => {
+      wrapper = mountView({ timeRange: { start_time: 1, end_time: 2 } });
+      await flushPromises();
+      runQuery.mockRejectedValue({ response: { status: 500, data: { message: "boom" } } });
+      await wrapper.setProps({ timeRange: { start_time: 2, end_time: 3 } });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-refresh-failed"]').exists()).toBe(true);
+
+      await wrapper.setProps({
+        overview: {
+          queries: [{ expr: "sum(rate(y[4m]))", legendTemplate: "" }],
+          chartType: "line",
+          unit: "count-per-sec",
+          bucketUnit: null,
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("Query failed");
+      expect(wrapper.find('[data-test="metrics-detail-refresh-failed"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-detail-data-age"]').exists()).toBe(false);
+    });
+
     it("a first load that fails (400) still shows the error state, with nothing to keep", async () => {
       runQuery.mockRejectedValue({ response: { status: 400, data: { message: "bad query" } } });
       wrapper = mountView();

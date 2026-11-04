@@ -23,12 +23,14 @@ export interface PanelFailedRefreshHold {
   hold: (panelId: string, source: string) => boolean;
 }
 
-/** The loader's two points in each load; both do nothing without a host. */
+/** The loader's points in each load; all do nothing without a host. */
 export interface FailedRefreshHoldHooks {
   /** A load was asked for; the one running is superseded from here on. */
   loadScheduled: () => void;
   /** The load is about to fetch, before it writes into the drawn result. */
   loadStarted: () => void;
+  /** The load drew a result from the panel cache instead of fetching. */
+  loadRestored: () => void;
 }
 
 export const PANEL_FAILED_REFRESH_HOLD: InjectionKey<PanelFailedRefreshHold> =
@@ -53,7 +55,11 @@ interface PanelResultState extends DrawnResult {
 
 const NO_ERROR = () => ({ message: "", code: "" as string | number });
 
-const NO_HOOKS: FailedRefreshHoldHooks = { loadScheduled: () => {}, loadStarted: () => {} };
+const NO_HOOKS: FailedRefreshHoldHooks = {
+  loadScheduled: () => {},
+  loadStarted: () => {},
+  loadRestored: () => {},
+};
 
 // The executors write into these arrays chunk by chunk, so the drawn result is copied one level down.
 const copyDrawn = (state: PanelResultState): DrawnResult => ({
@@ -128,6 +134,10 @@ export function useFailedRefreshHold(
       started = scheduled;
       // The request about to run names its source; the page's editor may already hold a staged query.
       startedSource = host.source(panel());
+    },
+    loadRestored: () => {
+      // The cache matched this panel's request, so the restored chart is a settled result of its current source.
+      settled = { ok: true, source: host.source(panel()) };
     },
   };
 }

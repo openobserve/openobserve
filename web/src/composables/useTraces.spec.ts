@@ -724,7 +724,7 @@ describe("useTraces", () => {
       mockSearch.mockResolvedValue({ data: { hits: [{ zo_count: 3 }] } });
     });
 
-    it("counts each eligible stream by trace id over the span's window and opens the ones that hold it", async () => {
+    it("counts each eligible stream by trace id over the trace's window and opens the ones that hold it on the span's window", async () => {
       mockSearch.mockImplementation(
         (req: any) =>
           countFor("app_logs", 4)(req) ?? Promise.resolve({ data: { hits: [{ zo_count: 0 }] } }),
@@ -744,8 +744,8 @@ describe("useTraces", () => {
       ]);
       expect(mockSearch.mock.calls[0][0].org_identifier).toBe("test-org");
       expect(mockSearch.mock.calls[0][0].query.query).toMatchObject({
-        start_time: 1000,
-        end_time: 2000,
+        start_time: 500,
+        end_time: 9000,
       });
       expect(pushedQuery()).toBe("trace_id = 'trace-c'");
       expect(mockRouterPush.mock.calls[0][0].query).toMatchObject({
@@ -754,6 +754,18 @@ describe("useTraces", () => {
         to: "2000",
       });
       expect(mockShowInfoNotification).not.toHaveBeenCalled();
+    });
+
+    it("counts over the span's window when the trace's window is unknown", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-u", "trace-u");
+
+      await navigateToCorrelatedLogs(correlationProps());
+
+      expect(mockSearch.mock.calls[0][0].query.query).toMatchObject({
+        start_time: 1000,
+        end_time: 2000,
+      });
     });
 
     it("drops the stream dimension filters once the trace id is known", async () => {
@@ -907,16 +919,34 @@ describe("useTraces", () => {
       }
     });
 
-    it("reports none, not a failure, when only some probes failed for server reasons", async () => {
+    it("reports the failure, not none, when one probe answers 4xx and another fails for a server reason", async () => {
+      const unavailable = { response: { status: 503 } };
       mockSearch.mockImplementation((req: any) =>
-        req.query.query.sql.includes("FROM app_logs ")
-          ? badRequest()
-          : Promise.reject({ response: { status: 503 } }),
+        req.query.query.sql.includes("FROM app_logs ") ? badRequest() : Promise.reject(unavailable),
       );
       const { navigateToCorrelatedLogs } = useTraces();
       selectSpan("span-m", "trace-m");
 
-      expect(await navigateToCorrelatedLogs(streams("app_logs", "web_logs"))).toBe("none");
+      expect(await navigateToCorrelatedLogs(streams("app_logs", "web_logs"))).toEqual({
+        failed: true,
+        error: unavailable,
+      });
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    });
+
+    it("reports the failure, not none, when one stream counts zero and another is throttled", async () => {
+      const throttled = { response: { status: 429 } };
+      mockSearch.mockImplementation(
+        (req: any) => countFor("app_logs", 0)(req) ?? Promise.reject(throttled),
+      );
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-z", "trace-z");
+
+      expect(await navigateToCorrelatedLogs(streams("app_logs", "web_logs"))).toEqual({
+        failed: true,
+        error: throttled,
+      });
+      expect(mockRouterPush).not.toHaveBeenCalled();
     });
 
     it("runs at most four count queries at once", async () => {

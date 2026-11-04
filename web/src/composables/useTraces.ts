@@ -51,10 +51,10 @@ const VIEW_LOGS_COUNT_TIMEOUT_MS = 5000;
 // Count queries share the search work-group queue; too many at once come back as 429s.
 const VIEW_LOGS_COUNT_CONCURRENCY = 4;
 
-/** What View logs did: opened Logs, found no stream holding the trace, could not check any stream, or the user moved to another span. */
+/** What View logs did: opened Logs, found no stream holding the trace, could not check every stream, or the user moved to another span. */
 export type CorrelatedLogsOutcome = "opened" | "none" | "moved" | CorrelatedLogsFailure;
 
-/** Every probe failed for a server reason; `error` is the first one, for `valueErrorCause`. */
+/** No stream was found to hold the trace and at least one probe failed for a server reason; `error` is the first, for `valueErrorCause`. */
 export interface CorrelatedLogsFailure {
   failed: true;
   error: unknown;
@@ -685,6 +685,8 @@ const useTraces = () => {
 
     const queryString = Array.from(conditions.values()).join(" and ");
     const timeRange = correlationProps.timeRange;
+    // The count is trace-wide, so a span's window would miss the trace's logs elsewhere.
+    const countRange = correlationProps.traceTimeRange ?? timeRange;
 
     let navStreams = streamList;
     let probeFailure: CorrelatedLogsFailure | null = null;
@@ -702,8 +704,8 @@ const useTraces = () => {
           query: {
             query: {
               sql: `SELECT count(*) AS zo_count FROM ${quoteSqlIdentifierIfNeeded(name)} WHERE ${queryString}`,
-              start_time: timeRange.startTime,
-              end_time: timeRange.endTime,
+              start_time: countRange.startTime,
+              end_time: countRange.endTime,
               from: 0,
               size: 1,
             },
@@ -715,9 +717,11 @@ const useTraces = () => {
       clearTimeout(timer);
       // Only a positive count proves a stream holds the trace; a stream lacking trace_id answers 4xx.
       navStreams = streamList.filter((_, i) => holdsLogs(counts[i]));
-      const serverErrors = counts.map((count) => probeServerError(count, timedOut));
-      if (serverErrors.every((error) => error !== null))
-        probeFailure = { failed: true, error: serverErrors[0] };
+      // A stream never checked may hold the trace, so with none found its failure is the answer, not "none".
+      const serverError = counts
+        .map((count) => probeServerError(count, timedOut))
+        .find((error) => error !== null);
+      if (serverError !== undefined) probeFailure = { failed: true, error: serverError };
     }
 
     // The user selected another span while this ran: do not navigate.

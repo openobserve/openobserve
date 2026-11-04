@@ -505,6 +505,7 @@ export const usePanelDataLoader = (
           state.loading = false;
           state.isOperationCancelled = false;
           log("loadData: panelcache: restored from cache");
+          failedRefreshHold.loadRestored();
           runCount++;
           if (!refreshAfterRestore.queueRefresh()) return;
         }

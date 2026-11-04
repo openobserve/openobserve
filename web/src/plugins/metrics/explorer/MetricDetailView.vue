@@ -1273,7 +1273,13 @@ export default defineComponent({
       const { signal } = active;
       const keeping = keep && overviewState.value.status === "done";
       if (keeping) overviewRefreshing.value = true;
-      else overviewState.value = { status: "loading", results: [], error: "" };
+      else {
+        overviewState.value = { status: "loading", results: [], error: "" };
+        // The old chart is gone, so its age and failed refresh must not speak for the new one.
+        overviewAt.value = null;
+        overviewFailedAt.value = null;
+        seedKept.value = false;
+      }
       try {
         const window = compare && {
           start: timeRange.start_time - compare.gapMs * 1000,

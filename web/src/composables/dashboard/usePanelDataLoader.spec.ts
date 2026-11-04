@@ -103,6 +103,13 @@ let mockCacheData: any = null;
 let shouldCacheThrow = false;
 let cacheOperationCount = 0;
 
+const failedRefreshHooks = vi.hoisted(() => ({
+  loadScheduled: vi.fn(),
+  loadStarted: vi.fn(),
+  loadRestored: vi.fn(),
+}));
+vi.mock("./panelFailedRefreshHold", () => ({ useFailedRefreshHold: () => failedRefreshHooks }));
+
 vi.mock("./usePanelCache", () => ({
   usePanelCache: vi.fn(() => ({
     getPanelCache: vi.fn().mockImplementation(() => {
@@ -2106,6 +2113,56 @@ describe("usePanelDataLoader", () => {
           rowsReturned: 2,
         });
         expect(loader.isPartialData.value).toBe(false);
+      });
+
+      it("tells the failed-refresh hold that a cached chart was drawn, so its first failed refresh keeps it", async () => {
+        const panelSchema = createMockPanelSchema();
+        mockCacheData = {
+          key: {
+            panelSchema: panelSchema.value,
+            variablesData: [],
+            forceLoad: false,
+            dashboardId: "test-dashboard",
+            folderId: "test-folder",
+          },
+          value: {
+            data: [[{ value: 42 }]],
+            loading: false,
+            errorDetail: { message: "", code: "" },
+            metadata: { queries: [] },
+            annotations: [],
+            resultMetaData: [],
+            lastTriggeredAt: Date.now(),
+            isPartialData: false,
+            isOperationCancelled: false,
+          },
+          cacheTimeRange: { start_time: Date.now() - 3600000, end_time: Date.now() },
+        };
+
+        allowPanelToBecomeVisible();
+
+        const loader = usePanelDataLoader(
+          panelSchema,
+          createMockSelectedTimeObj(),
+          createMockVariablesData(),
+          ref({ offsetWidth: 1000 }),
+          ref(false),
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(false),
+        );
+
+        await loader.loadData();
+
+        expect(loader.data.value).toEqual([[{ value: 42 }]]);
+        expect(failedRefreshHooks.loadRestored).toHaveBeenCalledTimes(1);
+        expect(failedRefreshHooks.loadStarted).not.toHaveBeenCalled();
       });
 
       it("should handle cache with different time ranges", async () => {

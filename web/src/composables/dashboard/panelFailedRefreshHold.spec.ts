@@ -126,6 +126,32 @@ describe("useFailedRefreshHold", () => {
     expect(state.errorDetail.message).toBe("Search failed");
   });
 
+  it("keeps a chart restored from the panel cache on its first failed refresh", () => {
+    const { host, hold } = sameSourceHost();
+    const state = setup(host);
+    hooks.loadScheduled();
+    state.data = [[{ value: 42 }]];
+    hooks.loadRestored();
+    failRefresh(state);
+
+    expect(hold).toHaveBeenCalledWith("panel-1", "A");
+    expect(state.errorDetail.message).toBe("");
+    expect(state.data).toEqual([[{ value: 42 }]]);
+  });
+
+  it("never keeps a cache-restored chart under another source", () => {
+    const { host, hold } = sameSourceHost();
+    const state = setup(host);
+    hooks.loadScheduled();
+    state.data = [[{ stream: "A" }]];
+    hooks.loadRestored();
+    source = "B";
+    failRefresh(state);
+
+    expect(hold).toHaveBeenCalledWith("panel-1", "A");
+    expect(state.errorDetail.message).toBe("Search failed");
+  });
+
   it("keeps the same drawn result through a second failed refresh", () => {
     const { host } = sameSourceHost();
     const state = setup(host);
