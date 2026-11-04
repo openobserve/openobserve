@@ -104,6 +104,8 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 // ── Import component under test (after all mocks) ───────────────────────────
 
 import orgService from "@/services/organizations";
+import { queryClient } from "@/composables/query/queryClient";
+import { fullConfigLoad } from "@/composables/useFullConfigLoad";
 import UsageTab from "./UsageTab.vue";
 
 // ── Mount factory ───────────────────────────────────────────────────────────
@@ -357,6 +359,34 @@ describe("UsageTab", () => {
 
       expect(orgService.get_organization_summary).toHaveBeenCalledTimes(1);
       expect(orgService.get_organization_summary).toHaveBeenCalledWith("default");
+    });
+
+    it("marks the org's full config loaded after the mount-time config refresh", async () => {
+      fullConfigLoad.loadedOrg = "";
+      const fetchSpy = vi.spyOn(queryClient, "fetchQuery").mockResolvedValue({ version: "v1" });
+      try {
+        wrapper = mountUsageTab();
+        await flushPromises();
+
+        expect(fullConfigLoad.loadedOrg).toBe("default");
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it("leaves the full config unmarked when the mount-time config refresh fails", async () => {
+      fullConfigLoad.loadedOrg = "";
+      const fetchSpy = vi.spyOn(queryClient, "fetchQuery").mockRejectedValue(new Error("down"));
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      try {
+        wrapper = mountUsageTab();
+        await flushPromises();
+
+        expect(fullConfigLoad.loadedOrg).toBe("");
+      } finally {
+        fetchSpy.mockRestore();
+        logSpy.mockRestore();
+      }
     });
 
     it("should show a loading notification while fetching", async () => {

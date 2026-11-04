@@ -54,6 +54,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import service_accounts from "@/services/service_accounts";
 import config from "@/aws-exports";
+import { queryClient } from "@/composables/query/queryClient";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -1281,6 +1282,46 @@ describe("ServiceAccountsList Component", () => {
       expect(wrapper.find('[data-test="service-accounts-token-access-summary"]').exists()).toBe(
         false,
       );
+    });
+  });
+
+  describe("Default sort (ENT#235)", () => {
+    it("sorts the table by created date, newest first, by default", () => {
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.props("sorting")).toBe("client");
+      expect(oTable.props("sortBy")).toBe("created_at");
+      expect(oTable.props("sortOrder")).toBe("desc");
+    });
+
+    it("renders a newly created account above older ones", async () => {
+      vi.mocked(service_accounts.list).mockResolvedValue({
+        data: {
+          data: [
+            { email: "oldest@example.com", first_name: "Oldest", created_at: 1_000_000 },
+            { email: "middle@example.com", first_name: "Middle", created_at: 2_000_000 },
+            { email: "newest@example.com", first_name: "Newest", created_at: 3_000_000 },
+          ],
+        },
+      });
+      wrapper.unmount();
+      queryClient.clear();
+      mockServiceAccountsState.service_accounts_users = [];
+      wrapper = mount(ServiceAccountsList, {
+        global: {
+          plugins: [i18n],
+          provide: { store, platform },
+          stubs: { AddServiceAccount: true, ODialog: true, ODrawer: true },
+        },
+      });
+      await flushPromises();
+      // The mocked serviceAccountsState is a plain object, so rows applied after mount render only on a forced update.
+      wrapper.vm.$forceUpdate();
+      await flushPromises();
+
+      const order = wrapper
+        .findAll('[data-test^="service-accounts-created-"]')
+        .map((cell) => cell.attributes("data-test").replace("service-accounts-created-", ""));
+      expect(order).toEqual(["newest@example.com", "middle@example.com", "oldest@example.com"]);
     });
   });
 

@@ -332,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-action"
             :disabled="!isDirty || isSubmitting"
-            @click="resetForm"
+            @click="cancelEdits"
           >
             {{ t("common.cancel") }}
           </OButton>
@@ -382,7 +382,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { onBeforeRouteLeave } from "vue-router";
 import { useStore } from "vuex";
 
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -405,6 +406,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import passwordPolicy, { type PasswordPolicy } from "@/services/passwordPolicy";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
+import { confirmForcedSignOutDiscard, draftSignOutForced } from "@/utils/drafts/draftSession";
 import { durationFormatter } from "@/utils/formatters";
 
 import {
@@ -519,6 +521,30 @@ const resetForm = () => {
   form.reset(formDefaults.value);
 };
 
+const confirmDiscard = () =>
+  confirm({
+    title: t("common.unsavedChanges"),
+    message: t("passwordPolicy.unsavedConfirm"),
+    confirmLabel: t("common.discardChanges"),
+    cancelLabel: t("common.cancel"),
+  });
+
+const cancelEdits = async () => {
+  if (isDirty.value && !(await confirmDiscard())) return;
+  resetForm();
+};
+
+onBeforeRouteLeave(() => {
+  if (!isDirty.value) return true;
+  if (draftSignOutForced.value) return confirmForcedSignOutDiscard(confirm, t);
+  return confirmDiscard();
+});
+
+// A reload or tab close skips the router, so the browser's own prompt has to cover it.
+const warnOnUnload = (event: BeforeUnloadEvent) => {
+  if (isDirty.value) event.preventDefault();
+};
+
 const onApplyToRootChange = (on: unknown) => {
   if (!on) return;
   rootAcknowledged.value = false;
@@ -564,5 +590,9 @@ const save = async (formValues: PolicyForm) => {
   }
 };
 
-onMounted(loadPolicy);
+onMounted(() => {
+  window.addEventListener("beforeunload", warnOnUnload);
+  loadPolicy();
+});
+onBeforeUnmount(() => window.removeEventListener("beforeunload", warnOnUnload));
 </script>

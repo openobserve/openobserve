@@ -353,6 +353,11 @@ import LicenseSearchBanner from "@/enterprise/components/billings/LicenseSearchB
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
+import {
+  markFullConfigFailed,
+  markFullConfigLoaded,
+  registerFullConfigLoader,
+} from "@/composables/useFullConfigLoad";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
@@ -1517,6 +1522,7 @@ export default defineComponent({
           initBrowserRum(res.data.rum, store.state.API_ENDPOINT);
           store.dispatch("setConfig", res.data);
           fullConfigOrg = orgIdentifier;
+          markFullConfigLoaded(orgIdentifier);
           fullConfigSettled.value = true;
           await nextTick();
 
@@ -1540,6 +1546,7 @@ export default defineComponent({
           } else {
             console.error("Failed to load the full configuration:", error);
           }
+          markFullConfigFailed(orgIdentifier);
           // Fail open: reveal the base menu even if the config never resolves.
           menuReady.value = true;
           fullConfigSettled.value = true;
@@ -1554,6 +1561,12 @@ export default defineComponent({
           }
         });
     };
+
+    // A manual retry passes the last attempt index: it forces a real fetch and schedules no further timers.
+    const unregisterFullConfigLoader = registerFullConfigLoader(() =>
+      getConfig(FULL_CONFIG_RETRY_DELAYS_MS.length),
+    );
+    onUnmounted(unregisterFullConfigLoader);
 
     if (config.isCloud == "true") {
       layoutMixin.getDefaultOrganization(store);

@@ -20,6 +20,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import { queryClient } from "@/composables/query/queryClient";
+import { fullConfigLoad, reloadFullConfig } from "@/composables/useFullConfigLoad";
 
 const getOrgSettings = vi.fn();
 const getConfigFull = vi.fn((): Promise<unknown> => new Promise(() => {}));
@@ -166,11 +167,15 @@ describe("MainLayout — boot gate", () => {
   describe("before the full config has landed", () => {
     let savedConfig: Record<string, unknown>;
     beforeEach(() => {
+      // A failed load schedules a 2s retry that outlives unmount; fake timers keep it out of later tests.
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       savedConfig = store.state.zoConfig;
       store.state.zoConfig = { commit_hash: "abc" };
       getOrgSettings.mockResolvedValue(settings({}));
     });
     afterEach(() => {
+      vi.clearAllTimers();
+      vi.useRealTimers();
       store.state.zoConfig = savedConfig;
       getConfigFull.mockReset();
       getConfigFull.mockImplementation(() => new Promise(() => {}));
@@ -194,6 +199,45 @@ describe("MainLayout — boot gate", () => {
       ({ wrapper } = await mountLayout());
       await flushPromises();
       expect(pageShown(wrapper)).toBe(true);
+    });
+
+    it("records a failed full config against the org it was fetched for (ENT#2698)", async () => {
+      getConfigFull.mockRejectedValue(new Error("down"));
+      ({ wrapper } = await mountLayout());
+      await flushPromises();
+
+      expect(fullConfigLoad).toEqual({ loadedOrg: "", failedOrg: "default" });
+    });
+
+    it("a page retry re-fetches through the layout's own load path and records the load (ENT#2698)", async () => {
+      getConfigFull.mockRejectedValueOnce(new Error("down"));
+      ({ wrapper } = await mountLayout());
+      await flushPromises();
+      getConfigFull.mockResolvedValueOnce({ data: { version: "v1", rum: { enabled: false } } });
+
+      await reloadFullConfig();
+      await flushPromises();
+
+      expect(getConfigFull).toHaveBeenCalledTimes(2);
+      expect(store.state.zoConfig.version).toBe("v1");
+      expect(fullConfigLoad).toEqual({ loadedOrg: "default", failedOrg: "" });
+    });
+
+    it("a failed page retry schedules no extra automatic retry (ENT#2698)", async () => {
+      getConfigFull.mockRejectedValue(new Error("down"));
+      ({ wrapper } = await mountLayout());
+      await flushPromises();
+      const timers = vi.spyOn(globalThis, "setTimeout");
+
+      await reloadFullConfig();
+      await flushPromises();
+
+      const retryDelays = timers.mock.calls.filter(([, ms]) =>
+        [2000, 5000, 15000].includes(ms ?? 0),
+      );
+      expect(retryDelays).toHaveLength(0);
+      expect(fullConfigLoad.failedOrg).toBe("default");
+      timers.mockRestore();
     });
   });
 });

@@ -3899,6 +3899,7 @@
   },
   "iam": {
     "sectionAccess": "Access",
+    "configLoadFailed": "This organization's configuration could not be loaded, so some sections may not reflect your real access. Retry to load it again.",
     "sectionPermissions": "Permissions",
     "sectionOrganization": "Organization",
     "usersDesc": "People with access to this organization",
@@ -4235,13 +4236,21 @@
       "show": "Show",
       "searchRoles": "Search Roles",
       "all": "All",
-      "selected": "Selected"
+      "selected": "Selected",
+      "noneSelectedTitle": "No roles selected",
+      "noneSelectedDescription": "None of the roles in this organization are selected here. Switch to All to select one.",
+      "showAll": "Show all roles",
+      "showAllDesc": "List every role in this organization"
     },
     "groupServiceAccounts": {
       "show": "Show",
       "searchServiceAccounts": "Search Service Accounts",
       "all": "All",
-      "selected": "Selected"
+      "selected": "Selected",
+      "noneSelectedTitle": "No service accounts selected",
+      "noneSelectedDescription": "None of the service accounts in this organization are selected here. Switch to All to select one.",
+      "showAll": "Show all service accounts",
+      "showAllDesc": "List every service account in this organization"
     },
     "groupUsers": {
       "all": "All",
@@ -4249,7 +4258,11 @@
       "organizations": "Organizations",
       "show": "Show",
       "searchUser": "Search User",
-      "selectOrganization": "Select Organization"
+      "selectOrganization": "Select Organization",
+      "noneSelectedTitle": "No users selected",
+      "noneSelectedDescription": "None of the users in this organization are selected here. Switch to All to select one.",
+      "showAll": "Show all users",
+      "showAllDesc": "List every user in this organization"
     },
     "addUpdateOrganization": {
       "updateFailed": "Organization Update failed.",
@@ -23369,6 +23382,7 @@
     "specialCharSetDesc": "Leave empty to accept any non-alphanumeric character",
     "maxLengthTooSmall": "Maximum length must be between the minimum length and 128.",
     "confirmTitle": "Save password policy?",
+    "unsavedConfirm": "Your changes to the password policy have not been saved. Discard them?",
     "confirmMessage": "Saving may force every native user to set a new password before they can continue. Root, external users and service accounts are exempt — this includes you unless you are the root account. It cannot be undone.",
     "saved": "Password policy saved. | Password policy saved. {count} user must reset their password. | Password policy saved. {count} users must reset their password.",
     "saveFailed": "Could not save the password policy.",

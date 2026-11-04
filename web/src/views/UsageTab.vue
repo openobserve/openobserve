@@ -592,6 +592,7 @@ import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { markFullConfigLoaded } from "@/composables/useFullConfigLoad";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -1000,6 +1001,7 @@ const refreshConfig = async () => {
         })
         .then(() => queryClient.fetchQuery(configFullQuery(orgId.value))),
     );
+    markFullConfigLoaded(orgId.value);
   } catch (error) {
     console.log(error);
   }

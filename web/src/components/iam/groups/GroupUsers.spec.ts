@@ -16,6 +16,7 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import GroupUsers from "@/components/iam/groups/GroupUsers.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -43,10 +44,11 @@ const o2Stubs = {
           <slot name="cell-email" :row="row" />
           <slot name="cell-organization" :row="row" />
         </template>
-        <slot v-if="!data || data.length === 0" name="empty" />
+        <slot v-if="!loading && (!data || data.length === 0)" name="empty" />
       </div>
     `,
     props: [
+      "loading",
       "data",
       "columns",
       "rowKey",
@@ -507,12 +509,152 @@ describe("GroupUsers Component", () => {
     });
 
     it("shows no users message when no data", async () => {
+      wrapper.vm.usersDisplay = "all";
       wrapper.vm.rows = [];
       await flushPromises();
 
       // When rows is empty, the OTable #empty slot renders <NoData />
       const noDataEl = wrapper.find('[data-test="iam-users-selection-table-no-data"]');
       expect(noDataEl.exists()).toBe(true);
+    });
+  });
+
+  describe("Empty states (ENT#2696)", () => {
+    const mountReal = async (groupUsers: string[]) => {
+      const realEmpty = mount(GroupUsers, {
+        global: {
+          provide: { store: enhancedStore },
+          plugins: [i18n],
+          stubs: { ...o2Stubs, OEmptyState: false },
+        },
+        props: {
+          groupUsers,
+          activeTab: "users",
+          addedUsers: new Set(),
+          removedUsers: new Set(),
+        },
+      });
+      await flushPromises();
+      return realEmpty;
+    };
+
+    it("says no users are selected, not that the org has none, when the Selected filter is empty", async () => {
+      const realEmpty = await mountReal([]);
+
+      const noneSelected = realEmpty.find('[data-test="iam-users-selection-none-selected"]');
+      expect(noneSelected.exists()).toBe(true);
+      expect(noneSelected.text()).toContain("No users selected");
+      expect(realEmpty.text()).not.toContain("No users yet");
+
+      realEmpty.unmount();
+    });
+
+    it("switches to All from the none-selected action", async () => {
+      const realEmpty = await mountReal([]);
+
+      await realEmpty
+        .find('[data-test="iam-users-selection-none-selected"] button')
+        .trigger("click");
+      await flushPromises();
+
+      expect((realEmpty.vm as any).usersDisplay).toBe("all");
+      expect((realEmpty.vm as any).rows).toHaveLength(3);
+
+      realEmpty.unmount();
+    });
+
+    it("keeps the org-empty copy under the All filter", async () => {
+      const realEmpty = await mountReal([]);
+      (realEmpty.vm as any).usersDisplay = "all";
+      (realEmpty.vm as any).rows = [];
+      await flushPromises();
+
+      expect(realEmpty.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(
+        false,
+      );
+      expect(realEmpty.text()).toContain("No users yet");
+
+      realEmpty.unmount();
+    });
+
+    it("keeps the org-empty copy under the default Selected filter when the org has no users", async () => {
+      mockUsersState.getOrgUsers.mockResolvedValue([]);
+      const realEmpty = await mountReal([]);
+
+      expect((realEmpty.vm as any).usersDisplay).toBe("selected");
+      expect(realEmpty.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(
+        false,
+      );
+      expect(realEmpty.text()).toContain("No users yet");
+
+      realEmpty.unmount();
+    });
+
+    const expectUnclippable = (w: any) => {
+      const emptyState = w.findComponent(OEmptyState);
+      expect(emptyState.props("size")).toBe("block");
+      expect(emptyState.classes()).toContain("shrink-0");
+    };
+
+    it("renders every empty branch at block size that cannot shrink below its content", async () => {
+      const realEmpty = await mountReal([]);
+      expect(realEmpty.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(true);
+      expectUnclippable(realEmpty);
+
+      (realEmpty.vm as any).userSearchKey = "nobody";
+      await flushPromises();
+      expect(realEmpty.text()).toContain("No users found");
+      expectUnclippable(realEmpty);
+
+      realEmpty.unmount();
+      mockUsersState.getOrgUsers.mockResolvedValue([]);
+      const orgEmpty = await mountReal([]);
+      expect(orgEmpty.text()).toContain("No users yet");
+      expectUnclippable(orgEmpty);
+
+      orgEmpty.unmount();
+    });
+
+    it("makes no claim about the org while its user list is still loading", async () => {
+      mockUsersState.getOrgUsers.mockReturnValue(new Promise(() => {}));
+      const pending = await mountReal([]);
+
+      expect(pending.findComponent(o2Stubs.OTable).props("loading")).toBe(true);
+      expect(pending.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(false);
+      expect(pending.text()).not.toContain("No users yet");
+
+      pending.unmount();
+    });
+
+    it("shows a load error, not the org-empty copy, when the user list fails, and recovers on retry", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      mockUsersState.getOrgUsers.mockRejectedValueOnce(new Error("boom"));
+      const failed = await mountReal([]);
+
+      expect(failed.find('[data-test="iam-users-selection-load-error"]').exists()).toBe(true);
+      expect(failed.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(false);
+      expect(failed.text()).not.toContain("No users yet");
+
+      await failed.find('[data-test="iam-users-selection-load-error"] button').trigger("click");
+      await flushPromises();
+
+      expect(failed.find('[data-test="iam-users-selection-load-error"]').exists()).toBe(false);
+      expect(failed.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(true);
+
+      failed.unmount();
+    });
+
+    it("shows the search-filtered state when a search empties the Selected view", async () => {
+      const realEmpty = await mountReal([]);
+      (realEmpty.vm as any).userSearchKey = "nobody";
+      await flushPromises();
+
+      expect(realEmpty.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(
+        false,
+      );
+      expect(realEmpty.text()).toContain("No users found");
+
+      realEmpty.unmount();
     });
   });
 

@@ -18,6 +18,7 @@ import { useStore } from "vuex";
 import { queryClient } from "@/composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { configFullQuery } from "@/services/config.queries";
+import { markFullConfigLoaded } from "@/composables/useFullConfigLoad";
 import licenseServer from "@/services/license_server";
 import { licenseQuery } from "@/services/license_server.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -43,6 +44,7 @@ export function useLicenseRefresh() {
         refetchType: "none",
       });
       store.dispatch("setConfig", await queryClient.fetchQuery(configFullQuery(org)));
+      markFullConfigLoaded(org);
     } catch (error) {
       console.error("Error reloading license state:", error);
     }
