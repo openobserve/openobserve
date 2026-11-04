@@ -1015,12 +1015,32 @@ test.describe('Anomaly Detection', () => {
         `detection failed: ${JSON.stringify(detected.data)}`,
       ).toBe(200);
 
+      // A scheduler tick right after save can score the window before this manual run, so the spike is read from _anomalies, which every run writes.
+      let scoredPoints = [];
+      await expect
+        .poll(
+          async () => {
+            scoredPoints = await searchSql(
+              page,
+              `SELECT actual_value, is_anomaly, score, threshold_value FROM "_anomalies" ` +
+                `WHERE anomaly_id = '${id}'`,
+            );
+            return scoredPoints.length;
+          },
+          {
+            timeout: 60000,
+            message: `no _anomalies rows for ${id} after detection (manual run scored ${detected.data.points_scored})`,
+          },
+        )
+        .toBeGreaterThan(0);
+      const flaggedPoints = scoredPoints.filter((a) => a.is_anomaly === true);
+
       // The spike must be found, and found as the worst point — a run that
       // flags only baseline noise would otherwise look like a pass.
-      expect(detected.data.anomalies_found).toBeGreaterThan(0);
-      const worst = Math.max(...detected.data.anomalies.map((a) => a.actual_value));
+      expect(flaggedPoints.length, `none of the ${scoredPoints.length} scored points for ${id} was flagged`).toBeGreaterThan(0);
+      const worst = Math.max(...flaggedPoints.map((a) => a.actual_value));
       expect(worst).toBe(120);
-      const spike = detected.data.anomalies.find((a) => a.actual_value === 120);
+      const spike = flaggedPoints.find((a) => a.actual_value === 120);
       expect(spike.is_anomaly).toBe(true);
       expect(spike.score).toBeGreaterThan(spike.threshold_value);
 
