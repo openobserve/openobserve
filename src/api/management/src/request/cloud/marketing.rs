@@ -95,22 +95,48 @@ pub async fn handle_new_attribution_event(
 }
 
 // Sign-ups through Google or GitHub carry these; their domain names no company.
-const FREE_MAIL_DOMAINS: [&str; 14] = [
-    "gmail.com",
-    "googlemail.com",
-    "outlook.com",
-    "hotmail.com",
-    "live.com",
-    "yahoo.com",
+const FREE_MAIL_DOMAINS: [&str; 8] = [
     "icloud.com",
     "me.com",
+    "mac.com",
     "proton.me",
-    "protonmail.com",
-    "aol.com",
-    "gmx.com",
-    "zoho.com",
-    "yandex.com",
+    "pm.me",
+    "qq.com",
+    "163.com",
+    "126.com",
 ];
+
+// Providers that run free mail under many country domains (yahoo.co.in, hotmail.co.uk).
+const FREE_MAIL_PROVIDERS: [&str; 13] = [
+    "gmail",
+    "googlemail",
+    "outlook",
+    "hotmail",
+    "live",
+    "msn",
+    "yahoo",
+    "ymail",
+    "aol",
+    "gmx",
+    "zoho",
+    "yandex",
+    "protonmail",
+];
+
+fn is_free_mail(domain: &str) -> bool {
+    let domain = domain.to_ascii_lowercase();
+    if FREE_MAIL_DOMAINS.contains(&domain.as_str()) {
+        return true;
+    }
+    // a country suffix is one or two short labels (fr, co.uk), so outlook.acme.io stays a company
+    domain.split_once('.').is_some_and(|(name, suffix)| {
+        FREE_MAIL_PROVIDERS.contains(&name)
+            && suffix.split('.').count() <= 2
+            && suffix
+                .split('.')
+                .all(|label| (2..=3).contains(&label.len()))
+    })
+}
 
 fn attribution_event_data(
     attribution: NewUserAttribution,
@@ -120,10 +146,7 @@ fn attribution_event_data(
     // Email signup asks for a work email, so the domain usually names the company.
     let company = if attribution.company.trim().is_empty() {
         let domain = email.rsplit_once('@').map_or("", |(_, domain)| domain);
-        if FREE_MAIL_DOMAINS
-            .iter()
-            .any(|free| free.eq_ignore_ascii_case(domain))
-        {
+        if is_free_mail(domain) {
             String::new()
         } else {
             domain.to_string()
@@ -200,6 +223,39 @@ mod tests {
                 json::from_str(r#"{"from":"","company":""}"#).unwrap();
             let data = attribution_event_data(attribution, email, "2026-10-22");
             assert_eq!(data["company"], json::json!(""), "{email}");
+        }
+    }
+
+    #[test]
+    fn test_attribution_company_skips_regional_free_mail_domains() {
+        for email in [
+            "jane@yahoo.co.in",
+            "jane@hotmail.co.uk",
+            "jane@outlook.in",
+            "jane@live.com.au",
+            "jane@Yahoo.FR",
+            "jane@qq.com",
+            "jane@163.com",
+            "jane@pm.me",
+        ] {
+            let attribution: NewUserAttribution =
+                json::from_str(r#"{"from":"","company":""}"#).unwrap();
+            let data = attribution_event_data(attribution, email, "2026-10-22");
+            assert_eq!(data["company"], json::json!(""), "{email}");
+        }
+    }
+
+    #[test]
+    fn test_attribution_company_keeps_work_domains_that_hold_a_provider_name() {
+        for (email, company) in [
+            ("jane@liveperson.com", "liveperson.com"),
+            ("jane@outlook.acme.io", "outlook.acme.io"),
+            ("jane@yahoo-inc.com", "yahoo-inc.com"),
+        ] {
+            let attribution: NewUserAttribution =
+                json::from_str(r#"{"from":"","company":""}"#).unwrap();
+            let data = attribution_event_data(attribution, email, "2026-10-22");
+            assert_eq!(data["company"], json::json!(company), "{email}");
         }
     }
 }
