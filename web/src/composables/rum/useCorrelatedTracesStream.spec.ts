@@ -23,10 +23,11 @@ const t = (i18nInstance.global as any).t;
 // ---------------------------------------------------------------------------
 
 const mockFetchQueryDataWithHttpStream = vi.fn();
+const mockCancelStream = vi.fn();
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: (...args: any[]) => mockFetchQueryDataWithHttpStream(...args),
-    cancelStreamQueryBasedOnRequestId: vi.fn(),
+    cancelStreamQueryBasedOnRequestId: (...args: any[]) => mockCancelStream(...args),
   }),
 }));
 
@@ -553,6 +554,25 @@ describe("useCorrelatedTracesStream", () => {
 
       await expect(pending).resolves.toEqual({});
       // 450 ids make 3 probe chunks of 200; the third never started.
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2);
+      expect(mockCommit).not.toHaveBeenCalled();
+    });
+
+    it("an abort settles in-flight probes, stops their streams and starts no further chunk", async () => {
+      const ids = Array.from({ length: 450 }, (_, index) => index.toString(16).padStart(32, "0"));
+      mockGetTraceTimeRanges.mockResolvedValue(indexResponse([], true));
+      // Probes that never answer: without the abort wiring the lookup would stay pending.
+      mockFetchQueryDataWithHttpStream.mockImplementation(() => new Promise(() => {}));
+      mockCancelStream.mockClear();
+      const controller = new AbortController();
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+
+      const pending = resolveTraceLocationsBulk(ids, 1_000, 2_000, controller.signal);
+      await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2));
+      controller.abort();
+
+      await expect(pending).resolves.toEqual({});
+      expect(mockCancelStream).toHaveBeenCalledTimes(2);
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(2);
       expect(mockCommit).not.toHaveBeenCalled();
     });

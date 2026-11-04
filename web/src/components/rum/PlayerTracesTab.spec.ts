@@ -301,8 +301,9 @@ import PlayerTracesTab from "@/components/rum/PlayerTracesTab.vue";
 // The composable now asks the stream schema which trace-id namespaces exist (`_o2_` vs
 // `_oo_`) before building SQL, so getStream must be mocked or every call hangs.
 // Reports the legacy spelling, matching data ingested before the namespace migration.
+// It serves both the RUM and the traces stream; `http_route` is a traces column the route-name query needs.
 const mockGetStream = vi.fn().mockResolvedValue({
-  schema: [{ name: "_oo_trace_id" }, { name: "_oo_span_id" }],
+  schema: [{ name: "_oo_trace_id" }, { name: "_oo_span_id" }, { name: "http_route" }],
 });
 
 vi.mock("@/composables/useStreams", () => ({
@@ -870,7 +871,9 @@ describe("PlayerTracesTab", () => {
     });
 
     describe("browser duration and HTTP status", () => {
-      const DEFAULT_SCHEMA = { schema: [{ name: "_oo_trace_id" }, { name: "_oo_span_id" }] };
+      const DEFAULT_SCHEMA = {
+        schema: [{ name: "_oo_trace_id" }, { name: "_oo_span_id" }, { name: "http_route" }],
+      };
       const RUM_SCHEMA = {
         schema: [
           { name: "_oo_trace_id" },
@@ -881,11 +884,18 @@ describe("PlayerTracesTab", () => {
       };
 
       // The traces stream's schema has `traceColumns`; the RUM stream's has the browser columns.
-      const withSchemas = (traceColumns: string[]) =>
+      // The traces stream has `traceColumns` (and `http_route` unless `route` is false).
+      const withSchemas = (traceColumns: string[], route = true) =>
         mockGetStream.mockImplementation((_name: string, type: string) =>
           Promise.resolve(
             type === "traces"
-              ? { schema: [{ name: "trace_id" }, ...traceColumns.map((name) => ({ name }))] }
+              ? {
+                  schema: [
+                    { name: "trace_id" },
+                    ...(route ? [{ name: "http_route" }] : []),
+                    ...traceColumns.map((name) => ({ name })),
+                  ],
+                }
               : RUM_SCHEMA,
           ),
         );
@@ -980,6 +990,40 @@ describe("PlayerTracesTab", () => {
         );
         // Not limited to routed spans: a 401 or an unmatched 404 has no route.
         expect(sql).toMatch(/WHERE .* AND span_kind='2' GROUP BY trace_id$/);
+      });
+
+      it("asks the status without naming http_route on a stream that lacks it", async () => {
+        wrapper.unmount();
+        withSchemas(["http_status_code"], false);
+        setupSuccessfulMocks(
+          [createRumHit({ _status_code: 0 })],
+          [createTraceMetadata({ spans: [5, 0] })],
+          [{ trace_id: "trace-abc123def456", operation_name: null, server_status: "403" }],
+        );
+        wrapper = mountComponent();
+        await flushPromises();
+
+        expect(traceSqls()).toHaveLength(1);
+        expect(traceSqls()[0]).toContain("NULL AS operation_name");
+        expect(traceSqls()[0]).not.toContain("http_route");
+        expect(statusItem()).toEqual({ errors: 1 });
+      });
+
+      it("asks the route names as before when the schema cannot be read", async () => {
+        wrapper.unmount();
+        mockGetStream.mockImplementation((_name: string, type: string) =>
+          type === "traces"
+            ? Promise.reject(new Error("schema failed"))
+            : Promise.resolve(RUM_SCHEMA),
+        );
+        setupSuccessfulMocks();
+        wrapper = mountComponent();
+        await flushPromises();
+
+        expect(traceSqls()).toHaveLength(1);
+        expect(traceSqls()[0]).toContain("http_route IS NOT NULL");
+        expect(traceSqls()[0]).not.toContain("server_status");
+        expect(wrapper.find('[data-test="table-row-0"]').text()).toContain("GET /api/products");
       });
 
       it("reads the schema once per stream, not once per batch", async () => {
@@ -2285,6 +2329,29 @@ describe("PlayerTracesTab", () => {
         expect(encodeURIComponent(filter).length).toBeLessThan(1800);
       }
       expect((wrapper.vm as any).correlatedViews.every((view: any) => view.metadata)).toBe(true);
+    });
+
+    it("keeps a row no stream claimed when one batch fails, and drops it when none does", async () => {
+      const streamless = hexId(99);
+      const claimAllButLast = (ids: string[]) =>
+        Promise.resolve(
+          Object.fromEntries(
+            ids.filter((id) => id !== streamless).map((id) => [id, { stream: "default" }]),
+          ),
+        );
+
+      mockResolveTraceLocationsBulk.mockImplementationOnce(claimAllButLast);
+      mockFallbackTracesStream.mockResolvedValueOnce(null);
+      await mountLongSession(100, (ids) => ids.includes(hexId(0)));
+      let views = (wrapper.vm as any).correlatedViews;
+      expect(views.some((view: any) => view.traceId === streamless)).toBe(true);
+
+      mockResolveTraceLocationsBulk.mockImplementationOnce(claimAllButLast);
+      mockFallbackTracesStream.mockResolvedValueOnce(null);
+      await mountLongSession(100);
+      views = (wrapper.vm as any).correlatedViews;
+      expect(views.some((view: any) => view.traceId === streamless)).toBe(false);
+      expect(views).toHaveLength(99);
     });
 
     it("keeps a failed batch's rows without metadata and shows a dash for their duration and status", async () => {

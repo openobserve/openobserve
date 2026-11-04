@@ -584,8 +584,8 @@ function traceTimeOffset(startTimeNs: number): string {
 }
 
 // ── Data fetching ───────────────────────────────────────────
-// A session's requests are read in pages, up to MAX_SESSION_TRACES (the largest prod session in a
-// week had about 7,600), instead of the first 250 only.
+// A session's requests are read in pages, up to MAX_SESSION_TRACES (a long session can have thousands),
+// instead of the first 250 only.
 const RUM_TRACE_PAGE_SIZE = 1000;
 const MAX_SESSION_TRACES = 10000;
 // The metadata GET carries its ids in the URL, so it goes in batches of TRACE_IDS_PER_GET_REQUEST;
@@ -615,33 +615,45 @@ function unionTraceWindow(
   };
 }
 
+/** What a traces stream's schema allows the server-span query to name. */
+interface ServerSpanSchema {
+  /** The HTTP status columns it has, in SERVER_STATUS_COLUMNS order. */
+  statusColumns: string[];
+  /** Whether it has `http_route`, which the route name needs. */
+  hasRoute: boolean;
+}
+
 /**
- * The server-span HTTP status columns a traces stream has, in SERVER_STATUS_COLUMNS order (naming a
- * column the stream lacks fails the whole query). Asked once per stream per fetch: getStream re-reads the schema
- * on every call. No schema means no columns; the route names still load.
+ * The server-span columns a traces stream has (naming a column the stream lacks fails the whole query). Asked
+ * once per stream per fetch: getStream re-reads the schema on every call. Without a schema there are no status
+ * columns, and the route name is asked as before.
  */
-async function serverStatusColumns(streamName: string): Promise<string[]> {
+async function serverSpanSchema(streamName: string): Promise<ServerSpanSchema> {
   try {
     const traceStream = await getStream(streamName, "traces", true);
     const columns = new Set((traceStream?.schema ?? []).map((field: any) => field?.name));
-    return SERVER_STATUS_COLUMNS.filter((column) => columns.has(column));
+    return {
+      statusColumns: SERVER_STATUS_COLUMNS.filter((column) => columns.has(column)),
+      hasRoute: columns.has("http_route"),
+    };
   } catch {
-    return [];
+    return { statusColumns: [], hasRoute: true };
   }
 }
 
 /**
  * Trace summaries for `traceIds` in one stream. `incomplete` is true when the server flagged the answer partial
  * (`is_partial`, `function_error`), so an id it lacks is unknown, not absent. Rejects when `signal` aborts.
- * `statusColumns` are the stream's server-span HTTP status columns (see serverStatusColumns).
+ * `serverSchema` says which server-span columns the stream has (see serverSpanSchema).
  */
 async function fetchTraceMetadata(
   traceIds: string[],
   streamName: string,
   window?: { startTime: number; endTime: number },
   signal?: AbortSignal,
-  statusColumns: string[] = [],
+  serverSchema: ServerSpanSchema = { statusColumns: [], hasRoute: true },
 ): Promise<{ metadata: Record<string, any>; incomplete: boolean }> {
+  const { statusColumns, hasRoute } = serverSchema;
   if (traceIds.length === 0) return { metadata: {}, incomplete: false };
   let incomplete = false;
 
@@ -726,7 +738,9 @@ async function fetchTraceMetadata(
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
   const stream = quoteSqlIdentifierIfNeeded(streamName);
   const timestamp = quoteSqlIdentifierIfNeeded(store.state.zoConfig.timestamp_column);
-  const routeSql = `SELECT trace_id, first_value(operation_name ORDER BY ${timestamp} ASC) AS operation_name FROM ${stream} WHERE ${filter} AND span_kind='2' AND http_route IS NOT NULL AND operation_name IS NOT NULL AND operation_name != '' GROUP BY trace_id`;
+  const routeSql = hasRoute
+    ? `SELECT trace_id, first_value(operation_name ORDER BY ${timestamp} ASC) AS operation_name FROM ${stream} WHERE ${filter} AND span_kind='2' AND http_route IS NOT NULL AND operation_name IS NOT NULL AND operation_name != '' GROUP BY trace_id`
+    : null;
   // With status columns, the status is the earliest server span's that has one: the request's
   // entry point, which answered the browser (a 404 an internal service returned to the backend is not the
   // request's status). Unrouted spans count, since a request rejected before routing (a 401, an unmatched 404)
@@ -739,8 +753,12 @@ async function fetchTraceMetadata(
         .map((column) => `CAST(${quoteSqlIdentifierIfNeeded(column)} AS VARCHAR)`)
         .join(", ")})`
     : "";
+  // A stream without `http_route` has no route names, and naming the column would fail the query.
+  const name = hasRoute
+    ? `first_value(CASE WHEN ${routed} THEN operation_name END ORDER BY CASE WHEN ${routed} THEN 0 ELSE 1 END ASC, ${timestamp} ASC)`
+    : "NULL";
   const statusSql = status
-    ? `SELECT trace_id, first_value(CASE WHEN ${routed} THEN operation_name END ORDER BY CASE WHEN ${routed} THEN 0 ELSE 1 END ASC, ${timestamp} ASC) AS operation_name, first_value(${status} ORDER BY CASE WHEN ${status} IS NOT NULL THEN 0 ELSE 1 END ASC, ${timestamp} ASC) AS server_status FROM ${stream} WHERE ${filter} AND span_kind='2' GROUP BY trace_id`
+    ? `SELECT trace_id, ${name} AS operation_name, first_value(${status} ORDER BY CASE WHEN ${status} IS NOT NULL THEN 0 ELSE 1 END ASC, ${timestamp} ASC) AS server_status FROM ${stream} WHERE ${filter} AND span_kind='2' GROUP BY trace_id`
     : null;
   const searchOperations = (sql: string) =>
     searchService.search(
@@ -760,13 +778,15 @@ async function fetchTraceMetadata(
       },
       "RUM",
     );
+  const firstSql = statusSql ?? routeSql;
+  if (!firstSql) return { metadata, incomplete };
   try {
     let operationResponse: any;
     try {
-      operationResponse = await searchOperations(statusSql ?? routeSql);
+      operationResponse = await searchOperations(firstSql);
     } catch (err) {
       // A failed status query costs the status only; the route names are asked again without it.
-      if (!statusSql || signal?.aborted) throw err;
+      if (!statusSql || !routeSql || signal?.aborted) throw err;
       console.warn("Server status lookup failed; loading the route names without it:", err);
       operationResponse = await searchOperations(routeSql);
     }
@@ -1007,9 +1027,9 @@ async function fetchTraces() {
           chunkItems(ids, TRACE_IDS_PER_GET_REQUEST).map((batchIds) => ({ stream, batchIds })),
         );
         // Each stream's status columns, asked once for this fetch rather than once per batch.
-        const statusColumnsByStream = new Map<string, string[]>();
+        const serverSchemaByStream = new Map<string, ServerSpanSchema>();
         for (const stream of idsByStream.keys()) {
-          statusColumnsByStream.set(stream, await serverStatusColumns(stream));
+          serverSchemaByStream.set(stream, await serverSpanSchema(stream));
           if (isStale()) return;
         }
         const metadata: Record<string, any> = {};
@@ -1027,7 +1047,7 @@ async function fetchTraces() {
                 searchWindow.end,
               ),
               abort.signal,
-              statusColumnsByStream.get(stream) ?? [],
+              serverSchemaByStream.get(stream),
             );
             Object.assign(metadata, part.metadata);
             if (part.incomplete) {

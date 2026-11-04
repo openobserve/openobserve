@@ -216,8 +216,9 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     startTimeUs: number,
     endTimeUs: number,
     outcome?: TraceLocationsOutcome,
+    signal?: AbortSignal,
   ): Promise<Record<string, string>> => {
-    if (!streams.length || !traceIds.length) return {};
+    if (!streams.length || !traceIds.length || signal?.aborted) return {};
     const idList = traceIds.map((id) => `'${id}'`).join(",");
     // DISTINCT is load-bearing: the probe scans span rows, and one trace's
     // spans would otherwise consume the whole limit, leaving sibling ids
@@ -233,10 +234,21 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     const probeTraceId = generateTraceContext()?.traceId ?? "";
     if (probeTraceId) activeProbeTraceIds.add(probeTraceId);
     let settleOnCancel: (() => void) | null = null;
+    // Aborting stops this probe's stream and settles it, like cancel() does for every probe.
+    const onAbort = () => {
+      if (probeTraceId) {
+        cancelStreamQueryBasedOnRequestId({
+          trace_id: probeTraceId,
+          org_id: store.state.selectedOrganization?.identifier,
+        });
+      }
+      settleOnCancel?.();
+    };
     try {
       await new Promise<void>((resolve) => {
         settleOnCancel = () => resolve();
         probeSettlers.add(settleOnCancel);
+        signal?.addEventListener("abort", onAbort, { once: true });
         fetchQueryDataWithHttpStream(
           {
             queryReq: {
@@ -304,6 +316,7 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       if (outcome) outcome.failed = true;
       return {};
     } finally {
+      signal?.removeEventListener("abort", onAbort);
       if (probeTraceId) activeProbeTraceIds.delete(probeTraceId);
       if (settleOnCancel) probeSettlers.delete(settleOnCancel);
     }
@@ -338,7 +351,7 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       async (chunk) =>
         signal?.aborted || generation !== cancelGeneration
           ? {}
-          : probeBatch(streams, chunk, startTimeUs, endTimeUs, outcome),
+          : probeBatch(streams, chunk, startTimeUs, endTimeUs, outcome, signal),
     );
     return Object.assign({}, ...parts);
   };
