@@ -80,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="autoobserve2-rail-scroll"
             @scroll="measureRail"
           >
+            <LivePaged v-if="live" class="order-2 shrink-0" />
             <LiveSuggestions
               v-if="live"
               class="order-2 shrink-0"
@@ -326,6 +327,7 @@ import AutoObserveIssuesTab from "@/components/autoobserve/AutoObserveIssuesTab.
 import ChangesPage from "@/components/autoobserve/v2/ChangesPage.vue";
 import { useLiveAutoObserve, useLiveMode } from "@/components/autoobserve/live/liveModel";
 import { coverageSentence as liveSentence } from "@/components/autoobserve/live/liveCopy";
+import LivePaged from "@/components/autoobserve/live/LivePaged.vue";
 import LiveSuggestions from "@/components/autoobserve/live/LiveSuggestions.vue";
 import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
 import {

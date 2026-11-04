@@ -15,13 +15,21 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/vue-query";
-import autoobserve from "./autoobserve";
-import { autoobserveSuggestionsPageQuery } from "./autoobserve.queries";
+import autoobserve, { type AutoObserveIncidentList } from "./autoobserve";
+import http from "./http";
+import {
+  autoobserveIncidentsPageQuery,
+  autoobserveSuggestionsPageQuery,
+} from "./autoobserve.queries";
+import { orgKey } from "@/composables/query/keys";
 import { RAIL_CAP } from "@/components/autoobserve/live/liveCopy";
+import fixture from "@/components/autoobserve/live/__fixtures__/autoobserveIncidents.json";
 
 vi.mock("./autoobserve", () => ({
-  default: { coverage: vi.fn(), suggestions: vi.fn() },
+  default: { coverage: vi.fn(), suggestions: vi.fn(), incidents: vi.fn() },
 }));
+
+vi.mock("./http", () => ({ default: vi.fn() }));
 
 const suggestions = vi.mocked(autoobserve.suggestions);
 
@@ -51,5 +59,38 @@ describe("autoobserveSuggestionsPageQuery (OSS-11)", () => {
     const second = autoobserveSuggestionsPageQuery("acme", 25, 25).queryKey;
     expect(first).not.toEqual(second);
     expect(autoobserveSuggestionsPageQuery("acme", RAIL_CAP, 0).queryKey).not.toEqual(first);
+  });
+});
+
+describe("autoobserveIncidentsPageQuery (D9-web)", () => {
+  type Interval = (query: { state: { data: unknown } }) => number | false;
+  const incidents = vi.mocked(autoobserve.incidents);
+  const running = fixture as unknown as AutoObserveIncidentList;
+  const settled = { ...running, items: running.items.slice(1) };
+
+  beforeEach(() => {
+    incidents.mockReset();
+    incidents.mockResolvedValue({ data: running } as never);
+  });
+
+  it("the query reads the route and polls only while a run is live", async () => {
+    const get = vi.fn().mockResolvedValue({ data: running });
+    vi.mocked(http).mockReturnValue({ get } as never);
+    const real = await vi.importActual<typeof import("./autoobserve")>("./autoobserve");
+    await real.default.incidents("demo-org", { limit: 3, offset: 0 });
+    expect(get).toHaveBeenCalledWith("/api/v2/demo-org/autoobserve/incidents", {
+      params: { limit: 3, offset: 0 },
+    });
+
+    const options = autoobserveIncidentsPageQuery("demo-org", 3, 0);
+    expect(options.queryKey).toEqual(orgKey("demo-org", "autoobserve", "incidents", 3, 0));
+    const page = await new QueryClient().fetchQuery(options);
+    expect(incidents).toHaveBeenCalledWith("demo-org", { limit: 3, offset: 0 });
+    expect(page.items).toHaveLength(6);
+
+    const interval = options.refetchInterval as unknown as Interval;
+    expect(interval({ state: { data: running } })).toBe(30_000);
+    expect(interval({ state: { data: settled } })).toBe(false);
+    expect(interval({ state: { data: undefined } })).toBe(false);
   });
 });

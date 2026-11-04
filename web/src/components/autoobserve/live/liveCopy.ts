@@ -20,7 +20,7 @@ import { LIVE_CHECKS, type CoverageCell, type LiveCheck } from "../fixtures";
 
 export type LiveFailure = "denied" | "off" | "unavailable" | "failed";
 
-export type LiveSurface = "coverage" | "suggestions";
+export type LiveSurface = "coverage" | "suggestions" | "incidents";
 
 export type LivePhase = "idle" | "loading" | "loaded";
 
@@ -83,6 +83,45 @@ const NOTICE_KEY: Record<LiveSurface, Record<LiveFailure, { title: I18nKey; desc
       desc: "autoobserveLive.notice.suggestions.failedDesc",
     },
   },
+  incidents: {
+    denied: {
+      title: "autoobserveLive.notice.incidents.deniedTitle",
+      desc: "autoobserveLive.notice.incidents.deniedDesc",
+    },
+    off: {
+      title: "autoobserveLive.notice.offTitle",
+      desc: "autoobserveLive.notice.incidents.offDesc",
+    },
+    unavailable: {
+      title: "autoobserveLive.notice.incidents.unavailableTitle",
+      desc: "autoobserveLive.notice.incidents.unavailableDesc",
+    },
+    failed: {
+      title: "autoobserveLive.notice.incidents.failedTitle",
+      desc: "autoobserveLive.notice.incidents.failedDesc",
+    },
+  },
+};
+
+const LOAD_KEY: Record<LiveSurface, Record<Exclude<LivePhase, "idle">, I18nKey>> = {
+  coverage: {
+    loading: "autoobserveLive.coverage.loading",
+    loaded: "autoobserveLive.coverage.loaded",
+  },
+  suggestions: {
+    loading: "autoobserveLive.suggestions.loading",
+    loaded: "autoobserveLive.suggestions.loaded",
+  },
+  incidents: {
+    loading: "autoobserveLive.incidents.loading",
+    loaded: "autoobserveLive.incidents.loaded",
+  },
+};
+
+const WHAT_KEY: Record<LiveSurface, I18nKey> = {
+  coverage: "autoobserveLive.notice.what.coverage",
+  suggestions: "autoobserveLive.notice.what.suggestions",
+  incidents: "autoobserveLive.notice.what.incidents",
 };
 
 // A denial or a turned-off engine cannot change on a retry, so neither offers one.
@@ -93,7 +132,7 @@ const NOTICE_LOOK: Record<LiveFailure, Omit<LiveNotice, "failure" | "title" | "d
   failed: { severity: "error", retry: true, details: true, icon: "error-outline" },
 };
 
-const statusOf = (error: unknown) =>
+export const statusOf = (error: unknown) =>
   (error as { response?: { status?: unknown } } | null | undefined)?.response?.status;
 
 export const liveFailureOf = (error: unknown): LiveFailure => {
@@ -113,18 +152,8 @@ export const liveNotice = (
   return { failure, title: t(keys.title), description: t(keys.desc), ...NOTICE_LOOK[failure] };
 };
 
-export const liveLoadText = (t: TranslateFn, surface: LiveSurface, phase: LivePhase): I18nText => {
-  if (phase === "idle") return raw("");
-  if (surface === "coverage")
-    return t(
-      phase === "loading" ? "autoobserveLive.coverage.loading" : "autoobserveLive.coverage.loaded",
-    );
-  return t(
-    phase === "loading"
-      ? "autoobserveLive.suggestions.loading"
-      : "autoobserveLive.suggestions.loaded",
-  );
-};
+export const liveLoadText = (t: TranslateFn, surface: LiveSurface, phase: LivePhase): I18nText =>
+  phase === "idle" ? raw("") : t(LOAD_KEY[surface][phase]);
 
 export const liveErrorDetail = (error: unknown): I18nText => {
   const e = error as { response?: { data?: { message?: unknown } }; message?: unknown } | null;
@@ -341,11 +370,7 @@ export const refreshFailedText = (
   t("autoobserveLive.notice.refreshFailed", {
     failedAt: formatWhen(stale.failedAt, locale, timeZone, now),
     dataAt: formatWhen(stale.dataAt, locale, timeZone, now),
-    what: t(
-      surface === "coverage"
-        ? "autoobserveLive.notice.what.coverage"
-        : "autoobserveLive.notice.what.suggestions",
-    ),
+    what: t(WHAT_KEY[surface]),
   });
 
 export const moreCount = (total: number, shown: number) => Math.max(0, total - shown);

@@ -16,7 +16,7 @@
 import { describe, expect, it } from "vitest";
 import type { Incident, RcaSummary } from "@/services/incidents";
 import { gt, raw } from "@/types/i18n";
-import { isLiveRca, rcaCellModel, type RcaCellModel } from "./rcaCell";
+import { RCA_BADGE_VARIANT, isLiveRca, rcaCellModel, type RcaCellModel } from "./rcaCell";
 
 const NOW = Date.UTC(2026, 9, 16, 12, 0, 0);
 const minutesAgoMicros = (m: number) => (NOW - m * 60_000) * 1000;
@@ -503,5 +503,17 @@ describe("isLiveRca (RR-34)", () => {
 
   it("no run is not live", () => {
     expect(isLiveRca(null)).toBe(false);
+  });
+});
+
+describe("RCA_BADGE_VARIANT (D9-web)", () => {
+  it("the moved badge map keeps the cell's colours", () => {
+    expect(RCA_BADGE_VARIANT).toEqual({
+      muted: "default",
+      warn: "warning",
+      "warn-strong": "orange-outline",
+      ok: "success",
+      err: "error",
+    });
   });
 });

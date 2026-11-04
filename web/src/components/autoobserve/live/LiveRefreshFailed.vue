@@ -22,7 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="dataTest"
   >
     <OIcon name="error-outline" size="xs" class="shrink-0" />
-    <span class="min-w-0 flex-1 text-pretty">{{ text }}</span>
+    <OTruncatedText v-if="lines" :lines="lines" class="flex-1 leading-3.5">{{
+      text
+    }}</OTruncatedText>
+    <span v-else class="min-w-0 flex-1 text-pretty">{{ text }}</span>
     <OButton
       variant="ghost"
       size="xs"
@@ -41,6 +44,8 @@ import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import type { TruncatedTextLines } from "@/lib/core/Typography/OTruncatedText.types";
 import { refreshFailedText, type LiveStale, type LiveSurface } from "./liveCopy";
 import { useLiveZone } from "./liveModel";
 
@@ -50,6 +55,8 @@ const props = defineProps<{
   dataTest: string;
   busy?: boolean;
   dense?: boolean;
+  // A fixed-height slot clamps the message in tight lines; the tooltip and the alert role still carry all of it.
+  lines?: TruncatedTextLines;
 }>();
 
 const emit = defineEmits<{ retry: [] }>();
