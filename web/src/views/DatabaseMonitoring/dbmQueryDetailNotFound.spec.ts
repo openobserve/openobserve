@@ -110,8 +110,10 @@ describe("the page renders that state instead of a blank body", () => {
     const gated = (dataTest: string): string => {
       const index = template.indexOf(`data-test="${dataTest}"`);
       expect(index, `the template must render ${dataTest}`).toBeGreaterThan(-1);
-      // The opening tag this marker belongs to.
-      const open = template.lastIndexOf("<", index);
+      // The tab strip sits in a lock-exempt wrapper that carries the gate.
+      const wrapper = template.lastIndexOf("<FeatureLockExempt", index);
+      const open =
+        dataTest === "dbm-detail-tabs" && wrapper > -1 ? wrapper : template.lastIndexOf("<", index);
       return template.slice(open, index);
     };
     for (const marker of ["dbm-detail-identity", "dbm-detail-tabs"]) {
@@ -171,7 +173,7 @@ describe("a named query that missed its scope keeps the page", () => {
     // stays truthy there — the exact thing the first cut got wrong.
     const index = template.indexOf('data-test="dbm-detail-tabs"');
     expect(index, "the template must render the tab strip").toBeGreaterThan(-1);
-    const open = template.slice(template.lastIndexOf("<", index), index);
+    const open = template.slice(template.lastIndexOf("<FeatureLockExempt", index), index);
     expect(open, "the strip must not be gated on anything stricter").toMatch(/v-if="hasQuery"/);
     expect(hasQuery("notFound")).toBe(true);
   });

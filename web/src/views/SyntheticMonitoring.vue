@@ -74,28 +74,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #header-tabs>
-      <OTabs
-        :model-value="activeSection"
-        align="left"
-        @change="activeSection = $event as SyntheticsSection"
-      >
-        <OTab name="checks">
-          <OIcon name="radar" size="sm" />
-          <span>{{ t("synthetics.tabs.checks") }}</span>
-        </OTab>
-        <OTab v-if="privateLocationsEnabled" name="private">
-          <OIcon name="location-on" size="sm" />
-          <span>{{ t("synthetics.tabs.private") }}</span>
-        </OTab>
-        <OTab name="status-pages">
-          <OIcon name="monitor-heart" size="sm" />
-          <span>{{ t("statusPages.tabTitle") }}</span>
-        </OTab>
-        <OTab name="variables">
-          <OIcon name="data-object" size="sm" />
-          <span>{{ t("synthetics.tabs.variables") }}</span>
-        </OTab>
-      </OTabs>
+      <!-- Section navigation stays live on a license-locked page; the actions inside each section stay locked. -->
+      <FeatureLockExempt class="contents">
+        <OTabs
+          :model-value="activeSection"
+          align="left"
+          @change="activeSection = $event as SyntheticsSection"
+        >
+          <OTab name="checks">
+            <OIcon name="radar" size="sm" />
+            <span>{{ t("synthetics.tabs.checks") }}</span>
+          </OTab>
+          <OTab v-if="privateLocationsEnabled" name="private">
+            <OIcon name="location-on" size="sm" />
+            <span>{{ t("synthetics.tabs.private") }}</span>
+          </OTab>
+          <OTab name="status-pages">
+            <OIcon name="monitor-heart" size="sm" />
+            <span>{{ t("statusPages.tabTitle") }}</span>
+          </OTab>
+          <OTab name="variables">
+            <OIcon name="data-object" size="sm" />
+            <span>{{ t("synthetics.tabs.variables") }}</span>
+          </OTab>
+        </OTabs>
+      </FeatureLockExempt>
     </template>
     <!-- CONTENT AREA: sidebar + main -->
     <div class="flex flex-1 overflow-hidden max-md:flex-col">
@@ -116,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="privateLocationsEnabled && activeSection === 'private'"
         :locations="privateLocations"
         :loading="locationsLoading"
+        :forbidden="locationsForbidden"
         @refresh="loadPrivateLocations"
         @copy-setup="openSetupDrawer"
         @delete="confirmDeleteLocation"
@@ -290,6 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="activeSection === 'status-pages'"
         :pages="statusPages"
         :loading="statusPagesLoading"
+        :forbidden="statusPagesForbidden"
         :timezone="store.state.timezone"
         @refresh="loadStatusPages"
         @new-page="showCreateStatusPage = true"
@@ -513,6 +518,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -561,6 +567,7 @@ import {
   statusPageEditRoute,
 } from "@/utils/synthetics/routes";
 import { getFoldersListByType } from "@/utils/commons";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -755,7 +762,7 @@ const loading = monitorsList.isPending;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = monitorsList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+  return forbiddenState(e) || e?.status === 403;
 });
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
@@ -1122,13 +1129,17 @@ const setupData = ref<AgentSetup | null>(null);
 const showDeleteLocation = ref(false);
 const locationToDelete = ref<SyntheticLocation | null>(null);
 
+const locationsForbidden = ref<ForbiddenState>(false);
+
 async function loadPrivateLocations() {
   locationsLoading.value = true;
+  locationsForbidden.value = false;
   try {
     const res = await syntheticsService.getLocations(orgIdentifier.value);
     const all: SyntheticLocation[] = (res.data as any).locations ?? [];
     privateLocations.value = all.filter((l) => l.kind === "private");
   } catch (err) {
+    locationsForbidden.value = forbiddenState(err);
     console.error("[synthetics] failed to load private locations", err);
   } finally {
     locationsLoading.value = false;
@@ -1180,15 +1191,18 @@ async function deleteLocation() {
 // ── Status pages tab ───────────────────────────────────────────────────
 const statusPages = ref<StatusPageListItem[]>([]);
 const statusPagesLoading = ref(false);
+const statusPagesForbidden = ref<ForbiddenState>(false);
 const showCreateStatusPage = ref(false);
 
 async function loadStatusPages() {
   if (!orgIdentifier.value) return;
   statusPagesLoading.value = true;
+  statusPagesForbidden.value = false;
   try {
     const res = await statusPagesService.list(orgIdentifier.value);
     statusPages.value = (res.data as any).pages ?? [];
   } catch (err) {
+    statusPagesForbidden.value = forbiddenState(err);
     console.error("[status-pages] failed to load", err);
   } finally {
     statusPagesLoading.value = false;

@@ -175,6 +175,8 @@ export const unionFleetRows = (
   metricsByKey: Map<string, DbmInstanceMetricSet>,
   context: DbmMergeContext & {
     system?: string | null;
+    /** The Schema filter; only query traffic can show a server holds that schema. */
+    namespace?: string | null;
     /** Instances `_o2_dbm_server` rows name — the second discovery source. */
     serverInstances?: readonly DbmServerInstanceRef[];
   } = {},
@@ -194,15 +196,14 @@ export const unionFleetRows = (
     if (aliasKey) claimed.add(aliasKey);
     return {
       ...row,
-      // The client grain includes the NAMESPACE — one host serving two
-      // databases is two rows — while an instance identity does not. Keying a
-      // client row on the identity would collapse those two onto one id and
-      // render one of them twice.
+      // Namespace included, so per-schema input rows on one instance never share an id.
       rowKey: clientRowKey(row),
       trafficless: false,
       metrics: resolveRowMetrics(row.db_system, row.db_instance, metricsByKey, context),
     };
   });
+
+  if (context.namespace) return clientRows;
 
   // Both non-client vantages, folded onto one identity key so an instance
   // they both report appears exactly once — with the metric set when the

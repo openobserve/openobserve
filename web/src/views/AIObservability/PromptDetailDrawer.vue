@@ -45,6 +45,7 @@
         </div>
         <div class="flex items-center gap-2 max-lg:w-full">
           <OButton
+            v-if="showPlayground"
             variant="outline"
             size="sm"
             icon-left="play-arrow"
@@ -422,8 +423,14 @@ const props = withDefaults(
     initialVersion?: number | null;
     initialTab?: string;
     protectedLabels?: string[];
+    showPlayground?: boolean;
   }>(),
-  { initialVersion: null, initialTab: "configuration", protectedLabels: () => [] },
+  {
+    initialVersion: null,
+    initialTab: "configuration",
+    protectedLabels: () => [],
+    showPlayground: true,
+  },
 );
 
 const moveLabelMutation = useMutation(() => movePromptLabelMutation(props.orgId));
@@ -521,7 +528,7 @@ const payloadText = (payload: unknown) =>
   typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
 const jsonText = (value: unknown) => (value == null ? "—" : JSON.stringify(value, null, 2));
 
-const versionColumns: OTableColumnDef<PromptVersion>[] = [
+const allVersionColumns: OTableColumnDef<PromptVersion>[] = [
   {
     id: "version",
     accessorKey: "version",
@@ -556,6 +563,12 @@ const versionColumns: OTableColumnDef<PromptVersion>[] = [
   },
   { id: "actions", isAction: true, header: raw(""), accessorKey: "id", size: 56 },
 ];
+// The actions column holds only the Playground button.
+const versionColumns = computed(() =>
+  props.showPlayground
+    ? allVersionColumns
+    : allVersionColumns.filter((column) => column.id !== "actions"),
+);
 
 function viewVersion(version: number) {
   selectedVersion.value = version;

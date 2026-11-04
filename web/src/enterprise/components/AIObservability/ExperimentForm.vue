@@ -113,7 +113,7 @@
               >
                 {{
                   t("aiObservability.experiments.form.datasetPinned", {
-                    version: selectedDatasetVersion,
+                    version: shownDatasetVersion,
                   })
                 }}
                 {{
@@ -533,7 +533,7 @@
                 >
                   {{
                     t("aiObservability.experiments.scorerApplicability", {
-                      scorer: entry.scorerId,
+                      scorer: scorerName(entry.scorerId),
                       version: entry.scorerVersion,
                       eligible: entry.eligibleSlotCount,
                       noReference: entry.noReferenceSlotCount,
@@ -562,6 +562,24 @@
       <footer
         class="bg-surface-base border-border-default sticky bottom-0 z-1 flex shrink-0 items-center justify-end gap-2 border-t px-5.5 py-3"
       >
+        <p
+          v-if="providerFailure"
+          role="alert"
+          class="text-status-error-text m-0 me-auto min-w-0 text-xs"
+          data-test="ai-experiment-form-provider-failure"
+        >
+          {{
+            t(
+              providerFailure.task
+                ? "aiObservability.experiments.form.taskProviderFailed"
+                : "aiObservability.experiments.form.judgeProviderFailed",
+              { provider: providerFailure.providerName },
+            )
+          }}
+          <template v-if="providerFailure.message">
+            {{ raw(`· ${providerFailure.message}`) }}
+          </template>
+        </p>
         <OButton
           type="button"
           variant="outline"
@@ -653,7 +671,13 @@ import {
   withPreviewScorers,
 } from "../../views/AIObservability/experimentPreview";
 import { aiExperimentsRoute } from "../../views/AIObservability/experimentRoutes";
+import {
+  checkRunProviders,
+  runProviderIds,
+  type ProviderCheckFailure,
+} from "../../views/AIObservability/experimentProviderCheck";
 import ExperimentPreviewPanel from "./ExperimentPreviewPanel.vue";
+import { useFeatureLock } from "@/composables/useFeatureLock";
 import {
   EXPERIMENT_ROW_SOURCES,
   experimentFormDefaults,
@@ -904,10 +928,16 @@ const selectedDataset = computed(
 );
 // A clone keeps the version its source pinned. Re-pinning to the dataset's head
 // would compare two runs over different rows and call the difference a result.
+// This is the pin key (a row version); `shownDatasetVersion` is what it reads as.
 const selectedDatasetVersion = computed(() =>
   cloneSource.value
     ? cloneSource.value.datasetVersion
     : (selectedDataset.value?.globalVersion ?? 0),
+);
+const shownDatasetVersion = computed(() =>
+  cloneSource.value
+    ? cloneSource.value.datasetWriteVersion
+    : (selectedDataset.value?.writeVersion ?? 0),
 );
 
 // preview() validates the entire create body, so it can only run once the task
@@ -922,7 +952,7 @@ const previewReady = computed(() => {
   return !!providerId.value && !!String(userPrompt.value ?? "").trim();
 });
 const datasetLabel = computed(() =>
-  selectedDataset.value ? `${selectedDataset.value.name} @ v${selectedDatasetVersion.value}` : "",
+  selectedDataset.value ? `${selectedDataset.value.name} @ v${shownDatasetVersion.value}` : "",
 );
 
 const datasetOptions = computed(() =>
@@ -967,6 +997,13 @@ const scorerOptions = computed(() =>
 );
 
 const scorerApplicability = computed(() => preview.value?.applicability?.scorerApplicability ?? []);
+
+/** Coverage lines name the scorer the user picked, not its entity id. A
+ *  scorer missing from the loaded list falls back to the id so the line still
+ *  says which one it is. */
+function scorerName(id: string): string {
+  return scorers.value.find((scorer) => entityId(scorer) === id)?.name ?? id;
+}
 
 /** First page of the selected dataset; source toggles filter it without refetching. */
 const datasetRows = ref<LlmDatasetItem[]>([]);
@@ -1160,6 +1197,7 @@ function previewKey(payload: ExperimentCreatePayload): string {
 
 async function onSubmit(values: ExperimentForm) {
   if (sendingConfirmed.value) return;
+  if (!(await providersAnswer(values))) return;
   // The server pins scorer versions itself; reusing the preview's pins when
   // one is in hand just closes the gap if a version ships mid-edit.
   const payload = buildPayload(values);
@@ -1175,6 +1213,41 @@ async function onSubmit(values: ExperimentForm) {
     return;
   }
   await send(body);
+}
+
+/** Last provider test before Create & run; the footer shows its failure. */
+const providerFailure = ref<ProviderCheckFailure | null>(null);
+// A different provider or judge set makes the last result about another run.
+watch([providerId, scorerIds, taskType], () => (providerFailure.value = null));
+
+/** Sends Test Connection's request for every provider the run calls. Nothing
+ *  is created when one does not answer, and the form stays open with why. */
+async function providersAnswer(values: ExperimentForm): Promise<boolean> {
+  providerFailure.value = null;
+  const ids = runProviderIds({
+    taskType: values.taskType,
+    providerId: values.providerId,
+    scorerIds: values.scorerIds ?? [],
+    scorers: scorers.value,
+  });
+  if (!ids.length || !orgId.value) return true;
+  let known: Provider[];
+  let listLoaded = true;
+  try {
+    // Unfiltered and fresh: a judge provider need not be in the chat list.
+    known = await onlineEvalsService.providers.list(orgId.value);
+  } catch {
+    known = providers.value;
+    listLoaded = false;
+  }
+  providerFailure.value = await checkRunProviders(
+    ids,
+    known,
+    (payload, id) => onlineEvalsService.providers.testConfig(orgId.value, payload, id),
+    values.taskType === "remote" ? null : values.providerId,
+    listLoaded,
+  );
+  return providerFailure.value === null;
 }
 
 async function send(body: ExperimentCreatePayload) {
@@ -1264,6 +1337,9 @@ onBeforeUnmount(() => runPreviewAfterTyping.cancel());
 watch(datasetId, loadDatasetRows, { immediate: true });
 watch([promptId, promptSelectionMode, promptLabel, promptVersion], resolvePromptSelection);
 
+// A locked page cannot be edited, and its locked save button would trap the user.
+const { locked: pageLocked } = useFeatureLock();
+
 const experimentDraft = useEditorDraft<ExperimentForm>({
   kind: "experiment",
   entityLabel: () => t("common.editorDraft.entities.experiment"),
@@ -1280,7 +1356,7 @@ const experimentDraft = useEditorDraft<ExperimentForm>({
     if (!resolvingPrompt.value) draftOverrides = null;
   },
   base: () => (cloning.value ? cloneDefinition(cloneSource.value) : undefined),
-  hasChanges: () => isDirty.value,
+  hasChanges: () => !pageLocked.value && isDirty.value,
   save: async () => {
     const run = { saved: false };
     leaveSave = run;

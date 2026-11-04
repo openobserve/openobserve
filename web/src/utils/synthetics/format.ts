@@ -43,3 +43,15 @@ export function locationDisplayLabel(name: string, region: string | undefined | 
   if (!r || r.toLowerCase() === name.trim().toLowerCase()) return name;
   return `${name} (${r})`;
 }
+
+/** Text before the first ":" of a run error, cut before a " (" group that the colon left unclosed. */
+export function errorHeadline(message: string): string {
+  const head = message.split(":")[0];
+  const open: number[] = [];
+  for (let i = 0; i < head.length; i++) {
+    if (head[i] === "(") open.push(i);
+    else if (head[i] === ")") open.pop();
+  }
+  if (!open.length || !/\s/.test(head.charAt(open[0] - 1))) return head;
+  return head.slice(0, open[0]).replace(/[\s.,;-]+$/, "") || head;
+}

@@ -46,6 +46,7 @@ import { useDbmScopeSyncScope } from "@/composables/dbm/useDbmScopeSync";
 import { useDbmTabCountsContext, type DbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
 import type { BadgeCount, DbmTabCountKey } from "@/composables/dbm/useDbmTabCounts";
 import { claimedCount, dbmHttpError } from "@/utils/dbm/format";
+import { forbiddenState, licenseDeniedFeatures, type ForbiddenState } from "@/utils/featureGate";
 
 export interface DbmListPageOptions {
   /**
@@ -147,7 +148,7 @@ export function useDbmListPage(options: DbmListPageOptions) {
   const loading = ref(false);
   const error = ref<string | null>(null);
   // A 403 on a page without its own permission diagnosis: the table shows "no access", not the raw error.
-  const forbidden = ref(false);
+  const forbidden = ref<ForbiddenState>(false);
   const search = ref("");
 
   /**
@@ -204,10 +205,10 @@ export function useDbmListPage(options: DbmListPageOptions) {
       const { status, serverMessage, message } = dbmHttpError(err);
       if ((status === 404 || status === 501) && runOptions.onNotCollecting) {
         runOptions.onNotCollecting();
-      } else if (status === 403 && runOptions.onForbidden) {
+      } else if (status === 403 && runOptions.onForbidden && !licenseDeniedFeatures(err)) {
         runOptions.onForbidden();
       } else if (status === 403) {
-        forbidden.value = true;
+        forbidden.value = forbiddenState(err) || true;
       } else if (runOptions.onError) {
         runOptions.onError(serverMessage, err);
       } else {

@@ -21,7 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   cell opens the impact dialog.
 -->
 <template>
+  <!-- Usage is counted from the alerts list, which a license without alerts cannot read. -->
+  <span v-if="alertsLocked" class="text-text-muted" :data-test="`used-by-${key}-locked`">{{
+    raw("—")
+  }}</span>
   <OButton
+    v-else
     variant="ghost"
     size="sm"
     class="h-auto! gap-1! px-1.5! py-1! font-normal!"
@@ -58,13 +63,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
   </OButton>
 
-  <DependencyImpactDialog v-model:open="open" :focus="focus" @deleted="emit('deleted', $event)" />
+  <DependencyImpactDialog
+    v-if="!alertsLocked"
+    v-model:open="open"
+    :focus="focus"
+    @deleted="emit('deleted', $event)"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { I18nText } from "@/types/i18n";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -82,6 +93,7 @@ const props = defineProps<{ graph: DepGraph; focus: DepFocus }>();
 const emit = defineEmits<{ (e: "deleted", kind: DepNodeKind): void }>();
 
 const { t } = useI18nTyped();
+const { locked: alertsLocked } = useLicenseLock("alerts");
 
 const open = ref(false);
 

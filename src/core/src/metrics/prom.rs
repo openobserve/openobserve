@@ -65,7 +65,7 @@ use crate::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
         meta::stream::SchemaRecords,
     },
-    ingestion::{TriggerAlertData, check_ingestion_allowed},
+    ingestion::check_ingestion_allowed,
     pipeline::batch_execution::ExecutablePipeline,
 };
 
@@ -186,7 +186,7 @@ pub async fn remote_write(
 
     // realtime alerts
     let mut stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
-    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, Option<ingest::StreamTriggers>> = HashMap::new();
 
     let decoded = config::utils::snappy::decode_raw_snappy(&body, cfg.limit.req_payload_limit)
         .map_err(|e| anyhow::anyhow!("Invalid snappy compressed data: {e}"))?;

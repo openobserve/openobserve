@@ -475,6 +475,33 @@ describe("unionFleetRows with server-vantage instances", () => {
     );
     expect(withOption).toEqual(without);
   });
+
+  it("adds no trafficless or engine-only row under a Schema filter", () => {
+    const rows = unionFleetRows(
+      [totalsRow({ db_instance: "pgprod-1", db_namespace: "orders" })],
+      new Map([
+        ["postgresql|pgprod-1", metrics()],
+        ["postgresql|idle-replica", metrics()],
+      ]),
+      {
+        namespace: "orders",
+        serverInstances: [
+          { db_system: "postgresql", db_instance: "pg-reporting" },
+          { db_system: "mysql", db_instance: null },
+        ],
+      },
+    );
+    expect(rows.map((r) => [r.db_instance, r.trafficless])).toEqual([["pgprod-1", false]]);
+    expect(rows[0].metrics?.state).toBe("matched");
+  });
+
+  it("leaves nothing to render when the Schema filter matched no traffic", () => {
+    const rows = unionFleetRows([], new Map([["postgresql|idle-replica", metrics()]]), {
+      namespace: "stale-schema",
+      serverInstances: [{ db_system: "postgresql", db_instance: "pg-reporting" }],
+    });
+    expect(rows).toEqual([]);
+  });
 });
 
 // ── the server-vantage ref dedupe ────────────────────────────────────────────

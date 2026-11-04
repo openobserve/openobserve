@@ -26,7 +26,7 @@ use base64::Engine;
 use common::meta::user::AuthTokensExt;
 use common::meta::user::{AuthTokens, UserOrgRole};
 use config::{
-    meta::user::UserRole,
+    meta::{feature::Feature, user::UserRole},
     utils::{hash::try_get_passcode_hash, json},
 };
 use lru::LruCache;
@@ -266,6 +266,8 @@ pub struct AuthExtractor {
     pub use_all_org: bool,
     pub use_self_context: bool,
     pub use_self_parent: bool,
+    /// License features the route requires; checked even when `bypass_check` is set.
+    pub feature: Option<&'static [Feature]>,
 }
 
 impl AuthExtractor {
@@ -282,6 +284,7 @@ impl AuthExtractor {
             use_all_org: false,
             use_self_context: false,
             use_self_parent: false,
+            feature: None,
         }
     }
 }
@@ -366,6 +369,9 @@ where
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()
             {
+                let feature =
+                    rp::resolve_permission(&path_columns, &method, &org_id, &folder, None)
+                        .and_then(|r| r.feature);
                 return Ok(AuthExtractor {
                     auth: reject_forged_session_marker(auth_str.to_owned()),
                     method,
@@ -376,6 +382,7 @@ where
                     use_all_org: false,
                     use_self_context: false,
                     use_self_parent: false,
+                    feature,
                 });
             }
             return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
@@ -394,6 +401,10 @@ where
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()
             {
+                // the stream-level bypass skips RBAC, not the license gate
+                let feature =
+                    rp::resolve_permission(&path_columns, &method, &org_id, &folder, None)
+                        .and_then(|r| r.feature);
                 return Ok(AuthExtractor {
                     auth: reject_forged_session_marker(auth_str.to_owned()),
                     method,
@@ -404,6 +415,7 @@ where
                     use_all_org: false,
                     use_self_context: false,
                     use_self_parent: false,
+                    feature,
                 });
             }
             return Err(AuthExtractorRejection::unauthorized("Unauthorized Access"));
@@ -447,6 +459,7 @@ where
                     use_all_org: false,
                     use_self_context: false,
                     use_self_parent: false,
+                    feature: None,
                 });
             }
         };
@@ -467,6 +480,7 @@ where
                 use_all_org: false,
                 use_self_context: false,
                 use_self_parent: false,
+                feature: resolved.feature,
             });
         }
 
@@ -485,6 +499,7 @@ where
             use_all_org: resolved.use_all_org,
             use_self_context: resolved.use_self_context,
             use_self_parent: resolved.use_self_parent,
+            feature: resolved.feature,
         })
     }
 
@@ -523,6 +538,7 @@ where
                 use_all_org: false,
                 use_self_context: false,
                 use_self_parent: false,
+                feature: None,
             });
         }
 
@@ -580,6 +596,7 @@ fn opamp_extractor(
         use_all_org: false,
         use_self_context: false,
         use_self_parent: false,
+        feature: None,
     })
 }
 
@@ -793,6 +810,7 @@ pub async fn check_permissions(
                 use_all_org,
                 use_self_context,
                 use_self_parent,
+                feature: None,
             },
             user.role,
             user.is_external,
@@ -999,6 +1017,24 @@ mod tests {
             generate_presigned_url(username, password, salt, base_url, exp_in, time);
 
         assert_eq!(generated_url, expected_url);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn ingestion_write_carries_its_route_feature() {
+        use axum::extract::FromRequestParts;
+        use config::meta::feature::Feature;
+
+        let (mut parts, _) = axum::http::Request::post("/myorg/v1/logs")
+            .header("Authorization", "Basic cm9vdEBleGFtcGxlLmNvbTpwYXNz")
+            .body(())
+            .unwrap()
+            .into_parts();
+        let Ok(auth) = AuthExtractor::from_request_parts(&mut parts, &()).await else {
+            panic!("an ingestion write with credentials must extract");
+        };
+        assert!(auth.bypass_check);
+        assert_eq!(auth.feature, Some(&[Feature::Logs][..]));
     }
 
     #[tokio::test]

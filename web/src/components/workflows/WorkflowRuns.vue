@@ -53,6 +53,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
       <template #actions-overflow>
+        <WorkflowHttpEndpointButton
+          v-if="hooksOn"
+          :chip="httpChip"
+          :tooltip-key="httpTooltipKey"
+          data-test="workflow-runs-http-endpoint"
+          @click="httpPanelOpen = true"
+        />
         <!-- Test is a read-only dry-run (it never edits the workflow), so it's
              offered here too — no need to switch to the editor just to test. -->
         <OButton variant="outline" data-test="workflow-runs-test" @click="onTest">
@@ -88,54 +95,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OPageHeader>
 
-    <div
-      class="relative flex min-h-0 flex-1 gap-2 px-2 pt-3 max-lg:flex-col max-lg:overflow-y-auto"
-    >
-      <!-- Read-only canvas (per-node run status overlay). Clicking a node's ✓/✗ badge
+    <OPageLockedBody>
+      <div
+        class="relative flex min-h-0 flex-1 gap-2 px-2 pt-3 max-lg:flex-col max-lg:overflow-y-auto"
+      >
+        <!-- Read-only canvas (per-node run status overlay). Clicking a node's ✓/✗ badge
            opens its NDV (read-only here) with the step's Input · Config · Output — the
            SAME panel the editor uses, so results read identically in both places. -->
-      <div
-        class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden max-lg:h-64 max-lg:flex-none dark:bg-transparent"
-      >
-        <WorkflowCanvas />
-      </div>
+        <div
+          class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden max-lg:h-64 max-lg:flex-none dark:bg-transparent"
+        >
+          <WorkflowCanvas />
+        </div>
 
-      <!-- Collapsible so a wide graph can be read whole; the panel is a fixed 27.5rem
-           of this master-detail page and there is nowhere else for the canvas to grow. -->
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        class="absolute top-2 right-2 z-10"
-        data-test="workflow-runs-panel-collapse"
-        :aria-label="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
-        @click="togglePanel"
-      >
-        <OIcon
-          :name="panelCollapsed ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
-          size="sm"
-        />
-        <OTooltip
-          :content="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
-          side="left"
-        />
-      </OButton>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          class="absolute top-2 right-2 z-10"
+          data-test="workflow-runs-panel-collapse"
+          :aria-label="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
+          @click="togglePanel"
+        >
+          <OIcon
+            :name="panelCollapsed ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
+            size="sm"
+          />
+          <OTooltip
+            :content="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
+            side="left"
+          />
+        </OButton>
 
-      <!-- Persistent runs list (master-detail). -->
-      <div
-        v-if="!panelCollapsed"
-        data-test="workflow-runs-panel"
-        class="rounded-surface border-border-default bg-surface-base mb-3 flex min-h-0 w-[27.5rem] max-w-[46%] shrink-0 flex-col overflow-hidden border max-lg:h-96 max-lg:w-full max-lg:max-w-full"
-      >
-        <WorkflowRunsPanel
-          ref="runsPanelRef"
-          :org-id="orgId"
-          :workflow-id="workflowId"
-          :workflow-name="workflowName"
-          :selected-run-id="selectedRunId"
-          @select-run="onSelectRun"
-        />
+        <!-- Persistent runs list (master-detail). -->
+        <div
+          v-if="!panelCollapsed"
+          data-test="workflow-runs-panel"
+          class="rounded-surface border-border-default bg-surface-base mb-3 flex min-h-0 w-[50rem] max-w-[60%] shrink-0 flex-col overflow-hidden border max-lg:h-96 max-lg:w-full max-lg:max-w-full"
+        >
+          <WorkflowRunsPanel
+            ref="runsPanelRef"
+            :org-id="orgId"
+            :workflow-id="workflowId"
+            :workflow-name="workflowName"
+            :selected-run-id="selectedRunId"
+            @select-run="onSelectRun"
+          />
+        </div>
       </div>
-    </div>
+    </OPageLockedBody>
 
     <!-- Node NDV (read-only here) — opened by a node's ✓/✗ badge to inspect that
          step's Input · Config · Output for the loaded run. -->
@@ -144,11 +151,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Test input popup — a fresh dry-run of the current graph, launched from the
          header. Results paint on the read-only canvas (switching it out of the
          selected historical run) and the node NDV shows each step's I/O. -->
-    <WorkflowTestDialog v-if="workflowObj.testRun.show" />
+    <WorkflowTestDialog
+      v-if="workflowObj.testRun.show"
+      :seed="testSeed"
+      :payload-from="testPayloadFrom"
+      :seed-run-at="testSeedRunAt"
+    />
+
+    <WorkflowHttpEndpointPanel
+      v-if="hooksOn"
+      :open="httpPanelOpen"
+      :workflow-id="workflowId || null"
+      :workflow-name="workflowName"
+      :kind="httpKind"
+      :is-draft-only="isDraft"
+      :workflow-enabled="workflowEnabled"
+      context="editor"
+      :trigger-node-id="httpTriggerNodeId"
+      @update:open="httpPanelOpen = $event"
+      @run-test="onHttpRunTest"
+      @view-run="onPanelViewRun"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import OPageLockedBody from "@/lib/core/PageLayout/OPageLockedBody.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
@@ -166,13 +194,19 @@ import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import WorkflowRunsPanel from "./WorkflowRunsPanel.vue";
+import WorkflowHttpEndpointButton from "./WorkflowHttpEndpointButton.vue";
+import WorkflowHttpEndpointPanel from "./WorkflowHttpEndpointPanel.vue";
 import useWorkflowCanvas, {
   workflowObj,
   hydrateWorkflow,
   loadWorkflowRun,
   isRetryableRun,
   retryWorkflowRun,
+  currentTriggerKind,
+  currentTriggerNodeId,
 } from "@/plugins/workflows/useWorkflowCanvas";
+import { useWorkflowHttpButton } from "@/plugins/workflows/useWorkflowHttpButton";
+import type { PayloadFrom } from "@/plugins/workflows/httpEndpointUi";
 import { workflowsQuery } from "@/services/workflows.queries";
 import { queryClient } from "@/composables/query/queryClient";
 
@@ -181,6 +215,7 @@ const { t } = useI18nTyped();
 const { resetWorkflowData } = useWorkflowCanvas(t);
 
 const router = useRouter();
+
 const store = useStore();
 
 const orgId = computed(() => store.state.selectedOrganization.identifier as string);
@@ -194,7 +229,30 @@ const activeFolderId = computed(
 );
 const workflowId = computed(() => (router.currentRoute.value.query.id as string) || "");
 const workflowName = computed(() => workflowObj.currentSelectedWorkflow?.name || "");
+const isDraft = computed(() => !!workflowObj.currentSelectedWorkflow?.isDraft);
+const workflowEnabled = computed(() => workflowObj.currentSelectedWorkflow?.enabled !== false);
 const selectedRunId = ref<string>("");
+
+const {
+  visible: hooksOn,
+  chip: httpChip,
+  tooltipKey: httpTooltipKey,
+} = useWorkflowHttpButton({ workflowId, isDraft, workflowEnabled });
+const httpKind = computed(() => currentTriggerKind());
+const httpTriggerNodeId = computed(() => currentTriggerNodeId());
+const httpPanelOpen = ref(false);
+const testSeed = ref<unknown[] | undefined>(undefined);
+const testPayloadFrom = ref<PayloadFrom | undefined>(undefined);
+const testSeedRunAt = ref<number | undefined>(undefined);
+watch(
+  () => workflowObj.testRun.show,
+  (show) => {
+    if (show) return;
+    testSeed.value = undefined;
+    testPayloadFrom.value = undefined;
+    testSeedRunAt.value = undefined;
+  },
+);
 
 // Steps this run executed that no longer exist in the workflow (deleted/edited
 // since). Their badges can't render, so the canvas alone would under-report the
@@ -241,6 +299,14 @@ const goBack = () => {
 const onTest = () => {
   selectedRunId.value = "";
   workflowObj.testRun.show = true;
+};
+
+const onHttpRunTest = (seed: unknown[], runAt?: number) => {
+  httpPanelOpen.value = false;
+  testSeed.value = seed;
+  testPayloadFrom.value = "http";
+  testSeedRunAt.value = runAt;
+  onTest();
 };
 
 // A live test result (from the header Test button, or a step drawer's "Use as Test
@@ -360,6 +426,23 @@ const onSelectRun = async (runId: string) => {
     name: "workflowRuns",
     query: { ...router.currentRoute.value.query, run_id: runId },
   });
+};
+
+// The panel's "View run" link lands on this same route, which does not remount.
+watch(
+  () => router.currentRoute.value.query.run_id,
+  (runId) => {
+    if (typeof runId !== "string" || !runId || runId === selectedRunId.value) return;
+    httpPanelOpen.value = false;
+    void onSelectRun(runId);
+  },
+);
+
+// A run already in the URL changes no route, so the watch above never reloads it.
+const onPanelViewRun = (runId: string) => {
+  if (runId === router.currentRoute.value.query.run_id && runId !== selectedRunId.value) {
+    void onSelectRun(runId);
+  }
 };
 
 onMounted(async () => {

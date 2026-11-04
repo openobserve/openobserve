@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #title-trail>
           <OBadge
+            v-if="hasRunStatus"
             :variant="statusBadgeVariant"
             size="sm"
             :icon="statusIcon"
@@ -59,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ statusLabel }}
           </OBadge>
+          <OSkeleton v-else-if="loading" type="text" class="h-6 w-16" />
           <OBadge
             v-if="currentRun.url"
             variant="default"
@@ -174,26 +176,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Steps and Evidence are siblings, not stacked. Stacking them pushed
              a 158-row event list above the step table and broke the drawer's
              scroll: OTabPanels owns the scroll container (`grow scroll="y"`). -->
-        <OTabs
-          v-if="!loading"
-          v-model="detailTab"
-          class="border-border-default mt-2 shrink-0 border-b px-2"
-        >
-          <OTab name="steps" data-test="synthetics-run-detail-tab-steps">
-            {{ t("synthetics.runs.tabSteps") }}
-            <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
-            <OBadge
-              v-if="skippedStepCount > 0"
-              variant="default"
-              size="sm"
-              data-test="synthetics-run-detail-skipped-count"
-              >{{ t("synthetics.runDetail.skippedCount", { n: skippedStepCount }) }}</OBadge
-            >
-          </OTab>
-          <OTab name="evidence" data-test="synthetics-run-detail-tab-evidence">
-            {{ t("synthetics.runDetail.evidenceSection") }}
-          </OTab>
-        </OTabs>
+        <FeatureLockExempt class="contents">
+          <OTabs
+            v-if="!loading"
+            v-model="detailTab"
+            class="border-border-default mt-2 shrink-0 border-b px-2"
+          >
+            <OTab name="steps" data-test="synthetics-run-detail-tab-steps">
+              {{ t("synthetics.runs.tabSteps") }}
+              <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
+              <OBadge
+                v-if="skippedStepCount > 0"
+                variant="default"
+                size="sm"
+                data-test="synthetics-run-detail-skipped-count"
+                >{{ t("synthetics.runDetail.skippedCount", { n: skippedStepCount }) }}</OBadge
+              >
+            </OTab>
+            <OTab name="evidence" data-test="synthetics-run-detail-tab-evidence">
+              {{ t("synthetics.runDetail.evidenceSection") }}
+            </OTab>
+          </OTabs>
+        </FeatureLockExempt>
 
         <div class="min-h-0 flex-1">
           <OTabPanels v-model="detailTab" grow scroll="y" class="h-full min-h-0">
@@ -249,7 +253,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="error" class="text-status-error-text shrink-0" size="md" />
                   <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
-                      <span class="text-status-error-text text-sm font-bold">
+                      <span
+                        class="text-status-error-text text-sm font-bold"
+                        data-test="synthetics-run-detail-error-type"
+                      >
                         {{ currentRun.errorType }}
                       </span>
                       <OBadge
@@ -672,7 +679,7 @@ import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
 import { timestampToTimezoneDate } from "@/utils/timezone";
-import { locationDisplayLabel } from "@/utils/synthetics/format";
+import { errorHeadline, locationDisplayLabel } from "@/utils/synthetics/format";
 import { syntheticsResultsRoute } from "@/utils/synthetics/routes";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -699,6 +706,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import {
   buildAttemptViews,
   effectiveSelector,
@@ -1224,7 +1232,7 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
     hasReplay: false,
     ...(hasIssue
       ? {
-          errorType: detail.error ? detail.error.split(":")[0] : t("synthetics.results.error"),
+          errorType: detail.error ? errorHeadline(detail.error) : t("synthetics.results.error"),
           errorReason: detail.error || "",
           errorStack: detail.error || "",
           errorSource: detail.errorSource,
@@ -1254,7 +1262,7 @@ function errorToDisplayRun(o: OverrideError): DisplayRun {
     timestamp: fmtTimestamp(o.timestamp),
     url: "",
     hasReplay: false,
-    errorType: o.message ? o.message.split(":")[0] : t("synthetics.results.error"),
+    errorType: o.message ? errorHeadline(o.message) : t("synthetics.results.error"),
     errorReason: o.message || "",
     errorStack: o.message || "",
     errorSource: o.errorSource,
@@ -1451,6 +1459,8 @@ const currentRun = computed<DisplayRun>(() => {
   if (props.overrideError) return errorToDisplayRun(props.overrideError);
   return toDisplayRun(null);
 });
+// The empty display run defaults to "pass", so only real run data may drive the status badge.
+const hasRunStatus = computed(() => !!synthetics.runDetail.value || !!props.overrideError);
 
 const isFailed = computed(
   () => currentRun.value.status === "fail" || currentRun.value.status === "error",

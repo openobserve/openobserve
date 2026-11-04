@@ -114,7 +114,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import searchService from "@/services/search";
-import { correlate as correlateStreams } from "@/services/service_streams";
+import { correlate as correlateStreams, getDimensionAnalytics } from "@/services/service_streams";
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -1458,5 +1458,97 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(rate(wrapper).config.unit).toBe("custom");
       expect(rate(wrapper).config.unit_custom).toBe("spans/s");
     });
+  });
+});
+
+describe("ServiceGraphNodeSidePanel — license locks", () => {
+  let wrapper: VueWrapper;
+  const LOGS_ITEM = '[data-test="service-graph-node-panel-view-related-logs-btn"]';
+  const DB_ITEM = '[data-test="service-graph-node-panel-view-related-databases-btn"]';
+  const TRACES_ITEM = '[data-test="service-graph-node-panel-view-related-traces-btn"]';
+  const METRICS_TAB = '[data-test="service-graph-node-panel-tab-metrics"]';
+
+  afterEach(() => {
+    wrapper?.unmount();
+    delete store.state.zoConfig.features;
+    vi.clearAllMocks();
+  });
+
+  it("locks the metrics tab and related logs without any correlation call when correlation is locked", async () => {
+    getStreamMock.mockResolvedValueOnce({ schema: [{ name: "service_name", type: "keyword" }] });
+    store.state.zoConfig.features = { correlation: "locked" };
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    await wrapper.find(METRICS_TAB).trigger("click");
+    await flushPromises();
+    expect(wrapper.find(METRICS_TAB).attributes("suffix-icon")).toBe("lock");
+    expect(
+      wrapper.find('[data-test="service-graph-side-panel-metrics-license-denied"]').exists(),
+    ).toBe(true);
+    expect(wrapper.find(LOGS_ITEM).attributes("disabled")).toBeDefined();
+    await wrapper.find(LOGS_ITEM).trigger("click");
+    await flushPromises();
+    expect(correlateStreams).not.toHaveBeenCalled();
+    expect(getDimensionAnalytics).not.toHaveBeenCalled();
+    expect(routerPushMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the correlation calls when correlation is enabled", async () => {
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    await wrapper.find(METRICS_TAB).trigger("click");
+    await flushPromises();
+    expect(wrapper.find(METRICS_TAB).attributes("suffix-icon")).toBeUndefined();
+    expect(correlateStreams).toHaveBeenCalled();
+  });
+
+  it("shows the related-databases item locked and does not navigate when db_monitoring is locked", async () => {
+    store.state.zoConfig.features = { db_monitoring: "locked" };
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    expect(wrapper.find(DB_ITEM).attributes("disabled")).toBeDefined();
+    await wrapper.find(DB_ITEM).trigger("click");
+    expect(routerPushMock).not.toHaveBeenCalled();
+  });
+
+  it("locks the related-logs item and does not navigate when logs is locked", async () => {
+    store.state.zoConfig.features = { logs: "locked" };
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    expect(wrapper.find(LOGS_ITEM).attributes("disabled")).toBeDefined();
+    await wrapper.find(LOGS_ITEM).trigger("click");
+    await flushPromises();
+    expect(routerPushMock).not.toHaveBeenCalled();
+  });
+
+  it("locks the related-traces item when traces is locked and leaves it live otherwise", async () => {
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    expect(wrapper.find(TRACES_ITEM).attributes("disabled")).toBe("false");
+    wrapper.unmount();
+    store.state.zoConfig.features = { traces: "locked" };
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    expect(wrapper.find(TRACES_ITEM).attributes("disabled")).toBe("true");
+    await wrapper.find(TRACES_ITEM).trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("view-traces")).toBeUndefined();
+  });
+
+  it("emits view-traces from View traces and row clicks only while traces is licensed", async () => {
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    const vm = wrapper.vm as any;
+    vm.viewInTraces();
+    vm.navigateToTraces({ operationName: "GET /" });
+    expect(wrapper.emitted("view-traces")).toHaveLength(2);
+    wrapper.unmount();
+
+    store.state.zoConfig.features = { traces: "locked" };
+    wrapper = mountPanel({ streamFilter: "default" });
+    await flushPromises();
+    (wrapper.vm as any).viewInTraces();
+    (wrapper.vm as any).navigateToTraces({ operationName: "GET /" });
+    expect(wrapper.emitted("view-traces")).toBeUndefined();
   });
 });

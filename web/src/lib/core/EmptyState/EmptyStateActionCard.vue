@@ -64,7 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!hideChevron"
       name="chevron-right"
       size="sm"
-      class="text-text-disabled group-hover:text-accent relative shrink-0 transition-transform group-hover:translate-x-0.5"
+      class="text-text-disabled relative shrink-0 transition-transform"
+      :class="!unavailable && 'group-hover:text-accent group-hover:translate-x-0.5'"
     />
     <!-- A marker pinned to the card itself, e.g. an unsaved-draft dot. -->
     <slot name="badge" />

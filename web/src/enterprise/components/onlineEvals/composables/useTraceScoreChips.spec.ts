@@ -28,9 +28,9 @@ vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),
 }));
 
-const mockListCached = vi.fn();
+const mockListScoreConfigs = vi.fn();
 vi.mock("@/services/online-evals.service", () => ({
-  default: { scoreConfigs: { listCached: (...args: any[]) => mockListCached(...args) } },
+  default: { scoreConfigs: { list: (...args: any[]) => mockListScoreConfigs(...args) } },
 }));
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -38,7 +38,7 @@ import { useTraceScoreChips } from "./useTraceScoreChips";
 
 beforeEach(() => {
   mockExecuteQueryOnce.mockReset();
-  mockListCached.mockReset();
+  mockListScoreConfigs.mockReset();
 });
 
 describe("useTraceScoreChips", () => {
@@ -53,7 +53,7 @@ describe("useTraceScoreChips", () => {
       },
       { scorer_id: "scorer-2", score_config_id: "cfg-safety", value_boolean: "true" },
     ]);
-    mockListCached.mockResolvedValue([
+    mockListScoreConfigs.mockResolvedValue([
       {
         id: "v1",
         entityId: "cfg-quality",
@@ -89,7 +89,7 @@ describe("useTraceScoreChips", () => {
   // A non-LLM org has no `_llm_scores` stream, so a rejected search must read as "no chips", never an error.
   it("resolves to no chips, never throws, when the score query fails", async () => {
     mockExecuteQueryOnce.mockRejectedValue(new Error("stream [_llm_scores] not found"));
-    mockListCached.mockResolvedValue([]);
+    mockListScoreConfigs.mockResolvedValue([]);
 
     const { chips, load } = useTraceScoreChips();
     await expect(load("trace", "trace-123", 1_000_000)).resolves.toBeUndefined();
@@ -99,7 +99,7 @@ describe("useTraceScoreChips", () => {
 
   it("resolves to no chips, never throws, when the score-config lookup fails", async () => {
     mockExecuteQueryOnce.mockResolvedValue([{ scorer_id: "s1", value_numeric: 1 }]);
-    mockListCached.mockRejectedValue(new Error("network error"));
+    mockListScoreConfigs.mockRejectedValue(new Error("network error"));
 
     const { chips, load } = useTraceScoreChips();
     await load("span", "span-123", 1_000_000);
@@ -143,7 +143,7 @@ describe("useTraceScoreChips", () => {
         _timestamp: 1_700_003_000_000_000,
       },
     ]);
-    mockListCached.mockResolvedValue([
+    mockListScoreConfigs.mockResolvedValue([
       { id: "v1", entityId: "cfg-correctness", name: "Correctness" },
     ]);
 

@@ -17,18 +17,26 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { queryClient } from "@/composables/query/queryClient";
 import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import {
+  addTeamMembersMutation,
+  applySchedulePresetMutation,
   confirmCodeMutation,
   contactQuery,
+  createOverrideMutation,
   createOwnershipRuleMutation,
+  deleteOverrideMutation,
   deleteOwnershipRuleMutation,
   deleteTelephonyMutation,
   oncallTeamsQuery,
   pagedResponsesQuery,
   responsesQuery,
   routingConfigQuery,
+  removeTeamMemberMutation,
   saveTelephonyMutation,
   setContactMutation,
   setTeamChannelMutation,
+  setTeamPolicyMutation,
+  setTeamScheduleMutation,
+  teamContextQuery,
   telephonyQuery,
   testTeamSlackChannelMutation,
   updateOwnershipRuleMutation,
@@ -124,6 +132,31 @@ describe("editing a team", () => {
     ]) {
       expect(scopes).toContainEqual(key);
     }
+  });
+});
+
+describe("the Pages list's team context", () => {
+  beforeEach(() => queryClient.clear());
+
+  // One entry for many teams, so it sits outside every per-team prefix those writes drop.
+  it.each([
+    ["a policy write", setTeamPolicyMutation],
+    ["a schedule write", setTeamScheduleMutation],
+    ["a schedule preset", applySchedulePresetMutation],
+    ["an override", createOverrideMutation],
+    ["an override removal", deleteOverrideMutation],
+    ["adding members", addTeamMembersMutation],
+    ["removing a member", removeTeamMemberMutation],
+    ["a channel write", setTeamChannelMutation],
+  ])("is marked stale by %s", async (_, mutation) => {
+    const key = teamContextQuery(ORG, ["t1", "t2"], true).queryKey;
+    queryClient.setQueryData(key, []);
+
+    for (const scope of mutation(ORG, "t1").meta?.invalidates ?? []) {
+      await queryClient.invalidateQueries({ queryKey: scope, refetchType: "none" });
+    }
+
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
   });
 });
 
