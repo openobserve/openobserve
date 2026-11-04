@@ -19,7 +19,7 @@ use arrow::ipc::writer::IpcWriteOptions;
 use arrow_flight::{FlightData, error::FlightError};
 use config::metrics;
 use datafusion::execution::SendableRecordBatchStream;
-use flight::{common::PreCustomMessage, encoder::FlightDataEncoder};
+use flight::{common::NodeMessages, encoder::FlightDataEncoder};
 use futures::{Stream, StreamExt};
 use search_service::work_group::DeferredLock;
 use tokio::{sync::mpsc, task::JoinSet};
@@ -35,7 +35,7 @@ pub(crate) const MAX_FLIGHT_DATA_SIZE: usize = 32 * 1024 * 1024;
 pub struct FlightEncoderStreamBuilder {
     options: IpcWriteOptions,
     max_flight_data_size: usize,
-    custom_messages: Vec<PreCustomMessage>,
+    node_messages: Option<NodeMessages>,
     // query context
     trace_id: String,
     is_super: bool,
@@ -53,7 +53,7 @@ impl FlightEncoderStreamBuilder {
         Self {
             options,
             max_flight_data_size,
-            custom_messages: vec![],
+            node_messages: None,
             trace_id: String::new(),
             is_super: false,
             defer_lock: None,
@@ -62,11 +62,8 @@ impl FlightEncoderStreamBuilder {
         }
     }
 
-    pub fn with_custom_messages(
-        mut self,
-        messages: impl IntoIterator<Item = PreCustomMessage>,
-    ) -> Self {
-        self.custom_messages.extend(messages);
+    pub fn with_node_messages(mut self, messages: NodeMessages) -> Self {
+        self.node_messages = Some(messages);
         self
     }
 
@@ -139,7 +136,7 @@ impl FlightEncoderStreamBuilder {
             source,
             encoder: FlightDataEncoder::new(self.options, self.max_flight_data_size),
             queue: VecDeque::new(),
-            custom_messages: self.custom_messages,
+            node_messages: self.node_messages,
             first_data: true,
             done: false,
             ctx: StreamContext {
@@ -170,7 +167,7 @@ pub struct FlightEncoderStream {
     /// Only used to encode custom messages (scan stats, peak memory, ...).
     encoder: FlightDataEncoder,
     queue: VecDeque<FlightData>,
-    custom_messages: Vec<PreCustomMessage>,
+    node_messages: Option<NodeMessages>,
     first_data: bool,
     done: bool,
     /// query context + resources consumed by the stream's `Drop` teardown.
@@ -235,31 +232,23 @@ impl EventLog {
 }
 
 impl FlightEncoderStream {
-    fn encode_custom_messages(&mut self) -> Result<(), FlightError> {
-        let custom_messages = std::mem::take(&mut self.custom_messages);
-        for message in custom_messages.into_iter() {
-            if let Some(message) = message.get_custom_message() {
-                let flight_data = self.encoder.encode_custom(&message)?;
-                self.queue.push_back(flight_data);
-            }
+    /// Queues the node's messages due now; a stream with no batch sends its first ones at the end.
+    fn encode_node_messages(&mut self, at_end: bool) -> Result<(), FlightError> {
+        let Some(node) = &self.node_messages else {
+            return Ok(());
+        };
+        let mut messages = Vec::new();
+        if self.first_data {
+            messages.extend(node.first());
         }
-        Ok(())
-    }
-
-    fn encode_early_emit_messages(&mut self) -> Result<(), FlightError> {
-        let custom_messages = std::mem::take(&mut self.custom_messages);
-        let mut remainder_messages = Vec::new();
-        for message in custom_messages.into_iter() {
-            if message.is_early_emit() {
-                if let Some(message) = message.get_custom_message() {
-                    let flight_data = self.encoder.encode_custom(&message)?;
-                    self.queue.push_back(flight_data);
-                }
-            } else {
-                remainder_messages.push(message);
-            }
+        if at_end {
+            messages.extend(node.last());
         }
-        self.custom_messages = remainder_messages;
+        self.first_data = false;
+        for message in messages {
+            let flight_data = self.encoder.encode_custom(&message)?;
+            self.queue.push_back(flight_data);
+        }
         Ok(())
     }
 
@@ -321,14 +310,10 @@ impl Stream for FlightEncoderStream {
             // 4. pull the next encoded FlightData from the partition encoder(s)
             match this.poll_source(cx) {
                 Poll::Ready(Some(Ok(group))) => {
-                    // before the first data, emit early-emit custom messages
-                    if this.first_data {
-                        this.first_data = false;
-                        if !this.custom_messages.is_empty()
-                            && let Err(e) = this.encode_early_emit_messages()
-                        {
-                            return this.fail(e);
-                        }
+                    if this.first_data
+                        && let Err(e) = this.encode_node_messages(false)
+                    {
+                        return this.fail(e);
                     }
                     // enqueue the whole group so the chunk's dictionary and records stay contiguous
                     this.queue.extend(group);
@@ -348,7 +333,7 @@ impl Stream for FlightEncoderStream {
                     if !this.ctx.tasks.is_empty() {
                         return Poll::Pending;
                     }
-                    if let Err(e) = this.encode_custom_messages() {
+                    if let Err(e) = this.encode_node_messages(true) {
                         return this.fail(e);
                     }
                     this.done = true;
@@ -407,7 +392,7 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::search::ScanStats;
     use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
-    use flight::common::PreCustomMessage;
+    use flight::common::{CustomMessage, NodeRole};
     use futures::TryStreamExt;
 
     use super::*;
@@ -427,7 +412,7 @@ mod tests {
         assert!(!b.is_super);
         assert!(b.defer_lock.is_none());
         assert!(b.session_guard.is_some());
-        assert!(b.custom_messages.is_empty());
+        assert!(b.node_messages.is_none());
     }
 
     #[test]
@@ -462,10 +447,59 @@ mod tests {
     }
 
     #[test]
-    fn test_builder_with_custom_messages() {
-        let msg = PreCustomMessage::ScanStats(ScanStats::new());
-        let b = make_builder().with_custom_messages([msg]);
-        assert_eq!(b.custom_messages.len(), 1);
+    fn test_builder_with_node_messages() {
+        let b = make_builder().with_node_messages(follower_messages());
+        assert!(b.node_messages.is_some());
+    }
+
+    fn follower_messages() -> NodeMessages {
+        NodeMessages {
+            scan_stats: ScanStats::new(),
+            peak_memory: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            profile: None,
+            role: NodeRole::Follower,
+        }
+    }
+
+    async fn message_kinds(partition: SendableRecordBatchStream) -> Vec<&'static str> {
+        let fds: Vec<FlightData> = make_builder()
+            .with_node_messages(follower_messages())
+            .build(vec![partition], tracing::Span::none())
+            .try_collect()
+            .await
+            .unwrap();
+        fds.iter()
+            .map(
+                |fd| match config::utils::json::from_slice(&fd.app_metadata) {
+                    Ok(CustomMessage::ScanStats(_)) => "ScanStats",
+                    Ok(CustomMessage::PeakMemory(_)) => "PeakMemory",
+                    Ok(_) => "other",
+                    Err(_) => "data",
+                },
+            )
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_node_messages_surround_the_batches() {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
+        let batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![1, 2]))])
+                .unwrap();
+        let with_rows: SendableRecordBatchStream = Box::pin(RecordBatchStreamAdapter::new(
+            schema.clone(),
+            futures::stream::iter(vec![Ok(batch)]),
+        ));
+        let kinds = message_kinds(with_rows).await;
+        assert_eq!(kinds.first(), Some(&"ScanStats"));
+        assert_eq!(kinds.last(), Some(&"PeakMemory"));
+        assert!(kinds[1..kinds.len() - 1].iter().all(|kind| *kind == "data"));
+
+        let empty: SendableRecordBatchStream = Box::pin(RecordBatchStreamAdapter::new(
+            schema,
+            futures::stream::empty(),
+        ));
+        assert_eq!(message_kinds(empty).await, ["ScanStats", "PeakMemory"]);
     }
 
     #[test]

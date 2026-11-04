@@ -28,7 +28,7 @@ use datafusion::{
     common::{DataFusionError, Result},
     physical_plan::execute_stream_partitioned,
 };
-use flight::common::{MetricsInfo, PreCustomMessage};
+use flight::common::{MetricsInfo, NodeMessages};
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
@@ -49,7 +49,7 @@ use crate::handler::grpc::{
     MetadataMap,
     flight::{
         stream::{FlightEncoderStreamBuilder, MAX_FLIGHT_DATA_SIZE},
-        visitor::{get_partial_err, get_peak_memory, get_peak_memory_from_ctx, get_scan_stats},
+        visitor::{get_peak_memory_from_ctx, node_role},
     },
 };
 
@@ -173,26 +173,15 @@ impl FlightService for FlightServiceImpl {
                 Status::internal(e.to_string())
             })?;
 
-        // The plan has a remote scan only when this node calls other nodes itself.
-        let partial_err_ref = get_partial_err(&plan);
-        let custom_messages = [
-            Some(PreCustomMessage::ScanStats(scan_stats)),
-            get_scan_stats(&plan).map(PreCustomMessage::ScanStatsRef),
-            req.search_info.is_analyze.then(|| {
-                PreCustomMessage::Metrics(MetricsInfo {
-                    plan: plan.clone(),
-                    build_profile: profile::build_profile,
-                })
+        let node_messages = NodeMessages {
+            scan_stats,
+            peak_memory: get_peak_memory_from_ctx(&ctx),
+            profile: req.search_info.is_analyze.then(|| MetricsInfo {
+                plan: plan.clone(),
+                build_profile: profile::build_profile,
             }),
-            Some(PreCustomMessage::PeakMemoryRef(get_peak_memory_from_ctx(
-                &ctx,
-            ))),
-            get_peak_memory(&plan).map(PreCustomMessage::PeakMemoryRef),
-            partial_err_ref
-                .clone()
-                .map(PreCustomMessage::PartialErrRefEarly),
-            partial_err_ref.map(PreCustomMessage::PartialErrRef),
-        ];
+            role: node_role(&plan),
+        };
 
         // One stream per output partition so they encode in parallel
         let streams = execute_stream_partitioned(plan, ctx.task_ctx()).map_err(|e| {
@@ -208,7 +197,7 @@ impl FlightService for FlightServiceImpl {
                 .with_is_super(is_super_cluster)
                 .with_defer_lock(lock)
                 .with_start(start)
-                .with_custom_messages(custom_messages.into_iter().flatten())
+                .with_node_messages(node_messages)
                 .build(streams, span);
 
         let stream = async_stream::stream! {

@@ -124,20 +124,65 @@ pub struct Metrics {
     pub profile: Option<ProfileNode>,
 }
 
-/// A custom message for the flight stream; the shared references are read only when it is encoded.
-pub enum PreCustomMessage {
+/// What a node sends besides its record batches; the shared references are read when sent.
+pub struct NodeMessages {
     /// This node's own scan stats, known before execution.
-    ScanStats(ScanStats),
-    /// What a remote scan in this plan collects from the nodes it calls.
-    ScanStatsRef(Arc<Mutex<ScanStats>>),
-    /// The plan to send back as a profile for EXPLAIN ANALYZE.
-    Metrics(MetricsInfo),
-    /// The peak of this node's memory pool, or of the nodes a remote scan in this plan calls.
-    PeakMemoryRef(Arc<AtomicUsize>),
-    /// Errors of the remote scan's calls, sent before the first batch so fast failures show early.
-    PartialErrRefEarly(Arc<Mutex<String>>),
-    /// The same errors, sent again after the last batch.
-    PartialErrRef(Arc<Mutex<String>>),
+    pub scan_stats: ScanStats,
+    /// The peak of this node's memory pool.
+    pub peak_memory: Arc<AtomicUsize>,
+    /// The plan to send back as a profile; set only for EXPLAIN ANALYZE.
+    pub profile: Option<MetricsInfo>,
+    pub role: NodeRole,
+}
+
+impl NodeMessages {
+    /// Sent before the first batch, so the caller sees scan stats and fast failures early.
+    pub fn first(&self) -> Vec<CustomMessage> {
+        let mut messages = vec![CustomMessage::ScanStats(self.scan_stats)];
+        if let NodeRole::ClusterLeader(remote) = &self.role {
+            messages.push(CustomMessage::ScanStats(*remote.scan_stats.lock()));
+            messages.extend(remote.partial_err());
+        }
+        messages
+    }
+
+    /// Sent after the last batch.
+    pub fn last(&self) -> Vec<CustomMessage> {
+        let mut messages = vec![CustomMessage::PeakMemory(
+            self.peak_memory.load(Ordering::Relaxed),
+        )];
+        if let NodeRole::ClusterLeader(remote) = &self.role {
+            messages.push(CustomMessage::PeakMemory(
+                remote.peak_memory.load(Ordering::Relaxed),
+            ));
+            messages.extend(remote.partial_err());
+        }
+        if let Some(info) = &self.profile {
+            messages.push(CustomMessage::Metrics(collect_metrics(info)));
+        }
+        messages
+    }
+}
+
+pub enum NodeRole {
+    /// Scans the data itself.
+    Follower,
+    /// A super cluster's cluster leader, which passes the query on to its own followers.
+    ClusterLeader(RemoteScanRefs),
+}
+
+/// What a cluster leader's remote scan collects from the followers it calls.
+pub struct RemoteScanRefs {
+    pub scan_stats: Arc<Mutex<ScanStats>>,
+    pub peak_memory: Arc<AtomicUsize>,
+    pub partial_err: Arc<Mutex<String>>,
+}
+
+impl RemoteScanRefs {
+    fn partial_err(&self) -> Option<CustomMessage> {
+        let err = self.partial_err.lock().clone();
+        (!err.is_empty()).then_some(CustomMessage::PartialErr(err))
+    }
 }
 
 pub struct MetricsInfo {
@@ -146,33 +191,6 @@ pub struct MetricsInfo {
     pub build_profile: fn(&dyn ExecutionPlan) -> ProfileNode,
 }
 
-impl PreCustomMessage {
-    pub fn is_early_emit(&self) -> bool {
-        matches!(
-            self,
-            PreCustomMessage::ScanStats(_)
-                | PreCustomMessage::ScanStatsRef(_)
-                | PreCustomMessage::PartialErrRefEarly(_)
-        )
-    }
-
-    pub fn get_custom_message(&self) -> Option<CustomMessage> {
-        match self {
-            PreCustomMessage::ScanStats(stats) => Some(CustomMessage::ScanStats(*stats)),
-            PreCustomMessage::ScanStatsRef(stats) => Some(CustomMessage::ScanStats(*stats.lock())),
-            PreCustomMessage::Metrics(info) => Some(CustomMessage::Metrics(collect_metrics(info))),
-            PreCustomMessage::PeakMemoryRef(peak) => {
-                Some(CustomMessage::PeakMemory(peak.load(Ordering::Relaxed)))
-            }
-            PreCustomMessage::PartialErrRefEarly(err) | PreCustomMessage::PartialErrRef(err) => {
-                let err = err.lock().clone();
-                (!err.is_empty()).then_some(CustomMessage::PartialErr(err))
-            }
-        }
-    }
-}
-
-// collect metrics from physical plan
 fn collect_metrics(metrics_info: &MetricsInfo) -> Vec<Metrics> {
     vec![Metrics {
         node_address: LOCAL_NODE.get_grpc_addr().to_string(),
@@ -232,96 +250,78 @@ mod tests {
         assert_eq!(metrics.metrics, "");
     }
 
+    fn describe(messages: Vec<CustomMessage>) -> Vec<String> {
+        messages
+            .into_iter()
+            .map(|message| match message {
+                CustomMessage::ScanStats(stats) => format!("ScanStats({})", stats.files),
+                CustomMessage::PeakMemory(peak) => format!("PeakMemory({peak})"),
+                CustomMessage::PartialErr(err) => format!("PartialErr({err})"),
+                CustomMessage::Metrics(metrics) => {
+                    format!("Metrics({})", metrics[0].profile.as_ref().unwrap().name)
+                }
+            })
+            .collect()
+    }
+
     #[test]
-    fn test_pre_custom_message_is_early_emit() {
-        let scan_stats = create_test_scan_stats();
+    fn test_follower_sends_only_its_own_values() {
+        let messages = NodeMessages {
+            scan_stats: create_test_scan_stats(),
+            peak_memory: Arc::new(AtomicUsize::new(5)),
+            profile: None,
+            role: NodeRole::Follower,
+        };
+        assert_eq!(describe(messages.first()), ["ScanStats(10)"]);
+        assert_eq!(describe(messages.last()), ["PeakMemory(5)"]);
+    }
 
-        // Test ScanStats variant
-        let pre_msg = PreCustomMessage::ScanStats(scan_stats);
-        assert!(pre_msg.is_early_emit());
+    #[test]
+    fn test_cluster_leader_also_sends_what_its_remote_scan_collected() {
+        let remote = RemoteScanRefs {
+            scan_stats: Arc::new(Mutex::new(ScanStats {
+                files: 3,
+                ..Default::default()
+            })),
+            peak_memory: Arc::new(AtomicUsize::new(7)),
+            partial_err: Arc::new(Mutex::new(String::new())),
+        };
+        let partial_err = remote.partial_err.clone();
+        let messages = NodeMessages {
+            scan_stats: create_test_scan_stats(),
+            peak_memory: Arc::new(AtomicUsize::new(5)),
+            profile: Some(MetricsInfo {
+                plan: create_test_execution_plan(),
+                build_profile: test_profile,
+            }),
+            role: NodeRole::ClusterLeader(remote),
+        };
+        assert_eq!(
+            describe(messages.first()),
+            ["ScanStats(10)", "ScanStats(3)"]
+        );
 
-        // Test ScanStatsRef variant
-        let stats_ref = Arc::new(Mutex::new(scan_stats));
-        let pre_msg = PreCustomMessage::ScanStatsRef(stats_ref);
-        assert!(pre_msg.is_early_emit());
+        *partial_err.lock() = "node down".to_string();
+        assert_eq!(
+            describe(messages.last()),
+            [
+                "PeakMemory(5)",
+                "PeakMemory(7)",
+                "PartialErr(node down)",
+                "Metrics(EmptyExec)"
+            ]
+        );
+    }
 
-        // Test Metrics variant (should be false)
-        let pre_msg = PreCustomMessage::Metrics(MetricsInfo {
+    #[test]
+    fn test_profile_carries_this_node() {
+        let metrics = collect_metrics(&MetricsInfo {
             plan: create_test_execution_plan(),
             build_profile: test_profile,
         });
-        assert!(!pre_msg.is_early_emit());
-    }
-
-    #[test]
-    fn test_pre_custom_message_get_custom_message_scan_stats() {
-        let scan_stats = create_test_scan_stats();
-
-        let pre_msg = PreCustomMessage::ScanStats(scan_stats);
-        let custom_msg = pre_msg.get_custom_message().unwrap();
-
-        match custom_msg {
-            CustomMessage::ScanStats(stats) => {
-                assert_eq!(stats.files, 10);
-                assert_eq!(stats.records, 1000);
-            }
-            _ => panic!("Expected ScanStats variant"),
-        }
-    }
-
-    #[test]
-    fn test_pre_custom_message_get_custom_message_scan_stats_ref() {
-        let scan_stats = create_test_scan_stats();
-        let stats_ref = Arc::new(Mutex::new(scan_stats));
-
-        let pre_msg = PreCustomMessage::ScanStatsRef(stats_ref);
-        let custom_msg = pre_msg.get_custom_message().unwrap();
-
-        match custom_msg {
-            CustomMessage::ScanStats(stats) => {
-                assert_eq!(stats.files, 10);
-                assert_eq!(stats.records, 1000);
-            }
-            _ => panic!("Expected ScanStats variant"),
-        }
-    }
-
-    #[test]
-    fn test_pre_custom_message_get_custom_message_metrics() {
-        let plan = create_test_execution_plan();
-        let metrics_info = MetricsInfo {
-            plan,
-            build_profile: test_profile,
-        };
-
-        let pre_msg = PreCustomMessage::Metrics(metrics_info);
-        let custom_msg = pre_msg.get_custom_message().unwrap();
-
-        match custom_msg {
-            CustomMessage::Metrics(metrics) => {
-                assert_eq!(metrics.len(), 1);
-                assert!(!metrics[0].node_address.is_empty());
-                assert!(!metrics[0].node_name.is_empty());
-                assert_eq!(metrics[0].profile.as_ref().unwrap().name, "EmptyExec");
-            }
-            _ => panic!("Expected Metrics variant"),
-        }
-    }
-
-    #[test]
-    fn test_pre_custom_message_skips_empty_partial_err() {
-        let err = Arc::new(Mutex::new(String::new()));
-        assert!(
-            PreCustomMessage::PartialErrRef(err.clone())
-                .get_custom_message()
-                .is_none()
-        );
-
-        *err.lock() = "node down".to_string();
-        match PreCustomMessage::PartialErrRefEarly(err).get_custom_message() {
-            Some(CustomMessage::PartialErr(err)) => assert_eq!(err, "node down"),
-            _ => panic!("Expected PartialErr variant"),
-        }
+        assert_eq!(metrics.len(), 1);
+        assert!(!metrics[0].node_address.is_empty());
+        assert!(!metrics[0].node_name.is_empty());
     }
 
     #[test]
