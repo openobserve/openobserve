@@ -5572,6 +5572,67 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_org_ingestion_token_is_judged_by_the_route_each_auth_layer_matched() {
+        let org = "route_wiring_org";
+        let token = "o2oi_route_wiring";
+        common::infra::config::ORGANIZATIONS.write().await.insert(
+            org.to_string(),
+            common::meta::organization::Organization {
+                identifier: org.to_string(),
+                name: org.to_string(),
+                org_type: "custom".to_string(),
+                service_account: None,
+            },
+        );
+        common::infra::config::ORG_INGESTION_TOKENS
+            .insert(format!("{org}/{token}"), "wiring-token".to_string());
+        let credentials = config::utils::base64::encode(&format!("collector@example.com:{token}"));
+        let app = Router::new().nest(
+            "/o2",
+            Router::new()
+                .nest("/api", service_routes())
+                .merge(other_service_routes()),
+        );
+        for (uri, header, accepted) in [
+            (format!("/o2/api/{org}/_bulk"), "Authorization", true),
+            (format!("/o2/api/{org}/kv/_json"), "Authorization", false),
+            (
+                format!("/o2/api/{org}/streams/_sub"),
+                "Authorization",
+                false,
+            ),
+            (
+                format!("/o2/aws/{org}/s/_kinesis_firehose"),
+                "X-Amz-Firehose-Access-Key",
+                true,
+            ),
+            (
+                format!("/o2/gcp/{org}/s/_sub?API-Key={credentials}"),
+                "",
+                true,
+            ),
+        ] {
+            let mut req = Request::builder().method(Method::POST).uri(&uri);
+            if header == "Authorization" {
+                req = req.header(header, format!("Basic {credentials}"));
+            } else if !header.is_empty() {
+                req = req.header(header, &credentials);
+            }
+            let status = app
+                .clone()
+                .oneshot(req.body(Body::empty()).unwrap())
+                .await
+                .unwrap()
+                .status();
+            assert_eq!(
+                status != StatusCode::UNAUTHORIZED,
+                accepted,
+                "POST {uri}: {status}"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn the_public_link_take_over_route_is_mounted_for_post_only() {
         let app = public_dashboard_admin_routes(Router::new());
         let request = |method: &str, path: &str| {

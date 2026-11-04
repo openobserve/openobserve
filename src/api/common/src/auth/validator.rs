@@ -2488,9 +2488,50 @@ CN5lTowpVXP2OIiiNTGa75Fj
             "a user's ingestion-only static token must not manage collectors"
         );
         fleet_prefixed_password_never_reaches_the_user_lookup(org_id, init_user).await;
+        exercise_root_creates_an_org_only_on_an_ingestion_route(init_user, pwd).await;
 
         #[cfg(feature = "enterprise")]
         exercise_lockout(org_id, init_user, pwd).await;
+    }
+
+    async fn exercise_root_creates_an_org_only_on_an_ingestion_route(root_user: &str, pwd: &str) {
+        // `is_root_user` reads the org-user cache, which nothing populates under test.
+        ORG_USERS.insert(
+            format!("{DEFAULT_ORG}/{root_user}"),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: "root_token".to_string(),
+                rum_token: None,
+                org_id: DEFAULT_ORG.to_string(),
+                email: root_user.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+        let credentials = base64::encode(&format!("{root_user}:{pwd}"));
+        let auth = AuthExtractor::bypass(format!("Basic {credentials}"), String::new());
+        for (org, uri, route, created) in [
+            (
+                "autoviakv",
+                "/autoviakv/kv/_json",
+                "/api/{org_id}/kv/{key}",
+                false,
+            ),
+            (
+                "autoviabulk",
+                "/autoviabulk/_bulk",
+                "/api/{org_id}/_bulk",
+                true,
+            ),
+        ] {
+            let result = oo_validator(&post_request(uri, route, HeaderMap::new()), &auth).await;
+            assert_eq!(result.is_ok(), created, "root POST {uri}");
+            assert_eq!(
+                organization::get_org(org).await.is_some(),
+                created,
+                "org {org}"
+            );
+        }
     }
 
     // NULL `password_ext`, exactly as the SRE-agent service-account migration writes it.

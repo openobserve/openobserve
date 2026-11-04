@@ -257,9 +257,8 @@ fn is_route_param(segment: &str) -> bool {
         .is_some_and(|name| !name.is_empty() && !name.starts_with('*'))
 }
 
-/// The part of the full `MatchedPath` below the mount prefixes `path` has already lost.
+/// The part of the full `MatchedPath` below the mount prefixes `path` (no leading `/`) has lost.
 fn route_below_mount<'a>(route: &'a str, path: &str) -> Option<&'a str> {
-    let path = path.strip_prefix('/').unwrap_or(path);
     let route = route.strip_prefix('/').unwrap_or(route);
     let skip = route
         .split('/')
@@ -448,7 +447,7 @@ mod tests {
             );
         }
         assert_eq!(
-            classify(&Method::POST, "default/_bulk", Some("/{org_id}/{x}/{y}")),
+            classify(&Method::POST, "default/_bulk", Some("/{org_id}/{x}/_bulk")),
             None,
             "a mount prefix holding a param is misaligned"
         );
@@ -587,6 +586,15 @@ mod tests {
                     classify(&method, literal, Some(&format!("/api/{literal}"))),
                     None,
                     "single-segment route /{literal} must not classify as the ES ping"
+                );
+                assert_eq!(
+                    classify(
+                        &method,
+                        &format!("{literal}/"),
+                        Some(&format!("/api/{literal}/"))
+                    ),
+                    None,
+                    "a literal route /{literal}/ is not the ES ping"
                 );
             }
         }
