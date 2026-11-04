@@ -138,14 +138,40 @@ describe("distribution buckets", () => {
     );
   });
 
-  it("keeps a full bucket count of the cap within the cap without a warning", () => {
-    const buckets = distributionBuckets([0.3, 997.7], {
+  it("keeps the bucket width of a full bucket count when alignment adds a bucket past the cap", () => {
+    const buckets = distributionBuckets([0.3, 1000], {
       distribution_bucket_count: DISTRIBUTION_MAX_BUCKETS,
       distribution_bucket_offset: 0.5,
     })!;
-    expect(buckets.count).toBeLessThanOrEqual(DISTRIBUTION_MAX_BUCKETS);
-    expect(buckets.start + buckets.count * buckets.size).toBeGreaterThan(997.7);
+    expect(buckets.size).toBe(1);
+    expect(buckets.count).toBe(DISTRIBUTION_MAX_BUCKETS + 1);
+    expect(buckets.start + buckets.count * buckets.size).toBeGreaterThan(1000);
     expect(buckets).not.toHaveProperty("widenedFrom");
+  });
+
+  it("keeps edges precise for huge offsets, tiny sizes and wide buckets, and skips an infinite range", () => {
+    const shifted = distributionBuckets([0.1, 0.7], {
+      distribution_bucket_size: 0.1,
+      distribution_bucket_offset: 1e9,
+    })!;
+    expect(shifted.start).toBeCloseTo(0.1, 12);
+    expect(bucketCounts([0.1, 0.7], shifted)[0]).toBe(1);
+    const wide = distributionBuckets([1e12, 9e12], {
+      distribution_bucket_size: 1e12,
+      distribution_bucket_offset: 2,
+    })!;
+    expect(wide.start).toBeLessThanOrEqual(1e12);
+    const below = distributionBuckets([-0.0000026, 89106], { distribution_bucket_size: 5000 })!;
+    expect(below.start).toBe(-5000);
+    expect(distributionBuckets([-Number.MAX_VALUE, Number.MAX_VALUE], {})).toBeNull();
+    const epochMs = distributionBuckets([1700000000049, 1700000001000], {
+      distribution_bucket_size: 50,
+    })!;
+    expect(epochMs.start).toBe(1700000000000);
+    const nearEdge = distributionBuckets([-252772.66, -2.184e-7, 2899.04], {})!;
+    expect(bucketCounts([-2.184e-7], nearEdge).indexOf(1)).toBe(
+      Math.floor((-2.184e-7 - nearEdge.start) / nearEdge.size),
+    );
   });
 
   it("counts each value into its bucket and clamps past the last one", () => {
@@ -281,6 +307,33 @@ describe("distribution through convertPanelData", () => {
       expect(new Set(colors).size).toBe(colors.length);
     }
 
+    const colorOf = async (data: any[]) => {
+      const { options } = await viaPanel(
+        panel("distribution", { y: [latency], breakdown: [service] }),
+        [data],
+      );
+      return Object.fromEntries(options.series.map((s: any) => [s.name, s.itemStyle.color]));
+    };
+    const ordered = [
+      { y_axis_1: 1, breakdown_1: "web" },
+      { y_axis_1: 2, breakdown_1: "api" },
+      { y_axis_1: 3, breakdown_1: "svc10" },
+      { y_axis_1: 4, breakdown_1: "svc7" },
+    ];
+    expect(await colorOf([...ordered].reverse())).toEqual(await colorOf(ordered));
+    const ties = [
+      { y_axis_1: 1, breakdown_1: "1" },
+      { y_axis_1: 2, breakdown_1: "01" },
+    ];
+    expect(await colorOf([...ties].reverse())).toEqual(await colorOf(ties));
+    const literal = [
+      { y_axis_1: 1, breakdown_1: "(empty)" },
+      { y_axis_1: 2, breakdown_1: null },
+      { y_axis_1: 3, breakdown_1: "api" },
+    ];
+    expect(Object.keys(await colorOf(literal))).toEqual(["api", "(empty)"]);
+    expect(await colorOf([...literal].reverse())).toEqual(await colorOf(literal));
+
     const mapped = await viaPanel(
       panel(
         "distribution",
@@ -347,11 +400,99 @@ describe("distribution through convertPanelData", () => {
       "1s – 1.2s",
     );
     expect(await tooltipAt({ distribution_bucket_size: 25 }, [30, 60], 0)).toContain("25 – 50");
+    expect(await tooltipAt({ distribution_bucket_size: 1e-9 }, [1e-9, 5e-9], 1)).toContain(
+      "0.000000002 – 0.000000003",
+    );
+    expect(await tooltipAt({ distribution_bucket_size: 1e-12 }, [42, 42], 0)).toContain(
+      "42 – 42.000000000001",
+    );
+    // Edges near zero carry the float error of a start or offset far from zero.
+    expect(
+      await tooltipAt(
+        { decimals: 2, distribution_bucket_size: 0.1, distribution_bucket_offset: 0.05 },
+        [-49.9, 0.2],
+        499,
+      ),
+    ).toContain("-0.05 – 0.05<");
+    expect(
+      await tooltipAt(
+        { decimals: 2, distribution_bucket_count: 1000, distribution_bucket_offset: -12345.6789 },
+        [3e-7, 3e-7],
+        0,
+      ),
+    ).toMatch(/<strong>0 – 0\.0000005<\/strong>/);
+    expect(
+      await tooltipAt(
+        { distribution_bucket_count: 1000, distribution_bucket_offset: 0.37 },
+        [89106, 0.05, -0.0000026],
+        0,
+      ),
+    ).toContain("-99.63 – 0.37<");
+    expect(
+      await tooltipAt(
+        {
+          unit: "percent-1",
+          decimals: 2,
+          distribution_bucket_size: 0.001,
+          distribution_bucket_offset: 0.0005,
+        },
+        [-0.4999, 0.0002],
+        500,
+      ),
+    ).toContain("-0.05% – 0.05%");
   });
 
-  it("counts a value on a bucket edge into the bucket that starts there, and shows no -0 edge", () => {
+  it("counts a value on a bucket edge into the bucket that starts there, and shows no -0 edge", async () => {
     const buckets = distributionBuckets([0.1, 0.3], { distribution_bucket_size: 0.1 })!;
     expect(bucketCounts([0.1, 0.3], buckets)).toEqual([1, 0, 1]);
+    // With this offset the float edge at zero comes out as -5.5e-17.
+    const { options } = await viaPanel(
+      panel(
+        "distribution",
+        { y: [latency] },
+        { decimals: 2, distribution_bucket_size: 0.1, distribution_bucket_offset: 0.3 },
+      ),
+      [[{ y_axis_1: -0.3 }, { y_axis_1: 0.05 }]],
+    );
+    const tooltip = options.tooltip.formatter([
+      { dataIndex: 2, color: "#000", seriesName: "Latency", value: [-0.05, 1] },
+    ]);
+    expect(tooltip).toContain("-0.1 – 0</strong>");
+    expect(tooltip).not.toContain("-0<");
+  });
+
+  it("keeps tooltip edges exact for currency units, whose text has thousands separators", async () => {
+    const { options } = await viaPanel(
+      panel(
+        "distribution",
+        { y: [latency] },
+        {
+          unit: "currency-dollar",
+          decimals: 0,
+          distribution_bucket_size: 1,
+          distribution_bucket_offset: 0.5,
+        },
+      ),
+      [[{ y_axis_1: 1234.7 }]],
+    );
+    const tooltip = options.tooltip.formatter([
+      { dataIndex: 0, color: "#000", seriesName: "Latency", value: [1235, 1] },
+    ]);
+    expect(tooltip).toContain("1,234.5");
+    expect(tooltip).toContain("1,235.5");
+    const rounded = await viaPanel(
+      panel(
+        "distribution",
+        { y: [latency] },
+        { unit: "currency-dollar", decimals: 0, distribution_bucket_size: 0.2 },
+      ),
+      [[{ y_axis_1: 999.5 }]],
+    );
+    expect(
+      rounded.options.tooltip.formatter([
+        { dataIndex: 0, color: "#000", seriesName: "Latency", value: [999.5, 1] },
+      ]),
+    ).toContain("999.4 – $999.6");
   });
 
   it("warns when the bucket size is widened, and keeps room for the Count title", async () => {

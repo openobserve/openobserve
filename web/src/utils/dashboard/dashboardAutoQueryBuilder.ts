@@ -14,6 +14,12 @@ import {
 // Builder y functions that stay per-row, so a raw-value chart can filter on them in WHERE.
 const ROW_SCALAR_FUNCTIONS = new Set<string | null>([null, "cast", "try_cast"]);
 
+interface BuilderYField {
+  type?: string;
+  functionName?: string | null;
+  isDerived?: boolean;
+}
+
 export function buildSQLQueryFromInput(fields: any, defaultStream: any): string {
   // Handle undefined or null fields
   if (!fields) {
@@ -566,20 +572,23 @@ function heatmapYBucketPlan(
 }
 
 /** A raw-value chart keeps only rows with a y value, so its row cap is not spent on rows it cannot plot. */
-function rawValuePresentSql(queryData: any, chartType: string, streamAlias: string): string {
+function rawValuePresentSql(
+  queryData: { fields: { y: BuilderYField[] } },
+  chartType: string,
+  streamAlias: string,
+): string {
   if (!isRawValueChart(chartType)) return "";
-  const fields = queryData.fields.y.filter((field: any) => !field?.isDerived);
+  const fields = queryData.fields.y.filter((field) => !field?.isDerived);
   // An aggregate cannot go in WHERE, and skipping one y field would drop the rows only it has.
   if (
     fields.some(
-      (field: any) =>
-        field?.type === "raw" || !ROW_SCALAR_FUNCTIONS.has(field?.functionName ?? null),
+      (field) => field?.type === "raw" || !ROW_SCALAR_FUNCTIONS.has(field?.functionName ?? null),
     )
   ) {
     return "";
   }
   const present = fields
-    .map((field: any) => buildSQLQueryFromInput(field, streamAlias))
+    .map((field) => buildSQLQueryFromInput(field, streamAlias))
     .filter(Boolean)
     .map((expr: string) => `${/^[\w."]+$/.test(expr) ? expr : `(${expr})`} IS NOT NULL`);
   return present.length > 1 ? `(${present.join(" OR ")})` : (present[0] ?? "");
