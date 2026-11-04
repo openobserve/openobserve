@@ -37,6 +37,7 @@ import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { REFRESH_QUERY_ORIGIN } from "@/composables/useLogs/logsRowNav";
 import { urlWriteMode } from "@/composables/useLogs/useLogsUrl";
+import { saveLogsStreamType } from "@/utils/streamPersist";
 
 initializeLogsIndexDom();
 
@@ -181,6 +182,15 @@ describe("Logs Index — first landing and URL loads (item 2)", { timeout: 30000
     expect(urlWriteMode(current, { ...current, stream: "k8s_json", query: "ZWRpdGVk" })).toBe(
       "push",
     );
+  });
+
+  it.each([
+    ["licensed", {}, "traces"],
+    ["locked", { traces: "locked" }, "logs"],
+  ])("restores a remembered traces type only while traces is %s", async (_s, features, type) => {
+    saveLogsStreamType(org, "traces");
+    await land({}, { auto_query_enabled: true, query_on_stream_selection: true, features });
+    expect(wrapper.vm.searchObj.data.stream.streamType).toBe(type);
   });
 
   it("AQE=false: no restore and no preselect, as today", async () => {

@@ -25,6 +25,7 @@ import {
 } from "@/composables/useAccessStore";
 import { usePasswordReset } from "@/composables/usePasswordReset";
 import { isPasswordResetError } from "@/utils/passwordResetErrors";
+import { receiveLicenseDenial } from "@/services/licenseDenialReceiver";
 
 declare module "axios" {
   interface AxiosRequestConfig {
@@ -34,6 +35,7 @@ declare module "axios" {
     silentForbidden?: boolean;
     /** Route the request started on, so a late 403 is not pinned on the page the user moved to. */
     accessRouteKey?: string;
+    startedAt?: number;
   }
 }
 
@@ -108,6 +110,7 @@ const http = ({ headers } = {} as any) => {
   instance.interceptors.request.use((requestConfig) => {
     // A retry after a token refresh reuses its config, so it keeps the page that first asked.
     requestConfig.accessRouteKey ??= currentAccessRouteKey();
+    requestConfig.startedAt = Date.now();
     return requestConfig;
   });
 
@@ -127,6 +130,8 @@ const http = ({ headers } = {} as any) => {
         // A blocked page fires many requests behind an undismissable dialog; one toast per rejection would stack.
         return new Promise(() => {});
       }
+      // Ahead of the status switch: a license denial must not read as a missing RBAC permission.
+      if (receiveLicenseDenial(error, error?.config?.startedAt)) return Promise.reject(error);
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:

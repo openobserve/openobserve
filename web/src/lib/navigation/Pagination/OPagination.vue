@@ -3,6 +3,7 @@ import { computed, useAttrs } from "vue";
 import type { PaginationProps, PaginationEmits } from "./OPagination.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18nTyped } from "@/types/i18n";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 const { t } = useI18nTyped();
 
@@ -19,6 +20,7 @@ const props = withDefaults(defineProps<PaginationProps>(), {
 });
 
 const emit = defineEmits<PaginationEmits>();
+const isDisabled = useLockedDisabled(() => props.disable);
 
 /** Clamp a value between min and max (inclusive). */
 const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
@@ -47,7 +49,7 @@ const isFirst = computed(() => props.modelValue <= 1);
 const isLast = computed(() => props.modelValue >= props.max);
 
 const navigate = (page: number) => {
-  if (props.disable) return;
+  if (isDisabled.value) return;
   const clamped = clamp(page, 1, props.max);
   if (clamped !== props.modelValue) {
     emit("update:modelValue", clamped);
@@ -67,11 +69,11 @@ const navigate = (page: number) => {
       type="button"
       class="o-pagination__btn rounded-default flex size-7 items-center justify-center transition-colors"
       :class="[
-        isFirst || disable
+        isFirst || isDisabled
           ? 'text-pagination-nav-disabled-text cursor-not-allowed opacity-50'
           : 'text-pagination-nav-text hover:bg-pagination-nav-hover-bg cursor-pointer',
       ]"
-      :disabled="isFirst || disable"
+      :disabled="isFirst || isDisabled"
       :aria-label="t('components.pagination.previousPage')"
       :data-test="parentDataTest ? `${parentDataTest}-prev` : undefined"
       @click="navigate(modelValue - 1)"
@@ -88,11 +90,11 @@ const navigate = (page: number) => {
       :class="[
         page === modelValue
           ? 'bg-pagination-item-active-bg text-pagination-item-active-text cursor-default'
-          : disable
+          : isDisabled
             ? 'text-pagination-item-disabled-text cursor-not-allowed opacity-50'
             : 'text-pagination-item-text hover:bg-pagination-item-hover-bg cursor-pointer',
       ]"
-      :disabled="disable && page !== modelValue"
+      :disabled="isDisabled && page !== modelValue"
       :aria-label="t('common.pageNumber', { page })"
       :aria-current="page === modelValue ? 'page' : undefined"
       :data-test="parentDataTest ? `${parentDataTest}-page-${page}` : undefined"
@@ -108,11 +110,11 @@ const navigate = (page: number) => {
       type="button"
       class="o-pagination__btn rounded-default flex size-7 items-center justify-center transition-colors"
       :class="[
-        isLast || disable
+        isLast || isDisabled
           ? 'text-pagination-nav-disabled-text cursor-not-allowed opacity-50'
           : 'text-pagination-nav-text hover:bg-pagination-nav-hover-bg cursor-pointer',
       ]"
-      :disabled="isLast || disable"
+      :disabled="isLast || isDisabled"
       :aria-label="t('components.pagination.nextPage')"
       :data-test="parentDataTest ? `${parentDataTest}-next` : undefined"
       @click="navigate(modelValue + 1)"

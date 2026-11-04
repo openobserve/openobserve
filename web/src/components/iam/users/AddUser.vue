@@ -111,34 +111,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="showLabelOnTop mt-2"
           data-test="user-role-field"
         />
-        <OFormSelect
+        <OTooltip
           v-if="
             (existingUser || beingUpdated) &&
             userRole !== 'member' &&
             store.state.userInfo.email !== formEmail &&
-            (config.isEnterprise == 'true' || config.isCloud == 'true')
+            (config.isEnterprise == 'true' || config.isCloud == 'true') &&
+            rbacState !== 'hidden'
           "
-          name="custom_role"
-          :label="t('user.customRole')"
-          :options="filterdOption"
-          class="showLabelOnTop mt-2"
-          multiple
-          data-test="user-custom-role-field"
-          :disable="
-            isCloud ? filterdOption.length === 0 : filterdOption.length === 0 || !!isExternalUser
-          "
-          :hint="
-            isCloud
-              ? filterdOption.length === 0
-                ? t('user.noCustomRolesHint')
-                : ''
-              : isExternalUser
-                ? t('user.externalUserCustomRoleHint')
-                : filterdOption.length === 0
-                  ? t('user.noCustomRolesHint')
-                  : ''
-          "
-        />
+          :content="rbacLockedReason"
+          :disabled="!rbacLocked"
+        >
+          <OFormSelect
+            name="custom_role"
+            :disabled="rbacLocked"
+            :label="t('user.customRole')"
+            :options="filterdOption"
+            class="showLabelOnTop mt-2"
+            multiple
+            data-test="user-custom-role-field"
+            :disable="
+              isCloud ? filterdOption.length === 0 : filterdOption.length === 0 || !!isExternalUser
+            "
+            :hint="
+              rbacLocked
+                ? ''
+                : isCloud
+                  ? filterdOption.length === 0
+                    ? t('user.noCustomRolesHint')
+                    : ''
+                  : isExternalUser
+                    ? t('user.externalUserCustomRoleHint')
+                    : filterdOption.length === 0
+                      ? t('user.noCustomRolesHint')
+                      : ''
+            "
+          >
+            <template v-if="rbacLocked" #icon-left>
+              <OIcon name="lock" size="sm" class="lock-chip" />
+            </template>
+          </OFormSelect>
+        </OTooltip>
         <div v-if="beingUpdated && !isCloud" class="mt-2">
           <OFormSwitch
             name="change_password"
@@ -256,7 +269,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount, watch, type PropType } from "vue";
+import {
+  computed,
+  defineComponent,
+  ref,
+  onActivated,
+  onBeforeMount,
+  watch,
+  type PropType,
+} from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -286,6 +307,9 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import PasswordRequirementList from "@/components/common/PasswordRequirementList.vue";
 import { durationFormatter } from "@/utils/formatters";
 import { reuseRejection } from "@/utils/passwordComplexity";
+import { featureState } from "@/utils/featureGate";
+import { useLicenseLock } from "@/composables/useFeatureLock";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -314,6 +338,7 @@ export default defineComponent({
     OFormSelect,
     OFormSwitch,
     OTruncatedText,
+    OTooltip,
     PasswordRequirementList,
   },
   props: {
@@ -407,6 +432,10 @@ export default defineComponent({
     // `custom_role` is an Enterprise/Cloud-only concept — the field is rendered
     // and hydrated (getUserRoles) ONLY under this flag.
     const supportsCustomRole = config.isEnterprise == "true" || config.isCloud == "true";
+    // Custom roles cannot be listed without the rbac license, so the picker would stay empty.
+    const rbacState = computed(() => featureState(store.state.zoConfig?.features, "rbac"));
+    const rbacLocked = computed(() => rbacState.value === "locked");
+    const { lockedReason: rbacLockedReason } = useLicenseLock("rbac");
 
     // Decide whether to send `custom_role`:
     //   • OSS → never (the field is Enterprise/Cloud-only).
@@ -729,6 +758,9 @@ export default defineComponent({
       existingUser,
       organization,
       isExternalUser,
+      rbacState,
+      rbacLocked,
+      rbacLockedReason,
       changePassword,
       formEmail,
       formRole,

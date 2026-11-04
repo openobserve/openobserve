@@ -756,6 +756,25 @@ describe("K8sDetailsDrawer actions", () => {
     expect(wrapper.emitted("action")).toHaveLength(3);
   });
 
+  it("locks Traces and Metrics behind their license, keeping Logs and YAML live", async () => {
+    const saved = store.state.zoConfig.features;
+    store.state.zoConfig.features = { traces: "locked", metrics: "locked", logs: "locked" };
+    try {
+      const ref = refOf("pod", "web-abc-1");
+      const wrapper = mountDrawer(ref);
+      for (const type of ["traces", "metrics"]) {
+        const button = wrapper.find(`[data-test="k8s2-drawer-action-${type}"]`);
+        expect(button.attributes("disabled")).toBeDefined();
+        expect(wrapper.find(`[data-test="k8s2-drawer-action-${type}-lock"]`).exists()).toBe(true);
+        await button.trigger("click");
+      }
+      await wrapper.find('[data-test="k8s2-drawer-view-logs"]').trigger("click");
+      expect(wrapper.emitted("action")).toEqual([["logs", ref]]);
+    } finally {
+      store.state.zoConfig.features = saved;
+    }
+  });
+
   it("emits action logs from the Logs button", async () => {
     const ref = refOf("pod", "web-abc-1");
     const wrapper = mountDrawer(ref);

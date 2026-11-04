@@ -595,12 +595,57 @@ describe("FleetCollectors", () => {
 
     it("restarts the selection after a confirm, once per collector", async () => {
       vi.mocked(fleet.restartCollector).mockResolvedValue({ data: { queued: true } } as any);
+      vi.mocked(fleet.listCollectors).mockResolvedValue({
+        data: { total: 2, items: [collector({ id: "c1" }), collector({ id: "c2" })] },
+      } as any);
       wrapper = await mountList();
       (wrapper.vm as any).selectedIds = ["c1", "c2"];
       await settle();
       await wrapper.find('[data-test="fleet-collectors-bulk-restart"]').trigger("click");
       await settle();
       expect(fleet.restartCollector).toHaveBeenCalledTimes(2);
+    });
+
+    it("restarts only the online part of a selection", async () => {
+      vi.mocked(fleet.restartCollector).mockResolvedValue({ data: { queued: true } } as any);
+      vi.mocked(fleet.listCollectors).mockResolvedValue({
+        data: {
+          total: 2,
+          items: [
+            collector({ id: "on", status: "online" }),
+            collector({ id: "off", status: "offline" }),
+          ],
+        },
+      } as any);
+      wrapper = await mountList();
+      (wrapper.vm as any).selectedIds = ["on", "off"];
+      await settle();
+      await wrapper.find('[data-test="fleet-collectors-bulk-restart"]').trigger("click");
+      await settle();
+      expect(fleet.restartCollector).toHaveBeenCalledTimes(1);
+      expect(fleet.restartCollector).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        "on",
+      );
+    });
+
+    it("offers no restart when the whole selection is offline", async () => {
+      vi.mocked(fleet.listCollectors).mockResolvedValue({
+        data: { total: 1, items: [collector({ id: "off", status: "offline" })] },
+      } as any);
+      wrapper = await mountList();
+      (wrapper.vm as any).selectedIds = ["off"];
+      await settle();
+      expect(wrapper.find('[data-test="fleet-collectors-bulk-restart"]').exists()).toBe(false);
+    });
+
+    it("disables a row's restart while the collector is offline", async () => {
+      vi.mocked(fleet.listCollectors).mockResolvedValue({
+        data: { total: 1, items: [collector({ id: "off", status: "offline" })] },
+      } as any);
+      wrapper = await mountList("/", menu);
+      const item = wrapper.find('[data-test="fleet-collectors-row-restart-off"]');
+      expect(item.attributes("disabled")).toBeDefined();
     });
 
     it("redelivers a row without asking", async () => {

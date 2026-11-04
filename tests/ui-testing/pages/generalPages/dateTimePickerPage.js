@@ -69,11 +69,12 @@ export class DateTimePickerPage {
         this.customPeriodTrigger = this.customRow.locator('[role="combobox"]');
 
         // ==================== Expected toast messages ====================
-        // Values of common.dateRangeCopied / dateRangePasted / dateRangePasteError
+        // Values of common.dateRangeCopied / dateRangePasted / dateRangePasteError / dateRangePasteEmpty
         // in web/src/locales/languages/en-US.json.
         this.copiedToastMessage = 'Date range copied';
         this.pastedToastMessage = 'Date range pasted';
         this.pasteErrorToastMessage = 'Could not parse date range';
+        this.pasteEmptyToastMessage = 'Clipboard is empty. Copy a date range first.';
     }
 
     // ==================== Locator factories ====================
@@ -248,6 +249,11 @@ export class DateTimePickerPage {
 
     async expectPasteErrorToast() {
         await expect(this.toastByMessage(this.pasteErrorToastMessage)).toBeVisible();
+    }
+
+    async expectPasteEmptyToast() {
+        await expect(this.toastByMessage(this.pasteEmptyToastMessage)).toBeVisible();
+        await expect(this.toastByMessage(this.pasteErrorToastMessage)).toHaveCount(0);
     }
 
     // ==================== Value readers ====================

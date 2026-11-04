@@ -459,16 +459,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</span>
                 </div>
                 <div class="ms-auto flex items-center gap-2">
+                  <OTooltip v-if="tracesLocked" :content="tracesLockedReason">
+                    <span class="inline-flex">
+                      <OButton
+                        variant="ghost"
+                        size="sm-action"
+                        disabled
+                        icon-left="lock"
+                        data-test="correlation-view-traces-page"
+                        class="text-xs"
+                      >
+                        {{ t("correlation.viewInTraces") }}
+                      </OButton>
+                    </span>
+                  </OTooltip>
                   <OButton
+                    v-else
                     variant="ghost"
                     size="sm-action"
+                    icon-left="open-in-new"
                     @click="openTracesPage"
                     data-test="correlation-view-traces-page"
                     class="text-xs"
                   >
-                    <OIcon name="open-in-new" size="xs" class="me-1" />
                     {{ t("correlation.viewInTraces") }}
-                    <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                   </OButton>
                   <OTag type="fieldTag" value="primary">
                     {{ tracesForDimensions.length }} {{ t("menu.traces") }}
@@ -904,16 +918,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
               </OTag>
               <div class="ms-auto flex items-center gap-2">
+                <OTooltip v-if="tracesLocked" :content="tracesLockedReason">
+                  <span class="inline-flex">
+                    <OButton
+                      variant="ghost"
+                      size="sm-action"
+                      disabled
+                      icon-left="lock"
+                      data-test="correlation-view-traces-page"
+                      class="text-xs"
+                    >
+                      {{ t("correlation.viewInTraces") }}
+                    </OButton>
+                  </span>
+                </OTooltip>
                 <OButton
+                  v-else
                   variant="ghost"
                   size="sm-action"
+                  icon-left="open-in-new"
                   @click="openTracesPage"
                   data-test="correlation-view-traces-page"
                   class="text-xs"
                 >
-                  <OIcon name="open-in-new" size="xs" class="me-1" />
                   {{ t("correlation.viewInTraces") }}
-                  <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                 </OButton>
               </div>
             </div>
@@ -1054,6 +1082,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { ref, computed, watch, defineAsyncComponent, provide, nextTick, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import useTraces from "@/composables/useTraces";
@@ -1163,6 +1192,7 @@ const emit = defineEmits<{
 const { showErrorNotification } = useNotifications();
 const store = useStore();
 const router = useRouter();
+const { locked: tracesLocked, lockedReason: tracesLockedReason } = useLicenseLock("traces");
 const { t } = useI18nTyped();
 const { generateDashboard, generateLogsDashboard } = useMetricsCorrelationDashboard(t);
 const { semanticGroups, loadSemanticGroups } = useServiceCorrelation();
@@ -2825,6 +2855,7 @@ const openTraceInNewWindow = (
         trace_end_time?: number;
       },
 ) => {
+  if (tracesLocked.value) return;
   // Handle case where event object is passed instead of trace_id (e.g., from @click without args)
   const traceObj = typeof trace === "string" ? undefined : trace;
   const traceId = typeof trace === "string" ? trace : trace.trace_id;

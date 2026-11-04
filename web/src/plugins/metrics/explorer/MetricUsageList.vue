@@ -62,7 +62,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="mb-4"
         :data-test="`metrics-detail-used-in-${group.kind}`"
       >
-        <h3 class="text-text-secondary mb-1 text-xs font-semibold">{{ group.label }}</h3>
+        <h3 class="text-text-secondary mb-1 flex items-center gap-1 text-xs font-semibold">
+          {{ group.label }}
+          <OTooltip v-if="isLocked(group.feature)" :content="lockedReason(group.feature)">
+            <span tabindex="0" class="inline-flex">
+              <OIcon
+                name="lock"
+                size="xs"
+                class="text-icon-locked"
+                :data-test="`metrics-detail-used-in-lock-${group.kind}`"
+              />
+              <span class="sr-only">{{ lockedReason(group.feature) }}</span>
+            </span>
+          </OTooltip>
+        </h3>
         <ul class="flex flex-col gap-1">
           <li v-for="item in group.items" :key="item.id" class="flex items-center gap-2">
             <router-link
@@ -105,12 +118,15 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 import type { MetricUsage, MetricUsageEntry } from "@/services/metrics";
 
 interface UsageGroup {
   kind: "dashboards" | "alerts" | "slos" | "pipelines";
+  feature: string;
   label: I18nText;
   items: MetricUsageEntry[];
   to: (item: MetricUsageEntry) => RouteLocationRaw;
@@ -125,6 +141,7 @@ const emit = defineEmits<{ retry: [] }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
+const { isLocked, lockedReason } = useLicenseLocks();
 
 const groups = computed<UsageGroup[]>(() => {
   const usage = props.usage;
@@ -133,6 +150,7 @@ const groups = computed<UsageGroup[]>(() => {
   const all: UsageGroup[] = [
     {
       kind: "dashboards",
+      feature: "dashboards",
       label: t("metrics.explorer.detail.usedIn.dashboards", { count: usage.dashboards.length }),
       items: usage.dashboards,
       to: (item) => ({
@@ -142,6 +160,7 @@ const groups = computed<UsageGroup[]>(() => {
     },
     {
       kind: "alerts",
+      feature: "alerts",
       label: t("metrics.explorer.detail.usedIn.alerts", { count: usage.alerts.length }),
       items: usage.alerts,
       to: (item) => ({
@@ -152,6 +171,7 @@ const groups = computed<UsageGroup[]>(() => {
     },
     {
       kind: "slos",
+      feature: "anomaly_detection",
       label: t("metrics.explorer.detail.usedIn.slos", { count: usage.slos.length }),
       items: usage.slos,
       to: (item) => ({
@@ -162,6 +182,7 @@ const groups = computed<UsageGroup[]>(() => {
     },
     {
       kind: "pipelines",
+      feature: "pipelines",
       label: t("metrics.explorer.detail.usedIn.pipelines", { count: usage.pipelines.length }),
       items: usage.pipelines,
       to: (item) => ({
