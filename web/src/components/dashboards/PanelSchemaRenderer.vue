@@ -2744,7 +2744,6 @@ export default defineComponent({
       exploreCellInLogs,
       ensureDrilldownSchema,
       panelBaseWhere,
-      panelWhereByStream,
       onCellDrawerOpenChange,
       exemplarsEligible,
       exemplarsEnabled,

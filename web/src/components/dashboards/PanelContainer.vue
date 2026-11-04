@@ -1205,18 +1205,13 @@ export default defineComponent({
       streamName: string,
     ): Promise<string | null> => {
       const renderer = PanleSchemaRendererRef.value;
+      // The panel's VRL was written for its result columns, which raw log rows don't have.
+      if (queryDetails.queries[0]?.vrlFunctionQuery?.trim()) return null;
       if (!supportsResultSchema(queryDetails.queries[0]?.fields?.stream_type) || !renderer) {
         return null;
       }
-      try {
-        await renderer.ensureDrilldownSchema(0, true);
-      } catch {
-        return null;
-      }
-      return buildPanelLogsQuery(query, streamName, {
-        baseWhere: renderer.panelBaseWhere ?? "",
-        whereByStream: renderer.panelWhereByStream ?? {},
-      });
+      await renderer.ensureDrilldownSchema(0, true);
+      return buildPanelLogsQuery(query, streamName, renderer.panelBaseWhere ?? "");
     };
 
     const licenseLocks = useLicenseLocks();

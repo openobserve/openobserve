@@ -20,14 +20,28 @@ import {
   stripWherePredicate,
 } from "@/utils/query/sqlComplexity";
 
-export interface PanelWhere {
-  baseWhere: string;
-  whereByStream: Record<string, string>;
+interface FromEntry {
+  table?: unknown;
+  as?: string | null;
 }
 
-let parserPromise: Promise<any> | null = null;
+interface SelectAst {
+  type?: string;
+  with?: unknown;
+  _next?: unknown;
+  set_op?: unknown;
+  having?: unknown;
+  where?: unknown;
+  from?: FromEntry[] | null;
+}
 
-const loadParser = (): Promise<any> => {
+interface SqlParser {
+  astify: (sql: string) => SelectAst | SelectAst[];
+}
+
+let parserPromise: Promise<SqlParser> | null = null;
+
+const loadParser = (): Promise<SqlParser> => {
   if (!parserPromise) {
     parserPromise = useParser().sqlParser();
     parserPromise.catch(() => {
@@ -37,7 +51,7 @@ const loadParser = (): Promise<any> => {
   return parserPromise;
 };
 
-const parseSingleSelect = async (sql: string): Promise<any | null> => {
+const parseSingleSelect = async (sql: string): Promise<SelectAst | null> => {
   // astify() is exponential in WHERE nesting; the WHERE text itself comes from the backend.
   const parseTarget = stripWherePredicate(sql);
   if (maxParenDepth(parseTarget) > SQL_PARSE_MAX_DEPTH) return null;
@@ -54,22 +68,20 @@ const parseSingleSelect = async (sql: string): Promise<any | null> => {
 export const buildPanelLogsQuery = async (
   sql: string,
   stream: string,
-  where: PanelWhere,
+  baseWhere: string,
 ): Promise<string | null> => {
   if (!sql || !stream) return null;
   const ast = await parseSingleSelect(sql);
   if (ast?.type !== "select" || ast.with || ast._next || ast.set_op || ast.having) return null;
 
-  const from: any[] = Array.isArray(ast.from) ? ast.from : [];
-  // A FROM entry without a plain table name is a subquery or table function.
-  if (!from.length || from.some((f) => typeof f?.table !== "string")) return null;
-  if (!from.some((f) => f.table === stream)) return null;
+  // One plain table only: a JOIN's filters can't all move onto one stream.
+  const from = Array.isArray(ast.from) ? ast.from : [];
+  if (from.length !== 1 || from[0].table !== stream) return null;
+  // The WHERE would keep the alias prefix, which neither this query nor the Logs histogram has.
+  if (from[0].as) return null;
 
-  const isJoin = from.length > 1;
-  const whereText = (isJoin ? where.whereByStream[stream] : where.baseWhere)?.trim() ?? "";
-  // For a JOIN an empty per-stream map means the backend could not split the WHERE.
-  const whereRead = isJoin ? Object.keys(where.whereByStream).length > 0 : whereText !== "";
-  if (ast.where && !whereRead) return null;
+  const whereText = baseWhere.trim();
+  if (ast.where && !whereText) return null;
 
   const table = `"${stream.replace(/"/g, '""')}"`;
   const filter = whereText ? ` WHERE ${whereText}` : "";

@@ -895,14 +895,13 @@ describe("PanelSchemaRenderer", () => {
     // PanelContainer's Go To Logs reads these off the renderer ref.
     it("exposes the panel WHERE through ensureDrilldownSchema on the instance", async () => {
       const resultSchema = vi.spyOn(searchService, "result_schema").mockResolvedValue({
-        data: { where_clause: "rev = 1", where_by_stream: { logs: "rev = 1" } },
+        data: { where_clause: "rev = 1", where_by_stream: {} },
       } as any);
       onTestFinished(() => resultSchema.mockRestore());
       wrapper = createWrapper();
       await wrapper.vm.ensureDrilldownSchema(0, true);
       expect(resultSchema).toHaveBeenCalledTimes(1);
       expect(wrapper.vm.panelBaseWhere).toBe("rev = 1");
-      expect(wrapper.vm.panelWhereByStream).toEqual({ logs: "rev = 1" });
     });
 
     it("makes no result_schema call on a chart click with cross-linking off", async () => {

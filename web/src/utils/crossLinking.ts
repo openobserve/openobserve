@@ -21,7 +21,7 @@ export const CROSS_LINKING_SUPPORTED_STREAM_TYPES = ["logs"] as const;
 
 /** True when `result_schema` can be called for this stream type, whatever the cross-linking config. */
 export const supportsResultSchema = (streamType: string | undefined): boolean =>
-  CROSS_LINKING_SUPPORTED_STREAM_TYPES.includes(streamType as any);
+  (CROSS_LINKING_SUPPORTED_STREAM_TYPES as readonly string[]).includes(streamType ?? "");
 
 /**
  * Returns true when cross-linking should be active for the given stream type.

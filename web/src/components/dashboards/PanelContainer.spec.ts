@@ -255,7 +255,7 @@ describe("PanelContainer", () => {
             // (PanelSchemaRenderer.vue:1448-1480, exposed at :1802). Tests drive
             // it through setNoData() so the consumer reads the same contract the
             // real renderer publishes, not a shape invented by the stub.
-            data: () => ({ noData: "", panelBaseWhere: "", panelWhereByStream: {} }),
+            data: () => ({ noData: "", panelBaseWhere: "" }),
             methods: {
               setNoData(this: any, value: string) {
                 this.noData = value;
@@ -1300,14 +1300,12 @@ describe("PanelContainer", () => {
       stream = "slo_slices",
       streamType = "logs",
       baseWhere = "",
-      whereByStream = {},
       vrl = "",
     }: {
       sql: string;
       stream?: string;
       streamType?: string;
       baseWhere?: string;
-      whereByStream?: Record<string, string>;
       vrl?: string;
     }) => {
       vi.spyOn(window, "open").mockImplementation(() => null);
@@ -1328,7 +1326,6 @@ describe("PanelContainer", () => {
       });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
       renderer.vm.panelBaseWhere = baseWhere;
-      renderer.vm.panelWhereByStream = whereByStream;
       await wrapper.vm.onLogPanel();
       await flushPromises();
       const { default: shortURL } = await import("@/services/short_url");
@@ -1366,17 +1363,12 @@ describe("PanelContainer", () => {
       expect(query).toBe('SELECT * FROM "slo_slices" ORDER BY _timestamp DESC');
     });
 
-    it("keeps only the main stream's own WHERE for a JOIN panel", async () => {
-      const { query } = await goToLogs({
-        sql: "SELECT a.svc, count(*) FROM stream_a a JOIN stream_b b ON a.id = b.id WHERE a.env = 'prod' AND b.tier = 'gold' GROUP BY a.svc",
-        stream: "stream_a",
-        baseWhere: "a.env = 'prod' AND b.tier = 'gold'",
-        whereByStream: { stream_a: "env = 'prod'", stream_b: "tier = 'gold'" },
-      });
-      expect(query).toBe("SELECT * FROM \"stream_a\" WHERE env = 'prod' ORDER BY _timestamp DESC");
-    });
-
     it.each([
+      [
+        "a JOIN query",
+        "SELECT a.slo_id, count(*) FROM slo_slices a JOIN stream_b b ON a.id = b.id WHERE a.rev = 1 GROUP BY a.slo_id",
+      ],
+      ["an aliased table", "SELECT count(*) FROM slo_slices d WHERE d.rev = 1 GROUP BY d.slo_id"],
       [
         "a WITH query",
         "WITH t AS (SELECT * FROM x) SELECT count(*) FROM slo_slices WHERE rev = 1 GROUP BY slo_id",
@@ -1397,16 +1389,6 @@ describe("PanelContainer", () => {
 
     it("falls back to the whole query when the WHERE lookup returns empty", async () => {
       const { query, histogram } = await goToLogs({ sql: aggregateSql, baseWhere: "" });
-      expect(query).toBe(aggregateSql);
-      expect(histogram).toBe("false");
-    });
-
-    it("falls back to the whole query when the WHERE lookup throws", async () => {
-      ensureDrilldownSchemaMock.mockRejectedValueOnce(new Error("result_schema failed"));
-      const { query, histogram } = await goToLogs({
-        sql: aggregateSql,
-        baseWhere: "rev = 1793591100",
-      });
       expect(query).toBe(aggregateSql);
       expect(histogram).toBe("false");
     });
@@ -1433,14 +1415,16 @@ describe("PanelContainer", () => {
       );
     });
 
-    it("still passes the VRL function with the converted query", async () => {
-      const vrl = ".level = upcase(.level)";
-      const { query, params } = await goToLogs({
+    it("sends the whole query with its VRL function when the panel has one", async () => {
+      const vrl = ".y_axis_1 = .y_axis_1 * 2";
+      const { query, histogram, params } = await goToLogs({
         sql: aggregateSql,
         baseWhere: "rev = 1793591100",
         vrl,
       });
-      expect(query.startsWith("SELECT * FROM")).toBe(true);
+      expect(ensureDrilldownSchemaMock).not.toHaveBeenCalled();
+      expect(query).toBe(aggregateSql);
+      expect(histogram).toBe("false");
       expect(b64DecodeUnicode(params.get("functionContent") ?? "")).toBe(vrl);
       expect(params.get("fn_editor")).toBe("true");
     });
