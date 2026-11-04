@@ -302,12 +302,12 @@ export function isDeletedTeam(
   return !!teamId && knownTeamIds !== null && !knownTeamIds.includes(teamId);
 }
 
-/** A ringing page whose ladder stopped, or whose team was deleted, pages nobody; the list's count and phrase both ask this. [pure] */
+/** A ringing page whose ladder stopped, or whose team was deleted, pages nobody; a ladder that ran out also sets `stopped_because` but is still paging. [pure] */
 export function ladderStopped(
   progress: EscalationProgress | null | undefined,
   teamDeleted: boolean,
 ): boolean {
-  return teamDeleted || !!progress?.stopped_because;
+  return teamDeleted || (!!progress?.stopped_because && !progress?.exhausted);
 }
 
 /** What is happening to a page, as one phrase: the Pages list, Recent pages and the page header all say this. */
