@@ -118,8 +118,8 @@ const stubs = {
   // The real picker is the shared DateTime control; the stub keeps the props this dialog sets and its slots.
   OFormDateTimeRange: {
     name: "OFormDateTimeRange",
-    props: ["name", "label", "triggerText", "pickerTimezone", "autoApply", "disableRelative"],
-    template: `<span :data-trigger="triggerText"><slot name="label-append" /><slot name="above" /></span>`,
+    props: ["name", "label"],
+    template: `<span><slot name="label-append" /><slot name="above" /></span>`,
   },
   OTime: {
     name: "OTime",
@@ -893,16 +893,19 @@ describe("OnCallMembers", () => {
       await wrapper.find('[data-test="oncall-members-mark-away-m1"]').trigger("click");
 
       const picker = wrapper.findComponent({ name: "OFormDateTimeRange" });
-      expect(picker.props("pickerTimezone")).toBe("Asia/Kolkata");
-      expect(picker.props("autoApply")).toBe("");
-      expect(picker.props("disableRelative")).toBe("");
+      const attrs = picker.vm.$attrs as Record<string, unknown>;
+      const attr = (k: string) =>
+        attrs[k] ?? attrs[k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)];
+      expect(attr("pickerTimezone")).toBe("Asia/Kolkata");
+      expect(attr("autoApply")).toBe("");
+      expect(attr("disableRelative")).toBe("");
       expect(picker.attributes("hide-clipboard")).toBeDefined();
       expect(String(picker.props("label"))).toBe("When");
       expect(
         wrapper.find('[data-test="oncall-members-away-zone"]').attributes("aria-label"),
       ).toContain("Asia/Kolkata");
       // The closed field states the window with its times, not just the days.
-      expect(String(picker.props("triggerText"))).toMatch(/\d{1,2}:\d{2}/);
+      expect(String(attr("triggerText"))).toMatch(/\d{1,2}:\d{2}/);
     });
 
     // #3149-2: an absence is entered and shown on the team's clock, whatever the browser's zone (tests pin UTC).
