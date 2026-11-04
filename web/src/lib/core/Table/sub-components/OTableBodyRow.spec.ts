@@ -119,7 +119,7 @@ describe("OTableBodyRow selection marking", () => {
     }
   });
 
-  it("gives a clickable row an inset focus-visible outline and no outline transition", () => {
+  it("gives a clickable row an inset focus-visible outline and no transition", () => {
     const classes = mountSelectable({ clickable: true });
     expect(classes).toEqual(
       expect.arrayContaining([
@@ -129,14 +129,12 @@ describe("OTableBodyRow selection marking", () => {
         "focus-visible:outline-focus-ring-accent",
       ]),
     );
-    expect(classes).toContain("transition-[background-color]");
-    expect(classes).not.toContain("transition-colors");
+    expect(classes.filter((c) => /(^|:)transition/.test(c))).toEqual([]);
   });
 
-  it("puts the hover-in and hover-out motion tokens on the background transition", () => {
+  it("switches the hover background instantly so a fast pointer leaves no trail of fading rows", () => {
     const classes = mountSelectable({});
-    expect(classes).toContain("duration-(--duration-hover-out)");
-    expect(classes).toContain("hover:duration-(--duration-hover-in)");
+    expect(classes.filter((c) => /(^|:)(transition|duration-)/.test(c))).toEqual([]);
     expect(classes.some((c) => c.startsWith("focus-visible:outline"))).toBe(false);
   });
 });
