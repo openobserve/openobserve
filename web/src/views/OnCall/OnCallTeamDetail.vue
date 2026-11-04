@@ -43,6 +43,10 @@
         data-test="oncall-team-refresh"
         @click="refreshPage"
       />
+    </template>
+
+    <!-- On a phone these sit behind one menu, so the team name keeps the title row. -->
+    <template #actions-overflow>
       <!-- A cover is a shift handed to a person, so it needs a roster to hand
            it to: on a team with nobody in it this would open on an empty
            picker, which is a dead end rather than an action. -->

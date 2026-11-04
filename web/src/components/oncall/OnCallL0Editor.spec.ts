@@ -226,4 +226,12 @@ describe("OnCallL0Editor", () => {
       expect(last.getAttribute("data-test")).toMatch(/^oncall-l0-allow-/);
     }
   });
+
+  // A row is one line: the suppress consequence sits beside its label, not under it.
+  it("keeps the suppress consequence on the label's line", () => {
+    const wrapper = render();
+    const note = wrapper.find('[data-test="oncall-l0-row-suppress-note"]');
+    expect(note.exists()).toBe(true);
+    expect(note.element.parentElement?.className).not.toContain("flex-col");
+  });
 });

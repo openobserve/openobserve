@@ -88,7 +88,7 @@ const stubs = {
   OPageLayout: {
     name: "OPageLayout",
     template:
-      "<div><slot name='title-trail' /><slot name='actions' /><slot name='header-tabs' /><slot /></div>",
+      "<div><slot name='title-trail' /><slot name='actions' /><slot name='actions-overflow' /><slot name='header-tabs' /><slot /></div>",
   },
   OTable: { name: "OTable", props: ["data", "columns"], template: "<div />" },
   OnCallScheduleTimeline: true,
@@ -1795,7 +1795,7 @@ describe("OnCallTeamDetail", () => {
         name: "OPageLayout",
         props: { tabsBelow: Boolean },
         template:
-          "<div><slot name='title-trail' /><slot name='actions' /><div data-test='header-tabs-slot'><slot name='header-tabs' /></div><slot /></div>",
+          "<div><slot name='title-trail' /><div data-test='header-actions-slot'><slot name='actions' /></div><div data-test='header-overflow-slot'><slot name='actions-overflow' /></div><div data-test='header-tabs-slot'><slot name='header-tabs' /></div><slot /></div>",
       },
     };
     const mountHeader = () =>
@@ -1806,6 +1806,18 @@ describe("OnCallTeamDetail", () => {
       pages_anyone: pagesAnyone,
       ends_with_whole_team: false,
       channels: [],
+    });
+
+    // On a phone the overflow folds behind one menu, so only refresh competes with the team name.
+    it("keeps refresh as the header action and puts Cover and Edit in the overflow", async () => {
+      const wrapper = mountHeader();
+      await flushPromises();
+
+      const actions = wrapper.find('[data-test="header-actions-slot"]');
+      const overflow = wrapper.find('[data-test="header-overflow-slot"]');
+      expect(actions.find('[data-test="oncall-team-refresh"]').exists()).toBe(true);
+      expect(actions.find('[data-test="oncall-team-detail-edit-btn"]').exists()).toBe(false);
+      expect(overflow.find('[data-test="oncall-team-detail-edit-btn"]').exists()).toBe(true);
     });
 
     /// Same header as the Incident page: tabs attached below the title, grey tallies.

@@ -72,7 +72,7 @@ function render(signals: UnroutedSignal[] = [signal()]) {
 }
 
 describe("OnCallUnroutedQueue", () => {
-  it("shows three identity chips and the rest behind +N, so the path stays in its cell", () => {
+  it("keeps the identity chips on one line, with every chip named in the +N tooltip", () => {
     const wrapper = render([
       signal({
         dimensions: {
@@ -84,13 +84,11 @@ describe("OnCallUnroutedQueue", () => {
         },
       }),
     ]);
-    const path = wrapper.find('[data-test="oncall-unrouted-path-s1"]');
-    expect(path.findAllComponents({ name: "ODimensionChip" })).toHaveLength(3);
-    const more = wrapper.find('[data-test="oncall-unrouted-path-more-s1"]');
-    expect(more.text()).toBe("+1");
-    expect(more.findComponent({ name: "OTooltip" }).props("content")).toBe(
-      "Service namespace ecommerce",
-    );
+    const fit = wrapper.findComponent({ name: "OnCallFitChips" });
+    expect(fit.attributes("data-test")).toBe("oncall-unrouted-path-s1");
+    expect(fit.classes()).toContain("flex-nowrap");
+    expect(fit.findAllComponents({ name: "ODimensionChip" })).toHaveLength(4);
+    expect(fit.props("tooltip")).toContain("Service namespace ecommerce");
   });
 
   it("names the alert and the dimensions a rule would be written against", () => {

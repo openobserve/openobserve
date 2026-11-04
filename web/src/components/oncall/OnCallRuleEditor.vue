@@ -217,10 +217,20 @@ watch(
     draftDimensions.value = { ...(props.rule?.dimensions ?? props.initialDimensions ?? {}) };
     seedKey.value += 1;
     team.value = props.rule?.team_id || props.teamId;
-    startSignal.value = null;
+    startSignal.value = props.rule ? null : claimedSignalId(props.initialDimensions);
   },
   { immediate: true },
 );
+
+/// A claim arrives as dimensions only, so the picker names the signal whose path they are.
+function claimedSignalId(dimensions: Record<string, string> | null): string | null {
+  if (!dimensions || !Object.keys(dimensions).length) return null;
+  const wanted = JSON.stringify(Object.entries(dimensions).sort());
+  const signal = props.signals.find(
+    (one) => JSON.stringify(Object.entries(claimableDimensions(one.dimensions)).sort()) === wanted,
+  );
+  return signal?.id ?? null;
+}
 
 const conditionCount = computed(() => Object.keys(draftDimensions.value).length);
 
@@ -232,9 +242,14 @@ function teamNameOf(teamId: string): string {
   return props.teams.find((option) => option.id === teamId)?.name || teamId;
 }
 
-const startable = computed(() =>
-  [...props.signals].sort((a, b) => b.occurrences - a.occurrences).slice(0, STARTABLE_SHOWN),
-);
+/// The chosen signal stays offered even outside the busiest few, so the picker never shows a value it does not list.
+const startable = computed(() => {
+  const top = [...props.signals]
+    .sort((a, b) => b.occurrences - a.occurrences)
+    .slice(0, STARTABLE_SHOWN);
+  const chosen = props.signals.find((one) => one.id === startSignal.value);
+  return chosen && !top.includes(chosen) ? [...top, chosen] : top;
+});
 
 const startOptions = computed(() =>
   startable.value.map((signal) => ({

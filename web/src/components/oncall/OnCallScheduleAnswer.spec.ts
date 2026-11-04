@@ -102,7 +102,7 @@ describe("OnCallScheduleAnswer", () => {
   it("states that nobody is on call", () => {
     const wrapper = render({ positions: [] });
     expect(wrapper.text()).toContain("Nobody is on call");
-    expect(wrapper.find('[data-test="oncall-answer-nobody-hint"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-answer-nobody"]').exists()).toBe(true);
   });
 
   /// Writing a cover lives on the chart's own toolbar now, beside Add rotation

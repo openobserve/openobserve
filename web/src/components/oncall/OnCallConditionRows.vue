@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         :model-value="row.op"
         :options="operatorOptions"
+        :searchable="false"
         size="sm"
         width="xs"
         :aria-label="t('oncall.conditionOperatorAria')"
@@ -234,28 +235,21 @@ function valueOptionsFor(row: ConditionRow) {
   });
   if (row.name === SERVICE_DIMENSION) props.services.forEach((service) => known.add(service.name));
   if (row.value) known.add(row.value);
-  const weight = (value: string) => [services.get(value) ?? 0, fired.get(value) ?? 0];
+  const weight = (value: string) => [fired.get(value) ?? 0, services.get(value) ?? 0];
   return (
     [...known]
       .sort((a, b) => {
-        const [sa, fa] = weight(a);
-        const [sb, fb] = weight(b);
-        return sb - sa || fb - fa || a.localeCompare(b);
+        const [fa, sa] = weight(a);
+        const [fb, sb] = weight(b);
+        return fb - fa || sb - sa || a.localeCompare(b);
       })
       // Not `subLabelInline`: the stacked layout cuts a long value with a tooltip instead of clipping it.
-      .map((value) => ({ label: raw(value), value, subLabel: countOf(value, services, fired) }))
+      .map((value) => ({ label: raw(value), value, subLabel: firesOf(fired.get(value) ?? 0) }))
   );
 }
 
-function countOf(
-  value: string,
-  services: Map<string, number>,
-  fired: Map<string, number>,
-): I18nText | undefined {
-  const serviceCount = services.get(value) ?? 0;
-  if (serviceCount)
-    return t("oncall.ruleEditorValueServices", { count: serviceCount }, serviceCount);
-  const fires = fired.get(value) ?? 0;
+/// One unit on every value, the one Unrouted and the match count speak: alerts in the last 30 days.
+function firesOf(fires: number): I18nText | undefined {
   return fires ? t("oncall.routingFiresWindow", { count: fires }, fires) : undefined;
 }
 

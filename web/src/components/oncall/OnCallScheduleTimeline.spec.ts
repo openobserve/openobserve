@@ -173,18 +173,22 @@ describe("OnCallScheduleTimeline", () => {
     expect(add.attributes("data-icon")).toBe("add");
   });
 
-  // A template rewrites the first rotation, so it can only be the way to build one while there is none.
-  it("offers a template or scratch from Add rotation only while the team has no rotations", async () => {
+  // A template rewrites the first rotation, so a staffed team is offered "start over" instead of a new one.
+  it("offers a template or scratch from Add rotation, naming the replacement once rotations exist", async () => {
     const empty = render({ rotations: [], segments: [] });
     expect(empty.find('[data-test="oncall-timeline-add"]').text()).toBe("Add rotation");
+    expect(empty.find('[data-test="oncall-timeline-add-template"]').text()).toBe("From a template");
     await empty.find('[data-test="oncall-timeline-add-template"]').trigger("click");
     expect(empty.emitted("presets")).toHaveLength(1);
     await empty.find('[data-test="oncall-timeline-add-scratch"]').trigger("click");
     expect(empty.emitted("add")).toHaveLength(1);
 
     const staffed = render();
-    expect(staffed.find('[data-test="oncall-timeline-add-template"]').exists()).toBe(false);
-    await staffed.find('[data-test="oncall-timeline-add"]').trigger("click");
+    const template = staffed.find('[data-test="oncall-timeline-add-template"]');
+    expect(template.text()).toBe("Start over from a template");
+    await template.trigger("click");
+    expect(staffed.emitted("presets")).toHaveLength(1);
+    await staffed.find('[data-test="oncall-timeline-add-scratch"]').trigger("click");
     expect(staffed.emitted("add")).toHaveLength(1);
   });
 

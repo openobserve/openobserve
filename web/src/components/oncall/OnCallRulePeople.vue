@@ -63,12 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="meta">
           {{ t("oncall.peopleCount", { count: rule.members.length }, rule.members.length) }}
         </OText>
-        <OText variant="meta" class="ms-auto">{{ t("oncall.peopleKeyboardHint") }}</OText>
         <OButton
           v-if="rule.members.length"
           variant="ghost-primary"
           size="xs"
           icon-left="check"
+          class="ms-auto"
           :data-test="`oncall-rule-people-done-${ruleIndex}`"
           @click="expanded = false"
         >
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
-                icon-left="more-horiz"
+                icon-left="more-vert"
                 variant="ghost"
                 size="icon-xs-sq"
                 class="ms-auto"

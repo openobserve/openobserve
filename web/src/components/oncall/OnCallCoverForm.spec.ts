@@ -83,6 +83,7 @@ const stubs = {
     emits: ["click:primary", "click:secondary", "update:open"],
     template: `<div v-if="open">
       <slot />
+      <slot name="footer-left" />
       <button
         data-test="dialog-primary"
         :disabled="primaryButtonDisabled"
@@ -487,6 +488,21 @@ describe("OnCallCoverForm — taking a cover", () => {
     return wrapper.emitted("save")?.[0]?.[0] as
       { user_email: string; start_at: number; end_at: number; rotation_id?: string } | undefined;
   }
+
+  // Save does nothing without a person, so it waits for one and says why.
+  it("blocks Save, with the reason, until somebody is covering", async () => {
+    const empty = renderCover({ gap: GAP, defaultUser: "" });
+    await flushPromises();
+    expect(empty.find('[data-test="dialog-primary"]').attributes("disabled")).toBeDefined();
+    expect(empty.find('[data-test="oncall-cover-save-blocked"]').text()).toBe(
+      "Choose who is covering",
+    );
+
+    const picked = renderCover({ gap: GAP });
+    await flushPromises();
+    expect(picked.find('[data-test="dialog-primary"]').attributes("disabled")).toBeUndefined();
+    expect(picked.find('[data-test="oncall-cover-save-blocked"]').exists()).toBe(false);
+  });
 
   it("emits the window as the start_at / end_at pair the API takes", async () => {
     const saved = await save(renderCover({ gap: GAP }));

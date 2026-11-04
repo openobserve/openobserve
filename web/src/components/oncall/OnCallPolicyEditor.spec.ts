@@ -157,9 +157,7 @@ describe("OnCallPolicyEditor", () => {
       ["oncall-policy-channel-1-voice", "Voice call"],
       ["oncall-policy-channel-1-webhook", "Chat / webhook"],
     ]);
-    expect(wrapper.find('[data-test="oncall-policy-channels-hint"]').text()).toBe(
-      "Texts and calls reach only people with a verified phone.",
-    );
+    expect(wrapper.find('[data-test="oncall-policy-channels-hint"]').exists()).toBe(false);
   });
 
   /// DM-2: Slack is offered only while the org has Slack on, and never pages without Email.
@@ -679,7 +677,6 @@ describe("OnCallPolicyEditor", () => {
       });
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-policy-no-default-warning"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="oncall-policy-ladder-end"]').text()).toContain("2 times");
     });
 
     it("names the default team once one exists, and does not warn", async () => {
@@ -697,17 +694,21 @@ describe("OnCallPolicyEditor", () => {
       });
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-policy-no-default-warning"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="oncall-policy-ladder-end"]').text()).toContain("Platform");
+      const options = wrapper
+        .findComponent('[data-test="oncall-policy-ladder-end-select"]')
+        .props("options") as { label: string; value: string }[];
+      expect(options.find((o) => o.value === "2:notify_default_team")?.label).toBe(
+        "Run 2 times, then hand off to Platform",
+      );
     });
 
-    it("says a stopping ladder marks the record never answered", async () => {
+    it("keeps the ladder's end to the select alone, with no sentence under it", async () => {
       const wrapper = mount(OnCallPolicyEditor, {
         props: { teamId: "team_1", policy: policyEnding("stop"), open: true },
         global: { plugins: [i18n, store], stubs },
       });
       await flushPromises();
-      const line = wrapper.find('[data-test="oncall-policy-ladder-end"]').text();
-      expect(line).toContain("never answered");
+      expect(wrapper.find('[data-test="oncall-policy-ladder-end"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="oncall-policy-no-default-warning"]').exists()).toBe(false);
     });
   });
@@ -1273,22 +1274,6 @@ describe("the end of the ladder, as an edit", () => {
     await save(wrapper);
 
     expect(saved()).toMatchObject({ repeat_count: 3, final_action: "notify_default_team" });
-  });
-
-  /// The sentence has to track the control, not the last save — otherwise it
-  /// describes a ladder the reader has already changed. It says what the
-  /// option label cannot: which team the page would actually land on.
-  it("re-words itself as the control moves", async () => {
-    const wrapper = renderWith();
-    await flushPromises();
-    const line = () => wrapper.find('[data-test="oncall-policy-ladder-end"]').text();
-
-    expect(line()).toContain("never answered");
-
-    endSelect(wrapper).vm.$emit("update:modelValue", "1:notify_default_team");
-    await flushPromises();
-
-    expect(line()).not.toContain("never answered");
   });
 
   /// §G.9 #9: `notify_default_team` with nobody nominated is indistinguishable

@@ -40,7 +40,7 @@ const stubs = {
   },
   OSelect: {
     name: "OSelect",
-    props: ["modelValue", "options", "label", "helpText", "disabled", "creatable"],
+    props: ["modelValue", "options", "label", "helpText", "disabled", "creatable", "searchable"],
     emits: ["update:modelValue", "create"],
     template: `<span><label>{{ label }}</label><small class="help">{{ helpText }}</small></span>`,
   },
@@ -120,14 +120,18 @@ describe("OnCallRuleEditor", () => {
     ]);
   });
 
-  it("offers known values with their service counts", () => {
+  // One unit on every value: a service count beside a trigger count read as two different answers.
+  it("offers known values counted in one unit, triggers in the last 30 days", () => {
     const wrapper = render();
     const options = select(wrapper, "oncall-rule-editor-value-0").props("options") as {
       value: string;
       subLabel?: string;
     }[];
-    expect(options[0]).toMatchObject({ value: "risk-api", subLabel: "2 services" });
-    expect(options.map((o) => o.value)).toContain("fraud-scorer");
+    expect(options[0]).toMatchObject({ value: "risk-api", subLabel: "6 triggers, last 30 days" });
+    expect(options.find((o) => o.value === "fraud-scorer")?.subLabel).toBe(
+      "3 triggers, last 30 days",
+    );
+    expect(options.find((o) => o.value === "checkout")?.subLabel).toBeUndefined();
   });
 
   it("writes starts with as the engine's trailing *", async () => {
@@ -229,6 +233,25 @@ describe("OnCallRuleEditor", () => {
     }[];
     expect(fields.map((o) => o.value)).toEqual(["k8s-namespace", "environment"]);
     expect(fields[0].label).toBe("K8s namespace");
+  });
+
+  // A claim arrives as dimensions; the picker names the signal they came from instead of "Choose…".
+  it("names the claimed signal in the start-from picker", async () => {
+    const wrapper = render({
+      initialDimensions: { "k8s-namespace": "risk", service: "fraud-scorer" },
+    });
+    await flushPromises();
+    expect(select(wrapper, "oncall-rule-editor-signals").props("modelValue")).toBe("s1");
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true, initialDimensions: null });
+    expect(select(wrapper, "oncall-rule-editor-signals").props("modelValue")).toBeNull();
+  });
+
+  // Two operators need no search box.
+  it("offers the operator as a plain two-option list", () => {
+    const op = select(render(), "oncall-rule-editor-op-0");
+    expect(op.props("searchable")).toBe(false);
+    expect(op.props("options")).toHaveLength(2);
   });
 
   it("names the team it takes alerts from when another team holds a broader path", async () => {

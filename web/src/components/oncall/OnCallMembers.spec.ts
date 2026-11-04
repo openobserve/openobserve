@@ -282,7 +282,7 @@ describe("OnCallMembers", () => {
 
     const options = wrapper.find('[data-test="oncall-members-user-select"]').findAll("option");
     const ana = options.find((o) => o.element.value === "ana@o2.ai")!;
-    expect(ana.text()).toContain("On team");
+    expect(ana.text()).toContain("ana@o2.ai · on team");
     expect(ana.attributes("disabled")).toBeDefined();
     expect(options.find((o) => o.element.value === "bob@o2.ai")!.attributes("disabled")).toBe(
       undefined,

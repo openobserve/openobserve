@@ -166,7 +166,6 @@
           <OInput
             v-model="active.name"
             :label="t('oncall.rotationName')"
-            :help-text="t('oncall.rotationNameHint')"
             :maxlength="MAX_ROTATION_NAME_CHARS"
             data-test="oncall-schedule-name"
           />

@@ -322,6 +322,19 @@ describe("OnCallRoutingSimulator", () => {
     expect(wrapper.find('[data-test="oncall-simulator-responder"]').text()).toBe("Pages nobody");
   });
 
+  it("disables Send a test page, with the reason, when the priority pages nobody", async () => {
+    const wrapper = render({ seed: { service: "payments-api" }, preview: preview() });
+    const button = () => wrapper.find('[data-test="oncall-simulator-send-test"]');
+    expect(button().attributes("disabled")).toBeUndefined();
+    select(wrapper, "oncall-simulator-priority").vm.$emit("update:modelValue", "P4");
+    await wrapper.vm.$nextTick();
+    expect(button().attributes("disabled")).toBeDefined();
+    const tip = wrapper
+      .find('[data-test="oncall-simulator-send-test-wrap"]')
+      .findComponent({ name: "OTooltip" });
+    expect(tip.props("content")).toBe("P4 pages nobody, so there is nothing to test");
+  });
+
   it("says the winning rule inline and counts the less specific ones, with no expander", () => {
     const wrapper = render({
       seed: { service: "payments-api" },

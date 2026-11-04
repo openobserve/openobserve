@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="oncall-members-away-person"
         />
       </span>
-      <OText variant="meta">{{ t("oncall.awayHintShort") }}</OText>
       <!-- The times below are the team's clock, said the way the Schedule tab says it. -->
       <span class="text-text-secondary text-xs" data-test="oncall-members-away-zone">
         {{ zoneCaption(timezone, localZone, Date.now() * 1000, t) }}
@@ -97,7 +96,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
-import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODate from "@/lib/forms/Date/ODate.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
