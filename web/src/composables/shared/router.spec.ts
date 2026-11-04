@@ -883,6 +883,12 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe("traces/trace-details");
     });
 
+    it("turns on Ask AI for the routed trace detail page only", () => {
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "traceDetails");
+      expect(route.props).toEqual({ showAskAi: true });
+    });
+
     it("redirects the standalone Service Graph path to the canonical query tab", () => {
       config.isEnterprise = "true";
       const { homeChildRoutes } = useRoutes();

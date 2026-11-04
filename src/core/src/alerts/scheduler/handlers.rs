@@ -2875,7 +2875,7 @@ fn rows_by_downtime_key(
 
 /// The group key of one multi-alert row, the same key [rows_by_downtime_key] files it under.
 #[cfg(feature = "enterprise")]
-fn downtime_row_key(
+pub(crate) fn downtime_row_key(
     alert: &config::meta::alerts::alert::Alert,
     group_by: &[String],
     row: &config::utils::json::Map<String, config::utils::json::Value>,
@@ -2889,7 +2889,7 @@ fn downtime_row_key(
 }
 
 #[cfg(feature = "enterprise")]
-fn alert_group_by(alert: &config::meta::alerts::alert::Alert) -> Vec<String> {
+pub(crate) fn alert_group_by(alert: &config::meta::alerts::alert::Alert) -> Vec<String> {
     alert
         .query_condition
         .aggregation

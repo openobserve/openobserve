@@ -116,6 +116,11 @@ const mountHeatmap = async (
   return wrapper;
 };
 
+const selectionDropdown = (wrapper: any) =>
+  wrapper
+    .findAllComponents({ name: "ODropdown" })
+    .find((dropdown: any) => dropdown.props("side") === "right");
+
 const options = (wrapper: any) =>
   wrapper.findComponent({ name: "ChartRenderer" }).props("data").options;
 
@@ -256,6 +261,35 @@ describe("TracesLatencyHeatmap", () => {
       await settle();
 
       expect(options(wrapper).yAxis.data).toEqual(["2s"]);
+    });
+  });
+
+  describe("header actions", () => {
+    const inlineMenu = {
+      ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        emits: ["select"],
+        template: "<div v-bind='$attrs' @click=\"$emit('select')\"><slot /></div>",
+      },
+    };
+
+    it("shows a labelled ⋮ on the Duration header", async () => {
+      wrapper = await mountHeatmap(undefined, inlineMenu);
+      const btn = wrapper.find('[data-test="traces-duration-actions-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("aria-label")).toBe(i18n.global.t("traces.redActions.durationActions"));
+    });
+
+    it("emits create-alert from Create alert", async () => {
+      wrapper = await mountHeatmap(undefined, inlineMenu);
+      await wrapper.find('[data-test="traces-duration-create-alert"]').trigger("click");
+      expect(wrapper.emitted("create-alert")).toHaveLength(1);
+    });
+
+    it("emits add-to-dashboard from Add to dashboard", async () => {
+      wrapper = await mountHeatmap(undefined, inlineMenu);
+      await wrapper.find('[data-test="traces-duration-add-to-dashboard"]').trigger("click");
+      expect(wrapper.emitted("add-to-dashboard")).toHaveLength(1);
     });
   });
 
@@ -642,7 +676,7 @@ describe("TracesLatencyHeatmap", () => {
     it("leaves the box and the parent selection alone when the menu is dismissed outside", async () => {
       wrapper = await mountAttached();
       await drawBox();
-      wrapper.findComponent({ name: "ODropdown" }).vm.$emit("update:open", false);
+      selectionDropdown(wrapper).vm.$emit("update:open", false);
       await settle();
       expect(drawn().exists()).toBe(true);
       expect(wrapper.emitted("clear")).toBeUndefined();
@@ -651,7 +685,7 @@ describe("TracesLatencyHeatmap", () => {
     it("reopens the menu from the box's corner control, a labelled button, after it was dismissed", async () => {
       wrapper = await mountAttached();
       await drawBox();
-      wrapper.findComponent({ name: "ODropdown" }).vm.$emit("update:open", false);
+      selectionDropdown(wrapper).vm.$emit("update:open", false);
       await settle();
       expect(menu()).toBeNull();
       const reopen = el("reopen")!;

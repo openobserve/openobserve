@@ -34,6 +34,7 @@ import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import { buildDbmPrefill } from "./fromDbm";
 import { buildDbmLockPrefill } from "./fromDbmLocks";
 import { buildPrefillFromRumFunnel } from "./fromRumFunnel";
+import { buildPrefillFromTraces } from "./fromTraces";
 
 interface AdapterCase {
   /** Registered source id. */
@@ -201,6 +202,25 @@ const ADAPTERS: AdapterCase[] = [
         events: [],
         belowPct: Number.NaN,
       }),
+  },
+  {
+    name: "traces",
+    healthy: () =>
+      buildPrefillFromTraces(
+        {
+          streamName: "default",
+          filter: "service_name = 'api'",
+          view: "spans",
+          metric: "errors",
+          datetime: { type: "relative", relativeTimePeriod: "15m" },
+        },
+        12,
+      ),
+    degenerate: () =>
+      buildPrefillFromTraces(
+        { streamName: "", filter: "", view: "spans", metric: "matches" },
+        null,
+      ),
   },
 ];
 

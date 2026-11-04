@@ -3868,6 +3868,33 @@ async fn send_discord_with_attachment(
     send_outcome(resp_status, &resp_body, hide_body)
 }
 
+/// A destination's non-2xx reply; `body` is `None` when the peer may not show it.
+#[derive(Debug)]
+pub(crate) struct DestinationStatusError {
+    pub(crate) status: reqwest::StatusCode,
+    body: Option<String>,
+}
+
+impl std::fmt::Display for DestinationStatusError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.body {
+            Some(body) => write!(f, "sent error status: {}, err: {body}", self.status),
+            None => write!(f, "sent error status: {}", self.status),
+        }
+    }
+}
+
+impl std::error::Error for DestinationStatusError {}
+
+#[cfg(all(test, feature = "enterprise"))]
+pub(crate) fn send_outcome_for_test(
+    status: reqwest::StatusCode,
+    body: &str,
+    hide_body: bool,
+) -> Result<String, anyhow::Error> {
+    send_outcome(status, body, hide_body)
+}
+
 /// What the caller of a send sees; a peer only the operator allowlist admits shows its status only.
 fn send_outcome(
     status: reqwest::StatusCode,
@@ -3877,8 +3904,10 @@ fn send_outcome(
     match (status.is_success(), hide_body) {
         (true, false) => Ok(format!("sent status: {status}, body: {body}")),
         (true, true) => Ok(format!("sent status: {status}")),
-        (false, false) => Err(anyhow::anyhow!("sent error status: {status}, err: {body}")),
-        (false, true) => Err(anyhow::anyhow!("sent error status: {status}")),
+        (false, hide_body) => Err(anyhow::Error::new(DestinationStatusError {
+            status,
+            body: (!hide_body).then(|| body.to_string()),
+        })),
     }
 }
 
@@ -4392,16 +4421,7 @@ async fn build_notification_context(
             None => String::new(),
         }
     } else if alert.stream_type == StreamType::Traces {
-        // The traces page takes a filter expression in `query`, not SQL, so the query is left out.
-        format!(
-            "{}{}/web/traces?stream={}&from={}&to={}&org_identifier={}&tab=spans",
-            cfg.common.web_url,
-            cfg.common.base_uri,
-            alert.stream_name,
-            alert_start_time,
-            alert_end_time,
-            alert.org_id
-        )
+        traces_alert_url(&cfg, alert, alert_start_time, alert_end_time)
     } else {
         match alert.query_condition.query_type {
             QueryType::SQL => {
@@ -4537,6 +4557,29 @@ async fn build_notification_context(
         chart_url: None,
         chart_png: None,
     }
+}
+
+fn traces_alert_url(cfg: &config::Config, alert: &Alert, start_time: i64, end_time: i64) -> String {
+    let mut url = format!(
+        "{}{}/web/traces?stream={}&from={}&to={}&org_identifier={}&tab=spans",
+        cfg.common.web_url,
+        cfg.common.base_uri,
+        alert.stream_name,
+        start_time,
+        end_time,
+        alert.org_id
+    );
+    // The traces page takes a filter expression in `query`, not SQL, so only the WHERE is carried.
+    if alert.query_condition.query_type == QueryType::SQL
+        && let Some(sql) = &alert.query_condition.sql
+    {
+        let where_clause = config::meta::sql::extract_where(sql).where_clause;
+        if !where_clause.is_empty() {
+            url.push_str("&query=");
+            url.push_str(&base64::encode_url(&where_clause));
+        }
+    }
+    url
 }
 pub fn get_row_column_map(rows: &[Map<String, Value>]) -> HashMap<String, HashSet<String>> {
     let mut vars = HashMap::with_capacity(rows.len());
@@ -5517,6 +5560,24 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn a_failed_send_keeps_its_text_and_hides_the_body_when_asked() {
+        let status = reqwest::StatusCode::INTERNAL_SERVER_ERROR;
+        let shown = send_outcome(status, "boom", false).unwrap_err();
+        assert_eq!(
+            shown.to_string(),
+            "sent error status: 500 Internal Server Error, err: boom"
+        );
+        let hidden = send_outcome(status, "boom", true).unwrap_err();
+        assert_eq!(
+            hidden.to_string(),
+            "sent error status: 500 Internal Server Error"
+        );
+        let typed = hidden.downcast_ref::<DestinationStatusError>().unwrap();
+        assert_eq!(typed.status, status);
+        assert!(typed.body.is_none());
+    }
 
     #[tokio::test]
     async fn a_multi_alert_with_recovery_saves() {
@@ -9592,14 +9653,13 @@ mod rule_notification_tests {
         assert!(matches!(error, AlertError::PromqlMissingQuery));
     }
 
-    #[tokio::test]
-    async fn traces_alert_url_opens_the_traces_page() {
+    async fn notification_url_for_traces_alert(query_type: QueryType, sql: Option<&str>) -> String {
         let mut alert = Alert::default();
         alert.org_id = "org".into();
         alert.stream_type = StreamType::Traces;
         alert.stream_name = "default".into();
-        alert.query_condition.query_type = QueryType::SQL;
-        alert.query_condition.sql = Some("SELECT span_id FROM \"default\"".into());
+        alert.query_condition.query_type = query_type;
+        alert.query_condition.sql = sql.map(Into::into);
         let options = ProcessTemplateOptions {
             rows_end_time: 0,
             start_time: None,
@@ -9611,12 +9671,15 @@ mod rule_notification_tests {
             resolved: false,
         };
         let context = build_notification_context("org", &alert, &[], &[], options, None).await;
-        let url = if let Some((_, suffix)) = context.alert_url.split_once("/web/short/") {
+        if let Some((_, suffix)) = context.alert_url.split_once("/web/short/") {
             let id = suffix.split('?').next().unwrap();
             short_url::retrieve(&alert.org_id, id).await.unwrap()
         } else {
             context.alert_url
-        };
+        }
+    }
+
+    fn assert_plain_traces_url(url: &str) {
         assert!(url.contains("/web/traces?stream=default&"));
         assert!(url.contains("&from=") && url.contains("&to="));
         assert!(url.contains("&org_identifier=org&"));
@@ -9624,5 +9687,54 @@ mod rule_notification_tests {
         assert!(!url.contains("/web/logs"));
         assert!(!url.contains("sql_mode"));
         assert!(!url.contains("query="));
+    }
+
+    #[tokio::test]
+    async fn traces_alert_url_without_where_opens_the_traces_page() {
+        let url = notification_url_for_traces_alert(
+            QueryType::SQL,
+            Some("SELECT span_id FROM \"default\""),
+        )
+        .await;
+        assert_plain_traces_url(&url);
+    }
+
+    #[tokio::test]
+    async fn traces_alert_url_keeps_the_where_filter() {
+        let url = notification_url_for_traces_alert(
+            QueryType::SQL,
+            Some("SELECT count(*) AS cnt FROM \"default\" WHERE service_name = 'api' AND duration > 100"),
+        )
+        .await;
+        assert!(url.contains("/web/traces?stream=default&"));
+        assert!(url.contains("&org_identifier=org&"));
+        assert!(url.contains("&tab=spans"));
+        assert!(!url.contains("sql_mode"));
+        let query = url
+            .split_once("&query=")
+            .unwrap()
+            .1
+            .split('&')
+            .next()
+            .unwrap();
+        assert_eq!(
+            base64::decode_url(query).unwrap(),
+            "service_name = 'api' AND duration > 100"
+        );
+    }
+
+    #[tokio::test]
+    async fn traces_alert_url_skips_unparsable_or_non_sql_queries() {
+        assert_plain_traces_url(
+            &notification_url_for_traces_alert(QueryType::SQL, Some("not sql WHERE")).await,
+        );
+        assert_plain_traces_url(&notification_url_for_traces_alert(QueryType::SQL, None).await);
+        assert_plain_traces_url(
+            &notification_url_for_traces_alert(
+                QueryType::Custom,
+                Some("SELECT * FROM \"default\" WHERE service_name = 'api'"),
+            )
+            .await,
+        );
     }
 }

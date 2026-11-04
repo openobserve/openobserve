@@ -1618,4 +1618,70 @@ describe("RenderDashboardCharts", () => {
       expect(wrapper.emitted("panelsValues")?.at(-1)).toEqual([true]);
     });
   });
+
+  describe("explore actions pass-through", () => {
+    let io: ReturnType<typeof installFakeIntersectionObserver>;
+
+    const PanelContainerStub = {
+      name: "PanelContainer",
+      props: ["data", "viewOnly", "exploreActions"],
+      emits: ["exploreCreateAlert", "exploreAddToDashboard"],
+      template: '<div data-test="panel-container-stub"></div>',
+    };
+    const panelSchema = {
+      id: "P1",
+      title: "Errors",
+      type: "line",
+      layout: { x: 0, y: 0, w: 6, h: 4, i: "P1" },
+      queries: [],
+    };
+
+    const mountWith = async (props: Record<string, any>) => {
+      wrapper = shallowMount(RenderDashboardCharts, {
+        props: {
+          ...defaultProps,
+          dashboardData: {
+            ...defaultProps.dashboardData,
+            tabs: [{ tabId: "default", name: "Default Tab", panels: [panelSchema] }],
+          },
+          ...props,
+        },
+        global: {
+          plugins: [i18n, store, router],
+          stubs: { ODialog: ODialogStub, PanelContainer: PanelContainerStub },
+        },
+      });
+      await flushPromises();
+      await vi.waitFor(() => expect(wrapper.vm.shouldMountPanel("P1")).toBe(true));
+      await flushPromises();
+    };
+    const panel = () => wrapper.findComponent({ name: "PanelContainer" });
+
+    beforeEach(() => {
+      io = installFakeIntersectionObserver({ autoVisible: true });
+    });
+
+    afterEach(() => {
+      io.restore();
+    });
+
+    it("passes exploreActions to the panel, off by default", async () => {
+      await mountWith({ viewOnly: true });
+      expect(panel().props("exploreActions")).toBe(false);
+      wrapper.unmount();
+
+      await mountWith({ viewOnly: true, exploreActions: true });
+      expect(panel().props("exploreActions")).toBe(true);
+    });
+
+    it("re-emits the panel's explore events with the panel schema", async () => {
+      await mountWith({ viewOnly: true, exploreActions: true });
+
+      panel().vm.$emit("exploreCreateAlert", panelSchema);
+      panel().vm.$emit("exploreAddToDashboard", panelSchema);
+
+      expect(wrapper.emitted("exploreCreateAlert")).toEqual([[panelSchema]]);
+      expect(wrapper.emitted("exploreAddToDashboard")).toEqual([[panelSchema]]);
+    });
+  });
 });
