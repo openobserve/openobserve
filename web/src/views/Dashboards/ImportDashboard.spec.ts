@@ -446,6 +446,36 @@ describe("ImportDashboard.vue", () => {
     expect(picker().props("disabled")).toBe(false);
   });
 
+  it("imports every uploaded dashboard into the folder chosen when the import started", async () => {
+    const dashboardService = (await import("@/services/dashboards")).default;
+    const settles: Array<(v: unknown) => void> = [];
+    (dashboardService.create as any).mockImplementation(
+      () => new Promise((resolve) => settles.push(resolve)),
+    );
+    const dash = (title: string) => ({ title, tabs: [{ tabId: "t1", panels: [] }] });
+    wrapper = mountComponent();
+    await nextTick();
+    wrapper.vm.selectedFolder = { label: "A", value: "folder-a" };
+    wrapper.vm.form.setFieldValue("jsonFiles", [
+      new File([JSON.stringify([dash("One"), dash("Two")])], "a.json", {
+        type: "application/json",
+      }),
+    ]);
+    await flushPromises();
+    wrapper.vm.jsonStr = JSON.stringify([[dash("One"), dash("Two")]]);
+
+    void wrapper.vm.importFiles();
+    await flushPromises();
+    wrapper.vm.selectedFolder = { label: "B", value: "folder-b" };
+    settles.shift()?.({ data: {} });
+    await flushPromises();
+    settles.shift()?.({ data: {} });
+    await flushPromises();
+
+    const folders = (dashboardService.create as any).mock.calls.map((c: any[]) => c[2]);
+    expect(folders).toEqual(["folder-a", "folder-a"]);
+  });
+
   // Real-OForm validation wiring (playbook §5): the OForm covers only the
   // url/jsonFiles input collection. The URL-format rule is the one field check
   // (non-required, so the paste-JSON flow is preserved).
