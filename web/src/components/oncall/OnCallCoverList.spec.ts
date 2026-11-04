@@ -19,6 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import OnCallCoverList from "@/components/oncall/OnCallCoverList.vue";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
+import { ok } from "@/test/unit/helpers/axiosReply";
 import store from "@/test/unit/helpers/store";
 import type { Override } from "@/ts/interfaces/oncall";
 
@@ -67,6 +68,7 @@ function cover(over: Partial<Override> = {}): Override {
     id: "ovr_1",
     org_id: "default",
     team_id: "team_1",
+    rotation_id: "rot_primary",
     user_email: "sam@o2.ai",
     start_at: FROM,
     end_at: FROM + 3_600_000_000,
@@ -91,14 +93,27 @@ function render(props: Record<string, unknown> = {}) {
 describe("OnCallCoverList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    service.listOverrides.mockResolvedValue({ data: [] } as any);
-    service.deleteOverride.mockResolvedValue({ data: { deleted: true } } as any);
+    service.listOverrides.mockResolvedValue(ok([]));
+    service.deleteOverride.mockResolvedValue(ok({ deleted: true }));
+  });
+
+  // The delete targets the team now shown, so the previous team's covers must not stay listed while its read is in flight.
+  it("drops the previous team's covers the moment the team changes", async () => {
+    service.listOverrides.mockResolvedValue(ok([cover({ team_id: "team_a" })]));
+    const wrapper = render({ teamId: "team_a" });
+    await flushPromises();
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
+
+    service.listOverrides.mockReturnValue(new Promise(() => {}));
+    await wrapper.setProps({ teamId: "team_b" });
+
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(0);
   });
 
   it("lists the covers standing over this team's rotations", async () => {
-    service.listOverrides.mockResolvedValue({
-      data: [cover({ covering_for: "ana@o2.ai", reason: "dentist" })],
-    } as any);
+    service.listOverrides.mockResolvedValue(
+      ok([cover({ covering_for: "ana@o2.ai", reason: "dentist" })]),
+    );
 
     const wrapper = render();
     await flushPromises();
@@ -113,7 +128,7 @@ describe("OnCallCoverList", () => {
   /// Both are optional on the wire, and legitimately so: "cover tonight" is a
   /// real request before anybody has worked out whose night it is.
   it("renders a cover that names neither a shift nor a reason", async () => {
-    service.listOverrides.mockResolvedValue({ data: [cover()] } as any);
+    service.listOverrides.mockResolvedValue(ok([cover()]));
 
     const wrapper = render();
     await flushPromises();
@@ -125,12 +140,12 @@ describe("OnCallCoverList", () => {
   /// Overlaps are legal and the NEWEST wins, so the row on top of an
   /// overlapping pair has to be the one actually in force.
   it("puts the cover that wins an overlap first", async () => {
-    service.listOverrides.mockResolvedValue({
-      data: [
+    service.listOverrides.mockResolvedValue(
+      ok([
         cover({ id: "ovr_old", user_email: "old@o2.ai", created_at: FROM }),
         cover({ id: "ovr_new", user_email: "new@o2.ai", created_at: FROM + 1 }),
-      ],
-    } as any);
+      ]),
+    );
 
     const wrapper = render();
     await flushPromises();
@@ -176,10 +191,10 @@ describe("OnCallCoverList", () => {
   it("ignores a slower answer for a window the calendar has already left", async () => {
     const thisWeek = { from: FROM, to: FROM + 86_400_000_000 };
     const nextWeek = { from: FROM + 86_400_000_000, to: FROM + 2 * 86_400_000_000 };
-    service.listOverrides.mockResolvedValue({ data: [cover()] } as any);
+    service.listOverrides.mockResolvedValue(ok([cover()]));
     const wrapper = render({ window: thisWeek });
     await flushPromises();
-    let answerNext: (value: unknown) => void = () => {};
+    let answerNext: (value: Awaited<ReturnType<typeof service.listOverrides>>) => void = () => {};
     service.listOverrides.mockImplementationOnce(
       () => new Promise((resolve) => (answerNext = resolve)),
     );
@@ -188,7 +203,7 @@ describe("OnCallCoverList", () => {
     await flushPromises();
     await wrapper.setProps({ window: thisWeek });
     await flushPromises();
-    answerNext({ data: [cover({ id: "ovr_2" }), cover({ id: "ovr_3" })] });
+    answerNext(ok([cover({ id: "ovr_2" }), cover({ id: "ovr_3" })]));
     await flushPromises();
 
     expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
@@ -196,7 +211,7 @@ describe("OnCallCoverList", () => {
 
   /// The calendar above this list remounts on every tab and range change.
   it("serves a remount from the cache, and reaches the server on refresh", async () => {
-    service.listOverrides.mockResolvedValue({ data: [cover()] } as any);
+    service.listOverrides.mockResolvedValue(ok([cover()]));
 
     const first = render({ window: { from: FROM, to: FROM + 86_400_000_000 } });
     await flushPromises();
@@ -215,7 +230,7 @@ describe("OnCallCoverList", () => {
 
   describe("removing a cover", () => {
     it("deletes it and re-reads the list", async () => {
-      service.listOverrides.mockResolvedValue({ data: [cover()] } as any);
+      service.listOverrides.mockResolvedValue(ok([cover()]));
       const wrapper = render();
       await flushPromises();
 
@@ -234,7 +249,7 @@ describe("OnCallCoverList", () => {
     /// the window this cover held belongs to the rotation again, and the cell
     /// still names the person who no longer holds it.
     it("tells the calendar to re-resolve", async () => {
-      service.listOverrides.mockResolvedValue({ data: [cover()] } as any);
+      service.listOverrides.mockResolvedValue(ok([cover()]));
       const wrapper = render();
       await flushPromises();
 
@@ -247,7 +262,7 @@ describe("OnCallCoverList", () => {
     });
 
     it("does not delete anything until the confirm is pressed", async () => {
-      service.listOverrides.mockResolvedValue({ data: [cover()] } as any);
+      service.listOverrides.mockResolvedValue(ok([cover()]));
       const wrapper = render();
       await flushPromises();
 
@@ -258,7 +273,7 @@ describe("OnCallCoverList", () => {
     });
 
     it("names the covering member in bold, with a destructive button", async () => {
-      service.listOverrides.mockResolvedValue({ data: [cover()] } as any);
+      service.listOverrides.mockResolvedValue(ok([cover()]));
       const wrapper = render();
       await flushPromises();
 
@@ -275,7 +290,7 @@ describe("OnCallCoverList", () => {
     });
 
     it("keeps the sentence while the dialog fades out after the remove", async () => {
-      service.listOverrides.mockResolvedValue({ data: [cover()] } as any);
+      service.listOverrides.mockResolvedValue(ok([cover()]));
       // Renders its body while closed, as the real dialog does during its fade.
       const FadingDialog = {
         name: "ODialog",
@@ -304,17 +319,17 @@ describe("OnCallCoverList", () => {
   /// team with three of them the unfiltered list answers it by making the
   /// reader check every chip.
   it("shows only the covers standing over the rotation it is scoped to", async () => {
-    service.listOverrides.mockResolvedValue({
-      data: [
+    service.listOverrides.mockResolvedValue(
+      ok([
         cover({ id: "ov_primary", rotation_id: "rot_primary" }),
         cover({ id: "ov_secondary", rotation_id: "rot_secondary" }),
-      ],
-    } as any);
+      ]),
+    );
 
     const wrapper = render({ rotationId: "rot_secondary" });
     await flushPromises();
 
-    const rows = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+    const rows = wrapper.findComponent({ name: "OTable" }).props("data") as Override[];
     expect(rows.map((r) => r.id)).toEqual(["ov_secondary"]);
   });
 
@@ -322,9 +337,7 @@ describe("OnCallCoverList", () => {
   /// question a one-rotation team can ask. It shows the rotation's NAME from
   /// its stored id — printing the id would be an identifier nobody can look up.
   it("names the rotation a cover stands over, by its name", async () => {
-    service.listOverrides.mockResolvedValue({
-      data: [cover({ rotation_id: "rot_secondary" })],
-    } as any);
+    service.listOverrides.mockResolvedValue(ok([cover({ rotation_id: "rot_secondary" })]));
 
     const rotations = [
       { id: "rot_primary", name: "Primary", shift_rules: [] },
@@ -348,7 +361,7 @@ describe("OnCallCoverList", () => {
 
   /// The timeline and its legend already show there are no covers, so an empty list says nothing at all.
   it("renders nothing when there are no covers in the window", async () => {
-    service.listOverrides.mockResolvedValue({ data: [] } as any);
+    service.listOverrides.mockResolvedValue(ok([]));
     const wrapper = render();
     await flushPromises();
 
@@ -357,9 +370,7 @@ describe("OnCallCoverList", () => {
   });
 
   it("heads the list with its count, and no explanation sentence", async () => {
-    service.listOverrides.mockResolvedValue({
-      data: [cover({ id: "ov_1" }), cover({ id: "ov_2" })],
-    } as any);
+    service.listOverrides.mockResolvedValue(ok([cover({ id: "ov_1" }), cover({ id: "ov_2" })]));
     const wrapper = render();
     await flushPromises();
 

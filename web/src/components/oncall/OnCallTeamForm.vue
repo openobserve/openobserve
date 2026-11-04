@@ -198,6 +198,7 @@ import {
 import OnCallRotationPreview from "./OnCallRotationPreview.vue";
 
 import { makeOnCallTeamSchema, type OnCallTeamFormValues } from "./OnCallTeamForm.schema";
+import { serverMessageOf, statusOf } from "@/utils/slackLink";
 
 const FORM_ID = "oncall-team-form";
 
@@ -375,14 +376,14 @@ async function onSubmit(values: OnCallTeamFormValues) {
       message: props.team ? t("oncall.teamUpdated") : t("oncall.teamCreated"),
     });
     emit("saved", teamId, !!props.offerDefault && !props.isDefault && !!values.make_default);
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
       message:
-        err?.response?.status === 403
+        statusOf(err) === 403
           ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.saveTeamFailed"),
+          : raw(serverMessageOf(err)) || t("oncall.saveTeamFailed"),
     });
   }
 }
@@ -397,10 +398,10 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
 
   try {
     await staffMembersWrite.mutateAsync({ teamId, userEmails: emails });
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "warning",
-      message: raw(err?.response?.data?.message) || t("oncall.teamCreatedWithoutMembers"),
+      message: raw(serverMessageOf(err)) || t("oncall.teamCreatedWithoutMembers"),
     });
     return;
   }
@@ -430,10 +431,10 @@ async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
         ),
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "warning",
-      message: raw(err?.response?.data?.message) || t("oncall.teamCreatedWithoutRotation"),
+      message: raw(serverMessageOf(err)) || t("oncall.teamCreatedWithoutRotation"),
     });
   }
 }

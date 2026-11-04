@@ -119,6 +119,7 @@ export class OnCallTeamDetailPage {
       presetsTabs: '[data-test="oncall-presets-picker"]',
       presetsApply: '[data-test="oncall-presets-apply"]',
       presetsError: '[data-test="oncall-presets-error"]',
+      presetsBlocked: '[data-test="oncall-presets-blocked"]',
       presetDefaults: '[data-test="oncall-preset-defaults"]',
       presetDefaultsToggle: '[data-test="oncall-preset-defaults-toggle"]',
 
@@ -149,11 +150,13 @@ export class OnCallTeamDetailPage {
       // Members tab.
       members: '[data-test="oncall-members"]',
       membersTable: '[data-test="oncall-members-table"]',
+      membersAddOpen: '[data-test="oncall-members-add-open"]',
+      membersAddDialog: '[data-test="oncall-members-add-dialog"]',
       membersAddButton: '[data-test="oncall-members-add-btn"]',
       membersEmailInput: '[data-test="oncall-members-email-input"]',
       membersUserSelect: '[data-test="oncall-members-user-select"]',
       membersEmpty: '[data-test="oncall-members-empty"]',
-      membersCoverage: '[data-test="oncall-members-coverage"]',
+      membersTabCount: '[data-test="oncall-team-tab-members-count"]',
       membersAwayDialog: '[data-test="oncall-members-away-dialog"]',
       membersAwaySave: '[data-test="oncall-members-away-save"]',
 
@@ -227,7 +230,8 @@ export class OnCallTeamDetailPage {
   /** An L0 hold band carries the agent id, so it is matched by prefix. */
   anyLadderL0() { return '[data-test^="oncall-ladder-l0-"]'; }
   /** Shift-rule tabs are indexed by POSITION, so a count is the only stable read. */
-  anyRuleTab() { return '[data-test^="oncall-schedule-rule-tab-"]'; }
+  // The tab's status icon shares the prefix, so it is excluded or a flagged rule counts twice.
+  anyRuleTab() { return '[data-test^="oncall-schedule-rule-tab-"]:not([data-test^="oncall-schedule-rule-tab-icon-"])'; }
 
   // ------------------------------------------------------------- element getters
 
@@ -390,7 +394,7 @@ export class OnCallTeamDetailPage {
     const tab = this.page.locator(this.ruleTab(index));
     await tab.waitFor({ state: 'visible', timeout: 15000 });
     await tab.click();
-    await expect(tab).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
+    await expect(tab).toHaveAttribute('data-state', 'active', { timeout: 10000 });
   }
 
   /** "+" opens the new rule's rename popover; it is closed so the tab body can be used. */
@@ -564,7 +568,7 @@ export class OnCallTeamDetailPage {
    * `requestSeen` is the part that catches a silent no-op: a Save that fires
    * nothing AND says nothing is the defect, and neither half alone proves it.
    *
-   * @returns {Promise<{disabled: boolean, requestSeen: boolean, error: string|null, invalidFields: number}>}
+   * @returns {Promise<{disabled: boolean, requestSeen: boolean, error: string|null, blocked: string|null, invalidFields: number}>}
    */
   async attemptQuickStartSave({ settleMs = 1500 } = {}) {
     const apply = this.getQuickStartApply();
@@ -585,17 +589,19 @@ export class OnCallTeamDetailPage {
       this.page.off('request', watch);
     }
 
-    const errorNode = this.page.locator(this.locators.presetsError);
-    const error = (await errorNode.count()) > 0
-      ? ((await errorNode.first().textContent()) ?? '').trim()
-      : null;
+    const textOf = async (selector) => {
+      const node = this.page.locator(selector);
+      return (await node.count()) > 0 ? ((await node.first().textContent()) ?? '').trim() : null;
+    };
+    const error = await textOf(this.locators.presetsError);
+    const blocked = await textOf(this.locators.presetsBlocked);
     // Per-field messages are rendered by the inputs themselves, so they are
     // counted rather than read: the point is that SOMETHING named the gap.
     const invalidFields = await this.page
       .locator(`${this.locators.presetsDrawer} [data-test$="-error"]`)
       .count();
 
-    return { disabled, requestSeen, error, invalidFields };
+    return { disabled, requestSeen, error, blocked, invalidFields };
   }
 
   // --------------------------------------------------------- escalation tab
@@ -646,7 +652,10 @@ export class OnCallTeamDetailPage {
   }
 
   async openAddMember() {
-    await this.page.locator(this.locators.membersAddButton).click();
+    const dialog = this.page.locator(this.locators.membersAddDialog);
+    if (await dialog.isVisible().catch(() => false)) return;
+    await this.page.locator(this.locators.membersAddOpen).click();
+    await expect(dialog).toBeVisible({ timeout: 15000 });
   }
 
   async removeMember(memberId) {
@@ -656,15 +665,16 @@ export class OnCallTeamDetailPage {
   }
 
   /**
-   * Stage one person for adding.
+   * Stage one person for adding, inside the Add members dialog.
    *
-   * The picker is a MULTI-select over org users, not a dialog: the Add button
-   * is the submit and stays disabled until something is staged. When the user
-   * lookup fails the component swaps the picker for a free-text email input,
-   * so both shapes are handled — the fallback is the only path that can add a
-   * NON-org address, which is the one the server must refuse.
+   * The picker is a MULTI-select over org users, and the dialog's Save stays
+   * disabled until something is staged. When the user lookup fails the
+   * component swaps the picker for a free-text email input, so both shapes are
+   * handled — the fallback is the only path that can add a NON-org address,
+   * which is the one the server must refuse.
    */
   async pickMemberToAdd(email) {
+    await this.openAddMember();
     const picker = this.page.locator(this.locators.membersUserSelect);
     if (await picker.count()) {
       const trigger = this.page.locator(part(this.locators.membersUserSelect, 'trigger')).first();
@@ -674,7 +684,9 @@ export class OnCallTeamDetailPage {
         .locator(`${part(this.locators.membersUserSelect, 'option')}[data-test-value="${email}"]`).first();
       await option.waitFor({ state: 'visible', timeout: 20000 });
       await option.click();
-      await this.page.keyboard.press('Escape');
+      // Escape closes only the topmost layer, so it is sent only while the listbox is still open over the dialog.
+      if (await option.isVisible().catch(() => false)) await this.page.keyboard.press('Escape');
+      await expect(this.page.locator(this.locators.membersAddDialog)).toBeVisible();
       return;
     }
     await this.page.locator(part(this.locators.membersEmailInput, 'field')).first().fill(email);
@@ -682,16 +694,16 @@ export class OnCallTeamDetailPage {
 
   async submitAddMembers() {
     await this.page.locator(this.locators.membersAddButton).click();
+    await expect(this.page.locator(this.locators.membersAddDialog)).toBeHidden({ timeout: 30000 });
   }
 
-  /** "N of M org members" — the screen's own answer to who is on this team. */
-  async readMembersCoverage() {
-    const node = this.page.locator(this.locators.membersCoverage);
+  /** The Members tab's count chip — the screen's own tally of who is on this team, or null when it shows none. */
+  async readMembersTabCount() {
+    const node = this.page.locator(this.locators.membersTabCount);
     if ((await node.count()) === 0) return null;
-    return ((await node.first().innerText()) ?? '').replace(/\s+/g, ' ').trim();
+    const text = ((await node.first().innerText()) ?? '').trim();
+    return /^\d+$/.test(text) ? Number(text) : null;
   }
-
-
 
   /** The attention banner's finding count (config risks, with folded findings discounted), or null when no banner shows. */
   async readConfigRiskCount() {

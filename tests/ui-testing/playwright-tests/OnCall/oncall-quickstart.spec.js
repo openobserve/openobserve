@@ -19,7 +19,7 @@
  * missing field, and never a silent no-op. That assertion is correct whether or
  * not the fix stays, which is the point of writing it that way.
  *
- * `attemptQuickStartSave()` returns `{disabled, requestSeen, error,
+ * `attemptQuickStartSave()` returns `{disabled, requestSeen, error, blocked,
  * invalidFields}`; `requestSeen` is the half that catches the silent no-op, and
  * neither half alone proves it.
  *
@@ -180,6 +180,7 @@ test.describe('On-call Quick start', {
 
     const spokeUp = outcome.disabled
       || Boolean(outcome.error)
+      || Boolean(outcome.blocked)
       || outcome.invalidFields > 0
       || outcome.requestSeen;
     expect(
@@ -202,23 +203,7 @@ test.describe('On-call Quick start', {
     ).toBe(0);
   });
 
-  /**
-   * The second limb, pinned precisely.
-   *
-   * With EXACTLY ONE field still blank, `apply()` takes the single-field branch
-   * — the one that names it. Worth its own test because the multi-field branch
-   * says only "fix the highlighted fields", which would pass an assertion about
-   * naming without naming anything.
-   *
-   * REACHING THAT BRANCH MEANS FILLING BOTH REGIONS BAR ONE FIELD. The
-   * catalogue declares `groups` with `min: 2`, so the shape opens at TWO region
-   * rows and each wants a name and a roster: naming only `groups-0` leaves
-   * three fields blank and lands on the summary instead. So this fills
-   * `groups-1` completely, names `groups-0`, and leaves that one roster empty —
-   * the single gap the message then has to name. The catch-all is not in the
-   * count: it is optional and its controls stay off screen until overridden,
-   * and `invalidFields()` skips a row whose controls are not visible.
-   */
+  // One region left unstaffed keeps Save disabled, and the footer says why.
   test('§11.2 a named but unstaffed region gets a message naming the gap', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
@@ -249,10 +234,11 @@ test.describe('On-call Quick start', {
     testLogger.info('§11.2 named-but-unstaffed outcome', outcome);
 
     expect(outcome.requestSeen, 'an unstaffed shape must not reach the server').toBe(false);
+    expect(outcome.disabled, 'Save stays blocked while a region has nobody in it').toBe(true);
     expect(
-      outcome.error ?? '',
-      'the single missing field must be named, not summarised',
-    ).toMatch(/needs someone assigned/i);
+      outcome.blocked ?? '',
+      'the footer says what is blocking Save',
+    ).toMatch(/add people to every group/i);
   });
 
   // Applying rewrites the primary rotation's shift rules, so the confirm names it; this guard is not §11.2's validation.

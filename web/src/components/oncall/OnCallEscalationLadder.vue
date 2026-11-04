@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-border-default rounded-surface bg-surface-base flex flex-col border"
       data-test="oncall-ladder-card"
     >
-      <!-- Edit and Send test sit on the header of the ladder they act on. -->
       <div
         class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-3"
         data-test="oncall-ladder-header"
@@ -132,7 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </p>
 
-        <!-- A numbered rail with a fixed time column, so every "who" starts on the same line. -->
         <ol v-else-if="preview" class="flex flex-col px-4 py-2" data-test="oncall-ladder-rungs">
           <li
             v-for="(group, index) in rungGroups"
@@ -140,7 +138,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="relative flex min-h-10 items-center gap-3 py-2"
             :data-test="`oncall-ladder-rung-${group.firstMicros}`"
           >
-            <!-- Symmetric padding puts each marker at the row's half-height, so the rail joins centre to centre. -->
             <span
               class="bg-border-default absolute start-3 bottom-0 w-px"
               :class="index === 0 ? 'top-1/2' : 'top-0'"
@@ -247,8 +244,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ endTime }}
               </OText>
               <!-- How a page can leave this team, in the server's words, on hover of the ending it qualifies. -->
-              <span class="text-text-secondary text-sm" data-test="oncall-ladder-ends-line">
+              <span
+                class="text-text-secondary text-sm"
+                :tabindex="preview.cross_team_moves.length ? 0 : undefined"
+                data-test="oncall-ladder-ends-line"
+              >
                 {{ endTitle }}
+                <span v-if="preview.cross_team_moves.length" class="sr-only">{{
+                  raw(preview.cross_team_moves.join(" "))
+                }}</span>
                 <OTooltip
                   v-if="preview.cross_team_moves.length"
                   side="bottom"
@@ -269,7 +273,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
         </ol>
 
-        <!-- The AI's part, in one line under the ladder it runs beside. -->
         <span
           v-if="l0 && !silent"
           class="border-border-default flex items-center gap-1.5 border-t px-4 py-2"
@@ -345,7 +348,6 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: "update:selected", priority: string): void;
   (e: "edit"): void;
-  (e: "open-members"): void;
   (e: "send-test"): void;
 }>();
 

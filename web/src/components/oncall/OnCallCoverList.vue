@@ -86,9 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OTable>
   </section>
 
-  <!-- Deleting a cover puts the rotation back in charge of that window, and
-       who that is is not always obvious from the row. The confirm says the
-       window rather than only the name. -->
+  <!-- Deleting a cover hands the window back to the rotation, so the confirm names the window, not only the person. -->
   <ODialog
     :open="!!toRemove"
     :title="t('oncall.coverRemoveTitle')"
@@ -134,6 +132,7 @@ import { deleteOverrideMutation, teamOverridesQuery } from "@/services/oncall.qu
 import type { Override, Rotation } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatInZone } from "@/utils/oncall";
+import { serverMessageOf } from "@/utils/slackLink";
 
 const props = withDefaults(
   defineProps<{
@@ -236,9 +235,6 @@ function windowOf(cover: Override): string {
   return `${fmt(cover.start_at)} – ${fmt(cover.end_at)}`;
 }
 
-/// Newest first, because that is the one in force where two overlap. The
-/// endpoint already answers in this order for the unfiltered read; sorting
-/// here keeps it true for the windowed one as well.
 // The newest read: a slower answer for a window the calendar has already left must not overwrite the list.
 let latestCoversRead = 0;
 
@@ -268,12 +264,11 @@ async function fetchCovers(force = false) {
     const all = props.rotationId
       ? res.filter((cover) => cover.rotation_id === props.rotationId)
       : res;
+    // Newest first, the one in force where two overlap; the windowed read does not promise that order.
     covers.value = [...all].sort((a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id));
   } catch {
     if (readId !== latestCoversRead) return;
-    // A cover list that cannot load is not worth an error over the calendar it
-    // sits under — the calendar still answers who is on call, which is the
-    // question people came with.
+    // No error over the calendar: it still answers who is on call.
     covers.value = [];
   } finally {
     if (readId === latestCoversRead) loading.value = false;
@@ -295,18 +290,25 @@ async function removeCover() {
     toRemove.value = null;
     // Unforced: the write expired the entry, so one server read repaints this ref.
     await fetchCovers();
-    // The calendar above is resolved server-side, so it has to be re-asked:
-    // the window this cover held now belongs to the rotation again.
+    // The calendar is resolved server-side, so the window this cover held must be re-asked.
     emit("changed");
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.coverRemoveFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.coverRemoveFailed"),
     });
   } finally {
     removing.value = false;
   }
 }
+
+// Another team's covers must not linger, deletable, while this team's first read is in flight.
+watch([orgId, () => props.teamId], () => {
+  latestCoversRead++;
+  covers.value = [];
+  toRemove.value = null;
+  loading.value = false;
+});
 
 // Wrapped: a watcher hands its new value to the callback, which `force` would take.
 watch(

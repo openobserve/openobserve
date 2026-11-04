@@ -230,7 +230,6 @@ describe("OnCallL0Editor", () => {
   // The switch is the state, so no row carries a second line explaining it.
   it("labels each permission row with its name alone", () => {
     const wrapper = render();
-    expect(wrapper.find('[data-test="oncall-l0-row-suppress-note"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-l0-row-suppress"]').text()).not.toContain("advice");
+    expect(wrapper.find('[data-test="oncall-l0-row-suppress"]').text()).toBe("Suppress the page");
   });
 });

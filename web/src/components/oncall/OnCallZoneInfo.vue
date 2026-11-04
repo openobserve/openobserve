@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     role="img"
     tabindex="0"
     class="text-text-secondary inline-flex cursor-help"
-    :aria-label="teamLine"
+    :aria-label="spokenLabel"
     data-test="oncall-zone-info"
   >
     <OIcon name="info-outline" size="sm" />
@@ -77,4 +77,8 @@ const otherLine = computed<I18nText | "">(() => {
     range: raw(formatZonedRange(from, to, props.viewerTimezone)),
   });
 });
+// The tooltip opens on hover and focus only, so a screen reader is handed both of its lines.
+const spokenLabel = computed<I18nText>(() =>
+  otherLine.value ? raw(`${teamLine.value} ${otherLine.value}`) : teamLine.value,
+);
 </script>

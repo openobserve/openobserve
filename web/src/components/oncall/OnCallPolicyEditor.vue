@@ -649,6 +649,7 @@ import {
   priorityLabel,
   resolveLadder,
 } from "@/utils/oncall";
+import { serverMessageOf } from "@/utils/slackLink";
 
 const props = withDefaults(
   defineProps<{
@@ -812,7 +813,7 @@ async function saveChannelAfterPolicy(): Promise<boolean> {
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
     channelBackToPolicy.value = false;
     return true;
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({ variant: "error", message: t("oncall.teamChannelNotSavedAfterPolicy") });
     return false;
@@ -842,11 +843,11 @@ async function saveTeamSlack(slack: Omit<SetTeamChannelBody, "destinations">) {
       ...slack,
     });
     teamChannel.value = res.data ?? null;
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.slackChannelSaveFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.slackChannelSaveFailed"),
     });
   } finally {
     savingSlack.value = false;
@@ -1297,11 +1298,11 @@ async function save(): Promise<boolean> {
     policyDraft.markSaved();
     emit("saved");
     return true;
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.savePolicyFailed"),
+      message: raw(serverMessageOf(err)) || t("oncall.savePolicyFailed"),
     });
     return false;
   } finally {

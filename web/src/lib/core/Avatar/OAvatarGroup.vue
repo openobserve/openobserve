@@ -5,22 +5,28 @@
 
 import { computed } from "vue";
 
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeSize } from "@/lib/core/Badge/OBadge.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw } from "@/types/i18n";
 
 import OAvatar from "./OAvatar.vue";
-import type { AvatarGroupProps } from "./OAvatar.types";
+import type { AvatarGroupPerson, AvatarGroupProps } from "./OAvatar.types";
 
 const props = withDefaults(defineProps<AvatarGroupProps>(), { max: 3, size: "md" });
 
 const shown = computed(() => props.people.slice(0, props.max));
 const hidden = computed(() => props.people.slice(props.max));
 
-/** The chip matches the faces' diameter, so the row reads as one stack. */
 const CHIP_SIZES: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
-  sm: "h-5 min-w-5 text-3xs -ms-0.5",
-  md: "h-6 min-w-6 text-2xs -ms-0.5",
-  lg: "h-8 min-w-8 text-xs -ms-1",
+  sm: "h-5 min-w-5 justify-center",
+  md: "h-6 min-w-6 justify-center",
+  lg: "h-8 min-w-8 justify-center",
+};
+const CHIP_BADGE_SIZE: Record<NonNullable<AvatarGroupProps["size"]>, BadgeSize> = {
+  sm: "xs",
+  md: "xs",
+  lg: "sm",
 };
 // The overlap stays under the initials' side margin, so a neighbour never clips a letter.
 const OVERLAP: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
@@ -28,6 +34,15 @@ const OVERLAP: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
   md: "-ms-0.5",
   lg: "-ms-1",
 };
+
+const label = (person: AvatarGroupPerson) => {
+  const name = person.name?.trim();
+  return name && name !== person.value ? `${name} (${person.value})` : person.value;
+};
+// The tooltip is hover- and focus-only, so a screen reader is handed the same names as the chip's name.
+const hiddenLabel = computed(() =>
+  raw(`+${hidden.value.length}: ${hidden.value.map(label).join(", ")}`),
+);
 </script>
 
 <template>
@@ -40,15 +55,18 @@ const OVERLAP: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
       :size="props.size"
       :class="['ring-surface-base ring-2', index > 0 ? OVERLAP[props.size] : '']"
     />
-    <span
+    <OBadge
       v-if="hidden.length"
-      :class="[
-        'bg-surface-subtle text-text-secondary ring-surface-base inline-flex items-center justify-center rounded-full px-1 font-medium ring-2',
-        CHIP_SIZES[props.size],
-      ]"
+      variant="default-soft"
+      :size="CHIP_BADGE_SIZE[props.size]"
+      shape="pill"
+      :class="[CHIP_SIZES[props.size], OVERLAP[props.size]]"
+      tabindex="0"
+      :aria-label="hiddenLabel"
       data-test="o-avatar-group-more"
-      >{{ raw(`+${hidden.length}`)
-      }}<OTooltip side="bottom">
+    >
+      {{ raw(`+${hidden.length}`) }}
+      <OTooltip side="bottom">
         <template #content>
           <span class="flex flex-col gap-1.5">
             <span v-for="person in hidden" :key="person.value" class="flex flex-col">
@@ -61,7 +79,7 @@ const OVERLAP: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
             </span>
           </span>
         </template>
-      </OTooltip></span
-    >
+      </OTooltip>
+    </OBadge>
   </span>
 </template>

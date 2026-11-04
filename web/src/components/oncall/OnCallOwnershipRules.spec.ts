@@ -26,7 +26,7 @@ import store from "@/test/unit/helpers/store";
 const stubs = {
   OEmptyState: {
     name: "OEmptyState",
-    props: ["size", "preset", "filtered", "description"],
+    props: ["size", "preset", "filtered", "description", "hideAction"],
     emits: ["action"],
     template: "<div />",
   },
@@ -253,6 +253,21 @@ describe("OnCallOwnershipRules", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-routing-says-r1"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-routing-says-r2"]').exists()).toBe(true);
+  });
+
+  // A reader who cannot write routing must not reach an editor whose save would only answer 403.
+  it("offers no add from the empty state to a reader who cannot edit routing", async () => {
+    const readOnly = render({ rules: [], editable: false });
+    await flushPromises();
+    const empty = readOnly.findComponent({ name: "OEmptyState" });
+    expect(empty.props("hideAction")).toBe(true);
+    empty.vm.$emit("action", "create");
+    expect(readOnly.emitted("add")).toBeUndefined();
+
+    const writer = render({ rules: [] });
+    await flushPromises();
+    writer.findComponent({ name: "OEmptyState" }).vm.$emit("action", "create");
+    expect(writer.emitted("add")).toHaveLength(1);
   });
 
   it("hides row actions for a reader who cannot edit routing", async () => {

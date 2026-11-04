@@ -157,7 +157,6 @@ describe("OnCallPolicyEditor", () => {
       ["oncall-policy-channel-1-voice", "Voice call"],
       ["oncall-policy-channel-1-webhook", "Chat / webhook"],
     ]);
-    expect(wrapper.find('[data-test="oncall-policy-channels-hint"]').exists()).toBe(false);
   });
 
   /// DM-2: Slack is offered only while the org has Slack on, and never pages without Email.

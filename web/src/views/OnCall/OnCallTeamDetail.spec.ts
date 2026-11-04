@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import type { ComponentPublicInstance } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { queryClient } from "@/composables/query/queryClient";
@@ -25,7 +26,10 @@ import oncallService from "@/services/oncall";
 import { oncallKeys } from "@/services/oncall.querykeys";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { userKeys } from "@/services/users.querykeys";
+import { ok } from "@/test/unit/helpers/axiosReply";
 import store from "@/test/unit/helpers/store";
+import type { UpcomingShift } from "@/components/oncall/OnCallCoverForm.vue";
+import type { ResolvedSegment, Rotation, Unavailability } from "@/ts/interfaces/oncall";
 import OnCallTeamDetail from "@/views/OnCall/OnCallTeamDetail.vue";
 import {
   readEditorDraft,
@@ -84,6 +88,10 @@ import analytics from "@/services/product_analytics";
 import shiftParity from "../../../../src/config/src/meta/oncall/shift_parity.json";
 
 const service = vi.mocked(oncallService);
+
+// A selector lookup cannot know the component it lands on, so its props are read by name.
+type AnyPropsWrapper = VueWrapper<ComponentPublicInstance<Record<string, unknown>>>;
+type Reply<K extends keyof typeof oncallService> = Awaited<ReturnType<(typeof oncallService)[K]>>;
 const toasted = vi.mocked(toast);
 
 // The tab strip and the attention banner are what is under test, so they
@@ -130,24 +138,22 @@ describe("OnCallTeamDetail", () => {
     localStorage.clear();
     vi.clearAllMocks();
     delete routeParams.tab;
-    service.getTeam.mockResolvedValue({
-      data: { id: "team_1", name: "Platform", timezone: "UTC" },
-    } as any);
-    service.listMembers.mockResolvedValue({ data: [{ user_email: "ana@corp.com" }] } as any);
-    service.getSchedule.mockResolvedValue({ data: { rotations: [] } } as any);
-    service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    service.listTeams.mockResolvedValue({ data: [] } as any);
-    service.listOwnershipRules.mockResolvedValue({ data: [] } as any);
-    service.listResponses.mockResolvedValue({ data: [] } as any);
-    service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
-    service.escalationPreview.mockResolvedValue({ data: null } as any);
-    service.teamOverview.mockResolvedValue({ data: null } as any);
-    service.teamReachability.mockResolvedValue({ data: null } as any);
-    service.teamConfigRisks.mockResolvedValue({ data: null } as any);
-    service.teamLoad.mockResolvedValue({ data: null } as any);
-    service.listOverrides.mockResolvedValue({ data: [] } as any);
-    service.listUnavailability.mockResolvedValue({ data: [] } as any);
+    service.getTeam.mockResolvedValue(ok({ id: "team_1", name: "Platform", timezone: "UTC" }));
+    service.listMembers.mockResolvedValue(ok([{ user_email: "ana@corp.com" }]));
+    service.getSchedule.mockResolvedValue(ok({ rotations: [] }));
+    service.getPolicy.mockResolvedValue(ok({ rungs: [] }));
+    service.whoIsOnCall.mockResolvedValue(ok([]));
+    service.listTeams.mockResolvedValue(ok([]));
+    service.listOwnershipRules.mockResolvedValue(ok([]));
+    service.listResponses.mockResolvedValue(ok([]));
+    service.resolvedSchedule.mockResolvedValue(ok([]));
+    service.escalationPreview.mockResolvedValue(ok(null));
+    service.teamOverview.mockResolvedValue(ok(null));
+    service.teamReachability.mockResolvedValue(ok(null));
+    service.teamConfigRisks.mockResolvedValue(ok(null));
+    service.teamLoad.mockResolvedValue(ok(null));
+    service.listOverrides.mockResolvedValue(ok([]));
+    service.listUnavailability.mockResolvedValue(ok([]));
   });
 
   /// Overview first — what the team HAS been doing — then the chain that
@@ -161,10 +167,21 @@ describe("OnCallTeamDetail", () => {
     expect(names).toEqual(["overview", "schedule", "policy", "ownership", "members"]);
   });
 
+  // The e2e roster check reads this chip, so it must carry the roster's own count.
+  it("counts the roster on the Members tab", async () => {
+    service.listMembers.mockResolvedValue(
+      ok([{ user_email: "ana@corp.com" }, { user_email: "bo@corp.com" }]),
+    );
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-team-tab-members-count"]').text()).toBe("2");
+  });
+
   /// A team with nobody in it cannot have an overview worth reading, so it
   /// lands where the work is instead.
   it("lands on members while the team is still empty", async () => {
-    service.listMembers.mockResolvedValue({ data: [] } as any);
+    service.listMembers.mockResolvedValue(ok([]));
     const wrapper = render();
     await flushPromises();
 
@@ -224,9 +241,9 @@ describe("OnCallTeamDetail", () => {
 
   // S7: the attention banner carries the findings; the header does not repeat them.
   it("keeps the config-risk count out of the header", async () => {
-    service.teamConfigRisks.mockResolvedValue({
-      data: { team_id: "team_1", horizon_days: 14, total: 3, risks: [] },
-    } as any);
+    service.teamConfigRisks.mockResolvedValue(
+      ok({ team_id: "team_1", horizon_days: 14, total: 3, risks: [] }),
+    );
     const wrapper = render();
     await flushPromises();
 
@@ -235,14 +252,14 @@ describe("OnCallTeamDetail", () => {
 
   // S6: the strip is told who cannot be reached, from the reachability the page already read.
   it("hands the coverage strip the people a page would not reach", async () => {
-    service.teamReachability.mockResolvedValue({
-      data: {
+    service.teamReachability.mockResolvedValue(
+      ok({
         members: [
           { user_email: "ana@corp.com", would_a_page_land: false },
           { user_email: "bob@corp.com", would_a_page_land: true },
         ],
-      },
-    } as any);
+      }),
+    );
     const wrapper = render();
     await flushPromises();
     wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "overview");
@@ -256,8 +273,8 @@ describe("OnCallTeamDetail", () => {
   // S4: a test page is confirmed against who it would reach, then reported by count.
   describe("sending a test page from the ladder", () => {
     beforeEach(() => {
-      service.escalationPreview.mockResolvedValue({
-        data: {
+      service.escalationPreview.mockResolvedValue(
+        ok({
           priority: "P1",
           pages_anyone: true,
           channels: ["sms", "email", "voice"],
@@ -279,8 +296,8 @@ describe("OnCallTeamDetail", () => {
               resolves_to_nobody: false,
             },
           ],
-        },
-      } as any);
+        }),
+      );
     });
 
     const DialogStub = {
@@ -300,7 +317,7 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
       const confirm = wrapper
         .findAllComponents({ name: "ODialog" })
-        .find((c: any) => c.props("title") === "Send a test page?")!;
+        .find((c) => c.props("title") === "Send a test page?")!;
       return { wrapper, confirm };
     }
 
@@ -314,24 +331,21 @@ describe("OnCallTeamDetail", () => {
       );
       // Each name carries its email in a tooltip, because two people can share a name.
       const people = wrapper.findAllComponents({ name: "OnCallPersonName" });
-      expect(people.map((one: any) => one.props("email"))).toEqual([
-        "ana@corp.com",
-        "bob@corp.com",
-      ]);
+      expect(people.map((one) => one.props("email"))).toEqual(["ana@corp.com", "bob@corp.com"]);
       expect(service.testPage).not.toHaveBeenCalled();
     });
 
     it("sends the selected priority on confirm and reports how many went out", async () => {
-      service.testPage.mockResolvedValue({
-        data: {
+      service.testPage.mockResolvedValue(
+        ok({
           reached_anyone: true,
           channels: ["email"],
           attempts: [
             { channel: "email", recipient: "ana@corp.com", reason: "", delivered: true },
             { channel: "sms", recipient: "ana@corp.com", reason: "", delivered: false },
           ],
-        },
-      } as any);
+        }),
+      );
       const { confirm } = await ask();
       confirm.vm.$emit("click:primary");
       await flushPromises();
@@ -345,21 +359,21 @@ describe("OnCallTeamDetail", () => {
 
   describe("the coverage chip", () => {
     function onCall(email: string) {
-      service.whoIsOnCall.mockResolvedValue({
-        data: [
+      service.whoIsOnCall.mockResolvedValue(
+        ok([
           {
             rotation_id: "rot_primary",
             rotation_name: "Weekdays",
             rule: "Base",
             user_email: email,
           },
-        ],
-      } as any);
+        ]),
+      );
     }
 
     function verdict(email: string, lands: boolean) {
-      service.teamReachability.mockResolvedValue({
-        data: {
+      service.teamReachability.mockResolvedValue(
+        ok({
           team_id: "team_1",
           smtp_configured: lands,
           members: [
@@ -376,8 +390,8 @@ describe("OnCallTeamDetail", () => {
           reachable: lands ? 1 : 0,
           total: 1,
           unreachable_members: lands ? [] : [email],
-        },
-      } as any);
+        }),
+      );
     }
 
     function chip(wrapper: ReturnType<typeof render>) {
@@ -395,8 +409,8 @@ describe("OnCallTeamDetail", () => {
 
     // Green only when every holder can be paged, so the chip agrees with the banner naming the one who cannot.
     it("is not green while one of two people on call cannot be reached", async () => {
-      service.whoIsOnCall.mockResolvedValue({
-        data: [
+      service.whoIsOnCall.mockResolvedValue(
+        ok([
           {
             rotation_id: "rot_primary",
             rotation_name: "Primary",
@@ -409,10 +423,10 @@ describe("OnCallTeamDetail", () => {
             rule: "Base",
             user_email: "bob@corp.com",
           },
-        ],
-      } as any);
-      service.teamReachability.mockResolvedValue({
-        data: {
+        ]),
+      );
+      service.teamReachability.mockResolvedValue(
+        ok({
           team_id: "team_1",
           smtp_configured: true,
           members: [
@@ -432,19 +446,19 @@ describe("OnCallTeamDetail", () => {
           reachable: 1,
           total: 2,
           unreachable_members: ["ana@corp.com"],
-        },
-      } as any);
+        }),
+      );
       const wrapper = render();
       await flushPromises();
 
       expect(chip(wrapper)).toContain("On call but can't be reached");
       const tag = wrapper
         .findAllComponents({ name: "OTag" })
-        .find((one: any) => one.props("type") === "oncallCoverage")!;
+        .find((one) => one.props("type") === "oncallCoverage")!;
       expect(tag.props("value")).toBe("unreachable");
       const tip = wrapper
         .findAllComponents({ name: "OTooltip" })
-        .find((one: any) => String(one.props("content")).includes("can't be reached"));
+        .find((one) => String(one.props("content")).includes("can't be reached"));
       expect(tip!.props("content")).toBe("1 of 2 on call can't be reached");
     });
 
@@ -461,7 +475,7 @@ describe("OnCallTeamDetail", () => {
     /// must not paint the header red.
     it("does not invent a verdict when reachability did not load", async () => {
       onCall("ana@corp.com");
-      service.teamReachability.mockResolvedValue({ data: null } as any);
+      service.teamReachability.mockResolvedValue(ok(null));
       const wrapper = render();
       await flushPromises();
 
@@ -542,7 +556,7 @@ describe("OnCallTeamDetail", () => {
     /// The skeleton keeps the tabs out of the DOM until load finishes, so
     /// nothing can attempt a switch that would overwrite the address bar.
     it("does not rewrite the URL before the team has loaded", async () => {
-      service.getTeam.mockReturnValue(new Promise(() => {}) as any);
+      service.getTeam.mockReturnValue(new Promise<Reply<"getTeam">>(() => {}));
       const wrapper = render();
       await flushPromises();
 
@@ -576,7 +590,7 @@ describe("OnCallTeamDetail", () => {
     /// A cover is a shift handed to somebody. With an empty roster the dialog
     /// would open on a picker with nothing in it.
     it("is not offered while the team has nobody in it", async () => {
-      service.listMembers.mockResolvedValue({ data: [] } as any);
+      service.listMembers.mockResolvedValue(ok([]));
       const wrapper = render();
       await flushPromises();
 
@@ -622,7 +636,7 @@ describe("OnCallTeamDetail", () => {
     }
 
     it("writes the cover the dialog handed it", async () => {
-      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      service.createOverride.mockResolvedValue(ok({ id: "ov_1" }));
       const wrapper = render();
       await flushPromises();
       await save(wrapper);
@@ -637,7 +651,7 @@ describe("OnCallTeamDetail", () => {
     /// endpoint, so a save it is never told about leaves them looking at a list
     /// that does not contain what they just saved.
     it("re-reads the Covers panel so the new cover appears in it", async () => {
-      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      service.createOverride.mockResolvedValue(ok({ id: "ov_1" }));
       const wrapper = render();
       await flushPromises();
       wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
@@ -657,11 +671,11 @@ describe("OnCallTeamDetail", () => {
     it("offers swap shifts at the team-zone handovers the server uses", async () => {
       const c = shiftParity[0];
       const now = vi.spyOn(Date, "now").mockReturnValue(c.at_micros / 1000);
-      service.getTeam.mockResolvedValue({
-        data: { id: "team_1", name: "Platform", timezone: c.timezone },
-      } as any);
-      service.getSchedule.mockResolvedValue({
-        data: {
+      service.getTeam.mockResolvedValue(
+        ok({ id: "team_1", name: "Platform", timezone: c.timezone }),
+      );
+      service.getSchedule.mockResolvedValue(
+        ok({
           timezone: c.timezone,
           rotations: [
             {
@@ -677,13 +691,15 @@ describe("OnCallTeamDetail", () => {
               ],
             },
           ],
-        },
-      } as any);
+        }),
+      );
       const wrapper = render();
       await flushPromises();
       wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
       await flushPromises();
-      const [first] = wrapper.findComponent({ name: "OnCallCoverForm" }).props("shifts") as any[];
+      const [first] = wrapper
+        .findComponent({ name: "OnCallCoverForm" })
+        .props("shifts") as UpcomingShift[];
       now.mockRestore();
       expect(first).toMatchObject({
         startMicros: c.shift_start,
@@ -695,7 +711,7 @@ describe("OnCallTeamDetail", () => {
     /// A swap is two covers written back to back, so it invalidates exactly
     /// what one cover invalidates.
     it("re-reads the Covers panel after a swap too", async () => {
-      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      service.createOverride.mockResolvedValue(ok({ id: "ov_1" }));
       const wrapper = render();
       await flushPromises();
       wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
@@ -719,7 +735,7 @@ describe("OnCallTeamDetail", () => {
     /// team and which hours — all three interpolated, or it reads as a sentence
     /// with the nouns cut out of it.
     it("names who covers what in the success toast", async () => {
-      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      service.createOverride.mockResolvedValue(ok({ id: "ov_1" }));
       const wrapper = render();
       await flushPromises();
       await save(wrapper);
@@ -734,7 +750,7 @@ describe("OnCallTeamDetail", () => {
     });
 
     it("tracks oncall_override_created as a cover once it is saved", async () => {
-      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      service.createOverride.mockResolvedValue(ok({ id: "ov_1" }));
       const wrapper = render();
       await flushPromises();
       await save(wrapper);
@@ -767,7 +783,7 @@ describe("OnCallTeamDetail", () => {
     }
 
     it("writes one cover each way", async () => {
-      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      service.createOverride.mockResolvedValue(ok({ id: "ov_1" }));
       const wrapper = render();
       await flushPromises();
       await swap(wrapper);
@@ -787,9 +803,9 @@ describe("OnCallTeamDetail", () => {
     /// did not agree to cover, and nobody has taken theirs.
     it("undoes the first cover when the second is refused", async () => {
       service.createOverride
-        .mockResolvedValueOnce({ data: { id: "ov_1" } } as any)
+        .mockResolvedValueOnce(ok({ id: "ov_1" }))
         .mockRejectedValueOnce({ response: { data: { message: "already covered" } } });
-      service.deleteOverride.mockResolvedValue({} as any);
+      service.deleteOverride.mockResolvedValue(ok(undefined));
 
       const wrapper = render();
       await flushPromises();
@@ -819,9 +835,9 @@ describe("OnCallTeamDetail", () => {
     /// same pair from scratch to try again.
     it("keeps the dialog open when the swap did not happen", async () => {
       service.createOverride
-        .mockResolvedValueOnce({ data: { id: "ov_1" } } as any)
+        .mockResolvedValueOnce(ok({ id: "ov_1" }))
         .mockRejectedValueOnce({ response: { data: { message: "already covered" } } });
-      service.deleteOverride.mockResolvedValue({} as any);
+      service.deleteOverride.mockResolvedValue(ok(undefined));
 
       const wrapper = render();
       await flushPromises();
@@ -835,7 +851,7 @@ describe("OnCallTeamDetail", () => {
     });
 
     it("closes the dialog once both covers are written", async () => {
-      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      service.createOverride.mockResolvedValue(ok({ id: "ov_1" }));
 
       const wrapper = render();
       await flushPromises();
@@ -845,7 +861,7 @@ describe("OnCallTeamDetail", () => {
     });
 
     it("tracks one oncall_override_created swap once both covers are written", async () => {
-      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      service.createOverride.mockResolvedValue(ok({ id: "ov_1" }));
       const wrapper = render();
       await flushPromises();
       await swap(wrapper);
@@ -856,9 +872,9 @@ describe("OnCallTeamDetail", () => {
 
     it("tracks nothing for a swap that was rolled back", async () => {
       service.createOverride
-        .mockResolvedValueOnce({ data: { id: "ov_1" } } as any)
+        .mockResolvedValueOnce(ok({ id: "ov_1" }))
         .mockRejectedValueOnce({ response: { data: { message: "already covered" } } });
-      service.deleteOverride.mockResolvedValue({} as any);
+      service.deleteOverride.mockResolvedValue(ok(undefined));
       const wrapper = render();
       await flushPromises();
       await swap(wrapper);
@@ -885,14 +901,14 @@ describe("OnCallTeamDetail", () => {
   describe("default team switch", () => {
     beforeEach(() => {
       __resetOnCallRoutingConfig();
-      service.coverageGaps.mockResolvedValue({ data: { teams: [] } } as any);
-      service.setRoutingConfig.mockResolvedValue({ data: {} } as any);
+      service.coverageGaps.mockResolvedValue(ok({ teams: [] }));
+      service.setRoutingConfig.mockResolvedValue(ok({}));
     });
 
     it("offers the switch, locked on while this team is the default", async () => {
-      service.getRoutingConfig.mockResolvedValue({
-        data: { org_id: "default", default_team_id: "team_1", updated_at: 0 },
-      } as any);
+      service.getRoutingConfig.mockResolvedValue(
+        ok({ org_id: "default", default_team_id: "team_1", updated_at: 0 }),
+      );
       const wrapper = render();
       await flushPromises();
 
@@ -902,9 +918,9 @@ describe("OnCallTeamDetail", () => {
     });
 
     it("nominates this team when saved with the switch on", async () => {
-      service.getRoutingConfig.mockResolvedValue({
-        data: { org_id: "default", default_team_id: "team_2", updated_at: 0 },
-      } as any);
+      service.getRoutingConfig.mockResolvedValue(
+        ok({ org_id: "default", default_team_id: "team_2", updated_at: 0 }),
+      );
       const wrapper = render();
       await flushPromises();
 
@@ -918,9 +934,9 @@ describe("OnCallTeamDetail", () => {
     });
 
     it("leaves the default alone when saved with the switch off", async () => {
-      service.getRoutingConfig.mockResolvedValue({
-        data: { org_id: "default", default_team_id: "team_2", updated_at: 0 },
-      } as any);
+      service.getRoutingConfig.mockResolvedValue(
+        ok({ org_id: "default", default_team_id: "team_2", updated_at: 0 }),
+      );
       const wrapper = render();
       await flushPromises();
 
@@ -940,7 +956,7 @@ describe("OnCallTeamDetail", () => {
 
   describe("the schedule tab", () => {
     /// The delete confirm, told apart from the presets dialog's own by title.
-    function deleteConfirm(wrapper: any) {
+    function deleteConfirm(wrapper: ReturnType<typeof render>) {
       return wrapper.findComponent({ name: "OnCallRemoveRotationDialog" });
     }
 
@@ -997,18 +1013,18 @@ describe("OnCallTeamDetail", () => {
     });
 
     it("deletes from the schedule the server has now, not the cached copy", async () => {
-      service.setSchedule.mockResolvedValue({ data: {} });
-      service.getSchedule.mockResolvedValue({
-        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
-      } as any);
+      service.setSchedule.mockResolvedValue(ok({}));
+      service.getSchedule.mockResolvedValue(
+        ok({ timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] }),
+      );
       const wrapper = await openSchedule();
       // A colleague added a rotation after this page cached its copy.
-      service.getSchedule.mockResolvedValue({
-        data: {
+      service.getSchedule.mockResolvedValue(
+        ok({
           timezone: "UTC",
           rotations: [rotation("rot_primary", "Primary"), rotation("rot_second", "Secondary")],
-        },
-      } as any);
+        }),
+      );
 
       wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_primary");
       await flushPromises();
@@ -1016,7 +1032,7 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
 
       const sent = service.setSchedule.mock.calls[0][0];
-      expect(sent.data.rotations.map((r: any) => r.name)).toEqual(["Secondary"]);
+      expect(sent.data.rotations.map((r) => r.name)).toEqual(["Secondary"]);
     });
 
     /// Until the lane menu carried it, a rotation could be created and never
@@ -1027,10 +1043,10 @@ describe("OnCallTeamDetail", () => {
     /// wrong one silently stops paging — but a name cannot key the delete,
     /// because two of them may share it.
     it("deletes a rotation by saving the schedule without it", async () => {
-      service.setSchedule.mockResolvedValue({ data: {} });
-      service.getSchedule.mockResolvedValue({
-        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
-      } as any);
+      service.setSchedule.mockResolvedValue(ok({}));
+      service.getSchedule.mockResolvedValue(
+        ok({ timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] }),
+      );
       const wrapper = await openSchedule();
 
       wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_primary");
@@ -1054,14 +1070,14 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
 
       const sent = service.setSchedule.mock.calls[0][0];
-      expect(sent.data.rotations.map((r: any) => r.name)).not.toContain("Primary");
+      expect(sent.data.rotations.map((r) => r.name)).not.toContain("Primary");
     });
 
     // S11: a hand-edited ladder that pages the rotation is edited first, from the dialog's link.
     it("opens the policy editor when the dialog asks for the policy first", async () => {
-      service.getSchedule.mockResolvedValue({
-        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
-      } as any);
+      service.getSchedule.mockResolvedValue(
+        ok({ timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] }),
+      );
       const wrapper = await openSchedule();
       wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_primary");
       await flushPromises();
@@ -1076,16 +1092,16 @@ describe("OnCallTeamDetail", () => {
 
     // The lane menu's delete is a human save too, so what is kept loses the default marker.
     it("clears the default-staffing marker from the rotations a lane delete keeps", async () => {
-      service.setSchedule.mockResolvedValue({ data: {} });
-      service.getSchedule.mockResolvedValue({
-        data: {
+      service.setSchedule.mockResolvedValue(ok({}));
+      service.getSchedule.mockResolvedValue(
+        ok({
           timezone: "UTC",
           rotations: [
             { ...rotation("rot_primary", "Primary"), source: "default" },
             { ...rotation("rot_second", "Secondary"), source: "default" },
           ],
-        },
-      } as any);
+        }),
+      );
       const wrapper = await openSchedule();
 
       wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "rot_second");
@@ -1094,7 +1110,7 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
 
       const sent = service.setSchedule.mock.calls[0][0].data.rotations;
-      expect(sent.map((r: any) => [r.name, r.source])).toEqual([["Primary", undefined]]);
+      expect(sent.map((r) => [r.name, r.source])).toEqual([["Primary", undefined]]);
     });
 
     it("drops the deleted rotation's draft and keeps another rotation's", async () => {
@@ -1104,13 +1120,13 @@ describe("OnCallTeamDetail", () => {
         entityId: `team_1/${rotationId}`,
         userEmail: store.state.userInfo.email,
       });
-      service.setSchedule.mockResolvedValue({ data: {} });
-      service.getSchedule.mockResolvedValue({
-        data: {
+      service.setSchedule.mockResolvedValue(ok({}));
+      service.getSchedule.mockResolvedValue(
+        ok({
           timezone: "UTC",
           rotations: [rotation("rot_primary", "Primary"), rotation("rot_backup", "Backup")],
-        },
-      } as never);
+        }),
+      );
       writeEditorDraft(scopeFor("rot_primary"), { data: {} });
       writeEditorDraft(scopeFor("rot_backup"), { data: {} });
       // A teammate's duplicate of the deleted rotation in this browser goes with it.
@@ -1148,9 +1164,9 @@ describe("OnCallTeamDetail", () => {
       };
       const fresh: EditorDraftScope = { ...base, entityId: null, variant: "team_1/new" };
       for (const scope of [gone, live, goneClone, fresh]) writeEditorDraft(scope, { data: {} });
-      service.getSchedule.mockResolvedValue({
-        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
-      } as never);
+      service.getSchedule.mockResolvedValue(
+        ok({ timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] }),
+      );
       const wrapper = await openSchedule();
 
       wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("edit", "rot_primary");
@@ -1186,7 +1202,7 @@ describe("OnCallTeamDetail", () => {
     /// Nothing is sent until the reader confirms — the dialog is the guard, not
     /// a receipt for a delete that already happened.
     it("leaves the schedule alone when the delete is cancelled", async () => {
-      service.setSchedule.mockResolvedValue({ data: {} });
+      service.setSchedule.mockResolvedValue(ok({}));
       const wrapper = await openSchedule();
 
       wrapper.findComponent({ name: "OnCallScheduleTimeline" }).vm.$emit("delete", "Primary");
@@ -1327,9 +1343,9 @@ describe("OnCallTeamDetail", () => {
     /// so the slower dry run for the one just left lands last — and must not
     /// show its recipients under the other priority's chip.
     it("ignores a slower dry run for a priority the reader has already left", async () => {
-      service.escalationPreview.mockResolvedValue({ data: { priority: 1 } } as any);
+      service.escalationPreview.mockResolvedValue(ok({ priority: "P1" }));
       const wrapper = await openEscalation();
-      let answerP3: (value: unknown) => void = () => {};
+      let answerP3: (value: Reply<"escalationPreview">) => void = () => {};
       service.escalationPreview.mockImplementationOnce(
         () => new Promise((resolve) => (answerP3 = resolve)),
       );
@@ -1339,11 +1355,11 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
       ladder.vm.$emit("update:selected", "P1");
       await flushPromises();
-      answerP3({ data: { priority: 3 } });
+      answerP3(ok({ priority: "P3" }));
       await flushPromises();
 
       expect(wrapper.findComponent({ name: "OnCallEscalationLadder" }).props("preview")).toEqual({
-        priority: 1,
+        priority: "P1",
       });
     });
   });
@@ -1371,9 +1387,9 @@ describe("OnCallTeamDetail", () => {
   /// indistinguishable from nothing having happened when the reader was
   /// already on the Schedule tab, since `activeTab` would be a no-op write.
   it("opens the named rotation's drawer, not just the schedule tab", async () => {
-    service.getSchedule.mockResolvedValue({
-      data: { timezone: "UTC", rotations: [rotation("rot_2", "Rotation 2")] },
-    } as any);
+    service.getSchedule.mockResolvedValue(
+      ok({ timezone: "UTC", rotations: [rotation("rot_2", "Rotation 2")] }),
+    );
     const wrapper = render();
     await flushPromises();
 
@@ -1423,12 +1439,10 @@ describe("OnCallTeamDetail", () => {
     expect(editor.props("intent")).toBeFalsy();
   });
 
-  /// The banner's "Add members" fix is the Members tab itself, so on an
-  /// empty team the reader is already there — `activeTab.value = "members"`
-  /// is a no-op write, and nothing else used to react to the click.
+  // On an empty team the reader is already on Members, so switching the tab alone would not react to the click.
   it("focuses the member picker from the attention banner, even when already on Members", async () => {
     const focusMemberPicker = vi.fn();
-    service.listMembers.mockResolvedValue({ data: [] } as any);
+    service.listMembers.mockResolvedValue(ok([]));
     const wrapper = mount(OnCallTeamDetail, {
       global: {
         plugins: [i18n, store],
@@ -1583,7 +1597,9 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
       const spy = vi.spyOn(queryClient, "invalidateQueries");
 
-      wrapper.findComponent('[data-test="oncall-team-detail-error"]').vm.$emit("action");
+      (wrapper.findComponent('[data-test="oncall-team-detail-error"]') as AnyPropsWrapper).vm.$emit(
+        "action",
+      );
       await flushPromises();
 
       for (const expiry of expiries) expect(spy).toHaveBeenCalledWith(expiry);
@@ -1598,7 +1614,7 @@ describe("OnCallTeamDetail", () => {
   describe("the resolved timeline", () => {
     /// The timeline owns the visible range and the fetch follows it, so
     /// nothing is asked for until it has said which week it is showing.
-    async function showWeek(wrapper: any) {
+    async function showWeek(wrapper: ReturnType<typeof render>) {
       wrapper.findComponent({ name: "OTabPanels" }).vm.$emit("update:modelValue", "schedule");
       await flushPromises();
       wrapper
@@ -1613,12 +1629,12 @@ describe("OnCallTeamDetail", () => {
     /// and a cover list scoped to a rotation the reader had forgotten choosing
     /// looked like a week with no covers in it.
     it("draws every rotation the team has, and every cover with them", async () => {
-      service.getSchedule.mockResolvedValue({
-        data: {
+      service.getSchedule.mockResolvedValue(
+        ok({
           timezone: "UTC",
           rotations: [rotation("rot_primary", "Primary"), rotation("rot_backup", "Backup")],
-        },
-      } as any);
+        }),
+      );
 
       const wrapper = render();
       await flushPromises();
@@ -1628,7 +1644,7 @@ describe("OnCallTeamDetail", () => {
         wrapper
           .findComponent({ name: "OnCallScheduleTimeline" })
           .props("rotations")
-          .map((r: any) => r.id),
+          .map((r: Rotation) => r.id),
       ).toEqual(["rot_primary", "rot_backup"]);
       expect(wrapper.findComponent({ name: "OnCallCoverList" }).props("rotationId")).toBe(null);
     });
@@ -1637,18 +1653,18 @@ describe("OnCallTeamDetail", () => {
     /// two — asking once got primary segments only, and every other rotation
     /// was drawn a lane it could never fill.
     it("asks once per rotation", async () => {
-      service.getSchedule.mockResolvedValue({
-        data: {
+      service.getSchedule.mockResolvedValue(
+        ok({
           timezone: "UTC",
           rotations: [rotation("rot_primary", "Primary"), rotation("rot_backup", "Backup")],
-        },
-      } as any);
+        }),
+      );
 
       const wrapper = render();
       await flushPromises();
       await showWeek(wrapper);
 
-      const asked = service.resolvedSchedule.mock.calls.map((call: any) => call[0].rotation_id);
+      const asked = service.resolvedSchedule.mock.calls.map((call) => call[0].rotation_id);
       expect(asked).toContain("rot_primary");
       expect(asked).toContain("rot_backup");
     });
@@ -1656,12 +1672,12 @@ describe("OnCallTeamDetail", () => {
     /// The primary may answer without echoing its own id, and a lane keyed on
     /// an absent field matches nothing.
     it("stamps the rotation it asked for onto the segments that come back", async () => {
-      service.getSchedule.mockResolvedValue({
-        data: { timezone: "UTC", rotations: [rotation("rot_backup", "Backup")] },
-      } as any);
-      service.resolvedSchedule.mockResolvedValue({
-        data: [{ from: 0, to: 1, rotation: "Base", user_email: "ana@o2.ai" }],
-      } as any);
+      service.getSchedule.mockResolvedValue(
+        ok({ timezone: "UTC", rotations: [rotation("rot_backup", "Backup")] }),
+      );
+      service.resolvedSchedule.mockResolvedValue(
+        ok([{ from: 0, to: 1, rotation: "Base", user_email: "ana@o2.ai" }]),
+      );
 
       const wrapper = render();
       await flushPromises();
@@ -1669,7 +1685,7 @@ describe("OnCallTeamDetail", () => {
 
       const drawn = wrapper
         .findComponent({ name: "OnCallScheduleTimeline" })
-        .props("segments") as any[];
+        .props("segments") as ResolvedSegment[];
       expect(drawn[0].rotation_id).toBe("rot_backup");
     });
 
@@ -1692,15 +1708,15 @@ describe("OnCallTeamDetail", () => {
     /// the slower answer for the week just left lands last — and must not be
     /// drawn on this week's axis.
     it("ignores a slower answer for a window the calendar has already left", async () => {
-      service.getSchedule.mockResolvedValue({
-        data: { timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] },
-      } as any);
+      service.getSchedule.mockResolvedValue(
+        ok({ timezone: "UTC", rotations: [rotation("rot_primary", "Primary")] }),
+      );
       const thisWeek = { from: 0, to: 1, rotation: "Primary", user_email: "ana@o2.ai" };
-      service.resolvedSchedule.mockResolvedValue({ data: [thisWeek] } as any);
+      service.resolvedSchedule.mockResolvedValue(ok([thisWeek]));
       const wrapper = render();
       await flushPromises();
       await showWeek(wrapper);
-      let answerNext: (value: unknown) => void = () => {};
+      let answerNext: (value: Reply<"resolvedSchedule">) => void = () => {};
       service.resolvedSchedule.mockImplementationOnce(
         () => new Promise((resolve) => (answerNext = resolve)),
       );
@@ -1710,12 +1726,12 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
       timeline.vm.$emit("update:window", { from: 1_000, to: 2_000 });
       await flushPromises();
-      answerNext({ data: [{ ...thisWeek, from: 2_000, to: 3_000 }] });
+      answerNext(ok([{ ...thisWeek, from: 2_000, to: 3_000 }]));
       await flushPromises();
 
       const drawn = wrapper
         .findComponent({ name: "OnCallScheduleTimeline" })
-        .props("segments") as any[];
+        .props("segments") as ResolvedSegment[];
       expect(drawn.map((s) => [s.from, s.to])).toEqual([[0, 1]]);
     });
   });
@@ -1729,12 +1745,10 @@ describe("OnCallTeamDetail", () => {
     };
 
     async function onSchedule(extraStubs: Record<string, unknown> = {}) {
-      service.getSchedule.mockResolvedValue({
-        data: { rotations: [rotation("rot_1", "Primary")] },
-      } as any);
-      service.listMembers.mockResolvedValue({
-        data: [{ user_email: "ana@o2.ai" }, { user_email: "bo@o2.ai" }],
-      } as any);
+      service.getSchedule.mockResolvedValue(ok({ rotations: [rotation("rot_1", "Primary")] }));
+      service.listMembers.mockResolvedValue(
+        ok([{ user_email: "ana@o2.ai" }, { user_email: "bo@o2.ai" }]),
+      );
       const wrapper = mount(OnCallTeamDetail, {
         global: { plugins: [i18n, store], stubs: { ...stubs, ...extraStubs } },
       });
@@ -1787,15 +1801,17 @@ describe("OnCallTeamDetail", () => {
         created_by: email,
         created_at: 0,
       });
-      service.listUnavailability.mockResolvedValue({
-        data: [absence("ana@o2.ai"), absence("stranger@o2.ai")],
-      } as any);
+      service.listUnavailability.mockResolvedValue(
+        ok([absence("ana@o2.ai"), absence("stranger@o2.ai")]),
+      );
       const { timeline } = await onSchedule();
 
       expect(service.listUnavailability).toHaveBeenCalledWith(
         expect.objectContaining({ from: 1_000, to: 3 * WEEK }),
       );
-      expect(timeline.props("absences").map((a: any) => a.user_email)).toEqual(["ana@o2.ai"]);
+      expect(timeline.props("absences").map((a: Unavailability) => a.user_email)).toEqual([
+        "ana@o2.ai",
+      ]);
     });
 
     /// The real form, not a stub: the swap it opens on is the clicked shift's week.
@@ -1804,7 +1820,9 @@ describe("OnCallTeamDetail", () => {
         OnCallCoverForm: false,
         ODialog: DialogStub,
       });
-      const [shift] = wrapper.findComponent({ name: "OnCallCoverForm" }).props("shifts") as any[];
+      const [shift] = wrapper
+        .findComponent({ name: "OnCallCoverForm" })
+        .props("shifts") as UpcomingShift[];
       expect(timeline.props("swapRotations")).toEqual(["rot_1"]);
 
       timeline.vm.$emit(
@@ -1815,14 +1833,16 @@ describe("OnCallTeamDetail", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="oncall-swap-form"]').exists()).toBe(true);
-      expect(wrapper.findComponent('[data-test="oncall-swap-a"]').props("modelValue")).toBe(
-        `rot_1:${shift.startMicros}`,
-      );
+      expect(
+        (wrapper.findComponent('[data-test="oncall-swap-a"]') as AnyPropsWrapper).props(
+          "modelValue",
+        ),
+      ).toBe(`rot_1:${shift.startMicros}`);
     });
 
     /// The real away dialog: opened on the shift's person and window, and saved against them.
     it("marks the shift's person away for that shift's window", async () => {
-      service.createUnavailability.mockResolvedValue({ data: {} } as any);
+      service.createUnavailability.mockResolvedValue(ok({}));
       const { wrapper, timeline } = await onSchedule({
         ODialog: DialogStub,
         OFormDateTimeRange: { name: "OFormDateTimeRange", template: "<span />" },
@@ -1835,10 +1855,12 @@ describe("OnCallTeamDetail", () => {
       const away = wrapper
         .findAllComponents({ name: "OForm" })
         .find((form) => form.attributes("id") === "oncall-away-form")!;
-      await (away.vm as any).form.handleSubmit();
+      await (
+        away.vm as unknown as { form: { handleSubmit: () => Promise<void> } }
+      ).form.handleSubmit();
       await flushPromises();
 
-      const sent = (service.createUnavailability.mock.calls[0][0] as any).data;
+      const sent = service.createUnavailability.mock.calls[0][0].data;
       expect(sent.user_email).toBe("bo@o2.ai");
       // The range control holds the instants themselves, so the shift's window goes through untouched.
       expect(sent.start_at).toBe(segment.from);
@@ -1903,16 +1925,16 @@ describe("OnCallTeamDetail", () => {
     /// P4–P5 paging nobody is the default; only a silent P1–P3 earns the warning.
     it("warns on the Escalation tab only when a P1–P3 pages nobody", async () => {
       queryClient.clear();
-      service.teamOverview.mockResolvedValue({
-        data: { rungs: [rung("P1", true), rung("P4", false), rung("P5", false)] },
-      } as any);
+      service.teamOverview.mockResolvedValue(
+        ok({ rungs: [rung("P1", true), rung("P4", false), rung("P5", false)] }),
+      );
       const quiet = mountHeader();
       await flushPromises();
       expect(quiet.find('[data-test="oncall-team-tab-policy-warning"]').exists()).toBe(false);
 
-      service.teamOverview.mockResolvedValue({
-        data: { rungs: [rung("P1", true), rung("P2", false), rung("P4", false)] },
-      } as any);
+      service.teamOverview.mockResolvedValue(
+        ok({ rungs: [rung("P1", true), rung("P2", false), rung("P4", false)] }),
+      );
       queryClient.clear();
       const loud = mountHeader();
       await flushPromises();
@@ -1925,10 +1947,8 @@ describe("OnCallTeamDetail", () => {
   });
 
   it("counts the same routing rules in the header as the Routing tab lists", async () => {
-    service.listOwnershipRules.mockResolvedValue({
-      data: [{ id: "r1" }, { id: "r2" }],
-    } as never);
-    service.teamOverview.mockResolvedValue({ data: { alerts_assigned: 0, members: 1 } } as never);
+    service.listOwnershipRules.mockResolvedValue(ok([{ id: "r1" }, { id: "r2" }]));
+    service.teamOverview.mockResolvedValue(ok({ alerts_assigned: 0, members: 1 }));
     routeParams.tab = "routing";
     const wrapper = mount(OnCallTeamDetail, {
       global: {

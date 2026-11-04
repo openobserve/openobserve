@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-show="shown < items.length"
       ref="moreRef"
       class="shrink-0"
+      v-bind="tooltip ? { role: 'img', tabindex: 0, 'aria-label': tooltip } : {}"
       data-test="oncall-fit-chips-more"
     >
       <OTag variant="default-outline" size="sm">{{ raw(`+${items.length - shown}`) }}</OTag>

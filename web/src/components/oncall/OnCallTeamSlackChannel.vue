@@ -129,6 +129,7 @@ import { testTeamSlackChannelMutation } from "@/services/oncall.queries";
 import type { SetTeamChannelBody, TeamChannel } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { serverMessageOf } from "@/utils/slackLink";
 
 const props = defineProps<{
   orgId: string;
@@ -185,11 +186,11 @@ async function sendTest() {
   try {
     const res = await testWrite.mutateAsync();
     result.value = { ok: res.data.ok, advice: raw(res.data.advice) };
-  } catch (err: any) {
+  } catch (err: unknown) {
     noteConfigurationDenied(err);
     result.value = {
       ok: false,
-      advice: raw(err?.response?.data?.message) || t("oncall.slackChannelTestFailed"),
+      advice: raw(serverMessageOf(err)) || t("oncall.slackChannelTestFailed"),
     };
   }
 }

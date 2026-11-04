@@ -13,13 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 
 import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.vue";
+import type {
+  ScheduleAxisTick,
+  ScheduleTrack,
+} from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
 import i18n from "@/locales";
 import usersService from "@/services/users";
+import { ok } from "@/test/unit/helpers/axiosReply";
 import store from "@/test/unit/helpers/store";
 import type { ResolvedSegment, Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
@@ -41,6 +46,8 @@ vi.mock("@/composables/useBreakpoint", async () => {
     }),
   };
 });
+
+type TimelineProps = InstanceType<typeof OnCallScheduleTimeline>["$props"];
 
 const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
@@ -133,7 +140,7 @@ const seg = (over: Partial<ResolvedSegment> = {}): ResolvedSegment => ({
   ...over,
 });
 
-function render(over: Record<string, unknown> = {}) {
+function render(over: Partial<TimelineProps> = {}) {
   return mount(OnCallScheduleTimeline, {
     props: {
       rotations: [rotation("Primary")],
@@ -142,13 +149,13 @@ function render(over: Record<string, unknown> = {}) {
       window: { from: 0, to: 0 },
       "onUpdate:window": () => {},
       ...over,
-    } as any,
+    },
     global: { plugins: [i18n, store], stubs },
   });
 }
 
-const tracksOf = (wrapper: any) =>
-  wrapper.findComponent({ name: "OScheduleTimeline" }).props("tracks");
+const tracksOf = (wrapper: VueWrapper) =>
+  wrapper.findComponent({ name: "OScheduleTimeline" }).props("tracks") as ScheduleTrack[];
 
 describe("OnCallScheduleTimeline", () => {
   afterEach(() => {
@@ -158,25 +165,28 @@ describe("OnCallScheduleTimeline", () => {
 
   /// A phone's day column is narrower than "Wed · today", which ran into the next day's label.
   it("labels today with the bare weekday on a phone, and keeps it emphasised", () => {
-    const todayOf = (wrapper: any) =>
-      wrapper
-        .findComponent({ name: "OScheduleTimeline" })
-        .props("axisTicks")
-        .find((tick: any) => tick.emphasis);
+    const todayOf = (wrapper: VueWrapper) =>
+      (
+        wrapper
+          .findComponent({ name: "OScheduleTimeline" })
+          .props("axisTicks") as ScheduleAxisTick[]
+      ).find((tick) => tick.emphasis);
 
-    expect(String(todayOf(render()).sublabel)).toContain("today");
+    expect(String(todayOf(render())!.sublabel)).toContain("today");
     mockViewport.mdUp = false;
-    expect(String(todayOf(render()).sublabel)).not.toContain("today");
+    expect(String(todayOf(render())!.sublabel)).not.toContain("today");
   });
 
   /// One "Cover a shift" lives in the team header, and templates replace a schedule, so neither sits in the toolbar.
   it("keeps only Add rotation in the toolbar, with a leading icon", () => {
     const wrapper = render();
 
-    expect(wrapper.find('[data-test="oncall-timeline-presets"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-timeline-request-cover"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-timeline-more-actions"]').exists()).toBe(false);
     const add = wrapper.find('[data-test="oncall-timeline-add"]');
+    const actions = Array.from(add.element.parentElement?.children ?? []);
+    expect(actions.map((el) => el.getAttribute("data-test"))).toEqual([
+      "oncall-timeline-range-group",
+      "oncall-timeline-add",
+    ]);
     expect(add.text()).toBe("Add rotation");
     expect(add.attributes("data-icon")).toBe("add");
   });
@@ -229,7 +239,7 @@ describe("OnCallScheduleTimeline", () => {
         timezone: "UTC",
         window: { from: 0, to: 0 },
         "onUpdate:window": () => {},
-      } as any,
+      },
       global: {
         plugins: [i18n, store],
         stubs: { ...stubs, OTooltip: { name: "OTooltip", props: ["content"], template: "<i />" } },
@@ -238,7 +248,7 @@ describe("OnCallScheduleTimeline", () => {
     const band = tracksOf(wrapper)[0].bands[0];
     const tip = wrapper
       .findAllComponents({ name: "OTooltip" })
-      .find((one: any) => one.attributes("data-test") === `oncall-shift-tip-${band.key}`);
+      .find((one) => one.attributes("data-test") === `oncall-shift-tip-${band.key}`);
     expect(String(tip!.props("content"))).toMatch(/^ana@o2\.ai · .+ – .+/);
   });
 
@@ -252,8 +262,8 @@ describe("OnCallScheduleTimeline", () => {
     });
     // Keyed on the ROTATION ID. A name is renameable and two rotations may
     // share one, so it cannot key a lane.
-    expect(tracksOf(wrapper).map((t: any) => t.key)).toEqual([rid("Primary"), rid("Secondary")]);
-    expect(tracksOf(wrapper).map((t: any) => t.label)).toEqual(["Primary", "Secondary"]);
+    expect(tracksOf(wrapper).map((t) => t.key)).toEqual([rid("Primary"), rid("Secondary")]);
+    expect(tracksOf(wrapper).map((t) => t.label)).toEqual(["Primary", "Secondary"]);
   });
 
   /// A layer nobody is on all week still has to appear — an absent lane reads
@@ -263,7 +273,7 @@ describe("OnCallScheduleTimeline", () => {
       rotations: [rotation("Primary"), rotation("Weekends")],
       segments: [seg()],
     });
-    const weekends = tracksOf(wrapper).find((t: any) => t.key === rid("Weekends"));
+    const weekends = tracksOf(wrapper).find((t) => t.key === rid("Weekends"))!;
     expect(weekends).toBeDefined();
     expect(weekends.bands).toHaveLength(0);
   });
@@ -378,7 +388,7 @@ describe("OnCallScheduleTimeline", () => {
       rotations: [rotation("Primary")],
       segments: [seg({ user_email: null })],
     });
-    expect(tracksOf(wrapper).map((t: any) => t.key)).toEqual([rid("Primary")]);
+    expect(tracksOf(wrapper).map((t) => t.key)).toEqual([rid("Primary")]);
     expect(tracksOf(wrapper)[0].bands[0].tone).toBe("gap");
   });
 
@@ -423,7 +433,9 @@ describe("OnCallScheduleTimeline", () => {
     const [{ from }] = wrapper.emitted("update:window")!.at(-1) as [{ from: number; to: number }];
     const now = Date.now() * 1000;
     expect(from <= now && now < from + DAY).toBe(true);
-    const ticks = wrapper.findComponent({ name: "OScheduleTimeline" }).props("axisTicks") as any[];
+    const ticks = wrapper
+      .findComponent({ name: "OScheduleTimeline" })
+      .props("axisTicks") as ScheduleAxisTick[];
     const span = 7 * DAY;
     for (const tick of ticks) {
       expect(toZonedInputValue(from + tick.offset * span, "Asia/Kolkata")).toMatch(/T00:00$/);
@@ -589,7 +601,7 @@ describe("OnCallScheduleTimeline", () => {
       rotations: [rotation("Primary"), rotation("Weekends")],
       segments: [seg(), seg({ rotation_id: rid("Weekends"), rotation: null, user_email: null })],
     });
-    const weekends = tracksOf(wrapper).find((t: any) => t.key === rid("Weekends"));
+    const weekends = tracksOf(wrapper).find((t) => t.key === rid("Weekends"))!;
     expect(weekends.bands).toHaveLength(1);
     expect(weekends.bands[0].tone).toBe("gap");
     expect(wrapper.find('[data-test="oncall-lane-empty-rot_weekends"]').exists()).toBe(false);
@@ -702,10 +714,8 @@ describe("OnCallScheduleTimeline", () => {
   });
 
   describe("the shift menu", () => {
-    const menuIds = (wrapper: any) =>
-      wrapper
-        .findAll('[data-test^="oncall-shift-menu-"]')
-        .map((b: any) => b.attributes("data-test"));
+    const menuIds = (wrapper: VueWrapper) =>
+      wrapper.findAll('[data-test^="oncall-shift-menu-"]').map((b) => b.attributes("data-test"));
 
     it("offers cover, swap and away on a shift, and hands the parent the segment", async () => {
       const wrapper = render({ swapRotations: [rid("Primary")] });
@@ -768,7 +778,7 @@ describe("OnCallScheduleTimeline", () => {
 
     it("draws absences in the window as a lane of their own, with a legend entry", () => {
       const wrapper = render({ absences: [absence()] });
-      const away = tracksOf(wrapper).find((t: any) => t.key === "__away");
+      const away = tracksOf(wrapper).find((t) => t.key === "__away")!;
 
       expect(String(away.label)).toBe("Away");
       expect(away.bands).toHaveLength(1);
@@ -777,12 +787,20 @@ describe("OnCallScheduleTimeline", () => {
       expect(wrapper.find('[data-test="oncall-timeline-legend-away"]').exists()).toBe(true);
     });
 
+    // An absence is not a schedule, so a team with one and no rotation still gets the road to its first rotation.
+    it("keeps the no-schedule empty state when the only lane would be Away", () => {
+      const wrapper = render({ rotations: [], segments: [], absences: [absence()] });
+
+      expect(wrapper.find('[data-test="oncall-timeline-empty"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-timeline-chart"]').exists()).toBe(false);
+    });
+
     it("draws no away lane when nobody is away in the window", () => {
       const wrapper = render({
         absences: [absence({ start_at: start + 30 * DAY, end_at: start + 31 * DAY })],
       });
 
-      expect(tracksOf(wrapper).some((t: any) => t.key === "__away")).toBe(false);
+      expect(tracksOf(wrapper).some((t) => t.key === "__away")).toBe(false);
       expect(wrapper.find('[data-test="oncall-timeline-legend-away"]').exists()).toBe(false);
     });
   });
@@ -790,9 +808,9 @@ describe("OnCallScheduleTimeline", () => {
   // The org's users are the IAM list's own cache entry, so a revisit of the Schedule tab costs nothing.
   it("serves the org's users to a remount from the cache", async () => {
     vi.mocked(usersService.orgUsers).mockClear();
-    vi.mocked(usersService.orgUsers).mockResolvedValue({
-      data: { data: [{ email: "ana@o2.ai", first_name: "Ana" }] },
-    } as any);
+    vi.mocked(usersService.orgUsers).mockResolvedValue(
+      ok({ data: [{ email: "ana@o2.ai", first_name: "Ana" }] }),
+    );
     const renderWithOrg = () =>
       mount(OnCallScheduleTimeline, {
         props: {
@@ -801,7 +819,7 @@ describe("OnCallScheduleTimeline", () => {
           timezone: "UTC",
           window: { from: 0, to: 0 },
           "onUpdate:window": () => {},
-        } as any,
+        },
         global: { plugins: [i18n, store], stubs },
       });
 

@@ -456,11 +456,7 @@ describe("OnCallEscalationLadder", () => {
     );
   });
 
-  /// The whole point: a policy lists target KINDS, and the question is who
-  /// that resolves to right now. One line — the channels that would carry it
-  /// are noise until one of them cannot.
-  /// The seat as a bordered pill, then the person in it, and the channels that would reach them.
-  // Channels belong to the priority, so they sit on the card header and never on a step row.
+  // Channels belong to the priority, so a step row names only the seat and the person in it.
   it("names who sits in the seat, with the seat pill after the name and no channel icons", () => {
     const row = render().find('[data-test="oncall-ladder-rung-0"]');
     const person = row.find('[data-test="oncall-ladder-person-0-ana@o2.ai"]');
@@ -540,7 +536,6 @@ describe("OnCallEscalationLadder", () => {
     const people = wrapper.find('[data-test="oncall-ladder-people-0"]');
     expect(people.findAllComponents({ name: "OTooltip" })).toHaveLength(4);
     expect(people.find('[data-test="o-avatar-group-more"]').text()).toContain("d@o2.ai");
-    expect(wrapper.find('[data-test="oncall-ladder-open-members-0"]').exists()).toBe(false);
   });
 
   /// A healthy ladder is read for its SHAPE — nothing about delivery is said
