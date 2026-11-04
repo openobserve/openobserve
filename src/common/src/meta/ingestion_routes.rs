@@ -233,15 +233,20 @@ static INGESTION_ROUTES: &[IngestionRoute] = &[
     },
 ];
 
-/// Does this segment pattern list match these route-template segments?
-fn segments_match(patterns: &[Seg], columns: &[&str]) -> bool {
-    if patterns.len() != columns.len() {
+/// Does this segment pattern list match these route-template segments and their path values?
+fn segments_match(patterns: &[Seg], columns: &[&str], values: &[&str]) -> bool {
+    if patterns.len() != columns.len() || columns.len() != values.len() {
         return false;
     }
-    patterns.iter().zip(columns).all(|(pat, col)| match pat {
-        Seg::Lit(lit) => col == lit,
-        Seg::Param => is_route_param(col),
-    })
+    patterns
+        .iter()
+        .zip(columns)
+        .zip(values)
+        .all(|((pat, col), value)| match pat {
+            Seg::Lit(lit) => col == lit,
+            // matchit lets a param match an empty segment; ingestion needs a value.
+            Seg::Param => is_route_param(col) && !value.is_empty(),
+        })
 }
 
 /// Is this template segment a single-segment axum parameter (`{name}`, not `{*rest}`)?
@@ -271,21 +276,26 @@ fn route_below_mount<'a>(route: &'a str, path: &str) -> Option<&'a str> {
 
 /// Classify by the full `MatchedPath`; `path` only aligns its mount. Absent or misaligned: None.
 pub fn classify(method: &Method, path: &str, route: Option<&str>) -> Option<IngestionKind> {
+    let path = path.strip_prefix('/').unwrap_or(path);
     let route = route_below_mount(route?, path)?;
     let method = method.as_str();
+    let columns: Vec<&str> = route.split('/').collect();
+    let values: Vec<&str> = path.split('/').collect();
 
     // The ES root ping is the only ingestion route with a mandatory trailing slash (`/{org_id}/`).
     if let Some(org) = route.strip_suffix('/')
         && is_route_param(org)
+        && values.first().is_some_and(|org| !org.is_empty())
         && (method == "GET" || method == "HEAD")
     {
         return Some(IngestionKind::EsHandshakeRead);
     }
 
-    let columns: Vec<&str> = route.split('/').collect();
     INGESTION_ROUTES
         .iter()
-        .find(|route| route.methods.contains(&method) && segments_match(route.segments, &columns))
+        .find(|route| {
+            route.methods.contains(&method) && segments_match(route.segments, &columns, &values)
+        })
         .map(|route| route.kind)
 }
 
@@ -446,6 +456,18 @@ mod tests {
             classify(&Method::POST, "a/default/_bulk", Some("/{org_id}/_bulk")),
             None,
             "a path deeper than the route is misaligned"
+        );
+    }
+
+    #[test]
+    fn an_empty_param_value_is_not_ingestion() {
+        let json = Some("/api/{org_id}/{stream_name}/_json");
+        assert_eq!(classify(&Method::POST, "default//_json", json), None);
+        assert_eq!(classify(&Method::POST, "//s/_json", json), None);
+        assert_eq!(
+            classify(&Method::GET, "//", Some("/api/{org_id}/")),
+            None,
+            "the ES ping needs an org"
         );
     }
 

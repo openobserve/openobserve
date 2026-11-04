@@ -715,14 +715,6 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let path = audited_path(request.uri());
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
-    let ingestion_path = if path.starts_with("api/") {
-        path.split_once("api/")
-            .map(|(_, rest)| rest)
-            .unwrap_or(&path)
-    } else {
-        &path
-    };
-
     let (audit_org, after_org) = audit_org_and_next(&path_columns);
 
     if get_o2_config().common.audit_enabled
@@ -730,7 +722,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             || path.ends_with("ai/chat_stream")
             || common::meta::ingestion_routes::is_ingestion_write(
                 &http_method,
-                ingestion_path,
+                &path,
                 matched_route(&request).as_deref(),
             ))
     {

@@ -1872,20 +1872,35 @@ CN5lTowpVXP2OIiiNTGa75Fj
         ORG_INGESTION_TOKENS.insert(format!("{org_id}/{token}"), "regression-token".to_string());
 
         // --- The bypass: data-bearing GET reads must be rejected. ---
-        for path in [
-            "default/mystream/traces/latest", // the exact route from the report
-            "default/mystream/traces/latest_stream",
-            "default/mystream/traces/session",
-            "default/mystream/traces/user",
-            "default/logs/_values",
-            "default/metrics/latest",
+        for (path, route) in [
+            (
+                "default/mystream/traces/latest", // the exact route from the report
+                "/api/{org_id}/{stream_name}/traces/latest",
+            ),
+            (
+                "default/mystream/traces/latest_stream",
+                "/api/{org_id}/{stream_name}/traces/latest_stream",
+            ),
+            (
+                "default/mystream/traces/session",
+                "/api/{org_id}/{stream_name}/traces/session",
+            ),
+            (
+                "default/mystream/traces/user",
+                "/api/{org_id}/{stream_name}/traces/user",
+            ),
+            (
+                "default/logs/_values",
+                "/api/{org_id}/{stream_name}/_values",
+            ),
+            ("default/metrics/latest", "/api/{org_id}/metrics/latest"),
         ] {
             assert!(
                 !validate_credentials(
                     "collector@example.com",
                     token,
                     path,
-                    None,
+                    Some(route),
                     &Method::GET,
                     false,
                 )
@@ -1955,7 +1970,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 "collector@example.com",
                 token,
                 "default",
-                None,
+                Some("/api/{org_id}"),
                 &Method::POST,
                 false,
             )
@@ -2018,7 +2033,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 "collector@example.com",
                 token,
                 "default",
-                None,
+                Some("/api/{org_id}"),
                 &Method::GET,
                 false,
             )
