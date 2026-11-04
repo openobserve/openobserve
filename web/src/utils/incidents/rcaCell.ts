@@ -117,6 +117,47 @@ export const OUTCOME: Record<RcaOutcome, { key: I18nKey; tone: RcaCellTone }> = 
   blocked: { key: "alerts.incidents.aiAnalysis.outcome.blocked", tone: "warn-strong" },
 };
 
+// Mirrors the reasons stored in `rca_off_reason` (`src/core/src/alerts/incidents.rs:48-57`), bar `l0_off`.
+export type StoredNotRunReason =
+  "rca_disabled" | "ai_unavailable" | "quota_exceeded" | "cooling_down" | "start_failed";
+
+// Stored when the incident opened, so each detail reads in the past tense.
+export const NOT_RUN: Record<
+  StoredNotRunReason,
+  { label: I18nKey; tone: RcaCellTone; detail: I18nKey }
+> = {
+  rca_disabled: {
+    label: "alerts.incidents.aiAnalysis.notAnalyzed",
+    tone: "muted",
+    detail: "alerts.incidents.aiAnalysis.reason.rcaDisabled",
+  },
+  ai_unavailable: {
+    label: "alerts.incidents.aiAnalysis.notAnalyzed",
+    tone: "muted",
+    detail: "alerts.incidents.aiAnalysis.reason.aiUnavailable",
+  },
+  quota_exceeded: {
+    label: "alerts.incidents.aiAnalysis.notAnalyzed",
+    tone: "warn",
+    detail: "alerts.incidents.aiAnalysis.reason.quotaExceeded",
+  },
+  cooling_down: {
+    label: "alerts.incidents.aiAnalysis.notAnalyzed",
+    tone: "muted",
+    detail: "alerts.incidents.aiAnalysis.reason.coolingDown",
+  },
+  start_failed: {
+    label: "alerts.incidents.aiAnalysis.failed",
+    tone: "err",
+    detail: "alerts.incidents.aiAnalysis.reason.startFailed",
+  },
+};
+
+export const isStoredNotRunReason = (
+  reason: string | null | undefined,
+): reason is StoredNotRunReason =>
+  !!reason && Object.prototype.hasOwnProperty.call(NOT_RUN, reason);
+
 const BAND_KEY: Record<RcaBand, I18nKey> = {
   high: "alerts.incidents.aiAnalysis.band.high",
   medium: "alerts.incidents.aiAnalysis.band.medium",
@@ -158,6 +199,13 @@ export function rcaCellModel(
             severity: String(incident.severity).toUpperCase(),
           }),
         ),
+        showAnalyzeOnHover: true,
+      };
+    }
+    if (isStoredNotRunReason(incident.rca_off_reason)) {
+      const notRun = NOT_RUN[incident.rca_off_reason];
+      return {
+        ...state(gt(notRun.label), notRun.tone, gt(notRun.detail)),
         showAnalyzeOnHover: true,
       };
     }

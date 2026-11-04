@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-text-secondary flex min-w-0 gap-1 truncate text-xs"
         data-test="incident-ai-analysis-detail"
       >
-        <span v-if="model.detail" class="truncate">{{ model.detail }}</span>
+        <OTruncatedText v-if="model.detail">{{ model.detail }}</OTruncatedText>
         <span v-if="model.detail && model.rerunNote" aria-hidden="true">·</span>
         <!-- A newer run did not finish; the result shown is the earlier one. -->
         <span
@@ -98,6 +98,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 
