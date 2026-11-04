@@ -29420,7 +29420,6 @@
       "retentionDaysHelp": "0 keeps offline collectors forever"
     },
     "audit": {
-      "search": "Search the audit trail",
       "editedConfig": "Edited configuration",
       "revokedToken": "Revoked enrollment token",
       "enrolledCollector": "Enrolled collector",
@@ -29432,7 +29431,6 @@
       "setDesired": "Changed version",
       "autoRollback": "Rolled back automatically",
       "rolloutHalted": "Rollout halted",
-      "assignedFleetConfig": "Assigned the fleet's configuration",
       "createdFleet": "Created fleet",
       "renamedFleet": "Renamed fleet",
       "deletedFleet": "Deleted fleet",
@@ -29446,6 +29444,7 @@
       "rolledBackRollout": "Rolled back rollout",
       "movedByToken": "Moved by enrollment token",
       "object": "Object",
+      "search": "Search the audit trail",
       "allObjects": "All objects",
       "kind": {
         "fleet": "Fleet",

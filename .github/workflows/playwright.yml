@@ -780,18 +780,32 @@ jobs:
           if-no-files-found: ignore
           retention-days: 1
 
+      # Playwright retries only a failed test, so a retry in a passing shard is a flaky test whose first failure the server log explains.
+      - name: Detect flaky tests
+        id: flaky
+        if: success()
+        continue-on-error: true
+        run: |
+          flaky=false
+          for z in tests/ui-testing/blob-report/*.zip; do
+            [ -f "$z" ] || continue
+            retries=$(unzip -p "$z" report.jsonl 2>/dev/null | grep -cE '"method":"onTestBegin".*"retry":[1-9]' || true)
+            if [ "${retries:-0}" -gt 0 ]; then flaky=true; echo "$z: $retries retried test attempt(s)"; fi
+          done
+          echo "flaky=$flaky" >> "$GITHUB_OUTPUT"
+
       - name: Show OpenObserve log tail
-        if: failure()
+        if: failure() || steps.flaky.outputs.flaky == 'true'
         run: tail -n 200 o2.log || true
 
       - name: Upload OpenObserve log
-        if: failure()
+        if: failure() || steps.flaky.outputs.flaky == 'true'
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: o2-log-${{ matrix.testfolder }}-attempt-${{ github.run_attempt }}
           path: o2.log
-          retention-days: 1
+          retention-days: 7
           if-no-files-found: ignore
 
   merge_reports:
@@ -1154,6 +1168,8 @@ jobs:
           # 2. Nothing Playwright-relevant changed → nothing ran → allow.
           if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
             echo "✅ No Playwright-relevant changes — suite not required."
+            echo "::notice title=Playwright tests skipped::No Playwright-relevant changes — suite did not run."
+            echo "### ⏭️ Playwright suite skipped — no Playwright-relevant changes in this PR, so no tests ran." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 

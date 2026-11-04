@@ -115,6 +115,13 @@ test("severityRank orders p0 first and treats legacy words like their mapped lev
 const xmlFinding = (severity, summary, extra = "") => `<finding><category>security</category><severity>${severity}</severity><file>src/a.rs</file><line>3</line><summary>${summary}</summary><description>d</description><suggestion>s</suggestion>${extra}</finding>`;
 const reviewer = (findings, agentName = "Security Reviewer") => ({ agentName, findings: parseFindings(findings.join("\n")) });
 
+test("the fallback calls P1-only findings major concerns, still blocking", () => {
+  const review = buildFallbackReview([reviewer([xmlFinding("p1", "high"), xmlFinding("p2", "mid")])], "full", [], "<!-- ai-code-review -->");
+  assert.match(review, /> \[!CAUTION\]\n> ### ⚠️ Major concerns found\n/);
+  assert.ok(review.includes("#### 🟠 P1 · Major concerns"));
+  assert.equal(review.includes("Blockers"), false);
+});
+
 test("findings are normalized when parsed, and one with no severity is dropped", () => {
   const findings = parseFindings([xmlFinding("Critical", "a"), xmlFinding("P1", "b"), xmlFinding("", "c")].join(""));
   assert.deepEqual(findings.map(f => [f.summary, f.severity]), [["a", "p0"], ["b", "p1"]]);
@@ -129,8 +136,8 @@ test("the fallback groups into P0 to P3 in order, with the caps applied", () => 
   ])];
   const review = buildFallbackReview(results, "full", [], "<!-- ai-code-review -->");
   const at = text => review.indexOf(text);
-  assert.ok(at("#### 🔴 P0 · Blockers") < at("#### 🟠 P1 · Blockers"));
-  assert.ok(at("#### 🟠 P1 · Blockers") < at("#### 🟡 P2 · Should fix"));
+  assert.ok(at("#### 🔴 P0 · Blockers") < at("#### 🟠 P1 · Major concerns"));
+  assert.ok(at("#### 🟠 P1 · Major concerns") < at("#### 🟡 P2 · Should fix"));
   assert.ok(at("#### 🟡 P2 · Should fix") < at("#### 🔵 P3 · Worth a look"));
   assert.match(review, /> \[!CAUTION\]\n> ### ⛔ Blockers found\n> Automated review .*un-judged\./);
   assert.match(review, /\*\*🔴 P0: 1 · 🟠 P1: 1 · 🟡 P2: 3 · 🔵 P3: 2\*\*/);
@@ -163,8 +170,8 @@ test("merge confidence applies every rule, the lowest level wins and every cause
     ["clean", {}, "high", ["no blockers; all reviewers finished; tests changed"]],
     ["no production code", { prodChanged: false, testsChanged: false }, "high", ["no blockers; all reviewers finished"]],
     ["p3 alone", { counts: { p3: 2 } }, "high", ["no blockers; all reviewers finished; tests changed"]],
-    ["one blocker", { counts: { p1: 1 } }, "low", ["1 blocker (P0/P1)"]],
-    ["two blockers", { counts: { p0: 1, p1: 1 } }, "low", ["2 blockers (P0/P1)"]],
+    ["one major concern", { counts: { p1: 1 } }, "low", ["1 major concern (P1)"]],
+    ["a blocker and a major concern", { counts: { p0: 1, p1: 1 } }, "low", ["1 blocker (P0)", "1 major concern (P1)"]],
     ["uncounted", { findingsKnown: false }, "low", ["findings could not be counted"]],
     ["security unfinished", { failedReviewers: ["Security Reviewer"] }, "low", ["Security reviewer did not finish"]],
     ["correctness unfinished", { failedReviewers: ["Correctness Reviewer"] }, "low", ["Correctness reviewer did not finish"]],
@@ -176,7 +183,7 @@ test("merge confidence applies every rule, the lowest level wins and every cause
     ["all failed", { failedReviewers: ["Security Reviewer", "Release Reviewer"], ranCount: 2 }, "low", ["no reviewer finished"]],
     ["none ran", { ranCount: 0 }, "low", ["no reviewer ran"]],
     ["lowest wins, worst first", { counts: { p1: 1, p2: 1 }, testsChanged: false, failedReviewers: ["Release Reviewer"] }, "low",
-      ["1 blocker (P0/P1)", "Release reviewer did not finish", "1 P2 finding", "no tests changed"]],
+      ["1 major concern (P1)", "Release reviewer did not finish", "1 P2 finding", "no tests changed"]],
   ];
   for (const [name, change, level, reasons] of table) {
     assert.deepEqual(mergeConfidence({ ...clean, ...change }), { level, reasons }, name);
@@ -470,7 +477,7 @@ test("an approved callout over a visible blocker section or count never approves
   assert.equal(isApprovedReview(`${clean}\n\n**Merge confidence: 🟢 High** — no blockers; all reviewers finished`), true);
   const blocked = [
     `${clean}\n\n#### 🔴 P0 · Blockers\n- \`a.rs:1\` **[Security]** Leaks a token.`,
-    `${clean}\n\n<details open>\n\n#### 🟠 P1 · Blockers\n- \`a.rs:1\` **[Correctness]** Crashes.\n</details>`,
+    `${clean}\n\n<details open>\n\n#### 🟠 P1 · Major concerns\n- \`a.rs:1\` **[Correctness]** Crashes.\n</details>`,
     `${head}**🔴 P0: 1 · 🟠 P1: 0 · 🟡 P2: 0 · 🔵 P3: 0**`,
     `${head}**🔴 P0: 0 · 🟠 P1: 2 · 🟡 P2: 0 · 🔵 P3: 0**`,
     `${head}**🔴 1 blocker · 🟡 0 warnings**`,
