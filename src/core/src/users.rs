@@ -1183,12 +1183,13 @@ pub async fn remove_user_from_org(
         match oncall_service::offboard_member(org_id, email_id, config::utils::time::now_micros())
             .await
         {
-            Ok(report) if report.needs_attention() => {
+            Ok(report) => {
                 for warning in report.warnings() {
                     log::warn!("[ONCALL] {email_id} left {org_id}: {warning}");
                 }
+                crate::alerts::ack::release_leaver_pages(org_id, &report.released_pages, email_id)
+                    .await;
             }
-            Ok(_) => {}
             Err(e) => log::error!(
                 "[ONCALL] {email_id} was removed from {org_id} but their on-call membership could not be cleaned up, so they may still be paged: {e}"
             ),

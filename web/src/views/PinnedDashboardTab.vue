@@ -109,7 +109,7 @@ const { isMobile } = useBreakpoint();
 const props = defineProps<{ dashboardId: string; folderId: string }>();
 const emit = defineEmits<{
   (e: "update-label", label: string): void;
-  (e: "unavailable", dashboardId: string): void;
+  (e: "unavailable", dashboardId: string, folderId: string): void;
 }>();
 
 const store = useStore();
@@ -217,7 +217,7 @@ const load = async () => {
 
     // getDashboard returns {} (not a throw) for a missing/deleted dashboard.
     if (!dashboard || typeof dashboard !== "object" || !dashboard.title) {
-      emit("unavailable", props.dashboardId);
+      emit("unavailable", props.dashboardId, props.folderId);
       return;
     }
 
@@ -230,7 +230,7 @@ const load = async () => {
     await nextTick();
     setTime();
   } catch {
-    emit("unavailable", props.dashboardId);
+    emit("unavailable", props.dashboardId, props.folderId);
   } finally {
     isLoading.value = false;
   }
