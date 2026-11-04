@@ -169,6 +169,17 @@ describe("OnCallTeams", () => {
     service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: null } } as any);
   });
 
+  /// Mounts the real page layout so the tag is proven to reach the rendered header.
+  it("tags the page title as Beta", async () => {
+    const wrapper = mount(OnCallTeams, {
+      global: { plugins: [i18n, store], stubs: { ...stubs, OPageLayout: false } },
+    });
+    await flushPromises();
+    const badge = wrapper.find('[data-test="beta-badge"]');
+    expect(badge.exists()).toBe(true);
+    expect(badge.text()).toBe(String(i18n.global.t("common.beta")));
+  });
+
   /// The setup checklist's first step sends somebody here already meaning to
   /// create a team. Landing them on the list to hunt for the button is the same
   /// click asked twice.

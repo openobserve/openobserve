@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default shrink-0 border-b"
       />
       <ConstrainedPage
-        :size="activeSection === 'password_policy' ? 'full' : 'lg'"
+        :size="FULL_WIDTH_SECTIONS.has(activeSection) ? 'full' : 'lg'"
         align="left"
         :padded="false"
         class="min-h-0 flex-1 px-4 py-3"
@@ -136,6 +136,8 @@ export default defineComponent({
       "slack",
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
+    // Card-and-table sections use the row width, like Telephony and the destination lists.
+    const FULL_WIDTH_SECTIONS = new Set(["password_policy", "slack"]);
 
     const slackVisible = computed(() => {
       const edition = buildFeatureGateContext(store.state.zoConfig);
@@ -546,6 +548,7 @@ export default defineComponent({
       isMetaOrg,
       activeSection,
       isConstrainedSection,
+      FULL_WIDTH_SECTIONS,
       activeSectionItem,
       sectionGroups,
       handleSettingsRouting,

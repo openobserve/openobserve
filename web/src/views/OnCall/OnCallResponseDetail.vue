@@ -4,7 +4,6 @@
     data-test="oncall-response-detail-page"
     :title="title"
     icon="notifications-active"
-    title-overflow="visible"
     tabs-below
     :back="{
       label: t('oncall.backToResponses'),
@@ -18,46 +17,65 @@
          instead of a trailing clause, which is enough for "not the first
          time" without spelling out how many. -->
     <template v-if="response" #subtitle>
-      <i18n-t
-        keypath="oncall.responseSubtitle"
-        tag="span"
-        scope="global"
-        class="flex min-w-0 items-center gap-1 truncate"
-        data-test="oncall-response-subtitle"
-      >
-        <template #team>
-          <span
-            v-if="!response.team_id"
-            class="text-status-error-text shrink-0"
-            data-test="oncall-response-team-none"
-            >{{ t("oncall.statUnrouted") }}</span
-          >
-          <OTag
-            v-else-if="teamDeleted"
-            variant="default-soft"
-            size="sm"
-            data-test="oncall-response-team-deleted"
-          >
-            {{ t("oncall.deletedTeam") }}
-          </OTag>
-          <OSkeleton
-            v-else-if="!teamName"
-            class="h-3.5 w-20"
-            data-test="oncall-response-team-pending"
-          />
-          <router-link
-            v-else
-            class="text-accent min-w-0 hover:underline"
-            :to="teamRoute"
-            data-test="oncall-response-team-link"
-          >
-            <OTruncatedText class="block">{{ raw(teamName) }}</OTruncatedText>
-          </router-link>
-        </template>
-        <template #opened>
-          <span class="shrink-0" data-test="oncall-response-opened">{{ openedAtClock }}</span>
-        </template>
-      </i18n-t>
+      <span class="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap">
+        <i18n-t
+          keypath="oncall.responseSubtitle"
+          tag="span"
+          scope="global"
+          class="flex min-w-0 items-center gap-1 truncate"
+          data-test="oncall-response-subtitle"
+        >
+          <template #team>
+            <span
+              v-if="!response.team_id"
+              class="text-status-error-text shrink-0"
+              data-test="oncall-response-team-none"
+              >{{ t("oncall.statUnrouted") }}</span
+            >
+            <OTag
+              v-else-if="teamDeleted"
+              variant="default-soft"
+              size="sm"
+              data-test="oncall-response-team-deleted"
+            >
+              {{ t("oncall.deletedTeam") }}
+            </OTag>
+            <OSkeleton
+              v-else-if="!teamName"
+              class="h-3.5 w-20"
+              data-test="oncall-response-team-pending"
+            />
+            <router-link
+              v-else
+              class="text-accent min-w-0 hover:underline"
+              :to="teamRoute"
+              data-test="oncall-response-team-link"
+            >
+              <OTruncatedText class="block">{{ raw(teamName) }}</OTruncatedText>
+            </router-link>
+          </template>
+          <template #opened>
+            <span class="shrink-0" data-test="oncall-response-opened">{{ openedAtClock }}</span>
+          </template>
+        </i18n-t>
+        <!-- The holder reads with team and time, and gives way first when the row is narrow. -->
+        <OTruncatedText
+          v-if="response.state === 'acknowledged' && response.acked_by"
+          class="shrink-[100]"
+          :tooltip="t('oncall.escalationAckedBy', { who: tooltipOf(response.acked_by) })"
+          data-test="oncall-response-acked-by"
+        >
+          {{ raw("·") }}
+          <i18n-t keypath="oncall.escalationAckedBy" tag="span" scope="global">
+            <template #who>
+              <OnCallPersonName
+                :email="response.acked_by"
+                data-test="oncall-response-acked-by-name"
+              />
+            </template>
+          </i18n-t>
+        </OTruncatedText>
+      </span>
     </template>
 
     <!-- The two facts a responder needs before anything else ride the title,
@@ -65,13 +83,18 @@
     <template #title-trail>
       <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
       <template v-if="response && lgUp">
-        <span class="inline-flex" data-test="oncall-response-state-tag">
+        <!-- The title is the one that ellipsises; the state facts beside it never shrink under it. -->
+        <span class="inline-flex shrink-0" data-test="oncall-response-state-tag">
           <OTag type="oncallResponseState" :value="response.state" size="sm" />
           <OTooltip v-if="closedAfter" :content="closedAfter" />
         </span>
-        <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
-        <!-- A closed page's state tag already says it; the phrase is only news while the ladder runs. -->
-        <span v-if="isOpenState" data-test="oncall-response-phrase">
+        <OTag class="shrink-0" type="alertPriority" :value="`p${response.priority}`" size="sm" />
+        <!-- A closed page's state tag already says it, and an acknowledged one names its holder in the subtitle. -->
+        <span
+          v-if="isOpenState && response.state !== 'acknowledged'"
+          class="shrink-0"
+          data-test="oncall-response-phrase"
+        >
           <OnCallEscalationCell
             :response-id="response.id"
             :record="response"
@@ -85,6 +108,7 @@
              state is said rather than halfway down the page. -->
         <OTag
           v-if="isImpacted"
+          class="shrink-0"
           variant="info-outline"
           size="sm"
           data-test="oncall-response-liaison-tag"
@@ -154,8 +178,8 @@
           data-test="oncall-response-ack-btn"
           @click="acknowledgeRecord"
         >
-          <OIcon name="check-circle" size="sm" />{{ t("oncall.acknowledge") }}
           <OTooltip :content="ackWords.ackHint" />
+          <OIcon name="check-circle" size="sm" />{{ t("oncall.acknowledge") }}
         </OButton>
         <template v-if="response.state === 'acknowledged'">
           <OButton
@@ -166,18 +190,24 @@
             data-test="oncall-response-take-over-btn"
             @click="takeOverRecord"
           >
-            <OIcon name="how-to-reg" size="sm" />{{ t("oncall.takeOver") }}
             <OTooltip :content="t('oncall.takeOverHint')" />
+            <OIcon name="how-to-reg" size="sm" />{{ t("oncall.takeOver") }}
           </OButton>
           <OButton
             variant="outline"
             size="sm"
             :loading="acking"
+            :disabled="!!unackBlockedReason"
+            :focusable-unavailable="!!unackBlockedReason"
             data-test="oncall-response-unack-btn"
             @click="unacknowledgeRecord"
           >
+            <!-- First child, so it anchors to the whole button: a disabled one must say why on hover. -->
+            <OTooltip :content="unackBlockedReason ?? ackWords.unackHint" />
             <OIcon name="undo" size="sm" />{{ t("oncall.unacknowledge") }}
-            <OTooltip :content="ackWords.unackHint" />
+            <template v-if="unackBlockedReason" #unavailable-reason>{{
+              unackBlockedReason
+            }}</template>
           </OButton>
         </template>
 
@@ -464,7 +494,7 @@
                 <OTabPanels v-model="activeDetailTab">
                   <OTabPanel name="activity">
                     <div data-test="oncall-response-activity">
-                      <div class="flex justify-end pt-2">
+                      <div v-if="systemActivityCount" class="flex justify-end pt-2">
                         <OButton
                           variant="ghost"
                           size="sm"
@@ -804,6 +834,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OnCallAboutPage from "@/components/oncall/OnCallAboutPage.vue";
 import OnCallDeliveryLedger from "@/components/oncall/OnCallDeliveryLedger.vue";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
+import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallReachAlarm from "@/components/oncall/OnCallReachAlarm.vue";
 import OnCallWhatFired from "@/components/oncall/OnCallWhatFired.vue";
 import OnCallWhoIsOn from "@/components/oncall/OnCallWhoIsOn.vue";
@@ -913,7 +944,7 @@ import { formatTimestampInTimezone } from "@/utils/date";
 const HOLD_RECHECK_MS = 10_000;
 
 const { t } = useI18nTyped();
-const { nameOf } = useOrgUserNames();
+const { nameOf, tooltipOf } = useOrgUserNames();
 const { lgUp } = useBreakpoint();
 const nowMicros = useOnCallClock();
 const store = useStore();
@@ -1036,7 +1067,8 @@ const showHandoff = ref(false);
 const escalatingNow = ref(false);
 
 const noteBody = ref("");
-const showAllActivity = ref(true);
+/// Engine bookkeeping stays folded until asked for; the default feed is what people and the ladder did.
+const showAllActivity = ref(false);
 /// Activity, deliveries and prior causes as tabs of one card rather than a
 /// card plus two collapsibles — the toggle-all button in the header only
 /// makes sense while activity is the one showing.
@@ -1060,6 +1092,13 @@ const subjectAlert = ref<{
   query_condition?: any;
   condition?: any;
 } | null>(null);
+/// True once the alert lookup answers 404: the page outlived its alert, and the server can no longer release it.
+const subjectAlertMissing = ref(false);
+/// Why the last Unacknowledge left the page held; cleared when another page loads.
+const unackRefusedReason = ref<I18nText | null>(null);
+const unackBlockedReason = computed<I18nText | null>(() =>
+  subjectAlertMissing.value ? t("oncall.unackAlertDeleted") : unackRefusedReason.value,
+);
 const escalation = ref<EscalationProgress | null>(null);
 /// False until the progress has answered, so the header makes no paging claim from a missing value.
 const escalationLoaded = ref(false);
@@ -1463,11 +1502,19 @@ async function unacknowledgeRecord() {
   acking.value = true;
   try {
     const res = await unackWrite.mutateAsync(responseId.value);
+    // The server answers 200 unchanged when it cannot find the alert to release, so the page stays held.
+    const stillHeld = res.data.ack?.changed === false && res.data.state === "acknowledged";
+    const refused = subjectAlertMissing.value
+      ? t("oncall.unackAlertDeleted")
+      : t("oncall.unackRefused");
+    if (stillHeld) unackRefusedReason.value = refused;
     toast(
-      res.data.ack?.changed === false
-        ? (resolvedToast(res.data, false) ??
+      stillHeld
+        ? { variant: "warning", message: refused }
+        : res.data.ack?.changed === false
+          ? (resolvedToast(res.data, false) ??
             notAckedToast(res.data.title || res.data.subject.source_id, t))
-        : { variant: "success", message: ackWords.value.unacked },
+          : { variant: "success", message: ackWords.value.unacked },
     );
     await fetchResponse();
   } catch (err: any) {
@@ -1580,12 +1627,14 @@ async function fetchHandoffTargets() {
 // Uncached: the page links to the alert editor, which seeds its form from the cached alert entry.
 async function fetchSubjectAlert() {
   subjectAlert.value = null;
+  subjectAlertMissing.value = false;
   if (response.value?.subject.subject_type !== "alert") return;
   try {
     const res = await alertsService.get_by_alert_id(orgId.value, response.value.subject.source_id);
     subjectAlert.value = res.data ?? null;
-  } catch {
+  } catch (err: any) {
     subjectAlert.value = null;
+    subjectAlertMissing.value = err?.response?.status === 404;
   }
 }
 
@@ -1905,6 +1954,8 @@ watch(
     incidentLoading.value = true;
     timelineReady.value = false;
     subjectAlert.value = null;
+    subjectAlertMissing.value = false;
+    unackRefusedReason.value = null;
     priorCauses.value = [];
     firingHistory.value = [];
     report.value = null;

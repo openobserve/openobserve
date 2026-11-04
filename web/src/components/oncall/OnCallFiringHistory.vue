@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="id"
         :frame="false"
         :loading="loading"
-        pagination="client"
+        :pagination="firings.length ? 'client' : 'none'"
         :show-global-filter="false"
         table-id="oncall-firing-history"
         data-test="oncall-firing-history-table"
@@ -61,13 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-else class="text-text-secondary text-sm">{{ ABSENT }}</span>
         </template>
 
-        <!-- A subject firing for the first time is the normal case, not an
-             error, so it says so rather than showing an empty frame. -->
         <template #empty>
           <OEmptyState
             size="inline"
-            preset="no-data"
-            :description="t('oncall.firingHistoryEmpty')"
+            variant="no-results"
+            :title="t('oncall.firingHistoryNone')"
+            hide-action
             data-test="oncall-firing-history-empty"
           />
         </template>

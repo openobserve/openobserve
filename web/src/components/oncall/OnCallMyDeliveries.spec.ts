@@ -151,13 +151,48 @@ describe("OnCallMyDeliveries", () => {
     answer([
       delivery({ event_id: "ev_1", response_id: "resp_1", at: AT }),
       delivery({ event_id: "ev_2", response_id: "resp_2", at: AT + 1 }),
-      delivery({ event_id: "ev_3", response_id: "resp_3", subject_id: "al_other", at: AT + 2 }),
+      delivery({
+        event_id: "ev_3",
+        response_id: "resp_3",
+        subject_id: "al_other",
+        title: "disk full",
+        at: AT + 2,
+      }),
     ]);
     const wrapper = render();
     await flushPromises();
 
     expect(historyRows(wrapper)).toHaveLength(2);
     expect(historyRows(wrapper)[1].text()).toContain("×2");
+  });
+
+  /// An alert and the incident it opened page under one name; two rows the reader cannot tell apart are one.
+  it("groups pages that share a name across subjects and teams", async () => {
+    answer([
+      delivery({ event_id: "ev_1", response_id: "resp_1", team_id: "team_dev", at: AT }),
+      delivery({
+        event_id: "ev_2",
+        response_id: "resp_2",
+        subject_type: "incident",
+        subject_id: "inc_1#1",
+        team_id: "team_dev",
+        at: AT + 1,
+      }),
+      delivery({
+        event_id: "ev_3",
+        response_id: "resp_3",
+        subject_type: "incident",
+        subject_id: "inc_2#1",
+        team_id: "team_sre",
+        at: AT + 2,
+      }),
+    ]);
+    const wrapper = render({ teamNames: { team_dev: "Dev Team", team_sre: "Platform SRE" } });
+    await flushPromises();
+
+    expect(historyRows(wrapper)).toHaveLength(1);
+    expect(historyRows(wrapper)[0].text()).toContain("×3");
+    expect(historyRows(wrapper)[0].text()).toContain("Platform SRE, Dev Team");
   });
 
   /// The subject id ends in the firing number, so two firings of one alert are still one row.
@@ -296,7 +331,9 @@ describe("OnCallMyDeliveries", () => {
     answer([delivery({ read: true, response_state: "resolved" })]);
     const wrapper = render();
     await flushPromises();
-    expect(wrapper.find('[data-test="oncall-my-deliveries-unread-toggle"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-my-deliveries-controls"]').classes()).toContain(
+      "invisible",
+    );
     expect(wrapper.find('[data-test="oncall-my-delivery-more-ev_88"]').exists()).toBe(true);
     const toggle = wrapper.findComponent('[data-test="oncall-my-delivery-toggle-ev_88"]');
     expect(toggle.props("iconLeft")).toBe("mail");
@@ -307,11 +344,35 @@ describe("OnCallMyDeliveries", () => {
     );
   });
 
-  /// An empty list has nothing to narrow, so it offers no filter.
-  it("offers no unread filter on an empty list", async () => {
+  /// An empty list has nothing to narrow, so the filter is hidden; it keeps its slot so the header never reflows.
+  it("hides the unread filter on an empty list without removing its slot", async () => {
     const wrapper = render();
     await flushPromises();
-    expect(wrapper.find('[data-test="oncall-my-deliveries-unread-toggle"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-my-deliveries-controls"]').classes()).toContain(
+      "invisible",
+    );
+  });
+
+  it("shows the filter and Mark all read once something is unread", async () => {
+    answer([delivery({ read: false })]);
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-my-deliveries-controls"]').classes()).not.toContain(
+      "invisible",
+    );
+    expect(wrapper.find('[data-test="oncall-my-deliveries-read-all"]').classes()).not.toContain(
+      "invisible",
+    );
+  });
+
+  /// A reader on no team has no page to test, so the empty history points them at a team instead.
+  it("offers Join a team on an empty history when the reader is on no team", async () => {
+    const wrapper = render({ noTeam: true });
+    await flushPromises();
+    const action = wrapper.find('[data-test="empty-action"]');
+    expect(action.text()).toBe("Join a team");
+    await action.trigger("click");
+    expect(wrapper.emitted("join-team")).toHaveLength(1);
   });
 
   /// Unticking answers from the cache at once, so the slower "unread only" answer must not narrow a widened inbox.
@@ -476,8 +537,8 @@ describe("OnCallMyDeliveries", () => {
     );
   });
 
-  /// A column of empty dots says nothing, so the unread column only exists while something is unread.
-  it("leaves out the unread column when nothing is unread", async () => {
+  /// The dot column is always there: arriving with the first unread row shifted every other column. Actions are not pinned.
+  it("keeps the unread column when nothing is unread", async () => {
     answer([delivery({ read: true })]);
     const wrapper = render();
     await flushPromises();
@@ -486,13 +547,15 @@ describe("OnCallMyDeliveries", () => {
       id: string;
     }[];
     expect(columns.map((c) => c.id)).toEqual([
+      "unread",
       "page",
       "team",
       "state",
       "channels",
       "at",
-      "actions",
+      "row-actions",
     ]);
+    expect(columns.some((c) => "pinned" in c)).toBe(false);
   });
 
   it("names the team that the empty history's test page goes to", async () => {

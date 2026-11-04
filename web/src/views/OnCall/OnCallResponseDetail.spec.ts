@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
@@ -581,6 +581,98 @@ describe("OnCallResponseDetail", () => {
     expect(toastSpy.mock.calls.at(-1)?.[0]).toEqual({
       variant: "info",
       message: "checkout down was not acknowledged",
+    });
+  });
+
+  /// The server answers an unack it cannot apply with 200 unchanged and the page still held.
+  /// Engine bookkeeping is folded by default; the toggle names how much it hides and appears only when there is some.
+  it("folds system activity until asked for", async () => {
+    service.getResponse.mockResolvedValue({
+      data: {
+        response: record(),
+        events: [
+          { kind: "sys", at: 1, actor: "o2-engine", body: "this signal carries no service" },
+          { kind: "note", at: 2, actor: "ana@acme.io", body: "looking" },
+        ],
+      },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+    const toggle = wrapper.find('[data-test="oncall-response-activity-toggle-all"]');
+    expect(toggle.text()).toContain("1");
+    expect(wrapper.findComponent({ name: "OnCallActivityTimeline" }).props("showAll")).toBe(false);
+  });
+
+  it("offers no system toggle when there is no system activity", async () => {
+    const wrapper = await renderWith();
+    expect(wrapper.find('[data-test="oncall-response-activity-toggle-all"]').exists()).toBe(false);
+  });
+
+  /// A long single-token alert name must ellipsise rather than run under the state chips beside it.
+  it("cuts a long title and keeps the state chips at full width", async () => {
+    const wrapper = await renderWith({
+      state: "acknowledged",
+      acked_by: "ana@acme.io",
+      title: "composite_clone_child_a_muv1p0nee7qa",
+    });
+    const layout = wrapper.findComponent({ name: "OPageLayout" });
+    expect(layout.attributes("title")).toBe("composite_clone_child_a_muv1p0nee7qa");
+    // "visible" lets the h1 overflow instead of ellipsising, which is what ran the title under the chips.
+    expect(layout.attributes("title-overflow")).toBeUndefined();
+    expect(wrapper.find('[data-test="oncall-response-state-tag"]').classes()).toContain("shrink-0");
+  });
+
+  /// Who holds the page reads with team and time, so the title row keeps its width for the title.
+  it("names the holder of an acknowledged page in the subtitle, not beside the title", async () => {
+    const wrapper = await renderWith({ state: "acknowledged", acked_by: "ana@acme.io" });
+    expect(wrapper.find('[data-test="oncall-response-phrase"]').exists()).toBe(false);
+    const acked = wrapper.find('[data-test="oncall-response-acked-by"]');
+    expect(acked.text()).toContain("Acknowledged by");
+    expect(acked.findComponent({ name: "OnCallPersonName" }).props("email")).toBe("ana@acme.io");
+  });
+
+  describe("an Unacknowledge the server cannot apply", () => {
+    const held = () => ({
+      state: "acknowledged",
+      acked_by: store.state.userInfo.email,
+      title: "checkout down",
+    });
+    const unackBtn = (wrapper: VueWrapper) =>
+      wrapper.findComponent('[data-test="oncall-response-unack-btn"]');
+
+    it("warns instead of claiming the page was never acknowledged, then turns the button off", async () => {
+      const wrapper = await renderWith(held());
+      service.unacknowledgeResponse.mockResolvedValue({
+        data: { ...record(held()), ack: { changed: false } },
+      } as any);
+      await unackBtn(wrapper).trigger("click");
+      await flushPromises();
+
+      expect(toastSpy.mock.calls.at(-1)?.[0]).toEqual({
+        variant: "warning",
+        message: "Couldn't unacknowledge this page",
+      });
+      expect(unackBtn(wrapper).props("disabled")).toBe(true);
+      expect(unackBtn(wrapper).findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "Couldn't unacknowledge this page",
+      );
+    });
+
+    it("blames the deleted alert when the lookup said it is gone", async () => {
+      alerts.get_by_alert_id.mockRejectedValue({ response: { status: 404 } });
+      const wrapper = await renderWith(held());
+
+      expect(unackBtn(wrapper).props("disabled")).toBe(true);
+      expect(unackBtn(wrapper).findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "Can't unacknowledge: this page's alert was deleted",
+      );
+    });
+
+    it("keeps the button on when the alert lookup failed for another reason", async () => {
+      alerts.get_by_alert_id.mockRejectedValue({ response: { status: 500 } });
+      const wrapper = await renderWith(held());
+
+      expect(unackBtn(wrapper).props("disabled")).toBe(false);
     });
   });
 

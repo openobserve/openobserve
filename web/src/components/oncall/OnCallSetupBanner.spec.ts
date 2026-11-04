@@ -107,6 +107,31 @@ describe("OnCallSetupBanner", () => {
     expect(wrapper.find('[data-test="oncall-setup-banner-host"]').exists()).toBe(false);
   });
 
+  /// One answering policy settles the step, so an org with many teams costs one policy read, not one per team.
+  it("stops reading policies at the first team that has one", async () => {
+    answer({
+      teams: [
+        { id: "team_1", name: "A" },
+        { id: "team_2", name: "B" },
+        { id: "team_3", name: "C" },
+      ],
+    });
+    await render();
+    expect(service.getPolicy).toHaveBeenCalledTimes(1);
+  });
+
+  /// A dismissed bar never shows, so it asks the server nothing.
+  it("reads nothing once dismissed", async () => {
+    answer();
+    const wrapper = await render();
+    await wrapper.find('[data-test="oncall-setup-dismiss"]').trigger("click");
+    vi.clearAllMocks();
+    queryClient.clear();
+    await render();
+    expect(service.listTeams).not.toHaveBeenCalled();
+    expect(service.getPolicy).not.toHaveBeenCalled();
+  });
+
   /// A read that failed is not a step left undone, so the bar stays away.
   it("stays away when a read fails", async () => {
     answer();

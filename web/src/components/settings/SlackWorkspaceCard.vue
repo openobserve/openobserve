@@ -597,7 +597,6 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           class="min-w-0 flex-1 md:max-w-120"
           :label="t('slackApp.card.helpContact')"
           :placeholder="t('slackApp.card.helpContactPlaceholder')"
-          :help-text="t('slackApp.card.helpContactHelp')"
           :maxlength="HELP_CONTACT_MAX_LENGTH"
           data-test="slack-help-contact"
         />

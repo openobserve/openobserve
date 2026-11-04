@@ -313,6 +313,17 @@ describe("OnCallResponses", () => {
     service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
   });
 
+  /// Mounts the real page layout so the tag is proven to reach the rendered header.
+  it("tags the page title as Beta", async () => {
+    const wrapper = mountTracked(OnCallResponses, {
+      global: { plugins: [i18n, store], stubs: { ...stubs, OPageLayout: false } },
+    });
+    await flushPromises();
+    const badge = wrapper.find('[data-test="beta-badge"]');
+    expect(badge.exists()).toBe(true);
+    expect(badge.text()).toBe(String(i18n.global.t("common.beta")));
+  });
+
   function page(over: Record<string, unknown> = {}, source = "al_ckt") {
     return {
       id: "resp_1",
@@ -767,8 +778,8 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(true);
     });
 
-    /// Pages are forward-only, so a resolved row has no Acknowledge or Resolve, yet its ⋯ still opens, expands and links it.
-    it("gives a resolved row only the ⋯ menu: open, timeline, copy link", async () => {
+    /// Pages are forward-only, so a resolved row has no Acknowledge or Resolve; the row click opens it, so ⋯ only expands and links it.
+    it("gives a resolved row only the ⋯ menu: timeline, copy link", async () => {
       const wrapper = await withPages([
         page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
       ]);
@@ -776,7 +787,7 @@ describe("OnCallResponses", () => {
       expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(false);
       expect(wrapper.find('[data-test^="oncall-row-resolve-"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="oncall-row-more-alert:al_ckt"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="oncall-row-open-alert:al_ckt"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-row-open-alert:al_ckt"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="oncall-row-copy-link-alert:al_ckt"]').exists()).toBe(true);
       const timeline = wrapper.findComponent('[data-test="oncall-row-show-timeline-alert:al_ckt"]');
       expect(timeline.text()).toBe("Show timeline");

@@ -163,28 +163,13 @@ const connectWithTicket = async (): Promise<void> => {
 const candidate = computed(() => props.upgradeCandidates[0] ?? null);
 const addToSlackSrcset = `${addToSlackImage2x} 2x`;
 
-const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
+const nextSteps = computed<I18nText[]>(() =>
   props.isCloud
-    ? [
-        { title: t("slackApp.connect.stepAddTitle"), detail: t("slackApp.connect.popupHint") },
-        {
-          title: t("slackApp.connect.stepLinkTitle"),
-          detail: t("slackApp.connect.stepLinkDetail"),
-        },
-      ]
+    ? [t("slackApp.connect.stepAddTitle"), t("slackApp.connect.stepLinkTitle")]
     : [
-        {
-          title: t("slackApp.connect.stepCheckTitle"),
-          detail: t("slackApp.connect.stepCheckDetailShort"),
-        },
-        {
-          title: t("slackApp.connect.stepCreateTitle"),
-          detail: t("slackApp.connect.stepCreateDetailShort"),
-        },
-        {
-          title: t("slackApp.connect.stepInstallTitle"),
-          detail: t("slackApp.connect.stepInstallDetailShort"),
-        },
+        t("slackApp.connect.stepCheckTitle"),
+        t("slackApp.connect.stepCreateTitle"),
+        t("slackApp.connect.stepInstallTitle"),
       ],
 );
 </script>
@@ -290,14 +275,9 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
       class="gap-3 p-5"
       data-test="slack-available"
     >
-      <div class="flex flex-col gap-1">
-        <h2 class="text-text-heading m-0 text-lg font-semibold">
-          {{ t("slackApp.connect.existingTitle") }}
-        </h2>
-        <p class="text-text-secondary m-0 text-sm">
-          {{ t("slackApp.connect.existingDescriptionShort") }}
-        </p>
-      </div>
+      <h2 class="text-text-heading m-0 text-lg font-semibold">
+        {{ t("slackApp.connect.existingTitle") }}
+      </h2>
       <div
         v-for="item in offered"
         :key="item.installation_id"
@@ -322,7 +302,6 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
         size="block"
         illustration="connect"
         :title="t('slackApp.connect.title')"
-        :description="t('slackApp.connect.description')"
         :backdrop="false"
       >
         <template #actions>
@@ -355,9 +334,6 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
           </OButton>
         </template>
         <template #extra>
-          <span class="text-text-label text-2xs font-semibold">
-            {{ t("slackApp.connect.nextTitle", { minutes: isCloud ? 2 : 5 }) }}
-          </span>
           <ol
             class="m-0 grid w-full max-w-2xl list-none grid-cols-1 gap-3 p-0 text-start"
             :class="nextSteps.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'"
@@ -367,7 +343,7 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
             <li
               v-for="(item, index) in nextSteps"
               :key="index"
-              class="border-border-subtle bg-surface-panel rounded-default flex items-start gap-2.5 border p-3"
+              class="border-border-subtle bg-surface-panel rounded-default flex items-center gap-2.5 border p-3"
               data-test="slack-connect-step"
             >
               <span
@@ -375,10 +351,7 @@ const nextSteps = computed<{ title: I18nText; detail: I18nText }[]>(() =>
               >
                 {{ index + 1 }}
               </span>
-              <span class="flex min-w-0 flex-col gap-0.5">
-                <span class="text-text-heading text-compact font-medium">{{ item.title }}</span>
-                <span class="text-text-secondary text-xs">{{ item.detail }}</span>
-              </span>
+              <span class="text-text-heading text-compact min-w-0 font-medium">{{ item }}</span>
             </li>
           </ol>
           <span v-if="!isCloud && instance" class="text-text-secondary text-xs">

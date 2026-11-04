@@ -21,6 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('oncall.teamsTitle')"
     icon="group-work"
   >
+    <template #title-trail>
+      <BetaBadge class="shrink-0" />
+    </template>
     <template #actions>
       <OButton
         v-if="canConfigure"
@@ -309,6 +312,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";

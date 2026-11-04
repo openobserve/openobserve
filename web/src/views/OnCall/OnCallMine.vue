@@ -23,10 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="person"
     scroll
   >
+    <template #title-trail>
+      <BetaBadge class="shrink-0" />
+    </template>
     <template #actions>
       <!-- Personal and org-wide, so it heads the page rather than sitting under one team. -->
+      <!-- Away only takes someone off a team's rotation, so a reader on no team has nothing to mark. -->
       <OButton
-        v-if="!unavailable"
+        v-if="!unavailable && (!loaded || (mine?.teams ?? []).length)"
         variant="outline"
         size="sm"
         :disabled="!loaded"
@@ -203,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Scroll events do not bubble, so the frame listens in the capture phase to the table's own scroller. -->
           <div
             v-else
-            class="relative h-55.5 shrink-0"
+            class="h-55.5 shrink-0"
             data-test="oncall-mine-shifts-frame"
             @scroll.capture="onShiftsScroll"
           >
@@ -302,15 +306,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
             </OTable>
-            <div
-              v-if="loaded && shiftsBelow > 0"
-              class="from-surface-base pointer-events-none absolute inset-x-0 bottom-0 flex h-8 items-end justify-center bg-linear-to-t to-transparent pb-1"
-              data-test="oncall-mine-shifts-more"
+          </div>
+          <!-- Below the rows, never over them; the line keeps its height once scrolled so the card does not jump. -->
+          <div
+            v-if="!isMobile && loaded && shiftRows.length > SHIFTS_SKELETON_ROWS"
+            class="border-border-default flex h-7 shrink-0 items-center justify-center gap-1 border-t"
+            data-test="oncall-mine-shifts-more"
+          >
+            <OText
+              v-if="shiftsBelow > 0"
+              variant="meta"
+              as="span"
+              class="inline-flex items-center gap-1"
             >
-              <OTag variant="default-outline" size="sm" class="bg-surface-base! shadow-xs">
-                {{ t("oncall.mineShiftsMore", { count: shiftsBelow }, shiftsBelow) }}
-              </OTag>
-            </div>
+              <OIcon name="expand-more" size="sm" aria-hidden="true" />
+              {{ t("oncall.mineShiftsMore", { count: shiftsBelow }, shiftsBelow) }}
+            </OText>
           </div>
         </section>
 
@@ -344,7 +355,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :teams-state="teamsState"
         :test-team-name="testTeam?.team_name ?? null"
         :can-test="!!testTeam"
+        :no-team="loaded && loadError === null && !(mine?.teams ?? []).length"
         @test-page="askTestPage(testTeam?.team_id ?? '')"
+        @join-team="openTeams"
       />
     </OContent>
 
@@ -454,6 +467,7 @@ import OnCallReachRow from "@/components/oncall/OnCallReachRow.vue";
 import OnCallSetupBanner from "@/components/oncall/OnCallSetupBanner.vue";
 import OnCallSlackCard from "@/components/oncall/OnCallSlackCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -581,10 +595,21 @@ function untilAt(row: ShiftRow): number {
   return Number.POSITIVE_INFINITY;
 }
 
+/// Held seats first, then off-duty, then unknown: "am I on call" outranks "when is my next shift".
+function dutyRank(row: ShiftRow): number {
+  if (row.on_call_now === true) return 0;
+  return row.on_call_now === false ? 1 : 2;
+}
+
 const shiftRows = computed<ShiftRow[]>(() =>
   (mine.value?.teams ?? [])
     .map((team) => ({ ...team, ...(shifts.value[team.team_id] ?? NO_FACTS) }))
-    .sort((a, b) => untilAt(a) - untilAt(b) || a.team_name.localeCompare(b.team_name)),
+    .sort(
+      (a, b) =>
+        dutyRank(a) - dutyRank(b) ||
+        untilAt(a) - untilAt(b) ||
+        a.team_name.localeCompare(b.team_name),
+    ),
 );
 
 /// Same as the frame's five rows, so the first paint is the loaded height.
@@ -723,10 +748,11 @@ async function fetchShifts(force = false) {
   const entries = await Promise.all(
     teams.map(async (team): Promise<[string, ShiftFacts] | null> => {
       try {
-        const positions = await read<OnCallPosition[]>(
-          whoIsOnCallQuery(orgId.value, team.team_id),
-          force,
-        );
+        // Off duty holds no seat, so only a held shift needs the who-is-on-call read.
+        const positions =
+          team.on_call_now === false
+            ? []
+            : await read<OnCallPosition[]>(whoIsOnCallQuery(orgId.value, team.team_id), force);
         const held = positions.filter((p) => p.user_email.toLowerCase() === me);
         const segments = await read<ResolvedSegment[]>(
           resolvedScheduleQuery(

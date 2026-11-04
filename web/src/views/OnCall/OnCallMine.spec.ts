@@ -123,7 +123,7 @@ const stubs = {
   // not carry, and its fetch would throw into its own catch for the wrong reason.
   OnCallMyDeliveries: {
     name: "OnCallMyDeliveries",
-    props: ["teamNames", "canTest"],
+    props: ["teamNames", "canTest", "noTeam"],
     template: "<div />",
     methods: { refresh: deliveriesRefresh },
   },
@@ -156,6 +156,17 @@ describe("OnCallMine", () => {
     service.listTeams.mockResolvedValue({ data: [] } as any);
     service.whoIsOnCall.mockRejectedValue({ response: { status: 403 } });
     service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
+  });
+
+  /// Mounts the real page layout so the tag is proven to reach the rendered header.
+  it("tags the page title as Beta", async () => {
+    const wrapper = mount(OnCallMine, {
+      global: { plugins: [i18n, store], stubs: { ...stubs, OPageLayout: false } },
+    });
+    await flushPromises();
+    const badge = wrapper.find('[data-test="beta-badge"]');
+    expect(badge.exists()).toBe(true);
+    expect(badge.text()).toBe(String(i18n.global.t("common.beta")));
   });
 
   it("serves a revisit from cache", async () => {
@@ -493,10 +504,65 @@ describe("OnCallMine", () => {
     expect(wrapper.find('[data-test="oncall-mine-shifts-toggle"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("Show all");
 
-    // The fold is marked inside the frame with how many rows wait below it, and the mark goes once they are reached.
-    expect(wrapper.find('[data-test="oncall-mine-shifts-more"]').text()).toBe("115 more");
+    // The fold is marked below the frame, never over a row; once reached its line empties but keeps its height.
+    const more = () => wrapper.find('[data-test="oncall-mine-shifts-more"]');
+    expect(more().text()).toBe("115 more");
+    expect(frame().find('[data-test="oncall-mine-shifts-more"]').exists()).toBe(false);
     await scroller.trigger("scroll");
-    expect(wrapper.find('[data-test="oncall-mine-shifts-more"]').exists()).toBe(false);
+    expect(more().exists()).toBe(true);
+    expect(more().text()).toBe("");
+    // Off duty holds no seat, so no team here needs the who-is-on-call read.
+    expect(service.whoIsOnCall).not.toHaveBeenCalled();
+  });
+
+  /// "Am I on call" outranks "when is my next shift", so a held seat sorts above an off-duty row that starts sooner.
+  it("sorts held seats first, then off-duty rows by their next shift", async () => {
+    const me = store.state.userInfo.email;
+    const now = Date.now() * 1000;
+    service.myOnCall.mockResolvedValue({
+      data: {
+        on_call_now: true,
+        teams: [
+          { team_id: "off_soon", team_name: "Off soon", on_call_now: false, on_call: [] },
+          { team_id: "held", team_name: "Held", on_call_now: true, on_call: [] },
+        ],
+      },
+    } as any);
+    service.whoIsOnCall.mockResolvedValue({
+      data: [{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: me }],
+    } as any);
+    service.resolvedSchedule.mockImplementation(
+      (args: { team_id: string }) =>
+        Promise.resolve({
+          data:
+            args.team_id === "held"
+              ? [{ rotation_id: "r1", from: now - 1, to: now + 9 * 3_600_000_000, user_email: me }]
+              : [
+                  {
+                    rotation_id: "r2",
+                    from: now + 60_000_000,
+                    to: now + 120_000_000,
+                    user_email: me,
+                  },
+                ],
+        }) as any,
+    );
+    const wrapper = mount(OnCallMine, {
+      global: { plugins: [i18n, store], stubs: { ...stubs, OTable: false } },
+    });
+    await flushPromises();
+    const names = () =>
+      wrapper.findAll('[data-test^="oncall-mine-team-"]').map((link) => link.text());
+    await vi.waitFor(() => expect(names()).toEqual(["Held", "Off soon"]));
+  });
+
+  /// Away only takes someone off a rotation, so a reader on no team has nothing to mark.
+  it("hides I'm away and points the history at a team for a reader on no team", async () => {
+    service.myOnCall.mockResolvedValue({ data: { on_call_now: false, teams: [] } } as any);
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-mine-away"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OnCallMyDeliveries" }).props("noTeam")).toBe(true);
   });
 
   it("marks no fold when every shift fits the frame", async () => {
