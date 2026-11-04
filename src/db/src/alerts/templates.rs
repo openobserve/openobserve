@@ -99,9 +99,29 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
     if let Some(template) = table::templates::get(org_id, name).await? {
         return Ok(template);
     }
-    table::templates::get(DEFAULT_ORG, name)
-        .await?
-        .ok_or(TemplateError::NotFound)
+    if let Some(template) = table::templates::get(DEFAULT_ORG, name).await? {
+        return Ok(template);
+    }
+    // A node whose destination or alert cache predates a rename still asks for the old name.
+    let renamed = table::templates::renamed_to(org_id, name)
+        .await
+        .map_err(infra::errors::Error::from)?;
+    match renamed.filter(|to| to != name) {
+        Some(to) => {
+            for key in [format!("{org_id}/{to}"), format!("{DEFAULT_ORG}/{to}")] {
+                if let Some(v) = ALERTS_TEMPLATES.get(&key) {
+                    return Ok(v.value().clone());
+                }
+            }
+            if let Some(template) = table::templates::get(org_id, &to).await? {
+                return Ok(template);
+            }
+            table::templates::get(DEFAULT_ORG, &to)
+                .await?
+                .ok_or(TemplateError::NotFound)
+        }
+        None => Err(TemplateError::NotFound),
+    }
 }
 
 pub async fn set(template: Template) -> Result<Template, TemplateError> {

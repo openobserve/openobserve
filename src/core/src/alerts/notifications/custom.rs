@@ -64,7 +64,11 @@ pub fn apply_custom_template(tpl: &str, ctx: &NotificationContext, is_email: boo
 fn looks_like_json(tpl: &str) -> bool {
     let mut chars = tpl.trim_start().chars();
     match chars.next() {
-        Some('[') => true,
+        // `[prod] {alert_name}` is text; an array opens with a value.
+        Some('[') => matches!(
+            chars.find(|c| !c.is_whitespace()),
+            Some('{' | '"' | '[' | ']' | '-' | '0'..='9')
+        ),
         Some('{') => matches!(chars.find(|c| !c.is_whitespace()), Some('"' | '}')),
         _ => false,
     }
@@ -609,6 +613,10 @@ mod golden {
         let json: serde_json::Value = serde_json::from_str(&body).expect(&body);
         assert_eq!(json["text"], "esc \u{1b}[31m red");
         assert_eq!(json["detail"], "col\tcol \u{1} \u{7f}");
+        assert_eq!(
+            apply_custom_template("[prod] {alert_name}", &ctx, false),
+            "[prod] Nightly \"deploy\" <db>"
+        );
         // A plain text body, such as an SNS message, gets the values as written.
         assert_eq!(
             apply_custom_template("{alert_name}: {alert_description}", &ctx, false),

@@ -334,6 +334,9 @@ pub const BRANCH_KIND_SEEDS: [&str; 5] = [
     "o2_default_synthetics",
     "o2_default_on_call",
 ];
+/// System setting mapping every renamed or retired template name to its new name, so a node whose
+/// cache still holds the old name resolves it.
+pub const RENAMED_ALIASES_KEY: &str = "templates_renamed";
 /// System setting holding the renames a migration made, whose ownership tuples boot still moves.
 pub const RENAMES_PENDING_KEY: &str = "templates_renamed_pending";
 /// The templates name column is varchar(256).
@@ -411,6 +414,7 @@ where
             to,
         });
     }
+    record_aliases(&txn, &renames).await?;
     txn.commit().await?;
     Ok(renames)
 }
@@ -552,6 +556,86 @@ pub async fn record_pending_renames<C: ConnectionTrait>(
     set_pending_renames(db, &list).await
 }
 
+/// Adds `renames` to the alias list; a later rename of the same name replaces its entry.
+async fn record_aliases<C: ConnectionTrait>(
+    db: &C,
+    renames: &[ReservedRename],
+) -> Result<(), sea_orm::DbErr> {
+    use super::entity::system_settings;
+
+    if renames.is_empty() {
+        return Ok(());
+    }
+    let existing = setting_row(db, RENAMED_ALIASES_KEY).await?;
+    let mut list = existing
+        .as_ref()
+        .and_then(|row| row.setting_value.as_array().cloned())
+        .unwrap_or_default();
+    for r in renames {
+        list.retain(|v| !(v["org"] == r.org.as_str() && v["from"] == r.from.as_str()));
+        list.push(serde_json::json!({"org": r.org, "from": r.from, "to": r.to}));
+    }
+    let now = chrono::Utc::now().timestamp_micros();
+    match existing {
+        Some(row) => {
+            let mut active: system_settings::ActiveModel = row.into();
+            active.setting_value = Set(serde_json::Value::Array(list));
+            active.updated_at = Set(now);
+            active.update(db).await?;
+        }
+        None => {
+            system_settings::ActiveModel {
+                scope: Set("system".to_string()),
+                setting_key: Set(RENAMED_ALIASES_KEY.to_string()),
+                setting_value: Set(serde_json::Value::Array(list)),
+                created_at: Set(now),
+                updated_at: Set(now),
+                ..Default::default()
+            }
+            .insert(db)
+            .await?;
+        }
+    }
+    Ok(())
+}
+
+/// The name `name` was renamed or retired to in `org` (or in the shared default org), if any.
+pub async fn renamed_to(org: &str, name: &str) -> Result<Option<String>, sea_orm::DbErr> {
+    renamed_to_with(get_orm_client_ro().await, org, name).await
+}
+
+pub async fn renamed_to_with<C: ConnectionTrait>(
+    db: &C,
+    org: &str,
+    name: &str,
+) -> Result<Option<String>, sea_orm::DbErr> {
+    let Some(row) = setting_row(db, RENAMED_ALIASES_KEY).await? else {
+        return Ok(None);
+    };
+    let found = |owner: &str| {
+        row.setting_value
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|v| v["org"] == owner && v["from"] == name)
+            .and_then(|v| v["to"].as_str().map(str::to_string))
+    };
+    Ok(found(org).or_else(|| found(DEFAULT_ORG)))
+}
+
+async fn setting_row<C: ConnectionTrait>(
+    db: &C,
+    key: &str,
+) -> Result<Option<super::entity::system_settings::Model>, sea_orm::DbErr> {
+    use super::entity::system_settings;
+
+    system_settings::Entity::find()
+        .filter(system_settings::Column::Scope.eq("system"))
+        .filter(system_settings::Column::SettingKey.eq(key))
+        .one(db)
+        .await
+}
+
 /// The renames whose tuples are still to move, oldest first; the list stays until it is replaced.
 pub async fn pending_renames<C: ConnectionTrait>(
     db: &C,
@@ -690,6 +774,7 @@ where
         .map(|r| r.from.clone())
         .collect();
     point_names_at_default(&txn, &kind_seeds).await?;
+    record_aliases(&txn, &moved).await?;
     system_settings::Entity::delete_many()
         .filter(system_settings::Column::Scope.eq("org"))
         .filter(system_settings::Column::SettingKey.is_in(POINTER_KEYS))
@@ -1523,6 +1608,7 @@ mod tests {
             Some("prebuilt_default")
         );
         let keys: Vec<String> = system_settings::Entity::find()
+            .filter(system_settings::Column::Scope.eq("org"))
             .all(&db)
             .await
             .unwrap()
@@ -1684,5 +1770,37 @@ mod tests {
                 "{table}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn a_renamed_or_retired_name_resolves_to_its_new_name() {
+        let db = retire_db().await;
+        insert_row(&db, DEFAULT_ORG, "o2_default_content", false, "content").await;
+        insert_row(&db, "acme", "o2_default_mine", false, "custom").await;
+
+        rename_reserved_collisions(&db, &BOOT_SEEDS, false)
+            .await
+            .unwrap();
+        retire_default_templates(&db).await.unwrap();
+
+        assert_eq!(
+            renamed_to_with(&db, "acme", "o2_default_mine")
+                .await
+                .unwrap(),
+            Some("user_o2_default_mine".to_string())
+        );
+        // A default org move is shared, so every org's stale name follows it.
+        assert_eq!(
+            renamed_to_with(&db, "other", "o2_default_content")
+                .await
+                .unwrap(),
+            Some("prebuilt_default".to_string())
+        );
+        assert_eq!(
+            renamed_to_with(&db, "other", "o2_default_mine")
+                .await
+                .unwrap(),
+            None
+        );
     }
 }
