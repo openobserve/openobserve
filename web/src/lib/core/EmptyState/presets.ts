@@ -904,13 +904,11 @@ export const emptyStatePresets = {
     illustration: "connect",
     variant: "create",
     titleKey: "emptyState.noPhoneProvider.title",
-    descriptionKey: "emptyState.noPhoneProvider.description",
     actions: [
       {
         id: "connect",
         icon: "call",
         titleKey: "emptyState.noPhoneProvider.action",
-        descriptionKey: "emptyState.noPhoneProvider.actionDesc",
       },
     ],
   },

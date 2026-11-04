@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/locales";
 import { queryClient } from "@/composables/query/queryClient";
 import alertsService from "@/services/alerts";
+import { alertKeys } from "@/services/alerts.querykeys";
 import oncallService from "@/services/oncall";
 import { responseProgressQuery } from "@/services/oncall.queries";
 import { oncallKeys } from "@/services/oncall.querykeys";
@@ -62,7 +63,7 @@ vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }))
 import analytics from "@/services/product_analytics";
 
 vi.mock("@/services/alerts", () => ({
-  default: { get_by_alert_id: vi.fn() },
+  default: { get_by_alert_id: vi.fn(), listByFolderId: vi.fn() },
 }));
 
 /// Escalate's whole point is what it reports back, and the report is a toast.
@@ -700,6 +701,33 @@ describe("OnCallResponseDetail", () => {
       expect(unackBtn(wrapper).findComponent({ name: "OTooltip" }).props("content")).toBe(
         "Can't unacknowledge: this page's alert was deleted",
       );
+    });
+
+    /// A cached org-wide list filled after the page opened settles it with no request at all.
+    it("learns the alert is gone from an already cached alert list", async () => {
+      queryClient.setQueryData(
+        alertKeys.dependencies(store.state.selectedOrganization.identifier),
+        [{ alert_id: "al_other" }],
+      );
+      const wrapper = await renderWith(held());
+
+      expect(alerts.get_by_alert_id).not.toHaveBeenCalled();
+      expect(alerts.listByFolderId).not.toHaveBeenCalled();
+      expect(unackBtn(wrapper).findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "Can't unacknowledge: this page's alert was deleted",
+      );
+      queryClient.removeQueries({
+        queryKey: alertKeys.dependencies(store.state.selectedOrganization.identifier),
+      });
+    });
+
+    it("asks for the alert itself when no list is cached", async () => {
+      alerts.get_by_alert_id.mockResolvedValue({ data: {} } as any);
+      const wrapper = await renderWith(held());
+
+      expect(alerts.listByFolderId).not.toHaveBeenCalled();
+      expect(alerts.get_by_alert_id).toHaveBeenCalledWith(expect.any(String), "al_ckt");
+      expect(unackBtn(wrapper).props("disabled")).toBe(false);
     });
 
     it("keeps the button on when the alert lookup failed for another reason", async () => {

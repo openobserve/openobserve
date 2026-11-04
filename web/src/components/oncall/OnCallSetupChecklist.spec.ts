@@ -117,7 +117,10 @@ describe("OnCallSetupChecklist", () => {
     const wrapper = render({ compact: true, hasTeam: true, firstTeamId: "team_1" });
 
     expect(wrapper.find('[data-test="oncall-setup-next"]').text()).toContain(
-      "Add people and who's on first",
+      "Add members and who's on first",
+    );
+    expect(wrapper.find('[data-test="oncall-setup-bar-cta-rotation"]').text()).toContain(
+      "Add members",
     );
 
     await wrapper.find('[data-test="oncall-setup-bar-cta-rotation"]').trigger("click");

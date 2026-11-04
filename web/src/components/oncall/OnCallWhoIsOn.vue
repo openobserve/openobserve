@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The roster first, and only the roster: a reach tag pinned to the
              right edge gives every person the same two columns to read, which
              a tag trailing the address never does. -->
-        <ODescriptionList dense>
+        <ODescriptionList dense label-width="narrow">
           <ODescriptionItem :label="closed ? t('oncall.onCallThen') : t('oncall.onCallNow')">
             <span class="flex w-full items-center gap-2">
               <OnCallPersonName
@@ -116,21 +116,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              have. `next_user_email` used to get its own row ("Up next"), but
              it names the same person `handoverTo` does, so the row was a
              second copy of this one rather than a second fact. -->
-        <ODescriptionList v-if="!closed && handoverAt" dense>
+        <ODescriptionList v-if="!closed && handoverAt" dense label-width="narrow">
           <!-- When the pager changes hands. A page still open at handover is one
                the next person inherits without being told, unless a screen says
                so before it happens. -->
           <ODescriptionItem :label="t('oncall.shiftHandover')">
-            <span class="flex w-full flex-wrap items-center gap-x-1 gap-y-1">
-              <OnCallPersonName
-                v-if="handoverTo"
-                class="min-w-0"
-                :email="handoverTo"
-                data-test="oncall-who-is-on-handover-to"
-              />
+            <span
+              class="flex w-full flex-wrap items-center gap-x-1 gap-y-1"
+              data-test="oncall-who-is-on-handover"
+            >
+              <span class="whitespace-nowrap" data-test="oncall-who-is-on-handover-at">
+                {{ raw(handoverAtLabel) }}
+              </span>
               <span class="text-text-secondary text-xs whitespace-nowrap">
                 {{ raw(`(${handoverInLabel})`) }}
               </span>
+              <template v-if="handoverTo">
+                <span class="text-text-secondary" aria-hidden="true">{{ raw("→") }}</span>
+                <OnCallPersonName
+                  class="min-w-0"
+                  :email="handoverTo"
+                  data-test="oncall-who-is-on-handover-to"
+                />
+              </template>
             </span>
           </ODescriptionItem>
         </ODescriptionList>
@@ -140,13 +148,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            that its timing rides the stat strip above the fold. -->
       <template v-if="ackedBy">
         <OSeparator class="my-3" />
-        <ODescriptionList dense>
+        <ODescriptionList dense label-width="narrow">
           <ODescriptionItem :label="t('oncall.ackedBy')">
-            <OnCallPersonName
-              class="min-w-0 truncate"
-              :email="ackedBy"
-              data-test="oncall-who-is-on-acked-by"
-            />
+            <OnCallPersonName truncate :email="ackedBy" data-test="oncall-who-is-on-acked-by" />
           </ODescriptionItem>
         </ODescriptionList>
       </template>
@@ -156,6 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useStore } from "vuex";
 
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -169,6 +174,7 @@ import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import type { DeliveryRecord, OnCallPosition } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { formatTimestampInTimezone } from "@/utils/date";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const props = withDefaults(
@@ -213,6 +219,7 @@ const props = withDefaults(
 
 const { t } = useI18nTyped();
 const nowMicros = useOnCallClock();
+const store = useStore();
 
 const closed = computed(() => Boolean(props.closedAt));
 
@@ -242,6 +249,13 @@ const others = computed(() => props.positions.filter((p) => p !== primary.value)
 /// same fact as a second row ("Up next") — one clock, one name, one row.
 const handoverInLabel = computed(() =>
   props.handoverAt !== null ? formatMicrosDuration(props.handoverAt - nowMicros.value) : "",
+);
+
+/// The weekday leads: a handover days away is placed by the day, not by its date alone.
+const handoverAtLabel = computed(() =>
+  props.handoverAt !== null
+    ? formatTimestampInTimezone(props.handoverAt, "EEE, MMM d, HH:mm", store.state.timezone)
+    : "",
 );
 
 /// What this page's own sends did for one address — never the team's general

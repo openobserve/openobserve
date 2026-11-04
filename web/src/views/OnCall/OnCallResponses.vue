@@ -293,15 +293,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Both caps are stated: a capped list under-reports, and a blank ladder cell would read as "nothing has fired". -->
-      <template v-if="truncated || escalationCapped" #footer-note>
-        <span class="flex flex-wrap gap-x-3">
-          <!-- The list endpoint has no count, so the loaded length is never presented as the total. -->
-          <span v-if="truncated" data-test="oncall-responses-truncated">
-            {{ t("oncall.listTruncatedNoTotal", { count: responses.length }) }}
-          </span>
-          <span v-if="escalationCapped" data-test="oncall-escalation-capped">
-            {{ t("oncall.escalationDetailCapped", { count: ESCALATION_DETAIL_LIMIT }) }}
-          </span>
+      <!-- The list endpoint has no count, so the loaded length is never presented as the total. -->
+      <template v-if="truncated" #footer-note>
+        <span data-test="oncall-responses-truncated">
+          {{ t("oncall.listTruncatedNoTotal", { count: responses.length }) }}
         </span>
       </template>
 
@@ -1007,7 +1002,6 @@ const positionsByTeam = ref<Record<string, OnCallPosition[]>>({});
 const progressById = ref<Record<string, EscalationProgress>>({});
 /// Ids whose progress was asked for and answered; a row past the cap or whose read failed is not in it, so it never reads "Not paged yet".
 const progressAnswered = ref<Set<string>>(new Set());
-const escalationCapped = ref(false);
 const expandedIds = ref<string[]>([]);
 const expandedEvents = ref<OnCallResponseEvent[]>([]);
 const expandedLoading = ref(false);
@@ -2058,7 +2052,6 @@ async function fetchEscalationProgress(force = false) {
     .filter((r) => isEscalating(r.state))
     .sort((a, b) => a.opened_at - b.opened_at);
 
-  escalationCapped.value = open.length > ESCALATION_DETAIL_LIMIT;
   const wanted = open.slice(0, ESCALATION_DETAIL_LIMIT);
 
   const results = await Promise.allSettled(

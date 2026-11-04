@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCardSection>
 
     <OCardSection role="body" dense>
-      <ODescriptionList dense>
+      <ODescriptionList dense label-width="narrow">
         <ODescriptionItem :label="t('alerts.groups.criticalCondition')">
           <span class="font-mono text-sm wrap-anywhere" data-test="oncall-what-fired-condition">
             {{ raw(conditionText) }}

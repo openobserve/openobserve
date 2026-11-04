@@ -924,6 +924,7 @@ import analytics from "@/services/product_analytics";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import alertsService from "@/services/alerts";
+import { alertKeys } from "@/services/alerts.querykeys";
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import {
@@ -1724,13 +1725,27 @@ async function fetchSubjectAlert() {
   subjectAlert.value = null;
   subjectAlertMissing.value = false;
   if (response.value?.subject.subject_type !== "alert") return;
+  const alertId = response.value.subject.source_id;
+  if (cachedAlertMissing(alertId, response.value.opened_at)) {
+    subjectAlertMissing.value = true;
+    return;
+  }
   try {
-    const res = await alertsService.get_by_alert_id(orgId.value, response.value.subject.source_id);
+    const res = await alertsService.get_by_alert_id(orgId.value, alertId);
     subjectAlert.value = res.data ?? null;
   } catch (err: any) {
     subjectAlert.value = null;
     subjectAlertMissing.value = err?.response?.status === 404;
   }
+}
+
+/// Only an org-wide list already cached since the page opened can say the alert is gone; anything else asks the alert itself.
+function cachedAlertMissing(alertId: string, openedAt: number): boolean {
+  const key = alertKeys.dependencies(orgId.value);
+  const list = queryClient.getQueryData<{ alert_id?: string }[]>(key);
+  const fetchedAt = queryClient.getQueryState(key)?.dataUpdatedAt ?? 0;
+  if (!Array.isArray(list) || fetchedAt * 1000 < openedAt) return false;
+  return !list.some((alert) => alert.alert_id === alertId);
 }
 
 async function fetchIncidentTitle() {
