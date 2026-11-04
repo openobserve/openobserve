@@ -250,6 +250,34 @@ describe("LicenseSearchBanner", () => {
       "Could not reach the license server. Limits were refreshed.",
     );
   });
+  it("drops a failed refresh outcome once search recovers on its own", async () => {
+    vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({
+      data: { error: "unreachable", limits_refreshed: true },
+    } as never);
+    const w = await mountBanner(PAUSED);
+    await w.get('[data-test="license-banner-refresh"]').trigger("click");
+    await flushPromises();
+    expect(w.find('[data-test="license-banner-outcome"]').exists()).toBe(true);
+    store.commit("setConfig", { meta_org: META, license_search_allowed: true });
+    await flushPromises();
+    expect(w.find('[data-test="license-search-banner"]').exists()).toBe(false);
+  });
+  it("does not carry a refresh outcome into a later pause", async () => {
+    vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({
+      data: { outcome: "renewed", renewed: { license_id: "new", expires_at: 1825113600000000 } },
+    } as never);
+    const w = await mountBanner(PAUSED);
+    await w.get('[data-test="license-banner-refresh"]').trigger("click");
+    await flushPromises();
+    store.commit("setConfig", { meta_org: META, license_search_allowed: true });
+    await flushPromises();
+    expect(w.find('[data-test="license-banner-outcome"]').exists()).toBe(true);
+    store.commit("setConfig", PAUSED);
+    await flushPromises();
+    expect(w.find('[data-test="license-banner-outcome"]').exists()).toBe(false);
+    expect(w.text()).toContain("Search is paused.");
+    expect(w.findComponent(OBanner).props("variant")).toBe("error");
+  });
   it("does not send overlapping refresh clicks", async () => {
     vi.mocked(licenseServer.refresh_license_limits).mockImplementation(
       () => new Promise(() => {}) as never,

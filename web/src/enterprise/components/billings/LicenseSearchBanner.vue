@@ -214,6 +214,16 @@ const openDetails = () =>
     query: { org_identifier: store.state.selectedOrganization?.identifier },
   });
 
+// An outcome belongs to the state it was clicked in; only a success outlives the recovery it caused.
+watch(
+  () => state.value.kind,
+  (kind, prev) => {
+    const recovered =
+      prev === "paused" && kind !== "paused" && outcome.value?.variant === "success";
+    if (!recovered) refreshResult.value = undefined;
+  },
+);
+
 let pollTimer: ReturnType<typeof setInterval> | undefined;
 
 const stopPolling = () => {
