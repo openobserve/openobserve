@@ -181,10 +181,12 @@ describe("EditRole drafts", () => {
 
     expect(Object.keys(vm().addedPermissions)).toEqual([GRANT]);
     expect(vm().activeTab).toBe("users");
-    const picked = document.body.querySelector(
-      '[data-test="iam-users-selection-table-body-row-u2@x.io-checkbox"] [role="checkbox"]',
-    );
-    expect(picked?.getAttribute("aria-checked")).toBe("true");
+    await vi.waitFor(() => {
+      const picked = document.body.querySelector(
+        '[data-test="iam-users-selection-table-body-row-u2@x.io-checkbox"] [role="checkbox"]',
+      );
+      expect(picked?.getAttribute("aria-checked")).toBe("true");
+    });
   });
 
   it("a restored member removal stays listed under Selected, unticked, so it can be undone", async () => {
@@ -196,10 +198,12 @@ describe("EditRole drafts", () => {
     await flushPromises();
     await flushPromises();
 
-    const removed = document.body.querySelector(
-      '[data-test="iam-users-selection-table-body-row-u1@x.io-checkbox"] [role="checkbox"]',
-    );
-    expect(removed?.getAttribute("aria-checked")).toBe("false");
+    await vi.waitFor(() => {
+      const removed = document.body.querySelector(
+        '[data-test="iam-users-selection-table-body-row-u1@x.io-checkbox"] [role="checkbox"]',
+      );
+      expect(removed?.getAttribute("aria-checked")).toBe("false");
+    });
   });
 
   it("Start fresh drops the draft and stages nothing", async () => {
