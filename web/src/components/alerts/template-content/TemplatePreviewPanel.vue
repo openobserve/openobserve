@@ -144,6 +144,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTag>
     </div>
 
+    <div
+      v-if="emptyVariables.length > 0"
+      class="flex flex-wrap items-center gap-1"
+      data-test="template-preview-panel-empty-variables-warning"
+    >
+      <OTag variant="warning-soft" data-test="template-preview-panel-empty-variables-chip">
+        {{
+          t("alert_templates.emptyVariables", {
+            kind: t(kindLabelKey(previewKind)),
+            names: emptyVariables.join(", "),
+          })
+        }}
+      </OTag>
+    </div>
+
     <OTabs
       data-test="template-preview-panel-view-tabs"
       :model-value="view"
@@ -356,6 +371,8 @@ interface PreviewResponseData {
   payload: unknown;
   preview_model: PreviewModel;
   unknown_variables: string[];
+  /** Variables the draft uses that render blank in the previewed kind's sample. */
+  empty_variables?: string[];
   variable_groups?: VariableGroup[];
 }
 
@@ -489,6 +506,7 @@ const forbidden = ref(false);
 
 const previewModel = computed(() => previewData.value?.preview_model ?? null);
 const unknownVariables = computed(() => previewData.value?.unknown_variables ?? []);
+const emptyVariables = computed(() => previewData.value?.empty_variables ?? []);
 
 /**
  * Severity accent for the preview card.

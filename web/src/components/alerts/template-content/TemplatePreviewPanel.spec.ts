@@ -160,6 +160,19 @@ describe("TemplatePreviewPanel", () => {
     expect(chip.text()).toContain("foo_bar");
   });
 
+  it("names the variables that render empty for the previewed kind", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(
+      makePreviewResponse({ empty_variables: ["alert_operator", "alert_threshold"] }) as any,
+    );
+
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+
+    const chip = w.find('[data-test="template-preview-panel-empty-variables-chip"]');
+    expect(chip.text()).toBe("Empty for Alert: alert_operator, alert_threshold");
+  });
+
   it("names the previewed channel on the card, so switching Channel is visibly acknowledged", async () => {
     // The backend returns an IDENTICAL preview_model for every channel — only
     // `payload` differs. Without this badge the card does not change at all

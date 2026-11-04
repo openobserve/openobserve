@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="min-w-0 flex-1 basis-60">
           <TemplateOverridePicker
             :kind="kind"
+            context="orgDefault"
             :model-value="values[kind] ?? null"
             :server-error="rowErrors[kind] ?? null"
             :disabled="readOnly"

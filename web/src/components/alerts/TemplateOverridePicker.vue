@@ -14,10 +14,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- One template override select for a notification kind; lists only user templates that apply to it. -->
+<!-- One template select for a notification kind: an object's override, or a row of the org default card. -->
 <template>
   <div class="flex min-w-0 flex-col gap-1" :data-test="`template-override-${kind}`">
     <OButton
+      v-if="context === 'object'"
       variant="ghost-primary"
       size="xs"
       class="gap-1 self-start font-medium"
@@ -69,11 +70,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       searchable
       :loading="state === 'loading'"
       :disabled="disabled || state === 'loading' || state === 'forbidden'"
-      :placeholder="t('alerts.templateOverride.placeholder')"
+      :placeholder="
+        context === 'orgDefault'
+          ? t('alerts.templateOverride.orgDefaultPlaceholder', { kind: kindLabel })
+          : t('alerts.templateOverride.placeholder')
+      "
       :help-text="
         state === 'forbidden'
           ? t('alerts.templateOverride.forbidden')
-          : t('alerts.templateOverride.help', { kind: kindLabel })
+          : context === 'orgDefault'
+            ? t('alerts.templateOverride.orgDefaultHelp', { kind: kindLabel })
+            : t('alerts.templateOverride.help', { kind: kindLabel })
       "
       :error-message="serverError ? raw(serverError) : undefined"
       class="max-w-105"
@@ -101,11 +108,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         })
       }}
     </span>
+    <div
+      v-if="willUse.length"
+      class="text-text-secondary flex flex-col text-xs"
+      role="status"
+      data-test="template-override-will-use"
+    >
+      <span v-if="willUse.length === 1">{{
+        t("alerts.templateOverride.willUse", { template: willUse[0].label })
+      }}</span>
+      <template v-else>
+        <span>{{ t("alerts.templateOverride.willUsePerDestination") }}</span>
+        <span
+          v-for="row in willUse"
+          :key="row.destination"
+          data-test="template-override-will-use-row"
+        >
+          {{
+            t("alerts.templateOverride.willUseRow", {
+              destination: row.destination,
+              template: row.label,
+            })
+          }}
+        </span>
+      </template>
+    </div>
     <AlertSettingsHelpDrawer
+      v-if="context === 'object'"
       v-model:open="helpOpen"
       topic="template"
+      subject="object"
       :templates="templates"
       :current-template="modelValue ?? ''"
+      :selected-destinations="formDestinations.map((d) => d.name)"
+      :unfit-destinations="mismatched"
+      :resolved-destinations="willUseByDestination"
       @apply:template="onSelect"
     />
   </div>
@@ -122,17 +159,25 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import templateService from "@/services/alert_templates";
+import settingsService from "@/services/settings";
+import { templatesQuery } from "@/services/alert_templates.queries";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   kindLabelKey,
+  resolveEffectiveTemplate,
   templateFitsTransport,
   type NotificationKind,
+  type ResolvableTemplate,
+  type TemplateSource,
 } from "@/utils/alerts/notificationKinds";
 
-interface PickerTemplate {
+type PickerTemplate = ResolvableTemplate;
+
+interface FormDestination {
   name: string;
-  kind?: string;
   type?: string;
-  isPrebuilt?: boolean;
+  template?: string | null;
 }
 
 const props = withDefaults(
@@ -140,12 +185,14 @@ const props = withDefaults(
     kind: NotificationKind;
     modelValue: string | null;
     disabled?: boolean;
-    /** The form's destinations with their transport, for the Custom fit warning. */
-    destinations?: { name: string; type?: string }[];
+    /** The form's destinations by name; a missing type or template is read from the destination list. */
+    destinations?: (string | FormDestination)[];
     /** The server's 400 message for this field, shown under the select. */
     serverError?: string | null;
+    /** `object` overrides one configuration; `orgDefault` is a row of the org default card. */
+    context?: "object" | "orgDefault";
   }>(),
-  { disabled: false, destinations: () => [], serverError: null },
+  { disabled: false, destinations: () => [], serverError: null, context: "object" },
 );
 
 const emit = defineEmits<{ (e: "update:modelValue", value: string | null): void }>();
@@ -187,14 +234,87 @@ const selected = computed(() => templates.value.find((tpl) => tpl.name === props
 // A deleted or renamed template would be re-sent under its old name until the server refused it.
 const isStale = computed(() => state.value === "ready" && !!props.modelValue && !selected.value);
 
+// What the effective-template line needs beyond the picker's own list; object context only.
+const allTemplates = ref<ResolvableTemplate[] | null>(null);
+const orgDestinations = ref<FormDestination[]>([]);
+const orgDefault = ref<string | null>(null);
+
+const formDestinations = computed<FormDestination[]>(() =>
+  props.destinations.map((d) => {
+    const given = typeof d === "string" ? { name: d } : d;
+    const known = orgDestinations.value.find((o) => o.name === given.name);
+    return {
+      name: given.name,
+      type: given.type ?? known?.type,
+      template: given.template ?? known?.template ?? null,
+    };
+  }),
+);
+
 // A Custom template renders only on its own transport; other destinations use their own template.
 const mismatched = computed(() => {
   const tpl = selected.value;
   if (!tpl || tpl.kind === "content") return [];
-  return props.destinations
+  return formDestinations.value
     .filter((d) => d.type && !templateFitsTransport(tpl.type, d.type))
     .map((d) => d.name);
 });
+
+const SOURCE_KEYS = {
+  explicit: "alerts.templateOverride.sourceExplicit",
+  destination: "alerts.templateOverride.sourceDestination",
+  org_default: "alerts.templateOverride.sourceOrgDefault",
+  compiled: "alerts.templateOverride.sourceCompiled",
+} as const satisfies Record<TemplateSource, string>;
+
+const willUseByDestination = computed(() => {
+  const templatesList = allTemplates.value;
+  if (props.context !== "object" || !templatesList) return [];
+  return formDestinations.value.map((d) => {
+    const { name, source } = resolveEffectiveTemplate({
+      kind: props.kind,
+      override: props.modelValue,
+      destination: d,
+      templates: templatesList,
+      orgDefault: orgDefault.value,
+    });
+    const template = name ?? t("alerts.templateOverride.builtIn", { kind: kindLabel.value });
+    return {
+      destination: d.name,
+      key: `${name ?? ""}|${source}`,
+      label: t("alerts.templateOverride.templateWithSource", {
+        name: template,
+        source: t(SOURCE_KEYS[source]),
+      }),
+    };
+  });
+});
+
+// One line when every destination gets the same template, one row per destination otherwise.
+const willUse = computed(() => {
+  const rows = willUseByDestination.value;
+  return rows.every((r) => r.key === rows[0]?.key) ? rows.slice(0, 1) : rows;
+});
+
+// Each read is optional: a failure (or a 403) leaves the line out rather than guessing.
+const loadResolution = async () => {
+  if (props.context !== "object") return;
+  const org = store.state.selectedOrganization.identifier;
+  const [templatesList, destinationList, setting] = await Promise.all([
+    queryClient.fetchQuery(templatesQuery(org)).catch(() => null),
+    queryClient.fetchQuery(destinationsQuery(org, "alert")).catch(() => []),
+    settingsService.getSetting(org, "default_templates").catch(() => null),
+  ]);
+  allTemplates.value = Array.isArray(templatesList) ? templatesList : null;
+  orgDestinations.value = (Array.isArray(destinationList) ? destinationList : []).map((d: any) => ({
+    name: d.name,
+    type: d.type,
+    template: d.template ?? null,
+  }));
+  const value = setting?.data?.setting_value;
+  const name = value && typeof value === "object" ? value[props.kind] : null;
+  orgDefault.value = typeof name === "string" && name ? name : null;
+};
 
 const load = async () => {
   state.value = "loading";
@@ -227,8 +347,17 @@ const openCreate = () => {
   window.open(route.href, "_blank");
 };
 
-watch(() => props.kind, load);
-onMounted(load);
+watch(
+  () => props.kind,
+  () => {
+    void load();
+    void loadResolution();
+  },
+);
+onMounted(() => {
+  void load();
+  void loadResolution();
+});
 
 defineExpose({ load });
 </script>

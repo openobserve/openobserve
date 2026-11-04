@@ -381,6 +381,36 @@ fn truncate(value: &str, len: usize) -> String {
 
 /// Find every remaining `{identifier}` / `{identifier:N}` token — anything
 /// still present after all known-variable passes ran is unmatched.
+/// Known variables in `input` whose value for `ctx` is blank, each once, in order of use.
+pub(crate) fn empty_variables(input: &str, ctx: &NotificationContext) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for name in scan_unmatched(input) {
+        let blank = var_value(&name, ctx).is_some_and(|v| v.trim().is_empty());
+        if blank && !out.contains(&name) {
+            out.push(name);
+        }
+    }
+    out
+}
+
+/// The value a `{name}` token takes for `ctx`, in the substitution engine's tier order.
+fn var_value(name: &str, ctx: &NotificationContext) -> Option<String> {
+    if let Some((_, v)) = scalar_vars(ctx).into_iter().find(|(n, _)| *n == name) {
+        return Some(v.to_string());
+    }
+    if let Some((_, v)) = extra_scalar_vars(ctx).into_iter().find(|(n, _)| *n == name) {
+        return Some(v);
+    }
+    if let Some((_, values)) = ctx.row_columns.iter().find(|(k, _)| k == name) {
+        return Some(values.join(", "));
+    }
+    ctx.context_attributes
+        .iter()
+        .chain(ctx.metadata.iter())
+        .find(|(k, _)| k == name)
+        .map(|(_, v)| v.clone())
+}
+
 fn scan_unmatched(tpl: &str) -> Vec<String> {
     let mut out = Vec::new();
     let bytes = tpl.as_bytes();

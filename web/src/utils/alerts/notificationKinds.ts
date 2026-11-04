@@ -71,3 +71,71 @@ export function templateFitsTransport(templateType?: string, destinationType?: s
   const transport = (t?: string) => (t === "email" ? "email" : t === "sns" ? "sns" : "http");
   return transport(templateType) === transport(destinationType);
 }
+
+/** A template row as the list endpoint returns it, with the fields the resolution reads. */
+export interface ResolvableTemplate {
+  name: string;
+  kind?: string;
+  type?: string;
+  isPrebuilt?: boolean;
+  isDefault?: boolean;
+  applies_to?: string[];
+}
+
+/** Where the effective template came from, as the server's send log names it. */
+export type TemplateSource = "explicit" | "destination" | "org_default" | "compiled";
+
+const SOURCE_LABEL_KEYS: Record<string, string> = {
+  explicit: "alerts.templateOverride.sourceExplicit",
+  destination: "alerts.templateOverride.sourceDestination",
+  org_default: "alerts.templateOverride.sourceOrgDefault",
+  compiled: "alerts.templateOverride.sourceCompiled",
+  platform_resolve: "alerts.templateOverride.sourcePlatformResolve",
+  legacy: "alerts.templateOverride.sourceLegacy",
+};
+
+/** The i18n key for a send log `template_source`; undefined for a value this build does not know. */
+export const templateSourceLabelKey = (source: string): string | undefined =>
+  SOURCE_LABEL_KEYS[source];
+
+/** A stored applies_to of [] means every kind. */
+export const templateAppliesTo = (tpl: ResolvableTemplate, kind: NotificationKind) =>
+  !tpl.applies_to?.length || tpl.applies_to.includes(kind);
+
+/**
+ * The server's walk for one destination: the override, then the destination template if it
+ * applies, then the org default, then the built-in message (`name` null).
+ */
+export function resolveEffectiveTemplate(input: {
+  kind: NotificationKind;
+  override: string | null;
+  destination: { type?: string; template?: string | null };
+  templates: ResolvableTemplate[];
+  orgDefault: string | null;
+}): { name: string | null; source: TemplateSource } {
+  const { kind, override, destination, templates } = input;
+  const find = (name?: string | null) =>
+    name ? templates.find((t) => t.name === name) : undefined;
+  const fits = (tpl: ResolvableTemplate) =>
+    tpl.kind === "content" ||
+    !destination.type ||
+    templateFitsTransport(tpl.type, destination.type);
+
+  const explicit = find(override);
+  if (explicit && fits(explicit)) return { name: explicit.name, source: "explicit" };
+
+  const own = find(destination.template);
+  if (own && (kind === "alert" || (!own.isPrebuilt && templateAppliesTo(own, kind))) && fits(own)) {
+    return { name: own.name, source: "destination" };
+  }
+
+  const orgDefault = input.orgDefault !== override ? find(input.orgDefault) : undefined;
+  if (orgDefault && fits(orgDefault)) return { name: orgDefault.name, source: "org_default" };
+
+  // Alerts still honour the template marked as default before the per-kind map existed.
+  if (kind === "alert" && !find(input.orgDefault)) {
+    const legacy = templates.find((t) => t.isDefault && fits(t));
+    if (legacy) return { name: legacy.name, source: "org_default" };
+  }
+  return { name: null, source: "compiled" };
+}

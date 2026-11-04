@@ -85,6 +85,8 @@ export interface DowntimeNotificationLogEntry {
   sent_at: number;
   destinations: string[];
   result?: string;
+  /** The template each destination that sent used; absent on rows sent before it was recorded. */
+  templates?: { destination: string; template_name: string; template_source: string }[];
 }
 
 export interface Downtime {

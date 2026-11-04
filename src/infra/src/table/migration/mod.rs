@@ -259,6 +259,7 @@ mod m20261120_000002_rename_reserved_template_collisions;
 mod m20261120_000003_add_anomaly_template;
 mod m20261201_000001_add_synthetics_template;
 mod m20261210_000001_add_oncall_policy_template;
+mod m20261211_000001_add_templates_to_downtime_notifications;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -419,8 +420,12 @@ pub(crate) async fn create_downtime_notifications_for_test(
     db: &sea_orm::DatabaseConnection,
 ) -> Result<(), DbErr> {
     use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
     m20261009_000005_create_downtime_notifications::Migration
-        .up(&SchemaManager::new(db))
+        .up(&manager)
+        .await?;
+    m20261211_000001_add_templates_to_downtime_notifications::Migration
+        .up(&manager)
         .await
 }
 
@@ -816,6 +821,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261120_000003_add_anomaly_template::Migration),
             Box::new(m20261201_000001_add_synthetics_template::Migration),
             Box::new(m20261210_000001_add_oncall_policy_template::Migration),
+            Box::new(m20261211_000001_add_templates_to_downtime_notifications::Migration),
         ]
     }
 }
@@ -924,6 +930,10 @@ mod tests {
         (138, "m20261120_000003_add_anomaly_template"),
         (139, "m20261201_000001_add_synthetics_template"),
         (140, "m20261210_000001_add_oncall_policy_template"),
+        (
+            141,
+            "m20261211_000001_add_templates_to_downtime_notifications",
+        ),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1053,6 +1063,10 @@ mod tests {
             (
                 "m20261009_000001_create_downtimes",
                 "m20261009_000005_create_downtime_notifications",
+            ),
+            (
+                "m20261009_000005_create_downtime_notifications",
+                "m20261211_000001_add_templates_to_downtime_notifications",
             ),
             (
                 "m20260923_000001_create_ai_chat_sessions",

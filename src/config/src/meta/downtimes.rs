@@ -376,6 +376,19 @@ pub struct DowntimeNotificationLogEntry {
     pub destinations: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result: Option<String>,
+    /// The template each destination that sent used; empty for rows sent before it was recorded.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub templates: Vec<DowntimeNotificationTemplate>,
+}
+
+/// One destination's template, as the send log line names it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct DowntimeNotificationTemplate {
+    pub destination: String,
+    /// Empty when the send carried no rendered template (a platform resolve or a legacy body).
+    pub template_name: String,
+    /// `explicit`, `destination`, `org_default`, `compiled`, `platform_resolve` or `legacy`.
+    pub template_source: String,
 }
 
 #[derive(Clone, Debug, Deserialize, ToSchema)]

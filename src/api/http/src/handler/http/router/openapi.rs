@@ -795,6 +795,7 @@ use crate::{
             config::meta::downtimes::NotificationEvents,
             config::meta::downtimes::NotificationEvent,
             config::meta::downtimes::DowntimeNotificationLogEntry,
+            config::meta::downtimes::DowntimeNotificationTemplate,
             config::meta::alerts::incidents::IncidentWithAlerts,
             config::meta::alerts::incidents::IncidentAlert,
             config::meta::alerts::incidents::IncidentStats,

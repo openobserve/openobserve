@@ -31,7 +31,7 @@ use super::{
     context::NotificationContext,
     format::ChannelFormat,
     render::{RenderedMessage, markdown::markdown_to_html, render, severity_color},
-    resolve::resolve_content,
+    resolve::{empty_variables, resolve_content},
 };
 
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -58,6 +58,8 @@ pub struct PreviewResponse {
     /// FE card rendering schema.
     pub preview_model: PreviewModel,
     pub unknown_variables: Vec<String>,
+    /// Variables the draft uses that render blank in the previewed kind's sample.
+    pub empty_variables: Vec<String>,
     /// Every variable a template of the requested kind can use.
     pub variables: Vec<String>,
     /// `common` and one group per kind whose producer renders templates in this release.
@@ -242,6 +244,7 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
     };
 
     let content = resolve_content(&req.definition, &ctx, format.channel_family());
+    let empty_variables = draft_empty_variables(&req.definition, &ctx, format.channel_family());
     let rendered =
         render(format, &content, &ctx).map_err(|e| PreviewError::RenderFailed(e.to_string()))?;
 
@@ -296,9 +299,30 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
         payload,
         preview_model,
         unknown_variables: content.unknown_variables,
+        empty_variables,
         variables: super::examples::variables_for(req.kind),
         variable_groups: super::examples::variable_groups(),
     })
+}
+
+/// Every authored surface of the draft that the channel renders, checked for blank variables.
+fn draft_empty_variables(
+    spec: &ContentSpec,
+    ctx: &NotificationContext,
+    channel_family: &str,
+) -> Vec<String> {
+    let title = spec
+        .title_overrides
+        .get(channel_family)
+        .unwrap_or(&spec.title);
+    let mut text = vec![title.as_str(), spec.body.as_str()];
+    for f in &spec.fields {
+        text.extend([f.label.as_str(), f.value.as_str()]);
+    }
+    for l in &spec.links {
+        text.extend([l.label.as_str(), l.url.as_str()]);
+    }
+    empty_variables(&text.join("\n"), ctx)
 }
 
 #[cfg(test)]
@@ -451,6 +475,41 @@ mod tests {
                 .variables
                 .iter()
                 .any(|v| v == "incident_id")
+        );
+    }
+
+    #[test]
+    fn an_alert_variable_is_named_empty_in_a_synthetics_preview_only() {
+        let mut spec = sample_spec();
+        spec.body = "{alert_name} observed **{alert_agg_value}** over {alert_threshold}".into();
+        let request = |kind| PreviewRequest {
+            definition: spec.clone(),
+            channel: "slack".into(),
+            severity: None,
+            sample: None,
+            kind,
+        };
+        let synthetics = preview(&request(NotificationKind::Synthetics)).unwrap();
+        assert!(
+            synthetics
+                .empty_variables
+                .contains(&"alert_agg_value".to_string())
+        );
+        assert!(
+            synthetics
+                .empty_variables
+                .contains(&"alert_threshold".to_string())
+        );
+        assert!(
+            !synthetics
+                .empty_variables
+                .contains(&"alert_name".to_string())
+        );
+        let alert = preview(&request(NotificationKind::Alert)).unwrap();
+        assert!(
+            alert.empty_variables.is_empty(),
+            "{:?}",
+            alert.empty_variables
         );
     }
 

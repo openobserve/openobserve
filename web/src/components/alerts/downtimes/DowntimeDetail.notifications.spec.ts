@@ -103,6 +103,13 @@ const DETAIL = {
       sent_at: NOW - 24 * HOUR,
       destinations: ["slack-oncall"],
       result: "ok",
+      templates: [
+        {
+          destination: "slack-oncall",
+          template_name: "play_downtime_card",
+          template_source: "org_default",
+        },
+      ],
     },
   ],
 } as unknown as Detail;
@@ -165,6 +172,14 @@ describe("DowntimeDetail notifications tab", () => {
     expect(text).toContain("Started");
     expect(text).toContain("Sent");
     expect(text.indexOf("Ended")).toBeLessThan(text.indexOf("Started"));
+    wrapper.unmount();
+  });
+
+  it("names the template each destination sent with", async () => {
+    const wrapper = await mountDetail();
+    const text = wrapper.get('[data-test="downtime-detail-notifications-table"]').text();
+    expect(text).toContain("Template");
+    expect(text).toContain("slack-oncall: play_downtime_card (org default)");
     wrapper.unmount();
   });
 

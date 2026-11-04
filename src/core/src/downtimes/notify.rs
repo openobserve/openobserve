@@ -16,7 +16,8 @@
 use config::{
     get_config,
     meta::downtimes::{
-        Downtime, DowntimeNotificationLogEntry, DowntimeWindow, NotificationEvent, TargetModule,
+        Downtime, DowntimeNotificationLogEntry, DowntimeNotificationTemplate, DowntimeWindow,
+        NotificationEvent, TargetModule,
     },
     utils::time::now_micros,
 };
@@ -78,7 +79,8 @@ pub async fn deliver(row: &Downtime, due: &DueEvent) -> Result<bool, DowntimeErr
         return Ok(false);
     }
     let destinations = destinations_of(row);
-    let result = match send(row, due, record.sent_at, &destinations).await {
+    let (result, templates) = send(row, due, record.sent_at, &destinations).await;
+    let result = match result {
         Ok(summary) => summary,
         Err(e) => {
             log::warn!(
@@ -90,7 +92,8 @@ pub async fn deliver(row: &Downtime, due: &DueEvent) -> Result<bool, DowntimeErr
             e
         }
     };
-    log_table::set_result(&record.id, &result).await?;
+    let templates = (!templates.is_empty()).then(|| serde_json::json!(templates));
+    log_table::set_result(&record.id, &result, templates).await?;
     Ok(true)
 }
 
@@ -134,6 +137,7 @@ fn record_for(row: &Downtime, due: &DueEvent, now: i64) -> Option<DowntimeNotifi
         sent_at: now,
         destinations: serde_json::json!(destinations_of(row)),
         result: None,
+        templates: None,
     })
 }
 
@@ -151,6 +155,10 @@ fn log_entry(row: DowntimeNotification) -> DowntimeNotificationLogEntry {
         sent_at: row.sent_at,
         destinations: serde_json::from_value(row.destinations).unwrap_or_default(),
         result: row.result,
+        templates: row
+            .templates
+            .and_then(|v| serde_json::from_value(v).ok())
+            .unwrap_or_default(),
     }
 }
 
@@ -159,7 +167,7 @@ async fn send(
     due: &DueEvent,
     claimed_at: i64,
     destinations: &[String],
-) -> Result<String, String> {
+) -> (Result<String, String>, Vec<DowntimeNotificationTemplate>) {
     use crate::alerts::notifications::notify::notify;
 
     let counts = super::match_counts(row).await.ok();
@@ -172,12 +180,20 @@ async fn send(
     );
     let ctx = downtime_context(row, due, claimed_at, vars);
     let mut results = Vec::with_capacity(destinations.len());
+    let mut templates = Vec::new();
     for name in destinations {
         let mut ctx = ctx.clone();
         let sent = notify(&row.org, name, &[], None, &mut ctx).await;
+        if let Ok(outcome) = &sent {
+            templates.push(DowntimeNotificationTemplate {
+                destination: name.clone(),
+                template_name: outcome.template_name.clone(),
+                template_source: outcome.template_source.clone(),
+            });
+        }
         results.push((name.as_str(), sent.map(|_| ())));
     }
-    summarize(&results)
+    (summarize(&results), templates)
 }
 
 /// One part per destination; a skip is named but only a real error fails the event.
@@ -498,6 +514,35 @@ mod tests {
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].event, "ended");
         assert_eq!(entries[0].destinations, ["slack", "pagerduty"]);
+        assert!(entries[0].templates.is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_log_entry_names_the_template_each_destination_sent_with() {
+        let db = log_db().await;
+        let d = row(None);
+        let record = record_for(&d, &due(NotificationEvent::Started), 1).unwrap();
+        assert!(
+            log_table::insert_if_absent_with(&db, &record)
+                .await
+                .unwrap()
+        );
+        let sent = vec![DowntimeNotificationTemplate {
+            destination: "slack".to_string(),
+            template_name: "o2_default_downtime".to_string(),
+            template_source: "org_default".to_string(),
+        }];
+        log_table::set_result_with(&db, &record.id, RESULT_OK, Some(serde_json::json!(sent)))
+            .await
+            .unwrap();
+
+        let rows = log_table::list_for_downtime_with(&db, "acme", &d.id, LOG_LIMIT)
+            .await
+            .unwrap();
+        let entry = log_entry(rows.into_iter().next().unwrap());
+        assert_eq!(entry.templates, sent);
+        let json = serde_json::to_value(&entry).unwrap();
+        assert_eq!(json["templates"][0]["template_name"], "o2_default_downtime");
     }
 
     fn due(event: NotificationEvent) -> DueEvent {

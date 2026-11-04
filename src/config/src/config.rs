@@ -138,7 +138,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 138: add template to anomaly_detection_config.
 // 139: add template to synthetics.
 // 140: add template to oncall_policies.
-pub const DB_SCHEMA_VERSION: u64 = 140;
+// 141: add templates to downtime_notifications.
+pub const DB_SCHEMA_VERSION: u64 = 141;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

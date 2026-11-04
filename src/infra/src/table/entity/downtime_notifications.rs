@@ -14,6 +14,7 @@ pub struct Model {
     pub sent_at: i64,
     pub destinations: Json,
     pub result: Option<String>,
+    pub templates: Option<Json>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

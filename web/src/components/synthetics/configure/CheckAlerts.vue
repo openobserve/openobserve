@@ -106,6 +106,7 @@ const silenceMinutes = computed({
           <TemplateOverridePicker
             kind="synthetics"
             :model-value="templateOverride"
+            :destinations="localDestinations"
             :server-error="props.validationErrors?.template ?? null"
             @update:model-value="templateOverride = $event"
           />

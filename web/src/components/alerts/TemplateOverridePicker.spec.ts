@@ -26,11 +26,22 @@ vi.mock("vue-router", () => ({
 vi.mock("@/services/alert_templates", () => ({
   default: { list: vi.fn() },
 }));
+vi.mock("@/services/alert_destination", () => ({
+  default: { list: vi.fn() },
+}));
+vi.mock("@/services/settings", () => ({
+  default: { getSetting: vi.fn() },
+}));
 
 import TemplateOverridePicker from "./TemplateOverridePicker.vue";
 import templateService from "@/services/alert_templates";
+import destinationService from "@/services/alert_destination";
+import settingsService from "@/services/settings";
+import { queryClient } from "@/composables/query/queryClient";
 
 const list = vi.mocked(templateService.list);
+const listDestinations = vi.mocked(destinationService.list);
+const getSetting = vi.mocked(settingsService.getSetting);
 
 async function mountPicker(props: Record<string, any> = {}) {
   const wrapper = mount(TemplateOverridePicker, {
@@ -46,6 +57,66 @@ const select = (w: any) => w.findComponent({ name: "OSelect" });
 describe("TemplateOverridePicker", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient.clear();
+    listDestinations.mockResolvedValue({ data: [] } as any);
+    getSetting.mockRejectedValue({ response: { status: 404 } });
+  });
+
+  it("as an org default row, names the built-in message and drops the override help", async () => {
+    list.mockResolvedValue({ data: [{ name: "card", kind: "content" }] } as any);
+    const w = await mountPicker({ context: "orgDefault", kind: "synthetics" });
+
+    expect(String(select(w).props("placeholder"))).toBe("Built-in Synthetics message");
+    expect(String(select(w).props("helpText"))).toBe(
+      "Sent for Synthetics messages when the destination has no template that applies.",
+    );
+    expect(w.find('[data-test="template-override-help-btn"]').exists()).toBe(false);
+    expect(w.find('[data-test="template-override-will-use"]').exists()).toBe(false);
+  });
+
+  it("names the destination template that an empty override leaves in place", async () => {
+    list.mockResolvedValue({
+      data: [{ name: "slack_tpl", kind: "custom", type: "http", applies_to: [] }],
+    } as any);
+    listDestinations.mockResolvedValue({
+      data: [{ name: "slack", type: "http", template: "slack_tpl" }],
+    } as any);
+    const w = await mountPicker({ destinations: ["slack"] });
+
+    expect(w.find('[data-test="template-override-will-use"]').text()).toBe(
+      "Will use: slack_tpl (destination template)",
+    );
+  });
+
+  it("lists one row per destination when they resolve to different templates", async () => {
+    list.mockResolvedValue({
+      data: [
+        { name: "alert_only", kind: "custom", type: "http", applies_to: ["alert"] },
+        { name: "org_card", kind: "content", type: "http", applies_to: [] },
+        { name: "o2_default_email", kind: "custom", type: "email", isPrebuilt: true },
+      ],
+    } as any);
+    listDestinations.mockResolvedValue({
+      data: [
+        { name: "hook", type: "http", template: "alert_only" },
+        { name: "mail", type: "email", template: "o2_default_email" },
+      ],
+    } as any);
+    getSetting.mockResolvedValue({ data: { setting_value: { synthetics: "org_card" } } } as any);
+    const w = await mountPicker({ kind: "synthetics", destinations: ["hook", "mail"] });
+
+    expect(w.findAll('[data-test="template-override-will-use-row"]').map((r) => r.text())).toEqual(
+      [],
+    );
+    expect(w.find('[data-test="template-override-will-use"]').text()).toBe(
+      "Will use: org_card (org default)",
+    );
+
+    await w.setProps({ modelValue: "alert_only" });
+    expect(w.findAll('[data-test="template-override-will-use-row"]').map((r) => r.text())).toEqual([
+      "hook: alert_only (this override)",
+      "mail: org_card (org default)",
+    ]);
   });
 
   it("asks for the kind's templates and lists Content then Custom without prebuilt rows", async () => {

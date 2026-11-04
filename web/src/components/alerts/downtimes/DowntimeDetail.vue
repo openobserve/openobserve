@@ -387,6 +387,7 @@ import { failedRequests, viewDenial } from "@/composables/useAccessStore";
 import OAccessLock from "@/components/access/OAccessLock.vue";
 import { sendDowntimeTestMutation } from "@/services/downtimes.queries";
 import { notifySentence } from "@/utils/downtimes/summary";
+import { templateSourceLabelKey } from "@/utils/alerts/notificationKinds";
 import type { TestDestination } from "@/utils/downtimes/notifyTest";
 import { useToast } from "@/lib/feedback/Toast/useToast";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -655,12 +656,26 @@ const resultText = (entry: DowntimeNotificationLogEntry): I18nText => {
   return entry.result === RESULT_OK ? t("alerts.downtimes.notify.log.ok") : raw(entry.result);
 };
 
+// "slack: card (org default)" per destination that sent; the source alone when nothing rendered.
+const templatesText = (entry: DowntimeNotificationLogEntry): I18nText => {
+  const parts = (entry.templates ?? []).map((tpl) => {
+    const key = templateSourceLabelKey(tpl.template_source);
+    const source = key ? String(t(key as I18nKey)) : tpl.template_source;
+    const template = tpl.template_name
+      ? String(t("alerts.templateOverride.templateWithSource", { name: tpl.template_name, source }))
+      : source;
+    return `${tpl.destination}: ${template}`;
+  });
+  return raw(parts.join(", "));
+};
+
 const notificationRows = computed(() =>
   (downtime.value?.notification_log ?? []).map((entry, index) => ({
     key: `${entry.sent_at}-${entry.event}-${index}`,
     sent_at: entry.sent_at,
     event: EVENT_LABEL_KEYS[entry.event] ? t(EVENT_LABEL_KEYS[entry.event]) : raw(entry.event),
     destinations: raw(entry.destinations.join(", ")),
+    template: templatesText(entry),
     result: resultText(entry),
     failed: !!entry.result && entry.result !== RESULT_OK,
   })),
@@ -681,6 +696,12 @@ const notificationColumns = computed<OTableColumnDef[]>(() => [
     accessorKey: "destinations",
     header: t("alerts.downtimes.notify.log.destinations"),
     size: 240,
+  },
+  {
+    id: "template",
+    accessorKey: "template",
+    header: t("alerts.downtimes.notify.log.template"),
+    size: 280,
   },
   {
     id: "result",
