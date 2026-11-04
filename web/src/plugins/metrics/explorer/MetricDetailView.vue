@@ -251,16 +251,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ODropdownItem
                     v-for="item in drilldownMenu[signal]"
                     :key="item.name"
-                    :disabled="!item.openable"
+                    :disabled="!item.openable || isSignalLocked(signal)"
+                    focusable-unavailable
+                    :icon-left="isSignalLocked(signal) ? 'lock' : undefined"
+                    :description="
+                      isSignalLocked(signal)
+                        ? signalLockedReason(signal)
+                        : item.openable
+                          ? undefined
+                          : t('metrics.explorer.detail.drilldown.noServiceField')
+                    "
                     :data-test="`metrics-detail-drilldown-${signal}-${item.name}`"
                     @select="drilldown.openStream(signal, item)"
                   >
-                    <span class="flex min-w-0 flex-col">
-                      <span class="truncate">{{ raw(item.name) }}</span>
-                      <span v-if="!item.openable" class="text-text-secondary text-xs">{{
-                        t("metrics.explorer.detail.drilldown.noServiceField")
-                      }}</span>
-                    </span>
+                    <span class="truncate">{{ raw(item.name) }}</span>
                   </ODropdownItem>
                   <ODropdownItem v-if="!drilldownMenu[signal].length" disabled>
                     {{
@@ -286,8 +290,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('metrics.explorer.detail.drilldown.button')"
                 data-test="metrics-detail-drilldown"
               >
-                <template v-if="drilldown.availability.value === 'oss'" #icon-left>
-                  <OIcon name="lock" size="sm" data-test="metrics-detail-drilldown-lock" />
+                <template
+                  v-if="
+                    drilldown.availability.value === 'oss' ||
+                    drilldown.availability.value === 'licenseLocked'
+                  "
+                  #icon-left
+                >
+                  <OIcon
+                    name="lock"
+                    class="lock-chip"
+                    size="sm"
+                    data-test="metrics-detail-drilldown-lock"
+                  />
                 </template>
                 <span class="max-md:hidden">{{
                   t("metrics.explorer.detail.drilldown.button")
@@ -631,6 +646,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useMetricDrilldown } from "@/composables/metrics/useMetricDrilldown";
+import { useLicenseLock, useLicenseLocks } from "@/composables/useFeatureLock";
+import { streamTypeFeature } from "@/utils/featureGate";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
@@ -889,6 +906,11 @@ export default defineComponent({
     const overviewState = ref<OverviewState>(IDLE);
 
     const router = useRouter();
+    const correlationLock = useLicenseLock("correlation");
+    const signalLocks = useLicenseLocks();
+    const isSignalLocked = (signal: string) => signalLocks.isLocked(streamTypeFeature(signal));
+    const signalLockedReason = (signal: string) =>
+      signalLocks.lockedReason(streamTypeFeature(signal) ?? signal);
     const drilldown = useMetricDrilldown({
       org: () => store.state.selectedOrganization?.identifier ?? "",
       metric: () => (props.card ? { name: props.card.name, labels: props.card.labels } : null),
@@ -898,6 +920,7 @@ export default defineComponent({
       inapplicableFilters: () => props.inapplicableFilters,
       timeRange: () => props.timeRange,
       serviceStreamsEnabled: () => !!store.state.zoConfig?.service_streams_enabled,
+      licenseLocked: () => correlationLock.locked.value,
       router,
       store,
       onDropped: (labels) =>
@@ -912,6 +935,7 @@ export default defineComponent({
     const drilldownBlockedReason = computed(() => {
       const state = drilldown.availability.value;
       if (state === "oss") return t("metrics.explorer.detail.drilldown.enterprise");
+      if (state === "licenseLocked") return correlationLock.lockedReason.value;
       if (state === "discoveryOff") return t("metrics.explorer.detail.drilldown.discoveryOff");
       if (state === "pending") return t("metrics.explorer.detail.drilldown.checking");
       return t("metrics.explorer.detail.drilldown.forbidden");
@@ -1215,6 +1239,8 @@ export default defineComponent({
       drilldown,
       drilldownMenu,
       drilldownBlockedReason,
+      isSignalLocked,
+      signalLockedReason,
       onDrilldownOpen,
       onDrilldownPick,
       onDrilldownRetry,

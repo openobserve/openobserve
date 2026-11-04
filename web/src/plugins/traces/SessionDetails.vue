@@ -54,8 +54,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #actions>
         <template v-if="canAnnotateContext">
+          <OTooltip v-if="aiObsLock.locked.value" :content="aiObsLock.lockedReason.value">
+            <span class="inline-flex">
+              <OButton
+                variant="outline"
+                size="sm"
+                disabled
+                icon-left="lock"
+                data-test="session-detail-annotate-btn"
+              >
+                {{ t("aiObservability.traceActions.annotate.button") }}
+              </OButton>
+            </span>
+          </OTooltip>
           <TraceAnnotateMenu
-            v-if="queuesAccess.allowed"
+            v-else-if="queuesAccess.allowed"
             ref-type="session"
             :ref-id="sessionId"
             :ref-trace-start-time="sessionEvaluationRange.startTime"
@@ -74,13 +87,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openUpgradeDialog"
           >
             {{ t("aiObservability.traceActions.annotate.button") }}
-            <template #icon-right
-              ><OIcon name="lock" size="sm" class="text-warning-600"
-            /></template>
+            <template #icon-right><OIcon name="lock" size="sm" class="lock-chip" /></template>
           </OButton>
         </template>
+        <OTooltip
+          v-if="aiObsLock.locked.value && evaluateContextReady"
+          :content="aiObsLock.lockedReason.value"
+        >
+          <span class="inline-flex">
+            <OButton
+              variant="outline"
+              size="sm"
+              disabled
+              icon-left="lock"
+              data-test="session-detail-evaluate-btn"
+            >
+              {{ t("onlineEvals.manualEvaluation.titles.session") }}
+            </OButton>
+          </span>
+        </OTooltip>
         <OButton
-          v-if="canManualEvaluate"
+          v-else-if="canManualEvaluate"
           variant="outline"
           size="sm"
           data-test="session-detail-evaluate-btn"
@@ -978,6 +1005,7 @@ import ThreadToolCalls from "./ThreadToolCalls.vue";
 import config from "@/aws-exports";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 import LLMCostCell from "./LLMCostCell.vue";
@@ -1042,12 +1070,10 @@ const sessionEvaluationRange = computed(() => {
 // The session detail endpoint is keyed by gen_ai_conversation_id, so a
 // populated response is authoritative evidence that this is an LLM session.
 const hasLlmSessionData = computed(() => detail.value !== null && traces.value.length > 0);
-const canManualEvaluate = computed(() => {
+const evaluateContextReady = computed(() => {
   const range = sessionEvaluationRange.value;
   return (
     hasLlmSessionData.value &&
-    (config.isEnterprise === "true" || config.isCloud === "true") &&
-    Boolean(store.state.zoConfig?.online_evals_enabled) &&
     Boolean(orgIdentifier.value) &&
     Boolean(streamName.value) &&
     Boolean(sessionId.value) &&
@@ -1056,6 +1082,12 @@ const canManualEvaluate = computed(() => {
     range.endTime > range.startTime
   );
 });
+const canManualEvaluate = computed(
+  () =>
+    evaluateContextReady.value &&
+    (config.isEnterprise === "true" || config.isCloud === "true") &&
+    Boolean(store.state.zoConfig?.online_evals_enabled),
+);
 const manualEvaluationOpen = ref(false);
 
 // Same non-edition conditions as manual evaluation minus the online-eval
@@ -1076,6 +1108,7 @@ const canAnnotateContext = computed(() => {
 // Annotating a session is the same capability as queuing it into AI
 // Observability's review Queues, so it shares that gate.
 const queuesAccess = useLockedAffordance("queues");
+const aiObsLock = useLicenseLock("ai_observability");
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 // Per-turn rollups used by the KPI sub-lines. All values are measured from the

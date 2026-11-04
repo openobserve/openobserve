@@ -43,7 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :workflow-options="workflowOptions"
         :workflows-enabled="workflowsEnabled"
         :workflows-locked="workflowsLocked"
-        :workflows-lock-message="workflowsAccess.message"
+        :workflows-license-locked="workflowsLicenseLocked"
+        :workflows-lock-message="
+          workflowsLicenseLocked ? workflowsLicenseReason : workflowsAccess.message
+        "
         :placeholder="placeholder"
         :error="!!error"
         @update:destinations="emit('update:destinations', $event)"
@@ -90,6 +93,7 @@ import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
 import { workflowsQuery } from "@/services/workflows.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 type RawOption = string | { label: I18nText; value: string };
 
@@ -143,13 +147,24 @@ const tooltipText = computed<I18nText>(() =>
 // it); a deployment that simply hasn't turned the runtime flag on stays
 // HIDDEN (upgrading wouldn't change that).
 const workflowsAccess = useLockedAffordance("workflows");
+const { locked: workflowsLicenseDenied, lockedReason: workflowsLicenseReason } =
+  useLicenseLock("workflows");
 const workflowsRuntimeEnabled = computed(() => store.state.zoConfig?.workflows_enabled === true);
 const workflowsEnabled = computed(
-  () => props.supportsWorkflows && workflowsAccess.value.allowed && workflowsRuntimeEnabled.value,
+  () =>
+    props.supportsWorkflows &&
+    workflowsAccess.value.allowed &&
+    !workflowsLicenseDenied.value &&
+    workflowsRuntimeEnabled.value,
 );
 // Shown (disabled) instead of hidden outright when the family supports
 // workflows but this edition doesn't unlock them.
-const workflowsLocked = computed(() => props.supportsWorkflows && !workflowsAccess.value.allowed);
+const workflowsLicenseLocked = computed(
+  () => props.supportsWorkflows && workflowsLicenseDenied.value,
+);
+const workflowsLocked = computed(
+  () => props.supportsWorkflows && (!workflowsAccess.value.allowed || workflowsLicenseDenied.value),
+);
 
 const workflowOptions = ref<{ label: I18nText; value: string }[]>([]);
 const fetchWorkflows = async (force = false) => {

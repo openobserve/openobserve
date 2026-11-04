@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default shrink-0 border-b"
       />
       <ConstrainedPage
-        :size="activeSection === 'password_policy' ? 'full' : 'lg'"
+        :size="['password_policy', 'license'].includes(activeSection) ? 'full' : 'lg'"
         align="left"
         :padded="false"
         class="min-h-0 flex-1 px-4 py-3"
@@ -72,6 +72,7 @@ import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
+import { featureState, menuState } from "@/utils/featureGate";
 import { isSlackSettingsVisible, readSlackOrgConfig } from "@/utils/slackSettings";
 import { useOnlineEvalsRouteOff } from "@/composables/shared/useOnlineEvalsGate";
 import OnlineEvalsDisabled from "@/components/OnlineEvalsDisabled.vue";
@@ -182,7 +183,11 @@ export default defineComponent({
       // the same backend flag the rest of synthetics does.
       const syntheticsBlocked =
         (store.state.zoConfig.meta_org && !isMetaOrg.value) ||
-        store.state.zoConfig?.synthetics_enabled === false;
+        menuState(
+          store.state.zoConfig?.features,
+          "synthetics",
+          store.state.zoConfig?.synthetics_enabled !== false,
+        ) === "hidden";
       if (name === "syntheticsLocations" && syntheticsBlocked) {
         toGeneral();
         return;
@@ -252,6 +257,22 @@ export default defineComponent({
       const queryManagementAccess = checkFeatureAccess("queryManagement", featureGateCtx);
       const nodesAccess = checkFeatureAccess("nodes", featureGateCtx);
       const licenseAccess = checkFeatureAccess("license", featureGateCtx);
+      // A locked license keeps the entry even where its runtime flag is off, so the lock stays discoverable.
+      const syntheticsLicense = menuState(
+        z?.features,
+        "synthetics",
+        z?.synthetics_enabled !== false,
+      );
+      const correlationLicense = menuState(
+        z?.features,
+        "correlation",
+        z?.service_streams_enabled !== false,
+      );
+      const queryManagementLicense = featureState(z?.features, "query_management");
+      const byobLicense = featureState(z?.features, "byob");
+      const oncallLicense = menuState(z?.features, "oncall", z?.oncall_enabled !== false);
+      const aiObsLicense = menuState(z?.features, "ai_observability", !!z?.online_evals_enabled);
+      const alertsLocked = featureState(z?.features, "alerts") === "locked";
 
       const items: (SectionHubItem & { group: string })[] = [
         {
@@ -365,9 +386,10 @@ export default defineComponent({
           icon: "call",
           to: { name: "telephonySettings", query: { org_identifier: org } },
           // The route guard's rule: only an explicit `oncall_enabled: false` closes it.
-          visible: z.oncall_enabled !== false && oncallAccess.visible,
+          visible: oncallLicense !== "hidden" && oncallAccess.visible,
           locked: !oncallAccess.allowed,
           lockedMessage: oncallAccess.message,
+          licenseLocked: oncallLicense === "locked",
           dataTest: "telephony-settings-tab",
           group: "Destinations",
         },
@@ -392,10 +414,12 @@ export default defineComponent({
           // this on a pure-Cloud build) for the enterprise+Cloud hybrid case.
           visible:
             storageSettingsAccess.visible &&
+            byobLicense !== "hidden" &&
             (!isCloud ||
               store.state.organizationData.organizationSettings.org_storage_enabled === true),
           locked: !storageSettingsAccess.allowed,
           lockedMessage: storageSettingsAccess.message,
+          licenseLocked: byobLicense === "locked",
           dataTest: "storage-settings-tab",
           group: "Data & AI",
         },
@@ -408,6 +432,7 @@ export default defineComponent({
           visible: !!z.model_pricing_enabled && modelPricingAccess.visible,
           locked: !modelPricingAccess.allowed,
           lockedMessage: modelPricingAccess.message,
+          licenseLocked: featureState(z?.features, "ai_observability") === "locked",
           dataTest: "model-pricing-tab",
           group: "Data & AI",
         },
@@ -417,9 +442,10 @@ export default defineComponent({
           description: t("settings.correlationSettingsDesc"),
           icon: "group-work",
           to: { name: "correlationSettings", query: { org_identifier: org } },
-          visible: z.service_streams_enabled !== false && correlationSettingsAccess.visible,
+          visible: correlationLicense !== "hidden" && correlationSettingsAccess.visible,
           locked: !correlationSettingsAccess.allowed,
           lockedMessage: correlationSettingsAccess.message,
+          licenseLocked: correlationLicense === "locked" && alertsLocked,
           dataTest: "correlation-settings-tab",
           group: "Data & AI",
         },
@@ -429,9 +455,10 @@ export default defineComponent({
           description: t("settings.llmProvidersDesc"),
           icon: "smart-toy",
           to: { name: "llmProviders", query: { org_identifier: org } },
-          visible: !!z.online_evals_enabled && llmProvidersAccess.visible,
+          visible: aiObsLicense !== "hidden" && llmProvidersAccess.visible,
           locked: !llmProvidersAccess.allowed,
           lockedMessage: llmProvidersAccess.message,
+          licenseLocked: aiObsLicense === "locked",
           dataTest: "llm-providers-tab",
           group: "Data & AI",
         },
@@ -441,9 +468,10 @@ export default defineComponent({
           description: t("settings.index.genAiAgentMappingDesc"),
           icon: "smart-toy",
           to: { name: "genAiAgentMapping", query: { org_identifier: org } },
-          visible: !!z.online_evals_enabled && genAiAgentMappingAccess.visible,
+          visible: aiObsLicense !== "hidden" && genAiAgentMappingAccess.visible,
           locked: !genAiAgentMappingAccess.allowed,
           lockedMessage: genAiAgentMappingAccess.message,
+          licenseLocked: aiObsLicense === "locked",
           dataTest: "gen-ai-agent-mapping-tab",
           group: "Data & AI",
         },
@@ -453,9 +481,10 @@ export default defineComponent({
           description: t("settings.queryManagementDesc"),
           icon: "query-stats",
           to: `/settings/query_management?org_identifier=${org}`,
-          visible: meta && queryManagementAccess.visible,
+          visible: meta && queryManagementAccess.visible && queryManagementLicense !== "hidden",
           locked: !queryManagementAccess.allowed,
           lockedMessage: queryManagementAccess.message,
+          licenseLocked: queryManagementLicense === "locked",
           dataTest: "query-management-tab",
           group: "Operations",
         },
@@ -479,7 +508,8 @@ export default defineComponent({
           to: { name: "syntheticsLocations", query: { org_identifier: org } },
           // Not `isEnt`: synthetics ships in OSS. Meta-org only (public rows are
           // cluster-wide) and driven by the same `/config` flag as the feature.
-          visible: meta && z?.synthetics_enabled !== false,
+          visible: meta && syntheticsLicense !== "hidden",
+          licenseLocked: syntheticsLicense === "locked",
           dataTest: "synthetics-locations-tab",
           group: "Synthetics",
         },
