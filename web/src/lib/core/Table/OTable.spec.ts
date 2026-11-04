@@ -2352,6 +2352,23 @@ describe("OTable", () => {
       });
       expect(wrapper.find('[data-test="o2-table-root"]').exists()).toBe(true);
     });
+
+    it("switches a pinned cell's hover background instantly, in step with its row", () => {
+      const cols: OTableColumnDef<TestRow>[] = [
+        { id: "id", header: "ID", accessorKey: "id" },
+        { id: "actions", header: "", isAction: true },
+      ];
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: cols },
+      });
+      const pinned = wrapper.find(
+        '[data-test="o2-table-row-0"] [data-test="o2-table-cell-actions"]',
+      );
+      expect(pinned.classes()).toContain("group-hover/row:bg-table-row-hover-bg");
+      expect(
+        pinned.classes().some((c) => c.startsWith("transition") || c.includes("duration")),
+      ).toBe(false);
+    });
   });
 
   // ── Highlighting ────────────────────────────────────────────

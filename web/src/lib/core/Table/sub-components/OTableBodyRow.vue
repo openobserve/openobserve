@@ -231,7 +231,6 @@ function onRowMouseleave() {
     :tabindex="clickable ? 0 : undefined"
     :class="[
       'group/row',
-      'transition-[background-color] duration-(--duration-hover-out) hover:duration-(--duration-hover-in)',
       clickable ? 'cursor-pointer' : '',
       isRowSelected || isActive
         ? 'bg-table-row-selected-bg [--color-text-secondary:var(--color-table-row-text-secondary-tinted)]'

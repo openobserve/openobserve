@@ -460,8 +460,8 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
       isAction ? 'w-0 whitespace-nowrap' : '',
       isPinned
         ? rowSelected
-          ? 'bg-table-row-selected-bg transition-colors duration-(--duration-hover-out)'
-          : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-(--duration-hover-out) group-hover/row:duration-(--duration-hover-in)'
+          ? 'bg-table-row-selected-bg'
+          : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg'
         : '',
       wrap
         ? 'wrap-anywhere whitespace-normal'
