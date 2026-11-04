@@ -43,6 +43,10 @@ export const oncallKeys = {
   members: (org: string, teamId: string) => orgKey(org, "oncall", "teams", teamId, "members"),
   schedule: (org: string, teamId: string) => orgKey(org, "oncall", "teams", teamId, "schedule"),
   policy: (org: string, teamId: string) => orgKey(org, "oncall", "teams", teamId, "policy"),
+  /** Many teams in one entry, outside every per-team prefix, so each team write names this scope too. */
+  teamContextAll: (org: string) => orgKey(org, "oncall", "teams", "context"),
+  teamContext: (org: string, teamIds: string[], includeMine: boolean) =>
+    orgKey(org, "oncall", "teams", "context", [...teamIds].sort().join(","), includeMine),
   /**
    * `at` omitted asks for "now", which every caller derives from the clock, so
    * it buckets to the minute; a pinned instant (a closed record's `closed_at`)
@@ -108,6 +112,9 @@ export const oncallKeys = {
   response: (org: string, responseId: string) => orgKey(org, "oncall", "responses", responseId),
   responseProgress: (org: string, responseId: string) =>
     orgKey(org, "oncall", "responses", responseId, "progress"),
+  /** Under `responsesAll`, so a response write drops it like the per-record entry. */
+  responsesProgress: (org: string, responseIds: string[]) =>
+    orgKey(org, "oncall", "responses", "escalation", [...responseIds].sort().join(",")),
   responsePriorCauses: (org: string, responseId: string) =>
     orgKey(org, "oncall", "responses", responseId, "priorCauses"),
   responseReport: (org: string, responseId: string) =>

@@ -479,7 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop
         >
           <OTruncatedText class="block">{{
-            raw(incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id)
+            raw(row.latest.incident_title ?? row.latest.incident_id)
           }}</OTruncatedText>
         </router-link>
       </template>
@@ -981,12 +981,11 @@ import {
   ownershipRulesQuery,
   pagedResponsesQuery,
   resolveResponseMutation,
-  responseProgressQuery,
   responseQuery,
+  responsesProgressQuery,
   snoozeResponseMutation,
   unsnoozeResponseMutation,
-  teamPolicyQuery,
-  teamScheduleQuery,
+  teamContextQuery,
   whoIsOnCallQuery,
 } from "@/services/oncall.queries";
 
@@ -999,12 +998,11 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { destinationsQuery } from "@/services/alert_destination.queries";
-import type { IncidentWithAlerts } from "@/services/incidents";
-import { incidentQuery } from "@/services/incidents.queries";
 import type {
   Channel,
   CoverageGaps,
   EscalationProgress,
+  EscalationProgressEntry,
   OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
@@ -1012,6 +1010,7 @@ import type {
   OnCallSchedule,
   OnCallPosition,
   OnCallTeam,
+  OnCallTeamContext,
   OwnershipRule,
   ResolutionCause,
 } from "@/ts/interfaces/oncall";
@@ -1045,16 +1044,8 @@ const { canConfigure } = useOnCallPermissions();
 /// columns and the actions never have to branch on the mode.
 type PageRow = OnCallResponseGroup & { rowKey: string };
 
-/**
- * How many open pages get their escalation ladder loaded.
- *
- * There is no bulk escalation endpoint, so this costs one request per page, on
- * every poll. Twenty-five covers the top of a triage list without turning a
- * 200-row incident into 200 requests every twenty seconds; the rows past it
- * still show their state, and the list says so rather than leaving a blank cell
- * that would read as "nothing has fired".
- */
-const ESCALATION_DETAIL_LIMIT = 25;
+/** The batch routes' cap on ids per request; rows past it on the ladder read are flagged, not left blank. */
+const ESCALATION_DETAIL_LIMIT = 200;
 
 /**
  * The states a reader triages by, in the order they matter.
@@ -1188,12 +1179,6 @@ const teamNameById = computed<Record<string, string>>(() =>
 const teamIsDeleted = (teamId: string | null) =>
   isDeletedTeam(teamId, teamsLoaded.value ? teams.value.map((team) => team.id) : null);
 
-// A ksuid asks the reader to look it up somewhere else, same as team_id
-// (`fetchTeamContext` below). There is no bulk "get these incidents" endpoint,
-// so this fills in one id at a time and the chip falls back to the raw id
-// until its title lands.
-const incidentTitleById = ref<Record<string, string>>({});
-
 const teamOptions = computed(() => [
   { label: t("oncall.allTeams"), value: "all" },
   ...teams.value.map((team) => ({ label: raw(team.name), value: team.id })),
@@ -1305,9 +1290,7 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     header: t("oncall.incident"),
     size: 160,
     accessorFn: (row: PageRow) =>
-      row.latest.incident_id
-        ? (incidentTitleById.value[row.latest.incident_id] ?? row.latest.incident_id)
-        : "",
+      row.latest.incident_id ? (row.latest.incident_title ?? row.latest.incident_id) : "",
     sortable: true,
     hideable: true,
   },
@@ -1955,9 +1938,8 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
     // error render the first-run checklist, telling a configured org that
     // nothing is set up.
     loaded.value = true;
-    // Fire-and-forget: the list is already usable with ids as the fallback,
-    // so titles fill in behind it rather than holding up the table.
-    void fetchIncidentTitles(!!opts.force);
+    // Fire-and-forget: the rows are already usable while their teams and ladders fill in.
+    void fetchRowContext(!!opts.force);
   } catch (err) {
     if (readId !== latestResponsesRead) return;
     // §G.8.1: the probe said "not here". Leaving `loaded` false keeps the
@@ -1971,32 +1953,6 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
   } finally {
     if (readId === latestResponsesRead) busy.value = false;
   }
-}
-
-/// One request per incident id — there is no bulk "get these incidents"
-/// endpoint (see `fetchTeamContext` for the same constraint on team data).
-/// Already-resolved ids are skipped so a background fetch doesn't re-read
-/// titles the list already has; only the reader's Refresh re-reads them all.
-async function fetchIncidentTitles(force = false) {
-  const ids = [
-    ...new Set(
-      responses.value
-        .map((response) => response.incident_id)
-        .filter((id): id is string => !!id && (force || !(id in incidentTitleById.value))),
-    ),
-  ];
-  if (!ids.length) return;
-  const results = await Promise.allSettled(
-    ids.map((id) => read<IncidentWithAlerts>(incidentQuery(orgId.value, id), force)),
-  );
-  const next = { ...incidentTitleById.value };
-  ids.forEach((id, index) => {
-    const result = results[index];
-    if (result.status === "fulfilled" && result.value?.title) {
-      next[id] = result.value.title;
-    }
-  });
-  incidentTitleById.value = next;
 }
 
 /// Teams, coverage and ownership answer the checklist, not the list. A failure
@@ -2048,73 +2004,63 @@ async function someTeamWouldPage(
   return slots.some((s) => s.status === "fulfilled" && s.value.length > 0);
 }
 
-/// Policy and rotation per team. Both are one request per team — there is no
-/// bulk endpoint for either — but team counts are small and the answers change
-/// far more slowly than the pages do.
-async function fetchTeamContext(force = false) {
-  const ids = teams.value.map((team) => team.id);
-  const [policies, slots, schedules] = await Promise.all([
-    Promise.allSettled(
-      ids.map((id) => read<OnCallPolicy | null>(teamPolicyQuery(orgId.value, id), force)),
-    ),
-    Promise.allSettled(
-      ids.map((id) => read<OnCallPosition[]>(whoIsOnCallQuery(orgId.value, id), force)),
-    ),
-    Promise.allSettled(
-      ids.map((id) => read<OnCallSchedule | null>(teamScheduleQuery(orgId.value, id), force)),
-    ),
-  ]);
+// The newest row-context read: one started for rows a filter has since replaced must not overwrite the maps.
+let latestRowContextRead = 0;
 
-  const nextPolicies: Record<string, OnCallPolicy> = {};
-  const nextSlots: Record<string, OnCallPosition[]> = {};
-  const nextSchedules: Record<string, OnCallSchedule> = {};
-  ids.forEach((id, index) => {
-    const policy = policies[index];
-    if (policy.status === "fulfilled" && policy.value) nextPolicies[id] = policy.value;
-    const slot = slots[index];
-    // A team whose rotation could not be read is left OUT rather than recorded
-    // as empty: an unreadable schedule is not the same fact as a coverage gap,
-    // and the card would otherwise accuse a staffed team of having none.
-    if (slot.status === "fulfilled") nextSlots[id] = slot.value;
-    const schedule = schedules[index];
-    if (schedule.status === "fulfilled" && schedule.value) {
-      nextSchedules[id] = schedule.value;
-    }
-  });
-  policyByTeam.value = nextPolicies;
-  positionsByTeam.value = nextSlots;
-  scheduleByTeam.value = nextSchedules;
-}
-
-/// Ladder position for the oldest open pages. Bounded by
-/// ESCALATION_DETAIL_LIMIT because each one is its own request.
-async function fetchEscalationProgress(force = false) {
+/// Team context for the row teams and the viewer's, and the ladder of the oldest open pages: one request each, sent together.
+async function fetchRowContext(force = false) {
+  const readId = ++latestRowContextRead;
+  const teamIds = [
+    ...new Set(responses.value.map((r) => r.team_id).filter((id): id is string => !!id)),
+  ];
   const open = responses.value
     .filter((r) => isEscalating(r.state))
     .sort((a, b) => a.opened_at - b.opened_at);
-
+  const wanted = open.slice(0, ESCALATION_DETAIL_LIMIT).map((r) => r.id);
+  const teamChunks: string[][] = [];
+  for (let i = 0; i < teamIds.length; i += ESCALATION_DETAIL_LIMIT) {
+    teamChunks.push(teamIds.slice(i, i + ESCALATION_DETAIL_LIMIT));
+  }
+  if (!teamChunks.length) teamChunks.push([]);
+  const [context, progress] = await Promise.allSettled([
+    Promise.allSettled(
+      teamChunks.map((ids, i) =>
+        read<OnCallTeamContext[]>(teamContextQuery(orgId.value, ids, i === 0), force),
+      ),
+    ).then((reads) => reads.flatMap((r) => (r.status === "fulfilled" ? r.value : []))),
+    wanted.length
+      ? read<EscalationProgressEntry[]>(responsesProgressQuery(orgId.value, wanted), force)
+      : Promise.resolve([]),
+  ]);
+  if (readId !== latestRowContextRead) return;
+  applyTeamContext(context.status === "fulfilled" ? context.value : []);
   escalationCapped.value = open.length > ESCALATION_DETAIL_LIMIT;
-  const wanted = open.slice(0, ESCALATION_DETAIL_LIMIT);
+  applyProgress(progress.status === "fulfilled" ? progress.value : []);
+}
 
-  const results = await Promise.allSettled(
-    wanted.map((r) =>
-      read<EscalationProgress | null>(responseProgressQuery(orgId.value, r.id), force),
-    ),
-  );
+/// Replaced wholesale, so a team no longer on screen drops out of the maps.
+function applyTeamContext(context: OnCallTeamContext[]) {
+  const policies: Record<string, OnCallPolicy> = {};
+  const slots: Record<string, OnCallPosition[]> = {};
+  const schedules: Record<string, OnCallSchedule> = {};
+  for (const team of context) {
+    if (team.policy) policies[team.team_id] = team.policy;
+    // An unreadable rotation is left OUT, not empty: it is not the same fact as a coverage gap.
+    if (team.on_call) slots[team.team_id] = team.on_call;
+    if (team.schedule) schedules[team.team_id] = team.schedule;
+  }
+  policyByTeam.value = policies;
+  positionsByTeam.value = slots;
+  scheduleByTeam.value = schedules;
+}
 
+/// Replaced wholesale, so a record that resolved since the last read drops a countdown that will never fire.
+function applyProgress(entries: EscalationProgressEntry[]) {
   const next: Record<string, EscalationProgress> = {};
-  const answered = new Set<string>();
-  wanted.forEach((record, index) => {
-    const result = results[index];
-    // An empty body is no answer, so the row stays unknown rather than reading "Not paged yet".
-    if (result.status !== "fulfilled" || !result.value) return;
-    answered.add(record.id);
-    next[record.id] = result.value;
-  });
-  // Replaced wholesale so a record that resolved since the last poll drops its
-  // stale ladder instead of keeping a countdown that will never fire.
+  for (const { response_id, ...progress } of entries) next[response_id] = progress;
   progressById.value = next;
-  progressAnswered.value = answered;
+  // Only the ids the server answered, so an unread row never reads "Not paged yet".
+  progressAnswered.value = new Set(Object.keys(next));
 }
 
 /// The expanded row's timeline.
@@ -2160,9 +2106,8 @@ async function loadAll(force = false) {
   // The probe answered "not here" — every further call would 404/403 the
   // same way, so stop asking.
   if (unavailable.value) return;
+  // Team and ladder reads were started by fetchResponses.
   await fetchContext(force);
-  await fetchTeamContext(force);
-  await fetchEscalationProgress(force);
   // The open timeline is part of what the reader sees, so a refresh reaches it too.
   const open = expandedResponseId();
   if (open) await fetchExpandedEvents(open, force);
