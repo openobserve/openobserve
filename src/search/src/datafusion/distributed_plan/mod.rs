@@ -39,6 +39,7 @@ pub mod enrichment_exec;
 pub mod metadata_count_exec;
 pub mod node;
 mod once_async;
+pub mod profile;
 pub mod remote_scan_exec;
 pub mod rewrite;
 pub mod streaming_aggs_exec;

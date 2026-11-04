@@ -87,17 +87,17 @@ impl ExecutionPlanVisitor for ScanStatsVisitor {
         let mayby_remote_scan_exec = plan.downcast_ref::<RemoteScanExec>();
         if let Some(remote_scan_exec) = mayby_remote_scan_exec {
             {
-                let guard = remote_scan_exec.scan_stats.lock();
+                let guard = remote_scan_exec.state.scan_stats.lock();
                 let stats = *guard;
                 self.scan_stats.add(&stats);
             }
             {
-                let guard = remote_scan_exec.partial_err.lock();
+                let guard = remote_scan_exec.state.partial_err.lock();
                 let err = (*guard).clone();
                 self.partial_err.push_str(&err);
             }
             {
-                let peak_memory = remote_scan_exec.peak_memory().load(Ordering::Relaxed);
+                let peak_memory = remote_scan_exec.state.peak_memory.load(Ordering::Relaxed);
                 self.peak_memory = peak_memory.max(self.peak_memory);
             }
         }

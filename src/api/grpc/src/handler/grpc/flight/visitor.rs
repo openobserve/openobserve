@@ -13,163 +13,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, atomic::AtomicUsize};
+use std::sync::Arc;
 
-use config::meta::search::ScanStats;
 use datafusion::{
-    common::{
-        Result,
-        tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
-    },
+    common::tree_node::{TreeNode, TreeNodeRecursion},
     physical_plan::ExecutionPlan,
 };
-use parking_lot::Mutex;
+use flight::common::NodeRole;
 use search::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
-pub use search::datafusion::plan_metrics::{get_cluster_metrics, get_peak_memory_from_ctx};
+pub use search::datafusion::plan_metrics::get_peak_memory_from_ctx;
 
-pub fn get_scan_stats(plan: &Arc<dyn ExecutionPlan>) -> Option<Arc<Mutex<ScanStats>>> {
-    let mut visitor = RemoteScanVisitor::new();
-    let _ = plan.visit(&mut visitor);
-    visitor.scan_stats
-}
-
-struct RemoteScanVisitor {
-    scan_stats: Option<Arc<Mutex<ScanStats>>>,
-}
-
-impl RemoteScanVisitor {
-    pub fn new() -> Self {
-        Self { scan_stats: None }
-    }
-}
-
-impl<'n> TreeNodeVisitor<'n> for RemoteScanVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        let name = node.name();
-        if name == "RemoteScanExec" {
-            let remote_scan_exec = node.downcast_ref::<RemoteScanExec>().unwrap();
-            self.scan_stats = Some(remote_scan_exec.scan_stats());
-            Ok(TreeNodeRecursion::Stop)
-        } else {
-            Ok(TreeNodeRecursion::Continue)
-        }
-    }
-}
-
-pub fn get_partial_err(plan: &Arc<dyn ExecutionPlan>) -> Option<Arc<Mutex<String>>> {
-    let mut visitor = PartialErrVisitor::new();
-    let _ = plan.visit(&mut visitor);
-    visitor.partial_err
-}
-
-struct PartialErrVisitor {
-    partial_err: Option<Arc<Mutex<String>>>,
-}
-
-impl PartialErrVisitor {
-    pub fn new() -> Self {
-        Self { partial_err: None }
-    }
-}
-
-impl<'n> TreeNodeVisitor<'n> for PartialErrVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if node.name() == "RemoteScanExec" {
-            let remote_scan_exec = node.downcast_ref::<RemoteScanExec>().unwrap();
-            self.partial_err = Some(remote_scan_exec.partial_err());
-            Ok(TreeNodeRecursion::Stop)
-        } else {
-            Ok(TreeNodeRecursion::Continue)
-        }
-    }
-}
-
-pub fn get_peak_memory(plan: &Arc<dyn ExecutionPlan>) -> Option<Arc<AtomicUsize>> {
-    let mut visitor = PeakMemoryVisitor::new();
-    let _ = plan.visit(&mut visitor);
-    visitor.peak_memory
-}
-
-struct PeakMemoryVisitor {
-    peak_memory: Option<Arc<AtomicUsize>>,
-}
-
-impl PeakMemoryVisitor {
-    pub fn new() -> Self {
-        Self { peak_memory: None }
-    }
-}
-
-impl<'n> TreeNodeVisitor<'n> for PeakMemoryVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        let name = node.name();
-        if name == "RemoteScanExec" {
-            let remote_scan_exec = node.downcast_ref::<RemoteScanExec>().unwrap();
-            self.peak_memory = Some(remote_scan_exec.peak_memory());
-        }
-        Ok(TreeNodeRecursion::Continue)
-    }
+/// Only a super cluster's cluster leader runs a plan with a remote scan in it.
+pub fn node_role(plan: &Arc<dyn ExecutionPlan>) -> NodeRole {
+    let mut role = NodeRole::Follower;
+    let _ = plan.apply(|node| {
+        let Some(remote_scan) = node.downcast_ref::<RemoteScanExec>() else {
+            return Ok(TreeNodeRecursion::Continue);
+        };
+        role = NodeRole::ClusterLeader(remote_scan.state.clone());
+        Ok(TreeNodeRecursion::Stop)
+    });
+    role
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::physical_plan::empty::EmptyExec;
 
     use super::*;
 
-    fn empty_plan() -> Arc<dyn datafusion::physical_plan::ExecutionPlan> {
+    #[test]
+    fn test_plan_without_remote_scan_is_follower() {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
-        Arc::new(EmptyExec::new(schema))
-    }
-
-    #[test]
-    fn test_remote_scan_visitor_new_has_no_stats() {
-        let v = RemoteScanVisitor::new();
-        assert!(v.scan_stats.is_none());
-    }
-
-    #[test]
-    fn test_partial_err_visitor_new_has_no_err() {
-        let v = PartialErrVisitor::new();
-        assert!(v.partial_err.is_none());
-    }
-
-    #[test]
-    fn test_peak_memory_visitor_new_has_none() {
-        let v = PeakMemoryVisitor::new();
-        assert!(v.peak_memory.is_none());
-    }
-
-    #[test]
-    fn test_get_scan_stats_no_remote_exec_returns_none() {
-        let plan = empty_plan();
-        assert!(get_scan_stats(&plan).is_none());
-    }
-
-    #[test]
-    fn test_get_cluster_metrics_no_remote_exec_returns_empty() {
-        let plan = empty_plan();
-        assert!(get_cluster_metrics(&plan).is_empty());
-    }
-
-    #[test]
-    fn test_get_partial_err_no_remote_exec_returns_none() {
-        let plan = empty_plan();
-        assert!(get_partial_err(&plan).is_none());
-    }
-
-    #[test]
-    fn test_get_peak_memory_no_remote_exec_returns_none() {
-        let plan = empty_plan();
-        assert!(get_peak_memory(&plan).is_none());
+        let plan: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
+        assert!(matches!(node_role(&plan), NodeRole::Follower));
     }
 }
