@@ -79,25 +79,26 @@ describe("SampleDataTour", () => {
     expect(router.currentRoute.value.params.id).toBe(SAMPLE_TOUR_STEPS[0].id);
   });
 
-  it("only the latest step request navigates when resolutions finish out of order", async () => {
-    session.startTour(ORG, 0);
+  it("a double click on Next opens only the next step", async () => {
+    session.startTour(ORG, 1);
     const { wrapper, router } = await mountTour();
-    const releases: Record<string, () => void> = {};
+    let release = () => {};
     resolveMock.mockImplementation(
       (_org: string, id: string) =>
         new Promise((resolve) => {
-          releases[id] = () => resolve({ name: "page", params: { id } });
+          release = () => resolve({ name: "page", params: { id } });
         }),
     );
     const next = wrapper.get('[data-test="sample-tour-next"]');
     await next.trigger("click");
+    expect(next.attributes("disabled")).toBeDefined();
+    expect(wrapper.get('[data-test="sample-tour-back"]').attributes("disabled")).toBeDefined();
     await next.trigger("click");
-    releases[SAMPLE_TOUR_STEPS[2].id]();
-    await flushPromises();
-    releases[SAMPLE_TOUR_STEPS[1].id]();
-    await flushPromises();
     expect(session.tour.value?.index).toBe(2);
+    release();
+    await flushPromises();
     expect(router.currentRoute.value.params.id).toBe(SAMPLE_TOUR_STEPS[2].id);
+    expect(next.attributes("disabled")).toBeUndefined();
   });
 
   it("a tour restarted while active stays visible in an org with real data", async () => {
@@ -110,24 +111,6 @@ describe("SampleDataTour", () => {
     await flushPromises();
     expect(session.tour.value?.ownData).toBe(true);
     expect(wrapper.find('[data-test="sample-tour-next"]').exists()).toBe(true);
-  });
-
-  it("reaching the finale while the last step resolves does not navigate afterwards", async () => {
-    session.startTour(ORG, SAMPLE_TOUR_STEPS.length - 2);
-    const { wrapper, router } = await mountTour();
-    let release = () => {};
-    resolveMock.mockImplementation(
-      (_org: string, id: string) =>
-        new Promise((resolve) => {
-          release = () => resolve({ name: "page", params: { id } });
-        }),
-    );
-    await wrapper.get('[data-test="sample-tour-next"]').trigger("click");
-    await wrapper.get('[data-test="sample-tour-next"]').trigger("click");
-    expect(session.tour.value?.index).toBe(SAMPLE_TOUR_STEPS.length);
-    release();
-    await flushPromises();
-    expect(router.currentRoute.value.name).toBe("home");
   });
 
   it("ending the tour while a step resolves does not navigate afterwards", async () => {

@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             icon-left="arrow-back"
+            :disabled="navigating"
             data-test="sample-tour-back"
             @click="back"
           >
@@ -106,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="primary"
             size="sm"
             icon-right="arrow-forward"
+            :disabled="navigating"
             data-test="sample-tour-next"
             @click="next"
           >
