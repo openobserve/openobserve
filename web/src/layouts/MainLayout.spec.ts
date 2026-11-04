@@ -2050,9 +2050,10 @@ describe("MainLayout — first-time cloud login", () => {
   });
 
   it("leaves a first login to the sample data welcome when the deployment runs it", async () => {
-    store.state.zoConfig.sample_data_onboarding_enabled = true;
+    store.state.zoConfig.onboarding_flow_enabled = false;
     const { wrapper, replace } = await mountAtHome();
     expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
     expect(
       localStorage.getItem(`o2.onboarding.pendingStart.${store.state.userInfo.email}`),
     ).toBeNull();
@@ -2061,6 +2062,7 @@ describe("MainLayout — first-time cloud login", () => {
 
   it("with both first-run flows off, sends no one to onboarding and ends the first login", async () => {
     store.state.zoConfig.onboarding_flow_enabled = false;
+    store.state.zoConfig.sample_data_onboarding_enabled = false;
     const { wrapper, replace } = await mountAtHome();
     expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
     expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
@@ -2213,10 +2215,18 @@ describe("MainLayout — first-time cloud login", () => {
     wrapper.unmount();
   });
 
-  it("clears the flag off cloud, where there is no onboarding page", async () => {
+  it("keeps the flag off cloud for the sample data welcome, with no onboarding page", async () => {
     (config as any).isCloud = "false";
     const { wrapper, replace } = await mountAtHome();
     expect(replace).not.toHaveBeenCalledWith(expect.objectContaining({ name: "onboarding" }));
+    expect(localStorage.getItem("isFirstTimeLogin")).toBe(store.state.userInfo.email);
+    wrapper.unmount();
+  });
+
+  it("clears the flag off cloud when the sample data welcome is off too", async () => {
+    (config as any).isCloud = "false";
+    store.state.zoConfig.sample_data_onboarding_enabled = false;
+    const { wrapper } = await mountAtHome();
     expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
     wrapper.unmount();
   });

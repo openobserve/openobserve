@@ -376,7 +376,11 @@ describe("CommunitySlackInvite", () => {
     });
 
     it("never shows next to the welcome when both mount on Home, as in the main layout", async () => {
-      store.commit("setConfig", { ...store.state.zoConfig, sample_data_onboarding_enabled: true });
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        onboarding_flow_enabled: false,
+        sample_data_onboarding_enabled: true,
+      });
       let answer!: (hasData: boolean) => void;
       vi.mocked(fetchHasUserStreams).mockReturnValueOnce(new Promise((r) => (answer = r)));
       const router = createRouter({
@@ -415,7 +419,11 @@ describe("CommunitySlackInvite", () => {
         "community_slack_prompt_shown",
         expect.anything(),
       );
-      store.commit("setConfig", { ...store.state.zoConfig, sample_data_onboarding_enabled: false });
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        onboarding_flow_enabled: true,
+        sample_data_onboarding_enabled: false,
+      });
     });
 
     it("hides, without counting a dismissal, while a welcome opens over it", async () => {

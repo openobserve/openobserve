@@ -114,7 +114,12 @@ const session = useSampleDataSession() as unknown as {
   openWelcome: () => void;
 };
 
-const makeStore = (zoConfig: Record<string, unknown> = { sample_data_onboarding_enabled: true }) =>
+const makeStore = (
+  zoConfig: Record<string, unknown> = {
+    onboarding_flow_enabled: false,
+    sample_data_onboarding_enabled: true,
+  },
+) =>
   createStore({
     state: {
       selectedOrganization: { identifier: ORG, label: "Acme Shop" },
@@ -235,7 +240,7 @@ describe("SampleDataWelcome finish", () => {
 
   it("opens once the full config turns the sample data flow on", async () => {
     await mountAtHome({});
-    store.state.zoConfig = { sample_data_onboarding_enabled: true };
+    store.state.zoConfig = { onboarding_flow_enabled: false, sample_data_onboarding_enabled: true };
     await flush();
     expect(session.welcomeOpen.value).toBe(true);
   });
@@ -317,7 +322,11 @@ describe("SampleDataWelcome finish", () => {
   });
 
   it("locks a chip whose guide the license locks, and a click picks nothing", async () => {
-    await mountAtHome({ sample_data_onboarding_enabled: true, features: { rum: "locked" } });
+    await mountAtHome({
+      onboarding_flow_enabled: false,
+      sample_data_onboarding_enabled: true,
+      features: { rum: "locked" },
+    });
     const push = pushSpy();
     expect(byTest("onboarding-get-started-source-rum").attributes("disabled")).toBeDefined();
     expect(byTest("onboarding-get-started-source-otel").attributes("disabled")).toBeUndefined();

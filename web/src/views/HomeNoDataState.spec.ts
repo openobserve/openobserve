@@ -74,12 +74,20 @@ describe("HomeNoDataState", () => {
     expect(await clickCard(card)).toEqual({ name: route, query: org });
   });
 
-  it("on cloud, keeps the setup page when the deployment runs the sample data flow", async () => {
+  it("on cloud, keeps the setup page when the onboarding is off and the sample data flow runs", async () => {
     awsConfig.isCloud = "true";
-    store.state.zoConfig = { ...store.state.zoConfig, sample_data_onboarding_enabled: true };
+    store.state.zoConfig = {
+      ...store.state.zoConfig,
+      onboarding_flow_enabled: false,
+      sample_data_onboarding_enabled: true,
+    };
 
     expect(await clickCard("logs")).toEqual({ name: "curl", query: org });
-    store.state.zoConfig = { ...store.state.zoConfig, sample_data_onboarding_enabled: false };
+    store.state.zoConfig = {
+      ...store.state.zoConfig,
+      onboarding_flow_enabled: true,
+      sample_data_onboarding_enabled: false,
+    };
   });
 
   it.each([

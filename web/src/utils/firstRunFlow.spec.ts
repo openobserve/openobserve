@@ -13,39 +13,41 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import config from "@/aws-exports";
 import { onboardingFlowOn, sampleDataFlowOn } from "./firstRunFlow";
 
+const CLOUD = config.isCloud;
+
 describe("first-run flow switches", () => {
-  it.each([
-    ["an older backend that sends neither switch", {}, true, false],
-    ["no config at all", undefined, true, false],
-    [
-      "the defaults",
-      { onboarding_flow_enabled: true, sample_data_onboarding_enabled: false },
-      true,
-      false,
-    ],
-    [
-      "sample data on",
-      { onboarding_flow_enabled: true, sample_data_onboarding_enabled: true },
-      false,
-      true,
-    ],
-    [
-      "sample data on, onboarding off",
-      { onboarding_flow_enabled: false, sample_data_onboarding_enabled: true },
-      false,
-      true,
-    ],
-    [
-      "both off",
-      { onboarding_flow_enabled: false, sample_data_onboarding_enabled: false },
-      false,
-      false,
-    ],
-  ])("%s", (_, cfg, onboarding, sample) => {
-    expect(onboardingFlowOn(cfg)).toBe(onboarding);
-    expect(sampleDataFlowOn(cfg)).toBe(sample);
+  afterEach(() => {
+    config.isCloud = CLOUD;
+  });
+
+  const flags = [undefined, true, false];
+  const cases = ["true", "false"].flatMap((cloud) =>
+    flags.flatMap((onb) =>
+      flags.map((sample) => {
+        const onboarding = cloud === "true" && onb !== false;
+        return [cloud, onb, sample, onboarding, sample !== false && !onboarding] as const;
+      }),
+    ),
+  );
+
+  it.each(cases)(
+    "isCloud=%s onboarding=%s sample=%s -> onboarding %s, sample %s",
+    (cloud, onb, sample, onboarding, sampleOn) => {
+      config.isCloud = cloud;
+      const cfg = { onboarding_flow_enabled: onb, sample_data_onboarding_enabled: sample };
+      expect(onboardingFlowOn(cfg)).toBe(onboarding);
+      expect(sampleDataFlowOn(cfg)).toBe(sampleOn);
+    },
+  );
+
+  it("treats a missing config as all switches undefined", () => {
+    config.isCloud = "true";
+    expect([onboardingFlowOn(), sampleDataFlowOn()]).toEqual([true, false]);
+    config.isCloud = "false";
+    expect([onboardingFlowOn(), sampleDataFlowOn()]).toEqual([false, true]);
   });
 });

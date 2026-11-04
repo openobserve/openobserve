@@ -13,16 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import config from "@/aws-exports";
+
 /** The `/config` switches (ZO_ONBOARDING_FLOW_ENABLED, ZO_SAMPLE_DATA_ONBOARDING_ENABLED) that pick the first-run flow. */
 interface FirstRunConfig {
   onboarding_flow_enabled?: boolean;
   sample_data_onboarding_enabled?: boolean;
 }
 
-/** The welcome dialog with one-click sample data: off unless the deployment turns it on. */
-export const sampleDataFlowOn = (cfg?: FirstRunConfig): boolean =>
-  cfg?.sample_data_onboarding_enabled === true;
-
-/** The full-page onboarding: on unless turned off or replaced by sample data; a backend without the switch counts as on. */
+/** The full-page onboarding exists on cloud only; it wins when on, and a backend without the switch counts as on. */
 export const onboardingFlowOn = (cfg?: FirstRunConfig): boolean =>
-  !sampleDataFlowOn(cfg) && cfg?.onboarding_flow_enabled !== false;
+  config.isCloud === "true" && cfg?.onboarding_flow_enabled !== false;
+
+/** The sample-data welcome shows whenever the full-page onboarding does not; a backend without the switch counts as on. */
+export const sampleDataFlowOn = (cfg?: FirstRunConfig): boolean =>
+  cfg?.sample_data_onboarding_enabled !== false && !onboardingFlowOn(cfg);

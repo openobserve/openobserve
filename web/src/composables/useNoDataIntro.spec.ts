@@ -291,34 +291,34 @@ describe("useNoDataIntro", () => {
     wrapper.unmount();
   });
 
-  it.each([
-    ["the onboarding flow is off", { onboarding_flow_enabled: false }],
-    ["the sample data flow is on", { sample_data_onboarding_enabled: true }],
-  ])("on cloud, keeps the guide's route when %s", async (_, flags) => {
-    config.isCloud = "true";
-    queryClient.clear();
-    lists([]);
-    const before = store.state.zoConfig;
-    store.state.zoConfig = { ...before, ...flags };
-    let setup!: ReturnType<typeof useSetupTarget>;
-    const wrapper = mount(
-      defineComponent({
-        setup() {
-          setup = useSetupTarget(ORG);
-          return () => h("div");
-        },
-      }),
-      { global: { plugins: [[VueQueryPlugin, { queryClient }], store] } },
-    );
-    await flushPromises();
-    expect(setup.onboarding.value).toBe(false);
-    expect(setup.target("logs", "curl", "over-http-with-curl")).toEqual({
-      name: "curl",
-      query: { org_identifier: ORG },
-    });
-    store.state.zoConfig = before;
-    wrapper.unmount();
-  });
+  it.each([["the onboarding flow is off", { onboarding_flow_enabled: false }]])(
+    "on cloud, keeps the guide's route when %s",
+    async (_, flags) => {
+      config.isCloud = "true";
+      queryClient.clear();
+      lists([]);
+      const before = store.state.zoConfig;
+      store.state.zoConfig = { ...before, ...flags };
+      let setup!: ReturnType<typeof useSetupTarget>;
+      const wrapper = mount(
+        defineComponent({
+          setup() {
+            setup = useSetupTarget(ORG);
+            return () => h("div");
+          },
+        }),
+        { global: { plugins: [[VueQueryPlugin, { queryClient }], store] } },
+      );
+      await flushPromises();
+      expect(setup.onboarding.value).toBe(false);
+      expect(setup.target("logs", "curl", "over-http-with-curl")).toEqual({
+        name: "curl",
+        query: { org_identifier: ORG },
+      });
+      store.state.zoConfig = before;
+      wrapper.unmount();
+    },
+  );
 
   it("with the flag off, reads the lists again, leaves once data appears, and never comes back", async () => {
     vi.useFakeTimers();
