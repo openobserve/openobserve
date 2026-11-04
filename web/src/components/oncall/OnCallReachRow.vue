@@ -14,7 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- One channel on My on-call: fixed columns so every channel's value, status and action line up. -->
 <template>
   <div
     class="grid min-h-10 grid-cols-[7rem_minmax(0,1fr)_6.5rem_8rem] items-center gap-x-3 gap-y-1 py-1 max-md:grid-cols-[minmax(0,1fr)_auto_auto]"

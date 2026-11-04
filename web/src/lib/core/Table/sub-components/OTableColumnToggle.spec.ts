@@ -69,9 +69,20 @@ describe("OTableColumnToggle", () => {
     expect(wrapper.find('[data-test="o2-table-column-toggle-hidden-badge"]').exists()).toBe(false);
   });
 
-  it("counts a default-hidden column the reader turned on", () => {
+  it("does not report a default-hidden column the reader turned on as hidden, but offers reset", () => {
     const wrapper = mountToggle({ arch: false }, { name: true, arch: true, from: true });
+    expect(wrapper.find('[data-test="o2-table-column-toggle-hidden-badge"]').exists()).toBe(false);
+    const button = wrapper.find('[data-test="o2-table-column-toggle-btn"]');
+    expect(button.attributes("aria-label")).not.toMatch(/hidden/i);
+    const reset = wrapper.find('[data-test="o2-table-column-toggle-reset-btn"]');
+    expect(reset.attributes("disabled")).toBeUndefined();
+  });
+
+  it("counts only the default-visible columns the reader hid", () => {
+    const wrapper = mountToggle({ arch: false }, { name: false, arch: true, from: true });
     expect(wrapper.find('[data-test="o2-table-column-toggle-hidden-badge"]').text()).toBe("1");
+    const button = wrapper.find('[data-test="o2-table-column-toggle-btn"]');
+    expect(button.attributes("aria-label")).toMatch(/1 hidden/);
   });
 
   it("disables reset while the table is already at its defaults", async () => {

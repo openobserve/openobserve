@@ -80,8 +80,8 @@ describe("OnCallFiringHistory", () => {
     const wrapper = render([]);
     expect(wrapper.find('[data-test="oncall-firing-history-empty"]').exists()).toBe(true);
     expect(wrapper.text()).toContain("No earlier firings");
-    // A pager reading "0 - 0 of 0" under an empty state says nothing.
-    expect(wrapper.findComponent({ name: "OTable" }).props("pagination")).toBe("none");
+    // No column headers or pager over nothing: the empty state stands alone.
+    expect(wrapper.findComponent({ name: "OTable" }).exists()).toBe(false);
   });
 
   /// Before `loading` existed, an in-flight fetch and a genuinely first-ever

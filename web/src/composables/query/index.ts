@@ -34,4 +34,5 @@ export { idbPersister, purgePersistedOrg, purgeAllPersisted } from "./persisters
 export { useOrgId } from "./useOrgId";
 export { useServerTable } from "./useServerTable";
 export { fetchInto } from "./fetchInto";
+export { readQuery } from "./readQuery";
 export type { ServerTableResult, ServerTableParams } from "./useServerTable";

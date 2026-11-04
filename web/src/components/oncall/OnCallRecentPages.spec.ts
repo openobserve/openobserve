@@ -127,7 +127,11 @@ describe("OnCallRecentPages", () => {
     );
 
     expect(rows(wrapper)).toHaveLength(3);
-    expect(wrapper.find('[data-test="oncall-recent-pages-window"]').exists()).toBe(false);
+    const header = wrapper.find('[data-test="oncall-recent-pages"] > div');
+    expect(header.findAll(":scope > *").map((el) => el.text())).toEqual([
+      "Recent pages",
+      "View all in On-Call",
+    ]);
   });
 
   it("orders newest first regardless of the order it was handed", () => {

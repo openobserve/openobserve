@@ -156,7 +156,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("oncall.scopeEveryone") }}
             </OToggleGroupItem>
           </OToggleGroup>
-          <!-- A select, not a toggle strip: five states beside the other filters wrapped the toolbar onto a second line. -->
           <OSelect
             :model-value="activeFilter"
             :options="statusOptions"
@@ -201,7 +200,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('oncall.searchResponses')"
             data-test="oncall-responses-search"
           />
-          <!-- One toolbar row: the rarer narrowings wait behind one button, and on a phone team and priority join them. -->
           <OPopover align="end" content-class="w-72" :aria-label="t('oncall.filters')">
             <template #trigger>
               <OButton
@@ -619,7 +617,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <!-- Slots stay fixed while a row has an inline action; a ⋯-only row drops them so it centres under the header. -->
       <template #cell-actions="{ row }">
         <div class="flex items-center justify-center">
           <template v-if="!row.latest.team_id">
@@ -883,6 +880,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { pageAckWords } from "@/utils/alerts/ackState";
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
+import { readQuery } from "@/composables/query/readQuery";
 import {
   acknowledgeResponseMutation,
   addResponseNoteMutation,
@@ -920,7 +918,6 @@ import type {
   OnCallPosition,
   OnCallTeam,
   OnCallTeamContext,
-  OwnershipRule,
   ResolutionCause,
 } from "@/ts/interfaces/oncall";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
@@ -941,6 +938,7 @@ import {
   reachedStepOf,
   nextHandover,
   winningRule,
+  apiErrorText,
 } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
@@ -1071,7 +1069,7 @@ const pageSize = ref(savedView.pageSize);
 // A view saved before the Status column was removed can still sort by it.
 const sortBy = ref(savedView.sortBy === "state" ? "last_alert_at" : savedView.sortBy);
 const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
-const oTableRef = ref<any>(null);
+const oTableRef = ref<{ restorePage?: (page: number) => void } | null>(null);
 const busyId = ref("");
 const openMenuKey = ref("");
 const bulkBusy = ref(false);
@@ -1141,12 +1139,15 @@ const statusOptions = computed(() => {
   ];
   // A count before the list has answered would read as "nothing here".
   const counted = setupLoaded.value && !loading.value;
+  // An open-only fetch never asked for resolved pages, so a tab showing them has no count yet, not zero.
+  const known = (tab: FilterTab) => includeResolved.value || !tabShows(tab, "resolved");
   return tabs.map((tab) => ({
     value: tab.value,
     icon: STATUS_ICON[tab.value],
-    label: counted
-      ? t("oncall.statusOptionCount", { label: tab.label, count: tab.count })
-      : tab.label,
+    label:
+      counted && known(tab.value)
+        ? t("oncall.statusOptionCount", { label: tab.label, count: tab.count })
+        : tab.label,
   }));
 });
 
@@ -1207,10 +1208,7 @@ const showChecklist = computed(
 /// Team and cause narrow the fetch itself, so an empty answer says nothing about whether the org has pages.
 const serverFiltered = computed(() => teamFilter.value !== "all" || !!causeFilter.value);
 
-/// Whether this org has ever paged anybody — read from what was FETCHED, not
-/// from the filtered rows, so narrowing the table to nothing does not swap the
-/// page's whole shape underneath the reader.
-// A server-side narrowing (open-only tab, team, cause) can fetch nothing, and hiding the toolbar then would strand the reader in it.
+// Read from what was fetched, and true under a server-side narrowing, so a narrowing that finds nothing never hides the toolbar.
 const hasPages = computed(
   () =>
     responses.value.length > 0 ||
@@ -1475,7 +1473,7 @@ function selectFilterTab(tab: FilterTab) {
 }
 
 const youLabel = computed(() => String(t("oncall.onCallYou")));
-const { nameOf } = useOrgUserNames();
+const { nameOf, tooltipOf } = useOrgUserNames();
 
 /// A name when the org has one, else the email's local part: the domain is the same on every row.
 function displayName(email: string): string {
@@ -1485,10 +1483,7 @@ function displayName(email: string): string {
 
 /// Names can repeat across an org, so the email is always one hover away.
 function personTooltip(email: string): I18nText {
-  const name = nameOf(email);
-  return name === email
-    ? raw(email)
-    : t("oncall.personNameWithEmail", { name: raw(name), email: raw(email) });
+  return tooltipOf(email);
 }
 
 /// Is this row somebody else's outage reaching this team's service?
@@ -1858,26 +1853,6 @@ function rowRailTone(row: PageRow): RowRailTone | null {
   return isRinging(row) ? "error" : null;
 }
 
-function errorMessage(err: unknown): string {
-  const body = (err as { response?: { data?: { message?: string } } } | null)?.response?.data;
-  return body?.message ?? (err instanceof Error ? err.message : "");
-}
-
-/// Cache-first; a force expires the entry before fetching, so it costs one request, not two.
-async function read<T>(
-  options: { queryKey: readonly unknown[]; [k: string]: any },
-  force: boolean,
-): Promise<T> {
-  if (force) {
-    await queryClient.invalidateQueries({
-      queryKey: options.queryKey,
-      exact: true,
-      refetchType: "none",
-    });
-  }
-  return queryClient.fetchQuery(options as any) as Promise<T>;
-}
-
 /// Team and cause go to the SERVER: narrowing client-side hid a team's older pages past the cap.
 function responseFilters() {
   return {
@@ -1905,7 +1880,7 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
   try {
     const filters = responseFilters();
     const options = pagedResponsesQuery(orgId.value, filters);
-    const walk = await read<{ rows: OnCallResponse[]; truncated: boolean }>(options, !!opts.force);
+    const walk = await readQuery(options, !!opts.force);
     if (readId !== latestResponsesRead) return;
     responses.value = walk.rows;
     responsesNarrowed.value = "team_id" in filters || "cause" in filters;
@@ -1928,7 +1903,7 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
       unavailable.value = true;
       return;
     }
-    loadError.value = errorMessage(err) || String(t("oncall.loadResponsesFailed"));
+    loadError.value = apiErrorText(err) || String(t("oncall.loadResponsesFailed"));
   } finally {
     if (readId === latestResponsesRead) busy.value = false;
   }
@@ -1938,9 +1913,9 @@ async function fetchResponses(opts: { background?: boolean; force?: boolean } = 
 /// on any one of them degrades a single control rather than the page.
 async function fetchContext(force = false) {
   const [teamRes, gapRes, ruleRes] = await Promise.allSettled([
-    read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force),
-    read<CoverageGaps | null>(coverageGapsQuery(orgId.value), force),
-    read<OwnershipRule[]>(ownershipRulesQuery(orgId.value), force),
+    readQuery(oncallTeamsQuery(orgId.value), force),
+    readQuery(coverageGapsQuery(orgId.value), force),
+    readQuery(ownershipRulesQuery(orgId.value), force),
   ]);
 
   teamsAvailable.value = teamRes.status === "fulfilled";
@@ -1972,9 +1947,7 @@ async function someTeamWouldPage(
     return (gapRes.value?.total ?? 0) < teams.value.length;
   }
   const slots = await Promise.allSettled(
-    teams.value.map((team) =>
-      read<OnCallPosition[]>(whoIsOnCallQuery(orgId.value, team.id), force),
-    ),
+    teams.value.map((team) => readQuery(whoIsOnCallQuery(orgId.value, team.id), force)),
   );
   return slots.some((s) => s.status === "fulfilled" && s.value.length > 0);
 }
@@ -1997,12 +1970,10 @@ async function fetchRowContext(force = false) {
   if (!teamChunks.length) teamChunks.push([]);
   const [context, progress] = await Promise.allSettled([
     Promise.allSettled(
-      teamChunks.map((ids, i) =>
-        read<OnCallTeamContext[]>(teamContextQuery(orgId.value, ids, i === 0), force),
-      ),
+      teamChunks.map((ids, i) => readQuery(teamContextQuery(orgId.value, ids, i === 0), force)),
     ).then((reads) => reads.flatMap((r) => (r.status === "fulfilled" ? r.value : []))),
     wanted.length
-      ? read<EscalationProgressEntry[]>(responsesProgressQuery(orgId.value, wanted), force)
+      ? readQuery(responsesProgressQuery(orgId.value, wanted), force)
       : Promise.resolve([]),
   ]);
   if (readId !== latestRowContextRead) return;
@@ -2019,9 +1990,7 @@ async function fetchPolicyPresence(force = false) {
   }
   const chunks = chunkIds(teams.value.map((team) => team.id));
   const reads = await Promise.allSettled(
-    chunks.map((ids) =>
-      read<OnCallTeamContext[]>(teamContextQuery(orgId.value, ids, false), force),
-    ),
+    chunks.map((ids) => readQuery(teamContextQuery(orgId.value, ids, false), force)),
   );
   // The server creates the default ladder on first read, so a policy that answers is one that pages.
   if (reads.some((r) => r.status === "fulfilled" && r.value.some((team) => !!team.policy))) {
@@ -2037,7 +2006,7 @@ async function anyTeamPolicy(teamIds: string[], force: boolean): Promise<boolean
   let unread = false;
   for (const teamId of teamIds) {
     try {
-      if (await read<OnCallPolicy | null>(teamPolicyQuery(orgId.value, teamId), force)) return true;
+      if (await readQuery(teamPolicyQuery(orgId.value, teamId), force)) return true;
     } catch {
       unread = true;
     }
@@ -2083,10 +2052,7 @@ async function fetchExpandedEvents(responseId: string, force = false) {
   expandedLoading.value = true;
   expandedEvents.value = [];
   try {
-    const record = await read<{ events?: OnCallResponseEvent[] } | null>(
-      responseQuery(orgId.value, responseId),
-      force,
-    );
+    const record = await readQuery(responseQuery(orgId.value, responseId), force);
     expandedEvents.value = record?.events ?? [];
   } catch {
     // A failed fetch leaves this row's timeline empty rather than erroring the whole list.
@@ -2106,7 +2072,7 @@ async function addExpandedNote(responseId: string) {
     // Unforced: the write expired this response's entry, so it reaches the server once.
     await fetchExpandedEvents(responseId);
   } catch (err) {
-    toast({ variant: "error", message: raw(errorMessage(err)) || t("oncall.addNoteFailed") });
+    toast({ variant: "error", message: raw(apiErrorText(err)) || t("oncall.addNoteFailed") });
   } finally {
     addingExpandedNote.value = false;
   }

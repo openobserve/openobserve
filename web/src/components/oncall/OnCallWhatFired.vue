@@ -57,7 +57,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 const props = defineProps<{
   /** The alert record fetched for this page's subject — same shape the alert's own config summary reads. */
-  alert: any;
+  alert: Record<string, unknown>;
 }>();
 
 const { t } = useI18nTyped();

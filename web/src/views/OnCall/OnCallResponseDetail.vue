@@ -59,7 +59,6 @@
             <span class="shrink-0" data-test="oncall-response-opened">{{ openedAtClock }}</span>
           </template>
         </i18n-t>
-        <!-- The holder reads with team and time, and gives way first when the row is narrow. -->
         <OTruncatedText
           v-if="response.state === 'acknowledged' && response.acked_by"
           class="shrink-[100]"
@@ -116,10 +115,7 @@
       </span>
     </template>
 
-    <!-- The two facts a responder needs before anything else ride the title,
-         rather than sitting in a metadata grid below the fold. -->
     <template #title-trail>
-      <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
       <template v-if="response && lgUp">
         <!-- The title ellipsises first; clipping here means the chips can never paint under the actions. -->
         <span
@@ -332,7 +328,6 @@
         </OButton>
       </template>
 
-      <!-- Until the row has room beside a readable title it holds claiming and closing; the verbs used less often share one menu. -->
       <ODropdown v-if="response && !inlineVerbs && hasMoreActions" side="bottom" align="end">
         <template #trigger>
           <OButton
@@ -539,7 +534,6 @@
             <OnCallVerdictCard :events="events" />
 
             <!-- Not clipped, or the note box could not stick to the scrolling body's foot. -->
-            <!-- Fills the column so a short feed still puts the note box at the viewport's foot. -->
             <OCard
               variant="glass"
               class="overflow-visible lg:flex-1"
@@ -604,14 +598,14 @@
 
                   <!-- The history behind the rail's one-line summary. -->
                   <OTabPanel name="causes">
-                    <div data-test="oncall-response-causes">
+                    <div class="flex flex-col gap-4 py-3" data-test="oncall-response-causes">
                       <OnCallPriorCauses
                         :groups="priorCauses"
                         :loading="priorCausesLoading"
                         @open="openResponse"
                       />
+                      <OSeparator />
                       <OnCallFiringHistory
-                        class="mt-4"
                         :firings="firingHistory"
                         :loading="priorCausesLoading"
                         @open="openResponse"
@@ -621,7 +615,7 @@
 
                   <!-- The working behind the verdict card's one sentence. -->
                   <OTabPanel name="report">
-                    <div data-test="oncall-response-report">
+                    <div class="py-3" data-test="oncall-response-report">
                       <OnCallReportCard :report="report" :loading="reportLoading" />
                     </div>
                   </OTabPanel>
@@ -898,6 +892,7 @@ import OnCallReachAlarm from "@/components/oncall/OnCallReachAlarm.vue";
 import OnCallWhatFired from "@/components/oncall/OnCallWhatFired.vue";
 import OnCallWhoIsOn from "@/components/oncall/OnCallWhoIsOn.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -935,6 +930,7 @@ import alertsService from "@/services/alerts";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
+import { readQuery } from "@/composables/query/readQuery";
 import {
   acknowledgeResponseMutation,
   takeOverResponseMutation,
@@ -963,9 +959,8 @@ import {
 } from "@/services/oncall.queries";
 import { oncallKeys } from "@/services/oncall.querykeys";
 import { incidentQuery } from "@/services/incidents.queries";
-import type { IncidentWithAlerts } from "@/services/incidents";
+
 import type {
-  DeliveryLedger,
   DeliveryRecord,
   CauseGroup,
   EscalateResult,
@@ -975,24 +970,23 @@ import type {
   OnCallResponseEvent,
   OnCallResponseReport,
   OnCallPosition,
-  OnCallTeam,
-  OnCallTeamMember,
   PromoteSeverity,
   ResolutionCause,
-  ResolvedSegment,
-  TeamReachability,
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import {
+  apiErrorMessage,
+  apiErrorStatus,
+  apiErrorText,
   DEFAULT_ACTIVITY_KINDS,
+  formatOnCallInstant,
+  isDeletedTeam,
   isEscalating,
   isSnoozed,
   isUnresolved,
-  formatOnCallInstant,
-  isDeletedTeam,
   pagePhrase,
   pageState,
   promoteSeverityFloor,
@@ -1010,7 +1004,7 @@ const LAPSE_RECHECKS = 6;
 const INLINE_VERBS_QUERY = "(min-width: 96rem)";
 
 const { t } = useI18nTyped();
-const { nameOf, tooltipOf } = useOrgUserNames();
+const { tooltipOf } = useOrgUserNames();
 const { lgUp } = useBreakpoint();
 const inlineVerbsMql =
   typeof window !== "undefined" && typeof window.matchMedia === "function"
@@ -1064,10 +1058,10 @@ async function confirmRecovery() {
     recoveryNote.value = "";
     toast({ variant: "success", message: t("oncall.recoveryConfirmed") });
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.confirmRecoveryFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.confirmRecoveryFailed"),
     });
   } finally {
     confirmingRecovery.value = false;
@@ -1116,14 +1110,14 @@ async function promoteRecord() {
       message: t("oncall.promoted", { incident: res.data.incident_id }),
     });
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     promoteOpen.value = false;
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.promoteFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.promoteFailed"),
     });
     // A refused write expires nothing, so only a forced read shows whose incident won.
-    if (err?.response?.status === 409) await fetchResponse(true);
+    if (apiErrorStatus(err) === 409) await fetchResponse(true);
   } finally {
     promoting.value = false;
   }
@@ -1151,18 +1145,14 @@ const firingHistory = ref<OnCallResponse[]>([]);
 const priorCausesLoading = ref(false);
 const report = ref<OnCallResponseReport | null>(null);
 const reportLoading = ref(false);
-/// Only the fields the page shows — the stream, and the condition that
-/// tripped it; the rest of the payload belongs on the alert's own screen,
-/// which the subject row links to. `query_condition`/`condition` is `any`
-/// because `alertConditionText` (shared with the alert's own config summary)
-/// already treats it that way — the same rule read by two screens.
+/// Only the fields the page shows; the condition shapes stay opaque because only `alertConditionText` reads them.
 const subjectAlert = ref<{
   name?: string;
   stream_name?: string;
   stream_type?: string;
-  query_condition?: any;
-  condition?: any;
-  trigger_condition?: any;
+  query_condition?: unknown;
+  condition?: unknown;
+  trigger_condition?: unknown;
 } | null>(null);
 /// True once the alert lookup answers 404: the page outlived its alert, and the server can no longer release it.
 const subjectAlertMissing = ref(false);
@@ -1402,35 +1392,25 @@ const snoozedUntilLabel = computed(() => {
 });
 const canUnsnooze = computed(() => canSnooze.value && !!snoozedUntilLabel.value);
 
-/// Cache-first; a force expires the entry first, so it costs one request, not two.
-async function read<T>(
-  options: { queryKey: readonly unknown[]; [k: string]: any },
-  force: boolean,
-): Promise<T> {
-  if (force) {
-    await queryClient.invalidateQueries({
-      queryKey: options.queryKey,
-      exact: true,
-      refetchType: "none",
-    });
-  }
-  return queryClient.fetchQuery(options as any) as Promise<T>;
-}
-
 // The newest read: a slower record for an id the route has already left must not overwrite the current one.
 let latestResponseRead = 0;
+
+type ReadGuard = () => boolean;
+
+/// True while no newer record read has started; every page read checks it before it writes.
+function readGuard(readId = latestResponseRead): ReadGuard {
+  return () => readId === latestResponseRead;
+}
 
 // `force` reaches the record alone — it is the only thing a promote conflict moved.
 async function fetchResponse(force = false) {
   loading.value = true;
   loadError.value = null;
   const readId = ++latestResponseRead;
+  const isCurrent = readGuard(readId);
   try {
-    const data = await read<{
-      response: OnCallResponse;
-      events: OnCallResponseEvent[];
-    } | null>(responseQuery(orgId.value, responseId.value), force);
-    if (readId !== latestResponseRead) return;
+    const data = await readQuery(responseQuery(orgId.value, responseId.value), force);
+    if (!isCurrent()) return;
     response.value = data?.response ?? null;
     events.value = data?.events ?? [];
     lastFetchedAt.value =
@@ -1439,33 +1419,31 @@ async function fetchResponse(force = false) {
     // Flip before the awaits below so the card skeletons instead of reading an empty roster as "nobody on call".
     onCallPositionsLoading.value = true;
     // The team list first: it says whether the team still exists, and a deleted one has nothing else to read.
-    await fetchTeams();
-    if (readId !== latestResponseRead) return;
+    await fetchTeams(isCurrent);
+    if (!isCurrent()) return;
     await Promise.all([
-      fetchTeamName(),
-      fetchSubjectAlert(),
-      fetchHandoffTargets(),
-      fetchPriorCauses(),
-      fetchReport(),
-      fetchEscalation(),
-      fetchDeliveries(),
-      fetchTeamContext(),
-      fetchIncidentTitle(),
+      fetchTeamName(isCurrent),
+      fetchSubjectAlert(isCurrent),
+      fetchHandoffTargets(isCurrent),
+      fetchPriorCauses(isCurrent),
+      fetchReport(isCurrent),
+      fetchEscalation(false, isCurrent),
+      fetchDeliveries(isCurrent),
+      fetchTeamContext(isCurrent),
+      fetchIncidentTitle(isCurrent),
     ]);
-  } catch (err: any) {
-    if (readId !== latestResponseRead) return;
+  } catch (err: unknown) {
+    if (!isCurrent()) return;
     if (!response.value) {
-      if (err?.response?.status !== 404) {
-        loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
-      }
+      if (apiErrorStatus(err) !== 404) loadError.value = apiErrorText(err);
       return;
     }
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.loadResponseFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.loadResponseFailed"),
     });
   } finally {
-    if (readId === latestResponseRead) loading.value = false;
+    if (isCurrent()) loading.value = false;
   }
 }
 
@@ -1487,18 +1465,19 @@ async function refreshPage() {
 }
 
 /// The org's teams: whether this page's team still exists, its name, and where it can be handed.
-async function fetchTeams() {
+async function fetchTeams(isCurrent: ReadGuard) {
   try {
-    const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), false);
+    const teams = await readQuery(oncallTeamsQuery(orgId.value), false);
+    if (!isCurrent()) return;
     knownTeamIds.value = teams.map((tm) => tm.id);
     teamNamesById.value = Object.fromEntries(teams.map((tm) => [tm.id, tm.name]));
   } catch {
-    knownTeamIds.value = null;
+    if (isCurrent()) knownTeamIds.value = null;
   }
 }
 
 // Never the raw id: the name from the list, else the team's own read, else a dash.
-async function fetchTeamName() {
+async function fetchTeamName(isCurrent: ReadGuard) {
   const teamId = response.value?.team_id;
   if (!teamId || teamDeleted.value) return;
   const listed = teamNamesById.value[teamId];
@@ -1507,10 +1486,10 @@ async function fetchTeamName() {
     return;
   }
   try {
-    const team = await read<OnCallTeam | null>(oncallTeamQuery(orgId.value, teamId), false);
-    teamName.value = team?.name || "—";
+    const team = await readQuery(oncallTeamQuery(orgId.value, teamId), false);
+    if (isCurrent()) teamName.value = team?.name || "—";
   } catch {
-    teamName.value = "—";
+    if (isCurrent()) teamName.value = "—";
   }
 }
 
@@ -1526,10 +1505,10 @@ async function resolveRecord() {
     analytics.track("oncall_page_resolved", { cause: resolveCause.value || "none", count: 1 });
     toast({ variant: "success", message: t("oncall.resolved") });
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.resolveFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.resolveFailed"),
     });
   } finally {
     resolving.value = false;
@@ -1555,10 +1534,10 @@ async function acknowledgeRecord() {
         : { variant: "success", message: ackWords.value.acked },
     );
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.acknowledgeFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.acknowledgeFailed"),
     });
   } finally {
     acking.value = false;
@@ -1576,10 +1555,10 @@ async function takeOverRecord() {
         : { variant: "success", message: t("oncall.tookOver", { who: raw(from) }) },
     );
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.acknowledgeFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.acknowledgeFailed"),
     });
   } finally {
     acking.value = false;
@@ -1605,10 +1584,10 @@ async function unacknowledgeRecord() {
           : { variant: "success", message: ackWords.value.unacked },
     );
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.unacknowledgeFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.unacknowledgeFailed"),
     });
   } finally {
     acking.value = false;
@@ -1621,10 +1600,10 @@ async function snoozeRecord(minutes: number) {
     await snoozeWrite.mutateAsync({ responseId: responseId.value, minutes });
     toast({ variant: "success", message: t("oncall.snoozed") });
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.snoozeFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.snoozeFailed"),
     });
   } finally {
     snoozing.value = false;
@@ -1637,10 +1616,10 @@ async function unsnoozeRecord() {
     await unsnoozeWrite.mutateAsync(responseId.value);
     toast({ variant: "success", message: t("oncall.unsnoozed") });
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.unsnoozeFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.unsnoozeFailed"),
     });
   } finally {
     snoozing.value = false;
@@ -1656,10 +1635,10 @@ async function addNote() {
     noteBody.value = "";
     toast({ variant: "success", message: t("oncall.noteAdded") });
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.addNoteFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.addNoteFailed"),
     });
   } finally {
     addingNote.value = false;
@@ -1685,10 +1664,10 @@ async function handoffRecord() {
     handoffNote.value = "";
     toast({ variant: "success", message: t("oncall.handoffDone") });
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.handoffFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.handoffFailed"),
     });
   } finally {
     handingOff.value = false;
@@ -1697,27 +1676,21 @@ async function handoffRecord() {
 
 // Handoff targets. Failing to load them leaves the selects empty rather than
 // breaking the page — every other action still works.
-async function fetchHandoffTargets() {
+async function fetchHandoffTargets(isCurrent: ReadGuard) {
   const r = response.value;
   if (!r) return;
   // An unrouted page or a deleted team has no members to hand to, but the team list still offers a team.
   const teamId = teamDeleted.value ? null : r.team_id;
   try {
-    const members = teamId
-      ? await read<OnCallTeamMember[]>(teamMembersQuery(orgId.value, teamId), false)
-      : [];
+    const members = teamId ? await readQuery(teamMembersQuery(orgId.value, teamId), false) : [];
+    if (!isCurrent()) return;
     // Names can repeat, so the email rides along in the option itself.
-    memberOptions.value = members.map((m) => {
-      const name = nameOf(m.user_email);
-      return {
-        label:
-          name === m.user_email
-            ? raw(name)
-            : t("oncall.personNameWithEmail", { name: raw(name), email: raw(m.user_email) }),
-        value: m.user_email,
-      };
-    });
+    memberOptions.value = members.map((m) => ({
+      label: tooltipOf(m.user_email),
+      value: m.user_email,
+    }));
   } catch {
+    if (!isCurrent()) return;
     memberOptions.value = [];
   }
   teamOptions.value = Object.entries(teamNamesById.value)
@@ -1729,7 +1702,7 @@ async function fetchHandoffTargets() {
 /// deleted must still render — the record is the authority on what happened,
 /// the alert only decorates it.
 // Uncached: the page links to the alert editor, which seeds its form from the cached alert entry.
-async function fetchSubjectAlert() {
+async function fetchSubjectAlert(isCurrent: ReadGuard) {
   subjectAlert.value = null;
   subjectAlertMissing.value = false;
   if (response.value?.subject.subject_type !== "alert") return;
@@ -1740,10 +1713,11 @@ async function fetchSubjectAlert() {
   }
   try {
     const res = await alertsService.get_by_alert_id(orgId.value, alertId);
-    subjectAlert.value = res.data ?? null;
-  } catch (err: any) {
+    if (isCurrent()) subjectAlert.value = res.data ?? null;
+  } catch (err: unknown) {
+    if (!isCurrent()) return;
     subjectAlert.value = null;
-    subjectAlertMissing.value = err?.response?.status === 404;
+    subjectAlertMissing.value = apiErrorStatus(err) === 404;
   }
 }
 
@@ -1756,7 +1730,7 @@ function cachedAlertMissing(alertId: string, openedAt: number): boolean {
   return !list.some((alert) => alert.alert_id === alertId);
 }
 
-async function fetchIncidentTitle() {
+async function fetchIncidentTitle(isCurrent: ReadGuard) {
   const incidentId = response.value?.incident_id;
   if (!incidentId) {
     incidentTitle.value = null;
@@ -1764,48 +1738,44 @@ async function fetchIncidentTitle() {
     return;
   }
   try {
-    const incident = await read<IncidentWithAlerts | null>(
-      incidentQuery(orgId.value, incidentId),
-      false,
-    );
-    incidentTitle.value = incident?.title ?? null;
+    const incident = await readQuery(incidentQuery(orgId.value, incidentId), false);
+    if (isCurrent()) incidentTitle.value = incident?.title ?? null;
   } catch {
     // The rail falls back to the id.
   } finally {
-    incidentLoading.value = false;
+    if (isCurrent()) incidentLoading.value = false;
   }
 }
 
 // History is context, not the page itself: failing to load it must not stop a
 // responder acting on what is in front of them. The two calls are independent,
 // so one server without the history route still leaves the causes readable.
-async function fetchPriorCauses() {
+async function fetchPriorCauses(isCurrent: ReadGuard) {
   priorCausesLoading.value = true;
   try {
     const [causeRes, historyRes] = await Promise.allSettled([
-      read<CauseGroup[]>(responsePriorCausesQuery(orgId.value, responseId.value), false),
-      read<OnCallResponse[]>(responseHistoryQuery(orgId.value, responseId.value), false),
+      readQuery(responsePriorCausesQuery(orgId.value, responseId.value), false),
+      readQuery(responseHistoryQuery(orgId.value, responseId.value), false),
     ]);
+    if (!isCurrent()) return;
     priorCauses.value = causeRes.status === "fulfilled" ? causeRes.value : [];
     firingHistory.value = historyRes.status === "fulfilled" ? historyRes.value : [];
   } finally {
-    priorCausesLoading.value = false;
+    if (isCurrent()) priorCausesLoading.value = false;
   }
 }
 
 // 404 is the ordinary answer — no agent ran, or it never answered — so a
 // failure here leaves the tab hidden rather than surfacing an error.
-async function fetchReport() {
+async function fetchReport(isCurrent: ReadGuard) {
   reportLoading.value = true;
   try {
-    report.value = await read<OnCallResponseReport | null>(
-      responseReportQuery(orgId.value, responseId.value),
-      false,
-    );
+    const next = await readQuery(responseReportQuery(orgId.value, responseId.value), false);
+    if (isCurrent()) report.value = next;
   } catch {
-    report.value = null;
+    if (isCurrent()) report.value = null;
   } finally {
-    reportLoading.value = false;
+    if (isCurrent()) reportLoading.value = false;
   }
 }
 
@@ -1818,20 +1788,19 @@ const deliveriesLoading = ref(false);
 /// The receipt beside the claim: the timeline says "paged ana", the ledger
 /// says whether the transport took it. A failure leaves the panel empty with
 /// its own empty state — the rest of the page still answers its questions.
-async function fetchDeliveries() {
+async function fetchDeliveries(isCurrent: ReadGuard) {
   deliveriesLoading.value = true;
   try {
-    const ledger = await read<DeliveryLedger | null>(
-      responseDeliveriesQuery(orgId.value, responseId.value),
-      false,
-    );
+    const ledger = await readQuery(responseDeliveriesQuery(orgId.value, responseId.value), false);
+    if (!isCurrent()) return;
     deliveries.value = ledger?.deliveries ?? [];
     deliveriesTotal.value = ledger?.total ?? 0;
   } catch {
+    if (!isCurrent()) return;
     deliveries.value = [];
     deliveriesTotal.value = 0;
   } finally {
-    deliveriesLoading.value = false;
+    if (isCurrent()) deliveriesLoading.value = false;
   }
 }
 
@@ -1843,15 +1812,15 @@ async function fetchDeliveries() {
  * four fail, so nothing here is allowed to throw and none of it gates the
  * record.
  */
-async function fetchTeamContext() {
+async function fetchTeamContext(isCurrent: ReadGuard) {
   try {
-    await readTeamContext();
+    await readTeamContext(isCurrent);
   } finally {
-    timelineReady.value = true;
+    if (isCurrent()) timelineReady.value = true;
   }
 }
 
-async function readTeamContext() {
+async function readTeamContext(isCurrent: ReadGuard) {
   const r = response.value;
   if (!r) return;
   const teamId = r.team_id;
@@ -1867,27 +1836,25 @@ async function readTeamContext() {
   try {
     const [slots, policyRes, reach] = await Promise.allSettled([
       // A closed record asks about its own last moment — the live rotation is not its history.
-      read<OnCallPosition[]>(
-        whoIsOnCallQuery(orgId.value, teamId, r.closed_at ?? undefined),
-        false,
-      ),
-      read<OnCallPolicy | null>(teamPolicyQuery(orgId.value, teamId), false),
-      read<TeamReachability | null>(teamReachabilityQuery(orgId.value, teamId), false),
+      readQuery(whoIsOnCallQuery(orgId.value, teamId, r.closed_at ?? undefined), false),
+      readQuery(teamPolicyQuery(orgId.value, teamId), false),
+      readQuery(teamReachabilityQuery(orgId.value, teamId), false),
     ]);
+    if (!isCurrent()) return;
     onCallPositions.value = slots.status === "fulfilled" ? slots.value : [];
     policy.value = policyRes.status === "fulfilled" ? policyRes.value : null;
     smtpConfigured.value =
       reach.status === "fulfilled" ? (reach.value?.smtp_configured ?? null) : null;
-    await fetchHandover();
+    await fetchHandover(isCurrent);
   } finally {
-    onCallPositionsLoading.value = false;
+    if (isCurrent()) onCallPositionsLoading.value = false;
   }
 }
 
 /// When the default slot's current span ends, and who inherits it. The
 /// on-call payload names the next person but not the hour, and a page still
 /// open at handover is one somebody inherits without being told.
-async function fetchHandover() {
+async function fetchHandover(isCurrent: ReadGuard) {
   handoverAt.value = null;
   handoverTo.value = null;
   const r = response.value;
@@ -1899,10 +1866,11 @@ async function fetchHandover() {
   const from = nowMicros.value;
   const to = from + 7 * 24 * 60 * 60 * 1_000_000;
   try {
-    const resolved = await read<ResolvedSegment[]>(
+    const resolved = await readQuery(
       resolvedScheduleQuery(orgId.value, r.team_id, from, to),
       false,
     );
+    if (!isCurrent()) return;
     const segments = [...resolved].sort((a, b) => a.from - b.from);
     const currentIndex = segments.findIndex((seg) => seg.from <= from && seg.to > from);
     if (currentIndex < 0) return;
@@ -1959,10 +1927,10 @@ async function escalateNow() {
     const res = await escalateWrite.mutateAsync({ responseId: responseId.value });
     toast(escalateOutcome(res.data));
     await fetchResponse();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.escalateFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.escalateFailed"),
     });
   } finally {
     escalatingNow.value = false;
@@ -1980,15 +1948,15 @@ function openReachability() {
   });
 }
 
-async function fetchEscalation(force = false) {
+async function fetchEscalation(force = false, isCurrent: ReadGuard = readGuard()) {
   try {
-    escalation.value = await read<EscalationProgress | null>(
-      responseProgressQuery(orgId.value, responseId.value),
-      force,
-    );
+    const progress = await readQuery(responseProgressQuery(orgId.value, responseId.value), force);
+    if (!isCurrent()) return;
+    escalation.value = progress;
     // An empty body is no answer, so the header makes no paging claim from it.
-    escalationLoaded.value = escalation.value !== null;
+    escalationLoaded.value = progress !== null;
   } catch {
+    if (!isCurrent()) return;
     escalation.value = null;
     escalationLoaded.value = false;
   }
@@ -1998,29 +1966,25 @@ async function fetchEscalation(force = false) {
 async function refreshRecord() {
   const id = responseId.value;
   try {
-    const data = await read<{ response: OnCallResponse; events: OnCallResponseEvent[] } | null>(
-      responseQuery(orgId.value, id),
-      true,
-    );
+    const data = await readQuery(responseQuery(orgId.value, id), true);
     if (!data?.response || id !== responseId.value) return;
     response.value = data.response;
     events.value = data.events ?? [];
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (id !== responseId.value) return;
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.loadResponseFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.loadResponseFailed"),
     });
   }
 }
 
 /// A failed re-read keeps the last good progress, so the hold banner and its polling survive until the next tick.
 async function recheckProgress() {
+  const isCurrent = readGuard();
   try {
-    escalation.value = await read<EscalationProgress | null>(
-      responseProgressQuery(orgId.value, responseId.value),
-      true,
-    );
+    const progress = await readQuery(responseProgressQuery(orgId.value, responseId.value), true);
+    if (isCurrent()) escalation.value = progress;
   } catch {
     // The next tick retries.
   }

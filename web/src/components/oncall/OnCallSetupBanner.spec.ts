@@ -23,6 +23,7 @@ import { resetOnCallSetupDismissed } from "@/composables/useOnCallSetupDismissed
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -57,11 +58,11 @@ function answer({
   rules = [] as unknown[],
   pages = [] as unknown[],
 } = {}) {
-  service.listTeams.mockResolvedValue({ data: teams } as any);
-  service.coverageGaps.mockResolvedValue({ data: { total: gaps } } as any);
-  service.listOwnershipRules.mockResolvedValue({ data: rules } as any);
-  service.listResponses.mockResolvedValue({ data: pages } as any);
-  service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
+  service.listTeams.mockResolvedValue(axiosReply(teams));
+  service.coverageGaps.mockResolvedValue(axiosReply({ total: gaps }));
+  service.listOwnershipRules.mockResolvedValue(axiosReply(rules));
+  service.listResponses.mockResolvedValue(axiosReply(pages));
+  service.getPolicy.mockResolvedValue(axiosReply({ rungs: [] }));
 }
 
 async function render(attrs: Record<string, unknown> = {}) {
@@ -177,7 +178,7 @@ describe("OnCallSetupBanner", () => {
   /// No policy read answered: the step is unknown, so it is not what the bar asks for next.
   it("skips the escalation step when no policy can be read", async () => {
     answer();
-    service.coverageGaps.mockResolvedValue({ data: { total: 1 } } as any);
+    service.coverageGaps.mockResolvedValue(axiosReply({ total: 1 }));
     service.getPolicy.mockRejectedValue(new Error("down"));
     const wrapper = await render();
 
@@ -199,7 +200,7 @@ describe("OnCallSetupBanner", () => {
   /// Opening escalation from the expanded list ticks the step, and the bar moves on.
   it("moves past the escalation step once it is reviewed", async () => {
     answer();
-    service.getPolicy.mockResolvedValue({ data: null } as any);
+    service.getPolicy.mockResolvedValue(axiosReply(null));
     const wrapper = await render();
     expect(wrapper.find('[data-test="oncall-setup-next"]').text()).toContain(
       "Check how they're woken",

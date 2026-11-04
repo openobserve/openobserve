@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @pointerover="onPointerOver"
     @pointerout="onPointerOut"
   >
-    <!-- Pinned past the page's bottom padding and across the card's side padding, so no row shows below or beside it. -->
     <ActivityTimeline
       :class="pinComposer ? 'lg:flex-1' : ''"
       :composer-class="pinComposer ? PINNED_COMPOSER : ''"
@@ -87,7 +86,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OnCallClampedText from "@/components/oncall/OnCallClampedText.vue";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
-import { raw, useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { getActivityAvatarColor } from "@/utils/activityTimeline";
 import {
   DEFAULT_ACTIVITY_KINDS,
@@ -144,7 +143,7 @@ const commentTextModel = computed({
 });
 
 const nowMicros = useOnCallClock();
-const { nameOf } = useOrgUserNames();
+const { nameOf, tooltipOf } = useOrgUserNames();
 
 const currentUserId = computed(() => nameOf(String(store.state.userInfo?.email ?? "")) || "User");
 
@@ -214,9 +213,8 @@ const getEventBadgeColor = (event: OnCallResponseEvent): string => {
 };
 
 const getEventBadgeText = (event: OnCallResponseEvent): string =>
-  t(`oncall.eventKind_${event.kind}` as any);
+  t(`oncall.eventKind_${event.kind}` as I18nKey);
 
-// The icon's colour already says the kind, so a "System" or "Page" tag on every line was noise.
 const getEventLayout = (): "no-badge" | "before" | "after" => "no-badge";
 
 // Every page opens as firing #1, so that number is only news from the second firing on.
@@ -250,9 +248,8 @@ function personUnder(target: EventTarget | null): { el: HTMLElement; email: stri
 function onPointerOver(e: PointerEvent) {
   const hit = personUnder(e.target);
   if (!hit) return;
-  const name = nameOf(hit.email);
-  if (name === hit.email) return;
-  personTooltip.value = t("oncall.personNameWithEmail", { name: raw(name), email: raw(hit.email) });
+  if (nameOf(hit.email) === hit.email) return;
+  personTooltip.value = tooltipOf(hit.email);
   personAnchor.value = hit.el;
 }
 

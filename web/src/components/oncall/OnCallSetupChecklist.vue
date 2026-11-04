@@ -194,7 +194,7 @@ import { useOnCallSetupDismissed } from "@/composables/useOnCallSetupDismissed";
 import { testPageMutation } from "@/services/oncall.queries";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { testPageOutcome } from "@/utils/oncall";
+import { apiErrorMessage, testPageOutcome } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -309,10 +309,10 @@ async function sendTestPage() {
     const outcome = testPageOutcome(res.data, t);
     testLanded.value = testLanded.value || outcome.landed;
     toast({ variant: outcome.variant, message: outcome.message });
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.testPageFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.testPageFailed"),
     });
   } finally {
     testing.value = false;

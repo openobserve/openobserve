@@ -76,7 +76,7 @@ const props = defineProps<{
 const emit = defineEmits<{ disconnect: []; uninstall: [] }>();
 
 const { t } = useI18nTyped();
-const { nameOf } = useOrgUserNames();
+const { nameOf, tooltipOf } = useOrgUserNames();
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const orgName = computed<string>(() => store.state.selectedOrganization?.label || org.value);
@@ -280,12 +280,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
                     nameOf(installation.this_org.connected_by) !==
                     installation.this_org.connected_by
                   "
-                  :content="
-                    t('oncall.personNameWithEmail', {
-                      name: raw(nameOf(installation.this_org.connected_by)),
-                      email: raw(installation.this_org.connected_by),
-                    })
-                  "
+                  :content="tooltipOf(installation.this_org.connected_by)"
                 />
               </template>
             </span>

@@ -297,18 +297,18 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { useMutation } from "@tanstack/vue-query";
-import { queryClient } from "@/composables/query/queryClient";
+import { readQuery } from "@/composables/query/readQuery";
 import { useListViewState } from "@/composables/useListViewState";
 import {
   acknowledgeResponseMutation,
   markDeliveriesReadMutation,
   myDeliveriesQuery,
 } from "@/services/oncall.queries";
-import type { Channel, MyDeliveries, MyDelivery } from "@/ts/interfaces/oncall";
+import type { Channel, MyDelivery } from "@/ts/interfaces/oncall";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";
-import { formatOnCallInstant, isEscalating } from "@/utils/oncall";
+import { apiErrorMessage, apiErrorText, formatOnCallInstant, isEscalating } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -412,7 +412,7 @@ const savedView = useListViewState("oncall-my-deliveries", {
 const unreadOnly = ref(savedView.unreadOnly);
 const currentPage = ref(savedView.currentPage);
 const pageSize = ref(savedView.pageSize);
-const oTableRef = ref<any>(null);
+const oTableRef = ref<{ restorePage?: (page: number) => void } | null>(null);
 const openPage = ref(1);
 const openPageSize = ref(savedView.openPageSize);
 
@@ -565,21 +565,6 @@ function clock(micros: number): string {
 
 const markWrite = useMutation(() => markDeliveriesReadMutation(orgId.value));
 
-/// Expiring the entry before the fetch keeps a forced read at one request rather than two.
-async function read<T>(
-  options: { queryKey: readonly unknown[]; [k: string]: any },
-  force: boolean,
-): Promise<T> {
-  if (force) {
-    await queryClient.invalidateQueries({
-      queryKey: options.queryKey,
-      exact: true,
-      refetchType: "none",
-    });
-  }
-  return queryClient.fetchQuery(options as any) as Promise<T>;
-}
-
 // The newest read: a slower answer for a filter the reader has already left must not overwrite the inbox.
 let latestDeliveriesRead = 0;
 let loadedOnce = false;
@@ -590,7 +575,7 @@ async function fetchDeliveries(force = false) {
   loading.value = true;
   const readId = ++latestDeliveriesRead;
   try {
-    const data = await read<MyDeliveries | null>(
+    const data = await readQuery(
       myDeliveriesQuery(orgId.value, unreadOnly.value ? { unread_only: true } : {}),
       force,
     );
@@ -604,19 +589,19 @@ async function fetchDeliveries(force = false) {
     setUnread(new Set(rows.value.filter(countsAsUnread).map((row) => row.response_id)).size);
     loadedOnce = true;
     loadError.value = null;
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (readId !== latestDeliveriesRead) return;
     // A failed refresh keeps the inbox on screen rather than emptying it and zeroing the badge.
     if (loadedOnce) {
       toast({
         variant: "error",
-        message: raw(err?.response?.data?.message) || t("oncall.refreshFailed"),
+        message: raw(apiErrorMessage(err)) || t("oncall.refreshFailed"),
       });
       return;
     }
     rows.value = [];
     setUnread(0);
-    loadError.value = String(err?.response?.data?.message ?? err?.message ?? "");
+    loadError.value = apiErrorText(err);
   } finally {
     if (readId === latestDeliveriesRead) loading.value = false;
   }
@@ -640,10 +625,10 @@ async function mark(data: { event_ids?: string[]; all?: boolean; read?: boolean 
     await markWrite.mutateAsync(data);
     // Unforced: the write already expired this scope, so the re-read that repaints the rows costs one request.
     await fetchDeliveries();
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.myDeliveriesMarkFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.myDeliveriesMarkFailed"),
     });
   } finally {
     marking.value = false;
@@ -667,10 +652,10 @@ async function acknowledge(row: MyDelivery) {
     await ackWrite.mutateAsync(row.response_id);
     toast({ variant: "success", message: t("oncall.myAcknowledged") });
     await fetchDeliveries(true);
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast({
       variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.acknowledgeFailed"),
+      message: raw(apiErrorMessage(err)) || t("oncall.acknowledgeFailed"),
     });
   } finally {
     ackingId.value = "";

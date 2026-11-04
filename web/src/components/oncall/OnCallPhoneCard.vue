@@ -58,14 +58,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
         </OTag>
+        <OnCallHint v-else-if="state === 'changed'" :hint="t('oncall.phoneChangedHint')">
+          <OTag variant="amber-soft" size="sm" data-test="oncall-phone-state">
+            {{ t("oncall.phoneNotVerified") }}
+          </OTag>
+        </OnCallHint>
         <OTag
-          v-else-if="state === 'codeSent' || state === 'changed'"
-          :variant="state === 'changed' ? 'amber-soft' : 'default-soft'"
+          v-else-if="state === 'codeSent'"
+          variant="default-soft"
           size="sm"
           data-test="oncall-phone-state"
         >
           {{ t("oncall.phoneNotVerified") }}
-          <OTooltip v-if="state === 'changed'" :content="t('oncall.phoneChangedHint')" />
         </OTag>
         <OTag v-else variant="default-soft" size="sm" data-test="oncall-phone-state">
           {{ t("oncall.reachNotSetUp") }}
@@ -83,14 +87,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="settings" size="sm" />{{ t("oncall.reachSetUp") }}
           <OTooltip :content="t('oncall.phoneSetUpHint')" />
         </OButton>
-        <span
+        <OnCallHint
           v-else-if="state === 'noProvider'"
-          class="inline-flex"
+          :hint="t('oncall.phoneAskAdmin')"
           data-test="oncall-phone-ask-admin"
-        >
-          <OIcon name="info" size="sm" class="text-text-secondary" />
-          <OTooltip :content="t('oncall.phoneAskAdmin')" />
-        </span>
+        />
         <OButton
           v-if="state === 'verified' || state === 'codeSent'"
           variant="ghost"
@@ -226,6 +227,7 @@ import { useStore } from "vuex";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OnCallHint from "@/components/oncall/OnCallHint.vue";
 import OnCallReachRow from "@/components/oncall/OnCallReachRow.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";

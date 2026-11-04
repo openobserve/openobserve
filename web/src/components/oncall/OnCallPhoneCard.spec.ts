@@ -66,7 +66,11 @@ const stubs = {
     emits: ["update:modelValue", "blur"],
     template: `<input :value="modelValue" :disabled="disabled" @input="$emit('update:modelValue', $event.target.value)" @blur="$emit('blur', $event)" />`,
   },
-  OTooltip: { name: "OTooltip", props: ["content"], template: "<span>{{ content }}</span>" },
+  OTooltip: {
+    name: "OTooltip",
+    props: ["content"],
+    template: "<span><slot />{{ content }}</span>",
+  },
   ConfirmDialog: {
     name: "ConfirmDialog",
     props: ["modelValue", "title", "message", "okLabel", "okVariant"],

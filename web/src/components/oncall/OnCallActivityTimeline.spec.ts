@@ -195,7 +195,6 @@ describe("OnCallActivityTimeline", () => {
       .element.closest(".pt-2");
     const classes = composer?.className.split(" ") ?? [];
     expect(classes).toEqual(expect.arrayContaining(["sticky", "bg-surface-base", "border-t"]));
-    // Past the page's bottom padding and across the card's side padding, so no row shows around it.
     expect(classes).toEqual(expect.arrayContaining(["-bottom-page-edge", "-mx-4", "px-4"]));
   });
 

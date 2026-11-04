@@ -38,7 +38,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
-import { queryClient } from "@/composables/query/queryClient";
+import { readQuery } from "@/composables/query/readQuery";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { useOnCallPolicyReviewed } from "@/composables/useOnCallPolicyReviewed";
 import { useOnCallSetupDismissed } from "@/composables/useOnCallSetupDismissed";
@@ -49,13 +49,7 @@ import {
   responsesQuery,
   teamPolicyQuery,
 } from "@/services/oncall.queries";
-import type {
-  CoverageGaps,
-  OnCallPolicy,
-  OnCallResponse,
-  OnCallTeam,
-  OwnershipRule,
-} from "@/ts/interfaces/oncall";
+import type { OnCallTeam } from "@/ts/interfaces/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -98,21 +92,6 @@ const unfinished = computed(
     ),
 );
 
-/// Cache-first; a force expires the entry first, so it costs one request, not two.
-async function read<T>(
-  options: { queryKey: readonly unknown[]; [k: string]: any },
-  force: boolean,
-): Promise<T> {
-  if (force) {
-    await queryClient.invalidateQueries({
-      queryKey: options.queryKey,
-      exact: true,
-      refetchType: "none",
-    });
-  }
-  return queryClient.fetchQuery(options as any) as Promise<T>;
-}
-
 /// One answering policy is enough, so teams are asked in turn; `null` when a team that might have one could not be read.
 async function anyPolicy(
   org: string,
@@ -122,7 +101,7 @@ async function anyPolicy(
   let unread = false;
   for (const team of teamList) {
     try {
-      if (await read<OnCallPolicy | null>(teamPolicyQuery(org, team.id), force)) return true;
+      if (await readQuery(teamPolicyQuery(org, team.id), force)) return true;
     } catch {
       unread = true;
     }
@@ -136,10 +115,10 @@ async function load(force = false) {
   if (!org || dismissed.value) return;
   try {
     const [teamList, gaps, rules, pages] = await Promise.all([
-      read<OnCallTeam[]>(oncallTeamsQuery(org), force),
-      read<CoverageGaps | null>(coverageGapsQuery(org), force),
-      read<OwnershipRule[]>(ownershipRulesQuery(org), force),
-      read<OnCallResponse[]>(responsesQuery(org, { include_resolved: true, limit: 20 }), force),
+      readQuery(oncallTeamsQuery(org), force),
+      readQuery(coverageGapsQuery(org), force),
+      readQuery(ownershipRulesQuery(org), force),
+      readQuery(responsesQuery(org, { include_resolved: true, limit: 20 }), force),
     ]);
     const hasPolicy = await anyPolicy(org, teamList, force);
     teams.value = teamList;

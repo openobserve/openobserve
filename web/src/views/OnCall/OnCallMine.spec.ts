@@ -21,6 +21,7 @@ import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import OnCallMine from "@/views/OnCall/OnCallMine.vue";
+import { axiosReply, deferredReply } from "@/test/unit/helpers/mockService";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -79,14 +80,14 @@ const stubs = {
     </div>`,
   },
   OEmptyState: { name: "OEmptyState", template: "<div />" },
-  OTag: { name: "OTag", template: "<span><slot /></span>" },
+  OTag: { name: "OTag", props: ["label"], template: "<span><slot />{{ label }}</span>" },
   OButton: {
     name: "OButton",
     props: ["disabled", "loading"],
     emits: ["click"],
     template: "<button :disabled='disabled' @click=\"$emit('click', $event)\"><slot /></button>",
   },
-  OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
+  OTooltip: { name: "OTooltip", props: ["content"], template: "<span><slot /></span>" },
   ODialog: {
     name: "ODialog",
     props: ["open"],
@@ -152,10 +153,10 @@ describe("OnCallMine", () => {
     vi.clearAllMocks();
     queryClient.clear();
     viewport.mobile = false;
-    service.myOnCall.mockResolvedValue({ data: MINE } as any);
-    service.listTeams.mockResolvedValue({ data: [] } as any);
+    service.myOnCall.mockResolvedValue(axiosReply(MINE));
+    service.listTeams.mockResolvedValue(axiosReply([]));
     service.whoIsOnCall.mockRejectedValue({ response: { status: 403 } });
-    service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
+    service.resolvedSchedule.mockResolvedValue(axiosReply([]));
   });
 
   /// Mounts the real page layout so the tag is proven to reach the rendered header.
@@ -197,11 +198,11 @@ describe("OnCallMine", () => {
   it("names the seat, when the shift ends and who is next", async () => {
     const me = store.state.userInfo.email;
     const now = Date.now() * 1000;
-    service.whoIsOnCall.mockResolvedValue({
-      data: [{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: me }],
-    } as any);
-    service.resolvedSchedule.mockResolvedValue({
-      data: [
+    service.whoIsOnCall.mockResolvedValue(
+      axiosReply([{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: me }]),
+    );
+    service.resolvedSchedule.mockResolvedValue(
+      axiosReply([
         { rotation_id: "r1", from: now - 1_000_000, to: now + 3_600_000_000, user_email: me },
         {
           rotation_id: "r1",
@@ -209,8 +210,8 @@ describe("OnCallMine", () => {
           to: now + 7_200_000_000,
           user_email: "raj@o2.ai",
         },
-      ],
-    } as any);
+      ]),
+    );
     const wrapper = render();
     await flushPromises();
 
@@ -226,16 +227,16 @@ describe("OnCallMine", () => {
   it("names an off-duty row's next shift short, with the full date in its tooltip", async () => {
     const me = store.state.userInfo.email;
     const from = Date.now() * 1000 + 3 * 24 * 3_600_000_000;
-    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
-    service.myOnCall.mockResolvedValue({
-      data: {
+    service.whoIsOnCall.mockResolvedValue(axiosReply([]));
+    service.myOnCall.mockResolvedValue(
+      axiosReply({
         on_call_now: false,
         teams: [{ team_id: "team_1", team_name: "Payments", on_call_now: false, on_call: [] }],
-      },
-    } as any);
-    service.resolvedSchedule.mockResolvedValue({
-      data: [{ rotation_id: "r1", from, to: from + 3_600_000_000, user_email: me }],
-    } as any);
+      }),
+    );
+    service.resolvedSchedule.mockResolvedValue(
+      axiosReply([{ rotation_id: "r1", from, to: from + 3_600_000_000, user_email: me }]),
+    );
     const wrapper = render();
     await flushPromises();
 
@@ -247,17 +248,15 @@ describe("OnCallMine", () => {
 
   /// The frame is five rows tall whatever lands in it, so the card never jumps between loading and loaded.
   it("keeps the shifts frame at five rows while loading and with one row", async () => {
-    let answerMine: (value: unknown) => void = () => {};
-    service.myOnCall.mockImplementationOnce(
-      () => new Promise((resolve) => (answerMine = resolve)) as any,
-    );
+    const answerMine = deferredReply();
+    service.myOnCall.mockImplementationOnce(() => answerMine.promise);
     const wrapper = render();
     await flushPromises();
     const frame = () => wrapper.find('[data-test="oncall-mine-shifts-frame"]');
     expect(frame().classes()).toContain("h-55.5");
     expect(wrapper.findComponent({ name: "OTable" }).attributes("skeleton-rows")).toBe("5");
 
-    answerMine({ data: MINE });
+    answerMine.answer(MINE);
     await flushPromises();
     expect(frame().classes()).toContain("h-55.5");
   });
@@ -276,14 +275,14 @@ describe("OnCallMine", () => {
     const me = store.state.userInfo.email;
     const now = Date.now() * 1000;
     const end = now + 3_600_000_000;
-    service.whoIsOnCall.mockResolvedValue({
-      data: [{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: me }],
-    } as any);
-    service.resolvedSchedule.mockResolvedValue({
-      data: [{ rotation_id: "r1", from: now - 1_000_000, to: end, user_email: me }],
-    } as any);
-    service.listMembers.mockResolvedValue({ data: [] } as any);
-    service.getSchedule.mockResolvedValue({ data: { rotations: [{ id: "r1" }] } } as any);
+    service.whoIsOnCall.mockResolvedValue(
+      axiosReply([{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: me }]),
+    );
+    service.resolvedSchedule.mockResolvedValue(
+      axiosReply([{ rotation_id: "r1", from: now - 1_000_000, to: end, user_email: me }]),
+    );
+    service.listMembers.mockResolvedValue(axiosReply([]));
+    service.getSchedule.mockResolvedValue(axiosReply({ rotations: [{ id: "r1" }] }));
     const wrapper = render();
     await flushPromises();
 
@@ -308,7 +307,7 @@ describe("OnCallMine", () => {
 
   /// Names a team the reader is not on, from the org team list, instead of its id.
   it("hands the deliveries every team's name", async () => {
-    service.listTeams.mockResolvedValue({ data: [{ id: "team_9", name: "Search" }] } as any);
+    service.listTeams.mockResolvedValue(axiosReply([{ id: "team_9", name: "Search" }]));
     const wrapper = render();
     await flushPromises();
 
@@ -320,7 +319,7 @@ describe("OnCallMine", () => {
 
   /// Self-away needs no admin role: the server reads a missing user_email as the caller.
   it("marks the reader away without naming them", async () => {
-    service.createUnavailability.mockResolvedValue({ data: {} } as any);
+    service.createUnavailability.mockResolvedValue(axiosReply({}));
     const wrapper = render();
     await flushPromises();
 
@@ -345,13 +344,13 @@ describe("OnCallMine", () => {
   });
 
   it("sends the team test page after a confirm", async () => {
-    service.testPage.mockResolvedValue({
-      data: {
+    service.testPage.mockResolvedValue(
+      axiosReply({
         reached_anyone: true,
         channels: ["email"],
         attempts: [{ channel: "email", recipient: "a@o2.ai", reason: "", delivered: true }],
-      },
-    } as any);
+      }),
+    );
     const wrapper = render();
     await flushPromises();
 
@@ -451,17 +450,15 @@ describe("OnCallMine", () => {
 
   /// The header keeps its shape while loading, so nothing jumps when the read answers.
   it("draws the header actions before the first read answers", async () => {
-    let answer: (value: unknown) => void = () => {};
-    service.myOnCall.mockReturnValueOnce(
-      new Promise((resolve) => (answer = resolve)) as ReturnType<typeof service.myOnCall>,
-    );
+    const answer = deferredReply();
+    service.myOnCall.mockReturnValueOnce(answer.promise);
     const wrapper = render();
     await flushPromises();
     const away = wrapper.find('[data-test="oncall-mine-away"]');
     expect(away.exists()).toBe(true);
     expect(away.attributes("disabled")).toBeDefined();
 
-    answer({ data: MINE });
+    answer.answer(MINE);
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-mine-away"]').attributes("disabled")).toBeUndefined();
   });
@@ -535,33 +532,33 @@ describe("OnCallMine", () => {
   it("sorts held seats first, then off-duty rows by their next shift", async () => {
     const me = store.state.userInfo.email;
     const now = Date.now() * 1000;
-    service.myOnCall.mockResolvedValue({
-      data: {
+    service.myOnCall.mockResolvedValue(
+      axiosReply({
         on_call_now: true,
         teams: [
           { team_id: "off_soon", team_name: "Off soon", on_call_now: false, on_call: [] },
           { team_id: "held", team_name: "Held", on_call_now: true, on_call: [] },
         ],
-      },
-    } as any);
-    service.whoIsOnCall.mockResolvedValue({
-      data: [{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: me }],
-    } as any);
-    service.resolvedSchedule.mockImplementation(
-      (args: { team_id: string }) =>
-        Promise.resolve({
-          data:
-            args.team_id === "held"
-              ? [{ rotation_id: "r1", from: now - 1, to: now + 9 * 3_600_000_000, user_email: me }]
-              : [
-                  {
-                    rotation_id: "r2",
-                    from: now + 60_000_000,
-                    to: now + 120_000_000,
-                    user_email: me,
-                  },
-                ],
-        }) as any,
+      }),
+    );
+    service.whoIsOnCall.mockResolvedValue(
+      axiosReply([{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: me }]),
+    );
+    service.resolvedSchedule.mockImplementation((args: { team_id: string }) =>
+      Promise.resolve(
+        axiosReply(
+          args.team_id === "held"
+            ? [{ rotation_id: "r1", from: now - 1, to: now + 9 * 3_600_000_000, user_email: me }]
+            : [
+                {
+                  rotation_id: "r2",
+                  from: now + 60_000_000,
+                  to: now + 120_000_000,
+                  user_email: me,
+                },
+              ],
+        ),
+      ),
     );
     const wrapper = mount(OnCallMine, {
       global: { plugins: [i18n, store], stubs: { ...stubs, OTable: false } },
@@ -574,7 +571,7 @@ describe("OnCallMine", () => {
 
   /// Away only takes someone off a rotation, so a reader on no team has nothing to mark.
   it("hides I'm away and points the history at a team for a reader on no team", async () => {
-    service.myOnCall.mockResolvedValue({ data: { on_call_now: false, teams: [] } } as any);
+    service.myOnCall.mockResolvedValue(axiosReply({ on_call_now: false, teams: [] }));
     const wrapper = render();
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-mine-away"]').exists()).toBe(false);
@@ -592,11 +589,11 @@ describe("OnCallMine", () => {
     viewport.mobile = true;
     const me = store.state.userInfo.email;
     const now = Date.now() * 1000;
-    service.whoIsOnCall.mockResolvedValue({
-      data: [{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: me }],
-    } as any);
-    service.resolvedSchedule.mockResolvedValue({
-      data: [
+    service.whoIsOnCall.mockResolvedValue(
+      axiosReply([{ rotation_id: "r1", rotation_name: "Primary", rule: "", user_email: me }]),
+    );
+    service.resolvedSchedule.mockResolvedValue(
+      axiosReply([
         { rotation_id: "r1", from: now - 1_000_000, to: now + 3_600_000_000, user_email: me },
         {
           rotation_id: "r1",
@@ -604,8 +601,8 @@ describe("OnCallMine", () => {
           to: now + 7_200_000_000,
           user_email: "raj@o2.ai",
         },
-      ],
-    } as any);
+      ]),
+    );
     const menu = { template: "<div><slot name='trigger' /><slot /></div>" };
     const wrapper = mount(OnCallMine, {
       global: {
@@ -629,12 +626,12 @@ describe("OnCallMine", () => {
   /// Off duty leaves one action, so the phone row shows it directly instead of a menu of one.
   it("shows the test page as its own button on a phone row that is off duty", async () => {
     viewport.mobile = true;
-    service.myOnCall.mockResolvedValue({
-      data: {
+    service.myOnCall.mockResolvedValue(
+      axiosReply({
         on_call_now: false,
         teams: [{ team_id: "team_1", team_name: "Payments", on_call_now: false, on_call: [] }],
-      },
-    } as any);
+      }),
+    );
     const wrapper = mount(OnCallMine, { global: { plugins: [i18n, store], stubs } });
     await flushPromises();
 
