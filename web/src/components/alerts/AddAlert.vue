@@ -175,7 +175,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Shown here rather than only in the confirm dialog because most
            surfaces now skip that dialog and come straight to this form; without
            this the transforms would be silent. -->
-      <div v-if="prefillWarnings.length" class="flex shrink-0 flex-col gap-2 px-3 pt-2">
+      <div
+        v-if="prefillWarnings.length || calibrationHandoff.reserved.value"
+        class="flex shrink-0 flex-col gap-2 px-3 pt-2"
+      >
+        <!-- Invisible until the handoff is read, so the slot keeps its height from first paint. -->
+        <div
+          v-if="calibrationHandoff.reserved.value"
+          :class="calibrationBanner ? '' : 'invisible'"
+          :data-severity="calibrationBanner?.variant ?? ''"
+          data-test="add-alert-calibration-banner"
+        >
+          <OBanner dense inline-actions :variant="calibrationBanner?.variant ?? 'info'">
+            <OTruncatedText>{{ calibrationBanner?.text ?? "" }}</OTruncatedText>
+          </OBanner>
+        </div>
         <OBanner
           v-for="(warning, index) in prefillWarnings"
           :key="`${warning.key}-${index}`"
@@ -675,6 +689,7 @@ import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlertin
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import { useAlertForm, defaultAlertValue, type AlertFormEmit } from "@/composables/useAlertForm";
 import { useAlertEditorDraft } from "@/composables/alerts/useAlertEditorDraft";
+import { useCalibrationHandoff } from "@/composables/alerts/useCalibrationHandoff";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import {
   anomalyNoticeBadgeKeys,
@@ -772,7 +787,16 @@ export default defineComponent({
       onSaved: (folderId, options) => emit("update:list", folderId, options),
     });
     onFormSaved = alertEditorDraft.handleSaved;
-    onMounted(() => alertEditorDraft.start());
+    const calibrationHandoff = useCalibrationHandoff({
+      form: alertForm,
+      editorDraft: alertEditorDraft,
+      modelValue: () => props.modelValue,
+    });
+    // The handoff waits for the restore choice, so a draft decides before any patch lands.
+    onMounted(async () => {
+      await alertEditorDraft.start();
+      await calibrationHandoff.run();
+    });
 
     const cancelEditor = async () => {
       if (await alertEditorDraft.draft.confirmLeave()) emit("cancel:hideform");
@@ -1072,6 +1096,8 @@ export default defineComponent({
       raw,
       ...alertForm,
       alertDraft: alertEditorDraft.draft,
+      calibrationHandoff,
+      calibrationBanner: calibrationHandoff.banner,
       draftFormKey: alertEditorDraft.formKey,
       cancelEditor,
       alertAutoName,

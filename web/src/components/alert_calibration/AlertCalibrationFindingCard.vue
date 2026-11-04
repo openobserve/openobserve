@@ -167,16 +167,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex min-w-0 flex-wrap items-baseline gap-x-2"
           :data-test="`alert-calibration-finding-action-${action.type}`"
         >
-          <span class="text-text-body text-xs font-medium">{{ action.label }}</span>
+          <OButton
+            v-if="action.run"
+            :variant="action.type === 'apply_suggestion' ? 'primary' : 'outline'"
+            size="xs"
+            :data-test="`alert-calibration-finding-action-${action.type}-button`"
+            @click="action.run"
+          >
+            {{ action.label }}
+          </OButton>
+          <span v-else class="text-text-body text-xs font-medium">{{ action.label }}</span>
           <OText v-if="action.description" variant="meta" as="span">{{ action.description }}</OText>
         </div>
       </div>
     </OCardSection>
+
+    <AlertCalibrationApplyDialog
+      v-if="applyAction"
+      v-model:open="applyOpen"
+      :action="applyAction"
+      :finding="finding"
+    />
   </OCard>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { format } from "date-fns";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -188,6 +204,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useOrgId } from "@/composables/query";
+import { writeAlertEditHandoff } from "@/utils/alerts/alertPrefillStorage";
+import { CALIBRATION_PREFILL } from "@/utils/alerts/alertEditHandoff";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import {
@@ -218,6 +236,14 @@ import {
   SEVERITY_TILE,
   TIER_LABEL,
 } from "./format";
+import AlertCalibrationApplyDialog from "./AlertCalibrationApplyDialog.vue";
+import {
+  applyCopy,
+  applySuggestionsOf,
+  toEditHandoff,
+  type ApplySuggestion,
+  type ReviewAlertAction,
+} from "./applySuggestion";
 
 const props = defineProps<{ finding: FindingRecord }>();
 
@@ -299,15 +325,43 @@ interface ActionRow {
   type: string;
   label: I18nText;
   description?: I18nText;
+  /** Set for an action that opens the editor; the rest stay labels until their target page exists. */
+  run?: () => void;
 }
 
-/** A v2 record carries typed actions only; its `actions` column is never read. */
-const insightActions = (): ActionRow[] =>
-  insightActionsOf(props.finding).map((action, index) => ({
+const applyAction = ref<ApplySuggestion | null>(null);
+const applyOpen = ref(false);
+
+const openApply = (action: ApplySuggestion) => {
+  applyAction.value = action;
+  applyOpen.value = true;
+};
+
+/** The same tab, so the editor's Cancel comes back to this finding (P6-D10). */
+const openReview = (action: ReviewAlertAction) => {
+  writeAlertEditHandoff(toEditHandoff(action, props.finding));
+  void router.push({
+    name: "editAlert",
+    params: { alert_id: action.alert_id },
+    query: { org_identifier: orgId.value, prefill: CALIBRATION_PREFILL },
+  });
+};
+
+/** A v2 record carries typed actions only; its `actions` column is never read. Apply comes first. */
+const insightActions = (): ActionRow[] => [
+  ...applySuggestionsOf(props.finding).map((action, index) => ({
+    key: `apply-${index}`,
+    type: action.type,
+    label: applyCopy(t, locale.value).button(),
+    run: () => openApply(action),
+  })),
+  ...insightActionsOf(props.finding).map((action, index) => ({
     key: `${index}`,
     type: action.type,
     label: t(insightActionLabel(action)),
-  }));
+    run: action.type === "review_alert" ? () => openReview(action) : undefined,
+  })),
+];
 
 /** `actions` is comma-joined; an action this build does not know still shows, by its raw name. */
 const v1Actions = (): ActionRow[] =>

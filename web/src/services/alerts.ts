@@ -253,7 +253,12 @@ const alerts = {
       `/api/v2/${org_identifier}/alerts?slo_id=${encodeURIComponent(slo_id)}&alert_type=slo`,
     );
   },
-  get_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
+  get_by_alert_id: (
+    org_identifier: string,
+    alert_id: string,
+    folder_id?: any,
+    options?: { silentForbidden?: boolean },
+  ) => {
     // A teardown-time watcher can reach here with no id; that must not become
     // a GET /alerts/undefined on the wire.
     if (!alert_id) return Promise.reject(new Error("alert_id is required"));
@@ -261,7 +266,7 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().get(url);
+    return options ? http().get(url, options) : http().get(url);
   },
   validateComposite: (
     org_identifier: string,

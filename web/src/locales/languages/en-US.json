@@ -11418,6 +11418,39 @@
     "runNeedsConfig": "Turn alert calibration on in its settings to run it.",
     "refresh": "Refresh",
     "retry": "Retry",
+    "apply": {
+      "button": "Apply suggestion",
+      "title": "Apply suggestion to {alert}",
+      "setting": "Setting",
+      "current": "Current",
+      "suggested": "Suggested",
+      "consequence": {
+        "pendingPeriod": "The alert fires only after its condition holds for {value}, so a real problem is reported up to {value} later.",
+        "keepFiringFor": "The alert stays firing for {value} after its condition clears, so a short recovery does not notify again. Recovery is reported up to {value} later.",
+        "silence": "After a notification, repeats are held for {value}, so a still-firing alert notifies less often.",
+        "destinations": "Notifications go to {list}."
+      },
+      "note": "You will review this change in Edit Alert. It takes effect only after you click Save.",
+      "continue": "Continue to Edit Alert",
+      "reviewInstead": "Review alert",
+      "stale": "This alert changed after the analysis: {setting} is now {current}, and the suggestion was based on {from}. Run calibration again for a new suggestion.",
+      "deleted": "This alert was deleted after the analysis.",
+      "denied": "You don't have access to this alert. Ask an admin for access to its folder.",
+      "failed": "Couldn't load this alert.",
+      "unsupported": "This suggestion applies only to scheduled alerts.",
+      "change": "{setting} {current} → {suggested}",
+      "more": "{count} more",
+      "editor": {
+        "applied": "Suggested by Alert Calibration: {changes}. Review, then click Save.",
+        "review": "Opened from an Alert Calibration finding.",
+        "notApplied": {
+          "draft": "The suggestion was not applied because this alert has unsaved changes. Save or discard them, then apply it again from the finding.",
+          "stale": "The suggestion was not applied because this alert changed after the analysis.",
+          "invalid": "The suggestion was not applied because it could not be read.",
+          "missingDestination": "{names} no longer exists, so destinations were not changed. Choose a destination. | {names} no longer exist, so destinations were not changed. Choose a destination."
+        }
+      }
+    },
     "tabs": {
       "runs": "Runs",
       "dashboard": "Dashboard"

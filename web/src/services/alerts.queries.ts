@@ -105,10 +105,20 @@ export const firingAlertsQuery = (org: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
-export const alertDetailQuery = (org: string, id: string, folderId?: string) =>
+export const alertDetailQuery = (
+  org: string,
+  id: string,
+  folderId?: string,
+  options?: { silentForbidden?: boolean },
+) =>
   queryOptions({
     queryKey: [...alertKeys.detail(org, id), ...(folderId ? [folderId] : [])],
-    queryFn: async () => (await alerts.get_by_alert_id(org, id, folderId)).data,
+    queryFn: async () =>
+      (
+        await (options
+          ? alerts.get_by_alert_id(org, id, folderId, options)
+          : alerts.get_by_alert_id(org, id, folderId))
+      ).data,
     staleTime: LIVE_STALE_TIME,
   });
 

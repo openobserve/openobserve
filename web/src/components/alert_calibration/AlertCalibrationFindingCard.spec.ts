@@ -14,9 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
+import { h } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
+import { withQueryClient } from "@/test/unit/helpers/queryClient";
+import { ALERT_PREFILL_KEY } from "@/utils/alerts/alertPrefillStorage";
 import AlertCalibrationFindingCard from "./AlertCalibrationFindingCard.vue";
 import type { FindingRecord } from "./digests";
 import analytics from "@/services/product_analytics";
@@ -213,6 +216,89 @@ describe("AlertCalibrationFindingCard", () => {
 
     const unknown = v2([{ type: "dismiss" }, { type: "review_alert", alert_id: "a1", focus: "x" }]);
     expect(unknown.find('[data-test="alert-calibration-finding-actions"]').exists()).toBe(false);
+  });
+
+  it("a v2 card shows Apply first, Review buttons, and labels for the rest", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", component: { render: () => h("div") } },
+        {
+          path: "/alerts/edit/:alert_id",
+          name: "editAlert",
+          component: { render: () => h("div") },
+        },
+      ],
+    });
+    await router.push("/");
+    const push = vi.spyOn(router, "push");
+    const apply = {
+      type: "apply_suggestion",
+      alert_id: "a1",
+      patch: [{ field: "silence_minutes", from: 10, to: 45 }],
+    };
+    const wrapper = mount(AlertCalibrationFindingCard, {
+      props: {
+        finding: finding({
+          schema_version: 2,
+          kind: "finding",
+          rule_id: "noise",
+          alert_id: "a1",
+          alert_name: "ops_cpu",
+          finding_id: "f1",
+          actions: undefined,
+          insight_actions: JSON.stringify([
+            { type: "review_alert", alert_id: "a1", focus: "query" },
+            apply,
+            { type: "review_platform" },
+          ]),
+        }),
+      },
+      attachTo: document.body,
+      global: { plugins: [store, router, withQueryClient()] },
+    });
+    const rows = wrapper
+      .findAll('[data-test^="alert-calibration-finding-action-"]')
+      .filter((row) => !row.attributes("data-test")?.endsWith("-button"));
+    expect(rows.map((row) => row.attributes("data-test"))).toEqual([
+      "alert-calibration-finding-action-apply_suggestion",
+      "alert-calibration-finding-action-review_alert",
+      "alert-calibration-finding-action-review_platform",
+    ]);
+    expect(rows.map((row) => row.text())).toEqual([
+      "Apply suggestion",
+      "Review query",
+      "Inspect platform",
+    ]);
+    expect(rows[0].find("button").exists()).toBe(true);
+    expect(rows[1].find("button").exists()).toBe(true);
+    expect(rows[2].find("button").exists()).toBe(false);
+
+    await rows[1].get("button").trigger("click");
+    await flushPromises();
+    expect(JSON.parse(sessionStorage.getItem(ALERT_PREFILL_KEY)!)).toMatchObject({
+      source: "calibration",
+      target: { alertId: "a1", findingId: "f1" },
+      focus: "query",
+    });
+    expect(push).toHaveBeenCalledWith({
+      name: "editAlert",
+      params: { alert_id: "a1" },
+      query: { org_identifier: "default", prefill: "calibration" },
+    });
+
+    await rows[0].get("button").trigger("click");
+    await flushPromises();
+    expect(
+      document.body.querySelector('[data-test="alert-calibration-apply-dialog"]'),
+    ).not.toBeNull();
+    wrapper.unmount();
+    sessionStorage.clear();
+
+    const v1 = mountCard(finding());
+    expect(
+      v1.find('[data-test="alert-calibration-finding-action-ScaleAlertScheduler"] button').exists(),
+    ).toBe(false);
   });
 
   it("names why the evidence is degraded under the quality badge, and nothing when usable", () => {

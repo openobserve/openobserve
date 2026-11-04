@@ -192,3 +192,31 @@ export interface AlertPrefill {
   /** Source-specific; never read by the form. Summary / telemetry only. */
   meta?: Record<string, unknown>;
 }
+
+/** One suggested setting change, `from` being the value the analysis read off the alert. */
+export interface AlertFieldChange<T> {
+  from: T;
+  to: T;
+}
+
+/** The settings a calibration suggestion may change, keyed as the design names them (D:L383). */
+export interface AlertFieldPatch {
+  pendingPeriodSecs?: AlertFieldChange<number>;
+  keepFiringForSecs?: AlertFieldChange<number>;
+  silenceMinutes?: AlertFieldChange<number>;
+  destinations?: AlertFieldChange<string[]>;
+}
+
+/** The alert editor's focus-manager field ids a handoff may focus. */
+export type AlertEditFocus =
+  "query" | "threshold" | "pending_period" | "silence" | "destinations" | "keep_firing_for";
+
+/** Opens an existing alert's editor from a calibration finding; unlike `AlertPrefill` it never creates an alert. */
+export interface AlertEditHandoff {
+  version: typeof ALERT_PREFILL_VERSION;
+  source: "calibration";
+  target: { alertId: string; findingId: string };
+  focus?: AlertEditFocus;
+  /** Absent for a Review handoff, which only focuses a field. */
+  patch?: AlertFieldPatch;
+}

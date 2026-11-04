@@ -135,7 +135,7 @@ export const isFinding = (record: DigestRecord): record is FindingRecord =>
 export const isSkip = (record: DigestRecord): record is SkipRecord => record.kind === "skip";
 
 /** An array column as ingestion stringified it, or already parsed; null for a string that is not JSON. */
-function arrayColumn(value: string | unknown[] | undefined): unknown[] | null {
+export function arrayColumn(value: string | unknown[] | undefined): unknown[] | null {
   if (Array.isArray(value)) return value;
   if (!value) return [];
   try {
