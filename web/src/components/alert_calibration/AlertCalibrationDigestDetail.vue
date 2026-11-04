@@ -36,43 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     pad-y
     data-test="alert-calibration-digest-page"
   >
-    <template #actions>
-      <OTooltip
-        v-if="run && !isScoped(run) && logsLock.locked.value"
-        :content="logsLock.lockedReason.value"
-      >
-        <span class="inline-flex">
-          <OButton
-            variant="outline"
-            size="sm"
-            disabled
-            data-test="alert-calibration-digest-view-in-logs"
-          >
-            <template #icon-left>
-              <OIcon
-                name="lock"
-                class="text-icon-locked"
-                size="sm"
-                data-test="alert-calibration-digest-view-in-logs-lock"
-              />
-            </template>
-            {{ t("alertCalibration.detail.viewInLogs") }}
-          </OButton>
-        </span>
-      </OTooltip>
-      <OButton
-        v-else-if="run && !isScoped(run)"
-        variant="outline"
-        size="sm"
-        icon-left="open-in-new"
-        data-test="alert-calibration-digest-view-in-logs"
-        @click="viewInLogs"
-      >
-        {{ t("alertCalibration.detail.viewInLogs") }}
-        <OTooltip side="bottom" :content="t('alertCalibration.detail.viewInLogsHint')" />
-      </OButton>
-    </template>
-
     <div v-if="records.loading.value && !run" class="flex flex-col gap-3">
       <OSkeleton class="rounded-default h-16 w-full" />
       <OSkeleton class="rounded-default h-40 w-full" />
@@ -258,7 +221,6 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -266,14 +228,10 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useLicenseLock } from "@/composables/useFeatureLock";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import { b64EncodeUnicode } from "@/utils/formatters";
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import { raw, useI18nTyped, type I18nText, type I18nKey } from "@/types/i18n";
 import AlertCalibrationFindingCard from "./AlertCalibrationFindingCard.vue";
@@ -282,12 +240,10 @@ import {
   countOrDash,
   coverageNotes,
   coverageVerdict,
-  DIGEST_STREAM,
   isQuiet,
   isScoped,
   latestEmission,
   recordHits,
-  runRecordsSql,
   SEARCH_SIZE,
   visibilityCopy,
   type DigestRecord,
@@ -301,7 +257,6 @@ const props = defineProps<{ windowStart: string | number; windowEnd: string | nu
 const { t } = useI18nTyped();
 useLeaveIfAlertCalibrationOff("alertList");
 const router = useRouter();
-const logsLock = useLicenseLock("logs");
 const route = useRoute();
 const { search, orgId } = useDigestSearch();
 
@@ -360,7 +315,7 @@ const loadError = computed<I18nText | null>(() => {
     return t("alertCalibration.detail.loadFailed", { message: raw(records.error.value) });
   }
   if (records.data.value && !run.value) {
-    return t("alertCalibration.detail.noRecords", { stream: DIGEST_STREAM });
+    return t("alertCalibration.detail.noRecords");
   }
   return null;
 });
@@ -448,24 +403,6 @@ const noneFoundReason = computed<I18nText>(() => {
   reasons.push(t("alertCalibration.detail.noneFoundNotClearance"));
   return raw(reasons.join(" "));
 });
-
-/** Opens Logs on the same records this page reads, from the run's end to now. */
-function viewInLogs() {
-  router.push({
-    path: "/logs",
-    query: {
-      org_identifier: orgId.value,
-      stream: DIGEST_STREAM,
-      stream_type: "logs",
-      from: String(windowEnd.value),
-      to: String(Date.now() * 1000),
-      refresh: "0",
-      sql_mode: "true",
-      query: b64EncodeUnicode(runRecordsSql(windowStart.value, windowEnd.value)),
-      type: "logs",
-    },
-  });
-}
 
 watch([windowStart, windowEnd], () => {
   ruleFilter.value = "all";

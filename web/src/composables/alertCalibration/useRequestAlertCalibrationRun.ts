@@ -19,7 +19,6 @@ import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { errorMessage } from "@/services/alert_calibration";
 import { requestAlertCalibrationRunMutation } from "@/services/alert_calibration.queries";
-import { DIGEST_STREAM } from "@/components/alert_calibration/digests";
 
 /** A run lands in the digest stream later, so a request only says it was queued. */
 export function useRequestAlertCalibrationRun() {
@@ -31,7 +30,7 @@ export function useRequestAlertCalibrationRun() {
     try {
       await run.mutateAsync();
       toast({
-        message: t("alertCalibration.runRequested", { stream: DIGEST_STREAM }),
+        message: t("alertCalibration.runRequested"),
         variant: "success",
       });
     } catch (error) {

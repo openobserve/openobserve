@@ -439,6 +439,18 @@ describe("useSearchResponseHandler", () => {
       expect(mockState.searchObj.data.errorDetail).toBe("Cast error");
     });
 
+    it("keeps the refusal code so the error state can show its own title and card", () => {
+      responseHandler.handleSearchError({ type: "search" }, {
+        content: {
+          message: "Search stream is protected: _o2_alert_calibration_digests",
+          code: 20014,
+          error_detail: "",
+        },
+      } as any);
+
+      expect(mockState.searchObj.data.errorCode).toBe(20014);
+    });
+
     it("adds no detail when the message is shown as sent", () => {
       responseHandler.handleSearchError({ type: "search" }, {
         content: { message: 'Error# SQL error: ParserError("x")', code: 400 },

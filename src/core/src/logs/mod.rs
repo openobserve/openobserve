@@ -462,9 +462,8 @@ async fn write_logs(
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    // Chat history never reaches a realtime alert, even one stored before alerts there were
-    // refused.
-    if !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(stream_name) {
+    // No realtime alert sees a protected stream, even one saved before alert save refused it.
+    if !config::meta::self_reporting::protected_streams::is_read_protected_stream(stream_name) {
         crate::ingestion::get_stream_alerts(
             &[StreamParams {
                 org_id: org_id.to_owned().into(),

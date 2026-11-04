@@ -110,10 +110,9 @@ struct StreamRecordNeeds {
 
 impl StreamRecordNeeds {
     async fn load(stream_param: StreamParams) -> Self {
-        // Chat history is replayed verbatim and hash-checked; no user pipeline may
-        // read (copy elsewhere) or rewrite it.
+        // No user pipeline may copy a protected stream's rows elsewhere or rewrite them.
         let executable_pipelines =
-            if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+            if config::meta::self_reporting::protected_streams::is_read_protected_stream(
                 &stream_param.stream_name,
             ) {
                 Vec::new()

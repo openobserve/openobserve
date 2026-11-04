@@ -14,11 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
+import { createMemoryHistory, createRouter } from "vue-router";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 const SEARCH_CARD = '[data-test="query-error-search-text-card"]';
 const RUN_CARD = '[data-test="query-error-run-suggestion-card"]';
@@ -276,5 +278,56 @@ describe("QueryErrorState plain-language errors", () => {
     expect(wrapper.find('[data-test="query-error-summary"]').text()).toBe(
       tr("queryError.explain.streamNotFound", { name: '"nosuch"' }),
     );
+  });
+});
+
+describe("QueryErrorState protected-stream refusal", () => {
+  it("the protected-stream refusal is a red denied state with the way to the records", async () => {
+    const page = { template: "<div />" };
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", component: page },
+        { path: "/alert-calibration", name: "alertCalibrationRuns", component: page },
+      ],
+    });
+    const push = vi.spyOn(router, "push");
+    const wrapper = mount(QueryErrorState, {
+      props: {
+        errorCode: 20014,
+        errorMsg:
+          "Stream _o2_alert_calibration_digests holds internal records and cannot be searched",
+        aiEnabled: true,
+      },
+      global: { plugins: [store, router] },
+    });
+    const title = wrapper.get('[data-test="query-error-title"]');
+    expect(title.text()).toBe("Alert calibration records can't be searched here");
+    expect(title.classes()).toContain("text-status-error-text");
+    expect(wrapper.text()).toContain(
+      "They are shown on the Alert Calibration page, filtered to the alerts you can access.",
+    );
+    expect(wrapper.findComponent(OEmptyState).props("illustration")).toBe("lock");
+    expect(wrapper.find(FIX_CARD).exists()).toBe(false);
+    expect(wrapper.find('[data-test="query-error-ask-ai-btn"]').exists()).toBe(false);
+
+    const card = wrapper.get('[data-test="query-error-open-calibration-card"]');
+    expect(card.text()).toContain("Open Alert Calibration");
+    expect(card.text()).toContain("See the runs and findings you have access to");
+    await card.trigger("click");
+    await flushPromises();
+    expect(push).toHaveBeenCalledWith({
+      name: "alertCalibrationRuns",
+      query: { org_identifier: "default" },
+    });
+  });
+
+  it("keeps the default title colour and illustration for every other code", () => {
+    const wrapper = mountState({ errorCode: 20002 });
+    expect(wrapper.get('[data-test="query-error-title"]').classes()).not.toContain(
+      "text-status-error-text",
+    );
+    expect(wrapper.findComponent(OEmptyState).props("illustration")).toBe("broken-panel");
+    expect(wrapper.find('[data-test="query-error-open-calibration-card"]').exists()).toBe(false);
   });
 });

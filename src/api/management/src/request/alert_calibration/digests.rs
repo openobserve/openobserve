@@ -652,7 +652,12 @@ async fn search_response(
         ..Default::default()
     };
     let trace_id = ider::generate();
-    search_service::search(&trace_id, org_id, StreamType::Logs, None, &request).await
+    // Only these reads apply visibility, so search refuses the digest stream to any other caller.
+    config::meta::self_reporting::protected_streams::as_reader(
+        config::meta::self_reporting::protected_streams::ProtectedReader::AlertCalibration,
+        search_service::search(&trace_id, org_id, StreamType::Logs, None, &request),
+    )
+    .await
 }
 
 fn respond(org_id: &str, hits: Result<Vec<Value>, InfraError>, columns: Columns) -> Response {
@@ -1024,5 +1029,19 @@ mod tests {
         let hits = read_runs(&V1_MARKERS, &stream).await;
         assert_eq!(hits, [v1_marker(), v1_marker()]);
         assert_eq!(stream.searches.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn every_digest_read_runs_as_the_calibration_reader() {
+        let read = search_response("ops", list_runs_sql(), 0, now_micros(), 10).await;
+        assert!(
+            matches!(
+                read,
+                Err(InfraError::ErrorCode(ErrorCodes::SearchStreamNotFound(ref s))) if s == DIGEST_STREAM
+            ),
+            "{read:?}"
+        );
+        let hits = rows("ops", read.map(|response| response.hits), Columns::Run);
+        assert!(hits.is_ok_and(|hits| hits.is_empty()));
     }
 }
