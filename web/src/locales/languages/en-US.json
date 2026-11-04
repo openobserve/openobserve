@@ -11441,7 +11441,8 @@
       "noise": "Noise",
       "notifyFailed": "Notification failed",
       "schedulerHealth": "Scheduler lag",
-      "silent": "Silent"
+      "silent": "Silent",
+      "other": "Another rule"
     },
     "evidence": {
       "errors": "Errors",
@@ -11463,6 +11464,9 @@
       "lateEvaluations": "Late evaluations",
       "lateRatio": "Late share",
       "longestDelay": "Longest delay",
+      "evaluationDelay": "Evaluation delay",
+      "incidentLinkedFirings": "Incident-linked firings",
+      "deliveryAttemptRecords": "Delivery attempt records",
       "yes": "Yes",
       "no": "No"
     },
@@ -11483,6 +11487,14 @@
       "attachDestinationDesc": "Give the alert somewhere to deliver to.",
       "scaleAlertScheduler": "Scale the alert scheduler",
       "scaleAlertSchedulerDesc": "Raise {concurrency}, add alert nodes, or raise {pullers}."
+    },
+    "insightActions": {
+      "reviewAlert": "Review alert",
+      "reviewQuery": "Review query",
+      "reviewSettings": "Review settings",
+      "reviewThreshold": "Review threshold",
+      "reviewGrouping": "Review grouping",
+      "inspectPlatform": "Inspect platform"
     },
     "severity": {
       "high": "High",
@@ -11511,10 +11523,11 @@
       "alertDisabled": "Alert disabled",
       "windowTooShort": "Window too short for the rule",
       "unsupportedMode": "Alert mode not supported by the rule",
-      "silenceCensoredHistory": "Silence paused evaluation, so episode lengths are not real",
+      "incompleteOrSilenceCensoredHistory": "History incomplete or paused by a silence, so episode lengths are not real",
       "noIncidentSignal": "No incidents, so nothing says whether firings were wanted",
       "sentinelByDesign": "Quiet by design",
-      "enrichmentTimeout": "Evidence read timed out"
+      "enrichmentTimeout": "Evidence read timed out",
+      "other": "Another reason"
     },
     "coverage": {
       "full": "Full coverage",
@@ -11581,6 +11594,9 @@
       "declinedHeading": "Declined with a reason",
       "declinedDesc": "Rules that could not run for an alert, or looked and declined. This is not a clearance.",
       "declinedCounted": "{count} routine decline counted, not listed | {count} routine declines counted, not listed",
+      "declinedSignal": "Signal: {signal}",
+      "declinedDetailOther": "More detail in Logs",
+      "showingSkipsCapped": "Showing {shown} of {total} declines: the search stopped at {count} records.",
       "statWindow": "Window",
       "findingsHeading": "Findings",
       "suggestionsOnly": "Suggestions only, nothing is applied automatically",
@@ -11598,6 +11614,7 @@
       "topOrgs": "Most affected orgs",
       "worstHours": "Worst hours",
       "proposedActions": "Proposed actions",
+      "qualityReasons": "Reason: {reasons} | Reasons: {reasons}",
       "openAlert": "Open alert"
     },
     "dashboard": {
@@ -11620,6 +11637,7 @@
     },
     "lastRun": {
       "succeeded": "The last run succeeded {time}.",
+      "deferred": "Digest format upgraded. This run's results appear after the next run.",
       "failed": "The last run failed {time}, so the newest digest may be out of date: {error}",
       "none": "No run has been attempted yet."
     },

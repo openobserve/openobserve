@@ -166,4 +166,68 @@ describe("AlertCalibrationFindingCard", () => {
     });
     open.mockRestore();
   });
+
+  it("renders a v2 record's actions by their design labels and never a raw name", () => {
+    const v2 = (insight_actions: unknown[]) =>
+      mountCard(
+        finding({
+          schema_version: 2,
+          kind: "finding",
+          rule_id: "failure",
+          alert_id: "a1",
+          actions: undefined,
+          insight_actions: JSON.stringify(insight_actions),
+        }),
+      );
+    const wrapper = v2([
+      { type: "review_alert", alert_id: "a1", focus: "query" },
+      { type: "review_alert", alert_id: "a1" },
+      { type: "review_alert", alert_id: "a1", focus: "settings" },
+      { type: "review_alert", alert_id: "a1", focus: "threshold" },
+      { type: "review_alert", alert_id: "a1", focus: "grouping" },
+      { type: "review_platform" },
+      { type: "test_send", destination: "pager" },
+    ]);
+    const panel = wrapper.find('[data-test="alert-calibration-finding-actions"]');
+    expect(panel.exists()).toBe(true);
+    expect(
+      panel
+        .findAll('[data-test="alert-calibration-finding-action-review_alert"]')
+        .map((row) => row.text()),
+    ).toEqual([
+      "Review query",
+      "Review alert",
+      "Review settings",
+      "Review threshold",
+      "Review grouping",
+    ]);
+    expect(
+      panel.find('[data-test="alert-calibration-finding-action-review_platform"]').text(),
+    ).toBe("Inspect platform");
+    expect(panel.text()).not.toMatch(/review_|test_send|pager|a1/);
+
+    const v1 = mountCard(finding());
+    expect(v1.find('[data-test="alert-calibration-finding-actions"]').text()).toContain(
+      "Scale the alert scheduler",
+    );
+
+    const unknown = v2([{ type: "dismiss" }, { type: "review_alert", alert_id: "a1", focus: "x" }]);
+    expect(unknown.find('[data-test="alert-calibration-finding-actions"]').exists()).toBe(false);
+  });
+
+  it("names why the evidence is degraded under the quality badge, and nothing when usable", () => {
+    const reasons = JSON.stringify(["Counters truncated", "Late rows"]);
+    const partial = mountCard(
+      finding({ schema_version: 2, kind: "finding", quality: "partial", quality_reasons: reasons }),
+    );
+    expect(partial.find('[data-test="alert-calibration-finding-quality-reasons"]').text()).toBe(
+      "Reasons: Counters truncated and Late rows",
+    );
+    const usable = mountCard(
+      finding({ schema_version: 2, kind: "finding", quality: "usable", quality_reasons: reasons }),
+    );
+    expect(usable.find('[data-test="alert-calibration-finding-quality-reasons"]').exists()).toBe(
+      false,
+    );
+  });
 });

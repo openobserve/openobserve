@@ -45,6 +45,8 @@ const MAX_CONFIG_RETRY_SECS: i64 = 86_400;
 const WRITE_ALLOWANCE_SECS: i64 = 60;
 
 type ConfigRead = Result<Option<CalibrationConfig>, InfraError>;
+/// A due pass's analysed window and whether its digest waits for a later run, or why it failed.
+type Analysis = Result<((i64, i64), bool), String>;
 
 /// What a calibration row carries from one pass to the next.
 #[derive(Default, Deserialize, Serialize)]
@@ -61,6 +63,9 @@ pub struct LastRun {
     pub status: RunOutcome,
     pub error: Option<String>,
     pub finished_at: i64,
+    /// The digest stream gained its version-2 columns too recently, so a later run writes.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub deferred: bool,
 }
 
 /// What a pass decided before any analysis.
@@ -93,14 +98,15 @@ impl<'a> Pass<'a> {
         }
     }
 
-    /// `analysis` is a due pass's result: the window it analysed, or why it failed.
+    /// `analysis` is a due pass's result.
     fn settle(
         &self,
         data: &mut JobData,
         retries: i32,
         now: i64,
-        analysis: Option<Result<(i64, i64), String>>,
+        analysis: Option<Analysis>,
     ) -> Outcome {
+        let mut deferred = false;
         let (config, status, error, window) = match self {
             // A switched-off deployment costs each org one wake a day, not one per cadence.
             Self::SwitchedOff => {
@@ -138,7 +144,12 @@ impl<'a> Pass<'a> {
                 None,
             ),
             Self::Due(config) => match analysis.unwrap_or_else(|| Err("no analysis ran".into())) {
-                Ok(window) => (config, RunOutcome::Succeeded, None, Some(window)),
+                Ok((window, false)) => (config, RunOutcome::Succeeded, None, Some(window)),
+                // Nothing was written, so the run is a skip whose reason the page names.
+                Ok((window, true)) => {
+                    deferred = true;
+                    (config, RunOutcome::Skipped, None, Some(window))
+                }
                 Err(e) => (config, RunOutcome::Error, Some(e), None),
             },
         };
@@ -148,6 +159,7 @@ impl<'a> Pass<'a> {
                 status: status.clone(),
                 error: error.clone(),
                 finished_at: now,
+                deferred,
             });
         }
         Outcome {
@@ -272,10 +284,13 @@ async fn analyse(
     trigger: &Trigger,
     config: &CalibrationConfig,
     time_left: std::time::Duration,
-) -> Result<(i64, i64), anyhow::Error> {
+) -> Result<((i64, i64), bool), anyhow::Error> {
     use o2_enterprise::enterprise::alert_calibration_service::run_pass;
 
-    use crate::alerts::alert_calibration::{SearchAdapter, sink::write_digest_records};
+    use crate::alerts::alert_calibration::{
+        SearchAdapter,
+        sink::{DigestWrite, write_digest_records},
+    };
 
     let pass = tokio::time::timeout(
         time_left,
@@ -305,8 +320,9 @@ async fn analyse(
     if !held {
         anyhow::bail!("lost the claim before writing the digest");
     }
-    write_digest_records(&trigger.org, pass.records).await?;
-    Ok((pass.window.start_micros, pass.window.end_micros))
+    let written = write_digest_records(&trigger.org, pass.records).await?;
+    let window = (pass.window.start_micros, pass.window.end_micros);
+    Ok((window, written == DigestWrite::Deferred))
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -314,7 +330,7 @@ async fn analyse(
     _trigger: &Trigger,
     _config: &CalibrationConfig,
     _time_left: std::time::Duration,
-) -> Result<(i64, i64), anyhow::Error> {
+) -> Result<((i64, i64), bool), anyhow::Error> {
     anyhow::bail!("alert calibration is an enterprise feature")
 }
 
@@ -491,7 +507,8 @@ mod tests {
             ..Default::default()
         };
         let enabled = config(true, 30);
-        let done = Pass::Due(&enabled).settle(&mut data, 0, NOW, Some(Ok((NOW - MINUTE, NOW))));
+        let done =
+            Pass::Due(&enabled).settle(&mut data, 0, NOW, Some(Ok(((NOW - MINUTE, NOW), false))));
         assert_eq!(data.config_misses, 0);
         assert_eq!(
             (done.status, done.next_run_at, done.window),
@@ -520,8 +537,36 @@ mod tests {
                 status: RunOutcome::Error,
                 error: Some("querier down".to_string()),
                 finished_at: NOW,
+                deferred: false,
             })
         );
+    }
+
+    // Nothing is written on a deferred pass, so the row must not read as a plain success.
+    #[test]
+    fn a_deferred_pass_is_recorded_as_a_deferred_skip() {
+        let mut data = JobData::default();
+        let enabled = config(true, 30);
+        let window = (NOW - MINUTE, NOW);
+        let deferred = Pass::Due(&enabled).settle(&mut data, 0, NOW, Some(Ok((window, true))));
+        assert_eq!(
+            (deferred.status, deferred.error, deferred.window),
+            (RunOutcome::Skipped, None, Some(window))
+        );
+        assert_eq!(
+            data.last_run,
+            Some(LastRun {
+                status: RunOutcome::Skipped,
+                error: None,
+                finished_at: NOW,
+                deferred: true,
+            })
+        );
+        assert_eq!(json::to_value(&data.last_run).unwrap()["deferred"], true);
+        Pass::Due(&enabled).settle(&mut data, 0, NOW + MINUTE, Some(Ok((window, false))));
+        let written = json::to_value(&data.last_run).unwrap();
+        assert_eq!(written["status"], "succeeded");
+        assert!(written.get("deferred").is_none());
     }
 
     #[test]

@@ -19,6 +19,7 @@ import {
   coverageNotes,
   coverageVerdict,
   findingsByRule,
+  insightActionsOf,
   titleAfterName,
   isClean,
   latestEmission,
@@ -26,6 +27,7 @@ import {
   latestRun,
   limitationsOf,
   parseLagRows,
+  qualityReasonsOf,
   schemaVersion,
   type DigestRecord,
   type FindingRecord,
@@ -33,7 +35,13 @@ import {
   type RunRow,
   type Severity,
 } from "./digests";
-import { formatEvidence, formatMinutes, splitMinutes } from "./format";
+import {
+  formatEvidence,
+  formatMinutes,
+  skipDetailLabel,
+  skipReasonLabel,
+  splitMinutes,
+} from "./format";
 import { rulesShownFor } from "./rules";
 
 const run = (overrides: Partial<RunRow> = {}): RunRow => ({
@@ -241,6 +249,27 @@ describe("the formatting", () => {
   });
 });
 
+describe("a skip's reason", () => {
+  it("is named in words, and one this build does not know is named generically", () => {
+    expect(skipReasonLabel(gt, "incomplete_or_silence_censored_history")).toBe(
+      "History incomplete or paused by a silence, so episode lengths are not real",
+    );
+    expect(skipReasonLabel(gt, "healthy_silence")).toBe("Another reason");
+  });
+
+  it("names a known signal in its detail, and any other detail generically", () => {
+    expect(skipDetailLabel(gt, '{"signal":"delivery_attempts"}')).toBe(
+      "Signal: Attempted deliveries",
+    );
+    expect(skipDetailLabel(gt, '{"signal":"delay_in_secs"}')).toBe("Signal: Evaluation delay");
+    for (const other of ['{"signal":"queue_depth"}', '{"mode":"real_time"}', "[1]", "not json"]) {
+      expect(skipDetailLabel(gt, other)).toBe("More detail in Logs");
+    }
+    expect(skipDetailLabel(gt, undefined)).toBeNull();
+    expect(skipDetailLabel(gt, "")).toBeNull();
+  });
+});
+
 describe("a cluster finding's lag lists", () => {
   it("reads each list back out of its one JSON column, keyed by org or by hour", () => {
     const orgs = JSON.stringify([
@@ -279,5 +308,49 @@ describe("the rules an org is shown", () => {
     expect(rulesShownFor("default")).not.toContain("scheduler_health");
     expect(rulesShownFor("_meta")).toContain("scheduler_health");
     expect(rulesShownFor("default")).toContain("noise");
+  });
+});
+
+describe("a version-2 finding's typed columns", () => {
+  const v2 = (overrides: Partial<DigestRecord>) =>
+    record({ schema_version: 2, kind: "finding", rule_id: "failure", ...overrides });
+
+  it("parses typed actions from a v2 record and drops an unknown type or focus", () => {
+    const insight_actions = JSON.stringify([
+      { type: "review_alert", alert_id: "a1", focus: "query" },
+      { type: "review_alert", alert_id: "a1" },
+      { type: "review_platform" },
+      { type: "review_alert", alert_id: "a1", focus: "pending" },
+      { type: "review_alert", focus: "query" },
+      { type: "apply_suggestion", alert_id: "a1" },
+      "review_platform",
+      null,
+    ]);
+    expect(insightActionsOf(v2({ insight_actions }))).toEqual([
+      { type: "review_alert", alert_id: "a1", focus: "query" },
+      { type: "review_alert", alert_id: "a1" },
+      { type: "review_platform" },
+    ]);
+    expect(insightActionsOf(v2({ insight_actions: [{ type: "review_platform" }] }))).toEqual([
+      { type: "review_platform" },
+    ]);
+    expect(insightActionsOf(v2({ insight_actions: "not json" }))).toEqual([]);
+    expect(
+      insightActionsOf(v2({ insight_actions: JSON.stringify({ type: "review_platform" }) })),
+    ).toEqual([]);
+    expect(insightActionsOf(v2({}))).toEqual([]);
+  });
+
+  it("reads the quality reasons out of their one column, keeping only text", () => {
+    expect(
+      qualityReasonsOf(
+        v2({ quality_reasons: JSON.stringify(["Counters truncated", 3, "Late rows"]) }),
+      ),
+    ).toEqual(["Counters truncated", "Late rows"]);
+    expect(qualityReasonsOf(v2({ quality_reasons: ["Counters truncated"] }))).toEqual([
+      "Counters truncated",
+    ]);
+    expect(qualityReasonsOf(v2({ quality_reasons: "plain" }))).toEqual(["plain"]);
+    expect(qualityReasonsOf(v2({}))).toEqual([]);
   });
 });

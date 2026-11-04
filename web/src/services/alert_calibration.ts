@@ -36,9 +36,11 @@ export interface UpdateAlertCalibrationConfig {
 
 /** How the latest attempted run ended; a failed run writes no digest, so only this says why. */
 export interface AlertCalibrationLastRun {
-  status: "succeeded" | "error";
+  status: "succeeded" | "skipped" | "error";
   error: string | null;
   finished_at: number;
+  /** The digest stream was upgraded too recently for this run to write; a later run does. */
+  deferred?: boolean;
 }
 
 export interface AlertCalibrationStatus {

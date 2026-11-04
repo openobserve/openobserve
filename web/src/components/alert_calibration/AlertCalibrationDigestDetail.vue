@@ -137,14 +137,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
           </OToggleGroup>
         </div>
-        <OText v-if="hitCount === SEARCH_SIZE" variant="meta" as="div">
-          {{
+        <OText
+          v-if="hitCount === SEARCH_SIZE"
+          variant="meta"
+          as="div"
+          data-test="alert-calibration-digest-findings-capped"
+        >
+          <!-- OText's meta colour wins over a class on it, so the amber sits on the text. -->
+          <span class="text-status-warning-text">{{
             t("alertCalibration.detail.showingCapped", {
               shown: findings.length,
               total: run.finding_count,
               count: SEARCH_SIZE,
             })
-          }}
+          }}</span>
         </OText>
         <OText v-else-if="findings.length !== run.finding_count" variant="meta" as="div">
           {{ t("alertCalibration.detail.perSubjectNote") }}
@@ -191,10 +197,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</OText>
           <OText variant="meta" as="p">{{ t("alertCalibration.detail.declinedDesc") }}</OText>
         </div>
+        <OText
+          v-if="skipsCapped"
+          variant="meta"
+          as="div"
+          data-test="alert-calibration-digest-skips-capped"
+        >
+          <span class="text-status-warning-text">{{
+            t("alertCalibration.detail.showingSkipsCapped", {
+              shown: skips.length,
+              total: writtenSkips,
+              count: SEARCH_SIZE,
+            })
+          }}</span>
+        </OText>
         <OCard variant="glass">
           <OCardSection role="body" class="flex flex-col gap-1.5 py-2">
             <div
-              v-for="skip in skips"
+              v-for="{ skip, detail } in skipRows"
               :key="`${skip.rule_id}:${skip.alert_id}`"
               class="flex min-w-0 flex-wrap items-baseline gap-x-2"
               data-test="alert-calibration-digest-skip"
@@ -206,9 +226,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 skip.alert_name ?? skip.alert_id
               }}</span>
               <OText variant="meta" as="span">{{ skipReasonLabel(t, skip.skip_reason) }}</OText>
-              <OText v-if="skip.skip_detail" variant="meta" as="span" class="tabular-nums">{{
-                skip.skip_detail
-              }}</OText>
+              <OText
+                v-if="detail"
+                variant="meta"
+                as="span"
+                data-test="alert-calibration-digest-skip-detail"
+                >{{ detail }}</OText
+              >
             </div>
           </OCardSection>
         </OCard>
@@ -259,7 +283,7 @@ import {
   type DigestRecord,
   type RuleId,
 } from "./digests";
-import { COVERAGE_BADGE, formatMinutes, skipReasonLabel } from "./format";
+import { COVERAGE_BADGE, formatMinutes, skipDetailLabel, skipReasonLabel } from "./format";
 import { isRuleId, RULE_IDS, RULE_META } from "./rules";
 
 const props = defineProps<{ windowStart: string | number; windowEnd: string | number }>();
@@ -294,12 +318,20 @@ const records = useLatestRead(async () => {
 const run = computed(() => records.data.value?.run ?? null);
 const findings = computed(() => records.data.value?.findings ?? []);
 const skips = computed(() => records.data.value?.skips ?? []);
+const skipRows = computed(() =>
+  skips.value.map((skip) => ({ skip, detail: skipDetailLabel(t, skip.skip_detail) })),
+);
 /** Floors not met are only counted by a version-2 run; a version-1 run has no split. */
 const omittedRoutine = computed(() => run.value?.omitted_routine_skip_count ?? 0);
-/** A skip names its rule as stored, which a build without that rule still shows. */
+/** A rule from a newer writer is named generically, never by its stored id. */
 const ruleLabel = (rule: string): I18nText =>
-  isRuleId(rule) ? t(RULE_META[rule].labelKey) : raw(rule);
+  t(isRuleId(rule) ? RULE_META[rule].labelKey : "alertCalibration.rules.other");
 const hitCount = computed(() => records.data.value?.hits ?? 0);
+/** A version-1 run writes no skip records, so it has no written count to fall short of. */
+const writtenSkips = computed(() => run.value?.written_skip_count ?? skips.value.length);
+const skipsCapped = computed(
+  () => hitCount.value === SEARCH_SIZE && skips.value.length < writtenSkips.value,
+);
 
 const loadError = computed<I18nText | null>(() => {
   if (records.error.value) {
