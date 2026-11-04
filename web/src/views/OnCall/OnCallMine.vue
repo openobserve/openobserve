@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!unavailable"
         class="md:min-w-23"
         layout="inline"
+        size="header"
         variant="outline"
         :last-run-at="lastFetchedAt"
         :loading="refreshing || !loaded"

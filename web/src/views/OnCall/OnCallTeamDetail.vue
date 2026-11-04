@@ -37,6 +37,7 @@
       <ORefreshButton
         v-if="loaded"
         layout="inline"
+        size="header"
         variant="outline"
         :last-run-at="lastFetchedAt"
         :loading="refreshing"

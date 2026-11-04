@@ -113,7 +113,11 @@ const stubs = {
   // `props` declared deliberately: a stub that does not declare what it is
   // passed drops it silently, and an assertion about a tooltip then passes
   // with no tooltip mounted.
-  OTooltip: { name: "OTooltip", props: ["content"], template: "<span>{{ content }}</span>" },
+  OTooltip: {
+    name: "OTooltip",
+    props: ["content"],
+    template: "<span>{{ content }}<slot /></span>",
+  },
   OTag: { name: "OTag", props: ["variant", "type", "value"], template: "<span><slot /></span>" },
   OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
   // Renders the menu open, so a row action behind ⋯ can be found and clicked like any other.
@@ -124,7 +128,12 @@ const stubs = {
     emits: ["select"],
     template: `<button :data-icon="iconLeft" @click="$emit('select')"><slot /></button>`,
   },
-  OnCallTeamForm: { name: "OnCallTeamForm", props: ["open", "team"], template: "<div />" },
+  OnCallTeamForm: {
+    name: "OnCallTeamForm",
+    props: ["open", "team", "offerDefault", "isDefault"],
+    emits: ["saved", "update:open"],
+    template: "<div />",
+  },
   ConfirmDialog: {
     name: "ConfirmDialog",
     props: ["modelValue", "message", "messageKeypath", "messageName", "okLabel", "okVariant"],
@@ -547,15 +556,12 @@ describe("OnCallTeams", () => {
       expect(wrapper.find('[data-test="oncall-team-delete-team_1"]').text()).toBe("Delete team");
     });
 
-    /// G8: Edit is the one inline icon; setting the default and deleting live in ⋯, and no star reads as "favourite".
-    it("keeps set-default and delete in the row menu, with no star", async () => {
+    /// G18: a row holds its actions as icons, never a menu; setting the default lives in the Edit drawer.
+    it("offers no row menu and no set-default on the row, with no star", async () => {
       const wrapper = await rendered();
-      const items = wrapper
-        .findAllComponents({ name: "ODropdownItem" })
-        .map((item) => item.attributes("data-test"));
-      expect(items).toEqual(
-        expect.arrayContaining(["oncall-team-set-default-team_1", "oncall-team-delete-team_1"]),
-      );
+      expect(wrapper.findComponent({ name: "ODropdown" }).exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-teams-row-more-actions"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="oncall-team-set-default-team_1"]').exists()).toBe(false);
       expect(wrapper.html()).not.toContain("star-outline");
     });
 
@@ -600,8 +606,8 @@ describe("OnCallTeams", () => {
       expect(badge.text()).toContain("Gets every alert no team owns");
     });
 
-    /// G9: every row keeps the same [Edit][⋯] slots, so the icons line up down the column.
-    it("gives the default row the same Edit and menu slots as every other row", async () => {
+    /// G9: every row keeps the same [Edit][Delete] slots, so the icons line up down the column.
+    it("gives the default row the same Edit and Delete slots as every other row", async () => {
       service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_2" } } as any);
       service.listTeams.mockResolvedValue({
         data: [team("team_1", "Platform"), team("team_2", "Payments")],
@@ -609,10 +615,9 @@ describe("OnCallTeams", () => {
       const wrapper = render();
       await flushPromises();
 
-      expect(wrapper.findAll('[data-test="oncall-teams-row-more-actions"]')).toHaveLength(2);
-      expect(wrapper.find('[data-test="oncall-team-edit-team_2"]').exists()).toBe(true);
-      for (const trigger of wrapper.findAll('[data-test="oncall-teams-row-more-actions"]')) {
-        expect(trigger.classes()).not.toContain("md:hidden");
+      for (const id of ["team_1", "team_2"]) {
+        expect(wrapper.find(`[data-test="oncall-team-edit-${id}"]`).exists()).toBe(true);
+        expect(wrapper.find(`[data-test="oncall-team-delete-${id}"]`).exists()).toBe(true);
       }
     });
 
@@ -626,42 +631,47 @@ describe("OnCallTeams", () => {
       const wrapper = render();
       await flushPromises();
 
-      const items = wrapper.findAllComponents({ name: "ODropdownItem" });
-      const deleteOf = (id: string) =>
-        items.find((item) => item.attributes("data-test") === `oncall-team-delete-${id}`);
-      // Still listed, so every row's menu reads the same, but off and saying why.
-      expect(deleteOf("team_2")?.props("disabled")).toBe(true);
-      // One line per item: the reason rides a tooltip, not a second line under the label.
-      expect(deleteOf("team_2")?.props("description")).toBeUndefined();
-      expect(deleteOf("team_2")?.findComponent({ name: "OTooltip" }).props("content")).toBe(
+      const blocked = wrapper.findComponent('[data-test="oncall-team-delete-team_2"]');
+      expect(blocked.attributes("disabled")).toBeDefined();
+      expect(blocked.attributes("focusable-unavailable")).toBeDefined();
+      expect(blocked.element.parentElement?.textContent).toContain(
         "Make another team the default first",
       );
-      expect(deleteOf("team_2")?.props("focusableUnavailable")).toBe(true);
-      expect(deleteOf("team_1")?.props("disabled")).toBeFalsy();
-      expect(deleteOf("team_1")?.findComponent({ name: "OTooltip" }).exists()).toBe(false);
+      const open = wrapper.find('[data-test="oncall-team-delete-team_1"]');
+      expect(open.attributes("disabled")).toBeUndefined();
+      await open.trigger("click");
+      expect(wrapper.find('[data-test="confirm"]').text()).toContain("Platform");
     });
 
-    it("offers to set as default on every team but the current one", async () => {
+    it("tells the Edit drawer whether the team is already the default", async () => {
       service.getRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_2" } } as any);
       service.listTeams.mockResolvedValue({
         data: [team("team_1", "Platform"), team("team_2", "Payments")],
       } as any);
-
       const wrapper = render();
       await flushPromises();
+      const form = () => wrapper.findComponent({ name: "OnCallTeamForm" });
 
-      expect(wrapper.find('[data-test="oncall-team-set-default-team_1"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="oncall-team-set-default-team_2"]').exists()).toBe(false);
+      await wrapper.find('[data-test="oncall-team-edit-team_2"]').trigger("click");
+      expect(form().props("offerDefault")).not.toBe(false);
+      expect(form().props("isDefault")).toBe(true);
+      await wrapper.find('[data-test="oncall-team-edit-team_1"]').trigger("click");
+      expect(form().props("isDefault")).toBe(false);
     });
 
-    it("nominates the team without a trip to the routing page", async () => {
+    async function savedAsDefault(wrapper: ReturnType<typeof render>) {
+      await wrapper.find('[data-test="oncall-team-edit-team_1"]').trigger("click");
+      wrapper.findComponent({ name: "OnCallTeamForm" }).vm.$emit("saved", "team_1", true);
+      await flushPromises();
+    }
+
+    it("nominates the team when the Edit drawer saves with Default team on", async () => {
       service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
       service.setRoutingConfig.mockResolvedValue({ data: { default_team_id: "team_1" } } as any);
       const wrapper = render();
       await flushPromises();
 
-      await wrapper.find('[data-test="oncall-team-set-default-team_1"]').trigger("click");
-      await flushPromises();
+      await savedAsDefault(wrapper);
 
       expect(service.setRoutingConfig).toHaveBeenCalledWith({
         org_identifier: "default",
@@ -683,8 +693,7 @@ describe("OnCallTeams", () => {
       const wrapper = render();
       await flushPromises();
 
-      await wrapper.find('[data-test="oncall-team-set-default-team_1"]').trigger("click");
-      await flushPromises();
+      await savedAsDefault(wrapper);
 
       expect(mockConfirm).toHaveBeenCalledWith(
         expect.objectContaining({ title: "This team is unstaffed" }),
@@ -748,54 +757,17 @@ describe("OnCallTeams", () => {
     spy.mockRestore();
   });
 
-  /// A phone's action column holds one control, so the row's buttons are mirrored in a menu that must act the same.
-  describe("the phone row menu", () => {
-    const menuStubs = {
-      ...stubs,
-      ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
-      ODropdownItem: {
-        name: "ODropdownItem",
-        emits: ["select"],
-        template: `<button @click="$emit('select')"><slot /></button>`,
-      },
-    };
-
-    async function rendered() {
+  /// A phone keeps both icons in the row: two fit, and a menu of the same two would only add a click.
+  describe("the row on a phone", () => {
+    it("keeps Edit and Delete visible below md", async () => {
       service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
-      const wrapper = mount(OnCallTeams, { global: { plugins: [i18n, store], stubs: menuStubs } });
-      await flushPromises();
-      return wrapper;
-    }
-
-    it("folds Edit into the menu below md, and keeps the menu at every size", async () => {
-      const wrapper = await rendered();
-
-      expect(wrapper.find('[data-test="oncall-team-edit-team_1"]').classes()).toContain(
-        "max-md:hidden",
-      );
-      expect(wrapper.find('[data-test="oncall-team-edit-team_1-menu"]').classes()).toContain(
-        "md:hidden",
-      );
-      expect(wrapper.find('[data-test="oncall-teams-row-more-actions"]').classes()).not.toContain(
-        "md:hidden",
-      );
-    });
-
-    it("edits the team the row is for", async () => {
-      const wrapper = await rendered();
-      await wrapper.find('[data-test="oncall-team-edit-team_1-menu"]').trigger("click");
+      const wrapper = render();
       await flushPromises();
 
-      expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("team")).toEqual(
-        expect.objectContaining({ id: "team_1" }),
-      );
-    });
-
-    it("asks before deleting, as the button does", async () => {
-      const wrapper = await rendered();
-      await wrapper.find('[data-test="oncall-team-delete-team_1"]').trigger("click");
-
-      expect(wrapper.find('[data-test="confirm"]').text()).toContain("Platform");
+      for (const id of ["oncall-team-edit-team_1", "oncall-team-delete-team_1"]) {
+        expect(wrapper.find(`[data-test="${id}"]`).classes()).not.toContain("max-md:hidden");
+      }
+      expect(wrapper.find('[data-test="oncall-team-edit-team_1-menu"]').exists()).toBe(false);
     });
   });
 });

@@ -49,6 +49,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-team-form-description"
       />
 
+      <!-- Saved with the team, after it: the default is a routing setting, so the team's own write goes first. -->
+      <div v-if="isEdit && offerDefault" class="flex flex-col gap-1">
+        <OFormSwitch
+          name="make_default"
+          :label="t('oncall.defaultTeamTitle')"
+          :disabled="isDefault"
+          data-test="oncall-team-form-default"
+        />
+        <OText variant="meta" data-test="oncall-team-form-default-hint">
+          {{ isDefault ? t("oncall.deleteDefaultTeamBlocked") : t("oncall.defaultTeamBadgeTip") }}
+        </OText>
+      </div>
+
       <!-- The fields above are the whole of what this drawer can change. A
            reader who opened it to fix "nobody on call" needs a way out to the
            screen that actually holds members/schedule/escalation, or the
@@ -149,6 +162,8 @@ import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OFormTime from "@/lib/forms/Time/OFormTime.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
@@ -183,10 +198,16 @@ import { makeOnCallTeamSchema, type OnCallTeamFormValues } from "./OnCallTeamFor
 
 const FORM_ID = "oncall-team-form";
 
-const props = defineProps<{ open: boolean; team: OnCallTeam | null }>();
+const props = defineProps<{
+  open: boolean;
+  team: OnCallTeam | null;
+  /** Shows the Default team switch; the host sets the default when `saved` says so. */
+  offerDefault?: boolean;
+  isDefault?: boolean;
+}>();
 const emit = defineEmits<{
   "update:open": [value: boolean];
-  saved: [teamId: string];
+  saved: [teamId: string, makeDefault: boolean];
 }>();
 
 const { t } = useI18nTyped();
@@ -261,6 +282,7 @@ const defaultValues = computed<OnCallTeamFormValues>(() => {
     // Ticked. A team with one position and no backup is the state almost
     // nobody wants and nobody notices until a page goes unanswered.
     create_secondary: true,
+    make_default: !!props.isDefault,
   };
 });
 
@@ -346,7 +368,7 @@ async function onSubmit(values: OnCallTeamFormValues) {
       variant: "success",
       message: props.team ? t("oncall.teamUpdated") : t("oncall.teamCreated"),
     });
-    emit("saved", teamId);
+    emit("saved", teamId, !!props.offerDefault && !props.isDefault && !!values.make_default);
   } catch (err: any) {
     noteConfigurationDenied(err);
     toast({

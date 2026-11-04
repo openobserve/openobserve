@@ -882,9 +882,9 @@ describe("OnCallMembers", () => {
       await flushPromises();
 
       await wrapper.find('[data-test="oncall-members-mark-away-m1"]').trigger("click");
-      expect(wrapper.find('[data-test="oncall-members-away-zone"]').text()).toContain(
-        "Asia/Kolkata",
-      );
+      expect(
+        wrapper.find('[data-test="oncall-members-away-zone"]').attributes("aria-label"),
+      ).toContain("Asia/Kolkata");
       await wrapper
         .find('[data-test="oncall-members-away-from-date"] input')
         .setValue("2026-11-02");

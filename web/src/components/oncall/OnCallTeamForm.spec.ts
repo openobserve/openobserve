@@ -608,7 +608,62 @@ describe("OnCallTeamForm", () => {
     await submit(wrapper);
     await flushPromises();
 
-    expect(wrapper.emitted("saved")?.[0]).toEqual(["team_new"]);
+    expect(wrapper.emitted("saved")?.[0]).toEqual(["team_new", false]);
+  });
+
+  describe("Default team switch", () => {
+    const TEAM = { id: "t1", name: "Payments", timezone: "UTC" };
+    function renderEdit(props: Record<string, unknown>) {
+      return mount(OnCallTeamForm, {
+        props: { open: true, team: TEAM as any, ...props },
+        global: { plugins: [i18n, store], stubs },
+      });
+    }
+    const toggle = (wrapper: any) => wrapper.find('[data-test="oncall-team-form-default"]');
+
+    it("is absent unless the host offers it", async () => {
+      const wrapper = renderEdit({});
+      await flushPromises();
+      expect(toggle(wrapper).exists()).toBe(false);
+    });
+
+    /// Off until switched on; Save, not the switch, asks the host to nominate the team.
+    it("asks the host to make the team default only when switched on and saved", async () => {
+      oncall.updateTeam.mockResolvedValue({ data: TEAM } as any);
+      const wrapper = renderEdit({ offerDefault: true, isDefault: false });
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-team-form-default-hint"]').text()).toBe(
+        "Gets every alert no team owns",
+      );
+
+      await toggle(wrapper).find('button, [role="switch"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.emitted("saved")).toBeUndefined();
+      await submit(wrapper);
+      await flushPromises();
+      expect(wrapper.emitted("saved")?.[0]).toEqual(["t1", true]);
+    });
+
+    it("saves without nominating when left off", async () => {
+      oncall.updateTeam.mockResolvedValue({ data: TEAM } as any);
+      const wrapper = renderEdit({ offerDefault: true, isDefault: false });
+      await flushPromises();
+      await submit(wrapper);
+      await flushPromises();
+      expect(wrapper.emitted("saved")?.[0]).toEqual(["t1", false]);
+    });
+
+    /// The default can only move to another team, so its own switch is on, off-limits, and says how.
+    it("is on and locked for the default team, saying how to change it", async () => {
+      const wrapper = renderEdit({ offerDefault: true, isDefault: true });
+      await flushPromises();
+      const control = toggle(wrapper).find('[role="switch"]');
+      expect(control.attributes("aria-checked")).toBe("true");
+      expect(control.attributes("disabled")).toBeDefined();
+      expect(wrapper.find('[data-test="oncall-team-form-default-hint"]').text()).toBe(
+        "Make another team the default first",
+      );
+    });
   });
 
   it("keeps Save on the edit drawer", async () => {

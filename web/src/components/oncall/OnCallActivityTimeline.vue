@@ -31,8 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @pointerover="onPointerOver"
     @pointerout="onPointerOut"
   >
+    <!-- Pinned past the page's bottom padding and across the card's side padding, so no row shows below or beside it. -->
     <ActivityTimeline
-      :composer-class="pinComposer ? 'bg-surface-base sticky bottom-0 z-10 pb-2' : ''"
+      :composer-class="pinComposer ? PINNED_COMPOSER : ''"
       :events="visibleEvents"
       :submitting="submitting"
       :show-scroll-buttons="showScrollButtons"
@@ -95,6 +96,9 @@ import {
   timelineStamp,
 } from "@/utils/oncall";
 import type { OnCallResponseEvent, ResponseEventKind } from "@/ts/interfaces/oncall";
+
+const PINNED_COMPOSER =
+  "border-border-default bg-surface-base shadow-sticky-footer sticky -bottom-page-edge z-10 -mx-4 border-t px-4 pb-5";
 
 interface Props {
   events: OnCallResponseEvent[];

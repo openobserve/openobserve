@@ -105,6 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-sm font-semibold">{{ t("common.timeRangeRecent") }}</span>
           </div>
           <div
+            v-if="!(hideClipboard && disableRelative)"
             class="border-border-default row-start-1 flex min-w-0 items-center gap-1 border-b px-3 py-2"
             :class="showRail ? 'col-start-2 max-sm:order-3' : 'col-start-1'"
           >
@@ -129,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
             <div v-else class="flex-1" />
-            <OTooltip :content="t('common.copyRange')">
+            <OTooltip v-if="!hideClipboard" :content="t('common.copyRange')">
               <OButton
                 data-test="date-time-copy-btn"
                 variant="ghost"
@@ -139,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="copyRange"
               />
             </OTooltip>
-            <OTooltip :content="t('common.pasteRange')">
+            <OTooltip v-if="!hideClipboard" :content="t('common.pasteRange')">
               <OButton
                 data-test="date-time-paste-btn"
                 variant="ghost"
@@ -544,6 +545,16 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Starts the picker on this IANA zone and keeps zone changes local to it instead of writing the app's timezone. */
+    pickerTimezone: {
+      type: String,
+      default: "",
+    },
+    /** Drops the copy and paste range buttons; a date-only picker then loses its whole top row. */
+    hideClipboard: {
+      type: Boolean,
+      default: false,
+    },
     hideRangeShift: {
       type: Boolean,
       default: false,
@@ -601,6 +612,10 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const store = useStore();
+    const pickerZone = ref(props.pickerTimezone);
+    const zone = computed<string>(() =>
+      props.pickerTimezone ? pickerZone.value : store.state.timezone,
+    );
     const { t, locale } = useI18nTyped();
     const selectedType = ref("relative");
     const selectedTime = ref({
@@ -635,7 +650,7 @@ export default defineComponent({
     const showRail = computed(() => !props.disableRelative);
     const lastValidCustomValue = ref(15);
     const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const timezone = ref(currentTimezone);
+    const timezone = ref(props.pickerTimezone || currentTimezone);
     let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz) => {
       return tz;
     });
@@ -645,22 +660,28 @@ export default defineComponent({
     // Add the UTC option
     timezoneOptions.unshift("UTC");
     timezoneOptions.unshift(browserTime);
+    if (props.pickerTimezone && !timezoneOptions.includes(props.pickerTimezone)) {
+      timezoneOptions.unshift(props.pickerTimezone);
+    }
 
     const onTimezoneChange = async () => {
       let selectedTimezone = timezone.value;
       if (selectedTimezone.toLowerCase() == browserTime.toLowerCase()) {
         selectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       }
-      //Intl.DateTimeFormat().resolvedOptions().timeZone
-      useLocalTimezone(selectedTimezone);
-      store.dispatch("setTimezone", selectedTimezone);
+      if (props.pickerTimezone) {
+        pickerZone.value = selectedTimezone;
+      } else {
+        useLocalTimezone(selectedTimezone);
+        store.dispatch("setTimezone", selectedTimezone);
+      }
       await nextTick();
       if (props.autoApply) {
         if (selectedType.value == "absolute") saveDate("absolute");
         else saveDate("relative");
       }
 
-      emit("on:timezone-change");
+      emit("on:timezone-change", selectedTimezone);
     };
 
     // if initial timezone is provided
@@ -733,10 +754,10 @@ export default defineComponent({
     const calendarTooltip = (token: string | null) =>
       token === null
         ? undefined
-        : (formatCalendarTooltip(token, store.state.timezone, tooltipNow.value) ?? undefined);
+        : (formatCalendarTooltip(token, zone.value, tooltipNow.value) ?? undefined);
 
     const calendarExceedsRestriction = (token: string | null) => {
-      const range = resolveCalendarPeriod(token, store.state.timezone, tooltipNow.value);
+      const range = resolveCalendarPeriod(token, zone.value, tooltipNow.value);
       return (
         !!range &&
         exceedsRangeRestriction(range.startTime, range.endTime, props.queryRangeRestrictionInHour)
@@ -745,10 +766,10 @@ export default defineComponent({
 
     // Each token is resolved once; tooltip and restriction both read that one range.
     const resolvePresetState = (token: string, nowMs: number): CalendarPresetState => {
-      const range = resolveCalendarPeriod(token, store.state.timezone, nowMs);
+      const range = resolveCalendarPeriod(token, zone.value, nowMs);
       if (!range) return { tooltip: undefined, disabled: false };
       return {
-        tooltip: formatResolvedCalendarTooltip(token, range, store.state.timezone),
+        tooltip: formatResolvedCalendarTooltip(token, range, zone.value),
         disabled: exceedsRangeRestriction(
           range.startTime,
           range.endTime,
@@ -759,7 +780,7 @@ export default defineComponent({
 
     // A finished period only moves when the picker's day changes, so a hover that bumps the clock keeps it cached.
     const pickerDay = computed(() =>
-      timestampToTimezoneDate(tooltipNow.value, store.state.timezone, "yyyy/MM/dd"),
+      timestampToTimezoneDate(tooltipNow.value, zone.value, "yyyy/MM/dd"),
     );
 
     const pastPresetStates = computed(() => {
@@ -807,9 +828,9 @@ export default defineComponent({
       const current = selectedType.value === "absolute" ? getUTCTimeStamp() : null;
       return timeRangeHistory.entries.value.map((entry, index) => ({
         id: String(index),
-        label: formatRecentRange(entry.startUs, entry.endUs, store.state.timezone),
-        parts: formatRecentRangeParts(entry.startUs, entry.endUs, store.state.timezone),
-        tooltip: formatRangeTooltip(entry.startUs, entry.endUs, store.state.timezone),
+        label: formatRecentRange(entry.startUs, entry.endUs, zone.value),
+        parts: formatRecentRangeParts(entry.startUs, entry.endUs, zone.value),
+        tooltip: formatRangeTooltip(entry.startUs, entry.endUs, zone.value),
         selected:
           current !== null && current.startUTC === entry.startUs && current.endUTC === entry.endUs,
         disabled: exceedsRangeRestriction(
@@ -848,7 +869,7 @@ export default defineComponent({
 
     const calendarMaxDate = computed(() => {
       if (props.maxDate) return props.maxDate;
-      return timestampToTimezoneDate(new Date().getTime(), store.state.timezone, "yyyy/MM/dd");
+      return timestampToTimezoneDate(new Date().getTime(), zone.value, "yyyy/MM/dd");
     });
 
     onMounted(() => {
@@ -980,7 +1001,7 @@ export default defineComponent({
     };
 
     const setRelativeTime = (period: string) => {
-      const calendarRange = resolveCalendarPeriod(period, store.state.timezone);
+      const calendarRange = resolveCalendarPeriod(period, zone.value);
       if (calendarRange && props.calendarPresets) {
         calendarToken.value = period;
         return;
@@ -1059,7 +1080,7 @@ export default defineComponent({
     };
 
     function convertUnixTime(unixTimeMicros: number) {
-      return formatAbsoluteInstant(unixTimeMicros, store.state.timezone);
+      return formatAbsoluteInstant(unixTimeMicros, zone.value);
     }
 
     const refresh = () => {
@@ -1215,7 +1236,7 @@ export default defineComponent({
     const getConsumableDateTime = (): ConsumableDateTime => {
       const calendarRange =
         selectedType.value === "relative"
-          ? resolveCalendarPeriod(calendarToken.value, store.state.timezone)
+          ? resolveCalendarPeriod(calendarToken.value, zone.value)
           : null;
       if (calendarRange) {
         return { ...calendarRange, relativeTimePeriod: calendarToken.value };
@@ -1299,20 +1320,19 @@ export default defineComponent({
     const getUTCTimeStamp = () => {
       let startTime = selectedDate.value.from + " " + selectedTime.value.startTime;
       let endTime = selectedDate.value.to + " " + selectedTime.value.endTime;
-      const startUTC = convertToUtcTimestamp(startTime, store.state.timezone);
+      const startUTC = convertToUtcTimestamp(startTime, zone.value);
       const untouchedSeededEnd =
         seededEnd !== null &&
         seededEnd.date === selectedDate.value.to &&
         seededEnd.time === selectedTime.value.endTime;
       // The shown last second stands for the exclusive end one second later, in whatever zone is now selected.
       const endUTC =
-        convertToUtcTimestamp(endTime, store.state.timezone) +
-        (untouchedSeededEnd ? MICROS_PER_SECOND : 0);
+        convertToUtcTimestamp(endTime, zone.value) + (untouchedSeededEnd ? MICROS_PER_SECOND : 0);
       return { startUTC, endUTC };
     };
 
     const setSavedDate = (dateobj: any) => {
-      timezone.value = store.state.timezone;
+      timezone.value = zone.value;
       selectedType.value = dateobj.type;
 
       if (dateobj.type === "relative") {
@@ -1382,7 +1402,7 @@ export default defineComponent({
         showsApplied && appliedCalendarToken.value !== null
           ? formatCalendarLabel(
               appliedCalendarToken.value,
-              store.state.timezone,
+              zone.value,
               t,
               intlLocale.value,
               tooltipNow.value,
@@ -1405,7 +1425,7 @@ export default defineComponent({
         !props.disableRelative && selectedType.value === "relative" && calendarToken.value !== null
           ? formatCalendarLabel(
               calendarToken.value,
-              store.state.timezone,
+              zone.value,
               t,
               intlLocale.value,
               tooltipNow.value,
@@ -1459,7 +1479,7 @@ export default defineComponent({
     // inverse of convertUnixTime.
     const absoluteToMicros = (date: string, time: string): number => {
       const iso = `${date.replace(/\//g, "-")}T${time}`;
-      return fromZonedTime(iso, store.state.timezone).getTime() * 1000;
+      return fromZonedTime(iso, zone.value).getTime() * 1000;
     };
 
     const finalizeAbsoluteRange = (startMicros: number, endMicros: number) => {
@@ -1631,7 +1651,7 @@ export default defineComponent({
     const shiftTimeRange = (direction: "prev" | "next") => {
       if (selectedType.value === "relative" && calendarToken.value !== null) {
         const shifted = shiftCalendarToken(calendarToken.value, direction === "prev" ? -1 : 1);
-        if (shifted === null || !resolveCalendarPeriod(shifted, store.state.timezone)) return;
+        if (shifted === null || !resolveCalendarPeriod(shifted, zone.value)) return;
         refreshTooltipNow();
         // A partial period can step into a full one longer than the page allows, which the rail would have refused.
         if (calendarExceedsRestriction(shifted)) {
@@ -1670,7 +1690,7 @@ export default defineComponent({
 
     const forwardCeilingMicros = () =>
       props.maxDate
-        ? convertToUtcTimestamp(`${props.maxDate} 23:59:59`, store.state.timezone)
+        ? convertToUtcTimestamp(`${props.maxDate} 23:59:59`, zone.value)
         : Date.now() * 1000;
 
     const isNextShiftDisabled = () => {

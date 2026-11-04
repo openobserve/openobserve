@@ -193,8 +193,22 @@ describe("OnCallActivityTimeline", () => {
     const composer = wrapper
       .find('[data-test="oncall-response-note-input"]')
       .element.closest(".pt-2");
-    expect(composer?.className).toContain("sticky");
-    expect(composer?.className).toContain("bottom-0");
-    expect(composer?.className).toContain("bg-surface-base");
+    const classes = composer?.className.split(" ") ?? [];
+    expect(classes).toEqual(expect.arrayContaining(["sticky", "bg-surface-base", "border-t"]));
+    // Past the page's bottom padding and across the card's side padding, so no row shows around it.
+    expect(classes).toEqual(expect.arrayContaining(["-bottom-page-edge", "-mx-4", "px-4"]));
+  });
+
+  it("leaves the note box in the flow when not pinned", async () => {
+    const wrapper = mount(OnCallActivityTimeline, {
+      props: { events, commentText: "", openedAt: OPENED },
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+
+    const composer = wrapper
+      .find('[data-test="oncall-response-note-input"]')
+      .element.closest(".pt-2");
+    expect(composer?.className).not.toContain("sticky");
   });
 });

@@ -175,68 +175,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
 
-      <!-- Edit is the one inline icon; setting the default and deleting are rarer and share the ⋯ menu. -->
+      <!-- Two fixed slots, so Edit and Delete line up on every row; the default is set from the Edit drawer. -->
       <template #cell-actions="{ row }">
-        <div class="flex items-center justify-end">
+        <div v-if="canConfigure" class="flex items-center justify-center gap-1">
           <OButton
-            v-if="canConfigure"
             variant="ghost"
             size="icon-sm"
             icon-left="edit"
-            class="max-md:hidden"
             :aria-label="t('oncall.editTeam')"
             :data-test="`oncall-team-edit-${row.id}`"
             @click.stop="openEdit(row)"
           >
             <OTooltip side="bottom" :content="t('oncall.editTeam')" />
           </OButton>
-          <ODropdown v-if="canConfigure" side="bottom" align="end">
-            <template #trigger>
-              <OButton
-                icon-left="more-vert"
-                variant="ghost"
-                size="icon-sm"
-                :loading="settingDefaultTeamId === row.id"
-                :aria-label="t('oncall.moreActions')"
-                data-test="oncall-teams-row-more-actions"
-                @click.stop
-              />
-            </template>
-            <ODropdownItem
-              icon-left="edit"
-              class="md:hidden"
-              :data-test="`oncall-team-edit-${row.id}-menu`"
-              @select="openEdit(row)"
-            >
-              <span>{{ t("oncall.editTeam") }}</span>
-            </ODropdownItem>
-            <ODropdownItem
-              v-if="row.id !== defaultTeamId"
-              icon-left="flag"
-              :data-test="`oncall-team-set-default-${row.id}`"
-              @select="setDefaultTeam(row)"
-            >
-              <span>{{ t("oncall.setDefaultTeam") }}</span>
-            </ODropdownItem>
-            <!-- The server refuses to delete the default team, so its Delete stays visible but says why it is off. -->
-            <ODropdownItem
+          <!-- The server refuses to delete the default team, so its Delete stays in its slot and says why it is off. -->
+          <OTooltip
+            v-if="row.id === defaultTeamId"
+            side="bottom"
+            :content="t('oncall.deleteDefaultTeamBlocked')"
+          >
+            <OButton
+              variant="ghost-destructive"
+              size="icon-sm"
               icon-left="delete-outline"
-              variant="destructive"
-              :disabled="row.id === defaultTeamId"
-              :focusable-unavailable="row.id === defaultTeamId"
+              disabled
+              focusable-unavailable
+              :aria-label="t('oncall.deleteTeam')"
               :data-test="`oncall-team-delete-${row.id}`"
-              @select="teamToDelete = row"
-            >
-              <span class="flex-1">
-                {{ t("oncall.deleteTeam") }}
-                <OTooltip
-                  v-if="row.id === defaultTeamId"
-                  side="right"
-                  :content="t('oncall.deleteDefaultTeamBlocked')"
-                />
-              </span>
-            </ODropdownItem>
-          </ODropdown>
+              @click.stop
+            />
+          </OTooltip>
+          <OButton
+            v-else
+            variant="ghost-destructive"
+            size="icon-sm"
+            icon-left="delete-outline"
+            :aria-label="t('oncall.deleteTeam')"
+            :data-test="`oncall-team-delete-${row.id}`"
+            @click.stop="teamToDelete = row"
+          >
+            <OTooltip side="bottom" :content="t('oncall.deleteTeam')" />
+          </OButton>
         </div>
       </template>
 
@@ -288,7 +267,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OTable>
 
-    <OnCallTeamForm v-model:open="formOpen" :team="editingTeam" @saved="onSaved" />
+    <OnCallTeamForm
+      v-model:open="formOpen"
+      :team="editingTeam"
+      offer-default
+      :is-default="!!editingTeam && editingTeam.id === defaultTeamId"
+      @saved="onSaved"
+    />
 
     <!-- Named in the prompt: deleting the wrong rotation silently stops
          paging, and the team name is the only thing that distinguishes two
@@ -320,8 +305,6 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -389,8 +372,6 @@ const teamToDelete = ref<OnCallTeam | null>(null);
 // Undefined = not fetched yet, so a team in flight reads as loading rather
 // than as an empty rotation.
 const onCallByTeam = ref<Record<string, OnCallPosition[]>>({});
-// Which row's default-team save is in flight, for the same reason.
-const settingDefaultTeamId = ref<string | null>(null);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const defaultTeamId = computed(() => routingConfig.value?.default_team_id ?? "");
@@ -665,7 +646,6 @@ async function setDefaultTeam(team: OnCallTeam) {
     if (!proceed) return;
   }
 
-  settingDefaultTeamId.value = team.id;
   try {
     await setRoutingConfigWrite.mutateAsync(team.id);
     // Unforced: the write expired the entry, so this repaints from one server read.
@@ -680,8 +660,6 @@ async function setDefaultTeam(team: OnCallTeam) {
           ? t("oncall.configDenied")
           : raw(err?.response?.data?.message) || t("oncall.defaultTeamSaveFailed"),
     });
-  } finally {
-    settingDefaultTeamId.value = null;
   }
 }
 
@@ -716,13 +694,14 @@ function onEmptyAction(id?: string) {
 }
 
 // A created team opens straight away: its members, schedule and ladder are set up there, not on this list.
-function onSaved(teamId: string) {
-  const created = !editingTeam.value;
+async function onSaved(teamId: string, makeDefault = false) {
+  const edited = editingTeam.value;
   formOpen.value = false;
-  if (created && teamId) {
+  if (!edited && teamId) {
     openTeam({ id: teamId });
     return;
   }
+  if (makeDefault && edited) await setDefaultTeam(edited);
   fetchTeams();
 }
 

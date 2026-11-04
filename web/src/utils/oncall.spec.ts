@@ -37,6 +37,7 @@ import {
   describeTarget,
   formatInZone,
   formatMinuteOfDay,
+  formatZonedRange,
   fromZonedInputValue,
   groupBySubject,
   holderStretches,
@@ -1208,6 +1209,29 @@ describe("resolvableTimezones", () => {
   it("adds a preferred zone missing from the list, without duplicating one already in it", () => {
     expect(resolvableTimezones("US/Eastern")).toContain("US/Eastern");
     expect(resolvableTimezones("UTC").filter((z) => z === "UTC")).toHaveLength(1);
+  });
+});
+
+describe("formatZonedRange", () => {
+  const FROM = Date.UTC(2026, 10, 4, 0, 0) * 1000;
+  const TO = Date.UTC(2026, 10, 5, 0, 0) * 1000;
+
+  it("states both ends on one clock, without a zone by default", () => {
+    expect(formatZonedRange(FROM, TO, "Asia/Kolkata", false, "en-GB")).toBe(
+      "Wed 4 Nov, 05:30 → Thu 5 Nov, 05:30",
+    );
+  });
+
+  it("names the zone once, at the end, when asked", () => {
+    expect(formatZonedRange(FROM, TO, "Asia/Kolkata", true, "en-GB")).toBe(
+      "Wed 4 Nov, 05:30 → Thu 5 Nov, 05:30 GMT+5:30",
+    );
+  });
+
+  it("falls back to UTC for a zone the runtime does not know", () => {
+    expect(formatZonedRange(FROM, TO, "Not/AZone", true, "en-GB")).toBe(
+      "Wed 4 Nov, 00:00 → Thu 5 Nov, 00:00",
+    );
   });
 });
 

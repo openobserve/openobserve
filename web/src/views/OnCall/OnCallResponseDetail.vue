@@ -177,6 +177,7 @@
       <ORefreshButton
         v-if="response"
         layout="inline"
+        size="header"
         variant="outline"
         :last-run-at="lastFetchedAt"
         :loading="refreshing"
@@ -336,7 +337,7 @@
         <template #trigger>
           <OButton
             variant="outline"
-            size="icon-toolbar"
+            size="icon-md"
             icon-left="more-vert"
             :loading="snoozing || escalatingNow"
             :aria-label="t('oncall.moreActions')"

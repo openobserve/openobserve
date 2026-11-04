@@ -121,6 +121,7 @@ const stubs = {
     name: "OFormDateTimeRange",
     props: ["name"],
     template: `<span :data-test-field="name" :data-test-type="value?.type">
+      <slot name="label-append" />
       <slot name="above" />
       <button data-test="window-pick" @click="set(PICKED)">{{ error }}</button>
       <button data-test="window-clear" @click="set(undefined)"></button>
@@ -245,12 +246,37 @@ describe("OnCallCoverForm — which clock the times are on", () => {
 
     expect(fieldText(wrapper)).toContain("→");
     expect(fieldText(wrapper)).toMatch(/\d{2}:\d{2}/);
-    expect(fieldText(wrapper)).toContain("UTC");
+    expect(fieldText(wrapper).match(/UTC/g)).toHaveLength(1);
+    expect(fieldText(wrapper)).toMatch(/ UTC$/);
+  });
+
+  /// The picker opens on the team's clock, so its zone and the closed field agree.
+  it("opens the picker on the team's zone, without the copy and paste row", () => {
+    const wrapper = renderCover({ timezone: IST, viewerTimezone: "UTC" });
+    const picker = wrapper.findComponent({ name: "OFormDateTimeRange" });
+
+    expect(picker.attributes("picker-timezone")).toBe(IST);
+    expect(picker.attributes()).toHaveProperty("hide-clipboard");
+  });
+
+  /// Another zone picked in the picker leaves the field on team time, and the tooltip restates the picked one.
+  it("keeps the field on team time when another zone is picked, and names the picked range", async () => {
+    const wrapper = renderCover({ timezone: IST, viewerTimezone: IST });
+    await flushPromises();
+    expect(fieldText(wrapper)).not.toContain("GMT");
+
+    wrapper.findComponent({ name: "OFormDateTimeRange" }).vm.$emit("on:timezone-change", "UTC");
+    await flushPromises();
+
+    expect(fieldText(wrapper)).toMatch(/ GMT\+5:30$/);
+    const info = wrapper.findComponent({ name: "OnCallZoneInfo" });
+    expect(info.props("pickedTimezone")).toBe("UTC");
+    expect(info.props("timezone")).toBe(IST);
   });
 
   // C8: a cover looks ahead, so the calendar runs from today to the 730-day limit, on the picker's clock.
   it("offers today up to 730 days ahead, and says a refusal under the picker", () => {
-    const wrapper = renderCover({ viewerTimezone: IST });
+    const wrapper = renderCover({ timezone: IST, viewerTimezone: "UTC" });
     const day = (micros: number) => toZonedInputValue(micros, IST).slice(0, 10).replace(/-/g, "/");
     const now = Date.now() * 1000;
 

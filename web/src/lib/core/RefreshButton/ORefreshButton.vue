@@ -95,12 +95,12 @@ function handleClick(e: MouseEvent) {
 </script>
 
 <template>
-  <!-- `h-8!` beats sm-toolbar's own 30px, so this matches the 32px icon-sm buttons beside it. -->
+  <!-- The forced height beats sm-toolbar's own 30px: 32px beside icon-sm toolbar buttons, 34px beside sm header buttons. -->
   <OButton
     v-if="layout === 'inline'"
     :variant="variant"
     size="sm-toolbar"
-    class="h-8!"
+    :class="size === 'header' ? 'h-8.5!' : 'h-8!'"
     icon-left="refresh"
     :loading="loading"
     :disabled="disabled"

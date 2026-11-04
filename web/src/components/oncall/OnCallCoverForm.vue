@@ -123,11 +123,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           disable-relative
           auto-apply
           :trigger-text="windowLabel"
+          :picker-timezone="pickedZone"
+          hide-clipboard
           show-error
           :min-date="calendarDay(0)"
           :max-date="calendarDay(MAX_AHEAD_MICROS)"
           data-test="oncall-cover-window"
+          @on:timezone-change="(zone: string) => (pickedZone = zone)"
         >
+          <template #label-append>
+            <OnCallZoneInfo
+              :timezone="timezone"
+              :viewer-timezone="viewerTimezone"
+              :picked-timezone="pickedZone"
+              :range="windowValue"
+            />
+          </template>
           <!-- The presets set this same field, so they sit inside it; the one matching the range is lit. -->
           <template #above>
             <span class="flex flex-wrap gap-2" data-test="oncall-cover-presets">
@@ -193,9 +204,15 @@ export interface UpcomingShift extends Shift {
   rotationId: string;
   rotationName: string;
 }
-import { formatInZone, fromZonedInputValue, toZonedInputValue } from "@/utils/oncall";
+import {
+  formatInZone,
+  formatZonedRange,
+  fromZonedInputValue,
+  toZonedInputValue,
+} from "@/utils/oncall";
 import { MAX_AHEAD_MICROS, makeOnCallCoverSchema } from "./OnCallCoverForm.schema";
 import OnCallPersonName from "./OnCallPersonName.vue";
+import OnCallZoneInfo from "./OnCallZoneInfo.vue";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 
 /**
@@ -219,19 +236,7 @@ const props = withDefaults(
     saving?: boolean;
     /** Who currently holds the shift; hosts still pass it, nothing on the form names them. */
     currentHolder?: string | null;
-    /**
-     * The clock the RANGE CONTROL edits in — the reader's own, which is not
-     * necessarily the team's.
-     *
-     * Passed in rather than read off the store because the picker takes it from
-     * there and this component does not: a summary that quietly restated the
-     * reader's 22:00 as the team's 16:30, with nothing on screen saying which
-     * clock either number was on, is the defect. Both are now named.
-     *
-     * Not fixed by handing the picker `initial-timezone` either — that DISPATCHES
-     * the zone into the store and persists it, so opening this dialog would
-     * change the reader's timezone for the whole app.
-     */
+    /** The reader's own clock; the zone is named in the field, and the window restated in the tooltip, when it is not the team's. */
     viewerTimezone?: string;
     /** Named in the confirmation, because a cover is always a cover OF a team. */
     teamName?: string;
@@ -466,10 +471,19 @@ function applyPreset(key: (typeof PRESETS)[number]["key"]) {
 const activePreset = ref<string | null>(null);
 let presetApplied: { key: string; from: number; to: number } | null = null;
 
+/// The zone the picker reads its fields in: the team's when it opens, and the reader may pick another.
+const pickedZone = ref(props.timezone);
+watch(
+  () => [props.open, props.timezone] as const,
+  ([isOpen]) => {
+    if (isOpen) pickedZone.value = props.timezone;
+  },
+);
+
 /// The picker's calendar day `aheadMicros` from now, on the clock the picker shows.
 function calendarDay(aheadMicros: number): string {
   const at = Date.now() * 1000 + aheadMicros;
-  return toZonedInputValue(at, props.viewerTimezone).slice(0, 10).replace(/-/g, "/");
+  return toZonedInputValue(at, pickedZone.value).slice(0, 10).replace(/-/g, "/");
 }
 
 watch(windowValue, (value) => {
@@ -478,20 +492,16 @@ watch(windowValue, (value) => {
     applied && value?.from === applied.from && value?.to === applied.to ? applied.key : null;
 });
 
-/// The field states the window on the team's clock, naming the zone only when the reader is on another one.
+/// The field states the window on the team's clock, naming the zone once, at the end, when the picker is on another one.
 const windowLabel = computed<string>(() => {
   const window = windowValue.value;
   if (typeof window?.from !== "number" || typeof window?.to !== "number") return "";
-  const fmt = (micros: number) =>
-    formatInZone(micros, props.timezone, {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      ...(props.timezone === props.viewerTimezone ? {} : { timeZoneName: "short" }),
-    });
-  return `${fmt(window.from)} → ${fmt(window.to)}`;
+  return formatZonedRange(
+    window.from,
+    window.to,
+    props.timezone,
+    props.timezone !== props.viewerTimezone || pickedZone.value !== props.timezone,
+  );
 });
 
 /// Who takes the shift; the window itself is said once, by the field.

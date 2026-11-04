@@ -29,25 +29,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-heading text-sm font-medium"
           data-test="oncall-members-away-person"
         />
-        <!-- The fields read on the team's clock, so its zone shows only when the reader is elsewhere. -->
-        <OTag
-          v-if="timezone !== localZone"
-          variant="default-outline"
-          size="sm"
-          icon="schedule"
-          class="ms-auto shrink-0"
-          data-test="oncall-members-away-zone"
-        >
-          {{ raw(timezone) }}
-          <OTooltip
-            side="bottom"
-            :content="zoneCaption(timezone, localZone, Date.now() * 1000, t)"
-          />
-        </OTag>
       </span>
       <div class="flex flex-col gap-1">
-        <span class="o-input-label text-sm leading-tight font-semibold">
+        <span class="o-input-label flex items-center gap-1 text-sm leading-tight font-semibold">
           {{ t("oncall.awayFrom") }}
+          <OnCallZoneInfo
+            :timezone="timezone"
+            :viewer-timezone="localZone"
+            :range="pickedRange"
+            data-test="oncall-members-away-zone"
+          />
         </span>
         <div class="flex gap-2" data-test="oncall-members-away-from">
           <ODate
@@ -103,21 +94,20 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useMutation } from "@tanstack/vue-query";
 
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
+import OnCallZoneInfo from "@/components/oncall/OnCallZoneInfo.vue";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODate from "@/lib/forms/Date/ODate.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { createUnavailabilityMutation } from "@/services/oncall.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { fromZonedInputValue, toZonedInputValue, zoneCaption } from "@/utils/oncall";
+import { fromZonedInputValue, toZonedInputValue } from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -174,6 +164,11 @@ watch(
 function zonedMicros(date: string, time: string): number {
   return fromZonedInputValue(`${date}T${time}`, props.timezone) ?? Number.NaN;
 }
+
+const pickedRange = computed(() => ({
+  from: zonedMicros(fromDate.value, fromTime.value),
+  to: zonedMicros(toDate.value, toTime.value),
+}));
 
 async function save() {
   saving.value = true;

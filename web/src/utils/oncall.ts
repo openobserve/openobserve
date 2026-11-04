@@ -1507,6 +1507,34 @@ export function formatInZone(
   }
 }
 
+const RANGE_END_OPTS: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
+/** `Thu 5 Nov, 05:30 → Fri 6 Nov, 05:30` on one clock, with that clock's short name once at the end when `withZone`. [pure] */
+export function formatZonedRange(
+  from: number,
+  to: number,
+  timezone: string,
+  withZone = false,
+  locale?: string,
+): string {
+  const range = `${formatInZone(from, timezone, RANGE_END_OPTS, locale)} → ${formatInZone(to, timezone, RANGE_END_OPTS, locale)}`;
+  if (!withZone) return range;
+  try {
+    const zoneName = new Intl.DateTimeFormat(locale, { timeZone: timezone, timeZoneName: "short" })
+      .formatToParts(new Date(to / 1000))
+      .find((part) => part.type === "timeZoneName")?.value;
+    return zoneName ? `${range} ${zoneName}` : range;
+  } catch {
+    return range;
+  }
+}
+
 /** Weekday, date and 24-hour time in the schedule's timezone: the drawer's one stamp for an instant. [pure] */
 export function formatStamp(micros: number, timezone: string): string {
   return formatInZone(micros, timezone, {
