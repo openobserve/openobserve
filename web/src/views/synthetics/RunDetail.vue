@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #title-trail>
           <OBadge
+            v-if="hasRunStatus"
             :variant="statusBadgeVariant"
             size="sm"
             :icon="statusIcon"
@@ -59,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ statusLabel }}
           </OBadge>
+          <OSkeleton v-else-if="loading" type="text" class="h-6 w-16" />
           <OBadge
             v-if="currentRun.url"
             variant="default"
@@ -1454,6 +1456,8 @@ const currentRun = computed<DisplayRun>(() => {
   if (props.overrideError) return errorToDisplayRun(props.overrideError);
   return toDisplayRun(null);
 });
+// The empty display run defaults to "pass", so only real run data may drive the status badge.
+const hasRunStatus = computed(() => !!synthetics.runDetail.value || !!props.overrideError);
 
 const isFailed = computed(
   () => currentRun.value.status === "fail" || currentRun.value.status === "error",
