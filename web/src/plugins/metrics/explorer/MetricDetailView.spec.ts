@@ -777,6 +777,42 @@ describe("MetricDetailView", () => {
         (config as any).isEnterprise = "true";
       });
 
+      describe("when the license locks correlation", () => {
+        beforeEach(() => {
+          store.state.zoConfig = { ...store.state.zoConfig, features: { correlation: "locked" } };
+        });
+        afterEach(() => {
+          store.state.zoConfig = { ...store.state.zoConfig, features: {} };
+        });
+
+        it("is disabled with the lock, no menu, and reads nothing", async () => {
+          wrapper = mountView();
+          await flushPromises();
+          expect(button().attributes("disabled")).toBeDefined();
+          expect(button().find('[data-test="metrics-detail-drilldown-lock"]').exists()).toBe(true);
+          expect(isMenuTrigger()).toBe(false);
+          expect(drilldownApi.getIdentityConfig).not.toHaveBeenCalled();
+          expect(drilldownApi.getSemanticGroups).not.toHaveBeenCalled();
+          expect(drilldownApi.correlate).not.toHaveBeenCalled();
+        });
+      });
+
+      it("locks the stream items of a locked signal only", async () => {
+        wrapper = mountView();
+        await flushPromises();
+        const vm = wrapper.vm as any;
+        expect(vm.isSignalLocked("logs")).toBe(false);
+        expect(vm.isSignalLocked("traces")).toBe(false);
+        store.state.zoConfig = { ...store.state.zoConfig, features: { traces: "locked" } };
+        try {
+          expect(vm.isSignalLocked("logs")).toBe(false);
+          expect(vm.isSignalLocked("traces")).toBe(true);
+          expect(vm.signalLockedReason("traces")).toMatch(/needs traces/i);
+        } finally {
+          store.state.zoConfig = { ...store.state.zoConfig, features: {} };
+        }
+      });
+
       it("is an enabled dropdown trigger when service discovery is on", async () => {
         wrapper = mountView();
         await flushPromises();

@@ -555,11 +555,6 @@ function exitRollout(id: string, exit: "resume" | "skip" | "rollback", skip: str
       : r.status === "halted" && r.halt?.exits.includes(exit);
   if (!offered) return fail(409, `rollout cannot ${exit} from ${r.status}`);
   const state = store.fleets.find((f) => f.id === r.fleet.id)?.state;
-  if (exit === "rollback" && !state?.stable)
-    return fail(
-      400,
-      `fleet ${r.fleet.id} has no stable version to roll back to; fix forward instead`,
-    );
   if (exit === "rollback") {
     r.status = "rolled_back";
     r.ended_at = Date.now();
@@ -573,6 +568,15 @@ function exitRollout(id: string, exit: "resume" | "skip" | "rollback", skip: str
         verify: false,
         auto_rollback: false,
       });
+    } else {
+      if (state) {
+        state.desired = null;
+        state.rollout = null;
+      }
+      for (const c of store.collectors.filter((x) => x.fleet.id === r.fleet.id)) {
+        c.config = null;
+        c.config_version = null;
+      }
     }
     return reply(r);
   }
@@ -689,7 +693,10 @@ export const fleetMock: FleetApi = {
     store.collectors = store.collectors.filter((c) => c.id !== id);
     return reply(undefined as unknown);
   },
-  restartCollector: () => reply({ queued: true }),
+  restartCollector: (_org, id) =>
+    store.collectors.find((c) => c.id === id)?.status === "offline"
+      ? fail(409, `collector ${id} is offline; restart it when it is back`)
+      : reply({ queued: true }),
   redeliverCollector: (_org, id) => {
     const c = findCollector(id);
     if (c?.config) c.delivery = "assigned";

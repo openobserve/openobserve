@@ -93,6 +93,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-routing-unavailable"
     />
 
+    <LicenseDeniedState
+      v-else-if="licenseDenied"
+      :features="licenseDenied"
+      data-test="oncall-routing-license-denied"
+    />
+
     <OEmptyState
       v-else-if="loadError"
       size="hero"
@@ -440,6 +446,9 @@ import {
   ownershipPath,
   readableConditions,
 } from "@/utils/oncall";
+import { licenseDeniedFeatures } from "@/utils/featureGate";
+import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
@@ -448,6 +457,7 @@ const router = useRouter();
 const route = useRoute();
 const { config: routingConfig, load: loadRoutingConfig } = useOnCallRoutingConfig();
 const defaultTeamCard = ref<InstanceType<typeof OnCallDefaultTeamCard> | null>(null);
+const { locked: correlationLocked } = useLicenseLock("correlation");
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
@@ -460,6 +470,7 @@ const conflict = ref<RoutingPreview | null>(null);
 
 const loaded = ref(false);
 const loadError = ref("");
+const licenseDenied = ref<string[] | null>(null);
 const unavailable = ref(false);
 const signalsError = ref(false);
 // True from mount, not false: the content div renders before `fetchAll`'s
@@ -569,6 +580,7 @@ async function read<T>(
 /// The vocabulary and the queue degrade section-by-section instead.
 async function fetchAll(force = false) {
   loadError.value = "";
+  licenseDenied.value = null;
   try {
     teams.value = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force);
   } catch (err) {
@@ -577,7 +589,8 @@ async function fetchAll(force = false) {
       unavailable.value = true;
       return;
     }
-    loadError.value = errorText(err);
+    licenseDenied.value = licenseDeniedFeatures(err);
+    if (!licenseDenied.value) loadError.value = errorText(err);
     loaded.value = true;
     return;
   }
@@ -591,9 +604,9 @@ async function fetchAll(force = false) {
     fetchRules(force),
     fetchSignals(force),
     fetchAliases(force),
-    fetchCatalogue(force),
-    fetchServices(force),
     loadRoutingConfig(orgId.value),
+    // The rule editor's discovered services and dimensions come from the correlation API.
+    ...(correlationLocked.value ? [] : [fetchCatalogue(force), fetchServices(force)]),
   ]);
   // The oldest of the backbone reads, so the age never claims the page is fresher than it is.
   lastFetchedAt.value = Math.min(

@@ -36,12 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Rail icons are a hair smaller than the md (24px) default. -->
           <OIcon v-if="icon" :name="icon" size="md" class="size-5.5!" />
           <component v-else-if="hasIconComponent" :is="iconComponent" class="o-icon size-5.5" />
-          <div
-            v-if="locked"
-            class="bg-surface-base absolute -top-1 -right-1 z-1 flex h-3.5 w-3.5 items-center justify-center rounded-full"
-          >
-            <OIcon name="lock" size="xs" class="text-warning-600" />
-          </div>
+          <OLockBadge
+            v-if="locked || licenseLocked"
+            :data-test="licenseLocked ? `menu-link-${link}-license-lock` : undefined"
+            :label="licenseLocked ? licenseLockedLabel : undefined"
+          />
           <div
             v-if="badge && badge > 0"
             class="menu-badge text-3xs text-text-inverse shadow-error-500/50 border-menu-badge-ring bg-gradient-notification absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 px-1 leading-none font-bold shadow-md"
@@ -104,6 +103,7 @@ import { injectTooltipRootContext } from "reka-ui";
 import { useTheme } from "@/composables/useTheme";
 import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useIsTruncated } from "@/lib/overlay/Tooltip/useIsTruncated";
 import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
@@ -131,7 +131,7 @@ const TooltipSilencer = defineComponent({
 
 export default defineComponent({
   name: "MenuLink",
-  components: { OIcon, OTooltip, TooltipSilencer },
+  components: { OIcon, OLockBadge, OTooltip, TooltipSilencer },
   // Attrs are re-bound onto the tile element by hand: the tooltip wrapper is a fragment.
   inheritAttrs: false,
   props: {
@@ -217,6 +217,15 @@ export default defineComponent({
     lockedMessage: {
       type: String as unknown as PropType<I18nText>,
       default: raw(""),
+    },
+    // The license locks the feature: badge only, since the real page renders its own locked state.
+    licenseLocked: {
+      type: Boolean,
+      default: false,
+    },
+    licenseLockedLabel: {
+      type: String as unknown as PropType<I18nText>,
+      default: undefined,
     },
   },
   emits: ["trigger"],

@@ -672,6 +672,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
+import { featureState, streamTypeFeature } from "@/utils/featureGate";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import useLogs from "@/composables/useLogs";
@@ -926,6 +928,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
+    const signalLocks = useLicenseLocks();
     const {
       searchObj,
       resetSearchObj,
@@ -1583,7 +1586,8 @@ export default defineComponent({
             const persistedType = restoreLogsStreamType(
               store.state.selectedOrganization.identifier,
             );
-            if (persistedType) {
+            // The page lock reads the URL type, so a remembered locked type would run unlocked.
+            if (persistedType && !signalLocks.isLocked(streamTypeFeature(persistedType))) {
               searchObj.data.stream.streamType = persistedType;
             }
           }
@@ -1653,7 +1657,11 @@ export default defineComponent({
 
     // Helper function to check if the environment is enterprise and super cluster is enabled
     function isEnterpriseClusterEnabled() {
-      return config.isEnterprise === "true" && store.state.zoConfig.super_cluster_enabled;
+      return (
+        config.isEnterprise === "true" &&
+        store.state.zoConfig.super_cluster_enabled &&
+        featureState(store.state.zoConfig.features, "super_cluster") !== "locked"
+      );
     }
 
     // Helper function to check if quick mode is enabled
@@ -3953,7 +3961,9 @@ export default defineComponent({
     };
 
     const permalinkResolveContext = (): ResolveContext => {
-      const superCluster = !!store.state.zoConfig?.super_cluster_enabled;
+      const superCluster =
+        !!store.state.zoConfig?.super_cluster_enabled &&
+        featureState(store.state.zoConfig?.features, "super_cluster") !== "locked";
       return {
         regions: superCluster ? [...(searchObj.meta.regions ?? [])] : [],
         clusters: superCluster ? [...(searchObj.meta.clusters ?? [])] : [],

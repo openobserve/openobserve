@@ -1566,6 +1566,10 @@ export default defineComponent({
         });
         return;
       }
+      if (!text.trim()) {
+        toast({ variant: "info", message: t("common.dateRangePasteEmpty") });
+        return;
+      }
       applyPastedTextWithToast(text);
     };
 

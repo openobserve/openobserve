@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -173,6 +173,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { SERVICE_DIMENSION, readableConditions } from "@/utils/oncall";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 const props = defineProps<{
   teamId: string;
@@ -188,6 +189,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { canConfigure } = useOnCallPermissions();
+const { locked: correlationLocked } = useLicenseLock("correlation");
 
 const rules = ref<OwnershipRuleStats[]>([]);
 const signals = ref<UnroutedSignal[]>([]);
@@ -388,12 +390,24 @@ async function deleteRule() {
   }
 }
 
+// Correlation reads wait for the org config: on a cold load it lands after mount, and empty reads as unlocked.
+let correlationRead = false;
+const configLoaded = computed(() => Object.keys(store.state.zoConfig ?? {}).length > 0);
+watch(
+  [configLoaded, correlationLocked],
+  ([loaded, locked]) => {
+    if (!loaded || locked || correlationRead) return;
+    correlationRead = true;
+    fetchCatalogue();
+    fetchServices();
+  },
+  { immediate: true },
+);
+
 onMounted(() => {
   fetchRules();
   fetchSignals();
   fetchAliases();
-  fetchCatalogue();
-  fetchServices();
   loadRoutingConfig(orgId.value);
 });
 </script>

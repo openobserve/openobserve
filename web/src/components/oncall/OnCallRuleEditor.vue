@@ -65,6 +65,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="oncall-rule-editor-conditions-info"
             />
           </OTooltip>
+          <OIcon
+            v-if="correlationLocked"
+            name="lock"
+            size="sm"
+            class="lock-chip"
+            data-test="oncall-rule-editor-correlation-lock"
+          >
+            <OTooltip side="right" :content="correlationLockedReason" />
+          </OIcon>
         </span>
 
         <OnCallConditionRows
@@ -142,6 +151,7 @@ import type {
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import {
   START_PICKER_DROPDOWN_STYLE,
   claimableDimensions,
@@ -157,6 +167,10 @@ export interface RuleDraft {
 
 /// How much of the unrouted queue the "start from a signal" picker offers.
 const STARTABLE_SHOWN = 20;
+
+// Discovered services and dimension values come from the correlation API; manual entry still works when it is locked.
+const { locked: correlationLocked, lockedReason: correlationLockedReason } =
+  useLicenseLock("correlation");
 
 const props = withDefaults(
   defineProps<{

@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { flushPromises } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
+import { defineComponent } from "vue";
 import { gt } from "@/types/i18n";
 
 const { mockGetStreams } = vi.hoisted(() => ({
@@ -90,6 +91,30 @@ describe("useViewTraceAction", () => {
       useViewTraceAction(gt, searchObj);
 
       expect(mockGetStreams).not.toHaveBeenCalled();
+    });
+
+    // The license lock resolves the real store by injection (its module is preloaded before vi.mock).
+    const inSetup = () => {
+      let action!: ReturnType<typeof useViewTraceAction>;
+      mount(
+        defineComponent({
+          setup() {
+            action = useViewTraceAction(gt, searchObj);
+            return () => null;
+          },
+        }),
+        { global: { provide: { store: mockStore } } },
+      );
+      return action;
+    };
+
+    it("reports traces as unlocked when the license leaves it enabled", () => {
+      expect(inSetup().tracesLocked.value).toBe(false);
+    });
+
+    it("reports the traces license lock while traces is locked", () => {
+      mockStore.state.zoConfig.features = { traces: "locked" };
+      expect(inSetup().tracesLocked.value).toBe(true);
     });
 
     it("gives each caller its own refs so JsonPreview and DetailTable do not share state", () => {

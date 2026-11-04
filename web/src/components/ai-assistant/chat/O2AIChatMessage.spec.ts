@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
+import { createStore } from "vuex";
 import i18n from "@/locales";
 
 vi.mock("dompurify", () => ({
@@ -91,6 +92,49 @@ describe("O2AIChatMessage", () => {
       [{ label: "Open", page: "logs", params: {} }],
       [{ label: "Go", page: "logs", params: {} }],
     ]);
+  });
+
+  it("locks View in Logs, in the block and the tool-call icon, while logs is locked", async () => {
+    const action = {
+      action: "load_query",
+      resource_type: "logs",
+      label: "View in Logs",
+      target: {},
+    };
+    const message = assistant({
+      contentBlocks: [
+        {
+          type: "tool_call",
+          tool: "SearchSQL",
+          message: "m",
+          success: true,
+          navigationAction: action,
+        },
+        { type: "navigation", navigationAction: action },
+      ],
+    });
+    const lockedStore = createStore({ state: { zoConfig: { features: { logs: "locked" } } } });
+    const locked = mount(O2AIChatMessage, {
+      global: { plugins: [i18n, lockedStore] },
+      props: {
+        message,
+        index: 0,
+        isLoading: false,
+        currentAnalyzingMessage: "",
+        expandedToolCalls: new Set<string>(),
+        expandedLogEntries: new Set<string>(),
+      },
+    });
+    const btn = locked.find('[data-test="o2-ai-chat-navigate-locked"]');
+    expect(btn.attributes("disabled")).toBeDefined();
+    await btn.trigger("click");
+    await locked.find('[data-test="o2-ai-chat-tool-navigate-locked"]').trigger("click");
+    expect(locked.emitted("navigate")).toBeUndefined();
+
+    const open = mountMessage(message);
+    expect(open.find('[data-test="o2-ai-chat-navigate-locked"]').exists()).toBe(false);
+    await open.find(".navigation-block-btn").trigger("click");
+    expect(open.emitted("navigate")).toEqual([[action]]);
   });
 
   it("emits retry with the message and like/dislike without arguments", async () => {

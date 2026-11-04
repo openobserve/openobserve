@@ -238,4 +238,70 @@ describe("OnCallOwnership", () => {
       expect.objectContaining({ data: expect.objectContaining({ team_id: "team_1" }) }),
     );
   });
+
+  it("skips the correlation reads while correlation is license-locked", async () => {
+    store.state.zoConfig.features = { correlation: "locked" };
+    try {
+      render();
+      await flushPromises();
+      expect(service.ownershipStats).toHaveBeenCalled();
+      expect(correlation.getServicesList).not.toHaveBeenCalled();
+      expect(correlation.getDimensionAnalytics).not.toHaveBeenCalled();
+    } finally {
+      delete store.state.zoConfig.features;
+    }
+  });
+
+  it("waits for a late config and makes no correlation read when it says locked", async () => {
+    const saved = store.state.zoConfig;
+    store.state.zoConfig = {} as never;
+    try {
+      render();
+      await flushPromises();
+      expect(correlation.getServicesList).not.toHaveBeenCalled();
+      store.state.zoConfig = { ...saved, features: { correlation: "locked" } } as never;
+      await flushPromises();
+      expect(correlation.getServicesList).not.toHaveBeenCalled();
+      expect(correlation.getDimensionAnalytics).not.toHaveBeenCalled();
+    } finally {
+      store.state.zoConfig = saved;
+    }
+  });
+
+  it("reads correlation once the late config lands unlocked", async () => {
+    const saved = store.state.zoConfig;
+    store.state.zoConfig = {} as never;
+    try {
+      render();
+      await flushPromises();
+      store.state.zoConfig = { ...saved } as never;
+      await flushPromises();
+      expect(correlation.getServicesList).toHaveBeenCalledTimes(1);
+      expect(correlation.getDimensionAnalytics).toHaveBeenCalledTimes(1);
+    } finally {
+      store.state.zoConfig = saved;
+    }
+  });
+
+  it("marks the rule editor's conditions locked while correlation is license-locked", async () => {
+    store.state.zoConfig.features = { correlation: "locked" };
+    try {
+      const wrapper = render();
+      await settle();
+      await wrapper.find('[data-test="oncall-ownership-add-rule"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-rule-editor-correlation-lock"]').exists()).toBe(true);
+    } finally {
+      delete store.state.zoConfig.features;
+    }
+  });
+
+  it("shows no lock on the rule editor while correlation is licensed", async () => {
+    const wrapper = render();
+    await settle();
+    await wrapper.find('[data-test="oncall-ownership-add-rule"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-rule-editor-sentence"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-rule-editor-correlation-lock"]').exists()).toBe(false);
+  });
 });

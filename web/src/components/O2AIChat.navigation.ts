@@ -15,6 +15,7 @@
 
 import type { NavigationAction } from "@/ts/interfaces/chat";
 import { raw, type TranslateFn } from "@/types/i18n";
+import { streamTypeFeature } from "@/utils/featureGate";
 
 export interface NavigationRoute {
   path: string;
@@ -173,6 +174,15 @@ export function generateNavigationFromToolResult(
     }),
     target,
   };
+}
+
+const RESOURCE_FEATURES: Record<string, string> = { alert: "alerts", dashboard: "dashboards" };
+
+/** License key of the page a navigation action opens; null when that page has no key. */
+export function navigationFeature(action: NavigationAction): string | null {
+  return action.action === "load_query"
+    ? streamTypeFeature(action.resource_type)
+    : (RESOURCE_FEATURES[action.resource_type] ?? null);
 }
 
 export function navigationPageName(action: NavigationAction): string {
