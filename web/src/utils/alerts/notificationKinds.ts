@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nKey, useI18nTyped } from "@/types/i18n";
+
 /** The notification kinds a template can apply to, in the editor's chip order. */
 export const NOTIFICATION_KINDS = [
   "alert",
@@ -97,6 +99,32 @@ const SOURCE_LABEL_KEYS: Record<string, string> = {
 /** The i18n key for a send log `template_source`; undefined for a value this build does not know. */
 export const templateSourceLabelKey = (source: string): string | undefined =>
   SOURCE_LABEL_KEYS[source];
+
+/** One destination's template on a sent message, as the send log line names it. */
+export interface SentTemplate {
+  destination: string;
+  template_name: string;
+  template_source: string;
+}
+
+/** "slack: card (org default)" per destination; the source alone when nothing rendered. */
+export function sentTemplatesText(
+  templates: SentTemplate[] | undefined,
+  t: ReturnType<typeof useI18nTyped>["t"],
+): string {
+  return (templates ?? [])
+    .map((tpl) => {
+      const key = templateSourceLabelKey(tpl.template_source);
+      const source = key ? String(t(key as I18nKey)) : tpl.template_source;
+      const template = tpl.template_name
+        ? String(
+            t("alerts.templateOverride.templateWithSource", { name: tpl.template_name, source }),
+          )
+        : source;
+      return `${tpl.destination}: ${template}`;
+    })
+    .join(", ");
+}
 
 /** A stored applies_to of [] means every kind. */
 export const templateAppliesTo = (tpl: ResolvableTemplate, kind: NotificationKind) =>

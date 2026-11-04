@@ -16,6 +16,8 @@
 // Mirrors `config::meta::oncall`. Every wire form here is the snake_case the
 // API emits — nothing is renamed on the way in.
 
+import type { SentTemplate } from "@/utils/alerts/notificationKinds";
+
 /**
  * Who a level of the ladder pages.
  *
@@ -1152,6 +1154,8 @@ export interface DeliveryRecord {
   channel?: Channel | null;
   /** `false` is a RECORDED failure — not the same as the field being absent. */
   delivered?: boolean | null;
+  /** The template each destination rendered with; absent on rows written before it was recorded. */
+  templates?: SentTemplate[];
 }
 
 /** `GET /oncall/responses/{id}/deliveries`. `total` is exact; `deliveries` is a page. */

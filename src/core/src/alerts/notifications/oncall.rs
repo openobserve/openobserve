@@ -15,7 +15,10 @@
 
 //! The on-call sender the enterprise engine reaches through its registered slot.
 
-use config::meta::alerts::{level::AlertLevel, notification_kind::NotificationKind};
+use config::meta::{
+    alerts::{level::AlertLevel, notification_kind::NotificationKind},
+    oncall::response::SentTemplate,
+};
 use o2_enterprise::enterprise::oncall::sender::{OnCallNotification, OnCallSendError, OnCallStage};
 
 use super::{
@@ -24,11 +27,15 @@ use super::{
 };
 
 /// Sends one on-call message to one destination through the shared path.
-pub async fn notify_destination(n: OnCallNotification) -> Result<(), OnCallSendError> {
+pub async fn notify_destination(n: OnCallNotification) -> Result<SentTemplate, OnCallSendError> {
     let mut ctx = on_call_context(&n);
     let explicit = super::org_default::load_override(&n.org_id, n.template.as_deref()).await;
     let result = notify(&n.org_id, &n.destination, &explicit, None, &mut ctx).await;
-    send_result(result.map(|_| ()))
+    send_result(result.map(|outcome| SentTemplate {
+        destination: n.destination.clone(),
+        template_name: outcome.template_name,
+        template_source: outcome.template_source,
+    }))
 }
 
 /// Upgrade notice: one line per policy whose email or SNS destinations now get pages.
@@ -126,9 +133,9 @@ pub fn on_call_context(n: &OnCallNotification) -> NotificationContext {
 }
 
 /// A Retryable error is retried by the engine; a platform skip is neither delivered nor failed.
-fn send_result(result: Result<(), NotifyError>) -> Result<(), OnCallSendError> {
+fn send_result<T>(result: Result<T, NotifyError>) -> Result<T, OnCallSendError> {
     match result {
-        Ok(()) => Ok(()),
+        Ok(sent) => Ok(sent),
         // A skip is not a delivery, so a send that only reached platforms reports nothing sent.
         Err(NotifyError::Skipped(reason)) => Err(OnCallSendError::Skipped(reason.as_str().into())),
         Err(e) if e.is_retryable() => Err(OnCallSendError::Retryable(e.to_string())),
@@ -256,22 +263,22 @@ mod tests {
     fn send_results_map_to_what_the_engine_retries() {
         assert_eq!(send_result(Ok(())), Ok(()));
         assert!(matches!(
-            send_result(Err(NotifyError::Skipped(SkipReason::PlatformNotForKind))),
+            send_result::<()>(Err(NotifyError::Skipped(SkipReason::PlatformNotForKind))),
             Err(OnCallSendError::Skipped(_))
         ));
         assert!(matches!(
-            send_result(Err(NotifyError::Skipped(SkipReason::NoOrgMemberRecipient))),
+            send_result::<()>(Err(NotifyError::Skipped(SkipReason::NoOrgMemberRecipient))),
             Err(OnCallSendError::Skipped(_))
         ));
         assert!(matches!(
-            send_result(Err(NotifyError::Rejected {
+            send_result::<()>(Err(NotifyError::Rejected {
                 status: 503,
                 body: String::new()
             })),
             Err(OnCallSendError::Retryable(_))
         ));
         assert!(matches!(
-            send_result(Err(NotifyError::DestinationNotFound("x".into()))),
+            send_result::<()>(Err(NotifyError::DestinationNotFound("x".into()))),
             Err(OnCallSendError::Permanent(_))
         ));
     }

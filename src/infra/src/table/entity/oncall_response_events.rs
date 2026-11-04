@@ -15,6 +15,7 @@ pub struct Model {
     pub recipient: Option<String>,
     pub channel: Option<i32>,
     pub delivered: Option<bool>,
+    pub templates: Option<Json>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

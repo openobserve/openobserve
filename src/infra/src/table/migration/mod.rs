@@ -260,6 +260,7 @@ mod m20261120_000003_add_anomaly_template;
 mod m20261201_000001_add_synthetics_template;
 mod m20261210_000001_add_oncall_policy_template;
 mod m20261211_000001_add_templates_to_downtime_notifications;
+mod m20261212_000001_add_templates_to_oncall_response_events;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -822,6 +823,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261201_000001_add_synthetics_template::Migration),
             Box::new(m20261210_000001_add_oncall_policy_template::Migration),
             Box::new(m20261211_000001_add_templates_to_downtime_notifications::Migration),
+            Box::new(m20261212_000001_add_templates_to_oncall_response_events::Migration),
         ]
     }
 }
@@ -933,6 +935,10 @@ mod tests {
         (
             141,
             "m20261211_000001_add_templates_to_downtime_notifications",
+        ),
+        (
+            142,
+            "m20261212_000001_add_templates_to_oncall_response_events",
         ),
     ];
 
@@ -1067,6 +1073,10 @@ mod tests {
             (
                 "m20261009_000005_create_downtime_notifications",
                 "m20261211_000001_add_templates_to_downtime_notifications",
+            ),
+            (
+                "m20260806_000001_create_oncall_tables",
+                "m20261212_000001_add_templates_to_oncall_response_events",
             ),
             (
                 "m20260923_000001_create_ai_chat_sessions",

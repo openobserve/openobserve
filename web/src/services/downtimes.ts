@@ -15,6 +15,7 @@
 
 import type { AxiosRequestConfig } from "axios";
 import http from "./http";
+import type { SentTemplate } from "@/utils/alerts/notificationKinds";
 
 export type TargetModule = "alerts" | "anomaly_detections" | "synthetics" | "slos";
 export type DowntimeStatus = "scheduled" | "active" | "ended" | "cancelled" | "ended_early";
@@ -86,7 +87,7 @@ export interface DowntimeNotificationLogEntry {
   destinations: string[];
   result?: string;
   /** The template each destination that sent used; absent on rows sent before it was recorded. */
-  templates?: { destination: string; template_name: string; template_source: string }[];
+  templates?: SentTemplate[];
 }
 
 export interface Downtime {

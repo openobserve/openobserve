@@ -578,6 +578,7 @@ async fn put_event_in<C: ConnectionTrait>(
         recipient: Set(event.recipient.clone()),
         channel: Set(channel),
         delivered: Set(event.delivered),
+        templates: Set(super::oncall_responses::templates_json(event)),
     }
     .insert(conn)
     .await?;

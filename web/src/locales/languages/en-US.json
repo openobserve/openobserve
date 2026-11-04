@@ -25850,6 +25850,7 @@
     "deliveriesNone": "Nothing has been sent yet.",
     "deliveriesRun": "Ladder run {run} — a handoff restarted the climb under the receiving team",
     "deliveryLanded": "Sent",
+    "deliveryTemplate": "Template: {templates}",
     "deliveryFailed": "Failed",
     "deliveriesTruncated": "Showing {shown} of {total} sends.",
     "teamChannelTitle": "Team channel",
