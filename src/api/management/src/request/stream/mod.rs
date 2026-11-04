@@ -23,7 +23,10 @@ use axum::{
 };
 use config::{
     meta::stream::{StreamType, TimeRange, UpdateStreamSettings},
-    utils::schema::format_stream_name,
+    utils::{
+        schema::format_stream_name,
+        time::{day_micros, hour_micros},
+    },
 };
 use enrichment_data::enrichment_table::cleanup_enrichment_table_resources;
 use hashbrown::HashMap;
@@ -863,14 +866,18 @@ pub async fn delete_stream_data_by_time_range(
                 .into_response();
         }
     };
+    let hour_aligned = start % hour_micros(1) == 0 && end % hour_micros(1) == 0;
+    let day_aligned = start % day_micros(1) == 0 && end % day_micros(1) == 0;
     // a merged day cannot be deleted by the hour; the job would skip it, so refuse here
-    if let Err(e) = search_service::file_list::check_delete_range(
-        &org_id,
-        stream_type,
-        &stream_name,
-        (start, end - 1),
-    )
-    .await
+    if hour_aligned
+        && !day_aligned
+        && let Err(e) = search_service::file_list::check_delete_range(
+            &org_id,
+            stream_type,
+            &stream_name,
+            (start, end - 1),
+        )
+        .await
     {
         return (
             StatusCode::BAD_REQUEST,
