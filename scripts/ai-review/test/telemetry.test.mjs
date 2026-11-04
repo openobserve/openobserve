@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import {
   addUsage,
   cleanAttributeValue,
+  genAiProviderName,
   genAiRequestAttributes,
   genAiResponseAttributes,
   sha256,
@@ -37,7 +38,7 @@ test("response content and provider-reported usage use standard attributes", () 
     {
       info: {
         id: "msg-123",
-        modelID: "deepseek-flash",
+        modelID: "claude-sonnet-5-5",
         finish: "stop",
         cost: 0.42,
         tokens: {
@@ -78,7 +79,7 @@ test("usage without cache or reasoning breakdown passes through unchanged", () =
   const attributes = genAiResponseAttributes(
     { info: { tokens: { input: 100, output: 20 } } },
     "ok",
-    "deepseek-flash",
+    "claude-sonnet-5-5",
   );
 
   assert.equal(attributes["gen_ai.usage.input_tokens"], 100);
@@ -121,6 +122,12 @@ test("usage of retried attempts is summed, and a missing side is skipped", () =>
   assert.deepEqual(sum.tokens, { input: 30, output: 5, reasoning: 12, cache: { read: 150, write: 1 } });
   assert.equal(addUsage(null, b), b);
   assert.equal(addUsage(a, undefined), a);
+});
+
+test("opencode provider ids map to the OTel gen_ai.provider.name vendor value", () => {
+  assert.equal(genAiProviderName("anthropic-review"), "anthropic");
+  assert.equal(genAiProviderName("deepseek-review"), "deepseek");
+  assert.equal(genAiProviderName("other-review"), "other-review");
 });
 
 test("neither config carries model prices, so the server's pricing table is the only price list", () => {

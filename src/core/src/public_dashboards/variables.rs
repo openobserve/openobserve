@@ -20,7 +20,9 @@ use std::collections::BTreeMap;
 use config::meta::dashboards::Dashboard;
 use regex::{Captures, Regex};
 
-const VARIABLE_FORMATS: &str = "csv|pipe|doublequote|singlequote";
+/// The list formats, then a date variable's (longer epoch names first).
+const VARIABLE_FORMATS: &str = "csv|pipe|doublequote|singlequote|iso|dmy|mdy|epochms|epochus|epoch";
+const DATE_FORMATS: [&str; 6] = ["iso", "dmy", "mdy", "epochms", "epochus", "epoch"];
 /// What an unset or empty value becomes; the server reads a filter on it as "all".
 pub(super) const SELECT_ALL_VALUE: &str = "_o2_all_";
 const MIN_PERCENTILE_SAMPLES: f64 = 20.0;
@@ -90,17 +92,25 @@ impl QueryVars {
 
     /// The values one panel sees: each variable's global, tab or panel value, as its scope says.
     pub fn for_panel(&self, tab_id: &str, panel_id: &str) -> PanelVars {
-        let values = self
-            .vars
-            .iter()
-            .filter_map(|var| {
-                let key = var.key_for(tab_id, panel_id)?;
-                let value = self.frozen.get(&key)?;
-                Some((var.name.clone(), value.clone()))
-            })
-            .collect();
+        let mut values = BTreeMap::new();
+        let mut dates = BTreeMap::new();
+        for var in &self.vars {
+            let Some(value) = var
+                .key_for(tab_id, panel_id)
+                .and_then(|key| self.frozen.get(&key))
+            else {
+                continue;
+            };
+            values.insert(var.name.clone(), value.clone());
+            // The variable that gives the value decides how it prints.
+            match &var.date {
+                Some(spec) => dates.insert(var.name.clone(), spec.clone()),
+                None => dates.remove(&var.name),
+            };
+        }
         PanelVars {
             values,
+            dates,
             scrape_secs: self.scrape_secs,
         }
     }
@@ -110,6 +120,50 @@ impl QueryVars {
 struct ScopedVar {
     name: String,
     scope: Scope,
+    date: Option<DateSpec>,
+}
+
+/// How a date variable prints when its placeholder names no date format.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct DateSpec {
+    format: String,
+}
+
+impl DateSpec {
+    /// Only a `date` variable has one; an unknown default format prints `iso`.
+    pub(super) fn of(v: &config::meta::dashboards::v8::VariableList) -> Option<Self> {
+        (v.type_field == "date").then(|| Self {
+            format: v
+                .date_format
+                .clone()
+                .filter(|f| DATE_FORMATS.contains(&f.as_str()))
+                .unwrap_or_else(|| "iso".to_string()),
+        })
+    }
+
+    /// The value in the placeholder's date format, else the default; None unless it is a date.
+    pub(super) fn format(
+        &self,
+        value: &serde_json::Value,
+        placeholder: Option<&str>,
+    ) -> Option<String> {
+        let serde_json::Value::String(date) = value else {
+            return None;
+        };
+        let start = config::utils::time::start_of_date_micros(date)?;
+        let format = placeholder
+            .filter(|f| DATE_FORMATS.contains(f))
+            .unwrap_or(self.format.as_str());
+        let (y, m, d) = (&date[0..4], &date[5..7], &date[8..10]);
+        Some(match format {
+            "dmy" => format!("{d}/{m}/{y}"),
+            "mdy" => format!("{m}/{d}/{y}"),
+            "epoch" => start.div_euclid(1_000_000).to_string(),
+            "epochms" => start.div_euclid(1_000).to_string(),
+            "epochus" => start.to_string(),
+            _ => date.clone(),
+        })
+    }
 }
 
 impl ScopedVar {
@@ -138,6 +192,7 @@ impl From<&config::meta::dashboards::v8::VariableList> for ScopedVar {
         Self {
             name: v.name.clone(),
             scope,
+            date: DateSpec::of(v),
         }
     }
 }
@@ -151,6 +206,7 @@ enum Scope {
 /// One panel's variable values plus the inputs of `$__interval` and kin.
 pub struct PanelVars {
     values: BTreeMap<String, serde_json::Value>,
+    dates: BTreeMap<String, DateSpec>,
     scrape_secs: f64,
 }
 
@@ -186,10 +242,13 @@ impl PanelVars {
                     value.clone()
                 };
             }
-            self.values.get(name).map_or_else(
-                || caps[0].to_string(),
-                |v| format_value(v, format, query_type),
-            )
+            let Some(v) = self.values.get(name) else {
+                return caps[0].to_string();
+            };
+            match self.dates.get(name).and_then(|spec| spec.format(v, format)) {
+                Some(date) => escape(&date),
+                None => format_value(v, format, query_type),
+            }
         })
         .into_owned()
     }
@@ -418,6 +477,7 @@ mod tests {
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.clone()))
                 .collect(),
+            dates: BTreeMap::new(),
             scrape_secs: 15.0,
         }
     }
@@ -470,6 +530,58 @@ mod tests {
             "prod $svc $pod $filters $stale"
         );
         assert_eq!(vars.for_panel("t1", "p1").scrape_secs, 15.0);
+    }
+
+    #[test]
+    fn a_date_variable_prints_in_its_format() {
+        let dash = Dashboard {
+            v8: Some(
+                serde_json::from_value(json!({
+                    "variables": {
+                        "list": [
+                            { "type": "date", "name": "day" },
+                            { "type": "date", "name": "micros", "dateFormat": "epochus" },
+                            { "type": "date", "name": "odd", "dateFormat": "nope" },
+                            { "type": "textbox", "name": "tb" },
+                            { "type": "date", "name": "empty" }
+                        ]
+                    }
+                }))
+                .unwrap(),
+            ),
+            ..Default::default()
+        };
+        let frozen = BTreeMap::from([
+            ("day".to_string(), json!("2026-07-01")),
+            ("micros".to_string(), json!("2026-07-01")),
+            ("odd".to_string(), json!("2026-07-01")),
+            ("tb".to_string(), json!("2026-07-01")),
+            ("empty".to_string(), json!("")),
+        ]);
+        let v = QueryVars::new(&dash, frozen, None).for_panel("t1", "p1");
+        assert_eq!(
+            sub(
+                &v,
+                "'$day' ${day:dmy} {{day:mdy}} ${day:epoch} ${ day : epochms }",
+                "sql"
+            ),
+            "'2026-07-01' 01/07/2026 07/01/2026 1782864000 1782864000000"
+        );
+        // The placeholder's date format wins; a list format keeps the variable's default.
+        assert_eq!(
+            sub(
+                &v,
+                "$micros ${micros:iso} ${micros:epoch} ${micros:csv}",
+                "sql"
+            ),
+            "1782864000000000 2026-07-01 1782864000 1782864000000000"
+        );
+        // An unknown default prints iso, a date format means nothing to a textbox, and empty stays
+        // empty.
+        assert_eq!(
+            sub(&v, "$odd ${tb:epoch} '$empty'", "sql"),
+            "2026-07-01 2026-07-01 ''"
+        );
     }
 
     #[test]

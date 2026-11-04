@@ -71,19 +71,32 @@ use crate::{
 pub mod columnar;
 pub mod grpc;
 pub mod ingestion_service;
+pub mod realtime_mute;
 pub mod rejections;
-
-pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
 /// Global atomic counter for round-robin distribution of requests across memory table buckets.
 /// This ensures even distribution of ingestion load across multiple buckets in axum.
 static REQUEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-/// `org/alert -> until`, taken before the downtime check so concurrent requests run it once.
+/// `org/alert` and `org/alert/downtime` -> until, so one node evaluates each once per floor.
 static REALTIME_FLOOR_CLAIMS: LazyLock<DashMap<String, (i64, u64)>> = LazyLock::new(DashMap::new);
 
 /// Tells claims of one key apart, so a request releases only its own.
 static REALTIME_FLOOR_TOKENS: AtomicU64 = AtomicU64::new(0);
+
+/// Each real-time alert with its matching rows and what is known of their downtime.
+pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>, RealtimeMute)>;
+
+/// The downtime decision a real-time trigger carries from ingestion.
+#[derive(Clone, Debug, PartialEq)]
+pub enum RealtimeMute {
+    /// Not classified at ingestion (the org has no alert downtime then); decided at send time.
+    Unchecked,
+    /// Every carried row is outside any downtime.
+    Unmuted,
+    /// Every matching row was muted; the merged downtime.
+    Muted(config::meta::downtimes::ActiveDowntime),
+}
 
 /// Memoizes the write partition per time bucket while no partition key is enabled.
 pub struct PartitionMemo<'a> {
@@ -206,7 +219,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
         return;
     }
     let mut trigger_usage_reports = vec![];
-    for (alert, val) in triggers.iter() {
+    for (alert, val, mute) in triggers.iter() {
         let module_key = scheduler_key(alert.id);
         let now = Utc::now().timestamp_micros();
         let mut trigger_data_stream = TriggerData {
@@ -259,7 +272,26 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
         } else {
             None
         };
-        let delivered = if let Some(downtime) = realtime_downtime(alert, val, now).await {
+        let downtime = match mute {
+            RealtimeMute::Unchecked => realtime_downtime(alert, val, now).await,
+            RealtimeMute::Unmuted => None,
+            RealtimeMute::Muted(downtime) => Some(downtime.clone()),
+        };
+        let delivered = if let Some(downtime) = downtime {
+            // Downtime keys are never released, so expired claims are dropped before a new one.
+            REALTIME_FLOOR_CLAIMS.retain(|_, (until, _)| *until > now);
+            if claim_realtime_floor(
+                &format!("{floor_key}/{}", downtime.id),
+                now,
+                TriggerCondition::min_silence_micros(),
+            )
+            .is_none()
+            {
+                if let Some(token) = floor_claim {
+                    release_realtime_floor(&floor_key, token);
+                }
+                continue;
+            }
             log::info!(
                 "Realtime alert {}/{} suppressed by downtime {}",
                 alert.org_id,
@@ -1004,10 +1036,10 @@ fn realtime_alert_is_live(trigger: Option<&db::scheduler::Trigger>) -> bool {
     trigger.is_none_or(|t| !t.is_silenced)
 }
 
-/// A suppressed run keeps the rate-limit floor only, so the first firing after the window pages.
+/// A suppressed run silences nothing, so an unmuted service of the same alert still pages.
 fn realtime_silence_micros(alert: &Alert, run: &TriggerData, delivered: bool) -> Option<i64> {
     match run.status {
-        RunOutcome::Suppressed => Some(TriggerCondition::min_silence_micros()),
+        RunOutcome::Suppressed => None,
         _ if delivered => Some(alert.trigger_condition.effective_silence_micros()),
         _ => None,
     }
@@ -1245,7 +1277,7 @@ mod tests {
     }
 
     #[test]
-    fn test_only_a_send_or_a_suppression_silences_a_realtime_alert() {
+    fn test_only_a_send_silences_a_realtime_alert() {
         let mut alert = Alert::default();
         alert.trigger_condition.silence = 60;
         let failed = TriggerData {
@@ -1258,6 +1290,12 @@ mod tests {
             Some(3_600_000_000)
         );
         assert!(realtime_alert_is_live(None));
+        // A muted firing silences nothing, so another service's rows still evaluate.
+        let suppressed = TriggerData {
+            status: RunOutcome::Suppressed,
+            ..Default::default()
+        };
+        assert_eq!(realtime_silence_micros(&alert, &suppressed, false), None);
     }
 
     #[test]

@@ -837,6 +837,42 @@ describe("PublicDashboard viewer", () => {
     expect(title).toBe("A (error)");
   });
 
+  it("keeps a date variable a read-only date, so a panel title formats it as the dashboard does", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: {
+        ...panelsConfig([{ id: "p1", title: "On $day / ${day:epoch}" }]),
+        variables: [
+          {
+            name: "day",
+            label: "Day",
+            value: "2026-10-30",
+            type: "date",
+            date_format: "dmy",
+          },
+        ],
+      },
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue(okSnapshot([]) as never);
+    const w = buildWrapper();
+    await flushPromises();
+    const { tabs, variables } = grid(w).props("dashboardData");
+    expect(variables.list[0]).toMatchObject({
+      type: "date",
+      value: "2026-10-30",
+      dateFormat: "dmy",
+      readOnly: true,
+    });
+    expect(variables.list[0]).not.toHaveProperty("timezone");
+    const title = getPanelDisplayTitle(
+      tabs[0].panels[0].title,
+      { values: variables.list },
+      { tabId: "t1", panelId: "p1" },
+      "All",
+    );
+    expect(title).toBe("On 30/10/2026 / 1793318400");
+  });
+
   it("shows a typed-in value without the picker's custom marker", async () => {
     vi.mocked(service.getConfig).mockResolvedValue({
       data: {

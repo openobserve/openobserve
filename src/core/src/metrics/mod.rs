@@ -277,7 +277,11 @@ fn merge_trigger_rows(
                     labels: HashSet::from([labels]),
                 },
             );
-            triggers.push((alert.clone(), rows));
+            triggers.push((
+                alert.clone(),
+                rows,
+                crate::ingestion::RealtimeMute::Unchecked,
+            ));
         }
     }
 }

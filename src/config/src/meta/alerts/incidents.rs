@@ -638,6 +638,11 @@ pub enum IncidentEventType {
         reason: String,
     },
 
+    /// A person resolved one of the incident's pages, which ended its acknowledgement.
+    AckEndedByPageResolve {
+        user_id: String,
+    },
+
     DimensionsUpgraded {
         from_key: String,
         to_key: String,
@@ -748,6 +753,7 @@ impl IncidentEventType {
         "Acknowledged",
         "Resolved",
         "Reopened",
+        "AckEndedByPageResolve",
         "DimensionsUpgraded",
         "TitleChanged",
         "AssignmentChanged",
@@ -830,6 +836,12 @@ impl IncidentEvent {
 
     pub fn resolved(user_id: Option<String>) -> Self {
         Self::now(IncidentEventType::Resolved { user_id })
+    }
+
+    pub fn ack_ended_by_page_resolve(user_id: impl Into<String>) -> Self {
+        Self::now(IncidentEventType::AckEndedByPageResolve {
+            user_id: user_id.into(),
+        })
     }
 
     pub fn reopened(user_id: impl Into<String>, reason: impl Into<String>) -> Self {
@@ -1090,6 +1102,9 @@ mod tests {
             IncidentEventType::Reopened {
                 user_id: "u".into(),
                 reason: "r".into(),
+            },
+            IncidentEventType::AckEndedByPageResolve {
+                user_id: "u".into(),
             },
             IncidentEventType::DimensionsUpgraded {
                 from_key: "a".into(),

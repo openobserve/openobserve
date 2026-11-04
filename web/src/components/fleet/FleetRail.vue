@@ -221,6 +221,7 @@ const RAIL_DOT: Partial<Record<FleetRolloutStatus, string>> = {
   halted: "bg-status-error-text",
   in_progress: "bg-accent",
   scheduled: "bg-text-secondary",
+  waiting: "bg-text-secondary",
 };
 
 const { t } = useI18nTyped();

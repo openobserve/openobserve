@@ -39,6 +39,7 @@ vi.mock("@/services/oncall", () => ({
     unacknowledgeResponse: vi.fn(),
     confirmRecovery: vi.fn(),
     snoozeResponse: vi.fn(),
+    unsnoozeResponse: vi.fn(),
     addNote: vi.fn(),
     handoffResponse: vi.fn(),
     resolveResponse: vi.fn(),
@@ -659,6 +660,29 @@ describe("OnCallResponseDetail", () => {
     queryClient.clear();
     const lapsed = await renderWith({ snoozed_until: (Date.now() - 60_000) * 1000 });
     expect(lapsed.find('[data-test="oncall-response-snoozed-banner"]').exists()).toBe(false);
+  });
+
+  /// Snooze means paused, then continues; while it is paused the same control continues it now.
+  it("swaps Snooze for Unsnooze while snoozed, and the banner offers it too", async () => {
+    const wrapper = await renderWith({ snoozed_until: (Date.now() + 30 * 60_000) * 1000 });
+    service.unsnoozeResponse.mockResolvedValue({ data: {} } as any);
+
+    expect(wrapper.find('[data-test="oncall-response-snooze-btn"]').exists()).toBe(false);
+    for (const button of [
+      "oncall-response-unsnooze-btn",
+      "oncall-response-snoozed-banner-unsnooze",
+    ]) {
+      service.unsnoozeResponse.mockClear();
+      toastSpy.mockClear();
+      await wrapper.find(`[data-test="${button}"]`).trigger("click");
+      await flushPromises();
+      expect(service.unsnoozeResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ response_id: "resp_1" }),
+      );
+      expect(toastSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "Snooze ended · paging continues" }),
+      );
+    }
   });
 
   it("adds a note and clears the box", async () => {
@@ -1533,6 +1557,22 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
     });
   });
 
+  /// R13, L2: the phrase keeps a readable floor and truncates past it, and the header keeps the title's floor.
+  it("keeps the escalation phrase readable and the title floored", async () => {
+    for (const lgUp of [true, false]) {
+      mockViewport.lgUp = lgUp;
+      const wrapper = await renderWith();
+      const classes = wrapper.find('[data-test="oncall-response-phrase"]').classes();
+      expect(classes, `lg ${lgUp}`).toEqual(expect.arrayContaining(["min-w-32", "truncate"]));
+      expect(classes, `lg ${lgUp}`).not.toContain("min-w-0");
+      expect(wrapper.findComponent({ name: "OPageLayout" }).attributes()).toHaveProperty(
+        "title-min-width",
+      );
+      wrapper.unmount();
+    }
+    mockViewport.lgUp = true;
+  });
+
   /// Seven header buttons wrap to three rows on a tablet or phone, so everything but claiming and closing shares one menu.
   describe("below the laptop breakpoint", () => {
     beforeEach(() => {
@@ -1566,6 +1606,19 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
       await flushPromises();
 
       expect(service.snoozeResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ response_id: "resp_1" }),
+      );
+    });
+
+    it("unsnoozes from the menu while snoozed", async () => {
+      const wrapper = await renderWith({ snoozed_until: (Date.now() + 30 * 60_000) * 1000 });
+      service.unsnoozeResponse.mockResolvedValue({ data: {} } as any);
+
+      expect(wrapper.find('[data-test="oncall-response-snooze-30-menu"]').exists()).toBe(false);
+      await wrapper.find('[data-test="oncall-response-unsnooze-btn-menu"]').trigger("click");
+      await flushPromises();
+
+      expect(service.unsnoozeResponse).toHaveBeenCalledWith(
         expect.objectContaining({ response_id: "resp_1" }),
       );
     });
@@ -1702,6 +1755,183 @@ describe("OnCallResponseDetail — responding", () => {
 
       expect(phrase(wrapper).text()).toMatch(/^Acknowledged by engineer@example\.com/);
       expect(wrapper.find('[data-test="oncall-response-exhausted-banner"]').exists()).toBe(false);
+    });
+  });
+
+  /// R14: a restarted ladder's due first rung is not "Not paged yet", and shows once sent.
+  describe("a rung that is due", () => {
+    const due = () =>
+      service.escalationProgress.mockResolvedValue({
+        data: {
+          fired: [],
+          next_targets: ["engineer@example.com"],
+          next_at: Date.now() * 1000 - 1_000_000,
+          exhausted: false,
+        },
+      } as any);
+    const phrase = (wrapper: any) =>
+      wrapper
+        .find('[data-test="oncall-response-phrase"] [data-test="oncall-escalation-cell-level"]')
+        .text();
+
+    afterEach(() => vi.useRealTimers());
+
+    it("reads as paging step 1, and re-reads until the rung is sent", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      due();
+      const wrapper = await renderWith();
+      expect(phrase(wrapper)).toMatch(/^Paging step 1 /);
+
+      service.escalationProgress.mockResolvedValue({
+        data: {
+          fired: [{ after_micros: 0, at: Date.now() * 1000, targets: [], reached: ["ana@o2.ai"] }],
+          next_targets: [],
+          next_at: null,
+          exhausted: false,
+        },
+      } as any);
+      vi.advanceTimersByTime(10_000);
+      await flushPromises();
+      expect(phrase(wrapper)).toMatch(/^Paging step 1 · ana@o2\.ai/);
+
+      const reads = service.escalationProgress.mock.calls.length;
+      for (let tick = 0; tick < 6; tick++) {
+        vi.advanceTimersByTime(10_000);
+        await flushPromises();
+      }
+      expect(service.escalationProgress.mock.calls.length, "stops once the rung appears").toBe(
+        reads,
+      );
+      wrapper.unmount();
+    });
+
+    /// L3: once the re-read sees the rung sent, the rung card and the activity read the record again.
+    it("re-reads the record when the rung is sent, so the rung card and activity agree", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      due();
+      const wrapper = await renderWith();
+      expect(stat(wrapper, "rung").value).toBe("—");
+
+      const sentAt = Date.now() * 1000;
+      service.getResponse.mockResolvedValue({
+        data: {
+          response: record({ reached_rung_micros: 0 }),
+          events: [
+            {
+              kind: "page",
+              at: sentAt,
+              actor: "system",
+              body: "paged ana@o2.ai",
+              rung_micros: 0,
+              ladder_run: 2,
+            },
+          ],
+        },
+      } as any);
+      service.escalationProgress.mockResolvedValue({
+        data: {
+          fired: [{ after_micros: 0, at: sentAt, targets: [], reached: ["ana@o2.ai"] }],
+          next_targets: [],
+          next_at: null,
+          exhausted: false,
+        },
+      } as any);
+      vi.advanceTimersByTime(10_000);
+      await flushPromises();
+
+      expect(stat(wrapper, "rung").value).not.toBe("—");
+      expect(wrapper.findComponent({ name: "OnCallActivityTimeline" }).props("events")).toEqual([
+        expect.objectContaining({ kind: "page", ladder_run: 2 }),
+      ]);
+      wrapper.unmount();
+    });
+
+    const sent = (at: number) => ({ after_micros: 0, at, targets: [], reached: ["ana@o2.ai"] });
+    const sentProgress = (at: number) =>
+      service.escalationProgress.mockResolvedValue({
+        data: { fired: [sent(at)], next_targets: [], next_at: null, exhausted: false },
+      } as any);
+
+    /// F1: a rung of a new ladder run is new even when the run has fewer rungs than the last one.
+    it("re-reads the record for a rung sent in a new ladder run", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      const now = Date.now() * 1000;
+      service.escalationProgress.mockResolvedValue({
+        data: {
+          fired: [
+            sent(now - 600_000_000),
+            { ...sent(now - 300_000_000), after_micros: 300_000_000 },
+          ],
+          next_targets: ["engineer@example.com"],
+          next_at: now - 1_000_000,
+          exhausted: false,
+        },
+      } as any);
+      const wrapper = await renderWith();
+      const reads = service.getResponse.mock.calls.length;
+
+      sentProgress(now);
+      vi.advanceTimersByTime(10_000);
+      await flushPromises();
+
+      expect(service.getResponse.mock.calls.length).toBeGreaterThan(reads);
+      wrapper.unmount();
+    });
+
+    /// F2: a failed re-read of the record says so, as the view's other read failures do.
+    it("says so when the record cannot be re-read after a rung is sent", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      due();
+      const wrapper = await renderWith();
+      toastSpy.mockClear();
+
+      service.getResponse.mockRejectedValue({ response: { status: 500, data: {} } });
+      sentProgress(Date.now() * 1000);
+      vi.advanceTimersByTime(10_000);
+      await flushPromises();
+
+      expect(toastSpy.mock.calls.at(-1)?.[0]).toEqual(
+        expect.objectContaining({ variant: "error" }),
+      );
+      wrapper.unmount();
+    });
+
+    /// F3: a background re-read of the record keeps what is typed into the open Promote dialog.
+    it("keeps the Promote dialog's typed title through a background re-read", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      due();
+      const wrapper = await renderWith({ title: "checkout down" });
+      await wrapper.find('[data-test="oncall-response-promote-btn"]').trigger("click");
+      await wrapper.find('[data-test="oncall-promote-title"]').setValue("payments outage");
+
+      service.getResponse.mockResolvedValue({
+        data: { response: record({ title: "checkout down", reached_rung_micros: 0 }), events: [] },
+      } as any);
+      sentProgress(Date.now() * 1000);
+      vi.advanceTimersByTime(10_000);
+      await flushPromises();
+
+      expect(service.getResponse).toHaveBeenCalledTimes(2);
+      expect(
+        (wrapper.find('[data-test="oncall-promote-title"]').element as HTMLInputElement).value,
+      ).toBe("payments outage");
+      wrapper.unmount();
+    });
+
+    it("stops re-reading a rung that never appears after a bounded number of tries", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+      due();
+      const wrapper = await renderWith();
+      const reads = service.escalationProgress.mock.calls.length;
+
+      for (let tick = 0; tick < 10; tick++) {
+        vi.advanceTimersByTime(10_000);
+        await flushPromises();
+      }
+
+      expect(service.escalationProgress.mock.calls.length).toBe(reads + 6);
+      expect(phrase(wrapper)).not.toContain("Not paged yet");
+      wrapper.unmount();
     });
   });
 
@@ -1874,6 +2104,43 @@ describe("OnCallResponseDetail — responding", () => {
 
       expect((wrapper.vm as any).escalation).toBe(null);
       expect((wrapper.vm as any).teamName).toBe("");
+      reactive(routeState).params.responseId = "resp_1";
+      await flushPromises();
+    });
+
+    /// N2: a linked page closes the Promote dialog, so its submit cannot promote the new page with the old title.
+    it("closes the Promote dialog when the view moves to a linked page", async () => {
+      const { reactive } = await import("vue");
+      const wrapper = await renderWith({ id: "resp_1", title: "First page" });
+      await wrapper.find('[data-test="oncall-response-promote-btn"]').trigger("click");
+      expect(wrapper.find('[data-test="oncall-promote-title"]').exists()).toBe(true);
+      service.getResponse.mockImplementationOnce(() => new Promise(() => {}));
+
+      reactive(routeState).params.responseId = "resp_next";
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-promote-title"]').exists()).toBe(false);
+      reactive(routeState).params.responseId = "resp_1";
+      await flushPromises();
+    });
+
+    /// N1: a record re-read that fails after the view moved on says nothing on the new page.
+    it("drops a failed re-read of the page the view has left", async () => {
+      const { reactive } = await import("vue");
+      const wrapper = await renderWith({ id: "resp_1", title: "First page" });
+      let fail: (e: unknown) => void = () => {};
+      service.getResponse.mockImplementationOnce(() => new Promise((_, reject) => (fail = reject)));
+      const pending = (wrapper.vm as any).refreshRecord();
+      service.getResponse.mockImplementationOnce(() => new Promise(() => {}));
+      reactive(routeState).params.responseId = "resp_next";
+      await flushPromises();
+      toastSpy.mockClear();
+
+      fail({ response: { status: 500, data: {} } });
+      await pending;
+      await flushPromises();
+
+      expect(toastSpy).not.toHaveBeenCalled();
       reactive(routeState).params.responseId = "resp_1";
       await flushPromises();
     });

@@ -68,6 +68,27 @@ pub async fn unack(
     {
         return Ok(None);
     }
+    publish_current(org_id, alert_id, group_key).await
+}
+
+/// [`unack`] only while `held.acked_by` still holds that firing's ack.
+pub async fn unack_held(
+    held: &AlertAck,
+    unacked_by: &str,
+    unacked_at: i64,
+) -> Result<Option<AlertAck>> {
+    if !infra::table::alert_acks::unack_held_with_outbox(held, unacked_by, unacked_at).await? {
+        return Ok(None);
+    }
+    publish_current(&held.org_id, &held.alert_id, &held.group_key).await
+}
+
+/// Replicates the row as it now stands, and returns it.
+async fn publish_current(
+    org_id: &str,
+    alert_id: &str,
+    group_key: &str,
+) -> Result<Option<AlertAck>> {
     let row = infra::table::alert_acks::get(org_id, alert_id, group_key).await?;
     if let Some(row) = row.as_ref() {
         publish(row).await;

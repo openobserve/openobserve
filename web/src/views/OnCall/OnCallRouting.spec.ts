@@ -488,6 +488,43 @@ describe("OnCallRouting", () => {
     expect(wrapper.find('[data-test="oncall-routing-content"]').exists()).toBe(true);
   });
 
+  it("shows the license empty state, not an error with the server text, for a license denial", async () => {
+    service.listTeams.mockRejectedValueOnce({
+      response: {
+        status: 403,
+        data: { code: 40001, message: "Features not included", error_detail: "oncall" },
+      },
+    });
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-routing-license-denied"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-routing-error"]').exists()).toBe(false);
+  });
+
+  it("skips the correlation reads while correlation is license-locked", async () => {
+    queryClient.clear();
+    store.state.zoConfig.features = { correlation: "locked" };
+    try {
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.find('[data-test="oncall-routing-content"]').exists()).toBe(true);
+      expect(correlation.getServicesList).not.toHaveBeenCalled();
+      expect(correlation.getIdentityConfig).not.toHaveBeenCalled();
+      expect(correlation.getDimensionAnalytics).not.toHaveBeenCalled();
+    } finally {
+      delete store.state.zoConfig.features;
+    }
+  });
+
+  it("reads the correlation catalogue while correlation is enabled", async () => {
+    queryClient.clear();
+    render();
+    await flushPromises();
+    expect(correlation.getServicesList).toHaveBeenCalled();
+    expect(correlation.getIdentityConfig).toHaveBeenCalled();
+    expect(correlation.getDimensionAnalytics).toHaveBeenCalled();
+  });
+
   /// A revisit pays for none of the three org reads; only the reader's Retry reaches the server.
   it("serves a revisit from the cache and forces on retry", async () => {
     service.ownershipStats.mockRejectedValueOnce(new Error("boom"));

@@ -3,6 +3,7 @@
 
 import type { ColorProps, ColorEmits, ColorSlots } from "./OColor.types";
 import { computed, ref, useAttrs, useId, watch } from "vue";
+import { useLockedDisabled } from "@/composables/useFeatureLock";
 import {
   PopoverRoot,
   PopoverPortal,
@@ -44,6 +45,7 @@ const props = withDefaults(defineProps<ColorProps>(), {
 
 const emit = defineEmits<ColorEmits>();
 defineSlots<ColorSlots>();
+const isDisabled = useLockedDisabled(() => props.disabled);
 
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
@@ -129,7 +131,7 @@ const wrapperClasses = computed(() => [
     : "border-datepicker-border hover:border-datepicker-hover-border",
   "focus-within:border-datepicker-focus-border",
   "focus-within:ring-2 focus-within:ring-datepicker-focus-ring",
-  props.disabled ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
+  isDisabled.value ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
   heightClasses[props.size ?? "md"],
 ]);
 </script>
@@ -158,10 +160,10 @@ const wrapperClasses = computed(() => [
       <PopoverRoot>
         <PopoverTrigger
           type="button"
-          :disabled="disabled || readonly"
+          :disabled="isDisabled || readonly"
           :aria-label="label ? t('common.pickColorFor', { label }) : t('common.pickColor')"
           class="ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-s-default flex shrink-0 items-center ps-2 pe-1 ring-offset-1 transition-[box-shadow] duration-150 outline-none focus-visible:ring-2"
-          :class="disabled || readonly ? 'cursor-not-allowed' : 'cursor-pointer'"
+          :class="isDisabled || readonly ? 'cursor-not-allowed' : 'cursor-pointer'"
         >
           <span
             :class="['rounded-default border-datepicker-border border', swatchSize[size ?? 'md']]"
@@ -213,7 +215,7 @@ const wrapperClasses = computed(() => [
               :value="swatchHex"
               maxlength="7"
               :placeholder="t('components.color.hexPlaceholder')"
-              :disabled="disabled"
+              :disabled="isDisabled"
               class="rounded-default text-datepicker-text placeholder:text-datepicker-placeholder bg-datepicker-bg border-datepicker-border focus:border-datepicker-focus-border w-full border px-2 py-1 font-mono text-xs outline-none"
               @input="handleText"
             />
@@ -230,7 +232,7 @@ const wrapperClasses = computed(() => [
         :name="name"
         :placeholder="placeholder ?? '#000000'"
         :readonly="readonly"
-        :disabled="disabled"
+        :disabled="isDisabled"
         :aria-invalid="hasError || undefined"
         :tabindex="inputTabindex"
         maxlength="7"

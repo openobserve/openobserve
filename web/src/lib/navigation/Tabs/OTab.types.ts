@@ -14,6 +14,8 @@ export interface OTabProps {
   icon?: string;
   /** Registered OIcon name shown after the label (e.g. a lock glyph on a locked tab) */
   suffixIcon?: string;
+  /** Screen-reader text for a lock suffix; falls back to `tooltip`. */
+  suffixLabel?: I18nText;
   /** Prevents interaction with this tab */
   disable?: boolean;
   /**

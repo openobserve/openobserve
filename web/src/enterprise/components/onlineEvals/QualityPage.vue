@@ -57,73 +57,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OPageHeader>
 
-    <section
-      class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
-      data-test="quality-body"
-    >
-      <!-- Env, Agent and Version scope the list and the detail alike; the detail adds its scope toggle. -->
-      <div
-        class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-2"
-        data-test="quality-scope-bar"
+    <OPageLockedBody>
+      <section
+        class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
+        data-test="quality-body"
       >
-        <slot name="filters" />
-        <OToggleGroup
-          v-if="configId && scopeOptions.length > 2"
-          :model-value="scope"
-          mobile-dropdown
-          class="ms-auto"
-          data-test="quality-detail-scope"
-          @update:model-value="
-            (value) => updateQuery({ scope: value === 'all' ? undefined : (value as string) })
-          "
+        <!-- Env, Agent and Version scope the list and the detail alike; the detail adds its scope toggle. -->
+        <div
+          class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-2"
+          data-test="quality-scope-bar"
         >
-          <OToggleGroupItem
-            v-for="option in scopeOptions"
-            :key="option.value"
-            :value="option.value"
-            size="sm"
-            :data-test="`quality-detail-scope-${option.value}`"
+          <slot name="filters" />
+          <OToggleGroup
+            v-if="configId && scopeOptions.length > 2"
+            :model-value="scope"
+            mobile-dropdown
+            class="ms-auto"
+            data-test="quality-detail-scope"
+            @update:model-value="
+              (value) => updateQuery({ scope: value === 'all' ? undefined : (value as string) })
+            "
           >
-            {{ option.label }}
-            <span class="font-semibold tabular-nums">{{ formatCount(option.count) }}</span>
-          </OToggleGroupItem>
-        </OToggleGroup>
-      </div>
-      <QualityConfigDetail
-        v-if="configId"
-        :config-id="configId"
-        :row="selectedRow"
-        :config="selectedConfig"
-        :scope="scope"
-        :only="only"
-        :date-window="dateWindow"
-        :agent-params="agentParams"
-        :enabled="enabled"
-        :initial-page="restoredPage"
-        :initial-score-id="restoredScoreId"
-        :initial-filter="restoredFilter"
-        @back="closeConfig"
-        @update:only="(value) => updateQuery({ only: value === 'all' ? undefined : value })"
-        @status="(status) => (detailStatus = status)"
-        @position="updatePosition"
-      />
-      <QualityConfigsTable
-        v-else
-        v-model:tile-filter="tileFilter"
-        v-model:search="search"
-        :rows="visibleRows"
-        :tiles="tiles"
-        :loading="listQuery.isPending.value || configsLoading"
-        :forbidden="listStatus === 403"
-        :load-error="!!listQuery.error.value && listStatus !== 403"
-        @open="openConfig"
-        @retry="retryList"
-      />
-    </section>
+            <OToggleGroupItem
+              v-for="option in scopeOptions"
+              :key="option.value"
+              :value="option.value"
+              size="sm"
+              :data-test="`quality-detail-scope-${option.value}`"
+            >
+              {{ option.label }}
+              <span class="font-semibold tabular-nums">{{ formatCount(option.count) }}</span>
+            </OToggleGroupItem>
+          </OToggleGroup>
+        </div>
+        <QualityConfigDetail
+          v-if="configId"
+          :config-id="configId"
+          :row="selectedRow"
+          :config="selectedConfig"
+          :scope="scope"
+          :only="only"
+          :date-window="dateWindow"
+          :agent-params="agentParams"
+          :enabled="enabled"
+          :initial-page="restoredPage"
+          :initial-score-id="restoredScoreId"
+          :initial-filter="restoredFilter"
+          @back="closeConfig"
+          @update:only="(value) => updateQuery({ only: value === 'all' ? undefined : value })"
+          @status="(status) => (detailStatus = status)"
+          @position="updatePosition"
+        />
+        <QualityConfigsTable
+          v-else
+          v-model:tile-filter="tileFilter"
+          v-model:search="search"
+          :rows="visibleRows"
+          :tiles="tiles"
+          :loading="listQuery.isPending.value || configsLoading"
+          :forbidden="listStatus === 403"
+          :load-error="!!listQuery.error.value && listStatus !== 403"
+          @open="openConfig"
+          @retry="retryList"
+        />
+      </section>
+    </OPageLockedBody>
   </div>
 </template>
 
 <script setup lang="ts">
+import OPageLockedBody from "@/lib/core/PageLayout/OPageLockedBody.vue";
 import { computed, ref, toRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";

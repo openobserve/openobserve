@@ -332,7 +332,8 @@ describe("ExperimentDetailPage", () => {
 
     const tasks = wrapper.get('[data-test="ai-experiment-detail-progress"]');
     expect(tasks.text()).toContain("Tasks");
-    expect(tasks.text()).toContain("29/30");
+    // Succeeded over total: the 4 failed slots are finished, not done.
+    expect(tasks.text()).toContain("25/30");
     expect(tasks.text()).toContain("25 succeeded · 4 failed · 1 pending · 0 skipped");
 
     const scores = wrapper.get('[data-test="ai-experiment-detail-scoring"]');
@@ -666,7 +667,7 @@ describe("ExperimentDetailPage", () => {
     const state = mounted.$.setupState;
     state.selectedRowDetail = {
       experimentId: "exp-1",
-      snapshot: { datasetId: "ds-1", datasetVersion: 1 },
+      snapshot: { datasetId: "ds-1", datasetVersion: 1, datasetWriteVersion: 1 },
       navigation: {
         rowIndex: 0,
         totalRows: 1,

@@ -14,15 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import i18n from "@/locales";
 import { queryClient } from "@/composables/query/queryClient";
-import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import usersService from "@/services/users";
+import { formatInZone, memberAt } from "@/utils/oncall";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -73,6 +74,9 @@ function submit(wrapper: any) {
 
 describe("OnCallTeamForm", () => {
   beforeEach(() => {
+    // The week before the fixtures' 17 Aug handover, since the form anchors on the shift containing now.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.UTC(2026, 7, 15));
     vi.clearAllMocks();
     users.orgUsers.mockResolvedValue({ data: { data: ORG_USERS } } as any);
     oncall.createTeam.mockResolvedValue({ data: { id: "team_new" } } as any);
@@ -80,6 +84,7 @@ describe("OnCallTeamForm", () => {
     oncall.getSchedule.mockResolvedValue({ data: null } as any);
     oncall.setSchedule.mockResolvedValue({ data: {} } as any);
   });
+  afterEach(() => vi.useRealTimers());
 
   // E2: the rotation editor's handover phrases stay out of the standalone shift-length labels.
   it("labels the shift lengths on their own, without the handover phrases", async () => {
@@ -129,11 +134,127 @@ describe("OnCallTeamForm", () => {
     // has no roster of its own.
     const [primary] = schedule.data.rotations;
     expect(primary.shift_rules[0].members).toEqual(["ana@o2.ai", "bob@o2.ai"]);
-    expect(primary.shift_rules[0].anchor_micros).toBe(Date.parse("2026-08-17T10:00") * 1000);
+    expect(primary.shift_rules[0].anchor_micros).toBe(
+      Date.parse("2026-08-17T10:00") * 1000 - MICROS_PER_WEEK,
+    );
     // A rotation is a position; a rule is who holds it and when. Naming both
     // "Secondary" put one word on two concepts and was a real defect.
     expect(primary.shift_rules[0].name).toBe("Base");
     expect(primary.name).toBe("Primary");
+  });
+
+  // C3: the first member picked holds the shift that ends at the first handover; the second takes over there.
+  it.each([
+    ["written by the form", null],
+    [
+      "staffed by the server",
+      {
+        timezone: "UTC",
+        rotations: ["rot_primary", "rot_secondary"].map((id) => ({
+          id,
+          name: id,
+          shift_rules: [
+            {
+              name: "Base",
+              members: ["ana@o2.ai", "bob@o2.ai", "cy@o2.ai"],
+              shift_micros: 1,
+              anchor_micros: 1,
+            },
+          ],
+        })),
+      },
+    ],
+  ])("puts the first member on call until the first handover (%s)", async (_, data) => {
+    oncall.getSchedule.mockResolvedValue({ data } as any);
+    const wrapper = render();
+    await flushPromises();
+    setValues(wrapper, {
+      name: "Payments",
+      timezone: "UTC",
+      members: ["ana@o2.ai", "bob@o2.ai", "cy@o2.ai"],
+      first_handover_date: "2026-08-17",
+      first_handover_time: "10:00",
+    });
+    await submit(wrapper);
+    await flushPromises();
+
+    const [primary, secondary] = (oncall.setSchedule.mock.calls[0][0] as any).data.rotations;
+    const handover = Date.UTC(2026, 7, 17, 10, 0) * 1000;
+    const holder = (rotation: any, at: number) => memberAt(rotation.shift_rules[0], at, "UTC");
+    expect(holder(primary, handover - 1)).toBe("ana@o2.ai");
+    expect(holder(secondary, handover - 1)).toBe("bob@o2.ai");
+    expect(holder(primary, handover)).toBe("bob@o2.ai");
+    expect(holder(secondary, handover)).toBe("cy@o2.ai");
+  });
+
+  // C3/F1/F5: wherever the first handover sits, the first member is on now, until the next real handover.
+  // Daily shifts, first handover Monday 17 Aug 10:00 UTC; now is a Tuesday before it or a Thursday after it.
+  describe.each([
+    ["more than one shift away", Date.UTC(2026, 7, 11, 15, 0), Date.UTC(2026, 7, 12, 10, 0)],
+    ["already past", Date.UTC(2026, 7, 20, 15, 0), Date.UTC(2026, 7, 21, 10, 0)],
+  ])("when the first handover is %s", (_, NOW, nextHandoverMs) => {
+    const NEXT_HANDOVER = nextHandoverMs * 1000;
+    const values = {
+      name: "Payments",
+      timezone: "UTC",
+      members: ["ana@o2.ai", "bob@o2.ai", "cy@o2.ai"],
+      shift_micros: MICROS_PER_DAY,
+      first_handover_date: "2026-08-17",
+      first_handover_time: "10:00",
+    };
+
+    beforeEach(() => vi.setSystemTime(NOW));
+
+    it("anchors on the shift that contains now", async () => {
+      const wrapper = render();
+      await flushPromises();
+      setValues(wrapper, values);
+      await submit(wrapper);
+      await flushPromises();
+
+      const [primary, secondary] = (oncall.setSchedule.mock.calls[0][0] as any).data.rotations;
+      const holder = (rotation: any, at: number) => memberAt(rotation.shift_rules[0], at, "UTC");
+      expect(primary.shift_rules[0].anchor_micros).toBeLessThanOrEqual(NOW * 1000);
+      expect(holder(primary, NOW * 1000)).toBe("ana@o2.ai");
+      expect(holder(secondary, NOW * 1000)).toBe("bob@o2.ai");
+      expect(holder(primary, NEXT_HANDOVER - 1)).toBe("ana@o2.ai");
+      expect(holder(primary, NEXT_HANDOVER)).toBe("bob@o2.ai");
+    });
+
+    it("previews now until the next real handover", async () => {
+      const wrapper = render();
+      await flushPromises();
+      setValues(wrapper, values);
+      await flushPromises();
+
+      const first = wrapper.findAll('[data-test="oncall-rotation-preview"] li')[0];
+      const next = formatInZone(NEXT_HANDOVER, "UTC", { dateStyle: "medium", timeStyle: "short" });
+      expect(first.text()).toContain(`Now – ${next}`);
+      expect(first.text()).toContain("ana@o2.ai");
+    });
+  });
+
+  // C3: the preview opens on the shift running now, which ends at the first handover.
+  it("previews the current shift as now until the first handover", async () => {
+    const wrapper = render();
+    await flushPromises();
+    setValues(wrapper, {
+      timezone: "UTC",
+      members: ["ana@o2.ai", "bob@o2.ai"],
+      first_handover_date: "2026-08-17",
+      first_handover_time: "10:00",
+    });
+    await flushPromises();
+
+    const rows = wrapper.findAll('[data-test="oncall-rotation-preview"] li');
+    const handover = formatInZone(Date.UTC(2026, 7, 17, 10, 0) * 1000, "UTC", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+    expect(rows[0].text()).toContain(`Now – ${handover}`);
+    expect(rows[0].text()).toContain("ana@o2.ai");
+    expect(rows[1].text()).toContain(handover);
+    expect(rows[1].text()).toContain("bob@o2.ai");
   });
 
   /// The date/time fields hold a WALL clock, meaningless without a zone. It
@@ -154,8 +275,8 @@ describe("OnCallTeamForm", () => {
     await flushPromises();
 
     const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
-    // 10:00 America/New_York on 2026-08-17 (EDT, UTC-4) is 14:00 UTC.
-    expect(rotations[0].shift_rules[0].anchor_micros).toBe(Date.UTC(2026, 7, 17, 14, 0) * 1000);
+    // 10:00 America/New_York on 2026-08-10 (EDT, UTC-4), a shift before the handover, is 14:00 UTC.
+    expect(rotations[0].shift_rules[0].anchor_micros).toBe(Date.UTC(2026, 7, 10, 14, 0) * 1000);
   });
 
   /// Adding members auto-staffs the team, and this PUT is a full replace: the
@@ -217,8 +338,8 @@ describe("OnCallTeamForm", () => {
     /// onto one instant, which is the opposite of what a second position is
     /// for.
     const anchor = Date.parse("2026-08-17T10:00") * 1000;
-    expect(rotations[0].shift_rules[0].anchor_micros).toBe(anchor);
-    expect(rotations[1].shift_rules[0].anchor_micros).toBe(anchor - MICROS_PER_WEEK);
+    expect(rotations[0].shift_rules[0].anchor_micros).toBe(anchor - MICROS_PER_WEEK);
+    expect(rotations[1].shift_rules[0].anchor_micros).toBe(anchor - 2 * MICROS_PER_WEEK);
   });
 
   /// A Secondary is one shift earlier on the team's clock: a clock change moves the instant, not the wall time.
@@ -236,6 +357,7 @@ describe("OnCallTeamForm", () => {
       },
     ],
   ])("anchors the Secondary across a clock change in the team's zone (%s)", async (_, data) => {
+    vi.setSystemTime(Date.UTC(2026, 9, 22));
     oncall.getSchedule.mockResolvedValue({ data } as any);
     const wrapper = render();
     await flushPromises();
@@ -250,9 +372,9 @@ describe("OnCallTeamForm", () => {
     await flushPromises();
 
     const { rotations } = (oncall.setSchedule.mock.calls[0][0] as any).data;
-    // Monday 26 Oct 09:00 GMT, and the Monday before at 09:00 BST: the clocks went back in between.
-    expect(rotations[0].shift_rules[0].anchor_micros).toBe(Date.UTC(2026, 9, 26, 9, 0) * 1000);
-    expect(rotations[1].shift_rules[0].anchor_micros).toBe(Date.UTC(2026, 9, 19, 8, 0) * 1000);
+    // The handover is Monday 26 Oct 09:00 GMT; the two Mondays before are 09:00 BST: the clocks went back in between.
+    expect(rotations[0].shift_rules[0].anchor_micros).toBe(Date.UTC(2026, 9, 19, 8, 0) * 1000);
+    expect(rotations[1].shift_rules[0].anchor_micros).toBe(Date.UTC(2026, 9, 12, 8, 0) * 1000);
   });
 
   /// The checkbox has to be able to say no. The backend staffs a second
@@ -360,8 +482,8 @@ describe("OnCallTeamForm", () => {
     expect(rotations[0].id).not.toBe(rotations[1].id);
 
     const anchor = Date.parse("2026-08-17T10:00") * 1000;
-    expect(rotations[0].shift_rules[0].anchor_micros).toBe(anchor);
-    expect(rotations[1].shift_rules[0].anchor_micros).toBe(anchor - MICROS_PER_WEEK);
+    expect(rotations[0].shift_rules[0].anchor_micros).toBe(anchor - MICROS_PER_WEEK);
+    expect(rotations[1].shift_rules[0].anchor_micros).toBe(anchor - 2 * MICROS_PER_WEEK);
   });
 
   it("writes only the one rotation when the box is cleared and the read-back fails", async () => {

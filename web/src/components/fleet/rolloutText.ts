@@ -21,10 +21,14 @@ export function useRolloutText() {
   const { t } = useI18nTyped();
 
   // An empty fleet still records a completed rollout, and "0 of 0 running" reads as a success.
-  const progressText = (r: { running: number; total: number }) =>
-    r.total === 0
+  const progressText = (r: { status: string; running: number; total: number }) => {
+    if (r.status === "waiting") return t("fleet.rollouts.waitingForCollector");
+    // Members are picked when the rollout starts, so an unstarted one has none yet.
+    if (r.status === "scheduled") return t("fleet.rollouts.notStarted");
+    return r.total === 0
       ? t("fleet.rollouts.noneTargeted")
       : t("fleet.rollouts.progressCount", { running: r.running, total: r.total });
+  };
 
   const startsText = (at: number) => {
     const ms = at - Date.now();

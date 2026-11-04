@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use config::utils::json;
 
 use crate::traces::otel::attributes::{
-    GenAiAttributes, LangfuseAttributes, OtelAttributes, VercelAiSdkAttributes,
+    FrameworkAttributes, GenAiAttributes, LangfuseAttributes, OtelAttributes, VercelAiSdkAttributes,
 };
 
 pub struct MetadataExtractor;
@@ -35,6 +35,7 @@ impl MetadataExtractor {
         let user_id_keys = [
             OtelAttributes::USER_ID,
             VercelAiSdkAttributes::TELEMETRY_METADATA_USER_ID,
+            FrameworkAttributes::TRACELOOP_ASSOCIATION_USER_ID,
             "service_user.id",
         ];
 
@@ -69,6 +70,7 @@ impl MetadataExtractor {
             VercelAiSdkAttributes::TELEMETRY_METADATA_SESSION_ID,
             LangfuseAttributes::METADATA_LANGFUSE_SESSION_ID,
             LangfuseAttributes::METADATA_SESSION_ID,
+            FrameworkAttributes::TRACELOOP_ASSOCIATION_SESSION_ID,
             "service_session.id",
         ];
 
@@ -128,6 +130,28 @@ mod tests {
     fn test_extract_user_id_returns_none_when_absent() {
         let result = MetadataExtractor.extract_user_id(&HashMap::new(), &HashMap::new());
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_user_id_from_traceloop_association_properties() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "traceloop.association.properties.user_id".to_string(),
+            json::json!("tl_user"),
+        );
+        let result = MetadataExtractor.extract_user_id(&attrs, &HashMap::new());
+        assert_eq!(result, Some("tl_user".to_string()));
+    }
+
+    #[test]
+    fn test_extract_session_id_from_traceloop_association_properties() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "traceloop.association.properties.session_id".to_string(),
+            json::json!("tl_session"),
+        );
+        let result = MetadataExtractor.extract_session_id(&attrs, &HashMap::new());
+        assert_eq!(result, Some("tl_session".to_string()));
     }
 
     #[test]

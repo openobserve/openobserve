@@ -9,8 +9,6 @@ class FleetRolloutPage {
     this.fleetTrigger = '[data-test="fleet-new-rollout-dialog-fleet-trigger"]';
     this.fleetError = '[data-test="fleet-new-rollout-dialog-fleet-error"]';
     this.start = '[data-test="fleet-new-rollout-dialog-start"]';
-    // The start and batching items have no data-test; reka renders each item's value on its button.
-    this.startAt = '[data-test="fleet-new-rollout-dialog-start"] button[value="at"]';
     this.firstField = '[data-test="fleet-new-rollout-dialog-first-field"]';
     this.firstError = '[data-test="fleet-new-rollout-dialog-first-error"]';
     this.initialField = '[data-test="fleet-new-rollout-dialog-initial-field"]';
@@ -19,6 +17,7 @@ class FleetRolloutPage {
     this.primaryBtn = '[data-test="o-dialog-primary-btn"]';
   }
 
+  // The batching items have no data-test; reka renders each item's value on its button.
   batchingItem(kind) {
     return this.page.locator(`[data-test="fleet-new-rollout-dialog-batching"] button[value="${kind}"]`);
   }
@@ -39,10 +38,6 @@ class FleetRolloutPage {
   async expectFleetError(text) {
     await expect(this.page.locator(this.fleetError)).toHaveText(text, { timeout: PAGE_TIMEOUT_MS });
     await expect(this.page.locator(this.dialog)).toBeVisible();
-  }
-
-  async expectScheduledDisabled() {
-    await expect(this.page.locator(this.startAt)).toBeDisabled({ timeout: PAGE_TIMEOUT_MS });
   }
 
   async chooseBatching(kind) {

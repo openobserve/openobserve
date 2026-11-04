@@ -299,45 +299,12 @@
                 @click="handleNodeClick"
               />
 
-              <!-- Zoom controls: explicit buttons drive zoom + fit-to-screen,
-                   floated bottom-right like a map control. -->
-              <div
-                class="rounded-default border-border-default bg-surface-panel absolute right-3 bottom-3 z-10 flex flex-col overflow-hidden border"
-                data-test="service-graph-zoom-controls"
-              >
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  icon-left="add"
-                  class="rounded-none"
-                  data-test="service-graph-zoom-in"
-                  @click="zoomIn"
-                >
-                  <OTooltip side="left" :content="t('traces.serviceGraph.zoomIn')" />
-                </OButton>
-                <OSeparator />
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  icon-left="remove"
-                  class="rounded-none"
-                  data-test="service-graph-zoom-out"
-                  @click="zoomOut"
-                >
-                  <OTooltip side="left" :content="t('traces.serviceGraph.zoomOut')" />
-                </OButton>
-                <OSeparator />
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  icon-left="fullscreen"
-                  class="rounded-none"
-                  data-test="service-graph-fit-screen"
-                  @click="fitToScreen"
-                >
-                  <OTooltip side="left" :content="t('traces.serviceGraph.fitToScreen')" />
-                </OButton>
-              </div>
+              <ChartZoomControls
+                data-test-prefix="service-graph"
+                @zoom-in="zoomIn"
+                @zoom-out="zoomOut"
+                @fit="fitToScreen"
+              />
 
               <!-- Service Graph Side Panel (node) -->
               <ServiceGraphSidePanel
@@ -428,11 +395,14 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ServiceGraphNoDataState from "./ServiceGraphNoDataState.vue";
+import ChartZoomControls from "@/components/traces/ChartZoomControls.vue";
+import useChartZoom from "@/composables/traces/useChartZoom";
 import { getEffectiveTimeRange } from "@/utils/date";
 
 export default defineComponent({
   name: "ServiceGraph",
   components: {
+    ChartZoomControls,
     OSeparator,
     ChartRenderer,
     ServiceGraphSidePanel,
@@ -652,44 +622,6 @@ export default defineComponent({
       applyFilters();
     };
 
-    // ── Zoom controls ─────────────────────────────────────────────────────────
-    // The mouse still zooms (roam:true) so you can focus an area with the wheel;
-    // scaleLimit on the series bounds it so it can't run away (the old "erratic"
-    // feel). The +/- buttons drive the SAME series `zoom` option via setOption,
-    // reading the chart's CURRENT zoom first so button + wheel stay in sync.
-    // Match the series `scaleLimit` (convertTraceData.ts) so the +/- buttons and
-    // box-zoom never compute a factor the chart will silently clamp away.
-    const ZOOM_MIN = 0.4;
-    const ZOOM_MAX = 3;
-
-    // The live zoom level from the chart (kept in sync with wheel zoom), so a
-    // button press adjusts from where the user actually is, not a stale ref.
-    const currentZoom = (chart: any): number => {
-      const opt = chart.getOption?.();
-      const z = opt?.series?.[0]?.zoom;
-      return typeof z === "number" && z > 0 ? z : 1;
-    };
-
-    const zoomBy = (factor: number) => {
-      const chart = chartRendererRef.value?.chart;
-      if (!chart) return;
-      const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, currentZoom(chart) * factor));
-      // Merge only the zoom so positions/data stay put.
-      chart.setOption({ series: [{ zoom: next }] }, { lazyUpdate: true });
-    };
-
-    const zoomIn = () => zoomBy(1.25);
-    const zoomOut = () => zoomBy(1 / 1.25);
-
-    // Fit-to-screen: recreate the chart (keyed on chartKey) so ECharts re-fits
-    // the full graph bounding box into the panel at zoom 1, re-centered — the
-    // reliable reset for both tree (layout:none) and graph series (also clears
-    // any wheel pan/zoom the user applied).
-    const fitToScreen = () => {
-      lastChartOptions = null;
-      chartKey.value++;
-    };
-
     const toggleKindVisibility = (kind: string) => {
       const s = new Set(hiddenKinds.value);
       s.has(kind) ? s.delete(kind) : s.add(kind);
@@ -821,8 +753,12 @@ export default defineComponent({
     // filtered — the "Show types" button reflects this (active state + count).
     const activeFilterCount = computed(() => hiddenKinds.value.size);
 
-    // Key to control chart recreation - only change when layout/visualization type changes
-    const chartKey = ref(0);
+    const { chartKey, zoomIn, zoomOut, fitToScreen } = useChartZoom(
+      () => chartRendererRef.value?.chart,
+      () => {
+        lastChartOptions = null;
+      },
+    );
 
     // Restore drag-to-pan (map-style). The shared ChartRenderer arms the
     // `dataZoomSelect` global cursor on every render, which turns a drag into a
