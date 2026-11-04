@@ -70,13 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="readOnly"
             @update:model-value="(v) => setRow(kind, v)"
           />
-          <div
-            v-if="kind === 'incident'"
-            class="text-text-secondary pt-1 text-xs"
-            data-test="settings-default-templates-incident-help"
-          >
-            {{ t("settings.defaultTemplates.incidentHelp") }}
-          </div>
         </div>
       </div>
       <div

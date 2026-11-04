@@ -74,6 +74,18 @@ describe("TemplateOverridePicker", () => {
     expect(w.find('[data-test="template-override-will-use"]').exists()).toBe(false);
   });
 
+  it("as the incident org default row, says it overrides the alert's and the destination's template", async () => {
+    list.mockResolvedValue({ data: [{ name: "card", kind: "content" }] } as any);
+    const w = await mountPicker({ context: "orgDefault", kind: "incident" });
+
+    expect(String(select(w).props("placeholder"))).toBe(
+      "Use the alert's or the destination's template",
+    );
+    expect(String(select(w).props("helpText"))).toBe(
+      "Overrides the alert's and the destination's template for incident messages.",
+    );
+  });
+
   it("names the destination template that an empty override leaves in place", async () => {
     list.mockResolvedValue({
       data: [{ name: "slack_tpl", kind: "custom", type: "http", applies_to: [] }],

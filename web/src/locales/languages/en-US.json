@@ -13487,6 +13487,8 @@
       "stale": "Template {name} no longer exists. Pick another one or clear the field.",
       "orgDefaultPlaceholder": "Built-in {kind} message",
       "orgDefaultHelp": "Sent for {kind} messages when the destination has no template that applies.",
+      "orgDefaultIncidentPlaceholder": "Use the alert's or the destination's template",
+      "orgDefaultIncidentHelp": "Overrides the alert's and the destination's template for incident messages.",
       "willUse": "Will use: {template}",
       "willUsePerDestination": "Will use, per destination:",
       "willUseRow": "{destination}: {template}",
@@ -15343,7 +15345,6 @@
     "defaultTemplates": {
       "title": "Default templates",
       "description": "Used when a destination has no template of its own, or only a prebuilt one. Applies to this region.",
-      "incidentHelp": "Also overrides the alert's template for incident messages",
       "save": "Save",
       "saved": "Default templates saved",
       "loadFailed": "Could not load the default templates",

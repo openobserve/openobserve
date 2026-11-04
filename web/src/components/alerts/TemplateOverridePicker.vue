@@ -71,16 +71,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="state === 'loading'"
       :disabled="disabled || state === 'loading' || state === 'forbidden'"
       :placeholder="
-        context === 'orgDefault'
-          ? t('alerts.templateOverride.orgDefaultPlaceholder', { kind: kindLabel })
-          : t('alerts.templateOverride.placeholder')
+        context !== 'orgDefault'
+          ? t('alerts.templateOverride.placeholder')
+          : kind === 'incident'
+            ? t('alerts.templateOverride.orgDefaultIncidentPlaceholder')
+            : t('alerts.templateOverride.orgDefaultPlaceholder', { kind: kindLabel })
       "
       :help-text="
         state === 'forbidden'
           ? t('alerts.templateOverride.forbidden')
-          : context === 'orgDefault'
-            ? t('alerts.templateOverride.orgDefaultHelp', { kind: kindLabel })
-            : t('alerts.templateOverride.help', { kind: kindLabel })
+          : context !== 'orgDefault'
+            ? t('alerts.templateOverride.help', { kind: kindLabel })
+            : kind === 'incident'
+              ? t('alerts.templateOverride.orgDefaultIncidentHelp')
+              : t('alerts.templateOverride.orgDefaultHelp', { kind: kindLabel })
       "
       :error-message="serverError ? raw(serverError) : undefined"
       class="max-w-105"
