@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex h-[30rem] max-h-[calc(90vh-4rem)] flex-col gap-5" :data-view="view">
       <div class="flex items-center gap-3">
         <span
-          v-if="view !== 'choose'"
+          v-if="view === 'progress' || view === 'ready'"
           class="rounded-surface flex size-12 shrink-0 items-center justify-center"
           :class="headerTint"
         >
@@ -122,9 +122,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-else>
-        <OBanner variant="error" dense data-test="sample-welcome-error">
-          {{ session.error.value || t("sampleData.toast.loadFailed") }}
-        </OBanner>
+        <div
+          role="alert"
+          class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 text-center"
+          data-test="sample-welcome-error"
+        >
+          <span
+            class="rounded-surface bg-icon-chip-error-bg text-icon-chip-error-text flex size-12 items-center justify-center"
+          >
+            <OIcon name="error" size="md" />
+          </span>
+          <p class="text-text-body m-0 max-w-md text-sm">{{ t("sampleData.welcome.errorBody") }}</p>
+          <p v-if="session.error.value" class="text-text-secondary m-0 max-w-md text-xs">
+            {{ session.error.value }}
+          </p>
+        </div>
         <div class="mt-auto flex justify-end gap-2">
           <OButton variant="ghost" size="sm" @click="close">{{ t("common.cancel") }}</OButton>
           <OButton variant="primary" size="sm" data-test="sample-welcome-retry" @click="load">
@@ -144,7 +156,6 @@ import config from "@/aws-exports";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import WelcomeChoices from "@/components/login/WelcomeChoices.vue";
 import {
@@ -182,11 +193,9 @@ const view = computed<"choose" | "progress" | "ready" | "error">(() => {
   return "choose";
 });
 
-const headerIcon = computed<IconName>(() => {
-  if (view.value === "ready") return "check-circle";
-  if (view.value === "progress") return "progress-activity";
-  return "science";
-});
+const headerIcon = computed<IconName>(() =>
+  view.value === "ready" ? "check-circle" : "progress-activity",
+);
 const headerTint = computed(() => {
   if (view.value === "ready") return "bg-icon-chip-success-bg text-status-success-text";
   return "bg-ingest-tint-purple text-ingest-accent-purple";
@@ -198,11 +207,9 @@ const headerTitle = computed(() => {
   if (view.value === "error") return t("sampleData.toast.loadFailed");
   return t("login.getStarted.title");
 });
-const headerBody = computed(() => {
-  if (view.value === "progress") return t("sampleData.welcome.progress.body");
-  if (view.value === "ready") return undefined;
-  return t("sampleData.welcome.errorBody");
-});
+const headerBody = computed(() =>
+  view.value === "progress" ? t("sampleData.welcome.progress.body") : undefined,
+);
 
 const close = () => {
   if (org.value) session.markWelcomeSeen(org.value);

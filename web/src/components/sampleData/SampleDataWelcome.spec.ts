@@ -105,6 +105,7 @@ const CHIP_ROUTES: Array<[string, string]> = [
 
 const session = useSampleDataSession() as unknown as {
   status: { value: string };
+  error: { value: string | null };
   loadingOrg: { value: string };
   welcomeOpen: { value: boolean };
   welcomeDeciding: { value: boolean };
@@ -199,6 +200,7 @@ describe("SampleDataWelcome finish", () => {
     session.start.mockClear();
     session.status.value = "idle";
     session.loadingOrg.value = "";
+    session.error.value = null;
     session.welcomeOpen.value = false;
     session.welcomeDeciding.value = false;
     session.tour.value = null;
@@ -417,6 +419,25 @@ describe("SampleDataWelcome finish", () => {
       await click("onboarding-get-started-sample-btn");
       expect(session.start).not.toHaveBeenCalled();
       expect(submitNewUserInfo).not.toHaveBeenCalled();
+    });
+
+    it("centres an error icon and the message when the load fails", async () => {
+      await mountAtHome();
+      await click("onboarding-get-started-sample-btn");
+      session.error.value = "HTTP 500";
+      session.status.value = "failed";
+      await flush();
+      expect(view()).toBe("error");
+      const error = byTest("sample-welcome-error");
+      expect(error.attributes("role")).toBe("alert");
+      expect(error.classes()).toEqual(
+        expect.arrayContaining(["flex-1", "items-center", "justify-center"]),
+      );
+      expect(error.findComponent({ name: "OIcon" }).props("name")).toBe("error");
+      expect(error.text()).toContain(enLocale.sampleData.welcome.errorBody);
+      expect(error.text()).toContain("HTTP 500");
+      expect(wrapper!.findComponent({ name: "OBanner" }).exists()).toBe(false);
+      expect(byTest("sample-welcome-retry").exists()).toBe(true);
     });
 
     it("closing the progress view is not a skip", async () => {
