@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
+import { ADVICE_LABEL, LIMITATION_LABEL, QUALITY_REASON_LABEL } from "./rules";
 
 export const DIGEST_STREAM = "_o2_alert_calibration_digests";
 /** Every digest search asks for this many rows, and a full page means more may exist. */
@@ -36,7 +37,11 @@ export type Audience = "owner" | "operator";
 export type ReviewFocus = "settings" | "threshold" | "query" | "grouping";
 /** The typed actions this build renders (D:L287); any other type is dropped, never shown raw. */
 export type InsightAction =
-  { type: "review_alert"; alert_id: string; focus?: ReviewFocus } | { type: "review_platform" };
+  | { type: "review_alert"; alert_id: string; focus?: ReviewFocus }
+  | { type: "review_source"; stream_type: string; stream_name: string }
+  | { type: "review_platform" };
+/** Whether the run judged alert definitions; only `checked` means AutoObserve's findings are current (U2). */
+export type DefinitionChecks = "checked" | "unavailable" | "not_yet" | "failed";
 
 const REVIEW_FOCI: ReviewFocus[] = ["settings", "threshold", "query", "grouping"];
 
@@ -49,6 +54,9 @@ export interface Coverage {
   coverage_error_clusters_truncated: boolean;
   coverage_error_clusters_unattributed: number;
   coverage_stream_substrate_empty: boolean;
+  /** Written only when the org has alerts, and only from version 2. */
+  coverage_definition_checks?: DefinitionChecks;
+  coverage_definition_checks_truncated?: boolean;
 }
 
 /** One run as the timeline lists it; a run is identified by its window, not by an id. */
@@ -63,6 +71,8 @@ export interface RunRow extends Coverage {
   omitted_routine_skip_count?: number;
   alerts_in_scope: number;
   coverage_gap: boolean;
+  /** Only an emission's own records carry it; the runs list does not select it. */
+  schema_version?: number;
 }
 
 /** One record of the digest stream; a run that found nothing writes one record with every finding column unset. */
@@ -91,8 +101,10 @@ export interface DigestRecord extends Omit<RunRow, "emitted_at"> {
   /** Why the evidence is degraded, as one JSON array; written only when it is. */
   quality_reasons?: string | unknown[];
   audience?: Audience;
-  /** A JSON array, stringified whole by ingestion. */
+  /** Codes, as one JSON array stringified whole by ingestion. */
   limitations?: string;
+  /** A code; the web holds its words. */
+  advice?: string;
   scope_kind?: string;
   scope_key?: string;
   finding_id?: string;
@@ -138,11 +150,21 @@ function textItems(value: string | unknown[] | undefined): string[] {
 const isReviewFocus = (value: unknown): value is ReviewFocus =>
   typeof value === "string" && (REVIEW_FOCI as string[]).includes(value);
 
-/** The limitations a finding lists, from the one column ingestion stringified them into. */
-export const limitationsOf = (record: DigestRecord): string[] => textItems(record.limitations);
+/** Codes this build can name; an unknown one shows nothing. */
+export const limitationsOf = (t: TranslateFn, record: DigestRecord): I18nText[] =>
+  textItems(record.limitations).flatMap((code) =>
+    Object.hasOwn(LIMITATION_LABEL, code) ? [t(LIMITATION_LABEL[code])] : [],
+  );
 
-export const qualityReasonsOf = (record: DigestRecord): string[] =>
-  textItems(record.quality_reasons);
+export const qualityReasonsOf = (t: TranslateFn, record: DigestRecord): I18nText[] =>
+  textItems(record.quality_reasons).flatMap((code) =>
+    Object.hasOwn(QUALITY_REASON_LABEL, code) ? [t(QUALITY_REASON_LABEL[code])] : [],
+  );
+
+export const adviceOf = (t: TranslateFn, record: DigestRecord): I18nText | null =>
+  record.advice && Object.hasOwn(ADVICE_LABEL, record.advice)
+    ? t(ADVICE_LABEL[record.advice])
+    : null;
 
 /** Only actions this build can label survive, so a newer writer's type never reaches the screen. */
 export function insightActionsOf(record: DigestRecord): InsightAction[] {
@@ -150,6 +172,12 @@ export function insightActionsOf(record: DigestRecord): InsightAction[] {
     if (typeof item !== "object" || item === null || Array.isArray(item)) return [];
     const action: Record<string, unknown> = { ...item };
     if (action.type === "review_platform") return [{ type: "review_platform" }];
+    if (action.type === "review_source") {
+      const { stream_type, stream_name } = action;
+      return typeof stream_type === "string" && typeof stream_name === "string"
+        ? [{ type: "review_source", stream_type, stream_name }]
+        : [];
+    }
     if (action.type !== "review_alert" || typeof action.alert_id !== "string") return [];
     if (action.focus === undefined) return [{ type: "review_alert", alert_id: action.alert_id }];
     return isReviewFocus(action.focus)
@@ -211,6 +239,9 @@ export function runIdentity(record: DigestRecord): RunRow {
     coverage_error_clusters_truncated: record.coverage_error_clusters_truncated,
     coverage_error_clusters_unattributed: record.coverage_error_clusters_unattributed,
     coverage_stream_substrate_empty: record.coverage_stream_substrate_empty,
+    coverage_definition_checks: record.coverage_definition_checks,
+    coverage_definition_checks_truncated: record.coverage_definition_checks_truncated,
+    schema_version: record.schema_version,
   };
 }
 
@@ -301,28 +332,62 @@ export function coverageVerdict(row: RunRow): CoverageVerdict {
   return row.coverage_gap ? "gap" : "full";
 }
 
+export interface CoverageNote {
+  text: I18nText;
+  /** Counted by the run's `coverage_gap`, so it is shown as a warning, never as neutral meta. */
+  gap: boolean;
+}
+
+/** AutoObserve off is configuration, not a blind spot of the run, so its note alone is neutral (U2). */
+const DEFINITION_CHECK_NOTE: Record<DefinitionChecks, { key: I18nKey; gap: boolean } | null> = {
+  checked: null,
+  unavailable: { key: "alertCalibration.coverage.definitionChecksUnavailable", gap: false },
+  not_yet: { key: "alertCalibration.coverage.definitionChecksNotYet", gap: true },
+  failed: { key: "alertCalibration.coverage.definitionChecksFailed", gap: true },
+};
+
 /** Every coverage column off its default, including the ones `coverage_gap` does not count. */
-export function coverageNotes(t: TranslateFn, row: RunRow): I18nText[] {
-  const notes: I18nText[] = [];
+export function coverageNoteRows(t: TranslateFn, row: RunRow): CoverageNote[] {
+  const notes: CoverageNote[] = [];
   if (row.coverage_stream_substrate_empty)
-    notes.push(t("alertCalibration.coverage.substrateEmpty"));
-  const counts: [keyof Coverage, I18nKey][] = [
-    ["coverage_unreadable_definitions", "alertCalibration.coverage.unreadableDefinitions"],
-    ["coverage_facts_without_definition", "alertCalibration.coverage.factsWithoutDefinition"],
-    ["coverage_error_clusters_unattributed", "alertCalibration.coverage.errorClustersUnattributed"],
-    ["coverage_definitions_without_facts", "alertCalibration.coverage.definitionsWithoutFacts"],
+    notes.push({ text: t("alertCalibration.coverage.substrateEmpty"), gap: true });
+  const counts: [keyof Coverage, I18nKey, boolean][] = [
+    ["coverage_unreadable_definitions", "alertCalibration.coverage.unreadableDefinitions", true],
+    [
+      "coverage_facts_without_definition",
+      "alertCalibration.coverage.factsWithoutDefinition",
+      false,
+    ],
+    [
+      "coverage_error_clusters_unattributed",
+      "alertCalibration.coverage.errorClustersUnattributed",
+      true,
+    ],
+    [
+      "coverage_definitions_without_facts",
+      "alertCalibration.coverage.definitionsWithoutFacts",
+      false,
+    ],
   ];
   const flags: [keyof Coverage, I18nKey][] = [
     ["coverage_transitions_truncated", "alertCalibration.coverage.transitionsTruncated"],
     ["coverage_counters_truncated", "alertCalibration.coverage.countersTruncated"],
     ["coverage_error_clusters_truncated", "alertCalibration.coverage.errorClustersTruncated"],
+    ["coverage_definition_checks_truncated", "alertCalibration.coverage.definitionChecksTruncated"],
   ];
-  for (const [column, key] of counts) {
+  for (const [column, key, gap] of counts) {
     const count = Number(row[column]);
-    if (count > 0) notes.push(t(key, { count }, count));
+    if (count > 0) notes.push({ text: t(key, { count }, count), gap });
   }
   for (const [column, key] of flags) {
-    if (row[column]) notes.push(t(key));
+    if (row[column]) notes.push({ text: t(key), gap: true });
   }
+  const checks = row.coverage_definition_checks;
+  const definitionNote =
+    checks && Object.hasOwn(DEFINITION_CHECK_NOTE, checks) ? DEFINITION_CHECK_NOTE[checks] : null;
+  if (definitionNote) notes.push({ text: t(definitionNote.key), gap: definitionNote.gap });
   return notes;
 }
+
+export const coverageNotes = (t: TranslateFn, row: RunRow): I18nText[] =>
+  coverageNoteRows(t, row).map((note) => note.text);

@@ -246,6 +246,81 @@ describe("AlertCalibrationDashboard", () => {
     wrapper.unmount();
   });
 
+  it("a_v2_run_hides_the_silent_group_and_explains_definition_checks", async () => {
+    const v2 = (extra: Partial<DigestRecord>) =>
+      record({ schema_version: 2, kind: "finding", ...extra });
+    const broken = v2({
+      rule_id: "failure",
+      pattern: "stream_missing",
+      severity: "High",
+      confidence: "High",
+      title: "orders error rate reads logs/orders_v1, which doesn't exist",
+      alert_id: "a1",
+      alert_name: "orders error rate",
+      finding_id: "f1",
+    });
+    const quiet = v2({
+      rule_id: "failure",
+      pattern: "source_inactive",
+      severity: "Medium",
+      confidence: "Medium",
+      title: "orders error rate reads logs/batch_logs, which has no recent data",
+      alert_id: "a1",
+      alert_name: "orders error rate",
+      finding_id: "f2",
+    });
+    const emit = (checks: string, gap: boolean) =>
+      vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+        read === ""
+          ? ([run] as never)
+          : ([broken, quiet].map((r) => ({
+              ...r,
+              coverage_gap: gap,
+              coverage_definition_checks: checks,
+            })) as never),
+      );
+
+    emit("unavailable", false);
+    const off = await mountPage();
+    const rules = off.findAll('[data-test^="alert-calibration-dashboard-rule-"]');
+    expect(rules.map((r) => r.attributes("data-test"))).not.toContain(
+      "alert-calibration-dashboard-rule-silent",
+    );
+    const failure = off.find('[data-test="alert-calibration-dashboard-rule-failure"]');
+    expect(failure.text()).toContain("Alert not working");
+    // Two findings on one alert are still one flagged alert.
+    expect(failure.text()).toContain("1 alert");
+    const neutral = off.findAll('[data-test="alert-calibration-dashboard-note"]');
+    expect(neutral.map((n) => n.text())).toEqual([
+      "Alert definition checks need AutoObserve, which is off. The other checks ran.",
+    ]);
+    expect(neutral[0].find(".text-status-warning-text").exists()).toBe(false);
+    expect(off.find('[data-test="alert-calibration-dashboard-gap-note"]').exists()).toBe(false);
+    off.unmount();
+
+    emit("not_yet", true);
+    const notYet = await mountPage();
+    const gap = notYet.find('[data-test="alert-calibration-dashboard-gap-note"]');
+    expect(gap.text()).toBe(
+      "AutoObserve has not checked alert definitions in the last day, so they were not judged.",
+    );
+    expect(gap.find(".text-status-warning-text").exists()).toBe(true);
+    notYet.unmount();
+
+    // A version-1 run keeps its legacy labels and its Silent group.
+    vi.mocked(alertCalibration.readDigests).mockImplementation(async (_org, read) =>
+      read === "" ? ([run] as never) : (findings as never),
+    );
+    const v1 = await mountPage();
+    expect(v1.find('[data-test="alert-calibration-dashboard-rule-silent"]').text()).toContain(
+      "Silent",
+    );
+    expect(v1.find('[data-test="alert-calibration-dashboard-rule-failure"]').text()).toContain(
+      "Failure",
+    );
+    v1.unmount();
+  });
+
   it("points an org with calibration off at the settings instead of an empty board", async () => {
     vi.mocked(alertCalibration.getConfig).mockResolvedValue(config(false) as never);
     const wrapper = await mountPage();

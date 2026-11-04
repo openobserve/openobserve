@@ -116,7 +116,7 @@ describe("AlertCalibrationFindingCard", () => {
         kind: "finding",
         tier: "A",
         quality: "partial",
-        limitations: JSON.stringify(["Counts are a floor"]),
+        limitations: JSON.stringify(["quiet_source"]),
       }),
     );
     expect(v2.find('[data-test="alert-calibration-finding-tier"]').text()).toBe(
@@ -126,7 +126,7 @@ describe("AlertCalibrationFindingCard", () => {
       "Partial evidence",
     );
     expect(v2.find('[data-test="alert-calibration-finding-limitations"]').text()).toContain(
-      "Counts are a floor",
+      "A quiet source can be a batch or cron job that is idle by design.",
     );
     const v1 = mountCard(finding());
     expect(v1.find('[data-test="alert-calibration-finding-tier"]').exists()).toBe(false);
@@ -216,12 +216,12 @@ describe("AlertCalibrationFindingCard", () => {
   });
 
   it("names why the evidence is degraded under the quality badge, and nothing when usable", () => {
-    const reasons = JSON.stringify(["Counters truncated", "Late rows"]);
+    const reasons = JSON.stringify(["scan_truncated"]);
     const partial = mountCard(
       finding({ schema_version: 2, kind: "finding", quality: "partial", quality_reasons: reasons }),
     );
     expect(partial.find('[data-test="alert-calibration-finding-quality-reasons"]').text()).toBe(
-      "Reasons: Counters truncated and Late rows",
+      "Reason: wider searches timed out",
     );
     const usable = mountCard(
       finding({ schema_version: 2, kind: "finding", quality: "usable", quality_reasons: reasons }),
@@ -229,5 +229,87 @@ describe("AlertCalibrationFindingCard", () => {
     expect(usable.find('[data-test="alert-calibration-finding-quality-reasons"]').exists()).toBe(
       false,
     );
+  });
+
+  it("renders_a_not_working_card_with_pattern_evidence_advice_and_codes_and_never_a_raw_code", () => {
+    const checkedAt = new Date(2026, 10, 4, 9, 30).getTime() * 1000;
+    const notWorking = (overrides: Partial<FindingRecord>) =>
+      finding({
+        schema_version: 2,
+        kind: "finding",
+        rule_id: "failure",
+        severity: "High",
+        confidence: "High",
+        alert_id: "a1",
+        alert_name: "orders error rate",
+        actions: undefined,
+        evidence_schedulerhealth_top_orgs: undefined,
+        evidence_notworking_checked_at_micros: checkedAt,
+        ...overrides,
+      });
+    const missing = mountCard(
+      notWorking({
+        pattern: "stream_missing",
+        tier: "A",
+        title: "orders error rate reads logs/orders_v1, which doesn't exist",
+        advice: "check_missing_stream",
+        insight_actions: JSON.stringify([{ type: "review_alert", alert_id: "a1", focus: "query" }]),
+        evidence_notworking_stream: "logs/orders_v1",
+        evidence_notworking_evaluation_errors: 86,
+        evidence_notworking_evaluations: 90,
+      }),
+    );
+    expect(missing.find('[data-test="alert-calibration-finding-rule"]').text()).toBe(
+      "Alert not working",
+    );
+    const rows = missing.findAll("dt").map((dt) => dt.text());
+    expect(rows).toEqual(["Stream", "Errors", "Evaluations", "Checked"]);
+    const values = missing.findAll("dd").map((dd) => dd.text());
+    expect(values).toEqual(["logs/orders_v1", "86", "90", "Nov 4, 09:30"]);
+    const advice = missing.find('[data-test="alert-calibration-finding-advice"]').text();
+    expect(advice).toContain("What to check");
+    expect(advice).toContain("Check the source the query reads: it does not exist.");
+    expect(missing.find('[data-test="alert-calibration-finding-limitations"]').exists()).toBe(
+      false,
+    );
+
+    const quiet = mountCard(
+      notWorking({
+        pattern: "source_inactive",
+        tier: "B",
+        severity: "Medium",
+        title: "orders error rate reads logs/batch_logs, which has no recent data",
+        advice: "confirm_quiet_source",
+        limitations: JSON.stringify(["quiet_source"]),
+        insight_actions: JSON.stringify([
+          { type: "review_source", stream_type: "logs", stream_name: "batch_logs" },
+        ]),
+        evidence_notworking_stream: "logs/batch_logs",
+        evidence_notworking_last_data_at_micros: checkedAt,
+      }),
+    );
+    expect(quiet.findAll("dt").map((dt) => dt.text())).toEqual(["Stream", "Last data", "Checked"]);
+    expect(quiet.find('[data-test="alert-calibration-finding-tier"]').text()).toBe("Investigate");
+    expect(quiet.find('[data-test="alert-calibration-finding-action-review_source"]').text()).toBe(
+      "Review source",
+    );
+    expect(quiet.find('[data-test="alert-calibration-finding-limitations"]').text()).toContain(
+      "A quiet source can be a batch or cron job that is idle by design.",
+    );
+
+    const unknown = mountCard(
+      notWorking({
+        pattern: "made_up",
+        quality: "partial",
+        advice: "made_up",
+        limitations: JSON.stringify(["made_up"]),
+        quality_reasons: JSON.stringify(["made_up"]),
+        insight_actions: JSON.stringify([{ type: "made_up" }]),
+      }),
+    );
+    expect(unknown.text()).not.toContain("made_up");
+    for (const block of ["advice", "limitations", "quality-reasons", "actions"]) {
+      expect(unknown.find(`[data-test="alert-calibration-finding-${block}"]`).exists()).toBe(false);
+    }
   });
 });

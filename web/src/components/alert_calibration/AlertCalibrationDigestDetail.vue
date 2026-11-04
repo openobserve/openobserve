@@ -127,13 +127,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               t("alertCalibration.detail.filterAll")
             }}</OToggleGroupItem>
             <OToggleGroupItem
-              v-for="rule in RULE_IDS"
+              v-for="rule in rulesOfVersion(version)"
               :key="rule"
               :value="rule"
               size="xs"
               :disabled="!presentRules.includes(rule)"
             >
-              {{ t(RULE_META[rule].labelKey) }}
+              {{ t(ruleLabelKey(rule, version)) }}
             </OToggleGroupItem>
           </OToggleGroup>
         </div>
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-col gap-3">
           <AlertCalibrationFindingCard
             v-for="finding in visibleFindings"
-            :key="`${finding.rule_id}:${finding.alert_id}`"
+            :key="finding.finding_id ?? `${finding.rule_id}:${finding.alert_id}`"
             :finding="finding"
           />
         </div>
@@ -284,7 +284,7 @@ import {
   type RuleId,
 } from "./digests";
 import { COVERAGE_BADGE, formatMinutes, skipDetailLabel, skipReasonLabel } from "./format";
-import { isRuleId, RULE_IDS, RULE_META } from "./rules";
+import { isRuleId, ruleLabelKey, rulesOfVersion } from "./rules";
 
 const props = defineProps<{ windowStart: string | number; windowEnd: string | number }>();
 
@@ -316,6 +316,7 @@ const records = useLatestRead(async () => {
 });
 
 const run = computed(() => records.data.value?.run ?? null);
+const version = computed(() => run.value?.schema_version ?? 1);
 const findings = computed(() => records.data.value?.findings ?? []);
 const skips = computed(() => records.data.value?.skips ?? []);
 const skipRows = computed(() =>
@@ -325,7 +326,7 @@ const skipRows = computed(() =>
 const omittedRoutine = computed(() => run.value?.omitted_routine_skip_count ?? 0);
 /** A rule from a newer writer is named generically, never by its stored id. */
 const ruleLabel = (rule: string): I18nText =>
-  t(isRuleId(rule) ? RULE_META[rule].labelKey : "alertCalibration.rules.other");
+  t(isRuleId(rule) ? ruleLabelKey(rule, version.value) : "alertCalibration.rules.other");
 const hitCount = computed(() => records.data.value?.hits ?? 0);
 /** A version-1 run writes no skip records, so it has no written count to fall short of. */
 const writtenSkips = computed(() => run.value?.written_skip_count ?? skips.value.length);

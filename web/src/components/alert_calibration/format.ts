@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { format as formatDate } from "date-fns";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { Confidence, CoverageVerdict, Quality, Severity, Tier } from "./digests";
 import type { EvidenceFormat } from "./rules";
@@ -53,11 +54,15 @@ export function formatSeconds(t: TranslateFn, secs: number): I18nText {
   return formatMinutes(t, Math.round(rounded / 60));
 }
 
+/** Microseconds, in the card's existing hour format. */
+const formatTime = (micros: number) => formatDate(micros / 1000, "MMM d, HH:mm");
+
 export function formatEvidence(t: TranslateFn, value: unknown, format: EvidenceFormat): I18nText {
   if (value === undefined || value === null || value === "") return raw("—");
   if (format === "ratio") return raw(`${(Number(value) * 100).toFixed(1)}%`);
   if (format === "seconds") return formatSeconds(t, Number(value));
   if (format === "count") return raw(Number(value).toLocaleString());
+  if (format === "time") return raw(formatTime(Number(value)));
   if (format === "boolean") {
     return value === true || value === "true"
       ? t("alertCalibration.evidence.yes")
@@ -124,6 +129,7 @@ const SKIP_REASON_LABEL: Record<string, I18nKey> = {
   no_incident_signal: "alertCalibration.skipReason.noIncidentSignal",
   sentinel_by_design: "alertCalibration.skipReason.sentinelByDesign",
   enrichment_timeout: "alertCalibration.skipReason.enrichmentTimeout",
+  healthy_silence: "alertCalibration.skipReason.healthySilence",
 };
 
 /** A reason from a newer writer is named generically, never by its stored name. */
