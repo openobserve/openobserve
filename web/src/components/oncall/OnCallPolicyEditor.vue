@@ -1258,6 +1258,7 @@ const policyDraft = useEditorDraft<PolicyDraftData>({
     repeat_count: props.policy?.repeat_count ?? 1,
     final_action: props.policy?.final_action ?? "stop",
     l0: props.policy?.l0 ?? null,
+    template: props.policy?.template ?? null,
   }),
   hasChanges: () => !!props.open && stableStringify(policyContent()) !== contentAtOpen,
   save: () => save(),

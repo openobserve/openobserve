@@ -87,6 +87,35 @@ pub enum TemplateError {
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
+    // Only reserved and retired names are ever renamed, so other lookups skip the alias reads.
+    let renamable = table::templates::is_reserved_default_name(name)
+        || table::templates::RETIRED_DEFAULT_NAMES.contains(&name);
+    if !renamable {
+        return get_shared(org_id, name).await;
+    }
+    // A node whose destination or alert cache predates a rename still asks for the old name: the
+    // org's own rename wins over the shared default row of that name.
+    if org_id != DEFAULT_ORG {
+        if let Some(template) = own_row(org_id, name).await? {
+            return Ok(template);
+        }
+        if let Some(to) = alias(org_id, name).await?
+            && let Ok(template) = get_shared(org_id, &to).await
+        {
+            return Ok(template);
+        }
+    }
+    match get_shared(org_id, name).await {
+        Err(TemplateError::NotFound) => match alias(DEFAULT_ORG, name).await? {
+            Some(to) => get_shared(org_id, &to).await,
+            None => Err(TemplateError::NotFound),
+        },
+        found => found,
+    }
+}
+
+/// The org's row, else the shared default org's row of that name.
+async fn get_shared(org_id: &str, name: &str) -> Result<Template, TemplateError> {
     let map_key = format!("{org_id}/{name}");
     if let Some(v) = ALERTS_TEMPLATES.get(&map_key) {
         return Ok(v.value().clone());
@@ -95,33 +124,27 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
     if let Some(v) = ALERTS_TEMPLATES.get(&default_org_key) {
         return Ok(v.value().clone());
     }
-
     if let Some(template) = table::templates::get(org_id, name).await? {
         return Ok(template);
     }
-    if let Some(template) = table::templates::get(DEFAULT_ORG, name).await? {
-        return Ok(template);
+    table::templates::get(DEFAULT_ORG, name)
+        .await?
+        .ok_or(TemplateError::NotFound)
+}
+
+async fn own_row(org_id: &str, name: &str) -> Result<Option<Template>, TemplateError> {
+    if let Some(v) = ALERTS_TEMPLATES.get(&format!("{org_id}/{name}")) {
+        return Ok(Some(v.value().clone()));
     }
-    // A node whose destination or alert cache predates a rename still asks for the old name.
-    let renamed = table::templates::renamed_to(org_id, name)
+    Ok(table::templates::get_own(org_id, name).await?)
+}
+
+/// The name `name` was renamed to in exactly `org_id`.
+async fn alias(org_id: &str, name: &str) -> Result<Option<String>, TemplateError> {
+    Ok(table::templates::renamed_in(org_id, name)
         .await
-        .map_err(infra::errors::Error::from)?;
-    match renamed.filter(|to| to != name) {
-        Some(to) => {
-            for key in [format!("{org_id}/{to}"), format!("{DEFAULT_ORG}/{to}")] {
-                if let Some(v) = ALERTS_TEMPLATES.get(&key) {
-                    return Ok(v.value().clone());
-                }
-            }
-            if let Some(template) = table::templates::get(org_id, &to).await? {
-                return Ok(template);
-            }
-            table::templates::get(DEFAULT_ORG, &to)
-                .await?
-                .ok_or(TemplateError::NotFound)
-        }
-        None => Err(TemplateError::NotFound),
-    }
+        .map_err(infra::errors::Error::from)?
+        .filter(|to| to != name))
 }
 
 pub async fn set(template: Template) -> Result<Template, TemplateError> {

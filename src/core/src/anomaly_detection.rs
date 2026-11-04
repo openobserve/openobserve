@@ -3700,6 +3700,11 @@ fn anomaly_notification_context(
             let message = anomaly_alert_message(&legacy_ctx, &legacy_link);
             anomaly_alert_payload(&legacy_ctx, &message, &legacy_link)
         })),
+        // A detector name is free text, so a Custom email escapes it as the other kinds do.
+        render_hints: crate::alerts::notifications::context::RenderHints {
+            escape_email_attributes: true,
+            ..Default::default()
+        },
         ..Default::default()
     }
 }

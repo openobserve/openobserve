@@ -117,6 +117,15 @@ pub async fn get(org_id: &str, name: &str) -> Result<Option<Template>, Error> {
     get_with(client, org_id, name).await
 }
 
+/// The org's own row only, with no fallback to the shared default org.
+pub async fn get_own(org_id: &str, name: &str) -> Result<Option<Template>, Error> {
+    let client = get_orm_client_ro().await;
+    match get_org_model(client, org_id, name).await? {
+        Some(model) => Ok(Some(Template::try_from(model)?)),
+        None => Ok(None),
+    }
+}
+
 /// Returns the org's own row, falling back to the shared default org.
 pub async fn get_with<C: ConnectionTrait>(
     db: &C,
@@ -597,6 +606,21 @@ async fn record_aliases<C: ConnectionTrait>(
         }
     }
     Ok(())
+}
+
+/// The name `name` was renamed or retired to in exactly `org`.
+pub async fn renamed_in(org: &str, name: &str) -> Result<Option<String>, sea_orm::DbErr> {
+    let db = get_orm_client_ro().await;
+    let Some(row) = setting_row(db, RENAMED_ALIASES_KEY).await? else {
+        return Ok(None);
+    };
+    Ok(row
+        .setting_value
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|v| v["org"] == org && v["from"] == name)
+        .and_then(|v| v["to"].as_str().map(str::to_string)))
 }
 
 /// The name `name` was renamed or retired to in `org` (or in the shared default org), if any.

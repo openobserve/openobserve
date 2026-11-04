@@ -288,6 +288,11 @@ pub(crate) fn apply_custom_template_plain(
         if is_email && ctx.render_hints.escape_email_attributes {
             let escaped = html_escape(value);
             process_variable_replace(&mut resp, key, &VarValue::Str(&escaped), is_email);
+        } else if escape {
+            // Another kind's JSON body: real JSON string escaping, as for its scalars.
+            scan_and_replace_var(&mut resp, key, |len| {
+                json_string_contents(&VarValue::Str(value).to_string_with_length(len, true))
+            });
         } else {
             process_variable_replace(&mut resp, key, &VarValue::Str(value), is_email);
         }
@@ -613,6 +618,13 @@ mod golden {
         let json: serde_json::Value = serde_json::from_str(&body).expect(&body);
         assert_eq!(json["text"], "esc \u{1b}[31m red");
         assert_eq!(json["detail"], "col\tcol \u{1} \u{7f}");
+        let attrs = NotificationContext {
+            context_attributes: vec![("check_error".into(), "timed \"out\"\n\u{1b}x".into())],
+            ..ctx.clone()
+        };
+        let body = apply_custom_template(r#"{"error":"{check_error}"}"#, &attrs, false);
+        let json: serde_json::Value = serde_json::from_str(&body).expect(&body);
+        assert_eq!(json["error"], "timed \"out\"\n\u{1b}x");
         assert_eq!(
             apply_custom_template("[prod] {alert_name}", &ctx, false),
             "[prod] Nightly \"deploy\" <db>"
