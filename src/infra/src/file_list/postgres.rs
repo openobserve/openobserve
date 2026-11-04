@@ -1473,8 +1473,7 @@ DO UPDATE SET
         let sql = if fast_mode {
             r#"SELECT stream, id, 0::BIGINT AS num FROM file_list_jobs WHERE status = $1 ORDER BY offsets DESC LIMIT $2 FOR UPDATE SKIP LOCKED;"#
         } else {
-            // newest hour first: a re-armed row never blocks later hours; locked rows skip the
-            // stream
+            // newest hour first, so a re-armed 00:00 row never blocks the day's later hours
             r#"
     WITH candidates AS (
         SELECT stream, max(offsets) AS offsets, COUNT(*)::BIGINT AS num
