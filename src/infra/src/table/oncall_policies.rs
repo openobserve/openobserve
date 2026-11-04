@@ -224,6 +224,19 @@ pub async fn update_rungs(
     // `None` means **unchanged**, never reset: this column is the only copy of a team's L0 block.
     l0: Option<&config::meta::oncall::L0Policy>,
 ) -> Result<Option<EscalationPolicy>, errors::Error> {
+    update_policy(org_id, team_id, rungs, destinations, l0, None).await
+}
+
+/// `update_rungs` that also sets (`Some(Some)`) or clears (`Some(None)`) the template override in
+/// the same write, so a concurrent save cannot pair one request's rungs with another's template.
+pub async fn update_policy(
+    org_id: &str,
+    team_id: &str,
+    rungs: &[PriorityRung],
+    destinations: Option<&[String]>,
+    l0: Option<&config::meta::oncall::L0Policy>,
+    template: Option<Option<&str>>,
+) -> Result<Option<EscalationPolicy>, errors::Error> {
     let client = get_orm_client_rw().await;
     let Some(existing) = oncall_policies::Entity::find()
         .filter(oncall_policies::Column::OrgId.eq(org_id))
@@ -240,6 +253,9 @@ pub async fn update_rungs(
     }
     if let Some(l0) = l0 {
         model.l0_json = Set(serde_json::to_string(l0)?);
+    }
+    if let Some(template) = template {
+        model.template = Set(template.map(str::to_string));
     }
     model.updated_at = Set(now_micros());
     let updated = to_policy(model.update(client).await?);

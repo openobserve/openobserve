@@ -1734,23 +1734,14 @@ pub async fn set_policy(
         {
             return MetaHttpResponse::bad_request(e.as_str());
         }
-        let policy = match o2_enterprise::enterprise::oncall::service::set_policy(
+        // One write and one replication carry the rungs and the template together.
+        match o2_enterprise::enterprise::oncall::service::set_policy(
             &org_id,
             &team_id,
             body.rungs,
             body.destinations,
             body.l0,
-        )
-        .await
-        {
-            Ok(policy) => policy,
-            Err(e) => return to_response(e),
-        };
-        let Some(template) = template else {
-            return MetaHttpResponse::json(policy);
-        };
-        match o2_enterprise::enterprise::oncall::service::set_policy_template(
-            &org_id, &team_id, template,
+            template,
         )
         .await
         {
