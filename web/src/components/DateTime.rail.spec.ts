@@ -128,8 +128,8 @@ describe("DateTime rail", () => {
       const recent = el("date-time-rail-recent-header")!;
       const calendar = el("date-time-rail-calendar-header")!;
       for (const header of [recent, calendar]) {
-        expect(header.className).toContain("text-text-secondary");
-        expect(header.className).toContain("tracking-widest");
+        expect(header.className).toContain("text-text-label");
+        expect(header.className).toContain("tracking-wide");
       }
     });
 

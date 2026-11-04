@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="date-time-rail-recent-group"
     >
       <div
-        class="text-text-secondary text-2xs px-3 pt-3 pb-1 font-medium tracking-widest uppercase opacity-80"
+        class="text-text-label px-3 pt-3 pb-1 text-xs font-medium tracking-wide uppercase"
         data-test="date-time-rail-recent-header"
       >
         {{ t("common.timeRangeRecent") }}
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @keydown.right.prevent="focusSibling($event, '[data-test$=\'-remove\']')"
           >
             <template v-if="item.compact">
-              <OTruncatedText :tooltip="false" class="min-w-0 flex-1 text-left font-bold">{{
+              <OTruncatedText :tooltip="false" class="min-w-0 flex-1 text-left">{{
                 item.compact.label
               }}</OTruncatedText>
               <span
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         :id="calendarHeadingId"
-        class="text-text-secondary text-2xs px-3 pt-3 pb-1 font-medium tracking-widest uppercase opacity-80"
+        class="text-text-label px-3 pt-3 pb-1 text-xs font-medium tracking-wide uppercase"
         data-test="date-time-rail-calendar-header"
       >
         {{ t("common.timeRangeCalendar") }}
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-date-time-rail-calendar
             :tabindex="tabindexFor(`calendar-${item.id}`)"
             :data-test="`date-time-rail-calendar-${item.id}`"
-            class="w-full justify-between! gap-2 font-bold! disabled:opacity-35"
+            class="w-full justify-between! gap-2 font-normal! disabled:opacity-35"
             :class="item.selected ? 'bg-button-primary! text-button-primary-foreground!' : ''"
             :disabled="item.disabled"
             :aria-pressed="item.selected"
