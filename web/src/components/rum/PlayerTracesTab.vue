@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ traceTimeOffset(selectedTrace.metadata.start_time) }}
           </button>
           <span
-            v-if="selectedTrace.metadata?.e2eDuration"
+            v-if="selectedTrace.metadata?.e2eDuration != null"
             class="rounded-default text-2xs bg-surface-accent text-text-body inline-flex items-center gap-1 px-1.5 py-0.5 whitespace-nowrap"
           >
             <OIcon name="timer" size="xs" class="text-text-secondary" />
@@ -231,7 +231,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-duration="{ row }">
             <span class="text-xs tabular-nums">
-              {{ formatTimeWithSuffix(row.metadata?.e2eDuration * 1000) }}
+              {{
+                row.metadata?.e2eDuration != null
+                  ? formatTimeWithSuffix(row.metadata.e2eDuration * 1000)
+                  : "—"
+              }}
             </span>
           </template>
           <template #cell-status="{ row }">
@@ -346,6 +350,18 @@ const pageOptions = computed(() =>
     value: page,
   })),
 );
+
+// Clock skew can put the trace end before the RUM request, so fall back to the span's own length.
+function traceDurationMs(rumDateMs: number, meta: any): number | null {
+  const endToEndMs =
+    rumDateMs && meta.end_time ? Math.floor(meta.end_time / 1_000_000) - rumDateMs : 0;
+  if (endToEndMs > 0) return endToEndMs;
+  const spanMs =
+    meta.start_time && meta.end_time
+      ? Math.floor((meta.end_time - meta.start_time) / 1_000_000)
+      : 0;
+  return spanMs > 0 ? spanMs : null;
+}
 
 // Like the Breadcrumbs type filter: a trace shows if it matches any checked status,
 // and an empty selection shows every trace.
@@ -792,10 +808,7 @@ async function fetchTraces() {
           .filter((view) => metadata[view.traceId])
           .map((view) => {
             const meta = metadata[view.traceId];
-            const e2eDuration =
-              view.rumDate && meta.end_time
-                ? Math.max(0, Math.floor(meta.end_time / 1_000_000) - view.rumDate)
-                : 0;
+            const e2eDuration = traceDurationMs(view.rumDate, meta);
             return { ...view, metadata: { ...meta, e2eDuration: e2eDuration } };
           })
           .sort((a, b) => (a.metadata.start_time ?? 0) - (b.metadata.start_time ?? 0));

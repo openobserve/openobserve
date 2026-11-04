@@ -121,6 +121,9 @@ interface FacetRow {
 type UsRange = { startUs: number; endUs: number };
 
 const DEFAULT_PERIOD = "7d";
+const WIDEN_RANGE_US = 30 * 24 * 3600 * 1_000_000;
+// DST makes 30 calendar days 719h, so the threshold gets an hour of slack.
+const DST_TOLERANCE_US = 3600 * 1_000_000;
 export const PICKER_LIMIT = 200;
 const SEARCH_STREAM_NOT_FOUND = 20002;
 const PATH_KEYS = ["anchor", "dir", "depth", "inc", "cohort"] as const;
@@ -554,6 +557,16 @@ export default function useProductAnalytics() {
     });
     void syncUrl(router);
   };
+
+  const canWidenRange = computed(() => {
+    const dt = state.datetime;
+    let span = dt.endTime - dt.startTime;
+    if (dt.valueType === "relative") {
+      const r = getConsumableRelativeTime(dt.relativeTimePeriod ?? DEFAULT_PERIOD);
+      span = r ? r.endTime - r.startTime : 0;
+    }
+    return span < WIDEN_RANGE_US - DST_TOLERANCE_US;
+  });
 
   const setScope = (patch: Partial<AnalyticsScopeState>, explicitApp = false) => {
     if (patch.datetime) range.value = null;
@@ -1149,6 +1162,7 @@ export default function useProductAnalytics() {
     syncedSignature: readonly(syncedSignature),
     setScope,
     widenRange,
+    canWidenRange,
     resolveRange,
     loadScope,
     pickerOptions,
