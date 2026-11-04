@@ -18,6 +18,7 @@ import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { alertsListQuery } from "@/services/alerts.queries";
 import { incidentsQuery } from "@/services/incidents.queries";
 import type { Incident } from "@/services/incidents";
@@ -44,12 +45,19 @@ export function useOverviewSignals(cluster: Ref<string | null>, refreshNonce: Re
   const store = useStore();
   const orgId = useOrgId();
   const incidentsAccess = useLockedAffordance("incidents");
+  const alertsLock = useLicenseLock("alerts");
+  const incidentsLock = useLicenseLock("incidents");
   const incidentsEnabled = computed(
-    () => incidentsAccess.value.allowed && store.state.zoConfig?.incidents_enabled === true,
+    () =>
+      incidentsAccess.value.allowed &&
+      store.state.zoConfig?.incidents_enabled === true &&
+      !incidentsLock.locked.value,
   );
 
   const alerts = useQuery(() =>
-    Object.assign(alertsListQuery(orgId.value, ""), { enabled: !!orgId.value }),
+    Object.assign(alertsListQuery(orgId.value, ""), {
+      enabled: !!orgId.value && !alertsLock.locked.value,
+    }),
   );
   const incidents = useQuery(() =>
     Object.assign(incidentsQuery(orgId.value, "open", INCIDENT_PAGE, 0), {
@@ -58,7 +66,7 @@ export function useOverviewSignals(cluster: Ref<string | null>, refreshNonce: Re
   );
 
   watch(refreshNonce, () => {
-    void alerts.refetch();
+    if (!alertsLock.locked.value) void alerts.refetch();
     if (incidentsEnabled.value) void incidents.refetch();
   });
 
@@ -83,10 +91,19 @@ export function useOverviewSignals(cluster: Ref<string | null>, refreshNonce: Re
   );
 
   return {
-    alertsLoading: computed(() => alerts.isPending.value),
-    alertsAvailable: computed(() => !alerts.isError.value),
+    alertsLocked: alertsLock.locked,
+    alertsLockedReason: alertsLock.lockedReason,
+    alertsLoading: computed(() => !alertsLock.locked.value && alerts.isPending.value),
+    alertsAvailable: computed(() => !alertsLock.locked.value && !alerts.isError.value),
     firingAlerts,
     incidentsEnabled,
+    incidentsLocked: computed(
+      () =>
+        incidentsAccess.value.allowed &&
+        store.state.zoConfig?.incidents_enabled === true &&
+        incidentsLock.locked.value,
+    ),
+    incidentsLockedReason: incidentsLock.lockedReason,
     incidentsLoading: computed(() => incidentsEnabled.value && incidents.isPending.value),
     incidentsAvailable: computed(() => incidentsEnabled.value && !incidents.isError.value),
     openIncidents,

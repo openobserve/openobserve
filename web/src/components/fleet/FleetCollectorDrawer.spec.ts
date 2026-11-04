@@ -319,6 +319,15 @@ describe("FleetCollectorDrawer", () => {
     expect(wrapper.find(sel("restart")).attributes("disabled")).toBeDefined();
   });
 
+  it("disables restart for an offline collector", async () => {
+    vi.mocked(fleet.getCollector).mockResolvedValue({
+      data: detail({ status: "offline" }),
+    } as any);
+    wrapper = mountDrawer();
+    await flushPromises();
+    expect(wrapper.find(sel("restart")).attributes("disabled")).toBeDefined();
+  });
+
   it("removes after the remove dialog confirms an online host, and closes", async () => {
     vi.mocked(fleet.deleteCollector).mockResolvedValue({ status: 204 } as any);
     wrapper = mountDrawer();

@@ -341,6 +341,35 @@ describe("RunDetail", () => {
 
       w.unmount();
     });
+
+    it("shows no status badge while the run loads, then the loaded run's status", async () => {
+      // Reassign the shared wrapper so afterEach unmounts it even when an assertion fails.
+      wrapper.unmount();
+      mockRunDetailRef.value = null;
+      let finishFetch!: () => void;
+      mockFetchRun.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishFetch = resolve;
+          }),
+      );
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="synthetics-run-detail-info-skeleton"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-run-detail-status-badge"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("synthetics.results.passed");
+
+      mockRunDetailRef.value = { ...mockRunDetail, status: "failed" };
+      mockLoading.value = false;
+      finishFetch();
+      await flushPromises();
+
+      const badge = wrapper.find('[data-test="synthetics-run-detail-status-badge"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBe("synthetics.results.failed");
+    });
   });
 });
 
@@ -567,6 +596,25 @@ describe("RunDetail — id-less error override (quota / reaper rows)", () => {
       "synthetics.runDetail.errorSourceDispatch",
     );
     expect(w.find('[data-test="synthetics-run-detail-error-desc"]').exists()).toBe(false);
+  });
+
+  it("headlines a dead-letter message without its cut '(phase' group", async () => {
+    mockRunDetailRef.value = null;
+    w = mountComponent({
+      drawerMode: true,
+      overrideMonitorType: "browser",
+      overrideError: {
+        ...overrideError,
+        errorSource: "dispatch",
+        message:
+          "no probe claimed the check for this location before its schedule window closed (phase: never claimed; 0 dispatch attempt(s)); a probe may be unable to reach the callback endpoint http://localhost:5080",
+      },
+    });
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-run-detail-error-type"]').text()).toBe(
+      "no probe claimed the check for this location before its schedule window closed",
+    );
   });
 
   it("renders the error view even for a protocol monitor type (skips ProtocolRunSummary)", async () => {

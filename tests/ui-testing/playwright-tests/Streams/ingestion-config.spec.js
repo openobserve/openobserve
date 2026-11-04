@@ -328,7 +328,7 @@ test.describe("Ingestion Configuration Tests", () => {
           testLogger.info(`  Path: ${item.path}`);
           for (const link of item.brokenLinks) {
             testLogger.info(`  ✗ ${link.url}`);
-            testLogger.info(`    Status: ${link.status || link.error}`);
+            testLogger.info(`    Status: ${link.error ? `${link.status} (${link.error})` : link.status}`);
           }
         }
         testLogger.info('\n' + '='.repeat(80));

@@ -654,6 +654,8 @@ jobs:
           # 2. Nothing API-relevant changed → nothing ran → allow.
           if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
             echo "✅ No API-relevant changes — suite not required."
+            echo "::notice title=API tests skipped::No API-relevant changes — suite did not run."
+            echo "### ⏭️ API suite skipped — no API-relevant changes in this PR, so no tests ran." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 

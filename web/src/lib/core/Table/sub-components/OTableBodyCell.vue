@@ -52,6 +52,9 @@ const props = defineProps<{
   cell: Cell<any, any>;
   row: Row<any>;
   rowSelected?: boolean;
+  rowActive?: boolean;
+  rowStriped?: boolean;
+  rowFocusable?: boolean;
   highlightText?: string;
   shouldHighlight?: boolean;
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
@@ -103,6 +106,16 @@ const slotContentClass = computed(() =>
 );
 
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
+
+// A sticky cell paints its own opaque background over the row's, so it must repeat every row state.
+const pinnedBgClass = computed(() => {
+  if (props.rowSelected || props.rowActive) return "bg-table-row-selected-bg";
+  return [
+    props.rowStriped ? "bg-table-row-striped-bg" : "bg-table-cell-bg",
+    "group-hover/row:bg-table-row-hover-bg",
+    props.rowFocusable ? "group-focus-visible/row:bg-table-row-hover-bg" : "",
+  ];
+});
 
 const pinOffset = computed(() => {
   if (!isPinned.value) return 0;
@@ -458,11 +471,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
       bordered && !pivotMerge?.hideBorder ? 'border-table-row-divider border-b' : '',
       alignClass,
       isAction ? 'w-0 whitespace-nowrap' : '',
-      isPinned
-        ? rowSelected
-          ? 'bg-table-row-selected-bg transition-colors duration-(--duration-hover-out)'
-          : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-(--duration-hover-out) group-hover/row:duration-(--duration-hover-in)'
-        : '',
+      isPinned ? pinnedBgClass : '',
       wrap
         ? 'wrap-anywhere whitespace-normal'
         : horizontalScroll?.value

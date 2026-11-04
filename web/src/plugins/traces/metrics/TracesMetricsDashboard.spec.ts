@@ -36,8 +36,21 @@ vi.mock("./TracesLatencyHeatmap.vue", () => ({
     name: "TracesLatencyHeatmap",
     template: '<div data-test="traces-latency-heatmap"></div>',
     props: ["request", "selection", "aiEnabled"],
-    emits: ["select", "filter", "drill-down", "clear", "ask-ai"],
+    emits: [
+      "select",
+      "filter",
+      "drill-down",
+      "clear",
+      "ask-ai",
+      "create-alert",
+      "add-to-dashboard",
+    ],
   },
+}));
+
+const createAlertMock = vi.hoisted(() => vi.fn());
+vi.mock("@/plugins/traces/composables/useTracesAlertAction", () => ({
+  useTracesAlertAction: () => ({ createAlert: createAlertMock }),
 }));
 
 vi.mock("./TracesComparison.vue", () => ({
@@ -153,7 +166,15 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
       stubs: {
         teleport: true,
         RenderDashboardCharts: {
+          name: "RenderDashboardCharts",
           template: '<div data-test="render-dashboard-charts"></div>',
+          props: ["viewOnly", "exploreActions", "dashboardData", "currentTimeObj"],
+          emits: ["updated:dataZoom", "exploreCreateAlert", "exploreAddToDashboard"],
+        },
+        AddToDashboard: {
+          name: "AddToDashboard",
+          template: '<div data-test="traces-add-to-dashboard-stub"></div>',
+          props: ["open", "dashboardPanelData", "defaultPanelTitle", "notice", "panels"],
         },
         TracesComparison: {
           name: "TracesComparison",
@@ -1519,6 +1540,63 @@ describe("TracesMetricsDashboard", () => {
       resolveParser({});
       await localWrapper.vm.$nextTick();
       localWrapper.unmount();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Chart actions
+  // -------------------------------------------------------------------------
+  describe("chart actions", () => {
+    const charts = () => wrapper.findComponent({ name: "RenderDashboardCharts" });
+    const heatmap = () => wrapper.findComponent({ name: "TracesLatencyHeatmap" });
+    const dialog = () => wrapper.findComponent({ name: "AddToDashboard" });
+
+    beforeEach(async () => {
+      mockSearchObj.data.datetime = { startTime: THIRTY_MIN_START, endTime: THIRTY_MIN_END };
+      mockSearchObj.data.editorValue = "service_name = 'checkout'";
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+    });
+
+    it("turns on the chart ⋮ for the RED panels", () => {
+      expect(charts().props("exploreActions")).toBe(true);
+      expect(charts().props("viewOnly")).toBe(true);
+    });
+
+    it("alerts on rate from Rate and on errors from Errors", async () => {
+      charts().vm.$emit("exploreCreateAlert", getPanel(wrapper, "Rate"));
+      charts().vm.$emit("exploreCreateAlert", getPanel(wrapper, "Errors"));
+      await flushPromises();
+      expect(createAlertMock.mock.calls).toEqual([["rate"], ["errors"]]);
+    });
+
+    it("alerts on duration from the heatmap header", async () => {
+      heatmap().vm.$emit("create-alert");
+      await flushPromises();
+      expect(createAlertMock).toHaveBeenCalledWith("duration");
+    });
+
+    it("adds the one chart it came from, with a filled title and the bucket the charts use", async () => {
+      expect(dialog().exists()).toBe(false);
+      charts().vm.$emit("exploreAddToDashboard", getPanel(wrapper, "Errors"));
+      await flushPromises();
+      const panel = dialog().props("dashboardPanelData").data;
+      expect(dialog().props("defaultPanelTitle")).toBe("Errors · service_name = 'checkout'");
+      expect(panel.queries[0].query).toContain("histogram(_timestamp, '15 second')");
+      expect(panel.queries[0].query).toContain("span_status = 'ERROR'");
+      expect(panel.queries[0].fields.stream_type).toBe("traces");
+      expect(dialog().props("notice")).toBe(
+        i18n.global.t("traces.redActions.bucketNoticeSingle.seconds", { count: 15 }),
+      );
+    });
+
+    it("adds a p50/p95/p99 Duration panel from the heatmap header", async () => {
+      heatmap().vm.$emit("add-to-dashboard");
+      await flushPromises();
+      const panel = dialog().props("dashboardPanelData").data;
+      expect(panel.type).toBe("line");
+      expect(panel.queries[0].query).toContain("approx_percentile_cont(duration, 0.99)");
+      expect(dialog().props("defaultPanelTitle")).toBe("Duration · service_name = 'checkout'");
     });
   });
 
