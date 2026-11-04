@@ -120,12 +120,31 @@ describe("timeRangeRail", () => {
     });
   });
 
+  describe("locale", () => {
+    it("keeps each locale's word order for recent labels and hints", () => {
+      const start = us("2026-10-02T08:00:00Z");
+      const end = us("2026-10-03T09:00:00Z");
+      expect(
+        formatRecentRangeLabel(start, end, "UTC", Date.parse("2026-11-04T12:00:00Z"), "de-DE"),
+      ).toBe("2.–3. Okt.");
+      expect(
+        formatCalendarRailHint(
+          "calendar:month:0",
+          "UTC",
+          Date.parse("2026-11-04T12:00:00Z"),
+          "fr-FR",
+        ),
+      ).toBe("nov.");
+    });
+  });
+
   describe("formatRecentDuration", () => {
     const dur = (seconds: number) => formatRecentDuration(0, seconds * 1_000_000);
 
     it("reads a range ending at :59 as inclusive, so a whole day is 1d", () => {
       expect(dur(86_399)).toBe("1d");
       expect(dur(2 * 86_400 - 1)).toBe("2d");
+      expect(formatRecentDuration(30_000_000, 89_000_000)).toBe("59s");
     });
 
     it("keeps the two largest non-zero units", () => {
@@ -158,8 +177,8 @@ describe("timeRangeRail", () => {
     });
 
     it("shows the whole Monday-to-Sunday week, not the elapsed part", () => {
-      expect(hint("calendar:week:0")).toBe("Nov 2–8");
-      expect(hint("calendar:week:-1")).toBe("Oct 26–Nov 1");
+      expect(hint("calendar:week:0")).toBe("Nov 2 – 8");
+      expect(hint("calendar:week:-1")).toBe("Oct 26 – Nov 1");
     });
 
     it("shows the month name and the quarter number", () => {
@@ -173,7 +192,7 @@ describe("timeRangeRail", () => {
       const jan = Date.parse("2026-01-07T12:00:00Z");
       expect(hint("calendar:day:-1", "UTC", jan)).toBe("Jan 6");
       expect(hint("calendar:week:-1", "UTC", Date.parse("2026-01-05T12:00:00Z"))).toBe(
-        "Dec 29, 2025–Jan 4, 2026",
+        "Dec 29, 2025 – Jan 4, 2026",
       );
       expect(hint("calendar:month:-1", "UTC", jan)).toBe("Dec 2025");
       expect(hint("calendar:quarter:-1", "UTC", jan)).toBe("Q4 2025");

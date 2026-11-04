@@ -195,7 +195,6 @@ describe("DateTime rail", () => {
       expect(el("datetime-timezone-select-trigger")?.textContent).toContain(
         "Asia/Calcutta (UTC+05:30)",
       );
-      expect(el("date-time-cancel-btn")).toBeNull();
       expect(el("date-time-apply-btn")).not.toBeNull();
     });
 

@@ -52,7 +52,7 @@ export interface TimeRangeRailItem {
   tooltip: I18nText | undefined;
   selected: boolean;
   disabled: boolean;
-  /** Recent rows only: the compact bold label and the duration chip shown instead of the full range. */
+  /** Recent rows only: the compact label and the duration chip shown instead of the full range. */
   compact?: { label: string; duration: string };
   /** Calendar rows only: the muted date hint shown beside the label. */
   hint?: string;
@@ -96,17 +96,17 @@ export const formatRecentRange = (
   return raw(`${start.date} ${start.time} - ${end.date} ${end.time}`);
 };
 
-const monthNames = new Map<string, string[]>();
-
-// Month names follow the picker's locale, like the sibling older-period labels.
-const monthName = (locale: string, month: number): string => {
-  let names = monthNames.get(locale);
-  if (!names) {
-    const format = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" });
-    names = Array.from({ length: 12 }, (_, m) => format.format(Date.UTC(2026, m, 1)));
-    monthNames.set(locale, names);
-  }
-  return names[month];
+// Intl keeps each locale's word order, as the sibling older-period labels do; thin spaces become plain ones.
+const formatCivilDays = (locale: string, first: Date, last: Date, withYear: boolean): string => {
+  const format = new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    ...(withYear ? { year: "numeric" } : {}),
+    timeZone: "UTC",
+  });
+  const text =
+    first.getTime() === last.getTime() ? format.format(first) : format.formatRange(first, last);
+  return text.replace(/[\u2009\u202f]/g, " ");
 };
 
 const civilParts = (date: string): { year: number; month: number; day: number } => {
@@ -135,22 +135,22 @@ export const formatRecentRangeLabel = (
   const { start, end } = splitRecentRange(startUs, endUs, zone);
   const from = civilParts(start.date);
   const to = civilParts(end.date);
-  const withYear =
-    from.year !== currentYearIn(nowMs, zone) || to.year !== currentYearIn(nowMs, zone);
-  const day = (p: typeof from) =>
-    `${monthName(locale, p.month)} ${p.day}${withYear ? `, ${p.year}` : ""}`;
-  if (from.year === to.year && from.month === to.month) {
-    if (from.day === to.day) return `${day(from)}${sameDayTimes(start.time, end.time)}`;
-    return `${monthName(locale, from.month)} ${from.day} – ${to.day}${withYear ? `, ${from.year}` : ""}`;
-  }
-  return `${day(from)} – ${day(to)}`;
+  const year = currentYearIn(nowMs, zone);
+  const days = formatCivilDays(
+    locale,
+    new Date(Date.UTC(from.year, from.month, from.day)),
+    new Date(Date.UTC(to.year, to.month, to.day)),
+    from.year !== year || to.year !== year,
+  );
+  const sameDay = from.year === to.year && from.month === to.month && from.day === to.day;
+  return sameDay ? `${days}${sameDayTimes(start.time, end.time)}` : days;
 };
 
 /** The two largest non-zero units of d/h/m/s in the span, e.g. "1d 15m", "45m", "30s". */
 export const formatRecentDuration = (startUs: number, endUs: number): string => {
   const spanSeconds = Math.max(0, Math.floor((endUs - startUs) / MICROS_PER_SECOND));
   // A range ending at :59 is inclusive of that minute, so a whole day reads 1d, not 23h 59m.
-  const total = spanSeconds % 60 === 59 ? spanSeconds + 1 : spanSeconds;
+  const total = Math.floor(endUs / MICROS_PER_SECOND) % 60 === 59 ? spanSeconds + 1 : spanSeconds;
   const units: [string, number][] = [
     ["d", Math.floor(total / 86_400)],
     ["h", Math.floor((total % 86_400) / 3600)],
@@ -174,21 +174,16 @@ export const formatCalendarRailHint = (
   const { unit, first, last, today } = span;
   const currentYear = today.getUTCFullYear();
   const withYear = first.getUTCFullYear() !== currentYear || last.getUTCFullYear() !== currentYear;
-  const day = (d: Date) =>
-    `${monthName(locale, d.getUTCMonth())} ${d.getUTCDate()}${withYear ? `, ${d.getUTCFullYear()}` : ""}`;
   const yearSuffix = withYear ? ` ${first.getUTCFullYear()}` : "";
-  if (unit === "day") return day(first);
-  if (unit === "month") return `${monthName(locale, first.getUTCMonth())}${yearSuffix}`;
-  if (unit === "quarter")
-    return `${quarterText(Math.floor(first.getUTCMonth() / 3) + 1)}${yearSuffix}`;
-  if (unit === "year") return String(first.getUTCFullYear());
-  if (
-    first.getUTCFullYear() === last.getUTCFullYear() &&
-    first.getUTCMonth() === last.getUTCMonth()
-  ) {
-    return `${monthName(locale, first.getUTCMonth())} ${first.getUTCDate()}–${last.getUTCDate()}${withYear ? `, ${first.getUTCFullYear()}` : ""}`;
+  if (unit === "day" || unit === "week") return formatCivilDays(locale, first, last, withYear);
+  if (unit === "month") {
+    const month = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" });
+    return `${month.format(first)}${yearSuffix}`;
   }
-  return `${day(first)}–${day(last)}`;
+  if (unit === "quarter") {
+    return `${quarterText(Math.floor(first.getUTCMonth() / 3) + 1)}${yearSuffix}`;
+  }
+  return String(first.getUTCFullYear());
 };
 
 /** Whether a range is longer than the page's query-range limit; 0 means no limit. */

@@ -485,6 +485,9 @@ interface ConsumableDateTime {
   userChangedValue?: boolean;
 }
 
+// One offset lookup per zone for the whole app, not per picker instance.
+const zoneOffsets = new Map<string, string>();
+
 export default defineComponent({
   components: {
     OSeparator,
@@ -679,8 +682,6 @@ export default defineComponent({
 
     const filteredTimezone: any = ref(timezoneOptions);
     const isTimezoneSelectOpen = ref(false);
-
-    const zoneOffsets = new Map<string, string>();
 
     // longOffset throws on engines that lack it, so the label falls back to no offset.
     const zoneOffset = (zone: string): string => {

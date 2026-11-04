@@ -258,9 +258,9 @@ const tabStop = computed(() =>
     : focusOrder.value[0],
 );
 
-// The accessible name must contain the visible compact label.
 const hasCalendar = computed(() => props.calendar !== null && props.calendar.length > 0);
 
+// The accessible name must contain the visible compact label.
 const rowName = (item: TimeRangeRailItem) =>
   item.compact ? `${item.compact.label} (${item.label})` : item.label;
 
