@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { formatTime, parseQueryPlanTree, collapseProjections } from "./queryPlanParser";
+import { formatTime, parseQueryPlanTree } from "./queryPlanParser";
 
 describe("queryPlanParser", () => {
   describe("formatTime", () => {
@@ -204,125 +204,6 @@ FileSink`;
     });
   });
 
-  describe("collapseProjections", () => {
-    it("should not collapse when fields are below threshold", () => {
-      const planText = "Projection: [field1, field2, field3]";
-      const result = collapseProjections(planText, 5);
-
-      expect(result).toBe(planText);
-    });
-
-    it("should collapse when fields exceed threshold", () => {
-      const planText = "Projection: [field1, field2, field3, field4, field5, field6, field7]";
-      const result = collapseProjections(planText, 5);
-
-      expect(result).toBe("Projection: [field1, field2, field3, ... 4 more]");
-    });
-
-    it("should use default threshold of 5", () => {
-      const planText = "Projection: [f1, f2, f3, f4, f5, f6, f7, f8]";
-      const result = collapseProjections(planText);
-
-      expect(result).toBe("Projection: [f1, f2, f3, ... 5 more]");
-    });
-
-    it("should handle nested brackets correctly", () => {
-      const planText =
-        "Projection: [field1, CAST(field2 AS INT), field3[0], field4, field5, field6, field7]";
-      const result = collapseProjections(planText, 5);
-
-      // The implementation counts 7 fields, so expect no collapse or different result
-      // Actually checking what the function returns
-      expect(result).toContain("Projection:");
-      expect(result.includes("field1")).toBe(true);
-    });
-
-    it("should handle quoted fields", () => {
-      const planText =
-        'Projection: ["field1", "field, with, comma", "field3", "field4", "field5", "field6"]';
-      const result = collapseProjections(planText, 5);
-
-      expect(result).toBe('Projection: ["field1", "field, with, comma", "field3", ... 3 more]');
-    });
-
-    it("should handle complex expressions with multiple levels of nesting", () => {
-      const planText =
-        "Projection: [field1, CASE WHEN x > 0 THEN (a + b) ELSE (c - d) END, field3, field4, field5, field6, field7]";
-      const result = collapseProjections(planText, 5);
-
-      expect(result).toBe(
-        "Projection: [field1, CASE WHEN x > 0 THEN (a + b) ELSE (c - d) END, field3, ... 4 more]",
-      );
-    });
-
-    it("should handle multiple projection lines", () => {
-      const planText = `ProjectionExec: [f1, f2, f3, f4, f5, f6]
-  FilterExec
-    Projection: [g1, g2, g3, g4, g5, g6, g7, g8]`;
-
-      const result = collapseProjections(planText, 5);
-
-      expect(result).toContain("ProjectionExec: [f1, f2, f3, ... 3 more]");
-      expect(result).toContain("Projection: [g1, g2, g3, ... 5 more]");
-    });
-
-    it("should not modify non-projection lines", () => {
-      const planText = `SortExec: elapsed_compute=10ms
-Projection: [f1, f2, f3, f4, f5, f6, f7]
-FilterExec: output_rows=100`;
-
-      const result = collapseProjections(planText, 5);
-
-      expect(result).toContain("SortExec: elapsed_compute=10ms");
-      expect(result).toContain("Projection: [f1, f2, f3, ... 4 more]");
-      expect(result).toContain("FilterExec: output_rows=100");
-    });
-
-    it("should handle empty projection", () => {
-      const planText = "Projection: []";
-      const result = collapseProjections(planText);
-
-      expect(result).toBe(planText);
-    });
-
-    it("should handle projection with single field", () => {
-      const planText = "Projection: [field1]";
-      const result = collapseProjections(planText);
-
-      expect(result).toBe(planText);
-    });
-
-    it("should preserve indentation", () => {
-      const planText = "  Projection: [f1, f2, f3, f4, f5, f6, f7]";
-      const result = collapseProjections(planText, 5);
-
-      expect(result).toBe("  Projection: [f1, f2, f3, ... 4 more]");
-    });
-
-    it("should handle projection with suffix content", () => {
-      const planText = "Projection: [f1, f2, f3, f4, f5, f6, f7], output_rows=100";
-      const result = collapseProjections(planText, 5);
-
-      expect(result).toBe("Projection: [f1, f2, f3, ... 4 more], output_rows=100");
-    });
-
-    it("should handle lines without projection", () => {
-      const planText = `SortExec
-FilterExec
-TableScan`;
-
-      const result = collapseProjections(planText);
-      expect(result).toBe(planText);
-    });
-
-    it("should handle fields with spaces", () => {
-      const planText = "Projection: [field 1, field 2, field 3, field 4, field 5, field 6]";
-      const result = collapseProjections(planText, 5);
-
-      expect(result).toBe("Projection: [field 1, field 2, field 3, ... 3 more]");
-    });
-  });
-
   describe("Edge Cases", () => {
     it("should handle microsecond symbol variant (us)", () => {
       const planText = "SortExec: elapsed_compute=500us";
@@ -404,17 +285,6 @@ TableScan`;
       // Verify tree structure
       expect(tree.children).toHaveLength(1);
       expect(tree.children[0].name).toBe("GlobalLimitExec");
-    });
-
-    it("should collapse long projection in real query", () => {
-      const planText = `ProjectionExec: expr=[id@0, name@1, email@2, address@3, phone@4, city@5, state@6, zip@7, country@8, created_at@9]
-  FilterExec: predicate=status = 'active'`;
-
-      const result = collapseProjections(planText, 5);
-
-      // Check that projection line contains expected text and FilterExec is preserved
-      expect(result).toContain("ProjectionExec: expr=[");
-      expect(result).toContain("FilterExec: predicate=status = 'active'");
     });
   });
 });

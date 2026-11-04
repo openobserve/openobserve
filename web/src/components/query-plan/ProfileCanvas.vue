@@ -160,145 +160,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      class="absolute end-3 bottom-3 z-10 flex items-end gap-2 max-lg:hidden"
+      class="bg-surface-base border-border-default rounded-default absolute end-3 bottom-3 z-10 flex flex-col border shadow-sm max-lg:hidden"
       data-canvas-overlay
     >
-      <div
-        class="bg-surface-base border-border-default rounded-default flex flex-col border shadow-sm"
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        icon-left="zoom-in"
+        :aria-label="t('search.queryProfile.zoomIn')"
+        data-test="query-profile-zoom-in"
+        @click="zoomBy(ZOOM_STEP)"
       >
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="zoom-in"
-          :aria-label="t('search.queryProfile.zoomIn')"
-          data-test="query-profile-zoom-in"
-          @click="zoomBy(ZOOM_STEP)"
-        >
-          <OTooltip side="left" :content="t('search.queryProfile.zoomIn')" />
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="zoom-out"
-          :aria-label="t('search.queryProfile.zoomOut')"
-          data-test="query-profile-zoom-out"
-          @click="zoomBy(1 / ZOOM_STEP)"
-        >
-          <OTooltip side="left" :content="t('search.queryProfile.zoomOut')" />
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="fit-screen"
-          :aria-label="t('search.queryProfile.fitView')"
-          data-test="query-profile-zoom-fit"
-          @click="fit"
-        >
-          <OTooltip side="left" :content="t('search.queryProfile.fitView')" />
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="layers"
-          :aria-label="t('search.queryProfile.overview')"
-          :aria-pressed="showMini"
-          :class="showMini ? 'text-accent' : ''"
-          data-test="query-profile-minimap-toggle"
-          @click="showMini = !showMini"
-        >
-          <OTooltip side="left" :content="t('search.queryProfile.overview')" />
-        </OButton>
-        <div class="border-border-default mx-1 border-t" />
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="compress"
-          :aria-label="t('search.queryProfile.foldPlumbing')"
-          :aria-pressed="plumbing"
-          :class="plumbing ? 'text-accent' : ''"
-          data-test="query-profile-fold-plumbing"
-          @click="emitFold({ type: 'plumbing' }, selectedAnchor())"
-        >
-          <OTooltip side="left" :content="t('search.queryProfile.foldPlumbing')" />
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="unfold-more"
-          :aria-label="t('search.queryProfile.expandAll')"
-          data-test="query-profile-expand-all"
-          @click="emitFold({ type: 'expandAll' })"
-        >
-          <OTooltip side="left" :content="t('search.queryProfile.expandAll')" />
-        </OButton>
-        <OButton
-          v-if="!model.planOnly"
-          variant="ghost"
-          size="icon-sm"
-          icon-left="local-fire-department"
-          :aria-label="t('search.queryProfile.collapseToHotPath')"
-          data-test="query-profile-hot-path"
-          @click="emitFold({ type: 'hotPath' })"
-        >
-          <OTooltip side="left" :content="t('search.queryProfile.collapseToHotPath')" />
-        </OButton>
-      </div>
-      <svg
-        v-if="showMini"
-        ref="miniEl"
-        class="bg-surface-base border-border-default rounded-default h-30 w-42.5 cursor-pointer border shadow-sm"
-        :viewBox="`${-MINI_PAD} ${-MINI_PAD} ${layout.width + 2 * MINI_PAD} ${layout.height + 2 * MINI_PAD}`"
-        preserveAspectRatio="xMidYMid meet"
-        role="img"
-        :aria-label="t('search.queryProfile.overview')"
-        data-test="query-profile-minimap"
-        @pointerdown.stop="onMiniPointer"
+        <OTooltip side="left" :content="t('search.queryProfile.zoomIn')" />
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        icon-left="zoom-out"
+        :aria-label="t('search.queryProfile.zoomOut')"
+        data-test="query-profile-zoom-out"
+        @click="zoomBy(1 / ZOOM_STEP)"
       >
-        <rect
-          v-for="s in layout.stages"
-          :key="s.stageId"
-          :x="s.x"
-          :y="s.y"
-          :width="s.w"
-          :height="s.h"
-          fill="none"
-          stroke="var(--color-border-strong)"
-          stroke-dasharray="4 4"
-          vector-effect="non-scaling-stroke"
-        />
-        <rect
-          v-for="f in layout.folds"
-          :key="f.key"
-          :x="f.x"
-          :y="f.y"
-          :width="CARD_W"
-          :height="FOLD_H"
-          fill="none"
-          stroke="var(--color-border-strong)"
-          stroke-dasharray="4 4"
-          vector-effect="non-scaling-stroke"
-        />
-        <rect
-          v-for="c in layout.cards"
-          :key="c.opId"
-          :x="c.x"
-          :y="c.y"
-          :width="CARD_W"
-          :height="CARD_H"
-          :fill="CATEGORY_STYLE[model.operators[c.opId].category].fill"
-          :opacity="c.opId === selectedId ? 1 : 0.6"
-        />
-        <rect
-          :x="-view.x / view.k"
-          :y="-view.y / view.k"
-          :width="size.w / view.k"
-          :height="size.h / view.k"
-          fill="var(--color-accent)"
-          fill-opacity="0.12"
-          stroke="var(--color-accent)"
-          vector-effect="non-scaling-stroke"
-        />
-      </svg>
+        <OTooltip side="left" :content="t('search.queryProfile.zoomOut')" />
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        icon-left="fit-screen"
+        :aria-label="t('search.queryProfile.fitView')"
+        data-test="query-profile-zoom-fit"
+        @click="fit"
+      >
+        <OTooltip side="left" :content="t('search.queryProfile.fitView')" />
+      </OButton>
+      <div class="border-border-default mx-1 border-t" />
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        icon-left="compress"
+        :aria-label="t('search.queryProfile.foldPlumbing')"
+        :aria-pressed="plumbing"
+        :class="plumbing ? 'text-accent' : ''"
+        data-test="query-profile-fold-plumbing"
+        @click="emitFold({ type: 'plumbing' }, selectedAnchor())"
+      >
+        <OTooltip side="left" :content="t('search.queryProfile.foldPlumbing')" />
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        icon-left="unfold-more"
+        :aria-label="t('search.queryProfile.expandAll')"
+        data-test="query-profile-expand-all"
+        @click="emitFold({ type: 'expandAll' })"
+      >
+        <OTooltip side="left" :content="t('search.queryProfile.expandAll')" />
+      </OButton>
     </div>
   </div>
 </template>
@@ -313,7 +230,6 @@ import { useI18nTyped } from "@/types/i18n";
 import {
   CARD_H,
   CARD_W,
-  FOLD_H,
   formatBytes,
   formatRows,
   scopedValue,
@@ -325,14 +241,13 @@ import {
 import type { FoldAction } from "@/utils/queryProfileFold";
 import ProfileFoldCard from "./ProfileFoldCard.vue";
 import ProfileOperatorCard from "./ProfileOperatorCard.vue";
-import { CATEGORY_STYLE, type FoldNotice } from "./profileStyles";
+import type { FoldNotice } from "./profileStyles";
 import { operatorTitle, variantLabel } from "./profileText";
 
 // World coordinates are screen pixels at zoom 1, so pointer pan and zoom map one to one.
 const ZOOM_STEP = 1.2;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2;
-const MINI_PAD = 40;
 const FIT_TOP = 56;
 const TOOLBAR_GAP = 8;
 const FIT_MARGIN = 24;
@@ -362,11 +277,9 @@ const { t } = useI18nTyped();
 const { isDesktop } = useBreakpoint();
 
 const canvasEl = ref<HTMLElement | null>(null);
-const miniEl = ref<SVGSVGElement | null>(null);
 const toolbarEl = ref<HTMLElement | null>(null);
 const view = reactive({ x: 0, y: 0, k: 1 });
 const size = reactive({ w: 0, h: 0 });
-const showMini = ref(false);
 const drag = ref<{ x: number; y: number; vx: number; vy: number; id: number } | null>(null);
 let observer: ResizeObserver | null = null;
 let lastModel = props.model;
@@ -511,11 +424,6 @@ function onLayout() {
   ensureVisible(props.selectedId);
 }
 
-/** Refits once the next layout lands, for fold changes made outside the canvas. */
-function fitNext() {
-  pending = "fit";
-}
-
 function clampZoom(k: number) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, k));
 }
@@ -580,26 +488,16 @@ function onPointerUp() {
 }
 
 function onWheel(e: WheelEvent) {
-  if (isOverlay(e.target) && !(e.target as Element).closest("[data-profile-card]")) return;
+  if (e.target instanceof Element && e.target.closest("[data-canvas-overlay]")) return;
+  const rect = canvasEl.value?.getBoundingClientRect();
+  if (!rect) return;
   e.preventDefault();
-  const rect = canvasEl.value!.getBoundingClientRect();
   zoomAt(view.k * Math.exp(-e.deltaY * 0.0015), e.clientX - rect.left, e.clientY - rect.top);
 }
 
 function centerOn(wx: number, wy: number) {
   view.x = size.w / 2 - wx * view.k;
   view.y = size.h / 2 - wy * view.k;
-}
-
-function onMiniPointer(e: PointerEvent) {
-  const svg = miniEl.value;
-  const ctm = svg?.getScreenCTM?.();
-  if (!svg || !ctm) return;
-  const pt = svg.createSVGPoint();
-  pt.x = e.clientX;
-  pt.y = e.clientY;
-  const world = pt.matrixTransform(ctm.inverse());
-  centerOn(world.x, world.y);
 }
 
 function ensureVisible(opId: string | null) {
@@ -650,6 +548,4 @@ watch(
   () => props.selectedId,
   (id) => nextTick(() => ensureVisible(id)),
 );
-
-defineExpose({ fit, fitNext, zoomBy, view });
 </script>

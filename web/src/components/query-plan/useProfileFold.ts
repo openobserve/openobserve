@@ -19,14 +19,12 @@ import { layoutProfile, type FoldState, type ProfileModel } from "@/utils/queryP
 import {
   applyFold,
   autoFold,
-  canFocus,
   initialFold,
   nearestVisible,
   revealOp,
   type FoldAction,
 } from "@/utils/queryProfileFold";
 import type { FoldNotice } from "./profileStyles";
-import { operatorTitle } from "./profileText";
 import { useQueryPlanPanels } from "./useQueryPlanPanels";
 
 /** Selection, fold state, the layout it produces, and the notice explaining what is folded, for one plan view. */
@@ -37,63 +35,34 @@ export function useProfileFold(
 ) {
   const { revealDetail } = useQueryPlanPanels();
   const selectedId = ref<string | null>(null);
-  const canvasRef = ref<{ fitNext: () => void } | null>(null);
   const fold = shallowRef<FoldState>(initialFold());
-  const reason = shallowRef<{ kind: "auto"; count: number } | { kind: "hot" } | null>(null);
+  const autoFolded = ref(0);
 
   const layout = computed(() => layoutProfile(model(), fold.value));
 
+  // the note holds while any automatic group is still folded
   const notice = computed<FoldNotice | null>(() => {
-    const focusOp = fold.value.focusId ? model().operators[fold.value.focusId] : null;
-    if (focusOp) {
-      return {
-        text: t("search.queryProfile.focusNote", { op: operatorTitle(t, focusOp) }),
-        action: t("search.queryProfile.showWholePlan"),
-      };
-    }
-    if (!reason.value || (reason.value.kind === "auto" && !fold.value.grouped.size)) return null;
-    const text =
-      reason.value.kind === "hot"
-        ? t("search.queryProfile.hotPathNote")
-        : t("search.queryProfile.autoFolded", { count: reason.value.count }, reason.value.count);
-    return { text, action: t("search.queryProfile.expandAll") };
+    const count = autoFolded.value;
+    if (!count || !fold.value.grouped.size) return null;
+    return {
+      text: t("search.queryProfile.autoFolded", { count }, count),
+      action: t("search.queryProfile.expandAll"),
+    };
   });
 
-  const focusable = computed(() =>
-    selectedId.value ? canFocus(model(), selectedId.value) : false,
-  );
-
   function act(action: FoldAction) {
-    const next = applyFold(model(), fold.value, action);
-    if (action.type === "hotPath") {
-      if (next !== fold.value) reason.value = { kind: "hot" };
-    } else if (reason.value?.kind !== "auto" || action.type === "expandAll") {
-      // the auto note holds while groups remain; the hot-path note only until the next change
-      reason.value = null;
-    }
-    fold.value = next;
-  }
-
-  function reveal(opId: string) {
-    const next = revealOp(model(), fold.value, opId);
-    if (next === fold.value) return;
-    if (reason.value?.kind === "hot") reason.value = null;
-    fold.value = next;
+    if (action.type === "expandAll") autoFolded.value = 0;
+    fold.value = applyFold(model(), fold.value, action);
   }
 
   function onNoticeAction() {
-    act(fold.value.focusId ? { type: "focus", opId: null } : { type: "expandAll" });
+    act({ type: "expandAll" });
   }
 
   function pick(id: string) {
-    reveal(id);
+    fold.value = revealOp(model(), fold.value, id);
     selectedId.value = id;
     revealDetail();
-  }
-
-  function focusOn(opId: string | null) {
-    canvasRef.value?.fitNext();
-    act({ type: "focus", opId });
   }
 
   watch(
@@ -101,7 +70,7 @@ export function useProfileFold(
     (m) => {
       const result = autoFold(m, initialFold());
       fold.value = result.fold;
-      reason.value = result.count ? { kind: "auto", count: result.count } : null;
+      autoFolded.value = result.count;
       selectedId.value = firstSelection(m);
     },
     { immediate: true },
@@ -115,14 +84,11 @@ export function useProfileFold(
 
   return {
     selectedId,
-    canvasRef,
     fold,
     layout,
     notice,
-    focusable,
     act,
     onNoticeAction,
     pick,
-    focusOn,
   };
 }

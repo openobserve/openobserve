@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { AxiosError, AxiosHeaders } from "axios";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import { AGG_LOGICAL_PLAN, AGG_PHYSICAL_PLAN } from "@/utils/__fixtures__/queryProfile.fixture";
@@ -312,6 +313,13 @@ describe("QueryPlanDialog", () => {
       wrapper = await openDialog();
       expect(find(wrapper, "query-plan-error").text()).toContain("Resources exhausted");
     });
+
+    it("keeps the plan error on the Text tab", async () => {
+      mockStreamingSearch.mockRejectedValue(new Error("network down"));
+      wrapper = await openDialog();
+      await selectMode(wrapper, "text");
+      expect(find(wrapper, "query-plan-error").text()).toContain("network down");
+    });
   });
 
   describe("analyze tab", () => {
@@ -431,7 +439,15 @@ describe("QueryPlanDialog", () => {
       const pending = deferred();
       wrapper = await openAndRun(pending.promise);
       await tick(wrapper, 41_000);
-      pending.reject({ response: { data: { message: "query exceeded the memory limit." } } });
+      pending.reject(
+        new AxiosError("Request failed", "ERR_BAD_RESPONSE", undefined, undefined, {
+          data: { message: "query exceeded the memory limit." },
+          status: 500,
+          statusText: "",
+          headers: {},
+          config: { headers: new AxiosHeaders() },
+        }),
+      );
       await flushPromises();
       expect(find(wrapper, "query-plan-analyze-notice").text()).toBe(
         "Failed after 0:41: query exceeded the memory limit. Narrow the time range or add filters, then try again.",

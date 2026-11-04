@@ -172,23 +172,11 @@ describe("QueryProfileView", () => {
       expect(find("query-profile-detail").text()).toContain("HashJoin");
     });
 
-    it("focuses one branch from the detail panel and shows the whole plan from the notice", async () => {
-      wrapper = mountView();
-      await find("query-profile-detail-focus").trigger("click");
-      expect(find("query-profile-fold-notice").text()).toContain("Showing only the branch through");
-      expect(wrapper.findAll('[data-test^="query-profile-fold-group-"]').length).toBeGreaterThan(0);
-      await find("query-profile-fold-notice-action").trigger("click");
-      expect(find("query-profile-fold-notice").exists()).toBe(false);
-      expect(wrapper.findAll('[data-test^="query-profile-fold-group-"]')).toHaveLength(0);
-    });
-
-    it("expands everything and keeps hotspots open on the hot path", async () => {
+    it("expands everything", async () => {
       wrapper = mountView();
       await find(`query-profile-card-${join}-branch`).trigger("click");
       await find("query-profile-expand-all").trigger("click");
       expect(find(`query-profile-fold-branch-${join}`).exists()).toBe(false);
-      await find("query-profile-hot-path").trigger("click");
-      expect(find("query-profile-fold-notice").text()).toContain("top hotspots");
     });
   });
 

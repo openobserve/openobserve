@@ -22,7 +22,7 @@ import { AGG_PHYSICAL_PLAN } from "@/utils/__fixtures__/queryProfile.fixture";
 import QueryPlanView from "./QueryPlanView.vue";
 
 const profile = physicalPlanToProfile(AGG_PHYSICAL_PLAN)!;
-const model = buildProfileModel(profile, [], { planOnly: true });
+const model = buildProfileModel(profile, { planOnly: true });
 
 function opId(name: string, index = 0) {
   return model.order.filter((id) => model.operators[id].name === name)[index];

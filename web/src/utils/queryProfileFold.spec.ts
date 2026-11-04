@@ -19,7 +19,6 @@ import {
   CARD_W,
   LEVEL_GAP,
   FOLD_H,
-  ancestorIds,
   buildProfileModel,
   hotspotSet,
   isPlumbing,
@@ -37,7 +36,6 @@ import {
   AUTO_FOLD_CARDS,
   applyFold,
   autoFold,
-  canFocus,
   foldSummary,
   initialFold,
   nearestVisible,
@@ -53,7 +51,7 @@ function joinModel() {
 }
 
 function planModel() {
-  return buildProfileModel(physicalPlanToProfile(AGG_PHYSICAL_PLAN)!, [], { planOnly: true });
+  return buildProfileModel(physicalPlanToProfile(AGG_PHYSICAL_PLAN)!, { planOnly: true });
 }
 
 function idOf(model: ProfileModel, name: string, index = 0) {
@@ -299,38 +297,6 @@ describe("collapsing branches and stages", () => {
   });
 });
 
-describe("hot path", () => {
-  it("leaves only the paths to the hotspots open, stage variants included", () => {
-    const model = joinModel();
-    const layout = layoutProfile(model, run(model, { type: "hotPath" }));
-    const keep = new Set([...hotspotSet(model)].flatMap((id) => [id, ...ancestorIds(model, id)]));
-    expect([...visibleIds(layout)].filter((id) => !keep.has(id))).toEqual([]);
-    expectEveryOpAccountedFor(model, layout);
-    expectNoOverlap(layout);
-  });
-
-  it("merges the branches off the hot path into one card", () => {
-    const model = unionModel([400, 260, ...Array(12).fill(2)]);
-    const layout = layoutProfile(model, run(model, { type: "hotPath" }));
-    expect(layout.folds).toHaveLength(1);
-    expect(layout.folds[0].opIds).toHaveLength(12);
-    expectEveryOpAccountedFor(model, layout);
-  });
-
-  it("refolds operators opened by hand", () => {
-    const model = joinModel();
-    const repartition = idOf(model, "RepartitionExec");
-    const fold = run(model, { type: "show", opIds: [repartition] }, { type: "hotPath" });
-    expect(fold.shown.size).toBe(0);
-  });
-
-  it("does nothing on a plain plan, which has no hotspots", () => {
-    const model = planModel();
-    const fold = initialFold();
-    expect(applyFold(model, fold, { type: "hotPath" })).toBe(fold);
-  });
-});
-
 describe("automatic folding of large plans", () => {
   it("collapses small sibling branches into one card and keeps hotspot paths open", () => {
     const model = unionModel([400, 260, ...Array(12).fill(2)]);
@@ -339,7 +305,7 @@ describe("automatic folding of large plans", () => {
     expect(count).toBe(12);
     const layout = layoutProfile(model, fold);
     expect(layout.folds).toHaveLength(1);
-    expect(layout.folds[0]).toMatchObject({ kind: "group", focus: false });
+    expect(layout.folds[0]).toMatchObject({ kind: "group" });
     expect(layout.folds[0].opIds).toHaveLength(12);
     for (const id of hotspotSet(model)) expect(visibleIds(layout).has(id)).toBe(true);
     expectEveryOpAccountedFor(model, layout);
@@ -367,37 +333,11 @@ describe("automatic folding of large plans", () => {
   });
 });
 
-describe("focus", () => {
-  it("collapses every branch that does not lead to or from the focused operator", () => {
-    const model = joinModel();
-    const scan = idOf(model, "DataSourceExec", 1);
-    const layout = layoutProfile(model, run(model, { type: "focus", opId: scan }));
-    const related = new Set([...subtreeIds(model, scan), ...ancestorIds(model, scan)]);
-    expect([...visibleIds(layout)].filter((id) => !related.has(id))).toEqual([]);
-    expect(layout.folds.every((f) => f.focus)).toBe(true);
-    expectEveryOpAccountedFor(model, layout);
-  });
-
-  it("clears focus when a focus card is opened or focus is cleared", () => {
-    const model = joinModel();
-    const fold = run(model, { type: "focus", opId: idOf(model, "DataSourceExec", 1) });
-    const card = layoutProfile(model, fold).folds[0];
-    expect(applyFold(model, fold, { type: "open", fold: card }).focusId).toBeNull();
-    expect(applyFold(model, fold, { type: "focus", opId: null }).focusId).toBeNull();
-  });
-
-  it("is only offered where some operator above has another branch", () => {
-    const model = joinModel();
-    expect(canFocus(model, model.rootId)).toBe(false);
-    expect(canFocus(model, idOf(model, "DataSourceExec"))).toBe(true);
-  });
-});
-
 describe("revealing a selected operator", () => {
   it("opens the folds hiding it without pinning plumbing above it open", () => {
     const model = joinModel();
     const scan = idOf(model, "DataSourceExec");
-    const hidden = run(model, { type: "hotPath" }, { type: "branch", opId: model.rootId });
+    const hidden = run(model, { type: "branch", opId: model.rootId });
     const revealed = revealOp(model, hidden, scan);
     const layout = layoutProfile(model, revealed);
     expect(visibleIds(layout).has(scan)).toBe(true);
@@ -414,12 +354,6 @@ describe("revealing a selected operator", () => {
     const model = joinModel();
     const fold = run(model, { type: "branch", opId: idOf(model, "HashJoinExec") });
     expect(revealOp(model, fold, idOf(model, "HashJoinExec"))).toBe(fold);
-  });
-
-  it("drops focus when the operator lies outside it", () => {
-    const model = joinModel();
-    const fold = run(model, { type: "focus", opId: idOf(model, "DataSourceExec", 1) });
-    expect(revealOp(model, fold, idOf(model, "DataSourceExec", 0)).focusId).toBeNull();
   });
 
   it("finds the closest visible operator above a hidden one", () => {

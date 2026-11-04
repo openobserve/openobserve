@@ -109,7 +109,9 @@ export interface PlanHit {
   node_address?: string;
   node_name?: string;
   plan?: string;
+  plan_type?: string;
   profile?: string | null;
+  _source?: Pick<PlanHit, "plan" | "plan_type">;
   [key: string]: unknown;
 }
 
@@ -156,8 +158,6 @@ export interface ProfileOperator {
   totalRows: number;
 }
 
-export type PlanSource = "profile" | "text" | "none";
-
 export interface StageNode {
   key: string;
   name: string;
@@ -170,7 +170,6 @@ export interface StageNode {
   wallUs: number;
   straggler: boolean;
   variantId: string | null;
-  planSource: PlanSource;
 }
 
 export type VariantRole = "querier" | "ingester" | "mixed";
@@ -201,7 +200,6 @@ interface ProfileStage {
 
 export interface ProfileModel {
   profile: QueryProfile;
-  hits: PlanHit[];
   options: BuildProfileOptions;
   rootId: string;
   operators: Record<string, ProfileOperator>;
@@ -338,8 +336,6 @@ export interface LayoutFold {
   opIds: string[];
   /** The visible card this fold hangs under. */
   ownerId: string;
-  /** Hidden by focus rather than by the user collapsing it. */
-  focus: boolean;
   x: number;
   y: number;
 }
@@ -350,7 +346,6 @@ export interface FoldState {
   collapsed: ReadonlySet<string>;
   grouped: ReadonlySet<string>;
   stages: ReadonlySet<string>;
-  focusId: string | null;
 }
 
 interface LayoutStage {
@@ -410,8 +405,6 @@ interface BuildContext {
   ops: Record<string, ProfileOperator>;
   order: string[];
   stages: ProfileStage[];
-  hits: PlanHit[];
-  usedHits: Set<PlanHit>;
   multiCluster: boolean;
   splitClusters: boolean;
 }
@@ -688,24 +681,6 @@ export function extractProfile(hits: PlanHit[] | undefined): QueryProfile | null
   }
 }
 
-/** Converts an old-style text plan node into the profile shape so it can join a stage. */
-function textPlanToProfile(node: OperatorNode): ProfileNode {
-  const metrics: ProfileMetric[] = [];
-  const ms = Number(node.metrics.elapsed_compute_ms);
-  if (ms > 0) {
-    metrics.push({ name: "elapsed_compute", kind: "time", value: ms * 1e6 });
-  }
-  const rows = Number(node.metrics.output_rows);
-  if (rows > 0) metrics.push({ name: "output_rows", kind: "count", value: rows });
-  return {
-    name: node.name,
-    detail: node.fullText,
-    partitions: 0,
-    metrics,
-    children: node.children.map(textPlanToProfile),
-  };
-}
-
 function planOnlyRemote(plan: ProfileNode): RemoteNodeProfile {
   return {
     partition: 0,
@@ -750,35 +725,6 @@ export function physicalPlanToProfile(planText: string): QueryProfile | null {
     end_us: 0,
     output_rows: 0,
     plan: planRoot(root.children),
-  };
-}
-
-function fallbackPlan(
-  remote: RemoteNodeProfile,
-  phase: number,
-  ctx: BuildContext,
-): ProfileNode | null {
-  // a skipped node never ran, and a cluster leader's own plan shares its pod name one phase up
-  if (remote.skipped) return null;
-  const hit = ctx.hits.find(
-    (h) =>
-      !ctx.usedHits.has(h) &&
-      (typeof h.phase === "number" ? h.phase === phase : true) &&
-      typeof h.plan === "string" &&
-      h.plan.trim() !== "" &&
-      ((!!remote.node_address && h.node_address === remote.node_address) ||
-        (!!remote.node_name && h.node_name === remote.node_name)),
-  );
-  if (!hit) return null;
-  ctx.usedHits.add(hit);
-  const root = parseQueryPlanTree(hit.plan as string);
-  if (!root.children.length) return null;
-  if (root.children.length === 1) return textPlanToProfile(root.children[0]);
-  return {
-    name: "Plan",
-    detail: "",
-    partitions: 0,
-    children: root.children.map(textPlanToProfile),
   };
 }
 
@@ -900,11 +846,10 @@ function buildStage(
     cluster: "",
   };
   ctx.stages.push(stage);
-  const phase = stageDepth(ctx.stages, stage);
   const used = new Set<string>();
   const groups = new Map<string, { nodes: StageNode[]; parts: PlanPart[]; cluster: string }>();
   for (const remote of entries) {
-    const plan = remote.plan ?? fallbackPlan(remote, phase, ctx);
+    const plan = remote.plan;
     const name = nodeNameOf(remote) || `#${remote.partition}`;
     // pod names repeat across clusters deployed from one chart, so the cluster tells them apart
     const clusterEntry = !!remote.cluster && remote.cluster === remote.node_name;
@@ -919,7 +864,6 @@ function buildStage(
       wallUs: remoteWallUs(remote),
       straggler: false,
       variantId: null,
-      planSource: remote.plan ? "profile" : plan ? "text" : "none",
     };
     stage.nodes.push(node);
     if (!plan) continue;
@@ -960,15 +904,6 @@ function onlyCluster(node: ProfileNode, cluster: string): ProfileNode {
   };
 }
 
-/** How many remote hops below the leader a stage runs, which is the phase of its text plans. */
-function stageDepth(stages: ProfileStage[], stage: ProfileStage): number {
-  let depth = 1;
-  for (let id = stage.parentStageId; id; depth++) {
-    id = stages.find((s) => s.id === id)?.parentStageId ?? null;
-  }
-  return depth;
-}
-
 // a cluster leader sends its scan stats with its first batch, before all of its pods finish
 function rollUpClusterEntries(stages: ProfileStage[]) {
   for (const stage of stages) {
@@ -1007,15 +942,12 @@ function addScanStats(a: RemoteScanStats, b: RemoteScanStats): RemoteScanStats {
 
 export function buildProfileModel(
   profile: QueryProfile,
-  hits: PlanHit[] = [],
   options: BuildProfileOptions = {},
 ): ProfileModel {
   const ctx: BuildContext = {
     ops: {},
     order: [],
     stages: [],
-    hits,
-    usedHits: new Set(),
     multiCluster: collectClusters(profile.plan, new Set()).size > 1,
     splitClusters: !!options.splitClusters,
   };
@@ -1033,7 +965,6 @@ export function buildProfileModel(
   for (const s of ctx.stages) for (const v of s.variants) variantById[v.id] = v;
   return {
     profile,
-    hits,
     options,
     rootId,
     operators: ctx.ops,
@@ -1063,11 +994,11 @@ export function clusterViewOf(cluster: string): ClusterView {
 export function modelForClusterView(model: ProfileModel, view: ClusterView): ProfileModel {
   if (view === "all") return model;
   if (view === "split") {
-    return buildProfileModel(model.profile, model.hits, { ...model.options, splitClusters: true });
+    return buildProfileModel(model.profile, { ...model.options, splitClusters: true });
   }
   const cluster = view.slice("cluster:".length);
   const profile = { ...model.profile, plan: onlyCluster(model.profile.plan, cluster) };
-  return buildProfileModel(profile, model.hits, { ...model.options, splitClusters: false });
+  return buildProfileModel(profile, { ...model.options, splitClusters: false });
 }
 
 /** Every node any stage dispatched to, once each, in stage order. */
@@ -1401,7 +1332,6 @@ interface FoldContext {
   model: ProfileModel;
   fold: FoldState;
   hot: Set<string>;
-  related: Set<string> | null;
 }
 
 interface Link {
@@ -1424,7 +1354,6 @@ export const NO_FOLD: FoldState = {
   collapsed: new Set(),
   grouped: new Set(),
   stages: new Set(),
-  focusId: null,
 };
 
 const PLUMBING_RE = /^(Repartition|CoalescePartitions|CoalesceBatches|Projection|Cooperative)Exec/;
@@ -1467,7 +1396,7 @@ function foldsAway(ctx: FoldContext, op: ProfileOperator): boolean {
 }
 
 function hiddenWhole(ctx: FoldContext, opId: string): boolean {
-  return ctx.fold.grouped.has(opId) || (!!ctx.related && !ctx.related.has(opId));
+  return ctx.fold.grouped.has(opId);
 }
 
 function chainNode(ctx: FoldContext, opId: string): VisNode {
@@ -1482,8 +1411,7 @@ function chainNode(ctx: FoldContext, opId: string): VisNode {
 }
 
 function groupFold(ctx: FoldContext, ownerId: string, opIds: string[]): VisNode {
-  const focus = !!ctx.related && opIds.some((id) => !ctx.related!.has(id));
-  const fold: FoldSpec = { key: `group-${opIds[0]}`, kind: "group", opIds, ownerId, focus };
+  const fold: FoldSpec = { key: `group-${opIds[0]}`, kind: "group", opIds, ownerId };
   return { kind: "fold", fold, folded: [] };
 }
 
@@ -1505,7 +1433,6 @@ function stageNode(ctx: FoldContext, op: ProfileOperator, stage: ProfileStage): 
       kind: "stage",
       opIds,
       ownerId: op.id,
-      focus: false,
     };
     return { kind: "fold", fold, folded: [] };
   }
@@ -1530,7 +1457,6 @@ function buildNode(ctx: FoldContext, opId: string): VisNode {
       kind: "branch",
       opIds: op.childIds,
       ownerId: opId,
-      focus: false,
     };
     node.blocks = [{ kind: "fold", fold, folded: [] }];
   } else {
@@ -1690,19 +1616,9 @@ function edgeFor(link: Link, x2: number, y2: number, parentId: string, slide: nu
   };
 }
 
-function relatedTo(model: ProfileModel, focusId: string | null): Set<string> | null {
-  if (!focusId || !model.operators[focusId]) return null;
-  return new Set([...subtreeIds(model, focusId), ...ancestorIds(model, focusId)]);
-}
-
 /** Tidy top-down layout: each subtree owns a disjoint x-range, stages box their variants side by side. */
 export function layoutProfile(model: ProfileModel, fold: FoldState = NO_FOLD): ProfileLayout {
-  const ctx: FoldContext = {
-    model,
-    fold,
-    hot: hotspotSet(model),
-    related: relatedTo(model, fold.focusId),
-  };
+  const ctx: FoldContext = { model, fold, hot: hotspotSet(model) };
   // the root has no edge above it to carry folded operators, so it is never folded away
   const root = buildNode(ctx, model.rootId);
   const memo = new WeakMap<VisNode, Box>();

@@ -93,9 +93,7 @@ const title = computed<I18nText>(() => {
   }
   const count = props.fold.kind === "branch" ? summary.value.count : props.fold.opIds.length;
   if (props.fold.kind === "branch") return t("search.queryProfile.foldHidden", { count }, count);
-  return props.fold.focus
-    ? t("search.queryProfile.foldOutsideFocus", { count }, count)
-    : t("search.queryProfile.foldBranches", { count }, count);
+  return t("search.queryProfile.foldBranches", { count }, count);
 });
 
 const sub = computed<I18nText>(() => {

@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-text-secondary text-sm">{{ t("search.loadingPlan") }}</div>
         </div>
 
-        <div v-else-if="mode === 'plan' && planError" class="p-4" data-test="query-plan-error">
+        <div v-else-if="planError" class="p-4" data-test="query-plan-error">
           <OBanner variant="error" icon="error" :content="raw(planError)" />
         </div>
 
@@ -191,6 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { isAxiosError } from "axios";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
@@ -294,7 +295,7 @@ const planProfile = computed(() =>
   physicalPlan.value ? physicalPlanToProfile(physicalPlan.value) : null,
 );
 const planModel = computed(() =>
-  planProfile.value ? buildProfileModel(planProfile.value, [], { planOnly: true }) : null,
+  planProfile.value ? buildProfileModel(planProfile.value, { planOnly: true }) : null,
 );
 // a join reads streams the logs page did not select, so prefer the ones the plan scans
 const planStreams = computed(() => (planModel.value ? summarizePlan(planModel.value).streams : []));
@@ -304,9 +305,7 @@ const analyzeBusy = computed(
 );
 const elapsedLabel = computed(() => formatElapsed(now.value - runStartedAt.value));
 
-const resultModel = computed(() =>
-  profile.value ? buildProfileModel(profile.value, streamResult.value?.hits ?? []) : null,
-);
+const resultModel = computed(() => (profile.value ? buildProfileModel(profile.value) : null));
 const resultNodes = computed(() =>
   resultModel.value ? clusterNodes(resultModel.value).filter((n) => !n.clusterEntry).length : 0,
 );
@@ -403,15 +402,18 @@ async function search(
 }
 
 function errorMessage(err: unknown, fallback: I18nText): string {
-  const e = err as { message?: string; response?: { data?: { message?: string } } } | null;
-  return e?.response?.data?.message || e?.message || fallback;
+  const body: unknown = isAxiosError(err) ? err.response?.data : null;
+  const server =
+    body && typeof body === "object" && "message" in body && typeof body.message === "string"
+      ? body.message
+      : "";
+  return server || (err instanceof Error ? err.message : "") || fallback;
 }
 
 function parseExplainHits(hits: PlanHit[]) {
   for (const hit of hits) {
-    const source = hit._source as PlanHit | undefined;
-    const planType = hit.plan_type ?? source?.plan_type;
-    const plan = String(hit.plan ?? source?.plan ?? "").trim();
+    const planType = hit.plan_type ?? hit._source?.plan_type;
+    const plan = (hit.plan ?? hit._source?.plan ?? "").trim();
     if (planType === "logical_plan") logicalPlan.value = plan;
     else if (planType === "physical_plan") physicalPlan.value = plan;
   }
@@ -570,8 +572,12 @@ function resetAnalyze() {
   clearResults();
 }
 
+function isPlanMode(value: unknown): value is PlanMode {
+  return MODES.some((m) => m === value);
+}
+
 function onMode(value: unknown) {
-  if (MODES.includes(value as PlanMode)) mode.value = value as PlanMode;
+  if (isPlanMode(value)) mode.value = value;
 }
 
 watch(

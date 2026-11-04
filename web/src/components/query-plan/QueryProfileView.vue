@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #canvas="{ leftInset }">
       <ProfileCanvas
-        ref="canvasRef"
         :model="viewModel"
         :layout="layout"
         :scope="scope"
@@ -115,11 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model="viewModel"
         :op-id="selectedId"
         :scope="scope"
-        :can-focus="focusable"
-        :focused="!!fold.focusId && fold.focusId === selectedId"
         @select="pick"
         @scope="scope = $event"
-        @focus="focusOn"
       />
     </template>
   </QueryPlanLayout>
@@ -166,18 +162,7 @@ const clusterView = ref<ClusterView>("all");
 const clusters = computed(() => clusterSummary(props.model));
 const viewModel = computed(() => modelForClusterView(props.model, clusterView.value));
 const summary = computed(() => summarizeProfile(viewModel.value, props.stream ?? {}));
-const {
-  selectedId,
-  canvasRef,
-  fold,
-  layout,
-  notice,
-  focusable,
-  act,
-  onNoticeAction,
-  pick,
-  focusOn,
-} = useProfileFold(
+const { selectedId, fold, layout, notice, act, onNoticeAction, pick } = useProfileFold(
   t,
   () => viewModel.value,
   (m) => summarizeProfile(m, props.stream ?? {}).hotspots[0] ?? m.rootId,

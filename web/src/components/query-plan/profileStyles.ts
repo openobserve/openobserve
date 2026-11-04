@@ -69,7 +69,6 @@ export interface CategoryStyle {
   border: string;
   chip: string;
   swatch: string;
-  fill: string;
   text: string;
 }
 
@@ -81,7 +80,6 @@ export const CATEGORY_STYLE: Record<OperatorCategory, CategoryStyle> = {
     border: "border-s-badge-teal-solid-bg",
     chip: "bg-badge-teal-soft-bg text-badge-teal-soft-text",
     swatch: "bg-badge-teal-solid-bg",
-    fill: "var(--color-badge-teal-solid-bg)",
     text: "text-badge-teal-soft-text",
   },
   filter: {
@@ -90,7 +88,6 @@ export const CATEGORY_STYLE: Record<OperatorCategory, CategoryStyle> = {
     border: "border-s-badge-error-solid-bg",
     chip: "bg-badge-error-soft-bg text-badge-error-soft-text",
     swatch: "bg-badge-error-solid-bg",
-    fill: "var(--color-badge-error-solid-bg)",
     text: "text-badge-error-soft-text",
   },
   join: {
@@ -99,7 +96,6 @@ export const CATEGORY_STYLE: Record<OperatorCategory, CategoryStyle> = {
     border: "border-s-badge-indigo-solid-bg",
     chip: "bg-badge-indigo-soft-bg text-badge-indigo-soft-text",
     swatch: "bg-badge-indigo-solid-bg",
-    fill: "var(--color-badge-indigo-solid-bg)",
     text: "text-badge-indigo-soft-text",
   },
   agg: {
@@ -108,7 +104,6 @@ export const CATEGORY_STYLE: Record<OperatorCategory, CategoryStyle> = {
     border: "border-s-badge-orange-solid-bg",
     chip: "bg-badge-orange-soft-bg text-badge-orange-soft-text",
     swatch: "bg-badge-orange-solid-bg",
-    fill: "var(--color-badge-orange-solid-bg)",
     text: "text-badge-orange-soft-text",
   },
   sort: {
@@ -117,7 +112,6 @@ export const CATEGORY_STYLE: Record<OperatorCategory, CategoryStyle> = {
     border: "border-s-badge-blue-solid-bg",
     chip: "bg-badge-blue-soft-bg text-badge-blue-soft-text",
     swatch: "bg-badge-blue-solid-bg",
-    fill: "var(--color-badge-blue-solid-bg)",
     text: "text-badge-blue-soft-text",
   },
   exchange: {
@@ -126,7 +120,6 @@ export const CATEGORY_STYLE: Record<OperatorCategory, CategoryStyle> = {
     border: "border-s-badge-default-soft-text",
     chip: "bg-badge-default-soft-bg text-badge-default-soft-text",
     swatch: "bg-badge-default-soft-text",
-    fill: "var(--color-badge-default-soft-text)",
     text: "text-badge-default-soft-text",
   },
   projection: {
@@ -135,7 +128,6 @@ export const CATEGORY_STYLE: Record<OperatorCategory, CategoryStyle> = {
     border: "border-s-badge-lime-solid-bg",
     chip: "bg-badge-lime-soft-bg text-badge-lime-soft-text",
     swatch: "bg-badge-lime-solid-bg",
-    fill: "var(--color-badge-lime-solid-bg)",
     text: "text-badge-lime-soft-text",
   },
   remote: {
@@ -144,7 +136,6 @@ export const CATEGORY_STYLE: Record<OperatorCategory, CategoryStyle> = {
     border: "border-s-badge-purple-solid-bg",
     chip: "bg-badge-purple-soft-bg text-badge-purple-soft-text",
     swatch: "bg-badge-purple-solid-bg",
-    fill: "var(--color-badge-purple-solid-bg)",
     text: "text-badge-purple-soft-text",
   },
   other: {
@@ -153,7 +144,6 @@ export const CATEGORY_STYLE: Record<OperatorCategory, CategoryStyle> = {
     border: "border-s-border-strong",
     chip: "bg-surface-subtle text-text-secondary",
     swatch: "bg-border-strong",
-    fill: "var(--color-border-strong)",
     text: "text-text-heading",
   },
 };

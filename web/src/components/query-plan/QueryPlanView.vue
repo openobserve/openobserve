@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #canvas="{ leftInset }">
       <ProfileCanvas
-        ref="canvasRef"
         :model="model"
         :layout="layout"
         scope="sum"
@@ -35,14 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
     <template #detail>
-      <PlanDetailPanel
-        :model="model"
-        :op-id="selectedId"
-        :can-focus="focusable"
-        :focused="!!fold.focusId && fold.focusId === selectedId"
-        @select="pick"
-        @focus="focusOn"
-      />
+      <PlanDetailPanel :model="model" :op-id="selectedId" @select="pick" />
     </template>
   </QueryPlanLayout>
 </template>
@@ -66,18 +58,7 @@ const emit = defineEmits<{ analyze: [] }>();
 const { t } = useI18nTyped();
 
 const summary = computed(() => summarizePlan(props.model));
-const {
-  selectedId,
-  canvasRef,
-  fold,
-  layout,
-  notice,
-  focusable,
-  act,
-  onNoticeAction,
-  pick,
-  focusOn,
-} = useProfileFold(
+const { selectedId, fold, layout, notice, act, onNoticeAction, pick } = useProfileFold(
   t,
   () => props.model,
   (m) => summarizePlan(m).scans[0]?.opId ?? m.rootId,

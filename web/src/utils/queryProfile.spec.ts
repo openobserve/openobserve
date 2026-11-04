@@ -611,24 +611,6 @@ describe("super-cluster node identity", () => {
     expect(summarizeProfile(model).nodeCounts.total).toBe(5);
   });
 
-  it("never gives a pod its cluster leader's text plan", () => {
-    const profile = joinOfClusters();
-    const pods = profile.plan.children![0].remote![0].plan!.remote!;
-    pods[3] = { ...pods[3], plan: undefined, skipped: true };
-    pods[4] = { ...pods[4], plan: undefined };
-    const leaderPlan = "RemoteScanExec: input_partitions=5, metrics=[output_rows=1]";
-    const hits = [
-      { phase: 1, node_name: "o2-querier-1", plan: leaderPlan },
-      { phase: 1, node_name: "o2-querier-2", plan: leaderPlan },
-      { phase: 2, node_name: "o2-querier-2", plan: "DataSourceExec: x, metrics=[output_rows=7]" },
-    ];
-    const model = buildProfileModel(profile, hits);
-    expect(model.stages).toHaveLength(4);
-    const nested = model.stages[1].nodes;
-    expect(nested.find((n) => n.key === "cluster-a/o2-querier-1")?.planSource).toBe("none");
-    expect(nested.find((n) => n.key === "cluster-a/o2-querier-2")?.planSource).toBe("text");
-  });
-
   it("keeps plain node keys inside a single cluster", () => {
     const model = buildProfileModel(singleStageProfile(clusterScan("zo1").remote!));
     expect(model.stages[0].nodes.map((n) => n.key)).toEqual(PODS.map(([pod]) => pod));
@@ -642,39 +624,16 @@ describe("super-cluster node identity", () => {
   });
 });
 
-describe("fallback when a remote node has no structured plan", () => {
-  const remotes = [
-    plainRemote("q-0", "querier", 0, scanPlan(1)),
-    plainRemote("q-old", "querier", 1),
-    plainRemote("q-gone", "querier", 2),
-  ];
-  const hits = [
-    { phase: 0, plan: "CoalescePartitionsExec" },
-    {
-      phase: 1,
-      node_name: "q-old",
-      node_address: "10.0.0.1:5081",
-      plan: "FilterExec: a = 1, metrics=[output_rows=5, elapsed_compute=2ms]\n  DataSourceExec: x, metrics=[output_rows=9]",
-    },
-  ];
-  const model = buildProfileModel(singleStageProfile(remotes), hits);
-  const stage = model.stages[0];
-
-  it("parses the node's text plan from the hits", () => {
-    const old = stage.nodes.find((n) => n.key === "q-old")!;
-    expect(old.planSource).toBe("text");
-    const variant = model.variantById[old.variantId!];
-    const root = model.operators[variant.rootOpId];
-    expect(root.name).toBe("FilterExec");
-    expect(root.totalComputeNs).toBe(2 * MS);
-    expect(root.totalRows).toBe(5);
-  });
-
-  it("keeps a node with no plan at all without crashing", () => {
-    const gone = stage.nodes.find((n) => n.key === "q-gone")!;
-    expect(gone.planSource).toBe("none");
-    expect(gone.variantId).toBeNull();
-    expect(stage.variants).toHaveLength(2);
+describe("a remote node that sent no plan", () => {
+  it("is kept as a node without a plan shape", () => {
+    const remotes = [
+      plainRemote("q-0", "querier", 0, scanPlan(1)),
+      plainRemote("q-old", "querier", 1),
+    ];
+    const model = buildProfileModel(singleStageProfile(remotes));
+    const stage = model.stages[0];
+    expect(stage.nodes.find((n) => n.key === "q-old")?.variantId).toBeNull();
+    expect(stage.variants).toHaveLength(1);
     expect(() => layoutProfile(model)).not.toThrow();
   });
 });
@@ -789,7 +748,7 @@ describe("plan detail parsing", () => {
 });
 
 describe("physicalPlanToProfile", () => {
-  const model = buildProfileModel(physicalPlanToProfile(AGG_PHYSICAL_PLAN)!, [], {
+  const model = buildProfileModel(physicalPlanToProfile(AGG_PHYSICAL_PLAN)!, {
     planOnly: true,
   });
   const byName = (name: string) => opsNamed(model, name);
@@ -843,7 +802,7 @@ describe("physicalPlanToProfile", () => {
   });
 
   it("reads sort order pushdown from a top-N plan", () => {
-    const topn = buildProfileModel(physicalPlanToProfile(TOPN_PHYSICAL_PLAN)!, [], {
+    const topn = buildProfileModel(physicalPlanToProfile(TOPN_PHYSICAL_PLAN)!, {
       planOnly: true,
     });
     const plan = summarizePlan(topn);

@@ -33,13 +33,11 @@ const AUTO_FOLD_SHARE = 0.05;
 export type FoldAction =
   | { type: "branch"; opId: string }
   | { type: "stage"; stageId: string }
-  | { type: "open"; fold: Pick<LayoutFold, "kind" | "opIds" | "ownerId" | "focus"> }
+  | { type: "open"; fold: Pick<LayoutFold, "kind" | "opIds" | "ownerId"> }
   | { type: "show"; opIds: string[] }
   | { type: "refold"; opId: string }
   | { type: "plumbing" }
-  | { type: "expandAll" }
-  | { type: "hotPath" }
-  | { type: "focus"; opId: string | null };
+  | { type: "expandAll" };
 
 interface FoldSummary {
   count: number;
@@ -70,12 +68,6 @@ export function applyFold(model: ProfileModel, fold: FoldState, action: FoldActi
         : { ...fold, plumbing: true, shown: new Set() };
     case "expandAll":
       return { ...initialFold(), plumbing: fold.plumbing, shown: fold.shown };
-    case "hotPath":
-      return hotPathFold(model, fold);
-    case "focus":
-      return action.opId
-        ? { ...revealOp(model, fold, action.opId), focusId: action.opId }
-        : { ...fold, focusId: null };
   }
 }
 
@@ -107,13 +99,8 @@ export function revealOp(model: ProfileModel, fold: FoldState, opId: string): Fo
   const ancestors = ancestorIds(model, opId);
   const path = [opId, ...ancestors];
   const stageIds = path.map((id) => model.operators[id].stageId).filter((s): s is string => !!s);
-  const outsideFocus =
-    !!fold.focusId &&
-    !path.includes(fold.focusId) &&
-    !ancestorIds(model, fold.focusId).includes(opId);
   const unfold = fold.plumbing && isPlumbing(model, op, hotspotSet(model)) && !fold.shown.has(opId);
   const changed =
-    outsideFocus ||
     unfold ||
     ancestors.some((id) => fold.collapsed.has(id)) ||
     path.some((id) => fold.grouped.has(id)) ||
@@ -126,13 +113,7 @@ export function revealOp(model: ProfileModel, fold: FoldState, opId: string): Fo
     collapsed: without(fold.collapsed, ancestors),
     grouped: without(fold.grouped, path),
     stages: without(fold.stages, stageIds),
-    focusId: outsideFocus ? null : fold.focusId,
   };
-}
-
-/** Focus only changes the canvas when some operator above this one has another branch. */
-export function canFocus(model: ProfileModel, opId: string): boolean {
-  return ancestorIds(model, opId).some((id) => model.operators[id].childIds.length > 1);
 }
 
 export function foldSummary(
@@ -161,21 +142,10 @@ function hotPath(model: ProfileModel): Set<string> {
   return new Set([...hotspotSet(model)].flatMap((id) => [id, ...ancestorIds(model, id)]));
 }
 
-function hotPathFold(model: ProfileModel, fold: FoldState): FoldState {
-  const keep = hotPath(model);
-  if (!keep.size) return fold;
-  const grouped = new Set<string>();
-  for (const id of keep) {
-    for (const childId of model.operators[id].childIds)
-      if (!keep.has(childId)) grouped.add(childId);
-  }
-  return { ...initialFold(), plumbing: fold.plumbing, grouped };
-}
-
 function openFold(
   model: ProfileModel,
   fold: FoldState,
-  target: Pick<LayoutFold, "kind" | "opIds" | "ownerId" | "focus">,
+  target: Pick<LayoutFold, "kind" | "opIds" | "ownerId">,
 ): FoldState {
   if (target.kind === "branch")
     return { ...fold, collapsed: without(fold.collapsed, [target.ownerId]) };
@@ -183,11 +153,7 @@ function openFold(
     const stageId = model.operators[target.ownerId]?.remoteStageId;
     return stageId ? { ...fold, stages: without(fold.stages, [stageId]) } : fold;
   }
-  return {
-    ...fold,
-    grouped: without(fold.grouped, target.opIds),
-    focusId: target.focus ? null : fold.focusId,
-  };
+  return { ...fold, grouped: without(fold.grouped, target.opIds) };
 }
 
 function subtreeShare(model: ProfileModel, opId: string): number {
