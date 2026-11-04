@@ -71,6 +71,7 @@ async fn rbac_stays_enforced_when_usage_reporting_fails() {
         use_all_org: false,
         use_self_context: false,
         use_self_parent: false,
+        feature: None,
     };
     assert!(
         !check_permissions(
