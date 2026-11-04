@@ -2994,6 +2994,12 @@ pub struct Limit {
     )]
     pub alert_eval_ledger_retention_days: i64,
     #[env_config(
+        name = "ZO_ALERT_TRANSITIONS_RETENTION_DAYS",
+        default = 97,
+        help = "How long alert state changes (alert_state_transitions: the level-change history and the input to alert calibration) are kept, in days. Alert calibration reads up to 90 days, so values below 97 shorten its history. 0 or less disables the reaper."
+    )]
+    pub alert_transitions_retention_days: i64,
+    #[env_config(
         name = "ZO_QUERY_HISTORY_ENABLED",
         default = true,
         help = "Records the queries users run in their query history. When false nothing is stored and the history lists empty; existing entries are kept until deleted or reaped."
