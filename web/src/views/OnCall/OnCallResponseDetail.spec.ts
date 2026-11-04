@@ -204,6 +204,7 @@ const stubs = {
       "subjectStream",
       "incidentId",
       "incidentTitle",
+      "incidentLoading",
       "cause",
       "causeNote",
       "teamDeleted",
@@ -354,7 +355,6 @@ describe("OnCallResponseDetail", () => {
     const wrapper = await renderWith();
     const reads = [
       service.getResponse,
-      service.getTeam,
       service.listMembers,
       service.listTeams,
       service.priorCauses,
@@ -374,6 +374,8 @@ describe("OnCallResponseDetail", () => {
 
     expect(spy).toHaveBeenCalledWith({ queryKey: oncallKeys.all("default"), refetchType: "none" });
     for (const read of reads) expect(read).toHaveBeenCalledTimes(2);
+    // The team list already names the team, so its own read is never needed.
+    expect(service.getTeam).not.toHaveBeenCalled();
     expect(wrapper.findComponent({ name: "OnCallAboutPage" }).exists()).toBe(true);
     spy.mockRestore();
   });
@@ -1501,6 +1503,42 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
     );
   });
 
+  /// A raw id is the one thing a responder cannot read, so the rail waits rather than flashing it.
+  it("skeletons the incident row until its title answers, never the id", async () => {
+    let answer: (v: unknown) => void = () => {};
+    incidentsGet.mockReturnValue(new Promise((resolve) => (answer = resolve)) as any);
+    const wrapper = await renderWith({ incident_id: "inc_9" });
+    const about = () => wrapper.findComponent({ name: "OnCallAboutPage" });
+
+    expect(about().props("incidentLoading")).toBe(true);
+
+    answer({ data: { title: "Checkout outage" } });
+    await flushPromises();
+    expect(about().props("incidentLoading")).toBe(false);
+    expect(about().props("incidentTitle")).toBe("Checkout outage");
+  });
+
+  /// The step a rung belongs to comes from the policy, so the feed waits for it instead of growing "(step 1)" later.
+  it("holds the timeline until the team's policy has answered", async () => {
+    let answer: (v: unknown) => void = () => {};
+    service.getPolicy.mockReturnValue(new Promise((resolve) => (answer = resolve)) as any);
+    const wrapper = await renderWith();
+
+    expect(wrapper.find('[data-test="oncall-response-activity-pending"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "OnCallActivityTimeline" }).exists()).toBe(false);
+
+    answer({ data: null });
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-response-activity-pending"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OnCallActivityTimeline" }).exists()).toBe(true);
+  });
+
+  /// The tab panel renders a fragment, so the hook sits on an element the panel always renders.
+  it("puts the activity hook on a rendered element", async () => {
+    const wrapper = await renderWith();
+    expect(wrapper.find('[data-test="oncall-response-activity"]').exists()).toBe(true);
+  });
+
   describe("a team that was deleted", () => {
     /// A deleted team's ladder has no rotations to reach; Hand off is the next step, and Snooze still works.
     it("offers no Escalate for a deleted team, but keeps Snooze", async () => {
@@ -1525,6 +1563,15 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
       expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("teamDeleted")).toBe(true);
       expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("teamDeleted")).toBe(true);
       expect(wrapper.findComponent({ name: "OnCallReachAlarm" }).props("noTeam")).toBe(true);
+    });
+
+    /// The list already said the team is gone, so the team and members reads would only 404.
+    it("reads neither the team nor its members once the list says it is gone", async () => {
+      service.listTeams.mockResolvedValue({ data: [{ id: "team_2", name: "Payments" }] } as any);
+      await renderWith();
+
+      expect(service.getTeam).not.toHaveBeenCalled();
+      expect(service.listMembers).not.toHaveBeenCalled();
     });
 
     /// A deleted team's roster can never load, so the card is not left waiting on a read that only 404s.

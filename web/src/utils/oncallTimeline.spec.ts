@@ -53,6 +53,12 @@ describe("timelineSentence", () => {
     ],
     ["page", "nobody matched the whole team", "This step had nobody to page"],
     ["ack", "ana@o2.ai acknowledged", "Acknowledged"],
+    // The actor heads the line already, so a takeover starts at the verb rather than naming them twice.
+    [
+      "ack",
+      "bo@o2.ai acknowledged, taking over from ana@o2.ai",
+      "Acknowledged, taking over from Ana Ruiz",
+    ],
     [
       "handoff",
       "ana@o2.ai handed off to Checkout: over to you",

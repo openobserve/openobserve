@@ -303,10 +303,22 @@ const hasConditions = computed(() => Object.keys(dimensions.value).length > 0);
 
 const priorityOptions = PRIORITIES.map((value) => ({ label: raw(value), value }));
 
+/// The conditions the picked start filled in; once the rows say something else, the start no longer describes them.
+let seededPath: string | null = null;
+
 function seedWith(next: Record<string, string>) {
   dimensions.value = { ...next };
+  seededPath = ownershipPath(next);
   seedKey.value += 1;
 }
+
+watch(
+  dimensions,
+  (next) => {
+    if (startPick.value !== null && ownershipPath(next) !== seededPath) startPick.value = null;
+  },
+  { deep: true },
+);
 
 /// Three kinds of real starting point, each tagged by its source so one id space cannot collide with another.
 const startOptions = computed<SelectOption[]>(() => {

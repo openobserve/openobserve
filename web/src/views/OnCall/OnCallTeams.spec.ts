@@ -893,4 +893,45 @@ describe("OnCallTeams - editor drafts", () => {
 
     expect(readEditorDraft(scopeOf("oncall_schedule", "team_1/rot_a"))).not.toBeNull();
   });
+  /// With no team the empty state is already the next step; once one exists the setup bar takes over.
+  describe("setup bar and first-run empty state", () => {
+    const withBanner = () =>
+      mount(OnCallTeams, {
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            ...stubs,
+            OnCallSetupBanner: {
+              name: "OnCallSetupBanner",
+              emits: ["create-team"],
+              template: "<div data-test='setup-banner' />",
+            },
+          },
+        },
+      });
+
+    it("shows the setup bar over a list that has teams, and lets it open the create form", async () => {
+      service.listTeams.mockResolvedValue({ data: [team("team_1", "Checkout")] } as any);
+      const wrapper = withBanner();
+      await flushPromises();
+
+      const banner = wrapper.findComponent({ name: "OnCallSetupBanner" });
+      expect(banner.exists()).toBe(true);
+      banner.vm.$emit("create-team");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("open")).toBe(true);
+    });
+
+    it("leaves the bar out while the org has no team, and the empty state says no more than its title", async () => {
+      service.listTeams.mockResolvedValue({ data: [] } as any);
+      const wrapper = withBanner();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="setup-banner"]').exists()).toBe(false);
+      const empty = wrapper.findComponent('[data-test="oncall-teams-empty"]');
+      expect(empty.exists()).toBe(true);
+      expect(empty.props("description")).toBeUndefined();
+      expect(empty.text()).not.toContain("A team decides who gets woken");
+    });
+  });
 });

@@ -1936,6 +1936,37 @@ describe("OnCallResponses", () => {
       expect(more.exists()).toBe(true);
       expect(more.classes()).not.toContain("md:hidden");
     });
+
+    /// An open tooltip is the top layer, so leaving it on the trigger made Escape close the tooltip and not the menu.
+    it("drops the ⋯ tooltip while its menu is open", async () => {
+      const wrapper = await withPages([page({ state: "resolved", closed_at: Date.now() * 1000 })]);
+      const menu = wrapper
+        .findAllComponents({ name: "ODropdown" })
+        .find((d) => d.find('[data-test="oncall-row-more-alert:al_ckt"]').exists())!;
+      const tooltips = () =>
+        menu
+          .find('[data-test="oncall-row-more-alert:al_ckt"]')
+          .findAllComponents({ name: "OTooltip" });
+      expect(tooltips()).toHaveLength(1);
+
+      menu.vm.$emit("update:open", true);
+      await wrapper.vm.$nextTick();
+      expect(tooltips()).toHaveLength(0);
+
+      menu.vm.$emit("update:open", false);
+      await wrapper.vm.$nextTick();
+      expect(tooltips()).toHaveLength(1);
+    });
+
+    /// With no name on file the whole email is the only thing that tells two people apart.
+    it("names a responder with no display name by the full email", async () => {
+      const wrapper = await withPages([
+        page({ state: "acknowledged", acked_by: "tl-eve-mvt9nu9l1842@maxxspace.com" }),
+      ]);
+      expect(wrapper.find('[data-test="oncall-responder-alert:al_ckt"]').text()).toBe(
+        "tl-eve-mvt9nu9l1842@maxxspace.com",
+      );
+    });
   });
 });
 

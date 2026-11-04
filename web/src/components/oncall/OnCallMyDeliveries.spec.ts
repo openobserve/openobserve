@@ -515,6 +515,18 @@ describe("OnCallMyDeliveries", () => {
     const wrapper = render();
     await flushPromises();
     expect(wrapper.find('[data-test="empty-action"]').exists()).toBe(false);
+    // The title alone: the explainer under it restated what the reader already sees.
+    expect(wrapper.text()).not.toContain("Pages show here once");
+  });
+
+  /// The first paint is the shape a first visit usually lands on, so the card does not collapse when rows arrive.
+  it("skeletons three history rows while the first read is out", async () => {
+    service.myDeliveries.mockReturnValue(new Promise(() => {}) as any);
+    const wrapper = render();
+    await flushPromises();
+    expect(history(wrapper).findComponent({ name: "OTable" }).attributes("skeleton-rows")).toBe(
+      "3",
+    );
   });
 
   describe("list view state", () => {

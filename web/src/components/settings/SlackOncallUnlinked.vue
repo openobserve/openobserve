@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
+import OnCallFitChips from "@/components/oncall/OnCallFitChips.vue";
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -25,6 +26,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { remindOncallUnlinkedMutation, slackOncallUnlinkedQuery } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -39,6 +41,9 @@ interface UnlinkedPerson {
 }
 
 const props = defineProps<{ installation: InstallationView }>();
+
+/// Ten people, not the table default: the card sits among other settings and must not run the page long.
+const PAGE_SIZE = 10;
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -122,22 +127,17 @@ const runRemind = async () => {
     class="flex flex-col gap-3 p-4"
     data-test="slack-oncall-unlinked"
   >
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div class="flex min-w-0 flex-col gap-0.5">
-        <span class="text-text-heading flex items-center gap-2 text-sm font-medium">
-          {{ t("slackApp.oncallUnlinked.title", { product: raw("Slack") }) }}
-          <OTag
-            type="countChip"
-            value="warning"
-            size="sm"
-            :label="t('slackApp.oncallUnlinked.count', { count: rows.length }, rows.length)"
-            data-test="slack-oncall-unlinked-count"
-          />
-        </span>
-        <span class="text-text-secondary text-xs">
-          {{ t("slackApp.oncallUnlinked.description") }}
-        </span>
-      </div>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <span class="text-text-heading flex min-w-0 items-center gap-2 text-sm font-medium">
+        {{ t("slackApp.oncallUnlinked.title", { product: raw("Slack") }) }}
+        <OTag
+          type="countChip"
+          value="warning"
+          size="sm"
+          :label="t('slackApp.oncallUnlinked.count', { count: rows.length }, rows.length)"
+          data-test="slack-oncall-unlinked-count"
+        />
+      </span>
       <OButton
         variant="outline"
         size="sm-action"
@@ -153,7 +153,8 @@ const runRemind = async () => {
       :data="rows"
       :columns="columns"
       row-key="email"
-      pagination="none"
+      :pagination="rows.length > PAGE_SIZE ? 'client' : 'none'"
+      :page-size="PAGE_SIZE"
       :show-global-filter="false"
       :cell-overflow-tooltip="false"
       dense
@@ -164,21 +165,22 @@ const runRemind = async () => {
         </span>
       </template>
       <template #cell-teams="{ row }">
-        <span class="flex flex-wrap gap-1">
-          <OTag
-            v-for="team in row.teams"
-            :key="team.id"
-            size="sm"
-            variant="default-soft"
-            :label="raw(team.name)"
-            data-test="slack-oncall-unlinked-team"
-          />
-        </span>
+        <OnCallFitChips
+          :items="row.teams"
+          :tooltip="raw(row.teams.map((team) => team.name).join(', '))"
+          :data-test="`slack-oncall-unlinked-teams-${row.email}`"
+        >
+          <template #item="{ item }">
+            <OTag size="sm" variant="default-soft" data-test="slack-oncall-unlinked-team">
+              <OTruncatedText>{{ raw(item.name) }}</OTruncatedText>
+            </OTag>
+          </template>
+        </OnCallFitChips>
       </template>
       <template #cell-next_shift="{ row }">
         <OTag
           v-if="row.onCallNow"
-          variant="error-soft"
+          variant="success-soft"
           size="sm"
           :label="t('slackApp.oncallUnlinked.onCallNow')"
           :data-test="`slack-oncall-unlinked-now-${row.email}`"

@@ -2300,9 +2300,13 @@ export function timelineSentence(
     case "page":
       line = pageLine(body, ctx, t);
       break;
-    case "ack":
-      line = /acknowledged$/.test(body) ? t("oncall.tlAcked") : null;
+    case "ack": {
+      // The actor already leads the line, so the sentence starts at the verb.
+      const takeover = body.match(/ acknowledged, taking over from (.+)$/);
+      if (takeover) line = t("oncall.tlAckedTakeover", { from: raw(ctx.nameOf(takeover[1])) });
+      else if (/acknowledged$/.test(body)) line = t("oncall.tlAcked");
       break;
+    }
     case "handoff": {
       const m = body.match(/^.+? handed off to (.+?)(?:: (.+))?$/);
       if (m) {

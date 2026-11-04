@@ -416,11 +416,8 @@ describe("TelephonySettings", () => {
 
   describe("disconnect", () => {
     it.each([
-      [true, "On-call texts and calls switch to the account this deployment provides."],
-      [
-        false,
-        "Every on-call team stops getting texts and calls; pages still go out by email, and to Slack where it is set up.",
-      ],
+      [true, "switch from ACte…0001 to this deployment's account."],
+      [false, "Texts and calls from ACte…0001 stop; email and Slack still page."],
     ])("with a deployment account %s, says what takes over", async (present, expected) => {
       await render({ ...CONNECTED, deployment_account_present: present });
       await click("disconnect");
@@ -433,7 +430,7 @@ describe("TelephonySettings", () => {
       await click("disconnect");
       const name = document.querySelector('[data-test="confirm-dialog-name"]');
       expect(name?.textContent).toBe("ACte…0001");
-      expect(document.body.textContent).toContain("Disconnects the ACte…0001 account.");
+      expect(document.body.textContent).toContain("Texts and calls from ACte…0001 stop");
       const ok = document.querySelector('[data-test="o-dialog-primary-btn"]');
       expect(ok?.className).toContain("bg-button-destructive");
       expect(ok?.textContent?.trim()).toBe("Disconnect Twilio");

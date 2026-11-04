@@ -77,19 +77,14 @@ export class OnCallResponseDetailPage {
       tabActivity: '[data-test="oncall-response-tab-activity"]',
       tabDeliveries: '[data-test="oncall-response-tab-deliveries"]',
       tabCauses: '[data-test="oncall-response-tab-causes"]',
-      // THE PANELS HAVE NO `data-test`, AND CANNOT HAVE ONE.
-      //
-      // OnCallResponseDetail.vue does write `data-test="oncall-response-activity"`
-      // (and -deliveries, -causes) onto each `OTabPanel`, but OTabPanel's template
-      // root is a `v-if`/`v-else` pair of `<template>` blocks, which compiles to a
-      // FRAGMENT — and Vue disables attribute fallthrough on a fragment root, so
-      // the attribute is dropped before it reaches the DOM. Verified on :5090: the
-      // active panel renders as `<div role="tabpanel" id="tab-panel-activity"
-      // class="o-tab-panel p-0">` with `data-test` null.
-      //
-      // So the panel is addressed by the id OTabPanel itself builds — which is the
-      // same handle OTab publishes as `aria-controls`, i.e. the component's own
-      // contract rather than a coincidence of markup.
+      // Each panel's hook sits on a div inside OTabPanel, whose fragment root drops attributes.
+      activityPanel: '[data-test="oncall-response-activity"]',
+      activityPending: '[data-test="oncall-response-activity-pending"]',
+      deliveriesPanel: '[data-test="oncall-response-deliveries"]',
+      causesPanel: '[data-test="oncall-response-causes"]',
+      reportPanel: '[data-test="oncall-response-report"]',
+      teamPending: '[data-test="oncall-response-team-pending"]',
+      incidentPending: '[data-test="oncall-about-incident-pending"]',
       activityToggleAll: '[data-test="oncall-response-activity-toggle-all"]',
 
       // The delivery ledger (OnCallDeliveryLedger), rendered inside the tab.
