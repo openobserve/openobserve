@@ -29,8 +29,7 @@
 //! changing an ingestion endpoint means editing [`INGESTION_ROUTES`] and nothing
 //! else.
 //!
-//! Paths are matched against the request path with the `/api/` (and base-uri)
-//! prefix already stripped, so segment 0 is `{org_id}`.
+//! Rows match axum's `MatchedPath` below the mount prefix, so segment 0 is `{org_id}`.
 
 use axum::http::Method;
 
@@ -39,10 +38,7 @@ use axum::http::Method;
 enum Seg {
     /// A fixed path segment that must match exactly (e.g. `_bulk`, `traces`).
     Lit(&'static str),
-    /// A single path parameter — matches any one non-empty segment
-    /// (`{org_id}`, `{stream_name}`, `{name}`, ...). It deliberately does NOT
-    /// match an ingestion keyword by accident because matching is positional:
-    /// a stream literally named `traces` only ever lands in a `Param` slot.
+    /// A single route parameter (`{org_id}`, `{stream_name}`, ...); never a literal segment.
     Param,
 }
 
@@ -237,70 +233,80 @@ static INGESTION_ROUTES: &[IngestionRoute] = &[
     },
 ];
 
-/// Does this segment pattern list match these path segments?
-fn segments_match(patterns: &[Seg], columns: &[&str]) -> bool {
-    if patterns.len() != columns.len() {
+/// Does this segment pattern list match these route-template segments and their path values?
+fn segments_match(patterns: &[Seg], columns: &[&str], values: &[&str]) -> bool {
+    if patterns.len() != columns.len() || columns.len() != values.len() {
         return false;
     }
-    patterns.iter().zip(columns).all(|(pat, col)| match pat {
-        Seg::Lit(lit) => col == lit,
-        // A param matches any single non-empty segment.
-        Seg::Param => !col.is_empty(),
-    })
+    patterns
+        .iter()
+        .zip(columns)
+        .zip(values)
+        .all(|((pat, col), value)| match pat {
+            Seg::Lit(lit) => col == lit,
+            // matchit lets a param match an empty segment; ingestion needs a value.
+            Seg::Param => is_route_param(col) && !value.is_empty(),
+        })
 }
 
-/// Classify a request against the ingestion-route table.
-///
-/// `path` is the request path with the `/api/` and base-uri prefix already
-/// stripped, so it starts at `{org_id}` (a leading `/` is tolerated). It is taken as a `&str` —
-/// rather than pre-split columns — specifically so the Elasticsearch root-ping route `GET /{org}/`
-/// can be told apart from a top-level single-segment collection route such as
-/// `GET /organizations`: the former has a trailing slash, the latter does not.
-///
-/// `method` is the HTTP method. Returns `Some(kind)` only when the request
-/// matches a declared ingestion route on both shape and method; `None` for
-/// everything else — including data-read routes such as `.../traces/latest`,
-/// which are intentionally not in the table.
-pub fn classify(method: &Method, path: &str) -> Option<IngestionKind> {
-    // No ingestion route lives under `/v2`, where segment 0 is not the org.
+/// Is this template segment a single-segment axum parameter (`{name}`, not `{*rest}`)?
+fn is_route_param(segment: &str) -> bool {
+    segment
+        .strip_prefix('{')
+        .and_then(|s| s.strip_suffix('}'))
+        .is_some_and(|name| !name.is_empty() && !name.starts_with('*'))
+}
+
+/// The part of the full `MatchedPath` below the mount prefixes `path` (no leading `/`) has lost.
+fn route_below_mount<'a>(route: &'a str, path: &str) -> Option<&'a str> {
+    let route = route.strip_prefix('/').unwrap_or(route);
+    let skip = route
+        .split('/')
+        .count()
+        .checked_sub(path.split('/').count())?;
+    let start = match skip {
+        0 => 0,
+        n => route.match_indices('/').nth(n - 1)?.0 + 1,
+    };
+    let (mount, below) = route.split_at(start);
+    // A mount prefix is literal; a param in it means the segments are misaligned.
+    (!mount.contains('{')).then_some(below)
+}
+
+/// Classify by the full `MatchedPath`; `path` only aligns its mount. Absent or misaligned: None.
+pub fn classify(method: &Method, path: &str, route: Option<&str>) -> Option<IngestionKind> {
     let path = path.strip_prefix('/').unwrap_or(path);
-
+    let route = route_below_mount(route?, path)?;
     let method = method.as_str();
+    let columns: Vec<&str> = route.split('/').collect();
+    let values: Vec<&str> = path.split('/').collect();
 
-    // The ES root version ping is the sole ingestion route registered with a
-    // mandatory trailing slash (`GET /{org}/`). Match it explicitly on the
-    // trailing slash so it does not collide with unrelated single-segment
-    // routes (`/organizations`, `/invites`, `/healthz`, ...).
-    if let Some(org) = path.strip_suffix('/')
-        && !org.is_empty()
-        && !org.contains('/')
+    // The ES root ping is the only ingestion route with a mandatory trailing slash (`/{org_id}/`).
+    if let Some(org) = route.strip_suffix('/')
+        && is_route_param(org)
+        && values.first().is_some_and(|org| !org.is_empty())
         && (method == "GET" || method == "HEAD")
     {
         return Some(IngestionKind::EsHandshakeRead);
     }
 
-    // Everything else matches on exact segment shape. A single trailing empty
-    // segment (trailing slash) is dropped so `.../_bulk/` == `.../_bulk`.
-    let mut columns: Vec<&str> = path.split('/').collect();
-    if columns.len() > 1 && columns.last() == Some(&"") {
-        columns.pop();
-    }
-
     INGESTION_ROUTES
         .iter()
-        .find(|route| route.methods.contains(&method) && segments_match(route.segments, &columns))
+        .find(|route| {
+            route.methods.contains(&method) && segments_match(route.segments, &columns, &values)
+        })
         .map(|route| route.kind)
 }
 
 /// Is this request a data-ingestion **write**? True only for `IngestionKind::Write`.
-pub fn is_ingestion_write(method: &Method, path: &str) -> bool {
-    matches!(classify(method, path), Some(IngestionKind::Write))
+pub fn is_ingestion_write(method: &Method, path: &str, route: Option<&str>) -> bool {
+    matches!(classify(method, path, route), Some(IngestionKind::Write))
 }
 
 /// May an org ingestion token be used on this request? True for real writes and
 /// the read-only ES handshake stubs — nothing else.
-pub fn is_ingestion_allowed(method: &Method, path: &str) -> bool {
-    classify(method, path).is_some()
+pub fn is_ingestion_allowed(method: &Method, path: &str, route: Option<&str>) -> bool {
+    classify(method, path, route).is_some()
 }
 
 /// Is this exactly `{org}/v1/opamp`, the OpAMP route whose auth differs from other writes?
@@ -317,114 +323,205 @@ pub fn is_opamp(path: &str) -> bool {
 mod tests {
     use super::*;
 
-    fn classify_path(method: &Method, path: &str) -> Option<IngestionKind> {
-        classify(method, path)
+    /// Classify a route registered under `/api`, requested with every param filled in.
+    fn classify_route(method: &Method, template: &str) -> Option<IngestionKind> {
+        let path = template
+            .split('/')
+            .map(|s| if is_route_param(s) { "default" } else { s })
+            .collect::<Vec<_>>()
+            .join("/");
+        classify(method, &path, Some(&format!("/api/{template}")))
     }
 
     #[test]
     fn writes_are_classified() {
-        for path in [
-            "default/_bulk",
-            "default/mystream/_multi",
-            "default/mystream/_json",
-            "default/_hec",
-            "default/loki/api/v1/push",
-            "default/v1/logs",
-            "default/v1/metrics",
-            "default/v1/traces",
-            "default/v1/profiles",
-            "default/v1development/profiles",
-            "default/traces",
-            "default/otel/v1/traces",
-            "default/ingest/metrics/_json",
-            "default/prometheus/api/v1/write",
-            "default/mystream/_kinesis_firehose",
-            "default/mystream/_sub",
-            "v1/default/logs",
+        for route in [
+            "{org_id}/_bulk",
+            "{org_id}/{stream_name}/_multi",
+            "{org_id}/{stream_name}/_json",
+            "{org_id}/_hec",
+            "{org_id}/loki/api/v1/push",
+            "{org_id}/v1/logs",
+            "{org_id}/v1/metrics",
+            "{org_id}/v1/traces",
+            "{org_id}/v1/profiles",
+            "{org_id}/v1development/profiles",
+            "{org_id}/traces",
+            "{org_id}/otel/v1/traces",
+            "{org_id}/ingest/metrics/_json",
+            "{org_id}/prometheus/api/v1/write",
+            "{org_id}/{stream_name}/_kinesis_firehose",
+            "{org_id}/{stream_name}/_sub",
+            "v1/{org_id}/logs",
         ] {
             assert_eq!(
-                classify_path(&Method::POST, path),
+                classify_route(&Method::POST, route),
                 Some(IngestionKind::Write),
-                "expected Write for POST /{path}"
+                "expected Write for POST /{route}"
             );
         }
     }
 
     #[test]
     fn es_handshake_reads_are_classified() {
-        for (method, path) in [
-            (Method::GET, "default/"),
-            (Method::HEAD, "default/"),
-            (Method::GET, "default/_license"),
-            (Method::GET, "default/_xpack"),
-            (Method::GET, "default/_ilm/policy/logs"),
-            (Method::HEAD, "default/_index_template/filebeat-7"),
-            (Method::GET, "default/_data_stream/filebeat-7"),
-            (Method::GET, "default/_ingest/pipeline/filebeat-7"),
+        for (method, route) in [
+            (Method::GET, "{org_id}/"),
+            (Method::HEAD, "{org_id}/"),
+            (Method::GET, "{org_id}/_license"),
+            (Method::GET, "{org_id}/_xpack"),
+            (Method::GET, "{org_id}/_ilm/policy/{name}"),
+            (Method::HEAD, "{org_id}/_index_template/{name}"),
+            (Method::GET, "{org_id}/_data_stream/{name}"),
+            (Method::GET, "{org_id}/_ingest/pipeline/{name}"),
         ] {
             assert_eq!(
-                classify_path(&method, path),
+                classify_route(&method, route),
                 Some(IngestionKind::EsHandshakeRead),
-                "expected EsHandshakeRead for {method} /{path}"
+                "expected EsHandshakeRead for {method} /{route}"
             );
         }
     }
 
     #[test]
     fn es_template_creates_are_classified() {
-        // POST creates on template/data-stream/pipeline are static stubs, with
-        // arbitrary `{name}` (not necessarily an ingestion word).
-        for path in [
-            "default/_index_template/filebeat-7.17.1",
-            "default/_data_stream/filebeat-7.17.1",
-            "default/_ingest/pipeline/filebeat-7.17.1",
+        for route in [
+            "{org_id}/_index_template/{name}",
+            "{org_id}/_data_stream/{name}",
+            "{org_id}/_ingest/pipeline/{name}",
         ] {
             assert_eq!(
-                classify_path(&Method::POST, path),
+                classify_route(&Method::POST, route),
                 Some(IngestionKind::EsHandshakeRead),
-                "expected EsHandshakeRead for POST /{path}"
+                "expected EsHandshakeRead for POST /{route}"
             );
         }
+    }
+
+    #[test]
+    fn a_management_route_named_after_an_ingestion_literal_is_not_ingestion() {
+        // The path matches a write row; the matched route does not.
+        for (route, path) in [
+            ("/api/{org_id}/kv/{key}", "default/kv/_json"),
+            ("/api/{org_id}/kv/{key}", "default/kv/_multi"),
+            (
+                "/api/{org_id}/streams/{stream_name}",
+                "default/streams/_sub",
+            ),
+            (
+                "/api/{org_id}/enrichment_tables/{table_name}",
+                "default/enrichment_tables/_sub",
+            ),
+            (
+                "/api/{org_id}/streams/{stream_name}",
+                "default/streams/_kinesis_firehose",
+            ),
+            ("/api/{org_id}/{module}", "default/_bulk"),
+            ("/api/v1/{org_id}/{module}", "v1/default/logs"),
+        ] {
+            assert_eq!(
+                classify(&Method::POST, path, Some(route)),
+                None,
+                "POST {route} as /{path}"
+            );
+        }
+    }
+
+    #[test]
+    fn without_a_matched_route_nothing_is_ingestion() {
+        assert_eq!(classify(&Method::POST, "default/_bulk", None), None);
+        assert_eq!(classify(&Method::GET, "default/", None), None);
+    }
+
+    #[test]
+    fn the_mount_prefix_is_lined_up_away() {
+        for route in [
+            "/{org_id}/_bulk",
+            "/api/{org_id}/_bulk",
+            "/o2/base/api/{org_id}/_bulk",
+            "/aws/{org_id}/_bulk",
+        ] {
+            assert_eq!(
+                classify(&Method::POST, "default/_bulk", Some(route)),
+                Some(IngestionKind::Write),
+                "{route}"
+            );
+        }
+        assert_eq!(
+            classify(&Method::POST, "default/_bulk", Some("/{org_id}/{x}/_bulk")),
+            None,
+            "a mount prefix holding a param is misaligned"
+        );
+        assert_eq!(
+            classify(&Method::POST, "a/default/_bulk", Some("/{org_id}/_bulk")),
+            None,
+            "a path deeper than the route is misaligned"
+        );
+    }
+
+    #[test]
+    fn an_empty_param_value_is_not_ingestion() {
+        let json = Some("/api/{org_id}/{stream_name}/_json");
+        assert_eq!(classify(&Method::POST, "default//_json", json), None);
+        assert_eq!(classify(&Method::POST, "//s/_json", json), None);
+        assert_eq!(
+            classify(&Method::GET, "//", Some("/api/{org_id}/")),
+            None,
+            "the ES ping needs an org"
+        );
+    }
+
+    #[test]
+    fn a_wildcard_is_not_a_param() {
+        assert_eq!(
+            classify(&Method::POST, "default/_bulk", Some("/api/{*rest}/_bulk")),
+            None
+        );
     }
 
     #[test]
     fn v2_module_routes_are_not_ingestion() {
         for leaf in ["_json", "_multi", "_sub", "_kinesis_firehose"] {
             let path = format!("v2/default/folders/{leaf}");
-            assert_eq!(classify_path(&Method::POST, &path), None, "POST /{path}");
+            assert_eq!(
+                classify(
+                    &Method::POST,
+                    &path,
+                    Some("/api/v2/{org_id}/folders/{folder_type}")
+                ),
+                None,
+                "POST /{path}"
+            );
         }
-        assert_eq!(classify_path(&Method::GET, "v2/default/_license"), None);
     }
 
     #[test]
     fn an_org_named_v2_ingests_like_any_other_org() {
         assert_eq!(
-            classify_path(&Method::POST, "v2/mystream/_json"),
-            Some(IngestionKind::Write)
-        );
-        assert_eq!(
-            classify_path(&Method::POST, "default/mystream/_json"),
+            classify(
+                &Method::POST,
+                "v2/mystream/_json",
+                Some("/api/{org_id}/{stream_name}/_json")
+            ),
             Some(IngestionKind::Write)
         );
     }
 
     #[test]
     fn data_reads_are_rejected_the_ghsa_bypass() {
-        // The reported bypass and its blast radius: data-bearing reads must not
-        // classify as ingestion, for any method.
-        for path in [
-            "default/mystream/traces/latest",
-            "default/mystream/traces/latest_stream",
-            "default/mystream/traces/session",
-            "default/mystream/traces/user",
-            "default/mystream/_values",
-            "default/mystream/_around",
+        // Data-bearing reads must not classify as ingestion, for any method.
+        for route in [
+            "{org_id}/{stream_name}/traces/latest",
+            "{org_id}/{stream_name}/traces/latest_stream",
+            "{org_id}/{stream_name}/traces/session",
+            "{org_id}/{stream_name}/traces/user",
+            "{org_id}/{stream_name}/_values",
+            "{org_id}/{stream_name}/_around",
         ] {
             for method in [Method::GET, Method::HEAD, Method::POST] {
                 assert_eq!(
-                    classify_path(&method, path),
+                    classify_route(&method, route),
                     None,
-                    "data read must never classify as ingestion: {method} /{path}"
+                    "data read must never classify as ingestion: {method} /{route}"
                 );
             }
         }
@@ -432,8 +529,6 @@ mod tests {
 
     #[test]
     fn stream_named_after_es_word_cannot_read_data() {
-        // A stream literally named `_ingest`/`_ilm`/etc must not let a data read
-        // slip through as an ES handshake (positional matching prevents it).
         for stream in [
             "_ingest",
             "_ilm",
@@ -444,7 +539,11 @@ mod tests {
         ] {
             let path = format!("default/{stream}/traces/latest");
             assert_eq!(
-                classify(&Method::GET, &path),
+                classify(
+                    &Method::GET,
+                    &path,
+                    Some("/api/{org_id}/{stream_name}/traces/latest")
+                ),
                 None,
                 "stream named {stream} must not alias an ES handshake read"
             );
@@ -453,76 +552,66 @@ mod tests {
 
     #[test]
     fn wrong_method_is_rejected() {
-        // Writes are POST-only; ES stubs are GET/HEAD (+POST only for the create
-        // stubs). PUT/DELETE/PATCH never classify.
         for method in [Method::PUT, Method::DELETE, Method::PATCH] {
-            assert_eq!(classify_path(&method, "default/_bulk"), None);
-            assert_eq!(classify_path(&method, "default/traces"), None);
-            assert_eq!(classify_path(&method, "default/_license"), None);
+            assert_eq!(classify_route(&method, "{org_id}/_bulk"), None);
+            assert_eq!(classify_route(&method, "{org_id}/traces"), None);
+            assert_eq!(classify_route(&method, "{org_id}/_license"), None);
         }
-        // A GET to a write endpoint does not classify as a write.
-        assert_eq!(classify_path(&Method::GET, "default/_bulk"), None);
-        // A POST to `_license`/`_xpack` (read-only stubs) does not classify.
-        assert_eq!(classify_path(&Method::POST, "default/_license"), None);
-        assert_eq!(classify_path(&Method::POST, "default/_xpack"), None);
+        assert_eq!(classify_route(&Method::GET, "{org_id}/_bulk"), None);
+        assert_eq!(classify_route(&Method::POST, "{org_id}/_license"), None);
+        assert_eq!(classify_route(&Method::POST, "{org_id}/_xpack"), None);
     }
 
     #[test]
-    fn non_ingestion_paths_are_rejected() {
-        assert_eq!(classify_path(&Method::POST, "default/dashboards"), None);
+    fn non_ingestion_routes_are_rejected() {
+        assert_eq!(classify_route(&Method::POST, "{org_id}/dashboards"), None);
         assert_eq!(
-            classify_path(&Method::POST, "default/enrichment_tables/mytable"),
+            classify_route(&Method::POST, "{org_id}/enrichment_tables/{table_name}"),
             None
         );
-        assert_eq!(classify_path(&Method::GET, "default/streams"), None);
-        assert_eq!(classify_path(&Method::DELETE, "default/users/bulk"), None);
+        assert_eq!(classify_route(&Method::GET, "{org_id}/streams"), None);
+        assert_eq!(classify_route(&Method::DELETE, "{org_id}/users/bulk"), None);
     }
 
     #[test]
     fn es_root_ping_requires_trailing_slash() {
-        // `GET /{org}/` (trailing slash) is the ES version ping — accepted.
         assert_eq!(
-            classify_path(&Method::GET, "default/"),
+            classify(&Method::GET, "/default/", Some("/api/{org_id}/")),
             Some(IngestionKind::EsHandshakeRead)
         );
-        assert_eq!(
-            classify_path(&Method::HEAD, "default/"),
-            Some(IngestionKind::EsHandshakeRead)
-        );
-        // Also with the leading slash the call sites may pass.
-        assert_eq!(
-            classify_path(&Method::GET, "/default/"),
-            Some(IngestionKind::EsHandshakeRead)
-        );
-
-        // Single-segment top-level collection routes have NO trailing slash and
-        // must NOT be mistaken for the org ping — otherwise an ingestion-only
-        // credential would authenticate on them (the over-match the route audit
-        // caught). These are real routes: `/organizations`, `/invites`,
-        // `/healthz`, `/clusters`, `/config`.
+        // Top-level collection routes have no trailing slash and no param.
         for literal in ["organizations", "invites", "healthz", "clusters", "config"] {
             for method in [Method::GET, Method::HEAD] {
                 assert_eq!(
-                    classify(&method, literal),
+                    classify(&method, literal, Some(&format!("/api/{literal}"))),
                     None,
                     "single-segment route /{literal} must not classify as the ES ping"
                 );
+                assert_eq!(
+                    classify(
+                        &method,
+                        &format!("{literal}/"),
+                        Some(&format!("/api/{literal}/"))
+                    ),
+                    None,
+                    "a literal route /{literal}/ is not the ES ping"
+                );
             }
         }
-        // A non-GET/HEAD to `/{org}/` is not the ping either.
-        assert_eq!(classify_path(&Method::POST, "default/"), None);
+        assert_eq!(classify_route(&Method::GET, "{org_id}"), None);
+        assert_eq!(classify_route(&Method::POST, "{org_id}/"), None);
     }
 
     #[test]
     fn opamp_get_and_post_are_ingestion_writes() {
         for method in [Method::GET, Method::POST] {
             assert_eq!(
-                classify_path(&method, "default/v1/opamp"),
+                classify_route(&method, "{org_id}/v1/opamp"),
                 Some(IngestionKind::Write),
-                "{method} /default/v1/opamp must be a header-only ingestion write"
+                "{method} /{{org_id}}/v1/opamp must be a header-only ingestion write"
             );
         }
-        assert_eq!(classify_path(&Method::PUT, "default/v1/opamp"), None);
+        assert_eq!(classify_route(&Method::PUT, "{org_id}/v1/opamp"), None);
     }
 
     #[test]
