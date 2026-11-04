@@ -20,7 +20,7 @@ import {
   TOOLTIP_SCROLL_STYLE,
 } from "./shared/types";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
-import { chartColor } from "@/utils/chartTheme";
+import { chartAxisTextColor, chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import {
   deaccumulateHistogramSeries,
@@ -415,6 +415,7 @@ function singleHistogramOptions(
         type: "category",
         data: xAxisData,
         splitArea: HEATMAP_SPLIT_AREA,
+        axisLabel: { color: chartAxisTextColor() },
       },
     ],
     yAxis: {
@@ -422,6 +423,7 @@ function singleHistogramOptions(
       data: grid.bucketLabels,
       splitArea: HEATMAP_SPLIT_AREA,
       axisLabel: {
+        color: chartAxisTextColor(),
         overflow: "truncate",
         width: config.axis_width || 150,
       },
@@ -471,7 +473,7 @@ function stackedHistogramOptions(
       data: xAxisData,
       splitArea: HEATMAP_SPLIT_AREA,
       // The grids share one time axis, so only the bottom one spends height on its labels.
-      axisLabel: { show: index === last },
+      axisLabel: { show: index === last, color: chartAxisTextColor() },
     })),
     yAxis: grids.map((grid, index) => ({
       type: "category",
@@ -479,6 +481,7 @@ function stackedHistogramOptions(
       data: grid.bucketLabels,
       splitArea: HEATMAP_SPLIT_AREA,
       axisLabel: {
+        color: chartAxisTextColor(),
         overflow: "truncate",
         width: config.axis_width || 150,
       },
@@ -779,6 +782,7 @@ export class HeatmapConverter implements PromQLChartConverter {
           type: "category",
           data: xAxisData,
           splitArea: HEATMAP_SPLIT_AREA,
+          axisLabel: { color: chartAxisTextColor() },
         },
       ],
       yAxis: {
@@ -786,6 +790,7 @@ export class HeatmapConverter implements PromQLChartConverter {
         data: seriesNames,
         splitArea: HEATMAP_SPLIT_AREA,
         axisLabel: {
+          color: chartAxisTextColor(),
           overflow: "truncate",
           width: config.axis_width || 150,
         },
