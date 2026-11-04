@@ -16,7 +16,7 @@
 use std::collections::{HashMap, HashSet};
 
 use config::meta::{
-    alerts::condition_ops::{check_extended_operators, extended_operators_of},
+    alerts::condition_ops::{check_gated_features, gated_features_of},
     folder::DEFAULT_FOLDER,
     pipeline::components::NodeData,
     self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
@@ -281,7 +281,7 @@ async fn check_condition_operators(workflow: &Workflow) -> Result<(), anyhow::Er
     let enabled = config::get_config()
         .common
         .alert_extended_condition_operators;
-    if enabled || extended_operators_of(&workflow.nodes).is_empty() {
+    if enabled || gated_features_of(&workflow.nodes).is_empty() {
         return Ok(());
     }
     let published = db::workflows::get_workflow(&workflow.org_id, &workflow.id).await;
@@ -293,7 +293,8 @@ async fn check_condition_operators(workflow: &Workflow) -> Result<(), anyhow::Er
     condition_operators_allowed(workflow, &stored, enabled)
 }
 
-/// Refuses extended operators new to this save unless `enabled`; ones a `stored` row used stay.
+/// Refuses gated condition features new to this save unless `enabled`; ones a `stored` row used
+/// stay.
 fn condition_operators_allowed(
     workflow: &Workflow,
     stored: &[Workflow],
@@ -301,9 +302,9 @@ fn condition_operators_allowed(
 ) -> Result<(), anyhow::Error> {
     let stored: Vec<_> = stored
         .iter()
-        .flat_map(|row| extended_operators_of(&row.nodes))
+        .flat_map(|row| gated_features_of(&row.nodes))
         .collect();
-    check_extended_operators(enabled, &extended_operators_of(&workflow.nodes), &stored)
+    check_gated_features(enabled, &gated_features_of(&workflow.nodes), &stored)
         .map_err(|e| anyhow::anyhow!(e))
 }
 
@@ -1391,6 +1392,42 @@ mod tests {
         assert!(
             condition_operators_allowed(&edited, &[stored_plain.clone(), stored_draft], false)
                 .is_ok()
+        );
+        assert!(condition_operators_allowed(&edited, &[stored_plain], false).is_err());
+        assert!(condition_operators_allowed(&edited, &[], true).is_ok());
+    }
+
+    fn workflow_with_case_insensitive_contains() -> Workflow {
+        let mut workflow = workflow_with_condition("contains");
+        let mut nodes = serde_json::to_value(&workflow.nodes).unwrap();
+        nodes[0]["data"]["conditions"]["conditions"][0]["case_insensitive"] =
+            serde_json::json!(true);
+        workflow.nodes = serde_json::from_value(nodes).unwrap();
+        workflow
+    }
+
+    #[tokio::test]
+    async fn a_new_case_insensitive_draft_is_refused_while_the_flag_is_off() {
+        let mut workflow = workflow_with_case_insensitive_contains();
+        workflow.id = "case_insensitive_draft".to_string();
+        let err = save_draft(workflow, None).await.unwrap_err();
+        assert!(err.to_string().contains("case_insensitive"), "{err}");
+    }
+
+    #[test]
+    fn a_stored_case_insensitive_condition_stays_saveable_while_the_flag_is_off() {
+        let edited = workflow_with_case_insensitive_contains();
+        let stored_plain = workflow_with_condition("contains");
+        assert!(
+            condition_operators_allowed(
+                &edited,
+                &[
+                    stored_plain.clone(),
+                    workflow_with_case_insensitive_contains()
+                ],
+                false
+            )
+            .is_ok()
         );
         assert!(condition_operators_allowed(&edited, &[stored_plain], false).is_err());
         assert!(condition_operators_allowed(&edited, &[], true).is_ok());

@@ -195,17 +195,17 @@ pub async fn scorer_definitions(
     Ok(definitions)
 }
 
-/// Refuses extended condition operators new to this save unless `enabled`; ones `stored` used stay.
+/// Refuses gated condition features new to this save unless `enabled`; ones `stored` used stay.
 fn check_condition_operators(
     stored: Option<&table::online_eval_jobs::OnlineEvalJob>,
     job: &table::online_eval_jobs::OnlineEvalJob,
     enabled: bool,
 ) -> Result<(), EvalJobError> {
-    config::meta::alerts::condition_ops::check_extended_operators(
+    config::meta::alerts::condition_ops::check_gated_features(
         enabled,
-        &job.extended_operators(),
+        &job.gated_features(),
         &stored
-            .map(table::online_eval_jobs::OnlineEvalJob::extended_operators)
+            .map(table::online_eval_jobs::OnlineEvalJob::gated_features)
             .unwrap_or_default(),
     )
     .map_err(EvalJobError::InvalidJob)
@@ -685,6 +685,31 @@ mod tests {
         let stored = job_with_filter("in");
         assert!(check_condition_operators(Some(&stored), &job_with_filter("in"), false).is_ok());
         let plain = job_with_filter("=");
+        assert!(check_condition_operators(Some(&plain), &stored, false).is_err());
+        assert!(check_condition_operators(None, &stored, true).is_ok());
+    }
+
+    fn job_with_case_insensitive_filter() -> table::online_eval_jobs::OnlineEvalJob {
+        let mut job = job_with_filter("contains");
+        job.filter_condition["conditions"]["conditions"][0]["case_insensitive"] =
+            serde_json::json!(true);
+        job
+    }
+
+    #[tokio::test]
+    async fn a_new_job_with_a_case_insensitive_filter_is_refused_while_the_flag_is_off() {
+        let err = prepare_new_job("o", job_with_case_insensitive_filter())
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("case_insensitive"), "{err}");
+    }
+
+    #[test]
+    fn a_stored_case_insensitive_filter_stays_saveable_while_the_flag_is_off() {
+        let stored = job_with_case_insensitive_filter();
+        let edited = job_with_case_insensitive_filter();
+        assert!(check_condition_operators(Some(&stored), &edited, false).is_ok());
+        let plain = job_with_filter("contains");
         assert!(check_condition_operators(Some(&plain), &stored, false).is_err());
         assert!(check_condition_operators(None, &stored, true).is_ok());
     }

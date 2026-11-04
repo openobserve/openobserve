@@ -16,7 +16,10 @@
 use std::collections::BTreeMap;
 
 use config::meta::{
-    alerts::{ConditionGroup, ConditionList, Operator, condition_ops::extended_operators_of},
+    alerts::{
+        ConditionGroup, ConditionList,
+        condition_ops::{GatedFeature, gated_features_of},
+    },
     pipeline::components::{ConditionParams, ScorerRef},
     self_reporting::{evaluator::EVALUATOR_STREAM, llm_scores::LLM_SCORES_STREAM},
 };
@@ -251,8 +254,8 @@ impl OnlineEvalJob {
         })
     }
 
-    /// Extended operators in the job filter, end signals and span selector filters.
-    pub fn extended_operators(&self) -> Vec<Operator> {
+    /// Gated condition features in the job filter, end signals and span selector filters.
+    pub fn gated_features(&self) -> Vec<GatedFeature> {
         let mut conditions = vec![&self.filter_condition];
         conditions.extend(
             self.trace_config
@@ -265,7 +268,7 @@ impl OnlineEvalJob {
                 .and_then(|c| c.end_signal.as_ref()),
         );
         conditions.extend(self.span_selectors.iter().map(|s| &s.filter_condition));
-        extended_operators_of(&conditions)
+        gated_features_of(&conditions)
     }
 
     /// Names the first set condition this version cannot parse; an unparsed filter would match all.
@@ -789,6 +792,8 @@ pub async fn update_status(
 
 #[cfg(test)]
 mod tests {
+    use config::meta::alerts::Operator;
+
     use super::*;
 
     fn end_signal() -> serde_json::Value {
@@ -849,7 +854,7 @@ mod tests {
     #[test]
     fn test_extended_operators_cover_filter_end_signals_and_selectors() {
         let mut job = trace_job_with_selector();
-        assert!(job.extended_operators().is_empty());
+        assert!(job.gated_features().is_empty());
         job.filter_condition = with_operator("in");
         job.trace_config = Some(TraceEvalConfig {
             end_signal: Some(with_operator("starts_with")),
@@ -857,8 +862,14 @@ mod tests {
         });
         job.span_selectors[0].filter_condition = with_operator("re_match");
         assert_eq!(
-            job.extended_operators(),
-            vec![Operator::In, Operator::StartsWith, Operator::ReMatch]
+            job.gated_features(),
+            [Operator::In, Operator::StartsWith, Operator::ReMatch].map(GatedFeature::Operator)
+        );
+        job.span_selectors[0].filter_condition["conditions"]["conditions"][0]["case_insensitive"] =
+            serde_json::json!(true);
+        assert!(
+            job.gated_features()
+                .contains(&GatedFeature::CaseInsensitive)
         );
     }
 

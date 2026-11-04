@@ -19,7 +19,7 @@ use config::{
         alerts::{
             Operator,
             condition_ops::{
-                MAX_REGEX_PATTERN_LEN, check_extended_operators, extended_operators_of,
+                MAX_REGEX_PATTERN_LEN, check_gated_features, gated_features_of,
                 validate_condition_value,
             },
         },
@@ -1257,7 +1257,7 @@ pub fn checked_annotation_sources(dashboard: &mut Dashboard) -> Result<(), Dashb
     Ok(())
 }
 
-/// Refuses extended filter operators new to this save unless `enabled`; ones `stored` used stay.
+/// Refuses gated filter features new to this save unless `enabled`; ones `stored` used stay.
 pub fn checked_annotation_operators(
     stored: Option<&Dashboard>,
     dashboard: &Dashboard,
@@ -1272,9 +1272,9 @@ pub fn checked_annotation_operators(
             .flatten()
             .map(|source| &source.filters)
             .collect();
-        extended_operators_of(&filters)
+        gated_features_of(&filters)
     };
-    check_extended_operators(
+    check_gated_features(
         enabled,
         &operators(dashboard),
         &stored.map(operators).unwrap_or_default(),
@@ -1952,6 +1952,28 @@ mod tests {
         assert!(checked_annotation_operators(Some(&plain), &with_in, false).is_err());
         assert!(checked_annotation_operators(Some(&with_in), &with_in, false).is_ok());
         assert!(checked_annotation_operators(None, &with_in, true).is_ok());
+    }
+
+    #[test]
+    fn checked_annotation_operators_gates_case_insensitive_leaves_while_the_flag_is_off() {
+        let with_ci = {
+            let mut source = valid_source("s1");
+            let mut leaf = single_condition_leaf("col");
+            if let v8::AnnotationConditionItem::Condition(ref mut c) = leaf {
+                c.operator = "contains".to_string();
+                c.case_insensitive = Some(true);
+            }
+            source.filters.conditions = vec![leaf];
+            dashboard_from_sources(vec![source])
+        };
+        let plain = dashboard_with_operator("contains");
+        assert!(matches!(
+            checked_annotation_operators(None, &with_ci, false),
+            Err(DashboardError::InvalidAnnotationSource(m)) if m.contains("case_insensitive")
+        ));
+        assert!(checked_annotation_operators(Some(&plain), &with_ci, false).is_err());
+        assert!(checked_annotation_operators(Some(&with_ci), &with_ci, false).is_ok());
+        assert!(checked_annotation_operators(None, &with_ci, true).is_ok());
     }
 
     #[test]

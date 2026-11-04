@@ -21,7 +21,7 @@ use common::meta::authz::Authz;
 use config::{
     get_config,
     meta::{
-        alerts::condition_ops::{check_extended_operators, extended_operators_of},
+        alerts::condition_ops::{check_gated_features, gated_features_of},
         pipeline::{
             Pipeline, PipelineKind,
             components::{DerivedStream, NodeData, PipelineSource},
@@ -129,17 +129,17 @@ fn qualified_org<'a>(stream: &'a StreamParams, org: &'a str) -> &'a str {
     }
 }
 
-/// Refuses extended condition operators new to this save unless `enabled`; ones `stored` used stay.
+/// Refuses gated condition features new to this save unless `enabled`; ones `stored` used stay.
 fn check_condition_operators(
     stored: Option<&Pipeline>,
     pipeline: &Pipeline,
     enabled: bool,
 ) -> Result<(), PipelineError> {
-    check_extended_operators(
+    check_gated_features(
         enabled,
-        &extended_operators_of(&pipeline.nodes),
+        &gated_features_of(&pipeline.nodes),
         &stored
-            .map(|stored| extended_operators_of(&stored.nodes))
+            .map(|stored| gated_features_of(&stored.nodes))
             .unwrap_or_default(),
     )
     .map_err(PipelineError::InvalidPipeline)
@@ -842,6 +842,37 @@ mod tests {
         assert!(check(Some(&stored), &condition_pipeline("p", "IN"), false).is_ok());
         assert!(check(Some(&stored), &condition_pipeline("p", "re_match"), false).is_err());
         assert!(check(Some(&condition_pipeline("p", "=")), &stored, false).is_err());
+        assert!(check(None, &stored, true).is_ok());
+    }
+
+    fn case_insensitive_pipeline(id: &str) -> Pipeline {
+        let mut value = serde_json::to_value(condition_pipeline(id, "contains")).unwrap();
+        value["nodes"][0]["data"]["conditions"]["conditions"][0]["case_insensitive"] =
+            serde_json::json!(true);
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_new_pipeline_with_a_case_insensitive_condition_is_refused_while_the_flag_is_off() {
+        let saved = super::save_user_pipeline_checked(
+            case_insensitive_pipeline("case_insensitive_new"),
+            Some(&Unreached),
+        )
+        .await;
+        assert!(
+            matches!(&saved, Err(super::PipelineError::InvalidPipeline(m))
+                if m.contains("case_insensitive") && m.contains("ZO_ALERT_EXTENDED_CONDITION_OPERATORS")),
+            "{saved:?}"
+        );
+    }
+
+    #[test]
+    fn a_stored_case_insensitive_condition_stays_saveable_while_the_flag_is_off() {
+        let stored = case_insensitive_pipeline("p");
+        let check = super::check_condition_operators;
+        assert!(check(Some(&stored), &case_insensitive_pipeline("p"), false).is_ok());
+        let plain = condition_pipeline("p", "contains");
+        assert!(check(Some(&plain), &stored, false).is_err());
         assert!(check(None, &stored, true).is_ok());
     }
 }

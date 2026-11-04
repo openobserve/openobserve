@@ -1202,7 +1202,7 @@ fn same_schedule(a: &Alert, b: &Alert) -> bool {
         && x.tolerance_in_secs == y.tolerance_in_secs
 }
 
-/// Refuses extended operators new to this save unless `enabled`; ones `stored` used stay saveable.
+/// Refuses gated condition features new to this save unless `enabled`; ones `stored` used stay.
 fn check_condition_operators(
     stored: Option<&Alert>,
     alert: &Alert,
@@ -1212,10 +1212,10 @@ fn check_condition_operators(
         a.query_condition
             .conditions
             .as_ref()
-            .map(config::meta::alerts::condition_ops::extended_operators_of)
+            .map(config::meta::alerts::condition_ops::gated_features_of)
             .unwrap_or_default()
     };
-    config::meta::alerts::condition_ops::check_extended_operators(
+    config::meta::alerts::condition_ops::check_gated_features(
         enabled,
         &operators(alert),
         &stored.map(operators).unwrap_or_default(),
@@ -9016,6 +9016,43 @@ mod tests {
         assert!(check_condition_operators(None, &edited, false).is_err());
         assert!(check_condition_operators(None, &edited, true).is_ok());
         assert!(check_condition_operators(Some(&stored), &edited, true).is_ok());
+    }
+
+    fn with_case_insensitive_contains(alert: &mut Alert) {
+        alert.query_condition.conditions = Some(
+            serde_json::from_value(serde_json::json!({"version": 2, "conditions": {
+                "filterType": "group", "logicalOperator": "AND", "conditions": [
+                    {"filterType": "condition", "column": "level", "operator": "contains",
+                     "value": "err", "case_insensitive": true, "logicalOperator": "AND"}]}}))
+            .unwrap(),
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_refuses_a_new_case_insensitive_condition_while_the_flag_is_off() {
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency = 60;
+            with_case_insensitive_contains(a);
+        })
+        .await;
+        assert!(
+            matches!(&err, AlertError::InvalidCondition(m)
+                if m.contains("case_insensitive") && m.contains("ZO_ALERT_EXTENDED_CONDITION_OPERATORS")),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn a_case_insensitive_condition_already_stored_stays_saveable_while_the_flag_is_off() {
+        let (mut stored, mut edited) = (Alert::default(), Alert::default());
+        with_case_insensitive_contains(&mut stored);
+        with_case_insensitive_contains(&mut edited);
+        assert!(check_condition_operators(Some(&stored), &edited, false).is_ok());
+
+        with_condition_operator(&mut stored, "contains");
+        assert!(check_condition_operators(Some(&stored), &edited, false).is_err());
+        assert!(check_condition_operators(None, &edited, false).is_err());
+        assert!(check_condition_operators(None, &edited, true).is_ok());
     }
 
     #[tokio::test]
