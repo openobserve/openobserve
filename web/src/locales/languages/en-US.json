@@ -27478,7 +27478,9 @@
     "unroutedClaimAllTitlePlain": "Claim {count} signal | Claim {count} signals",
     "unroutedClaimAllOutcome": "Future alerts like these go to {team}",
     "toastSignalsClaimed": "{count} signal now goes to {team} | {count} signals now go to {team}",
-    "claimSignalsFailed": "Could not claim the signals",
+    "claimSignalsFailedPaths": "Could not claim {paths}",
+    "claimSignalsMorePaths": "{paths} and {count} more",
+    "toastSignalsClaimedPartly": "{claimed} of {count} signal now goes to {team}; could not claim {paths} | {claimed} of {count} signals now go to {team}; could not claim {paths}",
     "unroutedPathMore": "+{count}"
   },
   "paidUsage": {

@@ -22,14 +22,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="card-title" data-test="oncall-ownership-title">
           {{ t("oncall.teamRoutingTitle", { team: raw(teamName) }) }}
         </OText>
-        <OIcon
-          name="info-outline"
-          size="sm"
-          class="text-text-secondary cursor-help"
-          data-test="oncall-ownership-precedence"
-        >
-          <OTooltip side="bottom" :content="t('oncall.routingPrecedence')" />
-        </OIcon>
+        <OTooltip side="bottom" :content="t('oncall.routingPrecedence')">
+          <OIcon
+            name="info-outline"
+            size="sm"
+            tabindex="0"
+            :label="t('oncall.routingPrecedence')"
+            class="text-text-secondary cursor-help"
+            data-test="oncall-ownership-precedence"
+          />
+        </OTooltip>
       </span>
       <OButton
         v-if="canConfigure"
@@ -302,8 +304,11 @@ async function fetchCatalogue() {
   }
 }
 
+let conflictRun = 0;
+
 /// Never surfaces an error: a missing outcome line must not stop somebody writing a rule.
 async function previewConflict(dimensions: Record<string, string>) {
+  const run = ++conflictRun;
   if (!Object.keys(dimensions).length) {
     conflict.value = null;
     return;
@@ -313,9 +318,9 @@ async function previewConflict(dimensions: Record<string, string>) {
       org_identifier: orgId.value,
       data: { dimensions },
     });
-    conflict.value = res.data ?? null;
+    if (run === conflictRun) conflict.value = res.data ?? null;
   } catch {
-    conflict.value = null;
+    if (run === conflictRun) conflict.value = null;
   }
 }
 

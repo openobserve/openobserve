@@ -55,9 +55,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-col gap-2">
         <span class="flex items-center gap-1">
           <OText variant="label">{{ t("oncall.ruleEditorConditions") }}</OText>
-          <OIcon name="info-outline" size="sm" class="text-text-secondary cursor-help">
-            <OTooltip side="right" :content="t('oncall.routingPrecedenceInfo')" />
-          </OIcon>
+          <OTooltip side="right" :content="t('oncall.routingPrecedenceInfo')">
+            <OIcon
+              name="info-outline"
+              size="sm"
+              tabindex="0"
+              :label="t('oncall.routingPrecedenceInfo')"
+              class="text-text-secondary cursor-help"
+              data-test="oncall-rule-editor-conditions-info"
+            />
+          </OTooltip>
         </span>
 
         <OnCallConditionRows

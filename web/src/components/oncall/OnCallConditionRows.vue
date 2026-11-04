@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- Live condition rows, [field] [is | starts with] [value] ✕, shared by the rule editor and Test routing. -->
+<!-- Live condition rows shared by the rule editor and Test routing. -->
 <template>
   <div class="flex flex-col gap-2" :data-test="`${testPrefix}-conditions`">
     <div

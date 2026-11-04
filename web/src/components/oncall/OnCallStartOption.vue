@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- One start-picker option on one line: the conditions as chips that fit, and the meta that never gets pushed off. -->
+<!-- One start-picker option: its conditions plus its meta line. -->
 <template>
   <span class="flex w-full min-w-0 items-center gap-2" :data-test="dataTest">
     <!-- First child: a child-mode tooltip binds to its previous sibling, so here it binds to the whole row. -->
