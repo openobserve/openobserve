@@ -523,7 +523,7 @@
     "noOncallMembers": {
       "title": "Noch keine Mitglieder",
       "description": "Fügen Sie Personen aus der Organisation hinzu, um sie in die Alarmierungsreihenfolge für dieses Team aufzunehmen.",
-      "action": "Mitglied hinzufügen",
+      "action": "Mitglieder hinzufügen",
       "actionDesc": "Wählen Sie aus Ihrer Organisation aus oder fügen Sie eine Liste mit E-Mail-Adressen ein."
     },
     "noOncallResponses": {
@@ -531,9 +531,9 @@
       "description": "Offene Alarmierungen erscheinen hier, sobald ein Alarm an ein Team weitergeleitet wird."
     },
     "noOncallRules": {
-      "title": "Noch keine Zuständigkeiten",
+      "title": "Noch keine Routing-Regeln",
       "description": "Übernehmen Sie die Zuständigkeit für einen Cluster oder Namespace. Alles darin erbt einen Verantwortlichen – auch Dienste, die es noch nicht gibt.",
-      "action": "Zuständigkeitsregel hinzufügen",
+      "action": "Neue Regel",
       "actionDesc": "Wählen Sie eine Dimension und einen Wert. Keine Regelsprache nötig."
     },
     "noTeamRouting": {
@@ -25725,7 +25725,7 @@
     "rotationNthName": "Rotation {n}",
     "rotationTitle": "Rotation",
     "rotationOrderHint": "Die Reihenfolge, in der Personen die Schicht übernehmen. Die nächste Person in der Liste übernimmt bei der Übergabe.",
-    "rotationOpenMembers": "Personen hinzufügen",
+    "rotationOpenMembers": "Mitglieder hinzufügen",
     "rotationNeedsPeople": "Wählen Sie mindestens eine Person — diese Regel würde niemanden alarmieren.",
     "rotationEmptyNotSaved": "\"{name}\" enthält niemanden und wurde daher nicht gespeichert. Wählen Sie zuerst mindestens eine Person aus.",
     "noRotations": "Noch keine Rotationen vorhanden. Fügen Sie eine hinzu, damit hierher weitergeleitete Alarme jemanden erreichen.",
@@ -25854,6 +25854,7 @@
     "awayReason": "Grund",
     "awayReasonPlaceholder": "Optional",
     "awaySave": "Als abwesend markieren",
+    "awayWindowRequired": "Wählen Sie, wann die Abwesenheit beginnt und endet.",
     "awaySaved": "Abwesenheit erfasst",
     "awaySaveFailed": "Abwesenheit konnte nicht erfasst werden",
     "awayRemove": "Diese Abwesenheit entfernen",
@@ -27014,7 +27015,7 @@
     "ruleEditorPrecedence": "Wenn zwei Regeln zutreffen, gewinnt die mit mehr Bedingungen.",
     "attentionNoTransportHeadline": "Diese Bereitstellung kann keine E-Mails senden, daher können diese Alarmierungen niemanden erreichen",
     "attentionNoTransportDetail": "E-Mail hat in dieser Bereitstellung keinen SMTP-Transport oder keine gültige Absenderadresse (ZO_SMTP_FROM_EMAIL). Jede Stufe, die auf E-Mail angewiesen ist, führt zu einer Person, die darüber nicht erreichbar ist.",
-    "attentionAddMember": "Mitglied hinzufügen",
+    "attentionAddMember": "Mitglieder hinzufügen",
     "attentionAddFinalRung": "Letzte Stufe hinzufügen",
     "attentionFindings": "{count} Feststellung | {count} Feststellungen",
     "attentionCountBlocking": "{count} blockierend",

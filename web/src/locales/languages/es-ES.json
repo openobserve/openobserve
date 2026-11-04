@@ -523,7 +523,7 @@
     "noOncallMembers": {
       "title": "Aún no hay miembros",
       "description": "Añade personas de la organización para incluirlas en el orden de avisos de este equipo.",
-      "action": "Añadir miembro",
+      "action": "Añadir miembros",
       "actionDesc": "Elige de tu organización o pega una lista de correos"
     },
     "noOncallResponses": {
@@ -531,9 +531,9 @@
       "description": "Los avisos abiertos aparecen aquí en cuanto una alerta se enruta a un equipo."
     },
     "noOncallRules": {
-      "title": "Aún no hay propiedad definida",
+      "title": "Aún no hay reglas de enrutamiento",
       "description": "Reclama un clúster o un espacio de nombres y todo lo que contiene hereda un propietario, incluidos los servicios que aún no existen.",
-      "action": "Añadir una regla de propiedad",
+      "action": "Nueva regla",
       "actionDesc": "Elige una dimensión y un valor. Sin lenguaje de reglas."
     },
     "noTeamRouting": {
@@ -25725,7 +25725,7 @@
     "rotationNthName": "Rotación {n}",
     "rotationTitle": "Rotación",
     "rotationOrderHint": "El orden en que las personas asumen el turno. La siguiente en la lista toma el relevo en el cambio de guardia.",
-    "rotationOpenMembers": "Añadir personas",
+    "rotationOpenMembers": "Añadir miembros",
     "rotationNeedsPeople": "Elige al menos una persona: esta regla no avisaría a nadie.",
     "rotationEmptyNotSaved": "\"{name}\" no tiene a nadie, por lo que no se guardó. Elige al menos una persona primero.",
     "noRotations": "Aún no hay rotaciones. Añade una para que las alertas enrutadas aquí lleguen a alguien.",
@@ -25854,6 +25854,7 @@
     "awayReason": "Motivo",
     "awayReasonPlaceholder": "Opcional",
     "awaySave": "Marcar como ausente",
+    "awayWindowRequired": "Elige cuándo empieza y termina la ausencia.",
     "awaySaved": "Ausencia registrada",
     "awaySaveFailed": "No se pudo registrar la ausencia",
     "awayRemove": "Eliminar esta ausencia",
@@ -27014,7 +27015,7 @@
     "ruleEditorPrecedence": "Si dos reglas coinciden, gana la que tenga más condiciones.",
     "attentionNoTransportHeadline": "Este despliegue no puede enviar correos electrónicos, por lo que estos avisos no pueden llegar a nadie",
     "attentionNoTransportDetail": "El correo electrónico no tiene transporte SMTP ni una dirección de remitente válida (ZO_SMTP_FROM_EMAIL) en este despliegue. Cada escalón que depende del correo electrónico acaba en una persona a la que no hay forma de contactar.",
-    "attentionAddMember": "Agregar un miembro",
+    "attentionAddMember": "Añadir miembros",
     "attentionAddFinalRung": "Agregar un escalón final",
     "attentionFindings": "{count} hallazgo | {count} hallazgos",
     "attentionCountBlocking": "{count} bloqueos",

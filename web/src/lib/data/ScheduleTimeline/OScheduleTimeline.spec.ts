@@ -315,6 +315,24 @@ describe("OScheduleTimeline", () => {
     w.unmount();
   });
 
+  /// A menu open over the plot holds the pointer, so the caller can put the frozen line away.
+  it("hides the hovered instant while the caller asks", async () => {
+    const w = mount(OScheduleTimeline, {
+      props: { tracks: [track()], laneHeaders: true, hoverLabel: raw("20 Aug, 14:00") },
+      attachTo: document.body,
+    });
+    const plot = w.find("[data-test='o2-schedule-timeline'] > div");
+    plot.element.getBoundingClientRect = () => ({ left: 0, right: 200, width: 200 }) as DOMRect;
+    await plot.trigger("mousemove", { clientX: 100 });
+    await w.setProps({ hideHover: true });
+
+    expect(w.find("[data-test='o2-schedule-timeline-hover']").exists()).toBe(false);
+    expect(w.find("[data-test='o2-schedule-timeline-hover-label']").exists()).toBe(false);
+    await w.setProps({ hideHover: false });
+    expect(w.find("[data-test='o2-schedule-timeline-hover']").exists()).toBe(true);
+    w.unmount();
+  });
+
   /// Gutter mode measures across a label column the share knows nothing about,
   /// so every instant it reported would be wrong by the width of that column.
   it("does not track the pointer without lane headers", async () => {

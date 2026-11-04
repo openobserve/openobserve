@@ -23,6 +23,8 @@ import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
 import store from "@/test/unit/helpers/store";
 import type { ChannelReadiness, OnCallTeamMember, Rotation } from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
+import { zonedMidnight } from "@/utils/oncall";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -113,6 +115,12 @@ const stubs = {
     props: ["modelValue"],
     template: `<div :data-test="$attrs['data-test']"><input type="date" :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" /></div>`,
   },
+  // The real picker is the shared DateTime control; the stub keeps the props this dialog sets and its slots.
+  OFormDateTimeRange: {
+    name: "OFormDateTimeRange",
+    props: ["name", "label", "triggerText", "pickerTimezone", "autoApply", "disableRelative"],
+    template: `<span :data-trigger="triggerText"><slot name="label-append" /><slot name="above" /></span>`,
+  },
   OTime: {
     name: "OTime",
     props: ["modelValue"],
@@ -164,6 +172,20 @@ function render(arg: OnCallTeamMember[] | RenderOpts = []) {
     },
     global: { plugins: [i18n, store], stubs },
   });
+}
+
+/// The Mark away form, whose window the stubbed picker leaves to the test to set.
+function awayForm(wrapper: ReturnType<typeof render>) {
+  return wrapper
+    .findAllComponents({ name: "OForm" })
+    .find((form) => form.attributes("id") === "oncall-away-form")!;
+}
+
+async function saveAway(wrapper: ReturnType<typeof render>, range?: { from: number; to: number }) {
+  const form = (awayForm(wrapper).vm as any).form;
+  if (range) form.setFieldValue("window", { type: "absolute", ...range });
+  await form.handleSubmit();
+  await flushPromises();
 }
 
 /// The picker lives in the Add members dialog, so a test opens it the way a reader does.
@@ -732,12 +754,7 @@ describe("OnCallMembers", () => {
     expect(oncall.resolvedSchedule).toHaveBeenCalledTimes(1);
 
     await second.find('[data-test="oncall-members-mark-away-ana@o2.ai"]').trigger("click");
-    await second.find('[data-test="oncall-members-away-from-date"] input').setValue("2026-09-20");
-    await second.find('[data-test="oncall-members-away-from-time"] input').setValue("09:00");
-    await second.find('[data-test="oncall-members-away-to-date"] input').setValue("2026-09-27");
-    await second.find('[data-test="oncall-members-away-to-time"] input').setValue("09:00");
-    await second.find('[data-test="oncall-members-away-save"]').trigger("click");
-    await flushPromises();
+    await saveAway(second);
 
     expect(oncall.listUnavailability).toHaveBeenCalledTimes(2);
     expect(oncall.resolvedSchedule).toHaveBeenCalledTimes(2);
@@ -856,47 +873,67 @@ describe("OnCallMembers", () => {
       await flushPromises();
 
       await wrapper.find('[data-test="oncall-members-mark-away-m1"]').trigger("click");
-      await wrapper
-        .find('[data-test="oncall-members-away-from-date"] input')
-        .setValue("2026-09-01");
-      await wrapper.find('[data-test="oncall-members-away-from-time"] input').setValue("09:00");
-      await wrapper.find('[data-test="oncall-members-away-to-date"] input').setValue("2026-09-08");
-      await wrapper.find('[data-test="oncall-members-away-to-time"] input').setValue("09:00");
-      await wrapper.find('[data-test="oncall-members-away-save"]').trigger("click");
-      await flushPromises();
+      const before = Date.now() * 1000;
+      await saveAway(wrapper);
 
-      expect(oncall.createUnavailability).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ user_email: "ana@o2.ai" }),
-        }),
-      );
+      const sent = (oncall.createUnavailability.mock.calls[0][0] as any).data;
+      expect(sent.user_email).toBe("ana@o2.ai");
+      // Opened with no shift behind it, the window runs a day from now.
+      expect(sent.end_at - sent.start_at).toBe(MICROS_PER_DAY);
+      expect(sent.start_at).toBeLessThanOrEqual(before);
       // The rota moves the away person's turn — the schedule tab's answer
       // changed with it.
       expect(wrapper.emitted("changed")).toBeTruthy();
     });
 
+    /// The same range control as Cover a shift: absolute, auto-applied, opened on the team's clock.
+    it("picks the window with the cover dialog's range control, on the team's clock", async () => {
+      const wrapper = render({ members: [member], timezone: "Asia/Kolkata" });
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-mark-away-m1"]').trigger("click");
+
+      const picker = wrapper.findComponent({ name: "OFormDateTimeRange" });
+      expect(picker.props("pickerTimezone")).toBe("Asia/Kolkata");
+      expect(picker.props("autoApply")).toBe("");
+      expect(picker.props("disableRelative")).toBe("");
+      expect(picker.attributes("hide-clipboard")).toBeDefined();
+      expect(String(picker.props("label"))).toBe("When");
+      expect(
+        wrapper.find('[data-test="oncall-members-away-zone"]').attributes("aria-label"),
+      ).toContain("Asia/Kolkata");
+      // The closed field states the window with its times, not just the days.
+      expect(String(picker.props("triggerText"))).toMatch(/\d{1,2}:\d{2}/);
+    });
+
     // #3149-2: an absence is entered and shown on the team's clock, whatever the browser's zone (tests pin UTC).
-    it("stores the times as the team's wall clock and says which zone they are in", async () => {
+    it("anchors Tomorrow to the team's day, not the browser's", async () => {
       oncall.createUnavailability.mockResolvedValue({ data: {} } as any);
       const wrapper = render({ members: [member], timezone: "Asia/Kolkata" });
       await flushPromises();
 
       await wrapper.find('[data-test="oncall-members-mark-away-m1"]').trigger("click");
+      await wrapper.find('[data-test="oncall-members-away-preset-tomorrow"]').trigger("click");
       expect(
-        wrapper.find('[data-test="oncall-members-away-zone"]').attributes("aria-label"),
-      ).toContain("Asia/Kolkata");
-      await wrapper
-        .find('[data-test="oncall-members-away-from-date"] input')
-        .setValue("2026-11-02");
-      await wrapper.find('[data-test="oncall-members-away-from-time"] input').setValue("00:00");
-      await wrapper.find('[data-test="oncall-members-away-to-date"] input').setValue("2026-11-03");
-      await wrapper.find('[data-test="oncall-members-away-to-time"] input').setValue("00:00");
-      await wrapper.find('[data-test="oncall-members-away-save"]').trigger("click");
-      await flushPromises();
+        wrapper
+          .find('[data-test="oncall-members-away-preset-tomorrow"]')
+          .attributes("aria-pressed"),
+      ).toBe("true");
+      await saveAway(wrapper);
 
+      const now = Date.now() * 1000;
       const sent = (oncall.createUnavailability.mock.calls[0][0] as any).data;
-      expect(sent.start_at).toBe(Date.UTC(2026, 10, 1, 18, 30) * 1000);
-      expect(sent.end_at).toBe(Date.UTC(2026, 10, 2, 18, 30) * 1000);
+      expect(sent.start_at).toBe(zonedMidnight(now, "Asia/Kolkata", 1));
+      expect(sent.end_at).toBe(zonedMidnight(now, "Asia/Kolkata", 2));
+    });
+
+    it("refuses a window that has already ended, and saves nothing", async () => {
+      const wrapper = render([member]);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-mark-away-m1"]').trigger("click");
+
+      const past = Date.now() * 1000 - 2 * MICROS_PER_DAY;
+      await saveAway(wrapper, { from: past, to: past + MICROS_PER_DAY });
+      expect(oncall.createUnavailability).not.toHaveBeenCalled();
     });
 
     it("labels the absence with the team-zone date", async () => {

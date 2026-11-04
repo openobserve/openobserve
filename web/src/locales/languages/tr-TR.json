@@ -531,9 +531,9 @@
       "description": "Bir uyarı bir ekibe yönlendirildiğinde açık çağrılar burada görünür."
     },
     "noOncallRules": {
-      "title": "Henüz sahiplik kuralı yok",
+      "title": "Henüz yönlendirme kuralı yok",
       "description": "Bir küme veya ad alanı sahiplenin; içindeki her şey — henüz var olmayan hizmetler dahil — bir sahip devralır.",
-      "action": "Sahiplik kuralı ekle",
+      "action": "Yeni kural",
       "actionDesc": "Bir boyut ve bir değer seçin. Kural dili yok."
     },
     "noTeamRouting": {
@@ -25725,7 +25725,7 @@
     "rotationNthName": "Rotasyon {n}",
     "rotationTitle": "Rotasyon",
     "rotationOrderHint": "İnsanların nöbeti devralma sırası. Sıradaki kişi devir teslimde nöbeti üstlenir.",
-    "rotationOpenMembers": "Kişi ekle",
+    "rotationOpenMembers": "Üye ekle",
     "rotationNeedsPeople": "En az bir kişi seçin — bu kural kimseyi çağırmaz.",
     "rotationEmptyNotSaved": "\"{name}\" içinde kimse yok, bu yüzden kaydedilmedi. Önce en az bir kişi seçin.",
     "noRotations": "Henüz rotasyon yok. Buraya yönlendirilen uyarıların birine ulaşması için bir tane ekleyin.",
@@ -25854,6 +25854,7 @@
     "awayReason": "Neden",
     "awayReasonPlaceholder": "İsteğe bağlı",
     "awaySave": "İzinli olarak işaretle",
+    "awayWindowRequired": "Yokluğun ne zaman başlayıp biteceğini seçin.",
     "awaySaved": "İzin kaydedildi",
     "awaySaveFailed": "İzin kaydedilemedi",
     "awayRemove": "Bu izni kaldır",

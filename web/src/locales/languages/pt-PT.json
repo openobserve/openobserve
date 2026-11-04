@@ -523,7 +523,7 @@
     "noOncallMembers": {
       "title": "Ainda não há membros",
       "description": "Adicione pessoas da organização para colocá-las na ordem de acionamento desta equipa.",
-      "action": "Adicionar membro",
+      "action": "Adicionar membros",
       "actionDesc": "Escolha da sua organização ou cole uma lista de e-mails"
     },
     "noOncallResponses": {
@@ -531,9 +531,9 @@
       "description": "Os acionamentos abertos aparecem aqui assim que um alerta é encaminhado para uma equipa."
     },
     "noOncallRules": {
-      "title": "Ainda não há propriedade definida",
+      "title": "Ainda não há regras de encaminhamento",
       "description": "Associe um cluster ou namespace e tudo dentro dele herda um proprietário — incluindo serviços que ainda não existem.",
-      "action": "Adicionar regra de propriedade",
+      "action": "Nova regra",
       "actionDesc": "Escolha uma dimensão e um valor. Sem linguagem de regra."
     },
     "noTeamRouting": {
@@ -25725,7 +25725,7 @@
     "rotationNthName": "Rotação {n}",
     "rotationTitle": "Rotação",
     "rotationOrderHint": "A ordem em que as pessoas fazem o turno. A próxima da lista assume na passagem de turno.",
-    "rotationOpenMembers": "Adicionar pessoas",
+    "rotationOpenMembers": "Adicionar membros",
     "rotationNeedsPeople": "Escolha pelo menos uma pessoa — esta regra não acionaria ninguém.",
     "rotationEmptyNotSaved": "\"{name}\" não tem ninguém, pelo que não foi guardada. Escolha primeiro pelo menos uma pessoa.",
     "noRotations": "Ainda não há rotações. Adicione uma para que os alertas encaminhados para aqui cheguem a alguém.",
@@ -25854,6 +25854,7 @@
     "awayReason": "Motivo",
     "awayReasonPlaceholder": "Opcional",
     "awaySave": "Marcar ausência",
+    "awayWindowRequired": "Escolha quando a ausência começa e termina.",
     "awaySaved": "Ausência registada",
     "awaySaveFailed": "Não foi possível registar a ausência",
     "awayRemove": "Remover esta ausência",
@@ -27014,7 +27015,7 @@
     "ruleEditorPrecedence": "Se duas regras corresponderem, a que tiver mais condições vence.",
     "attentionNoTransportHeadline": "Esta implementação não consegue enviar email, pelo que estes acionamentos não chegam a ninguém",
     "attentionNoTransportDetail": "Nesta implementação, o email não tem transporte SMTP nem um endereço de remetente válido (ZO_SMTP_FROM_EMAIL). Todos os níveis que dependem de email resultam numa pessoa sem forma de a contactar.",
-    "attentionAddMember": "Adicionar um membro",
+    "attentionAddMember": "Adicionar membros",
     "attentionAddFinalRung": "Adicionar um nível final",
     "attentionFindings": "{count} problema | {count} problemas",
     "attentionCountBlocking": "{count} em bloqueio",

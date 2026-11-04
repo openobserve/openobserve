@@ -266,7 +266,7 @@ describe("OnCallTeamAttention", () => {
       render(risks([risk({ kind: "single_member_rotation", severity: "medium" })])),
     );
     expect(wrapper.find('[data-test="oncall-attention-cta-single_member_rotation"]').text()).toBe(
-      "Add a member",
+      "Add members",
     );
   });
 

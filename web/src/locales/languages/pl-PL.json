@@ -523,7 +523,7 @@
     "noOncallMembers": {
       "title": "Brak członków",
       "description": "Dodaj osoby z organizacji, aby umieścić je w kolejności wzywania dla tego zespołu.",
-      "action": "Dodaj członka",
+      "action": "Dodaj członków",
       "actionDesc": "Wybierz z organizacji lub wklej listę adresów e-mail"
     },
     "noOncallResponses": {
@@ -531,9 +531,9 @@
       "description": "Otwarte wezwania pojawią się tutaj, gdy tylko alert zostanie skierowany do zespołu."
     },
     "noOncallRules": {
-      "title": "Brak przypisania właściciela",
+      "title": "Brak reguł routingu",
       "description": "Przejmij klaster lub przestrzeń nazw, a wszystko w jej wnętrzu odziedziczy właściciela — w tym usługi, które jeszcze nie istnieją.",
-      "action": "Dodaj regułę własności",
+      "action": "Nowa reguła",
       "actionDesc": "Wybierz wymiar i wartość. Bez języka reguł."
     },
     "noTeamRouting": {
@@ -25725,7 +25725,7 @@
     "rotationNthName": "Rotacja {n}",
     "rotationTitle": "Rotacja",
     "rotationOrderHint": "Kolejność, w jakiej osoby obejmują dyżur. Następna osoba na liście przejmuje go przy przekazaniu zmiany.",
-    "rotationOpenMembers": "Dodaj osoby",
+    "rotationOpenMembers": "Dodaj członków",
     "rotationNeedsPeople": "Wybierz co najmniej jedną osobę — ta reguła nie wezwałaby nikogo.",
     "rotationEmptyNotSaved": "\"{name}\" nie ma nikogo przypisanego, więc nie został zapisany. Najpierw wybierz co najmniej jedną osobę.",
     "noRotations": "Brak rotacji. Dodaj jedną, aby alerty kierowane tutaj do kogoś docierały.",
@@ -25854,6 +25854,7 @@
     "awayReason": "Powód",
     "awayReasonPlaceholder": "Opcjonalnie",
     "awaySave": "Oznacz nieobecność",
+    "awayWindowRequired": "Wybierz, kiedy nieobecność się zaczyna i kończy.",
     "awaySaved": "Nieobecność zapisana",
     "awaySaveFailed": "Nie udało się zapisać nieobecności",
     "awayRemove": "Usuń tę nieobecność",
@@ -27014,7 +27015,7 @@
     "ruleEditorPrecedence": "Jeśli pasują dwie reguły, wygrywa ta z większą liczbą warunków.",
     "attentionNoTransportHeadline": "To wdrożenie nie może wysyłać wiadomości e-mail, więc te wezwania nie mogą dotrzeć do nikogo",
     "attentionNoTransportDetail": "E-mail nie ma transportu SMTP lub prawidłowego adresu nadawcy (ZO_SMTP_FROM_EMAIL) w tym wdrożeniu. Każdy szczebel opierający się na e-mailu wskazuje osobę, z którą nie można się skontaktować.",
-    "attentionAddMember": "Dodaj członka",
+    "attentionAddMember": "Dodaj członków",
     "attentionAddFinalRung": "Dodaj ostatni szczebel",
     "attentionFindings": "{count} ustalenie | ustalenia: {count}",
     "attentionCountBlocking": "Blokujące: {count}",

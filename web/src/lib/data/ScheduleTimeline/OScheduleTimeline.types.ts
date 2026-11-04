@@ -121,6 +121,8 @@ export interface ScheduleTimelineProps {
    * the share goes out on `hover` and the sentence comes back here.
    */
   hoverLabel?: I18nText;
+  /** Hide the pointer marker, for a caller whose open menu would otherwise sit under a frozen line. */
+  hideHover?: boolean;
   /** Width of the left track-label gutter. Default `md`. */
   labelWidth?: "sm" | "md";
   /**

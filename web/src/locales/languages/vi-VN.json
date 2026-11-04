@@ -531,9 +531,9 @@
       "description": "Các thông báo trực đang mở sẽ xuất hiện ở đây ngay khi cảnh báo được định tuyến đến một nhóm."
     },
     "noOncallRules": {
-      "title": "Chưa có quyền sở hữu nào",
+      "title": "Chưa có quy tắc định tuyến nào",
       "description": "Nhận một cụm hoặc một namespace và mọi thứ bên trong sẽ kế thừa chủ sở hữu — kể cả những dịch vụ chưa tồn tại.",
-      "action": "Thêm quy tắc sở hữu",
+      "action": "Quy tắc mới",
       "actionDesc": "Chọn một chiều và một giá trị. Không cần ngôn ngữ quy tắc."
     },
     "noTeamRouting": {
@@ -25725,7 +25725,7 @@
     "rotationNthName": "Ca trực {n}",
     "rotationTitle": "Ca trực",
     "rotationOrderHint": "Thứ tự mọi người nhận ca. Người tiếp theo trong danh sách sẽ tiếp quản khi bàn giao ca.",
-    "rotationOpenMembers": "Thêm người",
+    "rotationOpenMembers": "Thêm thành viên",
     "rotationNeedsPeople": "Chọn ít nhất một người — nếu không, quy tắc này sẽ không gọi cho ai cả.",
     "rotationEmptyNotSaved": "\"{name}\" không có ai, nên chưa được lưu. Hãy chọn ít nhất một người trước.",
     "noRotations": "Chưa có ca trực nào. Hãy thêm một ca để cảnh báo được định tuyến tới đây đến được với ai đó.",
@@ -25854,6 +25854,7 @@
     "awayReason": "Lý do",
     "awayReasonPlaceholder": "Không bắt buộc",
     "awaySave": "Đánh dấu vắng mặt",
+    "awayWindowRequired": "Chọn thời điểm bắt đầu và kết thúc vắng mặt.",
     "awaySaved": "Đã ghi nhận vắng mặt",
     "awaySaveFailed": "Không thể ghi nhận vắng mặt",
     "awayRemove": "Xóa kỳ vắng mặt này",

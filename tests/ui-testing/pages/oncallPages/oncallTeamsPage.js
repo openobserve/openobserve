@@ -80,6 +80,8 @@ export class OnCallTeamsPage {
   // Row-scoped selectors are built, not stored, because they carry the team id.
   editButton(teamId) { return `[data-test="oncall-team-edit-${teamId}"]`; }
   deleteButton(teamId) { return `[data-test="oncall-team-delete-${teamId}"]`; }
+  /** Phone only: the row's ⋯, holding `<edit|delete>Button(id)-menu` items. */
+  moreButton(teamId) { return `[data-test="oncall-team-more-${teamId}"]`; }
   primaryGapTag(teamId) { return `[data-test="oncall-teams-primary-gap-${teamId}"]`; }
   /** Any team row, keyed by the id-carrying edit control — used to count rows. */
   anyRow() { return '[data-test^="oncall-team-edit-"]'; }

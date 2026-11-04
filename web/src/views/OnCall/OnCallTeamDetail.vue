@@ -385,7 +385,14 @@
       </OTabPanels>
     </template>
 
-    <OnCallTeamForm v-model:open="editOpen" :team="team" @saved="onTeamSaved" />
+    <!-- The same drawer as the Teams list's, Default switch included. -->
+    <OnCallTeamForm
+      v-model:open="editOpen"
+      :team="team"
+      offer-default
+      :is-default="!!team && team.id === defaultTeamId"
+      @saved="onTeamSaved"
+    />
 
     <!-- Named in the prompt: a rotation is what puts somebody on call, and two
          rotations in one team routinely differ by one word. -->
@@ -494,6 +501,7 @@ import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OnCallRemoveRotationDialog from "@/components/oncall/OnCallRemoveRotationDialog.vue";
 import OnCallTeamDetailSkeleton from "@/views/OnCall/OnCallTeamDetailSkeleton.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
+import { useOnCallDefaultTeam } from "@/composables/useOnCallDefaultTeam";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -634,7 +642,7 @@ const coverOpen = ref(false);
 /// landed on the server and left the list under the calendar unchanged.
 const coverListRef = ref<{ refresh: () => Promise<void> | void } | null>(null);
 
-/// So the attention banner's "Add a member" can focus the picker even when switching to this tab is a no-op.
+/// So the attention banner's "Add members" can focus the picker even when switching to this tab is a no-op.
 const membersRef = ref<{ focusMemberPicker: () => void } | null>(null);
 
 /// Both things a written cover invalidates: the calendar, which the server
@@ -695,6 +703,7 @@ const teamNotFound = ref(false);
 const editOpen = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+const { defaultTeamId, loadDefaultTeam, setDefaultTeam } = useOnCallDefaultTeam(orgId);
 const teamId = computed(() => String(route.params.teamId ?? ""));
 
 const scheduleDraftAt = useScheduleDraftTimes();
@@ -1528,8 +1537,9 @@ const recheckInsights = () => fetchInsights(true);
 const onMembersChanged = () => Promise.allSettled([fetchAll(), fetchAbsences()]);
 const onCoversChanged = () => fetchSegments();
 
-function onTeamSaved() {
+async function onTeamSaved(_teamId: string, makeDefault = false) {
   editOpen.value = false;
+  if (makeDefault && team.value) await setDefaultTeam(team.value);
   fetchAll();
 }
 
@@ -1568,5 +1578,8 @@ watch(
 );
 watch(selectedPriority, () => fetchPreview());
 
-onMounted(() => fetchAll());
+onMounted(() => {
+  fetchAll();
+  loadDefaultTeam();
+});
 </script>

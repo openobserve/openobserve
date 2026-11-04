@@ -88,6 +88,46 @@ describe("OnCallOwnershipRules", () => {
     expect(wrapper.text()).toContain("Order");
   });
 
+  /// A team's tab is the org list filtered, so a rule keeps the number it has on org Routing.
+  it("numbers a team's rules by their place in the org's order", async () => {
+    const wrapper = render({
+      teamId: "team_1",
+      rules: [
+        rule(),
+        rule({
+          rule_id: "r2",
+          team_id: "team_2",
+          dimensions: { service: "cart", "k8s-namespace": "shop" },
+        }),
+      ],
+    });
+    await flushPromises();
+    const rows = wrapper
+      .findAll("tbody tr")
+      .filter((row) => row.find('[data-test^="oncall-routing-says-"]').exists());
+    expect(rows).toHaveLength(1);
+    expect(rows[0].findAll("td")[0].text()).toBe("2");
+  });
+
+  /// "0 - 0 of 0" under an empty team list is a pager with nothing to page.
+  it("drops the pager from an empty team list and keeps it on the org list", async () => {
+    const team = render({ teamId: "team_9", rules: [rule()] });
+    await flushPromises();
+    expect(team.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(false);
+    const filled = render({ teamId: "team_1", rules: [rule()] });
+    await flushPromises();
+    expect(filled.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(true);
+  });
+
+  /// One wording for the empty list, with no sub-sentence under the title.
+  it("shows the empty state with no description override", async () => {
+    const wrapper = render({ teamId: "team_9", rules: [] });
+    await flushPromises();
+    const empty = wrapper.findComponent({ name: "OEmptyState" });
+    expect(empty.props("preset")).toBe("no-oncall-rules");
+    expect(empty.props("description")).toBeUndefined();
+  });
+
   it("reads the match as chips with sentence-case fields, and a trailing * as starts with", async () => {
     const wrapper = render({
       rules: [rule({ dimensions: { service: "checkout-*", "k8s-namespace": "shop" } })],

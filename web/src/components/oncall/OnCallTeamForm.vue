@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OFormInput
         name="name"
         :label="t('oncall.teamName')"
-        :help-text="t('oncall.teamNameHint')"
         required
         data-test="oncall-team-form-name"
       />
@@ -39,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="timezone"
         :label="t('oncall.timezone')"
         :options="timezoneOptions"
-        :help-text="t('oncall.timezoneHint')"
         required
         data-test="oncall-team-form-timezone"
       />
@@ -57,7 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="isDefault"
           data-test="oncall-team-form-default"
         />
-        <OText variant="meta" data-test="oncall-team-form-default-hint">
+        <!-- The blocking reason, or the outcome once switched on; nothing while the switch is off. -->
+        <OText
+          v-if="isDefault || makingDefault"
+          variant="meta"
+          data-test="oncall-team-form-default-hint"
+        >
           {{ isDefault ? t("oncall.deleteDefaultTeamBlocked") : t("oncall.defaultTeamBadgeTip") }}
         </OText>
       </div>
@@ -293,6 +296,9 @@ const form = useOForm<OnCallTeamFormValues>({
   onSubmit,
 });
 const memberCount = form.useStore((s: any) => (s.values?.members ?? []).length as number);
+const makingDefault = form.useStore(
+  (s: { values: OnCallTeamFormValues }) => !!s.values?.make_default,
+);
 
 const primaryLabel = computed(() => {
   if (isEdit.value) return t("oncall.save");

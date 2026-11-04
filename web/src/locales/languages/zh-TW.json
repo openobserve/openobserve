@@ -531,9 +531,9 @@
       "description": "一旦警示路由至團隊，進行中的呼叫就會出現在這裡。"
     },
     "noOncallRules": {
-      "title": "尚無歸屬規則",
+      "title": "尚無路由規則",
       "description": "指定一個叢集或命名空間，裡面的所有內容都會繼承擁有者——包括尚未存在的服務。",
-      "action": "新增歸屬規則",
+      "action": "新增規則",
       "actionDesc": "選擇一個維度和一個值，不需要規則語言。"
     },
     "noTeamRouting": {
@@ -25720,7 +25720,7 @@
     "rotationNthName": "輪值 {n}",
     "rotationTitle": "輪值",
     "rotationOrderHint": "人員值班的順序。列表中的下一位會在交接時接手。",
-    "rotationOpenMembers": "新增人員",
+    "rotationOpenMembers": "新增成員",
     "rotationNeedsPeople": "請至少選擇一人 — 否則此規則不會通知任何人。",
     "rotationEmptyNotSaved": "「{name}」中沒有任何成員，因此未儲存。請先選擇至少一人。",
     "noRotations": "尚無任何輪值。請新增一個，讓路由至此的警示能聯絡到人。",
@@ -25849,6 +25849,7 @@
     "awayReason": "原因",
     "awayReasonPlaceholder": "選填",
     "awaySave": "標記為不在",
+    "awayWindowRequired": "選擇缺席的開始和結束時間。",
     "awaySaved": "已標記為不在",
     "awaySaveFailed": "無法記錄不在狀態",
     "awayRemove": "移除此不在狀態",

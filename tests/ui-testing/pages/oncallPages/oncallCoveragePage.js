@@ -84,8 +84,7 @@ export class OnCallCoveragePage {
       // absences, which live on the members tab
       membersTable: '[data-test="oncall-members-table"]',
       awayDialog: '[data-test="oncall-members-away-dialog"]',
-      awayFromDate: '[data-test="oncall-members-away-from-date"]',
-      awayToDate: '[data-test="oncall-members-away-to-date"]',
+      awayWindow: '[data-test="oncall-members-away-window"]',
       awayReason: '[data-test="oncall-members-away-reason"]',
       awaySave: '[data-test="oncall-members-away-save"]',
 
@@ -101,6 +100,7 @@ export class OnCallCoveragePage {
   markAway(memberRowId) { return `[data-test="oncall-members-mark-away-${memberRowId}"]`; }
   clearAway(memberRowId) { return `[data-test="oncall-members-clear-away-${memberRowId}"]`; }
   awayTag(memberRowId) { return `[data-test="oncall-members-away-${memberRowId}"]`; }
+  awayPreset(key) { return `[data-test="oncall-members-away-preset-${key}"]`; }
 
   /**
    * The attention row for a rotation handing a shift to somebody away.

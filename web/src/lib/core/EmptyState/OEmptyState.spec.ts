@@ -212,6 +212,18 @@ describe("OEmptyState", () => {
       expect(description.text()).toContain("Dashboards bring your metrics");
     });
 
+    // On-call's empty tabs state a title and one action, with no sub-sentence, in one wording.
+    it.each([
+      ["no-oncall-members", "No members yet", "Add members"],
+      ["no-oncall-rules", "No routing rules yet", "New rule"],
+      ["no-oncall-schedule", "Create your first rotation", "Build it yourself"],
+    ])("renders %s as a title and its action only", (preset, title, action) => {
+      wrapper = buildWrapper({ preset });
+      expect(wrapper.find("h2").text()).toBe(title);
+      expect(wrapper.find("p").exists()).toBe(false);
+      expect(wrapper.text()).toContain(action);
+    });
+
     it("uses an inline p tag for title when size is inline", () => {
       // Arrange & Act
       wrapper = buildWrapper({ size: "inline" });

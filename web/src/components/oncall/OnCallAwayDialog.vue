@@ -18,9 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="open"
     :title="t('oncall.awayTitle')"
+    :primary-button-label="t('oncall.awaySave')"
+    :secondary-button-label="t('oncall.cancel')"
+    :form-id="FORM_ID"
+    :primary-button-loading="saving"
+    primary-button-data-test="oncall-members-away-save"
     data-test="oncall-members-away-dialog"
+    @click:secondary="open = false"
   >
-    <div class="flex flex-col gap-3">
+    <OForm :id="FORM_ID" :form="form" class="flex flex-col gap-5">
       <span v-if="email" class="flex min-w-0 items-center gap-2">
         <OAvatar :value="email" :name="nameOf(email)" size="sm" />
         <OnCallPersonName
@@ -30,62 +36,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="oncall-members-away-person"
         />
       </span>
-      <div class="flex flex-col gap-1">
-        <span class="o-input-label flex items-center gap-1 text-sm leading-tight font-semibold">
-          {{ t("oncall.awayFrom") }}
-          <OnCallZoneInfo
-            :timezone="timezone"
-            :viewer-timezone="localZone"
-            :range="pickedRange"
-            data-test="oncall-members-away-zone"
-          />
-        </span>
-        <div class="flex gap-2" data-test="oncall-members-away-from">
-          <ODate
-            v-model="fromDate"
-            class="min-w-0 flex-1"
-            data-test="oncall-members-away-from-date"
-          />
-          <OTime
-            v-model="fromTime"
-            class="min-w-0 flex-1"
-            data-test="oncall-members-away-from-time"
-          />
-        </div>
+
+      <!-- Absolute only, as Cover a shift: an absence is forward-looking, and a plain block keeps the picker's border to its buttons. -->
+      <div>
+        <OFormDateTimeRange
+          name="window"
+          :label="t('oncall.coverWhen')"
+          required
+          disable-relative
+          auto-apply
+          :trigger-text="windowLabel"
+          :picker-timezone="pickedZone"
+          hide-clipboard
+          show-error
+          :min-date="calendarDay()"
+          data-test="oncall-members-away-window"
+          @on:timezone-change="(zone: string) => (pickedZone = zone)"
+        >
+          <template #label-append>
+            <OnCallZoneInfo
+              :timezone="timezone"
+              :viewer-timezone="localZone"
+              :picked-timezone="pickedZone"
+              :range="windowValue"
+              data-test="oncall-members-away-zone"
+            />
+          </template>
+          <template #above>
+            <span class="flex flex-wrap gap-2" data-test="oncall-members-away-presets">
+              <OButton
+                v-for="preset in PRESETS"
+                :key="preset.key"
+                :variant="activePreset === preset.key ? 'outline-primary' : 'outline'"
+                size="xs"
+                :aria-pressed="activePreset === preset.key"
+                :data-test="`oncall-members-away-preset-${preset.key}`"
+                @click="applyPreset(preset.key)"
+              >
+                {{ t(preset.labelKey) }}
+              </OButton>
+            </span>
+          </template>
+        </OFormDateTimeRange>
       </div>
-      <div class="flex flex-col gap-1">
-        <span class="o-input-label text-sm leading-tight font-semibold">
-          {{ t("oncall.awayTo") }}
-        </span>
-        <div class="flex gap-2" data-test="oncall-members-away-to">
-          <ODate v-model="toDate" class="min-w-0 flex-1" data-test="oncall-members-away-to-date" />
-          <OTime v-model="toTime" class="min-w-0 flex-1" data-test="oncall-members-away-to-time" />
-        </div>
-      </div>
-      <OInput
-        v-model="reason"
+
+      <OFormInput
+        name="reason"
         :label="t('oncall.awayReason')"
         :placeholder="t('oncall.awayReasonPlaceholder')"
         data-test="oncall-members-away-reason"
       />
-    </div>
-    <template #footer>
-      <div class="flex justify-end gap-2">
-        <OButton variant="outline" size="sm-action" @click="open = false">
-          {{ t("oncall.cancel") }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :loading="saving"
-          :disabled="!fromDate || !fromTime || !toDate || !toTime"
-          data-test="oncall-members-away-save"
-          @click="save"
-        >
-          {{ t("oncall.awaySave") }}
-        </OButton>
-      </div>
-    </template>
+    </OForm>
   </ODialog>
 </template>
 
@@ -100,22 +101,33 @@ import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallZoneInfo from "@/components/oncall/OnCallZoneInfo.vue";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import ODate from "@/lib/forms/Date/ODate.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OTime from "@/lib/forms/Time/OTime.vue";
+import type { DateTimeRangeValue } from "@/lib/forms/DateTime/OFormDateTimeRange.types";
+import OFormDateTimeRange from "@/lib/forms/DateTime/OFormDateTimeRange.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { createUnavailabilityMutation } from "@/services/oncall.queries";
+import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
+import type { I18nKey } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { fromZonedInputValue, toZonedInputValue } from "@/utils/oncall";
+import { formatZonedRange, toZonedInputValue, zonedMidnight } from "@/utils/oncall";
+import { makeOnCallAwaySchema } from "./OnCallAwayDialog.schema";
+
+/** What the form holds: the window may be half-picked, which the schema exists to reject. */
+interface OnCallAwayFormValues extends Record<string, unknown> {
+  window?: DateTimeRangeValue;
+  reason: string;
+}
 
 const props = withDefaults(
   defineProps<{
     /** Whose absence this records. */
     email: string;
-    /** The team's zone: the fields are read and pre-filled on its clock. */
+    /** The team's zone: the picker opens on its clock and the field states the window on it. */
     timezone: string;
-    /** Pre-filled start, in micros; empty fields when absent. */
+    /** Pre-filled start, in micros; the next day from now when absent. */
     from?: number | null;
     /** Pre-filled end, in micros. */
     to?: number | null;
@@ -134,50 +146,105 @@ const selfEmail = computed(() => String(store.state.userInfo?.email ?? "").toLow
 
 const createAbsenceWrite = useMutation(() => createUnavailabilityMutation(orgId.value));
 
+const FORM_ID = "oncall-away-form";
 const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-const fromDate = ref("");
-const fromTime = ref("");
-const toDate = ref("");
-const toTime = ref("");
-const reason = ref("");
 const saving = ref(false);
 
-function split(micros: number | null): [string, string] {
-  if (micros === null) return ["", ""];
-  const local = toZonedInputValue(micros, props.timezone);
-  return [local.slice(0, 10), local.slice(11, 16)];
+const PRESETS = [
+  { key: "rest-of-day", labelKey: "oncall.coverRestOfDay" },
+  { key: "tomorrow", labelKey: "oncall.coverTomorrow" },
+  { key: "next-7-days", labelKey: "oncall.coverNext7Days" },
+] as const satisfies ReadonlyArray<{ key: string; labelKey: I18nKey }>;
+type PresetKey = (typeof PRESETS)[number]["key"];
+
+const form = useOForm<OnCallAwayFormValues>({
+  defaultValues: initialValues(),
+  schema: makeOnCallAwaySchema(t),
+  onSubmit: save,
+});
+
+/// `type: "absolute"` is load-bearing: a range without it is re-read as a relative period and resolved against now.
+function initialValues(): OnCallAwayFormValues {
+  const now = Date.now() * 1000;
+  const prefilled = props.from !== null && props.to !== null;
+  return {
+    window: {
+      type: "absolute",
+      ...(prefilled
+        ? { from: props.from!, to: props.to! }
+        : { from: now, to: now + MICROS_PER_DAY }),
+    },
+    reason: "",
+  };
 }
 
-watch(
-  open,
-  (isOpen) => {
-    if (!isOpen) return;
-    [fromDate.value, fromTime.value] = split(props.from);
-    [toDate.value, toTime.value] = split(props.to);
-    reason.value = "";
-  },
-  { immediate: true },
-);
+const windowValue = form.useStore((state: { values: OnCallAwayFormValues }) => state.values.window);
 
-/// The form's date and time read on the team's clock; Save stays disabled until both are filled.
-function zonedMicros(date: string, time: string): number {
-  return fromZonedInputValue(`${date}T${time}`, props.timezone) ?? Number.NaN;
+/// The zone the picker reads its fields in: the team's when it opens, and the reader may pick another.
+const pickedZone = ref(props.timezone);
+
+watch(open, (isOpen) => {
+  if (!isOpen) return;
+  pickedZone.value = props.timezone;
+  activePreset.value = null;
+  presetApplied = null;
+  form.reset(initialValues());
+});
+
+/// Today on the picker's clock, so no past day can be picked.
+function calendarDay(): string {
+  return toZonedInputValue(Date.now() * 1000, pickedZone.value)
+    .slice(0, 10)
+    .replace(/-/g, "/");
 }
 
-const pickedRange = computed(() => ({
-  from: zonedMicros(fromDate.value, fromTime.value),
-  to: zonedMicros(toDate.value, toTime.value),
-}));
+/// Anchored to the team's day, as Cover a shift's presets are.
+function applyPreset(key: PresetKey) {
+  const now = Date.now() * 1000;
+  const zone = props.timezone;
+  const ranges: Record<PresetKey, { from: number; to: number }> = {
+    "rest-of-day": { from: now, to: zonedMidnight(now, zone, 1) },
+    tomorrow: { from: zonedMidnight(now, zone, 1), to: zonedMidnight(now, zone, 2) },
+    "next-7-days": { from: now, to: now + 7 * MICROS_PER_DAY },
+  };
+  form.setFieldValue("window", { type: "absolute", ...ranges[key] });
+  presetApplied = { key, ...ranges[key] };
+  activePreset.value = key;
+}
 
-async function save() {
+/// The preset whose range the field still holds; any other edit to the window unlights it.
+const activePreset = ref<PresetKey | null>(null);
+let presetApplied: { key: PresetKey; from: number; to: number } | null = null;
+
+watch(windowValue, (value) => {
+  const applied = presetApplied;
+  activePreset.value =
+    applied && value?.from === applied.from && value?.to === applied.to ? applied.key : null;
+});
+
+/// The field states the window on the team's clock, naming the zone when another clock is in play.
+const windowLabel = computed<string>(() => {
+  const window = windowValue.value;
+  if (typeof window?.from !== "number" || typeof window?.to !== "number") return "";
+  return formatZonedRange(
+    window.from,
+    window.to,
+    props.timezone,
+    props.timezone !== localZone || pickedZone.value !== props.timezone,
+  );
+});
+
+async function save(value: OnCallAwayFormValues) {
+  const window = value.window;
+  if (typeof window?.from !== "number" || typeof window?.to !== "number") return;
+  const reason = String(value.reason ?? "").trim();
   saving.value = true;
   try {
     await createAbsenceWrite.mutateAsync({
       user_email: props.email,
-      start_at: zonedMicros(fromDate.value, fromTime.value),
-      end_at: zonedMicros(toDate.value, toTime.value),
-      ...(reason.value.trim() ? { reason: reason.value.trim() } : {}),
+      start_at: window.from,
+      end_at: window.to,
+      ...(reason ? { reason } : {}),
     });
     open.value = false;
     toast({ variant: "success", message: t("oncall.awaySaved") });

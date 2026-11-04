@@ -99,8 +99,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- A template rewrites the first rotation, so once one exists the menu says so. -->
-        <ODropdown align="end">
+        <!-- A template only rewrites the first rotation, so once one exists Add rotation adds from scratch; Start over lives in that lane's menu. -->
+        <OButton
+          v-if="rotations.length"
+          variant="outline"
+          size="sm-action"
+          icon-left="add"
+          data-test="oncall-timeline-add"
+          @click="emit('add')"
+        >
+          {{ t("oncall.addRotation") }}
+        </OButton>
+        <ODropdown v-else align="end">
           <template #trigger>
             <OButton
               variant="outline"
@@ -113,13 +123,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <ODropdownItem
-            :icon-left="rotations.length ? 'restart-alt' : 'dashboard-customize'"
+            icon-left="dashboard-customize"
             data-test="oncall-timeline-add-template"
             @select="emit('presets')"
           >
-            {{
-              rotations.length ? t("oncall.presetsStartOver") : t("oncall.addRotationFromTemplate")
-            }}
+            {{ t("oncall.addRotationFromTemplate") }}
           </ODropdownItem>
           <ODropdownItem
             icon-left="edit"
@@ -151,6 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :now-offset="nowOffset"
       :now-label="nowLabel"
       :hover-label="hoverLabel"
+      :hide-hover="openMenus.size > 0"
       data-test="oncall-timeline-chart"
       @hover="hoverAt = $event"
     >
@@ -210,7 +219,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Edit is the one act worth a button of its own; the rest are
                  rarer and would each cost a lane's width every row. -->
-            <ODropdown align="end">
+            <ODropdown
+              align="end"
+              @update:open="(isOpen: boolean) => trackMenu(`lane:${track.key}`, isOpen)"
+            >
               <template #trigger>
                 <OButton
                   variant="ghost"
@@ -281,7 +293,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- The tooltip follows the band, so it anchors to the band itself, not to the menu around it. -->
       <template #band="{ band }">
-        <ODropdown v-if="shiftActions(band.key).length" align="start">
+        <ODropdown
+          v-if="shiftActions(band.key).length"
+          align="start"
+          @update:open="(isOpen: boolean) => trackMenu(`band:${band.key}`, isOpen)"
+        >
           <template #trigger>
             <OScheduleBand
               :band="band"
@@ -913,6 +929,15 @@ const nowLabel = computed(() => stamp(nowMicros.value));
 /// geometry and hands the share over; only this side knows what instant the
 /// share lands on, because only this side knows `from` and `to`.
 const hoverAt = ref<number | null>(null);
+
+/// A menu open over the chart takes the pointer, so the hover line would freeze under it.
+const openMenus = ref(new Set<string>());
+function trackMenu(key: string, isOpen: boolean) {
+  const next = new Set(openMenus.value);
+  if (isOpen) next.add(key);
+  else next.delete(key);
+  openMenus.value = next;
+}
 
 const hoverLabel = computed(() =>
   hoverAt.value === null ? undefined : stamp(from.value + hoverAt.value * span.value),

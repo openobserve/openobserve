@@ -182,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="icon-sm"
             icon-left="edit"
+            class="max-md:hidden"
             :aria-label="t('oncall.editTeam')"
             :data-test="`oncall-team-edit-${row.id}`"
             @click.stop="openEdit(row)"
@@ -198,6 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="delete-outline"
+              class="max-md:hidden"
               disabled
               focusable-unavailable
               :aria-label="t('oncall.deleteTeam')"
@@ -210,12 +212,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost-destructive"
             size="icon-sm"
             icon-left="delete-outline"
+            class="max-md:hidden"
             :aria-label="t('oncall.deleteTeam')"
             :data-test="`oncall-team-delete-${row.id}`"
             @click.stop="teamToDelete = row"
           >
             <OTooltip side="bottom" :content="t('oncall.deleteTeam')" />
           </OButton>
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                icon-left="more-vert"
+                variant="ghost"
+                size="icon-xs-sq"
+                class="md:hidden"
+                :aria-label="t('oncall.moreActions')"
+                :data-test="`oncall-team-more-${row.id}`"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              icon-left="edit"
+              class="md:hidden"
+              :data-test="`oncall-team-edit-${row.id}-menu`"
+              @select="openEdit(row)"
+            >
+              <span>{{ t("oncall.editTeam") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="delete-outline"
+              variant="destructive"
+              class="md:hidden"
+              :disabled="row.id === defaultTeamId"
+              :focusable-unavailable="row.id === defaultTeamId"
+              :description="
+                row.id === defaultTeamId ? t('oncall.deleteDefaultTeamBlocked') : undefined
+              "
+              :data-test="`oncall-team-delete-${row.id}-menu`"
+              @select="teamToDelete = row"
+            >
+              <span>{{ t("oncall.deleteTeam") }}</span>
+            </ODropdownItem>
+          </ODropdown>
         </div>
       </template>
 
@@ -306,6 +344,8 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallSetupBanner from "@/components/oncall/OnCallSetupBanner.vue";
@@ -315,18 +355,12 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useListViewState } from "@/composables/useListViewState";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
+import { useOnCallDefaultTeam } from "@/composables/useOnCallDefaultTeam";
 import { queryClient } from "@/composables/query/queryClient";
-import oncallService from "@/services/oncall";
-import {
-  deleteTeamMutation,
-  oncallTeamsQuery,
-  setRoutingConfigMutation,
-  whoIsOnCallQuery,
-} from "@/services/oncall.queries";
+import { deleteTeamMutation, oncallTeamsQuery, whoIsOnCallQuery } from "@/services/oncall.queries";
 import { userKeys } from "@/services/users.querykeys";
 import { useMutation } from "@tanstack/vue-query";
 import type { OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
@@ -344,7 +378,6 @@ const route = useRoute();
 const router = useRouter();
 const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
 const { nameOf } = useOrgUserNames();
-const { confirm } = useConfirmDialog();
 const { config: routingConfig, load: loadRoutingConfig } = useOnCallRoutingConfig();
 
 const teams = ref<OnCallTeam[]>([]);
@@ -395,7 +428,7 @@ const teamDraftTimes = computed(() => {
   }
   return times;
 });
-const setRoutingConfigWrite = useMutation(() => setRoutingConfigMutation(orgId.value));
+const { setDefaultTeam } = useOnCallDefaultTeam(orgId);
 
 // Named handler: `@click="fetchTeams"` would hand the MouseEvent to `force`.
 const refreshTeams = () => fetchTeams(true);
@@ -627,42 +660,6 @@ async function deleteTeam() {
 // Mirrors the routing screen's own check: nominating a team is the one
 // moment "nobody is on call" is still avoidable, so an unstaffed pick warns
 // before it starts silently swallowing unrouted signals.
-async function isTeamUnstaffed(teamId: string): Promise<boolean> {
-  try {
-    const { data } = await oncallService.coverageGaps({ org_identifier: orgId.value, limit: 200 });
-    return data.teams.some((gap) => gap.id === teamId);
-  } catch {
-    return false;
-  }
-}
-
-async function setDefaultTeam(team: OnCallTeam) {
-  if (await isTeamUnstaffed(team.id)) {
-    const proceed = await confirm({
-      title: t("oncall.defaultTeamUnstaffedTitle"),
-      message: t("oncall.defaultTeamUnstaffedMessage", { team: raw(team.name) }),
-      confirmLabel: t("oncall.defaultTeamUnstaffedConfirm"),
-    });
-    if (!proceed) return;
-  }
-
-  try {
-    await setRoutingConfigWrite.mutateAsync(team.id);
-    // Unforced: the write expired the entry, so this repaints from one server read.
-    await loadRoutingConfig(orgId.value);
-    toast({ variant: "success", message: t("oncall.defaultTeamSaved") });
-  } catch (err: any) {
-    noteConfigurationDenied(err);
-    toast({
-      variant: "error",
-      message:
-        err?.response?.status === 403
-          ? t("oncall.configDenied")
-          : raw(err?.response?.data?.message) || t("oncall.defaultTeamSaveFailed"),
-    });
-  }
-}
-
 function openCreate() {
   editingTeam.value = null;
   formOpen.value = true;

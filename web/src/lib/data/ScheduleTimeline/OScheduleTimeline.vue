@@ -240,7 +240,7 @@ const pillSide = (offset: number) => (offset > 0.85 ? "-translate-x-full -ms-1.5
       <div v-if="laneHeaders" class="pointer-events-none absolute inset-0 z-2">
         <!-- Where the pointer is. Grey, because it answers "which instant am I
            looking at" — a question about the reader, not about the schedule. -->
-        <template v-if="hover !== null">
+        <template v-if="hover !== null && !hideHover">
           <span
             class="bg-border-strong absolute inset-y-0 w-px"
             :style="inlineStart(hover)"

@@ -56,7 +56,15 @@ const stubs = {
   },
   OScheduleTimeline: {
     name: "OScheduleTimeline",
-    props: ["tracks", "axisTicks", "nowOffset", "nowLabel", "laneHeaders", "hoverLabel"],
+    props: [
+      "tracks",
+      "axisTicks",
+      "nowOffset",
+      "nowLabel",
+      "laneHeaders",
+      "hoverLabel",
+      "hideHover",
+    ],
     emits: ["hover"],
     // Mirrors the real primitive's lane mode: a header per track, and the
     // empty slot standing in for a strip with no bands.
@@ -173,8 +181,8 @@ describe("OnCallScheduleTimeline", () => {
     expect(add.attributes("data-icon")).toBe("add");
   });
 
-  // A template rewrites the first rotation, so a staffed team is offered "start over" instead of a new one.
-  it("offers a template or scratch from Add rotation, naming the replacement once rotations exist", async () => {
+  // A template rewrites the first rotation, so a staffed team's Add rotation adds from scratch and offers no template.
+  it("offers a template or scratch from Add rotation only before any rotation exists", async () => {
     const empty = render({ rotations: [], segments: [] });
     expect(empty.find('[data-test="oncall-timeline-add"]').text()).toBe("Add rotation");
     expect(empty.find('[data-test="oncall-timeline-add-template"]').text()).toBe("From a template");
@@ -184,12 +192,32 @@ describe("OnCallScheduleTimeline", () => {
     expect(empty.emitted("add")).toHaveLength(1);
 
     const staffed = render();
-    const template = staffed.find('[data-test="oncall-timeline-add-template"]');
-    expect(template.text()).toBe("Start over from a template");
-    await template.trigger("click");
-    expect(staffed.emitted("presets")).toHaveLength(1);
-    await staffed.find('[data-test="oncall-timeline-add-scratch"]').trigger("click");
+    expect(staffed.find('[data-test="oncall-timeline-add-template"]').exists()).toBe(false);
+    expect(staffed.find('[data-test="oncall-timeline-add-scratch"]').exists()).toBe(false);
+    const add = staffed.find('[data-test="oncall-timeline-add"]');
+    expect(add.attributes("data-icon")).toBe("add");
+    await add.trigger("click");
     expect(staffed.emitted("add")).toHaveLength(1);
+    expect(staffed.emitted("presets")).toBeUndefined();
+  });
+
+  // An open shift or lane menu holds the pointer, so the hover line would freeze under it.
+  it("hides the hover line while a shift or lane menu is open", async () => {
+    const wrapper = render();
+    const chart = wrapper.findComponent({ name: "OScheduleTimeline" });
+    const menus = wrapper.findAllComponents({ name: "ODropdown" });
+    expect(chart.props("hideHover")).toBe(false);
+
+    menus[0].vm.$emit("update:open", true);
+    await nextTick();
+    expect(chart.props("hideHover")).toBe(true);
+    menus.at(-1)!.vm.$emit("update:open", true);
+    menus[0].vm.$emit("update:open", false);
+    await nextTick();
+    expect(chart.props("hideHover")).toBe(true);
+    menus.at(-1)!.vm.$emit("update:open", false);
+    await nextTick();
+    expect(chart.props("hideHover")).toBe(false);
   });
 
   // The band only has room for a name; two people can share one, so the email rides the tooltip.

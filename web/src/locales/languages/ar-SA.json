@@ -523,7 +523,7 @@
     "noOncallMembers": {
       "title": "لا يوجد أعضاء بعد",
       "description": "أضف أشخاصًا من المؤسسة لإدراجهم في ترتيب الاستدعاء لهذا الفريق.",
-      "action": "إضافة عضو",
+      "action": "إضافة أعضاء",
       "actionDesc": "اختر من مؤسستك، أو ألصق قائمة بعناوين البريد الإلكتروني"
     },
     "noOncallResponses": {
@@ -531,9 +531,9 @@
       "description": "تظهر الاستدعاءات المفتوحة هنا بمجرد توجيه تنبيه إلى فريق."
     },
     "noOncallRules": {
-      "title": "لا توجد ملكية بعد",
+      "title": "لا توجد قواعد توجيه بعد",
       "description": "اختر عنقودًا أو مساحة أسماء وسيرث كل ما بداخله مالكًا، بما في ذلك الخدمات غير الموجودة بعد.",
-      "action": "إضافة قاعدة ملكية",
+      "action": "قاعدة جديدة",
       "actionDesc": "اختر بُعدًا وقيمة. لا حاجة إلى لغة قواعد."
     },
     "noTeamRouting": {
@@ -25725,7 +25725,7 @@
     "rotationNthName": "الدورة {n}",
     "rotationTitle": "دورة",
     "rotationOrderHint": "الترتيب الذي يتناوب به الأشخاص على الوردية. التالي في القائمة يتولى المهمة عند التسليم.",
-    "rotationOpenMembers": "إضافة أشخاص",
+    "rotationOpenMembers": "إضافة أعضاء",
     "rotationNeedsPeople": "اختر شخصًا واحدًا على الأقل — هذه القاعدة لن تستدعي أحدًا.",
     "rotationEmptyNotSaved": "لا يوجد أحد في \"{name}\"، لذلك لم يتم حفظه. اختر شخصًا واحدًا على الأقل أولًا.",
     "noRotations": "لا توجد دورات بعد. أضف واحدة حتى تصل التنبيهات الموجهة هنا إلى شخص ما.",
@@ -25854,6 +25854,7 @@
     "awayReason": "السبب",
     "awayReasonPlaceholder": "اختياري",
     "awaySave": "تحديد كغائب",
+    "awayWindowRequired": "اختر متى يبدأ الغياب ومتى ينتهي.",
     "awaySaved": "تم تسجيل الغياب",
     "awaySaveFailed": "تعذر تسجيل الغياب",
     "awayRemove": "إزالة هذا الغياب",
@@ -27014,7 +27015,7 @@
     "ruleEditorPrecedence": "إذا تطابقت قاعدتان، فالقاعدة التي تضم شروطًا أكثر هي التي تفوز.",
     "attentionNoTransportHeadline": "لا يمكن لهذا النشر إرسال البريد الإلكتروني، لذا لا يمكن لنداءات المناوبة هذه الوصول إلى أي شخص",
     "attentionNoTransportDetail": "لا يوجد لدى البريد الإلكتروني ناقل SMTP أو لا يوجد عنوان From صالح (ZO_SMTP_FROM_EMAIL) في هذا النشر. كل مستوى تصعيد يعتمد على البريد الإلكتروني ينتهي إلى شخص لا توجد وسيلة للوصول إليه.",
-    "attentionAddMember": "إضافة عضو",
+    "attentionAddMember": "إضافة أعضاء",
     "attentionAddFinalRung": "إضافة مستوى أخير",
     "attentionFindings": "{count} نتيجة | النتائج: {count}",
     "attentionCountBlocking": "{count} مانع",
