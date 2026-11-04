@@ -837,6 +837,7 @@
     "dateRangeCopied": "Intervalo de datas copiado",
     "dateRangePasted": "Intervalo de datas colado",
     "dateRangePasteError": "Não foi possível analisar o intervalo de datas",
+    "dateRangePasteEmpty": "A área de transferência está vazia. Copie primeiro um intervalo de datas.",
     "dateRangePasteBlocked": "Este navegador bloqueou a leitura da área de transferência. Prima {shortcut} com o seletor aberto para colar.",
     "pastSecond": "Último {count} segundo | Últimos {count} segundos",
     "pastMinute": "Último {count} minuto | Últimos {count} minutos",
