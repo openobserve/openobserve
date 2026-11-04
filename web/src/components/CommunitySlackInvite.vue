@@ -15,15 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { addCommasToNumber } from "@/utils/zincutils";
 import analytics from "@/services/product_analytics";
 import {
-  connectDataPopupSettled,
-  connectDataPromptSessionKey,
   getCommunitySlackUrl,
   markSlackInviteDismissed,
   markSlackInviteResolved,
@@ -37,7 +35,7 @@ import SlackIcon from "@/components/icons/SlackIcon.vue";
 const { t } = useI18nTyped();
 const store = useStore();
 
-// Day-2 follow-up for a user who didn't act on ConnectDataSourcePopup's embedded offer — clock is shared via utils/slackCommunityInvite.ts.
+// Day-2 follow-up; the onboarding dialog starts the clock via utils/slackCommunityInvite.ts.
 const isOpen = ref(false);
 
 const userEmail = store.state.userInfo?.email ?? "anonymous";
@@ -57,35 +55,18 @@ const track = (event: string, properties: Record<string, any> = {}) => {
   }
 };
 
-const maybeShowStandaloneInvite = () => {
-  // ConnectDataSourcePopup gets first refusal on this session — if it claimed the
-  // session (shown, or about to be), the two popups must not stack.
-  if (sessionStorage.getItem(connectDataPromptSessionKey(userEmail)) === "true") return;
-  if (shouldShowStandaloneSlackInvite(userEmail)) {
-    isOpen.value = true;
-    track("community_slack_prompt_shown");
-  }
-};
-
 onMounted(() => {
   // Cloud-only: bail out entirely on Enterprise / open source so nothing is
   // captured or shown there.
   if (config.isCloud !== "true") return;
 
-  // Never compete with ConnectDataSourcePopup/GetStarted during the user's
-  // first-login session — the day-2 clock only starts once that session ends.
+  // Never compete with the onboarding dialog during the user's first-login session.
   if (localStorage.getItem("isFirstTimeLogin") === "true") return;
 
-  if (connectDataPopupSettled.value) {
-    maybeShowStandaloneInvite();
-    return;
+  if (shouldShowStandaloneSlackInvite(userEmail)) {
+    isOpen.value = true;
+    track("community_slack_prompt_shown");
   }
-  // ConnectDataSourcePopup is still deciding whether it opens this session — wait for it.
-  const stopWaiting = watch(connectDataPopupSettled, (settled) => {
-    if (!settled) return;
-    stopWaiting();
-    maybeShowStandaloneInvite();
-  });
 });
 
 // Real member count, sourced from the backend `/config` response

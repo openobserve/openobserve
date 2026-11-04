@@ -226,18 +226,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <ODialog
-      data-test="main-layout-get-started-dialog"
-      v-model:open="showGetStarted"
-      size="lg"
-      persistent
-      :show-close="false"
-    >
-      <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
-    </ODialog>
-    <ConnectDataSourcePopup />
     <SampleDataWelcome />
     <SampleDataTour />
+    <SampleDataProgressDock />
     <CommunitySlackInvite />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
@@ -299,12 +290,10 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
-import GetStarted from "@/components/login/GetStarted.vue";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
-import ConnectDataSourcePopup from "@/components/ConnectDataSourcePopup.vue";
 import SampleDataWelcome from "@/components/sampleData/SampleDataWelcome.vue";
 import SampleDataTour from "@/components/sampleData/SampleDataTour.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import SampleDataProgressDock from "@/components/sampleData/SampleDataProgressDock.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -362,12 +351,10 @@ export default defineComponent({
     O2AIChat,
     PaidOverageConsentDialog,
     ShortcutCheatsheet,
-    GetStarted,
     CommunitySlackInvite,
-    ConnectDataSourcePopup,
     SampleDataWelcome,
     SampleDataTour,
-    ODialog,
+    SampleDataProgressDock,
     ODrawer,
     OButton,
     FirstDataNotice,
@@ -466,7 +453,6 @@ export default defineComponent({
     const { prefetchRoute } = useRoutePrefetch();
 
     const isMonacoEditorLoaded = ref(false);
-    const showGetStarted = ref((localStorage.getItem("isFirstTimeLogin") ?? "false") === "true");
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const aiChatAppendMode = ref(true);
@@ -1618,13 +1604,6 @@ export default defineComponent({
 
       return getImageURL("images/common/ai_icon_gradient.svg");
     });
-    //this will be the function used to cancel the get started dialog and remove the isFirstTimeLogin from local storage
-    //this will be called from the get started component whenever users clicks on the submit button
-    const removeFirstTimeLogin = (val: boolean) => {
-      showGetStarted.value = val;
-      localStorage.removeItem("isFirstTimeLogin");
-    };
-
     /** `value` is a query string or `{ query, autoSend?, chipName?, newChat?, context? }`; a chip never auto-sends. */
     const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
       const wasOpen = store.state.isAiChatEnabled;
@@ -1762,8 +1741,6 @@ export default defineComponent({
       closeChat,
       getBtnLogo,
       isHovered,
-      showGetStarted,
-      removeFirstTimeLogin,
       sendToAiChat,
       aiChatInputContext,
       aiChatAppendMode,

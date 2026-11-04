@@ -148,6 +148,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- RIGHT SIDE: Controls -->
     <div class="flex shrink-0 items-center justify-end gap-1 pe-3">
+      <!-- SAMPLE DATA: stays visible while the org holds sample data -->
+      <SampleDataHeaderChip class="me-2" />
+
       <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
       <div
         class="me-4 flex items-center gap-1 max-md:hidden"
@@ -511,6 +514,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import SampleDataHeaderChip from "@/components/sampleData/SampleDataHeaderChip.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -525,6 +529,7 @@ export default defineComponent({
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OrganizationSelector,
+    SampleDataHeaderChip,
     LinkedAccountsDialog,
     OButton,
     OIcon,

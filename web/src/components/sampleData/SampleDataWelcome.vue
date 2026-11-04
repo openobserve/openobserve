@@ -17,24 +17,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     :open="session.welcomeOpen.value"
-    size="lg"
+    size="xl"
     :show-close="false"
     data-test="sample-welcome-dialog"
-    @update:open="(open) => !open && close()"
+    @update:open="(open) => !open && dismiss()"
   >
-    <div class="flex min-h-106 flex-col gap-5" :data-view="view">
-      <div class="flex items-start gap-3">
+    <!-- one fixed height for every step, so the centered dialog never jumps between them -->
+    <div class="flex h-[30rem] max-h-[calc(90vh-4rem)] flex-col gap-5" :data-view="view">
+      <div class="flex items-center gap-3">
         <span
+          v-if="view !== 'choose'"
           class="rounded-surface flex size-12 shrink-0 items-center justify-center"
           :class="headerTint"
         >
           <OIcon :name="headerIcon" size="md" />
         </span>
         <div class="flex min-w-0 flex-1 flex-col gap-1">
-          <h2 class="text-text-heading m-0 text-2xl" data-test="sample-welcome-title">
-            {{ headerTitle }}
-          </h2>
-          <span class="text-text-secondary text-sm">{{ headerBody }}</span>
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <h2 class="text-text-heading m-0 text-2xl" data-test="sample-welcome-title">
+              {{ headerTitle }}
+            </h2>
+            <div
+              v-if="askHeard && view === 'choose'"
+              class="flex items-center gap-2"
+              data-test="onboarding-hear-about-us"
+            >
+              <label
+                for="onboarding-hear-about-us"
+                class="text-text-heading text-base font-medium whitespace-nowrap"
+                >{{ t("login.getStarted.heard.label") }}</label
+              >
+              <OSelect
+                id="onboarding-hear-about-us"
+                v-model="heardFrom"
+                :options="heardOptions"
+                :placeholder="t('login.getStarted.heard.placeholder')"
+                size="xs"
+                width="sm"
+                data-test="onboarding-hear-about-us-select"
+              />
+              <span
+                role="status"
+                class="text-status-success-text flex items-center gap-1 text-xs"
+                data-test="onboarding-hear-about-us-thanks"
+              >
+                <template v-if="heardFrom">
+                  <OIcon name="check" size="xs" />
+                  {{ t("login.getStarted.heard.thanks") }}
+                </template>
+              </span>
+            </div>
+          </div>
+          <span v-if="view !== 'choose' && headerBody" class="text-text-secondary text-sm">{{
+            headerBody
+          }}</span>
         </div>
         <OButton
           variant="ghost"
@@ -42,148 +78,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="-me-1 shrink-0"
           :aria-label="t('common.close')"
           data-test="sample-welcome-close"
-          @click="close"
+          @click="dismiss"
         >
           <OIcon name="close" size="sm" />
         </OButton>
       </div>
 
-      <template v-if="view === 'choose'">
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div
-            class="border-accent bg-surface-base rounded-surface flex flex-col gap-3 border-2 p-4"
-            data-test="sample-welcome-connect-card"
-          >
-            <div class="flex items-center gap-2">
-              <span
-                class="bg-ingest-tint-blue text-ingest-accent-blue rounded-default flex size-8 shrink-0 items-center justify-center"
-              >
-                <OIcon name="cloud-upload" size="sm" />
-              </span>
-              <strong class="text-text-heading flex-1 text-base">{{
-                t("sampleData.welcome.connect.title")
-              }}</strong>
-            </div>
-            <span class="text-text-secondary text-sm">{{ connectBody }}</span>
-            <ul class="m-0 flex flex-1 list-none flex-col gap-1.5 p-0">
-              <li
-                v-for="point in connectPoints"
-                :key="point"
-                class="text-text-body flex items-start gap-2 text-sm"
-              >
-                <OIcon name="check" size="sm" class="text-status-success-text mt-0.5 shrink-0" />
-                {{ point }}
-              </li>
-            </ul>
-            <OButton
-              variant="primary"
-              icon-right="arrow-forward"
-              class="w-full"
-              data-test="sample-welcome-connect"
-              @click="connect"
-            >
-              {{ t("sampleData.welcome.connect.cta") }}
-            </OButton>
-          </div>
+      <WelcomeChoices
+        v-if="view === 'choose'"
+        class="min-h-0 flex-1"
+        @browse="browseAll"
+        @pick="openGuide"
+        @sample="pickSample"
+        @skip="skip"
+      />
 
-          <div
-            class="border-border-default bg-surface-base rounded-surface flex flex-col gap-3 border p-4"
-            data-test="sample-welcome-sample-card"
-          >
-            <div class="flex items-center gap-2">
-              <span
-                class="bg-ingest-tint-purple text-ingest-accent-purple rounded-default flex size-8 shrink-0 items-center justify-center"
-              >
-                <OIcon name="science" size="sm" />
-              </span>
-              <strong class="text-text-heading flex-1 text-base">{{
-                t("sampleData.welcome.sample.title")
-              }}</strong>
-            </div>
-            <span class="text-text-secondary text-sm">{{
-              t("sampleData.welcome.sample.body")
-            }}</span>
-            <ul class="m-0 flex flex-1 list-none flex-col gap-1.5 p-0">
-              <li
-                v-for="point in samplePoints"
-                :key="point"
-                class="text-text-body flex items-start gap-2 text-sm"
-              >
-                <OIcon name="check" size="sm" class="text-status-success-text mt-0.5 shrink-0" />
-                {{ point }}
-              </li>
-            </ul>
-            <OButton
-              variant="outline"
-              icon-left="play-arrow"
-              class="w-full"
-              data-test="sample-welcome-load"
-              @click="load"
-            >
-              {{ t("sampleData.welcome.sample.cta") }}
-            </OButton>
-          </div>
-        </div>
-
-        <div class="flex justify-end">
-          <OButton variant="ghost" size="sm" data-test="sample-welcome-skip" @click="close">
-            {{ t("sampleData.welcome.skip") }}
-          </OButton>
-        </div>
-      </template>
-
-      <template v-else-if="view === 'progress'">
-        <SampleDataProgress stacked />
-        <div class="mt-auto flex justify-end">
-          <OButton variant="ghost" size="sm" data-test="sample-welcome-background" @click="close">
-            {{ t("sampleData.welcome.continueInBackground") }}
-          </OButton>
-        </div>
-      </template>
-
-      <template v-else-if="view === 'ready'">
-        <div class="flex flex-col gap-2">
-          <span class="text-text-label text-xs">{{ t("sampleData.welcome.ready.covers") }}</span>
-          <ul class="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 md:grid-cols-3">
-            <li
-              v-for="cap in tourCapabilities"
-              :key="cap.id"
-              class="border-border-default rounded-surface flex items-start gap-3 border p-3"
-            >
-              <span
-                class="bg-surface-subtle text-accent rounded-default flex size-9 shrink-0 items-center justify-center"
-              >
-                <OIcon :name="cap.icon" size="sm" />
-              </span>
-              <div class="flex min-w-0 flex-col gap-0.5">
-                <strong class="text-text-heading text-sm">{{ cap.label }}</strong>
-                <span class="text-text-secondary text-xs">{{ cap.detail }}</span>
-              </div>
-            </li>
-          </ul>
-        </div>
+      <template v-else-if="view === 'progress' || view === 'ready'">
+        <SampleDataProgress class="min-h-0 flex-1" :done="view === 'ready'" />
         <div class="mt-auto flex flex-wrap items-center justify-end gap-2">
-          <OButton variant="ghost" size="sm" data-test="sample-welcome-own-way" @click="close">
-            {{ t("sampleData.welcome.ready.ownWay") }}
-          </OButton>
           <OButton
+            v-if="view === 'progress'"
             variant="outline"
             size="sm"
-            icon-left="dashboard"
-            data-test="sample-welcome-open-overview"
-            @click="openOverview"
+            data-test="sample-welcome-background"
+            @click="close"
           >
-            {{ t("sampleData.openOverview") }}
+            {{ t("sampleData.welcome.continueInBackground") }}
           </OButton>
-          <OButton
-            variant="primary"
-            size="sm"
-            icon-left="flag"
-            data-test="sample-welcome-start-tour"
-            @click="startTour"
-          >
-            {{ t("sampleData.welcome.ready.startTour") }}
-          </OButton>
+          <template v-else>
+            <OButton variant="outline" size="sm" data-test="sample-welcome-own-way" @click="close">
+              {{ t("sampleData.welcome.ready.ownWay") }}
+            </OButton>
+            <OButton
+              variant="primary"
+              size="sm"
+              data-test="sample-welcome-start-tour"
+              @click="startTour"
+            >
+              {{ t("sampleData.welcome.ready.startTour") }}
+            </OButton>
+          </template>
         </div>
       </template>
 
@@ -203,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -211,13 +145,21 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import WelcomeChoices from "@/components/login/WelcomeChoices.vue";
+import {
+  firstSourceOption,
+  writeFirstSource,
+  type FirstSourceId,
+} from "@/components/login/firstSourceOptions";
+import billings from "@/services/billings";
+import analytics from "@/services/product_analytics";
+import { markSlackInviteOffered } from "@/utils/slackCommunityInvite";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { queryClient } from "@/composables/query/queryClient";
-import { orgSummaryQuery } from "@/services/organizations.queries";
+import { fetchHasUserStreams } from "@/composables/sampleData/useSampleDataPresence";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
-import { sampleWindowHours } from "@/utils/sampleData/loader";
 import { SAMPLE_TOUR_STEPS, resolveTourTarget } from "@/utils/sampleData/tour";
 import SampleDataProgress from "@/components/sampleData/SampleDataProgress.vue";
 
@@ -228,67 +170,37 @@ const router = useRouter();
 const session = useSampleDataSession();
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
-const hours = computed(() => sampleWindowHours(store.state.zoConfig?.ingest_allowed_upto));
 
 const view = computed<"choose" | "progress" | "ready" | "error">(() => {
-  if (session.loadingOrg.value !== org.value) return "choose";
-  if (session.status.value === "loading") return "progress";
-  if (session.status.value === "loaded") return "ready";
-  if (session.status.value === "failed") return "error";
+  if (session.loadingOrg.value === org.value) {
+    if (session.status.value === "loading") return "progress";
+    if (session.status.value === "loaded") return "ready";
+    if (session.status.value === "failed") return "error";
+  }
   return "choose";
 });
 
 const headerIcon = computed<IconName>(() => {
   if (view.value === "ready") return "check-circle";
   if (view.value === "progress") return "progress-activity";
-  if (view.value === "choose") return "rocket-launch";
   return "science";
 });
 const headerTint = computed(() => {
   if (view.value === "ready") return "bg-icon-chip-success-bg text-status-success-text";
-  if (view.value === "choose") return "bg-ingest-tint-blue text-ingest-accent-blue";
   return "bg-ingest-tint-purple text-ingest-accent-purple";
 });
+
 const headerTitle = computed(() => {
   if (view.value === "progress") return t("sampleData.welcome.progress.title");
   if (view.value === "ready") return t("sampleData.welcome.ready.title");
   if (view.value === "error") return t("sampleData.toast.loadFailed");
-  return t("sampleData.welcome.title", { product: raw("OpenObserve") });
+  return t("login.getStarted.title");
 });
 const headerBody = computed(() => {
   if (view.value === "progress") return t("sampleData.welcome.progress.body");
-  if (view.value === "ready") return t("sampleData.welcome.ready.body");
-  if (view.value === "error") return t("sampleData.welcome.errorBody");
-  return t("sampleData.welcome.subtitle");
+  if (view.value === "ready") return undefined;
+  return t("sampleData.welcome.errorBody");
 });
-
-const connectPoints = computed<I18nText[]>(() => [
-  t("sampleData.welcome.connect.point1"),
-  t("sampleData.welcome.connect.point2"),
-  t("sampleData.welcome.connect.point3"),
-]);
-const samplePoints = computed<I18nText[]>(() => [
-  t("sampleData.welcome.sample.point1", { hours: raw(String(hours.value)) }),
-  t("sampleData.welcome.sample.point2"),
-  t("sampleData.welcome.sample.point3"),
-]);
-const connectBody = computed(() =>
-  t("sampleData.welcome.connect.body", {
-    p1: raw("OpenTelemetry"),
-    p2: raw("Kubernetes"),
-    p3: raw("Fluent Bit"),
-    p4: raw("Prometheus"),
-  }),
-);
-
-const tourCapabilities = computed(() =>
-  [...new Map(SAMPLE_TOUR_STEPS.map((s) => [s.capability, s])).values()].map((s) => ({
-    id: s.capability,
-    icon: s.icon,
-    label: t(`sampleData.tour.capabilities.${s.capability}`),
-    detail: t(`sampleData.welcome.ready.capabilities.${s.capability}`),
-  })),
-);
 
 const close = () => {
   if (org.value) session.markWelcomeSeen(org.value);
@@ -302,37 +214,123 @@ const startTourFor = (target: string) => {
     .catch(() => {});
 };
 
-const load = () => {
-  session.markWelcomeSeen(org.value);
-  session.start(org.value, store.state.zoConfig?.ingest_allowed_upto);
-};
+const load = () => session.loadInDialog(org.value, store.state.zoConfig?.ingest_allowed_upto);
 
 const startTour = () => startTourFor(org.value);
 
-const openOverview = () => {
-  close();
-  resolveTourTarget(org.value, "dashboard")
-    .then((to) => router.push(to))
-    .catch(() => {});
+// Login has already followed a redirectURI or marketplace link by now, so landing anywhere but Home means one was pending.
+const redirectPending = (): boolean => {
+  if (route.name !== "home") return true;
+  try {
+    const session = window.sessionStorage;
+    if (session.getItem("redirectURI") || session.getItem("azure_marketplace_token")) return true;
+  } catch {
+    // Unreadable storage holds no pending redirect.
+  }
+  return document.cookie.split("; ").some((c) => c.startsWith("aws_marketplace_token="));
 };
 
-const connect = () => {
+const HEARD_FROM = [
+  "search",
+  "ai",
+  "social",
+  "github",
+  "blog",
+  "video",
+  "friend",
+  "event",
+  "other",
+] as const;
+const heardOptions = computed(() =>
+  HEARD_FROM.map((id) => ({ value: id, label: t(`login.getStarted.heard.options.${id}`) })),
+);
+const heardFrom = ref<string>();
+// cloud only, on a first login: the answer goes to the cloud billing attribution endpoint
+const askHeard = ref(false);
+watch(
+  session.welcomeOpen,
+  (open) => {
+    if (!open) return;
+    heardFrom.value = undefined;
+    askHeard.value =
+      config.isCloud === "true" && localStorage.getItem("isFirstTimeLogin") === "true";
+  },
+  { immediate: true },
+);
+
+// Records the answer; telemetry goes out once, for a new cloud user's first login only.
+const finish = (firstSource?: FirstSourceId) => {
+  const id = org.value;
+  if (firstSource) writeFirstSource(id, firstSource);
+  const firstLogin = localStorage.getItem("isFirstTimeLogin") === "true";
+  localStorage.removeItem("isFirstTimeLogin");
+  if (config.isCloud !== "true" || !firstLogin) return;
+  const skipped = !firstSource;
+  const from = heardFrom.value ?? "";
+  // The backend still requires from and company; empty strings are its "no answer".
+  billings
+    .submit_new_user_info(id, { from, company: "", first_source: firstSource, skipped })
+    .catch((error: unknown) => console.warn("SampleDataWelcome: new user info not sent:", error));
+  analytics.track("onboarding_get_started_submitted", {
+    first_source: firstSource ?? null,
+    heard_from: heardFrom.value ?? null,
+    skipped,
+  });
+  if (skipped) analytics.track("onboarding_questions_skipped", { first_source: null });
+};
+
+const skip = () => {
+  finish();
   close();
-  router.push({ name: "recommended", query: { org_identifier: org.value } }).catch(() => {});
+};
+
+// only the choices are still unanswered; every later view already picked sample data
+const dismiss = () => (view.value === "choose" ? skip() : close());
+
+// picking sample data is the go-ahead, so the load starts without the confirm step
+const pickSample = () => {
+  finish("sample");
+  load();
+};
+
+const openGuide = (id: FirstSourceId) => {
+  finish(id);
+  const name = redirectPending() ? undefined : firstSourceOption(id)?.route;
+  close();
+  if (name) router.push({ name, query: { org_identifier: org.value } }).catch(() => {});
+};
+
+const browseAll = () => {
+  finish();
+  close();
+  if (!redirectPending()) {
+    router.push({ name: "ingestion", query: { org_identifier: org.value } }).catch(() => {});
+  }
 };
 
 const maybeGreet = async () => {
   const id = org.value;
-  if (config.isCloud === "true" || store.state.kioskMode) return;
-  if (!id || route.name !== "home" || session.welcomeSeen(id) || session.tour.value) return;
+  if (store.state.kioskMode) return;
+  // a tour left open in another org is hidden here, so only this org's tour holds the welcome back
+  if (!id || route.name !== "home" || session.welcomeSeen(id) || session.tour.value?.org === id) {
+    return;
+  }
   if (session.status.value === "loading") return;
+  let hasData: boolean;
   try {
-    const summary = await queryClient.fetchQuery(orgSummaryQuery(id));
-    if (summary?.streams?.num_streams) return;
+    hasData = await fetchHasUserStreams(id);
   } catch {
     return;
   }
-  if (id === org.value && route.name === "home") session.openWelcome();
+  // the Slack invite day-2 clock starts on the first Home visit, data or not
+  if (config.isCloud === "true") markSlackInviteOffered(store.state.userInfo?.email ?? "anonymous");
+  if (hasData) {
+    // an org with data never shows the welcome, so its first-login state ends here
+    localStorage.removeItem("isFirstTimeLogin");
+    return;
+  }
+  if (id !== org.value || route.name !== "home") return;
+  session.openWelcome();
 };
 
 // every entry point loads through the session, so this one host announces the result
@@ -340,7 +338,8 @@ watch(session.status, (now, before) => {
   if (before !== "loading" || now !== "loaded") return;
   const target = session.loadingOrg.value;
   if (target === org.value) store.dispatch("setIsDataIngested", true);
-  if (session.welcomeOpen.value) return;
+  // the corner dock announces a finished load for this org; only a load left behind in another org needs a toast
+  if (session.welcomeOpen.value || target === org.value) return;
   toast({
     variant: "success",
     message: t("sampleData.toast.loaded"),
@@ -348,6 +347,7 @@ watch(session.status, (now, before) => {
   });
 });
 
-watch([org, () => route.name], maybeGreet);
+// a load in another org holds the welcome back, so check again once it ends
+watch([org, () => route.name, () => session.status.value === "loading"], maybeGreet);
 onMounted(maybeGreet);
 </script>

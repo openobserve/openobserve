@@ -194,6 +194,14 @@ const markdownPanel = (id: string, title: string, markdown: string, layout: Layo
   markdownContent: markdown,
 });
 
+export interface SampleWindow {
+  startUs: number;
+  endUs: number;
+}
+
+// the loaded window, so the dashboard opens on its data on any later day
+let defaultRange: SampleWindow | undefined;
+
 const dashboard = (title: string, description: string, panels: unknown[]) => ({
   version: CURRENT_DASHBOARD_SCHEMA_VERSION,
   title,
@@ -203,7 +211,14 @@ const dashboard = (title: string, description: string, panels: unknown[]) => ({
   created: new Date().toISOString(),
   tabs: [{ tabId: "default", name: "Default", panels }],
   variables: { list: [], showDynamicFilters: true },
-  defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "3h", startTime: 0, endTime: 0 },
+  defaultDatetimeDuration: defaultRange
+    ? {
+        type: "absolute",
+        relativeTimePeriod: "",
+        startTime: defaultRange.startUs,
+        endTime: defaultRange.endUs,
+      }
+    : { type: "relative", relativeTimePeriod: "3h", startTime: 0, endTime: 0 },
 });
 
 const ACCESS = `"${SAMPLE_STREAMS.accessLogs}"`;
@@ -616,8 +631,9 @@ const infraDashboard = () =>
     ],
   );
 
-export const sampleDashboards = () => {
+export const sampleDashboards = (range?: SampleWindow) => {
   panelIndex = 0;
+  defaultRange = range;
   return [overviewDashboard(), businessDashboard(), webTrafficDashboard(), infraDashboard()];
 };
 
@@ -689,7 +705,7 @@ export const sampleAlertDestination = () => ({
 export const sampleAlerts = (folderId: string) => [
   sqlAlert(
     {
-      name: "sample_payment_errors_spike",
+      name: "o2_demo_payment_errors_spike",
       description:
         "Payment service is logging failed charges. Fires while the sample incident is in progress.",
       stream: SAMPLE_STREAMS.appLogs,
@@ -702,7 +718,7 @@ export const sampleAlerts = (folderId: string) => [
   ),
   sqlAlert(
     {
-      name: "sample_checkout_p95_latency",
+      name: "o2_demo_checkout_p95_latency",
       description: "p95 latency of POST /api/checkout is above 1.5 seconds.",
       stream: SAMPLE_STREAMS.accessLogs,
       sql: `SELECT route, approx_percentile_cont(request_time * 1000, 0.95) AS p95_ms FROM ${ACCESS} WHERE route = '/api/checkout' GROUP BY route HAVING approx_percentile_cont(request_time * 1000, 0.95) > 1500`,
@@ -714,7 +730,7 @@ export const sampleAlerts = (folderId: string) => [
   ),
   sqlAlert(
     {
-      name: "sample_edge_5xx_rate",
+      name: "o2_demo_edge_5xx_rate",
       description: "More than 2% of storefront API requests are failing with a 5xx response.",
       stream: SAMPLE_STREAMS.accessLogs,
       sql: `SELECT round(100.0 * sum(CASE WHEN status >= 500 THEN 1 ELSE 0 END) / count(*), 2) AS error_pct FROM ${ACCESS} WHERE ${NOT_STATIC} HAVING round(100.0 * sum(CASE WHEN status >= 500 THEN 1 ELSE 0 END) / count(*), 2) > 2`,
@@ -726,7 +742,7 @@ export const sampleAlerts = (folderId: string) => [
   ),
   sqlAlert(
     {
-      name: "sample_login_failures",
+      name: "o2_demo_login_failures",
       description: "Possible credential stuffing: an unusual number of failed logins.",
       stream: SAMPLE_STREAMS.appLogs,
       sql: `SELECT count(*) AS failures FROM ${APP} WHERE service_name = 'auth' AND message = 'Login failed: invalid credentials' HAVING count(*) > 50`,
@@ -738,7 +754,7 @@ export const sampleAlerts = (folderId: string) => [
   ),
   sqlAlert(
     {
-      name: "sample_recommendation_timeouts",
+      name: "o2_demo_recommendation_timeouts",
       description:
         "Recommendation model is exceeding its latency budget. Disabled to show a paused alert.",
       stream: SAMPLE_STREAMS.appLogs,

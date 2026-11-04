@@ -78,6 +78,12 @@ describe("internalStreams", () => {
     expect(isInternalStreamName("errors_app")).toBe(false);
   });
 
+  it("treats the service graph metrics O2 derives from traces as internal", () => {
+    expect(isInternalStreamName("traces_service_graph_request_total")).toBe(true);
+    expect(isInternalStreamName("traces_service_graph_processed_timestamp")).toBe(true);
+    expect(isInternalStreamName("traces_app")).toBe(false);
+  });
+
   it("counts only logs, metrics and traces, RUM streams included", () => {
     expect(isUserDataStream("default", "logs")).toBe(true);
     expect(isUserDataStream("up", "metrics")).toBe(true);

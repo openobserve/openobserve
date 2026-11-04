@@ -18,6 +18,9 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { queryClient } from "@/composables/query/queryClient";
 import { foldersQuery } from "@/services/common.queries";
 import { dashboardsSearchQuery, type DashboardSearchHit } from "@/services/dashboards.queries";
+import { sampleDataStateQuery } from "@/services/sample_data.queries";
+import type { SampleDataState } from "@/services/sample_data";
+import type { SampleWindow } from "./assets";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import {
   SAMPLE_DASHBOARD_TITLES,
@@ -41,7 +44,12 @@ export interface SampleTourStep {
 /** One incident, investigated end to end: each chapter shows one capability on the same story. */
 export const SAMPLE_TOUR_STEPS: readonly SampleTourStep[] = [
   { id: "dashboard", icon: "dashboard", capability: "dashboards", routes: ["viewDashboard"] },
-  { id: "alert", icon: "notifications", capability: "alerts", routes: ["alertList"] },
+  {
+    id: "alert",
+    icon: "notifications",
+    capability: "alerts",
+    routes: ["alertList"],
+  },
   { id: "logs", icon: "search", capability: "logs", routes: ["logs"] },
   { id: "deploy", icon: "search", capability: "logs", routes: ["logs"] },
   { id: "traces", icon: "account-tree", capability: "traces", routes: ["traces", "traceDetails"] },
@@ -50,13 +58,30 @@ export const SAMPLE_TOUR_STEPS: readonly SampleTourStep[] = [
   { id: "business", icon: "dashboard", capability: "dashboards", routes: ["viewDashboard"] },
 ];
 
-const logsQuery = (org: string, stream: string, filter: string) => ({
+export interface SampleWindowQuery {
+  from?: string;
+  to?: string;
+  period?: string;
+}
+
+/** The saved load window as URL params; orgs loaded before the window was saved fall back to a relative period. */
+export const windowParams = (
+  win: SampleWindow | undefined,
+  fallbackPeriod?: string,
+): SampleWindowQuery =>
+  win
+    ? { from: String(win.startUs), to: String(win.endUs) }
+    : fallbackPeriod
+      ? { period: fallbackPeriod }
+      : {};
+
+const logsQuery = (org: string, stream: string, filter: string, win: SampleWindowQuery) => ({
   name: "logs",
   query: {
     org_identifier: org,
     stream,
     stream_type: "logs",
-    period: "1h",
+    ...win,
     refresh: "0",
     sql_mode: "false",
     query: b64EncodeUnicode(filter) ?? "",
@@ -77,10 +102,14 @@ const dashboardTarget = async (org: string, title: string): Promise<RouteLocatio
       org_identifier: org,
       dashboard: hit.dashboardId,
       folder: hit.folderId ?? "default",
-      period: "3h",
     },
   };
 };
+
+const stateToWindow = (state?: SampleDataState): SampleWindow | undefined =>
+  state?.status === "loaded" && state.start_time && state.end_time
+    ? { startUs: state.start_time, endUs: state.end_time }
+    : undefined;
 
 const alertsTarget = async (org: string): Promise<RouteLocationRaw> => {
   const folders = await queryClient.fetchQuery(foldersQuery(org, "alerts"));
@@ -93,6 +122,9 @@ export const resolveTourTarget = async (
   org: string,
   id: SampleTourStepId,
 ): Promise<RouteLocationRaw> => {
+  const win = stateToWindow(
+    await queryClient.fetchQuery(sampleDataStateQuery(org)).catch(() => undefined),
+  );
   switch (id) {
     case "dashboard":
       return dashboardTarget(org, SAMPLE_DASHBOARD_TITLES.overview);
@@ -101,21 +133,34 @@ export const resolveTourTarget = async (
     case "alert":
       return alertsTarget(org);
     case "logs":
-      return logsQuery(org, SAMPLE_STREAMS.appLogs, "service_name = 'payment' AND level = 'error'");
+      return logsQuery(
+        org,
+        SAMPLE_STREAMS.appLogs,
+        "service_name = 'payment' AND level = 'error'",
+        windowParams(win, "1h"),
+      );
     case "deploy":
-      return logsQuery(org, SAMPLE_STREAMS.appLogs, "event = 'deployment'");
+      return logsQuery(
+        org,
+        SAMPLE_STREAMS.appLogs,
+        "event = 'deployment'",
+        windowParams(win, "1h"),
+      );
     case "traces":
       return {
         name: "traces",
         query: {
           org_identifier: org,
           stream: SAMPLE_STREAMS.traces,
-          period: "1h",
+          ...windowParams(win, "1h"),
           query: b64EncodeUnicode("span_status = 'ERROR'") ?? "",
         },
       };
     case "metrics":
-      return { name: "metrics", query: { org_identifier: org, metric: SAMPLE_METRICS.latencyP95 } };
+      return {
+        name: "metrics",
+        query: { org_identifier: org, metric: SAMPLE_METRICS.latencyP95, ...windowParams(win) },
+      };
     case "pipeline":
       return { name: "pipelines", query: { org_identifier: org } };
   }

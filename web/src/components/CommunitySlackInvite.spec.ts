@@ -64,7 +64,7 @@ const ODialogStub = {
   `,
 };
 
-// A `pending_day2` record left over from ConnectDataSourcePopup's touchpoint.
+// A `pending_day2` record left by the onboarding dialog's touchpoint.
 // `hoursAgo` controls whether the day-2 threshold has elapsed yet.
 function setPendingDay2(hoursAgo: number) {
   localStorage.setItem(
@@ -96,8 +96,8 @@ function buildWrapper() {
 // Child components: ODialog (stubbed), OButton (real), OIcon (real), SlackIcon (real)
 // Conditional states:
 //   - Cloud vs non-Cloud (isCloud !== "true" → nothing shown)
-//   - First-time login (isFirstTimeLogin = "true") → never opens, defers entirely
-//     to ConnectDataSourcePopup for that session
+//   - First-time login (isFirstTimeLogin = "true") → never opens, defers to the
+//     onboarding dialog for that session
 //   - Day-2 record not yet "pending_day2", or shownAt < 24h ago → stays closed
 //   - Day-2 record "pending_day2" and shownAt >= 24h ago → opens on mount
 //   - memberCount present/absent → different captionText
@@ -235,8 +235,7 @@ describe("CommunitySlackInvite", () => {
   });
 
   // ── First-login gate ─────────────────────────────────────────────────────────
-  // Never compete with ConnectDataSourcePopup/GetStarted during the user's
-  // first-login session — the day-2 clock only starts once that session ends.
+  // Never compete with the onboarding dialog during the user's first-login session.
 
   describe("first-login gate", () => {
     it("does not open during first-time login even with an elapsed day-2 record", () => {
@@ -256,6 +255,17 @@ describe("CommunitySlackInvite", () => {
       await nextTick();
 
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+    });
+
+    it("ignores the retired connect-popup session flag", async () => {
+      sessionStorage.setItem(`connectDataSourcePromptShown:${USER_EMAIL}`, "true");
+      setPendingDay2(25);
+
+      wrapper = buildWrapper();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+      sessionStorage.clear();
     });
   });
 

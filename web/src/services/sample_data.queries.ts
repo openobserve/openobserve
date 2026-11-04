@@ -13,14 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mutationOptions } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
+import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 import { orgKey } from "@/composables/query/keys";
+import sampleDataService from "./sample_data";
+import { sampleDataKeys } from "./sample_data.querykeys";
 import {
   loadSampleData,
   removeSampleData,
   type SampleLoadResult,
   type SampleProgress,
 } from "@/utils/sampleData/loader";
+
+export const sampleDataStateQuery = (org: string) =>
+  queryOptions({
+    queryKey: sampleDataKeys.state(org),
+    queryFn: async () => (await sampleDataService.getState(org)).data,
+    staleTime: MEDIUM_STALE_TIME,
+  });
 
 export interface LoadSampleDataVars {
   ingestAllowedUptoHours?: number;

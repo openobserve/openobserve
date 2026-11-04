@@ -16,45 +16,11 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { mount } from "@vue/test-utils";
-import { defineComponent, ref, h } from "vue";
 import * as cookies from "@/utils/cookies";
 import { shouldPaywallRoute } from "@/utils/auth";
 import config from "@/aws-exports";
 
 const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
-
-// ODialog stub mirrors the migrated public contract (v-model:open, size, show-close,
-// update:open / click:* emits). Mirrors stubs used in other migrated specs.
-const ODialogStub = defineComponent({
-  name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "persistent",
-    "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryVariant",
-    "secondaryVariant",
-    "neutralVariant",
-    "primaryDisabled",
-    "secondaryDisabled",
-    "neutralDisabled",
-    "primaryLoading",
-    "secondaryLoading",
-    "neutralLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  setup(_, { slots }) {
-    return () =>
-      h("div", { class: "o-dialog-stub" }, [slots.header?.(), slots.default?.(), slots.footer?.()]);
-  },
-});
 
 // Mock cookies module
 vi.mock("@/utils/cookies", () => ({
@@ -556,20 +522,6 @@ describe("MainLayout Methods and Functions", () => {
       // Verify message context is set
       expect(mockStore.dispatch).toHaveBeenCalledWith("setAiChatContext", testMessage);
     });
-
-    it("should handle removeFirstTimeLogin", () => {
-      const removeFirstTimeLogin = (show: boolean) => {
-        localStorage.setItem("isFirstTimeLogin", "true");
-        if (!show) {
-          localStorage.removeItem("isFirstTimeLogin");
-        }
-        return !show;
-      };
-
-      const result = removeFirstTimeLogin(false);
-      expect(result).toBe(true);
-      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
-    });
   });
 
   describe("Menu Management", () => {
@@ -1069,33 +1021,6 @@ describe("MainLayout Methods and Functions", () => {
     });
   });
 
-  describe("Local Storage Operations", () => {
-    it("should handle first time login flag removal", () => {
-      localStorage.setItem("isFirstTimeLogin", "true");
-
-      const removeFirstTimeLogin = () => {
-        localStorage.removeItem("isFirstTimeLogin");
-        return localStorage.getItem("isFirstTimeLogin") === null;
-      };
-
-      const result = removeFirstTimeLogin();
-      expect(result).toBe(true);
-      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
-    });
-
-    it("should check if first time login flag exists", () => {
-      const checkFirstTimeLogin = () => {
-        return localStorage.getItem("isFirstTimeLogin") === "true";
-      };
-
-      localStorage.setItem("isFirstTimeLogin", "true");
-      expect(checkFirstTimeLogin()).toBe(true);
-
-      localStorage.removeItem("isFirstTimeLogin");
-      expect(checkFirstTimeLogin()).toBe(false);
-    });
-  });
-
   describe("Event Handling", () => {
     it("should dispatch window resize event", () => {
       const mockEventListeners: { [key: string]: Function[] } = {};
@@ -1248,101 +1173,6 @@ describe("MainLayout Methods and Functions", () => {
           { name: "", title: "Invalid" },
         ]),
       ).toHaveLength(2);
-    });
-  });
-
-  // The MainLayout template now uses <ODialog v-model:open="showGetStarted" size="full"
-  // :show-close="false"> to host <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />.
-  // The full layout requires complex DI (skipped above), so we exercise just the migrated
-  // fragment via a small host component plus an ODialogStub. This guards the migration
-  // contract: prop bindings, v-model:open round-trip, and the removeFirstTimeLogin handler.
-  describe("ODialog Migration - GetStarted Dialog", () => {
-    const GetStartedStub = defineComponent({
-      name: "GetStarted",
-      emits: ["removeFirstTimeLogin"],
-      setup(_, { emit }) {
-        return () =>
-          h(
-            "button",
-            {
-              class: "get-started-stub",
-              onClick: () => emit("removeFirstTimeLogin", false),
-            },
-            "submit",
-          );
-      },
-    });
-
-    const Host = defineComponent({
-      name: "MainLayoutDialogHost",
-      components: { ODialog: ODialogStub, GetStarted: GetStartedStub },
-      setup() {
-        const showGetStarted = ref(true);
-        const removeFirstTimeLogin = (val: boolean) => {
-          showGetStarted.value = val;
-          localStorage.removeItem("isFirstTimeLogin");
-        };
-        return { showGetStarted, removeFirstTimeLogin };
-      },
-      template: `
-        <ODialog v-model:open="showGetStarted" size="full" :show-close="false">
-          <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
-        </ODialog>
-      `,
-    });
-
-    beforeEach(() => {
-      localStorage.setItem("isFirstTimeLogin", "true");
-    });
-
-    afterEach(() => {
-      localStorage.removeItem("isFirstTimeLogin");
-    });
-
-    it("renders ODialog with size='full' and showClose=false", () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(dialog.exists()).toBe(true);
-      expect(dialog.props("size")).toBe("full");
-      expect(dialog.props("showClose")).toBe(false);
-    });
-
-    it("binds open prop from showGetStarted (initially true)", () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(dialog.props("open")).toBe(true);
-    });
-
-    it("closes via v-model:open when ODialog emits update:open=false", async () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      await dialog.vm.$emit("update:open", false);
-
-      expect(dialog.props("open")).toBe(false);
-      expect((wrapper.vm as any).showGetStarted).toBe(false);
-    });
-
-    it("closes and clears isFirstTimeLogin when GetStarted emits removeFirstTimeLogin", async () => {
-      const wrapper = mount(Host);
-      const getStarted = wrapper.findComponent(GetStartedStub);
-
-      await getStarted.vm.$emit("removeFirstTimeLogin", false);
-
-      expect((wrapper.vm as any).showGetStarted).toBe(false);
-      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
-    });
-
-    it("does NOT forward any legacy dialog-specific props (migration removed maximized/full-height)", () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      // ODialog has no `maximized` / `fullHeight` props — verify only the new contract is in use.
-      expect(dialog.props()).not.toHaveProperty("maximized");
-      expect(dialog.props()).not.toHaveProperty("fullHeight");
-      expect(dialog.props("size")).toBe("full");
     });
   });
 

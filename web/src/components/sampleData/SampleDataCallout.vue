@@ -31,27 +31,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         t("sampleData.callout.body", { product: raw("OpenObserve") })
       }}</span>
     </div>
-    <div class="flex shrink-0 flex-wrap items-center gap-2">
-      <OButton variant="ghost" size="sm" data-test="sample-data-callout-details" @click="details">
-        {{ t("sampleData.callout.details") }}
-      </OButton>
-      <OButton
-        variant="outline"
-        size="sm"
-        icon-left="play-arrow"
-        data-test="sample-data-callout-load"
-        @click="load"
-      >
-        {{ loading ? t("sampleData.callout.loading") : t("sampleData.callout.cta") }}
-      </OButton>
-    </div>
+    <OButton
+      variant="outline"
+      size="sm"
+      icon-left="play-arrow"
+      class="shrink-0"
+      data-test="sample-data-callout-load"
+      @click="session.loadInDialog(org, store.state.zoConfig?.ingest_allowed_upto)"
+    >
+      {{ loading ? t("sampleData.callout.loading") : t("sampleData.callout.cta") }}
+    </OButton>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -59,7 +54,6 @@ import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSess
 
 const { t } = useI18nTyped();
 const store = useStore();
-const router = useRouter();
 const session = useSampleDataSession();
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
@@ -71,12 +65,4 @@ const loading = computed(
 const loaded = computed(
   () => session.status.value === "loaded" && session.loadingOrg.value === org.value,
 );
-
-const load = () => {
-  session.openWelcome();
-  session.start(org.value, store.state.zoConfig?.ingest_allowed_upto);
-};
-
-const details = () =>
-  router.push({ name: "sampleData", query: { org_identifier: org.value } }).catch(() => {});
 </script>

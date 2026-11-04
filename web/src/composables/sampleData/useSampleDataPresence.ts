@@ -15,9 +15,25 @@
 
 import { computed, type Ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { USER_DATA_STREAM_TYPES, userDataStreams } from "@/utils/internalStreams";
 import { isSampleStreamName } from "@/utils/sampleData/catalog";
+
+type StreamRow = { name?: string; stream_type?: string };
+
+const userStreamNames = (list: StreamRow[] | undefined, type: string) =>
+  userDataStreams(
+    (list ?? []).map((s) => ({ name: s?.name ?? "", stream_type: s?.stream_type ?? type })),
+  ).map((s) => s.name);
+
+/** True when the org has any logs, metrics or traces stream that O2 does not write itself. */
+export const fetchHasUserStreams = async (org: string): Promise<boolean> => {
+  const lists = await Promise.all(
+    USER_DATA_STREAM_TYPES.map((type) => queryClient.fetchQuery(streamNameListQuery(org, type))),
+  );
+  return lists.some((list, i) => userStreamNames(list, USER_DATA_STREAM_TYPES[i]).length > 0);
+};
 
 /** Whether an org holds sample streams, streams of its own, or both. */
 export const useSampleDataPresence = (
@@ -26,22 +42,16 @@ export const useSampleDataPresence = (
 ) => {
   const lists = USER_DATA_STREAM_TYPES.map((type) =>
     useQuery(
-      computed(() => ({
-        ...streamNameListQuery(org.value, type),
-        enabled: !!org.value && enabled.value,
-      })),
+      computed(() =>
+        Object.assign(streamNameListQuery(org.value, type), {
+          enabled: !!org.value && enabled.value,
+        }),
+      ),
     ),
   );
 
   const names = computed(() =>
-    lists.flatMap((q, i) =>
-      userDataStreams(
-        (q.data.value ?? []).map((s: { name?: string; stream_type?: string }) => ({
-          name: s?.name ?? "",
-          stream_type: s?.stream_type ?? USER_DATA_STREAM_TYPES[i],
-        })),
-      ).map((s) => s.name),
-    ),
+    lists.flatMap((q, i) => userStreamNames(q.data.value, USER_DATA_STREAM_TYPES[i])),
   );
 
   return {

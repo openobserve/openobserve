@@ -30,7 +30,8 @@ export const INTERNAL_STREAM_NAMES = [
   "_anomalies",
 ] as const;
 
-export const INTERNAL_STREAM_PREFIXES = ["_o2_"] as const;
+// the service graph derives traces_service_graph_* metrics from any traces, sample ones included
+export const INTERNAL_STREAM_PREFIXES = ["_o2_", "traces_service_graph_"] as const;
 
 /** RUM streams (_rumdata, _rumlog, _sessionreplay) are logs, so they count as user data. */
 export const USER_DATA_STREAM_TYPES = ["logs", "metrics", "traces"] as const;

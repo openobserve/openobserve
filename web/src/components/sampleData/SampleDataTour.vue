@@ -93,27 +93,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-2">
           <OButton
             v-if="index > 0"
-            variant="ghost"
+            variant="outline"
             size="sm"
             icon-left="arrow-back"
             data-test="sample-tour-back"
-            @click="session.setTourIndex(index - 1)"
+            @click="back"
           >
             {{ t("common.back") }}
           </OButton>
           <span class="flex-1" />
           <OButton
-            :variant="onStepRoute ? 'outline' : 'primary'"
-            size="sm"
-            icon-left="open-in-new"
-            :loading="navigating"
-            data-test="sample-tour-show"
-            @click="showStep"
-          >
-            {{ t("sampleData.tour.showMe") }}
-          </OButton>
-          <OButton
-            :variant="onStepRoute ? 'primary' : 'outline'"
+            variant="primary"
             size="sm"
             icon-right="arrow-forward"
             data-test="sample-tour-next"
@@ -138,7 +128,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="primary"
             size="sm"
-            icon-left="rocket-launch"
             data-test="sample-tour-connect"
             @click="connectOwnData"
           >
@@ -146,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <div class="flex items-center justify-between gap-2">
             <OButton
-              variant="ghost"
+              variant="outline"
               size="sm"
               data-test="sample-tour-restart"
               @click="session.setTourIndex(0)"
@@ -196,14 +185,20 @@ const navigating = ref(false);
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const active = computed(() => !!tour.value && tour.value.org === org.value);
 const presence = useSampleDataPresence(org, active);
+// only data that arrives during the tour ends it; an org that already had its own streams keeps it
+watch(
+  [active, presence.ready],
+  ([on, ready]) => on && ready && session.setTourOwnData(presence.hasRealData.value),
+  { immediate: true },
+);
 const visible = computed(
-  () => active.value && !presence.hasRealData.value && !store.state.kioskMode,
+  () =>
+    active.value &&
+    !store.state.kioskMode &&
+    (tour.value?.ownData === true || !presence.hasRealData.value),
 );
 const index = computed(() => tour.value?.index ?? 0);
 const current = computed<SampleTourStep | undefined>(() => SAMPLE_TOUR_STEPS[index.value]);
-const onStepRoute = computed(
-  () => !!current.value && current.value.routes.includes(String(route.name ?? "")),
-);
 const capabilities = computed(() => [...new Set(SAMPLE_TOUR_STEPS.map((s) => s.capability))]);
 
 const positionLabel = computed(() =>
@@ -248,6 +243,11 @@ const next = async () => {
   if (current.value) await showStep();
 };
 
+const back = async () => {
+  session.setTourIndex(index.value - 1);
+  if (current.value) await showStep();
+};
+
 const connectOwnData = () => {
   session.stopTour();
   router.push({ name: "recommended", query: { org_identifier: org.value } }).catch(() => {});
@@ -255,7 +255,7 @@ const connectOwnData = () => {
 
 // once the org has data of its own the demo has served its purpose; Home offers the cleanup
 watch(
-  () => active.value && presence.hasRealData.value,
+  () => active.value && tour.value?.ownData === false && presence.hasRealData.value,
   (stale) => stale && session.stopTour(),
 );
 </script>

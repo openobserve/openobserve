@@ -15,21 +15,21 @@
 
 /** The names every sample asset is created under; removal finds them by these names. */
 export const SAMPLE_STREAMS = {
-  appLogs: "sample_app_logs",
-  accessLogs: "sample_nginx_access",
-  traces: "sample_traces",
+  appLogs: "o2_demo_app_logs",
+  accessLogs: "o2_demo_nginx_access",
+  traces: "o2_demo_traces",
 } as const;
 
 export const SAMPLE_METRICS = {
-  requests: "sample_http_requests_total",
-  latencyP95: "sample_http_request_duration_p95_ms",
-  cpu: "sample_container_cpu_usage_percent",
-  memory: "sample_container_memory_usage_bytes",
-  orders: "sample_orders_total",
-  kafkaLag: "sample_kafka_consumer_lag",
+  requests: "o2_demo_http_requests_total",
+  latencyP95: "o2_demo_http_request_duration_p95_ms",
+  cpu: "o2_demo_container_cpu_usage_percent",
+  memory: "o2_demo_container_memory_usage_bytes",
+  orders: "o2_demo_orders_total",
+  kafkaLag: "o2_demo_kafka_consumer_lag",
 } as const;
 
-export const SAMPLE_ENRICHMENT_TABLE = "sample_service_owners";
+export const SAMPLE_ENRICHMENT_TABLE = "o2_demo_service_owners";
 export const SAMPLE_FOLDER_NAME = "Sample data";
 export const SAMPLE_DASHBOARD_TITLES = {
   overview: "Storefront · Service overview",
@@ -38,10 +38,10 @@ export const SAMPLE_DASHBOARD_TITLES = {
   infra: "Storefront · Infrastructure",
 } as const;
 export const SAMPLE_OVERVIEW_TITLE = SAMPLE_DASHBOARD_TITLES.overview;
-export const SAMPLE_ALERT_TEMPLATE = "sample_alert_template";
-export const SAMPLE_ALERT_DESTINATION = "sample_webhook";
-export const SAMPLE_FUNCTIONS = ["sample_classify_latency", "sample_parse_user_agent"] as const;
-export const SAMPLE_PIPELINE = "sample_enrich_access_logs";
+export const SAMPLE_ALERT_TEMPLATE = "o2_demo_alert_template";
+export const SAMPLE_ALERT_DESTINATION = "o2_demo_webhook";
+export const SAMPLE_FUNCTIONS = ["o2_demo_classify_latency", "o2_demo_parse_user_agent"] as const;
+export const SAMPLE_PIPELINE = "o2_demo_enrich_access_logs";
 
 export const SAMPLE_NAMESPACE = "storefront";
 

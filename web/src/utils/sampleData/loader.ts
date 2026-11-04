@@ -40,6 +40,7 @@ import {
   sampleAlertTemplate,
   sampleAlerts,
   sampleDashboards,
+  type SampleWindow,
   sampleFunctions,
   sampleServiceOwnersCsv,
 } from "./assets";
@@ -64,12 +65,35 @@ export interface SampleCounts {
   metrics: number;
 }
 
+export interface SampleLogLine {
+  /** Microseconds. */
+  ts: number;
+  level: string;
+  text: string;
+}
+
 export interface SampleProgress {
   step: SampleStepId;
   /** 0..1 within the telemetry step; the asset steps report 0 then 1. */
   fraction: number;
   counts: SampleCounts;
+  /** A few of the app log rows the last telemetry batch really sent. */
+  logs?: SampleLogLine[];
 }
+
+const FEED_LINES = 12;
+const feedOf = (rows: Record<string, string | number | boolean>[]): SampleLogLine[] => {
+  const step = Math.max(1, Math.floor(rows.length / FEED_LINES));
+  return rows
+    .filter((_, i) => i % step === 0)
+    .slice(0, FEED_LINES)
+    .map((r) => ({
+      ts: Number(r._timestamp),
+      level: String(r.level ?? "info"),
+      text: `${r.service_name}: ${r.message}`,
+    }))
+    .sort((a, b) => a.ts - b.ts);
+};
 
 export interface SampleLoadResult {
   counts: SampleCounts;
@@ -107,10 +131,11 @@ const findFolder = async (org: string, type: "dashboards" | "alerts") => {
 const ingestTelemetry = async (
   org: string,
   hours: number,
-  report: (fraction: number, counts: SampleCounts) => void,
+  report: (fraction: number, counts: SampleCounts, logs: SampleLogLine[]) => void,
 ) => {
   const endUs = Date.now() * 1000;
-  const gen = createSampleGenerator({ startUs: endUs - hours * HOUR_US, endUs });
+  const range: SampleWindow = { startUs: endUs - hours * HOUR_US, endUs };
+  const gen = createSampleGenerator(range);
   const counts: SampleCounts = { logs: 0, spans: 0, metrics: 0 };
   for (let i = 0; i < gen.chunkCount; i++) {
     const batch = gen.generateChunk(i);
@@ -126,12 +151,12 @@ const ingestTelemetry = async (
     counts.logs += batch.appLogs.length + batch.accessLogs.length;
     counts.spans += batch.spanCount;
     counts.metrics += batch.metrics.length;
-    report((i + 1) / gen.chunkCount, { ...counts });
+    report((i + 1) / gen.chunkCount, { ...counts }, feedOf(batch.appLogs));
   }
-  return counts;
+  return { counts, window: range };
 };
 
-const createDashboards = async (org: string) => {
+const createDashboards = async (org: string, range: SampleWindow) => {
   const folderId = await findOrCreateFolder(org, "dashboards");
   const existing = await dashboardService.list(0, 1000, "name", false, "", org, folderId, "");
   const titles = new Set(
@@ -140,7 +165,7 @@ const createDashboards = async (org: string) => {
   let overviewId: string | undefined = (existing.data?.dashboards ?? [])
     .map(toSearchHit)
     .find((hit: { title: string }) => hit.title === SAMPLE_OVERVIEW_TITLE)?.dashboardId;
-  for (const dash of sampleDashboards()) {
+  for (const dash of sampleDashboards(range)) {
     if (titles.has(dash.title)) continue;
     const res = await dashboardService.create(org, dash, folderId);
     if (dash.title === SAMPLE_OVERVIEW_TITLE) overviewId = toSearchHit(res.data).dashboardId;
@@ -225,13 +250,20 @@ export const loadSampleData = async (
   await run("pipeline", () => createPipeline(org));
 
   onProgress({ step: "telemetry", fraction: 0, counts });
-  counts = await ingestTelemetry(org, hours, (fraction, c) =>
-    onProgress({ step: "telemetry", fraction, counts: c }),
+  const telemetry = await ingestTelemetry(org, hours, (fraction, c, logs) =>
+    onProgress({ step: "telemetry", fraction, counts: c, logs }),
   );
+  counts = telemetry.counts;
   result.counts = counts;
+  try {
+    await sampleDataService.putState(org, telemetry.window.startUs, telemetry.window.endUs);
+  } catch (e) {
+    // the data is already loaded; without the saved window the tour falls back to relative ranges
+    console.warn("Sample data window was not saved", e);
+  }
 
   await run("dashboards", async () => {
-    const { folderId, overviewId } = await createDashboards(org);
+    const { folderId, overviewId } = await createDashboards(org, telemetry.window);
     result.dashboardFolderId = folderId;
     result.overviewDashboardId = overviewId;
   });
@@ -306,4 +338,10 @@ export const removeSampleData = async (org: string) => {
       ignoreMissing(() => streamService.delete(org, s.name, s.type, true)),
     ),
   );
+  try {
+    await sampleDataService.deleteState(org);
+  } catch (e) {
+    // everything else is already deleted; a stale state only points the tour at a window with no data
+    console.warn("Sample data window was not deleted", e);
+  }
 };

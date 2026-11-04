@@ -15,12 +15,16 @@ class GetStartedPage {
         this.subtitle = page.locator('[data-test="onboarding-get-started-subtitle"]');
         this.grid = page.locator('[data-test="onboarding-get-started-source-grid"]');
         this.sources = page.locator('[data-test^="onboarding-get-started-source-"]:not([data-test="onboarding-get-started-source-grid"])');
-        this.hearAboutUs = page.locator('[data-test="onboarding-get-started-hear-about-us-field"]');
-        this.whereDoYouWork = page.locator('[data-test="onboarding-get-started-where-do-you-work-field"]');
-        // The box itself: the wrapper's centre lands on the Privacy policy link in the label.
-        this.agree = page.locator('[data-test="onboarding-get-started-agree-checkbox"]').getByRole('checkbox');
+        this.connectCard = page.locator('[data-test="onboarding-get-started-connect-card"]');
+        this.chips = page.locator('[data-test="onboarding-get-started-chips"]');
+        this.moreChip = page.locator('[data-test="onboarding-get-started-more-chip"]');
+        this.chooseBtn = page.locator('[data-test="onboarding-get-started-choose-btn"]');
+        this.sampleCard = page.locator('[data-test="onboarding-get-started-sample-card"]');
+        this.sampleBtn = page.locator('[data-test="onboarding-get-started-sample-btn"]');
+        this.backBtn = page.locator('[data-test="onboarding-get-started-back-btn"]');
+        this.search = page.locator('[data-test="onboarding-get-started-search"]');
+        this.noMatch = page.locator('[data-test="onboarding-get-started-no-match"]');
         this.skipBtn = page.locator('[data-test="onboarding-get-started-skip-btn"]');
-        this.continueBtn = page.locator('[data-test="onboarding-get-started-submit-btn"]');
         this.connectPopup = page.locator('[data-test="connect-data-source-popup-dialog"]');
         this.pickGroup = page.locator('[data-test="ingestion-recommended-pick-group"]');
         this.attributionBodies = [];
@@ -44,14 +48,12 @@ class GetStartedPage {
     }
 
     // Puts this browser into the first-login state MainLayout opens the dialog for.
-    async openAsFirstLogin(path, { orgId, prefill } = {}) {
+    async openAsFirstLogin(path, { orgId } = {}) {
         await this.page.goto(path);
-        await this.page.evaluate(({ org, pre }) => {
+        await this.page.evaluate((org) => {
             localStorage.setItem('isFirstTimeLogin', 'true');
             localStorage.removeItem(`o2.onboarding.firstSource.${org}`);
-            if (pre) sessionStorage.setItem('o2.onboarding.prefill', JSON.stringify(pre));
-            else sessionStorage.removeItem('o2.onboarding.prefill');
-        }, { org: orgId, pre: prefill ?? null });
+        }, orgId);
         await this.page.reload();
         await expect(this.title).toBeVisible({ timeout: 20000 });
     }
@@ -61,8 +63,20 @@ class GetStartedPage {
             els.map((el) => el.getAttribute('data-test').replace('onboarding-get-started-source-', '')));
     }
 
-    async expectPicked(id) {
-        await expect(this.source(id)).toHaveAttribute('data-state', 'checked');
+    // Opens the searchable list of every source from the connect card.
+    async showAllSources() {
+        await this.chooseBtn.click();
+        await expect(this.grid).toBeVisible();
+    }
+
+    // Picks a source from the list; Not sure yet is not a pick any more and starts the sample.
+    async pickFromList(id) {
+        await this.showAllSources();
+        await this.source(id).click();
+    }
+
+    async exploreSample() {
+        await this.sampleBtn.click();
     }
 
     async storedPick(orgId) {

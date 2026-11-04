@@ -54,7 +54,6 @@ describe("MainLayout — Product Analytics menu entry", () => {
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,
           ShortcutCheatsheet: StubDiv,
-          GetStarted: StubDiv,
           CommunitySlackInvite: StubDiv,
           ThemeSwitcher: StubDiv,
           PredefinedThemes: StubDiv,

@@ -30,8 +30,9 @@ use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
-    kv, metrics_usage, model_pricing, organization, query_history, rum_analytics, service_accounts,
-    short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics, users,
+    kv, metrics_usage, model_pricing, organization, query_history, rum_analytics, sample_data,
+    service_accounts, short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics,
+    users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -1327,6 +1328,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/dashboards/move", patch(dashboards::move_dashboards))
         .route("/{org_id}/dashboards/{dashboard_id}/panels", post(dashboards::add_panel))
         .route("/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}", put(dashboards::update_panel).delete(dashboards::delete_panel))
+        .route("/{org_id}/sample_data", get(sample_data::get).put(sample_data::put).delete(sample_data::delete))
 
         .merge(report_routes())
 

@@ -21,6 +21,7 @@ import {
   SAMPLE_STEPS,
   type SampleCounts,
   type SampleLoadResult,
+  type SampleLogLine,
   type SampleProgress,
   type SampleStepId,
 } from "@/utils/sampleData/loader";
@@ -33,14 +34,15 @@ interface TourState {
   org: string;
   index: number;
   minimized: boolean;
+  /** Whether the org already held its own streams when the tour started. */
+  ownData?: boolean;
 }
 
 const TOUR_STORAGE_KEY = "o2_sample_tour";
 const WELCOME_SEEN_KEY = "o2_sample_welcome_seen";
 const TOUR_DONE_KEY = "o2_sample_tour_done";
-const BANNER_DISMISSED_KEY = "o2_sample_home_banner_dismissed";
 const CLEANUP_DISMISSED_KEY = "o2_sample_cleanup_dismissed";
-const ORG_FLAGS = [TOUR_DONE_KEY, BANNER_DISMISSED_KEY, CLEANUP_DISMISSED_KEY] as const;
+const ORG_FLAGS = [TOUR_DONE_KEY, CLEANUP_DISMISSED_KEY] as const;
 
 type OrgFlag = (typeof ORG_FLAGS)[number];
 
@@ -96,7 +98,10 @@ const fraction = computed(() => {
   );
 });
 
+const recentLogs = ref<SampleLogLine[]>([]);
+
 const resetProgress = () => {
+  recentLogs.value = [];
   for (const id of SAMPLE_STEPS) steps[id] = "pending";
   telemetryFraction.value = 0;
   Object.assign(counts, { logs: 0, spans: 0, metrics: 0 });
@@ -104,6 +109,7 @@ const resetProgress = () => {
 
 const onProgress = (p: SampleProgress) => {
   Object.assign(counts, p.counts);
+  if (p.logs?.length) recentLogs.value = p.logs;
   if (p.step === "telemetry") {
     telemetryFraction.value = p.fraction;
     steps.telemetry = p.fraction >= 1 ? "done" : "running";
@@ -170,6 +176,12 @@ const setTourIndex = (index: number) => {
   if (next === last) setOrgFlag(TOUR_DONE_KEY, tour.value.org, true);
 };
 
+const setTourOwnData = (ownData: boolean) => {
+  if (!tour.value || tour.value.ownData !== undefined) return;
+  tour.value = { ...tour.value, ownData };
+  persistTour();
+};
+
 const setTourMinimized = (minimized: boolean) => {
   if (!tour.value) return;
   tour.value = { ...tour.value, minimized };
@@ -195,6 +207,7 @@ export const useSampleDataSession = () => ({
   error,
   result,
   counts,
+  recentLogs,
   steps,
   fraction,
   welcomeOpen,
@@ -205,13 +218,18 @@ export const useSampleDataSession = () => ({
   stopTour,
   setTourIndex,
   setTourMinimized,
+  setTourOwnData,
   welcomeSeen,
   markWelcomeSeen,
   tourDone: (org: string) => orgFlag(TOUR_DONE_KEY, org),
-  bannerDismissed: (org: string) => orgFlag(BANNER_DISMISSED_KEY, org),
-  dismissBanner: (org: string) => setOrgFlag(BANNER_DISMISSED_KEY, org, true),
   cleanupDismissed: (org: string) => orgFlag(CLEANUP_DISMISSED_KEY, org),
   dismissCleanup: (org: string) => setOrgFlag(CLEANUP_DISMISSED_KEY, org, true),
   openWelcome: () => (welcomeOpen.value = true),
+  /** Starts a load with its progress on screen in the welcome dialog. */
+  loadInDialog: (org: string, ingestAllowedUptoHours?: number) => {
+    markWelcomeSeen(org);
+    welcomeOpen.value = true;
+    return start(org, ingestAllowedUptoHours);
+  },
   closeWelcome: () => (welcomeOpen.value = false),
 });

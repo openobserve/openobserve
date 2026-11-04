@@ -3015,13 +3015,9 @@
     "getStartedBannerMessage": "Try OpenObserve today for more efficient and performant observability.",
     "getStartedBannerAlt": "Get Started Banner",
     "getStartedHeading": "One last thing before we begin",
-    "hearAboutUsLabel": "How did you hear about us?",
     "hearAboutUsPlaceholder": "Eg. From a friend",
-    "whereDoYouWorkLabel": "Where do you work?",
     "whereDoYouWorkPlaceholder": "Company Name",
-    "agreeToTermsPrefix": "I have read and agree with the",
     "termsOfUse": "Terms of use",
-    "and": "and",
     "privacyPolicyStar": "Privacy policy*",
     "startTrialButton": "Start your 14-day Trial",
     "copyrightNotice": "© OpenObserve",
@@ -3032,19 +3028,39 @@
     "emailRequired": "Email is required",
     "emailInvalid": "Please enter a valid email",
     "passwordRequired": "Password is required",
-    "mustAcceptTerms": "You must accept the terms to continue",
     "getStarted": {
       "title": "Welcome to OpenObserve",
-      "subtitle": "Your 14-day trial has started. Two quick questions, then we'll take you to setup.",
-      "sourceLabel": "What do you want to send first?",
-      "optional": "(optional)",
-      "skip": "Skip questions",
-      "continue": "Continue",
-      "hearAboutUsPlaceholder": "For example, a colleague or a blog post",
-      "whereDoYouWorkPlaceholder": "Company or team",
-      "termsOfService": "Terms of service",
-      "privacyPolicy": "Privacy policy",
-      "agreeHint": "Needed to continue, even if you skip the questions.",
+      "skipForNow": "Skip for Now",
+      "heard": {
+        "label": "How did you hear about us?",
+        "placeholder": "Select an Option",
+        "thanks": "Thanks!",
+        "options": {
+          "search": "Search Engine",
+          "ai": "AI Assistant",
+          "social": "Social Media",
+          "github": "GitHub",
+          "blog": "Blog or Article",
+          "video": "YouTube or Video",
+          "friend": "Colleague or Friend",
+          "event": "Event or Conference",
+          "other": "Other"
+        }
+      },
+      "connect": {
+        "title": "Connect Your Data",
+        "point1": "Step-by-step setup for each source",
+        "point2": "Logs, metrics and traces in one place",
+        "point3": "See your first events within minutes",
+        "cta": "Explore Other Data Sources"
+      },
+      "sample": {
+        "title": "Explore With Sample Data",
+        "point1": "Logs, traces and metrics from sample services",
+        "point2": "Dashboards, alerts, a pipeline and VRL functions",
+        "point3": "A guided tour, and one click to remove it all",
+        "cta": "Explore With Sample Data"
+      },
       "sources": {
         "kubernetes": "Kubernetes",
         "linux": "Linux or VM host",
@@ -3057,6 +3073,17 @@
         "llm": "LLM or AI app",
         "agent": "Let an AI agent set it up",
         "unsure": "Not sure yet"
+      },
+      "chips": {
+        "kubernetes": "Kubernetes",
+        "linux": "Linux / VM",
+        "windows": "Windows",
+        "webserver": "Web Server",
+        "otel": "OpenTelemetry",
+        "cloud": "AWS · Azure · GCP",
+        "rum": "Browser (RUM)",
+        "llm": "LLM or AI App",
+        "agent": "AI Agent"
       }
     }
   },
@@ -5022,12 +5049,6 @@
     "membersCount": "{count} members",
     "joinSlack": "Join the Slack",
     "maybeLater": "Maybe later"
-  },
-  "connectDataSourcePopup": {
-    "title": "To get started, let's connect your first data source.",
-    "description": "We've got lots to show you, but we'll need to get your data connected first. Most teams see their first logs in about a minute.",
-    "connectButton": "Connect a data source",
-    "slackLink": "Also join our Slack community"
   },
   "confirmDialog": {
     "continueFromWherePaused": "Continue from where it paused",
@@ -20727,7 +20748,6 @@
     },
     "login": {
       "somethingWentWrong": "Something went wrong",
-      "thankYouForYourFeedback": "Thank you for your feedback",
       "selectedSuggestion": "Selected suggestion \"{suggestion}\"",
       "pleaseFillAllTheFieldsAnd": "Please fill all the fields and try again.",
       "invalidUsernameOrPassword": "Invalid username or password",
@@ -27246,33 +27266,8 @@
     }
   },
   "sampleData": {
-    "title": "Explore with sample data",
-    "subtitle": "Try the whole platform with realistic data before you connect your own",
-    "load": "Load sample data",
+    "delete": "Delete Sample Data",
     "remove": "Remove sample data",
-    "openOverview": "Open service overview",
-    "hero": {
-      "title": "A realistic storefront, ready to explore",
-      "body": "Loads the last {hours} hours of logs, traces and metrics from a 10-service e-commerce app on Kubernetes, with dashboards, alerts and functions already set up. Something is going wrong in checkout: see if you can find out why.",
-      "loadedTitle": "Sample data is loaded",
-      "loadedBody": "The storefront's telemetry and assets are in this organization. Take the guided tour to investigate the checkout incident, or pick a place to start."
-    },
-    "included": {
-      "title": "What gets created",
-      "logs": "Logs",
-      "logsDetail": "Application logs and web access logs in {app} and {access}",
-      "traces": "Traces",
-      "tracesDetail": "Distributed traces across 10 services, linked to their logs",
-      "metrics": "Metrics",
-      "metricsDetail": "{count} Prometheus metrics for requests, latency, CPU, memory and queue lag",
-      "dashboards": "4 dashboards",
-      "dashboardsDetail": "Service overview, business KPIs, web traffic and infrastructure",
-      "alerts": "5 alerts",
-      "alertsDetail": "Scheduled SQL alerts, one of them firing on the ongoing incident",
-      "pipeline": "Pipeline and functions",
-      "pipelineDetail": "A real-time pipeline that parses every access log with VRL, 2 functions and a service owners enrichment table"
-    },
-    "footnote": "Streams and functions start with {prefix}, dashboards and alerts sit in a Sample data folder, and the data covers the last {hours} hours. Remove all of it from this page in one click.",
     "steps": {
       "functions": "Creating functions",
       "pipeline": "Creating a real-time pipeline",
@@ -27285,23 +27280,10 @@
       "loading": "Loading sample data…",
       "done": "Sample data loaded",
       "counts": "{logs} log records · {spans} spans · {metrics} metric points",
-      "skipped": "Skipped"
-    },
-    "explore": {
-      "title": "Start exploring",
-      "subtitle": "Each card opens the storefront's data in a different part of the product.",
-      "dashboards": "Service overview dashboard",
-      "dashboardsDesc": "Golden signals and the incident at a glance",
-      "logs": "Payment errors in Logs",
-      "logsDesc": "Search the failing charges from the last hour",
-      "traces": "Failed requests in Traces",
-      "tracesDesc": "Follow a failed checkout across services",
-      "metrics": "Metrics",
-      "metricsDesc": "Request rates, latency and saturation with PromQL",
-      "alerts": "Alerts",
-      "alertsDesc": "Five alerts in the Sample data folder",
-      "pipeline": "Pipelines",
-      "pipelineDesc": "Real-time processing with VRL as data arrives"
+      "skipped": "Skipped",
+      "logs": "Logs",
+      "spans": "Spans",
+      "metrics": "Metric Points"
     },
     "removeConfirm": {
       "title": "Remove sample data?",
@@ -27314,19 +27296,22 @@
       "removeFailed": "Could not remove all sample data"
     },
     "entry": {
-      "ingestionBtn": "Try sample data",
       "onboardingSource": "Explore sample data"
     },
     "callout": {
       "title": "Not ready to send data yet?",
       "body": "Explore {product} with a sample online store first: an incident in progress, and a guided tour through dashboards, alerts, logs, traces, metrics and pipelines.",
       "cta": "Explore with sample data",
-      "loading": "Loading sample data…",
-      "details": "What's included"
+      "loading": "Loading sample data…"
+    },
+    "header": {
+      "label": "Sample Data",
+      "try": "Try Sample Data"
+    },
+    "dock": {
+      "details": "Show Details"
     },
     "homeBanner": {
-      "message": "You're exploring sample data. Follow the guided tour to investigate the checkout incident.",
-      "manage": "Manage sample data",
       "cleanup": {
         "message": "Your own data is arriving. Remove the sample data so it does not mix into your dashboards, alerts and searches.",
         "keep": "Keep for now",
@@ -27334,25 +27319,6 @@
       }
     },
     "welcome": {
-      "title": "Welcome to {product}",
-      "subtitle": "Send your logs, metrics and traces to get started.",
-      "sample": {
-        "title": "Explore with sample data",
-        "body": "Not ready to connect yet? Try a busy online store with an incident in progress.",
-        "point1": "{hours} hours of logs, traces and metrics from 10 services",
-        "point2": "4 dashboards, 5 alerts, a pipeline and VRL functions",
-        "point3": "A guided tour, and one click to remove it all",
-        "cta": "Explore with sample data"
-      },
-      "connect": {
-        "title": "Connect your data",
-        "body": "Send logs, metrics and traces from {p1}, {p2}, {p3}, {p4} and 100+ other sources.",
-        "point1": "Step-by-step setup for each source",
-        "point2": "Logs, metrics and traces in one place",
-        "point3": "See your first events within minutes",
-        "cta": "Choose a data source"
-      },
-      "skip": "Skip for now",
       "continueInBackground": "Continue in the background",
       "progress": {
         "title": "Building your sample store",
@@ -27360,16 +27326,6 @@
       },
       "ready": {
         "title": "Your sample store is live",
-        "body": "Checkout started failing 35 minutes ago. The guided tour walks you through finding out why.",
-        "covers": "The guided tour covers",
-        "capabilities": {
-          "dashboards": "Spot the spike, then see what it cost",
-          "alerts": "See which alerts fired, and why",
-          "logs": "Filter the errors and find the bad deploy",
-          "traces": "Follow a slow checkout to the database",
-          "metrics": "Chart p95 latency with PromQL",
-          "pipelines": "Enrich logs in real time with VRL"
-        },
         "startTour": "Start the guided tour",
         "ownWay": "Explore on my own"
       },
@@ -27382,7 +27338,6 @@
       "done": "Tour complete",
       "minimize": "Minimize tour",
       "close": "End tour",
-      "showMe": "Show me",
       "next": "Next",
       "capabilities": {
         "dashboards": "Dashboards",
