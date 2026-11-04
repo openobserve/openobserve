@@ -379,6 +379,17 @@ impl ManualTrigger {
             }
         }
     }
+
+    /// What the send could not deliver, such as a failed destination or a page the license
+    /// withheld.
+    pub fn warning(&self) -> Option<&str> {
+        match self {
+            Self::Sent { error_message, .. } if !error_message.trim().is_empty() => {
+                Some(error_message)
+            }
+            _ => None,
+        }
+    }
 }
 
 pub async fn save(
@@ -2358,6 +2369,18 @@ pub(crate) fn with_incident_notify_error(
     }
 }
 
+/// A failure, not a skip, so alert history says why on-call stayed silent.
+#[cfg(feature = "enterprise")]
+pub(crate) fn with_unlicensed_page_reason(
+    notify_error: Option<String>,
+    unlicensed: Option<&str>,
+) -> Option<String> {
+    match unlicensed {
+        None => notify_error,
+        Some(reason) => Some(with_incident_notify_error(reason.to_string(), notify_error)),
+    }
+}
+
 /// Whether a send tried any destination or workflow; an `Err` is a failed delivery, so it counts.
 pub(crate) fn send_attempted(result: &Result<NotificationOutcome, AlertError>) -> bool {
     result.as_ref().map_or(true, |outcome| outcome.attempted)
@@ -2408,9 +2431,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
     let (incident_notified, incident_notify_error) = if alert.creates_incident
-        && o2_enterprise::enterprise::common::config::get_config()
-            .incidents
-            .enabled
+        && crate::alerts::incidents::incidents_enabled()
     {
         let synthetic_row = manual_trigger_row(&alert);
         let notify = std::slice::from_ref(&synthetic_row);
@@ -2478,6 +2499,11 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     if o2_enterprise::enterprise::oncall::is_enabled() && !incident_notified {
         crate::alerts::scheduler::handlers::page_for_alert_firing(&trace_id, &alert, &rows).await;
     }
+    #[cfg(feature = "enterprise")]
+    let incident_notify_error = with_unlicensed_page_reason(
+        incident_notify_error,
+        o2_enterprise::enterprise::oncall::escalation::unlicensed_page_reason(&alert.org_id).await,
+    );
     let outcome = alert
         .send_notification(
             &trace_id,
@@ -2976,7 +3002,7 @@ impl AlertExt for Alert {
         }
 
         outcome.success_message = success_message;
-        outcome.error_message = err_message;
+        outcome.error_message = format!("{err_message}{workflow_err_msg}");
 
         // Attempted = destinations not skipped by the ledger. An attempt in
         // which every attempted destination failed is still a hard error, so
@@ -4692,6 +4718,7 @@ pub async fn permitted_alerts(
                 use_self_context: false,
                 use_self_parent: true,
                 auth: "".to_string(), // We don't need to pass the auth token here.
+                feature: None,
             },
             user_role,
             false,
@@ -8703,6 +8730,16 @@ mod tests {
             error_message: String::new(),
         };
         assert_eq!(sent.response_message(), "Alert triggered");
+        assert_eq!(sent.warning(), None);
+        assert_eq!(suppressed.warning(), None);
+        let partial = ManualTrigger::Sent {
+            success_message: String::new(),
+            error_message: "not paged: On-Call is not included in your license".to_string(),
+        };
+        assert_eq!(
+            partial.warning(),
+            Some("not paged: On-Call is not included in your license")
+        );
     }
 
     #[test]
