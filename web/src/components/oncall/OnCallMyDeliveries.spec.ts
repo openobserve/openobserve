@@ -108,9 +108,10 @@ const history = (wrapper: ReturnType<typeof render>) =>
   wrapper.findComponent('[data-test="oncall-my-deliveries-table"]');
 const historyRows = (wrapper: ReturnType<typeof render>) =>
   history(wrapper).findAll('[data-test="row"]');
-const answer = (deliveries: MyDelivery[]) =>
+/// The server counts unread sends, not pages, and ignores both the filter and the row window.
+const answer = (deliveries: MyDelivery[], unread = deliveries.filter((d) => !d.read).length) =>
   service.myDeliveries.mockResolvedValue(
-    axiosReply({ total: deliveries.length, unread: 99, deliveries }),
+    axiosReply({ total: deliveries.length, unread, deliveries }),
   );
 
 describe("OnCallMyDeliveries", () => {
@@ -351,6 +352,64 @@ describe("OnCallMyDeliveries", () => {
       expect(wrapper.find('[data-test="oncall-my-deliveries-unread"]').text()).toContain("2");
     });
 
+    it("takes the server's total when older unread pages lie past the loaded 100", async () => {
+      const loaded = Array.from({ length: 100 }, (_, i) =>
+        delivery({
+          event_id: `ev_${i}`,
+          response_id: `resp_${i}`,
+          subject_id: `al_${i}`,
+          read: i >= 60,
+        }),
+      );
+      answer(loaded, 140);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.emitted("unread")?.at(-1)).toEqual([140]);
+      expect(wrapper.find('[data-test="oncall-my-deliveries-unread"]').text()).toContain("140");
+      expect(wrapper.find('[data-test="oncall-my-deliveries-read-all"]').classes()).not.toContain(
+        "invisible",
+      );
+    });
+
+    it("keeps the badge when Unread only is ticked", async () => {
+      const send = (i: number, read: boolean) =>
+        delivery({
+          event_id: `ev_${i}`,
+          response_id: `resp_${i % 50}`,
+          subject_id: `al_${i}`,
+          read,
+        });
+      service.myDeliveries.mockImplementation(async (args) =>
+        axiosReply({
+          total: 100,
+          unread: 150,
+          deliveries: Array.from({ length: 100 }, (_, i) =>
+            send(i, args.unread_only ? false : i >= 40),
+          ),
+        }),
+      );
+      const wrapper = render();
+      await flushPromises();
+      const before = wrapper.emitted("unread")?.at(-1);
+
+      await wrapper.find('[data-test="oncall-my-deliveries-unread-toggle"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.emitted("unread")?.at(-1)).toEqual(before);
+    });
+
+    it("shows Mark all read when every loaded row is read but older ones are not", async () => {
+      answer([delivery({ read: true })], 3);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.emitted("unread")?.at(-1)).toEqual([3]);
+      expect(wrapper.find('[data-test="oncall-my-deliveries-read-all"]').classes()).not.toContain(
+        "invisible",
+      );
+    });
+
     it("shows the unread dot on an unread resolved alert", async () => {
       answer([delivery({ read: false, response_state: "resolved" })]);
       const wrapper = render();
@@ -370,6 +429,52 @@ describe("OnCallMyDeliveries", () => {
     await flushPromises();
 
     expect(service.myDeliveries.mock.calls.at(-1)![0]).toMatchObject({ unread_only: true });
+  });
+
+  it("keeps a read open page in Needs you while History shows unread only", async () => {
+    const open = delivery({
+      event_id: "ev_open",
+      response_id: "resp_open",
+      read: true,
+      response_state: "triggered",
+    });
+    const unreadOne = delivery({
+      event_id: "ev_new",
+      response_id: "resp_new",
+      subject_id: "al_new",
+      title: "disk full",
+      read: false,
+      response_state: "resolved",
+    });
+    service.myDeliveries.mockImplementation(async (args) =>
+      axiosReply({
+        total: args.unread_only ? 1 : 2,
+        unread: 1,
+        deliveries: args.unread_only ? [unreadOne] : [open, unreadOne],
+      }),
+    );
+    const wrapper = render();
+    await flushPromises();
+    const needsYou = () => wrapper.findComponent('[data-test="oncall-my-needs-you-table"]');
+    expect(needsYou().props("data")).toHaveLength(1);
+
+    await wrapper.find('[data-test="oncall-my-deliveries-unread-toggle"]').trigger("click");
+    await flushPromises();
+
+    expect(historyRows(wrapper)).toHaveLength(1);
+    expect(needsYou().props("data")).toEqual([open]);
+    expect(wrapper.find('[data-test="oncall-my-needs-you-ack-resp_open"]').exists()).toBe(true);
+  });
+
+  it("reads the unfiltered inbox for Needs you when the page opens on unread only", async () => {
+    Object.assign(useListViewState("oncall-my-deliveries", {}), { unreadOnly: true });
+    answer([delivery({ read: true, response_state: "triggered" })]);
+    const wrapper = render();
+    await flushPromises();
+
+    const filters = service.myDeliveries.mock.calls.map(([args]) => !!args.unread_only);
+    expect(filters.sort()).toEqual([false, true]);
+    expect(wrapper.find('[data-test="oncall-my-needs-you"]').exists()).toBe(true);
   });
 
   /// A read, resolved page still offers "Mark unread" on its row, and nothing to filter.

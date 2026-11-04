@@ -370,6 +370,8 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 const nowMicros = useOnCallClock();
 
 const rows = ref<MyDelivery[]>([]);
+/// The unfiltered inbox: "Needs you" is every open page, whatever History is narrowed to.
+const allRows = ref<MyDelivery[]>([]);
 
 const needsYouKey = computed(
   () =>
@@ -467,7 +469,7 @@ const emptyAction = computed<{ label: I18nText; icon: IconName; run: () => void 
 /// The open pages, one row per page with its newest send.
 const openRows = computed<MyDelivery[]>(() => {
   const byPage = new Map<string, MyDelivery>();
-  for (const row of rows.value) {
+  for (const row of allRows.value) {
     if (row.response_state === "resolved") continue;
     const seen = byPage.get(row.response_id);
     if (!seen || seen.at < row.at) byPage.set(row.response_id, row);
@@ -571,22 +573,33 @@ let loadedOnce = false;
 /// Set only when the first load fails, so "nothing was sent" is never said for a read that did not happen.
 const loadError = ref<string | null>(null);
 
-async function fetchDeliveries(force = false) {
+/// Pages where the loaded window shows them; sends the window did not reach still count, one each.
+function unreadPages(loaded: MyDelivery[], serverUnread: number): number {
+  const unreadSends = loaded.filter(countsAsUnread);
+  const pages = new Set(unreadSends.map((row) => row.response_id)).size;
+  return pages + Math.max(0, serverUnread - unreadSends.length);
+}
+
+/// `withOpen: false` re-reads History only: a filter flip changes neither the open pages nor the badge.
+async function fetchDeliveries(force = false, withOpen = true) {
   loading.value = true;
   const readId = ++latestDeliveriesRead;
+  const filtered = unreadOnly.value;
   try {
-    const data = await readQuery(
-      myDeliveriesQuery(orgId.value, unreadOnly.value ? { unread_only: true } : {}),
-      force,
-    );
+    const [data, unfiltered] = await Promise.all([
+      readQuery(myDeliveriesQuery(orgId.value, filtered ? { unread_only: true } : {}), force),
+      filtered && withOpen ? readQuery(myDeliveriesQuery(orgId.value), force) : null,
+    ]);
     if (readId !== latestDeliveriesRead) return;
     rows.value = data?.deliveries ?? [];
-    if (!unreadOnly.value) {
+    const all = filtered ? unfiltered : data;
+    if (all) {
+      allRows.value = all.deliveries ?? [];
       if (!openRows.value.length) rememberOpenShape("none");
       else rememberOpenShape(openPaged.value ? "paged" : "flat");
     }
-    // Pages, not sends: one page that reached the reader on three channels is one unread.
-    setUnread(new Set(rows.value.filter(countsAsUnread).map((row) => row.response_id)).size);
+    // From the unfiltered window and the server's total, so the badge is neither capped at 100 rows nor moved by the filter.
+    setUnread(unreadPages(allRows.value, data?.unread ?? 0));
     loadedOnce = true;
     loadError.value = null;
   } catch (err: unknown) {
@@ -600,6 +613,7 @@ async function fetchDeliveries(force = false) {
       return;
     }
     rows.value = [];
+    allRows.value = [];
     setUnread(0);
     loadError.value = apiErrorText(err);
   } finally {
@@ -614,7 +628,7 @@ function setUnread(count: number) {
 
 function setUnreadOnly(on: boolean) {
   unreadOnly.value = on;
-  void fetchDeliveries();
+  void fetchDeliveries(false, false);
 }
 
 /// The count travels back on the write, so the badge is right without a second
