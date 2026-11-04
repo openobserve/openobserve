@@ -304,6 +304,46 @@ describe("usePanelDrilldown", () => {
     expect(plain.hideChartTooltip).not.toHaveBeenCalled();
   });
 
+  it("formats date variables in a custom Logs drilldown query", async () => {
+    const deps = makeDeps();
+    deps.panelSchema.value.config.drilldown = [
+      {
+        name: "Logs",
+        type: "logs",
+        targetBlank: false,
+        data: {
+          logsMode: "custom",
+          logsQuery: `SELECT * FROM "default" WHERE a = '$d' AND b >= \${d:epochus} AND c = '\${t:epochus}'`,
+        },
+      } as any,
+    ];
+    deps.variablesData.value.values = [
+      { name: "d", type: "date", value: "2026-03-08", dateFormat: "dmy" },
+      { name: "t", type: "textbox", value: "2026-03-08" },
+    ] as any;
+    const api = usePanelDrilldown(deps as any);
+
+    await api.onChartClick({
+      componentType: "series",
+      event: { offsetX: 40, offsetY: 50 },
+      dataIndex: 0,
+      seriesName: "series-a",
+      value: ["x", 1],
+    });
+    await api.openDrilldown(0);
+
+    // the date variable prints in its own format (or the placeholder's); a text variable ignores the date format
+    await vi.waitFor(() =>
+      expect(deps.router.push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            query: `b64(SELECT * FROM "default" WHERE a = '08/03/2026' AND b >= 1772928000000000 AND c = '2026-03-08')`,
+          }),
+        }),
+      ),
+    );
+  });
+
   it("resolves variables sharing a name prefix in a custom Logs drilldown query", async () => {
     const deps = makeDeps();
     deps.panelSchema.value.config.drilldown = [

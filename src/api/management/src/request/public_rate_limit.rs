@@ -31,12 +31,13 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// How a client whose `RealIp` was not resolved shows up in logs.
 pub const UNKNOWN_IP: &str = "unknown";
-const MAX_KEYS: usize = 65_536;
+pub const MAX_KEYS: usize = 65_536;
 
 /// Hit counts per key in fixed windows, holding at most a fixed number of keys; a full map evicts
 /// the oldest window.
 pub struct Counters {
     max_keys: usize,
+    fail_open: bool,
     state: Mutex<CounterState>,
 }
 
@@ -44,13 +45,27 @@ impl Counters {
     pub fn new(max_keys: usize) -> Self {
         Self {
             max_keys,
+            fail_open: false,
             state: Mutex::new(CounterState::default()),
+        }
+    }
+
+    /// Fails open: a new key while the map is full is admitted untracked instead of evicting one.
+    pub fn fail_open(max_keys: usize) -> Self {
+        Self {
+            fail_open: true,
+            ..Self::new(max_keys)
         }
     }
 
     /// Counts one hit for `key`; true past its budget.
     pub fn over_budget(&self, key: &str, window: Duration, max: u32) -> bool {
-        self.over_budget_at(key, window, max, Instant::now())
+        self.over_budget_at(key, window, max, 1, Instant::now())
+    }
+
+    /// Counts `amount` units for `key`, for budgets measured in bytes rather than calls.
+    pub fn over_budget_by(&self, key: &str, window: Duration, max: u32, amount: u32) -> bool {
+        self.over_budget_at(key, window, max, amount, Instant::now())
     }
 
     /// Whether `key` already spent `max` hits in its window; counts nothing.
@@ -64,7 +79,14 @@ impl Counters {
             .is_some_and(|(n, at)| Instant::now().duration_since(*at) < window && *n >= max)
     }
 
-    fn over_budget_at(&self, key: &str, window: Duration, max: u32, now: Instant) -> bool {
+    fn over_budget_at(
+        &self,
+        key: &str,
+        window: Duration,
+        max: u32,
+        amount: u32,
+        now: Instant,
+    ) -> bool {
         let Ok(mut state) = self.state.lock() else {
             return false;
         };
@@ -83,7 +105,7 @@ impl Counters {
             if renewed {
                 *entry = (0, now);
             }
-            entry.0 = entry.0.saturating_add(1);
+            entry.0 = entry.0.saturating_add(amount);
             let over = entry.0 > max;
             if renewed {
                 state.order.push_back((key.to_owned(), now));
@@ -91,11 +113,14 @@ impl Counters {
             return over;
         }
         if state.hits.len() >= self.max_keys {
+            if self.fail_open {
+                return false;
+            }
             state.evict_oldest();
         }
-        state.hits.insert(key.to_owned(), (1, now));
+        state.hits.insert(key.to_owned(), (amount, now));
         state.order.push_back((key.to_owned(), now));
-        max == 0
+        amount > max
     }
 }
 
@@ -158,9 +183,9 @@ mod tests {
         let counters = Counters::new(2);
         let window = Duration::from_secs(60);
         let t0 = Instant::now();
-        assert!(!counters.over_budget_at("a", window, 1, t0));
-        assert!(!counters.over_budget_at("b", window, 1, t0 + Duration::from_secs(1)));
-        assert!(!counters.over_budget_at("c", window, 1, t0 + Duration::from_secs(2)));
+        assert!(!counters.over_budget_at("a", window, 1, 1, t0));
+        assert!(!counters.over_budget_at("b", window, 1, 1, t0 + Duration::from_secs(1)));
+        assert!(!counters.over_budget_at("c", window, 1, 1, t0 + Duration::from_secs(2)));
         {
             let state = counters.state.lock().unwrap();
             assert_eq!(state.hits.len(), 2);
@@ -168,11 +193,38 @@ mod tests {
             assert!(state.hits.contains_key("b") && state.hits.contains_key("c"));
         }
         assert!(
-            counters.over_budget_at("b", window, 1, t0 + Duration::from_secs(3)),
+            counters.over_budget_at("b", window, 1, 1, t0 + Duration::from_secs(3)),
             "a kept key keeps its count"
         );
-        assert!(!counters.over_budget_at("a", window, 1, t0 + Duration::from_secs(4)));
+        assert!(!counters.over_budget_at("a", window, 1, 1, t0 + Duration::from_secs(4)));
         assert!(!counters.state.lock().unwrap().hits.contains_key("b"));
+    }
+
+    #[test]
+    fn a_full_ip_map_fails_open() {
+        let counters = Counters::fail_open(2);
+        let window = Duration::from_secs(60);
+        let t0 = Instant::now();
+        assert!(!counters.over_budget_at("a", window, 1, 1, t0));
+        assert!(!counters.over_budget_at("b", window, 1, 1, t0));
+        assert!(!counters.over_budget_at("c", window, 1, 1, t0));
+        assert!(!counters.over_budget_at("c", window, 1, 1, t0));
+        assert!(
+            counters.over_budget_at("a", window, 1, 1, t0),
+            "keys already tracked keep their budget"
+        );
+        assert_eq!(counters.state.lock().unwrap().hits.len(), 2);
+    }
+
+    #[test]
+    fn byte_budget_counts_bytes_not_calls() {
+        let counters = Counters::default();
+        let window = Duration::from_secs(60);
+        assert!(!counters.over_budget_by("org", window, 1000, 600));
+        assert!(!counters.over_budget_by("org", window, 1000, 400));
+        assert!(counters.over_budget_by("org", window, 1000, 1));
+        assert!(!counters.over_budget_by("other", window, 1000, 1000));
+        assert!(counters.over_budget_by("big", window, 1000, 1001));
     }
 
     #[tokio::test]

@@ -20,12 +20,24 @@ import OTimeCell from "./OTimeCell.vue";
 
 const NOW = Date.UTC(2026, 9, 30, 12, 0, 0);
 const MIN = 60_000;
+const US = 1_792_575_542_000_000;
+
+const TooltipStub = {
+  name: "OTooltip",
+  template: `<i class="tip"><slot name="content" /></i>`,
+};
 
 const relative = (agoMs: number) =>
   mount(OTimeCell, {
     props: { value: NOW - agoMs, unit: "ms", now: NOW },
     global: { stubs: { OTooltip: true } },
   }).text();
+
+const mountCell = (props: Record<string, unknown>) =>
+  mount(OTimeCell, {
+    props: { value: US, unit: "us", mode: "absolute", timezone: "UTC", ...props },
+    global: { stubs: { OTooltip: TooltipStub } },
+  });
 
 describe("OTimeCell", () => {
   afterEach(() => {
@@ -43,5 +55,22 @@ describe("OTimeCell", () => {
   it("speaks the active UI language", () => {
     i18n.global.locale = "de";
     expect(relative(24 * MIN)).toBe("vor 24 Minuten");
+  });
+
+  it("absolute mode shows the full datetime and no tooltip", () => {
+    const w = mountCell({});
+    expect(w.find("span").text()).toBe("2026-10-21 09:39:02");
+    expect(w.find(".tip").exists()).toBe(false);
+  });
+
+  it("a format pattern shortens the absolute display and offers the full datetime on hover", () => {
+    const w = mountCell({ format: "MMM d, HH:mm" });
+    expect(w.find("span").text()).toBe("Oct 21, 09:39");
+    expect(w.find(".tip").text()).toBe("2026-10-21 09:39:02");
+  });
+
+  it("an empty value still shows the empty label with a format", () => {
+    const w = mountCell({ value: null, format: "MMM d, HH:mm" });
+    expect(w.text()).toBe("—");
   });
 });

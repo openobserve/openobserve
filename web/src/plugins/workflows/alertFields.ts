@@ -29,6 +29,8 @@ export interface WorkflowFieldOption {
   label: I18nText;
   value: string;
   type: string;
+  /** A non-selectable group heading in the field picker (OSelect `header`). */
+  header?: boolean;
 }
 
 // Schema of the fixed `meta` block the Alert Trigger emits per firing, shown

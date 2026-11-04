@@ -418,21 +418,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
             </div>
           </div>
-          <OButton
-            variant="outline"
-            size="icon-toolbar"
-            :disabled="!searchObj.data.queryResults?.hits?.length"
-            :title="t('traces.exportTraces')"
-            @click="downloadLogs"
-          >
-            <OIcon name="download" size="sm" />
-          </OButton>
           <ShareButton
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
             variant="outline"
             size="icon-toolbar"
             shortcut-id="tracesCopyUrl"
+          />
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                data-test="traces-search-bar-more-actions-btn"
+                class="hover:bg-interactive-hover-bg! size-[2.125rem]!"
+                variant="outline"
+                size="icon-toolbar"
+              >
+                <OIcon name="menu" size="sm" />
+                <OTooltip max-width="7rem" :content="t('search.moreActions')" />
+              </OButton>
+            </template>
+
+            <ODropdownGroup :label="t('search.menuGroupDownloads')">
+              <ODropdownItem
+                data-test="traces-search-bar-export-btn"
+                :disabled="!searchObj.data.queryResults?.hits?.length"
+                @select="downloadLogs"
+              >
+                <template #icon-left>
+                  <span
+                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  >
+                    <OIcon name="download" size="sm" />
+                  </span>
+                </template>
+                {{ t("traces.exportTraces") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+
+            <ODropdownSeparator />
+
+            <ODropdownGroup :label="t('search.menuGroupAlerts')">
+              <ODropdownItem
+                data-test="traces-create-alert-btn"
+                :disabled="!!createAlertDisabledReason"
+                focusable-unavailable
+                :description="createAlertDisabledReason || createAlertNote"
+                @select="onCreateAlert"
+              >
+                <template #icon-left>
+                  <span
+                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  >
+                    <OIcon :name="createAlertIcon" size="sm" />
+                  </span>
+                </template>
+                {{ t("alerts.prefill.sources.traces.label") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+
+            <ODropdownSeparator />
+
+            <ODropdownGroup :label="t('traces.redActions.menuGroupDashboards')">
+              <ODropdownItem
+                data-test="traces-add-red-to-dashboard-btn"
+                :disabled="!!redDashboardDisabledReason"
+                focusable-unavailable
+                :description="redDashboardDisabledReason"
+                @select="openRedDashboardDialog"
+              >
+                <template #icon-left>
+                  <span
+                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  >
+                    <OIcon name="dashboard" size="sm" />
+                  </span>
+                </template>
+                {{ t("traces.redActions.addRedToDashboard") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+          </ODropdown>
+          <AddToDashboard
+            v-if="redDashboardOpen"
+            v-model:open="redDashboardOpen"
+            :dashboard-panel-data="{ data: {} }"
+            :panels="redDashboardPanels"
+            :notice="redDashboardNotice"
           />
         </div>
 
@@ -528,13 +598,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @keydown.capture="onRecentEditorKeydown"
       >
         <OButton
-          v-if="!searchObj.meta.sqlMode"
+          v-if="!searchObj.meta.sqlMode && !nlpMode"
           :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
           data-test="traces-search-bar-filter-builder-toggle"
           :aria-pressed="filterBuilderOn"
           variant="ghost"
           size="icon-xs-sq"
-          class="absolute! top-0.75 right-1 z-51"
+          class="absolute! top-0.75 z-51"
+          :style="{ right: filterBuilderToggleRight }"
           @click="toggleFilterBuilder"
         >
           <OTooltip
@@ -557,18 +628,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @extra-select="pickRecentFilterRow"
           />
         </div>
-        <CodeQueryEditor
+        <UnifiedQueryEditor
           v-show="!showFilterBuilder"
           ref="queryEditorRef"
           editor-id="traces-query-editor"
+          data-test-prefix="traces-search-bar"
           v-model:query="searchObj.data.editorValue"
+          v-model:nlp-mode="nlpMode"
           :keywords="effectiveKeywords"
           :suggestions="effectiveSuggestions"
           :field-value-resolver="resolveFieldValues"
           :recent-queries="recentQueries"
           :debounce-time="100"
           :filter-mode="!searchObj.meta.sqlMode"
-          language="sql"
+          :hide-nl-toggle="!isAiEnabled"
+          :transform-generated-query="toTracesFilter"
+          editor-height="100%"
           @update:query="updateQueryValue"
           @user-edit="onRecentEditorEdit"
           @run-query="searchData"
@@ -592,7 +667,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.editorValue === '' &&
             searchObj.meta.queryEditorPlaceholderFlag &&
             !showFilterBuilder &&
-            !recentFocusOpen
+            !recentFocusOpen &&
+            !nlpMode
           "
           class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
         >
@@ -636,8 +712,15 @@ import {
   onActivated,
   computed,
   toRef,
+  shallowRef,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
+import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
+import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { nlSqlToTracesFilter } from "@/plugins/traces/utils/nlSqlToTracesFilter";
+import { chartInterval } from "./metrics/latencyHeatmap";
+import { buildTracesRedPanels, tracesBucketNotice } from "./metrics/tracesRedPanels";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -653,6 +736,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -735,12 +819,14 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
+    ODropdownGroup,
+    AddToDashboard: defineAsyncComponent(() => import("@/plugins/metrics/AddToDashboard.vue")),
     ODialog,
     OInput,
     OSwitch,
     OSelect,
     OTooltip,
-    CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
+    UnifiedQueryEditor: defineAsyncComponent(() => import("@/components/QueryEditor.vue")),
     SqlFilterBuilder,
     SyntaxGuide,
     RecentSearchesButton,
@@ -794,6 +880,16 @@ export default defineComponent({
 
     const { searchObj, tracesShareURL, tracesParser } = useTraces();
     const queryEditorRef = ref(null);
+
+    const nlpMode = ref(false);
+    const isAiEnabled = computed(
+      () => config.isEnterprise === "true" && Boolean(store.state.zoConfig.ai_enabled),
+    );
+    const toTracesFilter = (sql: string): string | null => {
+      const filter = nlSqlToTracesFilter(sql, tracesParser.value);
+      if (filter === null) toast({ message: t("traces.nlNeedsSql"), variant: "warning" });
+      return filter;
+    };
 
     const {
       onFocus: _sqlOnFocus,
@@ -921,6 +1017,10 @@ export default defineComponent({
       immediate: true,
     });
     const showFilterBuilder = computed(() => filterBuilderOn.value && !searchObj.meta.sqlMode);
+    // QueryEditor's floating AI button takes the corner slot while the editor is shown.
+    const filterBuilderToggleRight = computed(() =>
+      !showFilterBuilder.value && isAiEnabled.value ? "2.375rem" : "0.25rem",
+    );
     const filterBuilderFields = computed(() =>
       toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
     );
@@ -1199,6 +1299,50 @@ export default defineComponent({
       if (!downloaded) {
         toast({ message: t("traces.exportTracesFailed"), variant: "error" });
       }
+    };
+
+    const {
+      createAlert,
+      disabledReason: createAlertDisabledReason,
+      queryNotRun,
+    } = useTracesAlertAction();
+    const createAlertIcon = getAlertSource("traces").icon;
+    const createAlertNote = computed(() =>
+      queryNotRun.value ? t("search.queryActions.usesUnrunQuery") : null,
+    );
+    const onCreateAlert = () => {
+      if (!createAlertDisabledReason.value) createAlert("matches");
+    };
+
+    const redDashboardOpen = ref(false);
+    const redDashboardPanels = shallowRef([]);
+    const redDashboardNotice = ref(undefined);
+    const redDashboardDisabledReason = computed(() =>
+      searchObj.data.stream.selectedStream?.value
+        ? null
+        : t("alerts.prefill.sources.traces.noStream"),
+    );
+    const openRedDashboardDialog = () => {
+      const stream = searchObj.data.stream.selectedStream?.value;
+      if (!stream) return;
+      const view = searchObj.meta.searchMode === "spans" ? "spans" : "traces";
+      // Same bucket the RED charts compute for this range.
+      const interval = chartInterval(
+        searchObj.data.datetime.startTime,
+        searchObj.data.datetime.endTime,
+      );
+      const editorText = searchObj.data.editorValue ?? "";
+      redDashboardPanels.value = buildTracesRedPanels({
+        streamName: stream,
+        filter: resolveTracesFilter(editorText, tracesParser.value, stream),
+        filterText: editorText,
+        view,
+        interval,
+        rateUnit: t(`traces.metrics.perSecond.${view}`),
+      });
+      const { unit, count } = tracesBucketNotice(interval.seconds);
+      redDashboardNotice.value = t(`traces.redActions.bucketNotice.${unit}`, { count });
+      redDashboardOpen.value = true;
     };
 
     const updateTimezone = () => {
@@ -1539,6 +1683,9 @@ export default defineComponent({
       store,
       searchObj,
       queryEditorRef,
+      nlpMode,
+      isAiEnabled,
+      toTracesFilter,
       onQueryEditorFocus,
       onQueryEditorBlur,
       queryEditorBoxRef,
@@ -1561,6 +1708,15 @@ export default defineComponent({
       updateQueryValue,
       updateDateTime,
       downloadLogs,
+      createAlertDisabledReason,
+      createAlertNote,
+      createAlertIcon,
+      onCreateAlert,
+      redDashboardOpen,
+      redDashboardPanels,
+      redDashboardNotice,
+      redDashboardDisabledReason,
+      openRedDashboardDialog,
       setEditorValue,
       autoCompleteKeywords,
       effectiveKeywords,
@@ -1568,6 +1724,7 @@ export default defineComponent({
       filterBuilderOn,
       toggleFilterBuilder,
       showFilterBuilder,
+      filterBuilderToggleRight,
       filterBuilderFields,
       filterBuilderRef,
       loadFilterBuilderValues,

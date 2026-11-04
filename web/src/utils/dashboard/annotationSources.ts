@@ -21,6 +21,7 @@ import type {
 } from "@/ts/interfaces/dashboard";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
+  formatDateVariable,
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
 } from "@/utils/dashboard/variables/variablesUtils";
@@ -67,6 +68,9 @@ export type AnnotationRow = Record<string, unknown>;
 export interface AnnotationVariable {
   name: string;
   value: unknown;
+  /** Only read for `date` variables. */
+  type?: string;
+  dateFormat?: string;
 }
 
 export const defaultAnnotationSourceColor = (index: number): string =>
@@ -104,9 +108,9 @@ export const renderAnnotationTemplate = (
   variables: AnnotationVariable[] = [],
 ): RenderedTemplate => {
   if (!template) return { text: "", missing: [] };
-  const byName = new Map<string, unknown>();
+  const byName = new Map<string, AnnotationVariable>();
   variables.forEach((variable) => {
-    if (variable?.name && !byName.has(variable.name)) byName.set(variable.name, variable.value);
+    if (variable?.name && !byName.has(variable.name)) byName.set(variable.name, variable);
   });
   const missing: string[] = [];
   // {field} is resolved against the template itself so a variable's value can't be mistaken for one.
@@ -118,9 +122,10 @@ export const renderAnnotationTemplate = (
       return "";
     },
   );
-  const text = replaceVariablePlaceholders(withFields, byName.keys(), ({ name }) =>
-    variableDisplayValue(byName.get(name)),
-  );
+  const text = replaceVariablePlaceholders(withFields, byName.keys(), ({ name, format }) => {
+    const variable = byName.get(name);
+    return formatDateVariable(variable, format) ?? variableDisplayValue(variable?.value);
+  });
   return { text: text.trim(), missing };
 };
 

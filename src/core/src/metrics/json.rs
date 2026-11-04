@@ -47,7 +47,7 @@ use ingestion_common::{IngestionResponse, StreamStatus};
 use super::ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream};
 use crate::{
     common::meta::{authz::Authz, stream::SchemaRecords},
-    ingestion::{TriggerAlertData, check_ingestion_allowed},
+    ingestion::check_ingestion_allowed,
     pipeline::batch_execution::ExecutablePipeline,
 };
 
@@ -314,7 +314,7 @@ async fn buffer_stream_rows(
     (mut rows, first_type): (Vec<Row>, Option<&'static str>),
     lookups: &mut StreamLookups,
     partitions: &mut HashMap<String, SchemaRecords>,
-) -> Result<Option<TriggerAlertData>> {
+) -> Result<Option<ingest::StreamTriggers>> {
     if !lookups.partitions.contains_key(stream_name) {
         let keys =
             crate::ingestion::get_stream_partition_keys(org_id, &StreamType::Metrics, stream_name)
@@ -511,7 +511,7 @@ pub async fn ingest(
     }
 
     let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
-    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, Option<ingest::StreamTriggers>> = HashMap::new();
     for (stream_name, records) in records_by_stream {
         // redacted before finish_rows, so the series hash covers the stored values
         #[cfg(feature = "vectorscan")]

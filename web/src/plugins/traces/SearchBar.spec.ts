@@ -18,6 +18,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { ref, computed, reactive } from "vue";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import config from "@/aws-exports";
 
 // ---------------------------------------------------------------------------
 // Module-level mocks — vi.mock is hoisted by Vitest; never use vi.doMock here
@@ -33,6 +34,13 @@ vi.mock("@/services/product_analytics", () => ({
 
 vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "true" },
+}));
+
+const nlFilterMock = vi.hoisted(() =>
+  vi.fn((_sql: string, _parser: unknown): string | null => null),
+);
+vi.mock("@/plugins/traces/utils/nlSqlToTracesFilter", () => ({
+  nlSqlToTracesFilter: nlFilterMock,
 }));
 
 // getImageURL is called by the metricsIcon computed; stub to avoid asset loading.
@@ -300,6 +308,23 @@ vi.mock("@/composables/useTraces", () => ({
   }),
 }));
 
+const alertAction = vi.hoisted(() => ({
+  createAlert: vi.fn(),
+  disabledReason: { value: null as string | null },
+  queryNotRun: { value: false },
+}));
+
+vi.mock("@/plugins/traces/composables/useTracesAlertAction", async () => {
+  const { computed } = await import("vue");
+  return {
+    useTracesAlertAction: () => ({
+      createAlert: alertAction.createAlert,
+      disabledReason: computed(() => alertAction.disabledReason.value),
+      queryNotRun: computed(() => alertAction.queryNotRun.value),
+    }),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Import the component AFTER all vi.mock declarations.
 import queryHistory from "@/services/query_history";
@@ -344,7 +369,7 @@ const sharedStubs = {
       };
     },
   },
-  CodeQueryEditor: {
+  UnifiedQueryEditor: {
     // Monaco's caret element: the recent-searches dropdown opens at it.
     template:
       '<div data-test="code-query-editor-stub"><div class="monaco-editor"><div class="cursors-layer"><div class="cursor" /></div></div></div>',
@@ -361,8 +386,11 @@ const sharedStubs = {
       "filterMode",
       "debounceTime",
       "fieldValueResolver",
+      "hideNlToggle",
+      "nlpMode",
+      "transformGeneratedQuery",
     ],
-    emits: ["update:query", "run-query", "focus", "blur", "user-edit"],
+    emits: ["update:query", "run-query", "focus", "blur", "user-edit", "update:nlpMode"],
     setup(_: unknown, { emit }: { emit: (event: "focus") => void }) {
       return {
         setValue: vi.fn(),
@@ -423,6 +451,11 @@ const sharedStubs = {
     template: '<div v-bind="$attrs"><slot name="label-action" /><slot /></div>',
   },
   ODropdownSeparator: { template: "<hr />" },
+  AddToDashboard: {
+    name: "AddToDashboard",
+    template: '<div data-test="traces-add-to-dashboard-stub" />',
+    props: ["open", "panels", "notice", "dashboardPanelData"],
+  },
   ODropdownSub: {
     name: "ODropdownSub",
     template:
@@ -1458,8 +1491,7 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      // OButton: the download button uses title="Export Traces" (no .download-logs-btn class)
-      expect(wrapper.find('[title="traces.exportTraces"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-search-bar-export-btn"]').exists()).toBe(true);
     });
 
     it("should be disabled when queryResults.hits is empty", async () => {
@@ -1467,10 +1499,9 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      // OButton uses native HTML disabled attribute (not a CSS "disabled" class)
-      const btn = wrapper.find('[title="traces.exportTraces"]');
+      const btn = wrapper.find('[data-test="traces-search-bar-export-btn"]');
       expect(btn.exists()).toBe(true);
-      expect(btn.attributes("disabled")).toBeDefined();
+      expect(btn.attributes("disabled")).toBe("true");
     });
 
     it("should be enabled when queryResults.hits has entries", async () => {
@@ -1485,10 +1516,9 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      // OButton: when enabled, native disabled attribute should be absent
-      const btn = wrapper.find('[title="traces.exportTraces"]');
+      const btn = wrapper.find('[data-test="traces-search-bar-export-btn"]');
       expect(btn.exists()).toBe(true);
-      expect(btn.attributes("disabled")).toBeUndefined();
+      expect(btn.attributes("disabled")).toBe("false");
     });
 
     it("should export a traces-mode hit with a services object as aligned CSV", async () => {
@@ -1544,6 +1574,88 @@ describe("SearchBar", () => {
         message: "traces.exportTracesFailed",
         variant: "error",
       });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("more actions menu", () => {
+    const moreBtn = () => wrapper.find('[data-test="traces-search-bar-more-actions-btn"]');
+    const alertItem = () => wrapper.find('[data-test="traces-create-alert-btn"]');
+    const redItem = () => wrapper.find('[data-test="traces-add-red-to-dashboard-btn"]');
+
+    beforeEach(() => {
+      alertAction.createAlert.mockReset();
+      alertAction.disabledReason.value = null;
+      alertAction.queryNotRun.value = false;
+    });
+
+    it("renders the more actions trigger with Export, Create alert and Add RED charts inside", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(moreBtn().exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-search-bar-export-btn"]').exists()).toBe(true);
+      expect(alertItem().exists()).toBe(true);
+      expect(redItem().exists()).toBe(true);
+      expect(wrapper.find('[title="traces.exportTraces"]').exists()).toBe(false);
+    });
+
+    it("exports from the menu item", async () => {
+      downloadFileMock.mockReturnValue(true);
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await wrapper.find('[data-test="traces-search-bar-export-btn"]').trigger("click");
+      expect(downloadFileMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("hides the menu outside the spans and traces views", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(moreBtn().exists()).toBe(false);
+    });
+
+    it("creates a matches alert on select", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await alertItem().trigger("click");
+      expect(alertAction.createAlert).toHaveBeenCalledWith("matches");
+    });
+
+    it("disables Create alert with the reason when no stream is picked", async () => {
+      alertAction.disabledReason.value = "Pick a stream first";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(alertItem().attributes("disabled")).toBe("true");
+      expect(alertItem().attributes("description")).toBe("Pick a stream first");
+      await alertItem().trigger("click");
+      expect(alertAction.createAlert).not.toHaveBeenCalled();
+    });
+
+    it("notes when the query has not run yet", async () => {
+      alertAction.queryNotRun.value = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(alertItem().attributes("description")).toBe("search.queryActions.usesUnrunQuery");
+    });
+
+    it("opens Add to dashboard with Rate, Errors and Duration panels and the bucket notice", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      await redItem().trigger("click");
+      await flushPromises();
+      const dialog = wrapper.findComponent({ name: "AddToDashboard" });
+      expect(dialog.exists()).toBe(true);
+      const panels = dialog.props("panels") as any[];
+      expect(panels.map((p) => p.title.split(" · ")[0])).toEqual(["Rate", "Errors", "Duration"]);
+      expect(panels.every((p) => p.queries[0].fields.stream_type === "traces")).toBe(true);
+      expect(dialog.props("notice")).toBe("traces.redActions.bucketNotice.seconds");
+    });
+
+    it("disables Add RED charts when no stream is picked", async () => {
+      searchObjInstance.data.stream.selectedStream = { label: "", value: "" };
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(redItem().attributes("disabled")).toBe("true");
     });
   });
 
@@ -1617,6 +1729,92 @@ describe("SearchBar", () => {
       await wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]').trigger("click");
       await flushPromises();
       expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([null]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("plain-English filter (Ask AI) on the query editor", () => {
+    const editor = () => wrapper.findComponent({ ref: "queryEditorRef" });
+
+    afterEach(() => {
+      config.isEnterprise = "true";
+      delete store.state.zoConfig.ai_enabled;
+      nlFilterMock.mockReset();
+    });
+
+    it("keeps the Monaco host id the e2e helpers look for", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(editor().props("editorId")).toBe("traces-query-editor");
+    });
+
+    it("shows the AI toggle on an enterprise build with AI enabled", async () => {
+      store.state.zoConfig.ai_enabled = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(editor().props("hideNlToggle")).toBe(false);
+    });
+
+    it("hides the AI toggle when AI is off", async () => {
+      store.state.zoConfig.ai_enabled = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(editor().props("hideNlToggle")).toBe(true);
+    });
+
+    it("hides the AI toggle on a non-enterprise build", async () => {
+      store.state.zoConfig.ai_enabled = true;
+      config.isEnterprise = "false";
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(editor().props("hideNlToggle")).toBe(true);
+    });
+
+    it("writes only the WHERE part of the generated SQL into the editor", async () => {
+      nlFilterMock.mockReturnValue("service_name = 'querier'");
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const sql = "SELECT * FROM default WHERE service_name = 'querier' LIMIT 100";
+      expect(editor().props("transformGeneratedQuery")(sql)).toBe("service_name = 'querier'");
+      expect(nlFilterMock).toHaveBeenCalledWith(sql, tracesParserRef.value);
+      expect(toastMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps the user's text and says the question needs SQL when no filter fits", async () => {
+      nlFilterMock.mockReturnValue(null);
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const sql = "SELECT service_name, count(*) FROM default GROUP BY service_name";
+      expect(editor().props("transformGeneratedQuery")(sql)).toBeNull();
+      expect(toastMock).toHaveBeenCalledWith({
+        message: "traces.nlNeedsSql",
+        variant: "warning",
+      });
+    });
+
+    it("moves the builder toggle beside the AI button while the code editor shows, and hides it in AI mode", async () => {
+      store.state.zoConfig.ai_enabled = true;
+      searchObjInstance.meta.showQuery = true;
+      searchObjInstance.meta.sqlMode = false;
+      localStorage.setItem("o2.traces.queryInput", "query");
+      try {
+        wrapper = mountSearchBar();
+        await flushPromises();
+        const toggle = () => wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]');
+        expect(toggle().attributes("style")).toContain("right: 2.375rem");
+
+        await toggle().trigger("click");
+        await flushPromises();
+        expect(toggle().attributes("style")).toContain("right: 0.25rem");
+
+        await toggle().trigger("click");
+        await flushPromises();
+        editor().vm.$emit("update:nlpMode", true);
+        await flushPromises();
+        expect(toggle().exists()).toBe(false);
+      } finally {
+        localStorage.removeItem("o2.traces.queryInput");
+      }
     });
   });
 

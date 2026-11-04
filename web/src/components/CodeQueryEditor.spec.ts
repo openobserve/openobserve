@@ -153,6 +153,7 @@ vi.mock("@/composables/useLogs/searchState", () => ({
 
 const nlq = vi.hoisted(() => ({
   generateSQL: vi.fn(() => Promise.resolve(null as string | null)),
+  transformToSQL: vi.fn((_nl: string, sql: string) => `-- nl\n${sql}`),
   refusalNotice: null as unknown as { value: string },
   showErrorNotification: vi.fn(),
 }));
@@ -165,7 +166,7 @@ vi.mock("@/composables/useNLQuery", async () => {
     useNLQuery: () => ({
       detectNaturalLanguage: vi.fn(() => false),
       generateSQL: nlq.generateSQL,
-      transformToSQL: vi.fn((_nl: string, sql: string) => sql),
+      transformToSQL: nlq.transformToSQL,
       isGenerating: { value: false },
       streamingResponse: { value: "" },
       refusalNotice: nlq.refusalNotice,
@@ -481,6 +482,46 @@ describe("CodeQueryEditor", () => {
 
       expect(nlq.showErrorNotification).toHaveBeenCalledTimes(1);
       expect(nlq.showErrorNotification).toHaveBeenCalledWith(notice);
+      wrapper.unmount();
+    });
+  });
+
+  describe("generated query transform", () => {
+    const sql = "SELECT * FROM default WHERE a = 1 LIMIT 10";
+    const lastQuery = (wrapper: ReturnType<typeof createWrapper>) =>
+      wrapper.emitted("update:query")?.at(-1)?.[0];
+
+    it("writes the commented SQL by default, as Logs expects", async () => {
+      nlq.generateSQL.mockResolvedValueOnce(sql);
+      const wrapper = createWrapper();
+      await wrapper.vm.handleGenerateSQL("rows where a is 1");
+      expect(lastQuery(wrapper)).toBe(`-- nl\n${sql}`);
+      expect(wrapper.emitted("generation-success")?.[0]?.[0]).toEqual({
+        type: "sql",
+        message: sql,
+      });
+      wrapper.unmount();
+    });
+
+    it("writes the page's transform of the SQL instead", async () => {
+      nlq.generateSQL.mockResolvedValueOnce(sql);
+      nlq.transformToSQL.mockClear();
+      const transformGeneratedQuery = vi.fn(() => "a = 1");
+      const wrapper = createWrapper({ transformGeneratedQuery });
+      await wrapper.vm.handleGenerateSQL("rows where a is 1");
+      expect(transformGeneratedQuery).toHaveBeenCalledWith(sql);
+      expect(nlq.transformToSQL).not.toHaveBeenCalled();
+      expect(lastQuery(wrapper)).toBe("a = 1");
+      expect(wrapper.emitted("generation-success")).toHaveLength(1);
+      wrapper.unmount();
+    });
+
+    it("leaves the editor alone when the transform returns null", async () => {
+      nlq.generateSQL.mockResolvedValueOnce(sql);
+      const wrapper = createWrapper({ transformGeneratedQuery: () => null });
+      await wrapper.vm.handleGenerateSQL("count errors per service");
+      expect(wrapper.emitted("update:query")).toBeUndefined();
+      expect(wrapper.emitted("generation-success")).toBeUndefined();
       wrapper.unmount();
     });
   });

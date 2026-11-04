@@ -397,6 +397,8 @@ pub async fn host_route_middleware(
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Response {
+    use axum::response::IntoResponse;
+    use config::meta::feature::Feature;
     use o2_enterprise::enterprise::status_pages::host_routing::{
         HostRouteDecision, PageRoute, resolve_host_route,
     };
@@ -416,6 +418,18 @@ pub async fn host_route_middleware(
     match resolve_host_route(&host, &method, request.uri().path()).await {
         HostRouteDecision::Fallthrough => next.run(request).await,
         HostRouteDecision::NotConnected => domain_not_connected(),
+        HostRouteDecision::Page { .. }
+            if !o2_enterprise::enterprise::license::check_features(&[Feature::Synthetics]) =>
+        {
+            let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled(
+                <&str>::from(Feature::Synthetics).to_owned(),
+            );
+            (
+                StatusCode::FORBIDDEN,
+                Json(common::meta::http::HttpResponse::error_code(err)),
+            )
+                .into_response()
+        }
         HostRouteDecision::Page { slug, route } => {
             // The RealIp layer sits outside this one, so the resolved visitor IP is already on the
             // request.

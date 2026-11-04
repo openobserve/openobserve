@@ -112,6 +112,17 @@ describe("renderAnnotationTemplate", () => {
     ).toEqual({ text: "prod/us, eu: x", missing: [] });
   });
 
+  it("prints a date variable in its format, or the placeholder's", () => {
+    const variables = [
+      { name: "from", type: "date", value: "2026-03-08", dateFormat: "dmy" },
+      { name: "note", type: "textbox", value: "2026-03-08" },
+    ];
+    expect(
+      renderAnnotationTemplate("$from | ${from:epoch} | ${note:dmy} | [{a}]", { a: "1" }, variables)
+        .text,
+    ).toBe("08/03/2026 | 1772928000 | 2026-03-08 | [1]");
+  });
+
   it("leaves an unknown $name as written and does not read it as a field", () => {
     expect(renderAnnotationTemplate("cost $5 {a}", { a: "1" }).text).toBe("cost $5 1");
   });

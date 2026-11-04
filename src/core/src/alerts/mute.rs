@@ -84,7 +84,8 @@ pub async fn mute(
     let now = now_micros();
     let ends_at = requested_end(req.until_clear, req.minutes, req.ends_at, now)?;
     let groups = requested_groups(target, req).await?;
-    let rows = db::downtimes::list_cached(&target.org_id);
+    // The primary, so a mute made moments ago is seen; two at the same instant can still race.
+    let rows = downtimes::primary_rows(&target.org_id).await?;
     if let Some(live) = covering_mute(&rows, &target.alert_id, groups.as_deref(), now) {
         return Err(MuteError::Conflict(AlertMuteConflict::AlreadyMuted {
             downtime_id: live.id.clone(),
